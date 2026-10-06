@@ -13,6 +13,26 @@ public sealed class RoamingNetworkChangeSetTests
     private static JsonElement Json(string value) => JsonDocument.Parse(value).RootElement.Clone();
 
     [Test]
+    public void RoamingNetworks_json_serialization_enumerates_the_source_once()
+    {
+        var network = new RoamingNetwork(RoamingNetwork_Id.Parse("test-network"));
+        var enumerationCount = 0;
+
+        IEnumerable<RoamingNetwork> SingleUseSource()
+        {
+            if (++enumerationCount > 1)
+                throw new InvalidOperationException("The source can only be enumerated once.");
+
+            yield return network;
+        }
+
+        var json = RoamingNetworkExtensions2.ToJSON(SingleUseSource());
+
+        Assert.That(json, Has.Count.EqualTo(1));
+        Assert.That(enumerationCount, Is.EqualTo(1));
+    }
+
+    [Test]
     public void ChangeSet_round_trips_operations_payloads_and_signature()
     {
         var set = new RoamingNetworkChangeSet(

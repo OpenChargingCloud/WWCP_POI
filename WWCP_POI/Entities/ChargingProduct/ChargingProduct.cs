@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 using Newtonsoft.Json.Linq;
 
@@ -223,6 +224,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        /// <summary>Parse a charging product, including optional duration, power, energy and cost limits.</summary>
+        public static ChargingProduct Parse(JObject JSON)
+        {
+            if (TryParse(JSON, out var product, out var error))
+                return product;
+            throw new ArgumentException($"Invalid charging product JSON: {error}", nameof(JSON));
+        }
+
         public static Boolean TryParse(JObject                                    JSON,
                                        [NotNullWhen(true)]  out ChargingProduct?  ChargingProduct,
                                        [NotNullWhen(false)] out String?           ErrorResponse)
@@ -252,18 +261,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                if (!JsonValueParsing.TryReadOptional(JSON, "minDuration", TryParseSeconds,
+                                                      out TimeSpan? minDuration, out ErrorResponse) ||
+                    !JsonValueParsing.TryReadOptional(JSON, "stopChargingAfterTime", TryParseSeconds,
+                                                      out TimeSpan? stopChargingAfterTime, out ErrorResponse) ||
+                    !JsonValueParsing.TryReadOptional(JSON, "minPower", Watt.TryParse,
+                                                      out Watt? minPower, out ErrorResponse) ||
+                    !JsonValueParsing.TryReadOptional(JSON, "maxPower", Watt.TryParse,
+                                                      out Watt? maxPower, out ErrorResponse) ||
+                    !JsonValueParsing.TryReadOptional(JSON, "minEnergy", WattHour.TryParse,
+                                                      out WattHour? minEnergy, out ErrorResponse) ||
+                    !JsonValueParsing.TryReadOptional(JSON, "stopChargingAfterKWh", WattHour.TryParse,
+                                                      out WattHour? stopChargingAfterKWh, out ErrorResponse) ||
+                    !JsonValueParsing.TryReadOptional(JSON, "maxB2BServiceCosts", TryParseCosts,
+                                                      out Decimal? maxB2BServiceCosts, out ErrorResponse))
+                    return false;
+
+                var intermediateToken = JSON["intermediateCDRs"];
+                if (intermediateToken is not null && intermediateToken.Type is not (JTokenType.Boolean or JTokenType.Null))
+                {
+                    ErrorResponse = "Invalid 'intermediateCDRs': expected a boolean.";
+                    return false;
+                }
+                Boolean? intermediateCDRs = intermediateToken?.Type == JTokenType.Boolean
+                                                ? intermediateToken.Value<Boolean>()
+                                                : null;
 
                 ChargingProduct = new ChargingProduct(
 
                                       Id,
-                                      null, //MinDuration,
-                                      null, //StopChargingAfterTime,
-                                      null, //MinPower,
-                                      null, //MaxPower,
-                                      null, //MinEnergy,
-                                      null, //StopChargingAfterKWh,
-                                      null, //MaxB2BServiceCosts,
-                                      null  //IntermediateCDRs
+                                      minDuration,
+                                      stopChargingAfterTime,
+                                      minPower,
+                                      maxPower,
+                                      minEnergy,
+                                      stopChargingAfterKWh,
+                                      maxB2BServiceCosts,
+                                      intermediateCDRs
 
                                   );
 
@@ -279,6 +313,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return false;
 
         }
+
+        private static Boolean TryParseSeconds(String text, out TimeSpan duration)
+        {
+            duration = default;
+            if (!Double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) ||
+                !Double.IsFinite(seconds))
+                return false;
+            duration = TimeSpan.FromSeconds(seconds);
+            return true;
+        }
+
+        private static Boolean TryParseCosts(String text, out Decimal costs)
+            => Decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out costs);
 
 
         #region Operator overloading

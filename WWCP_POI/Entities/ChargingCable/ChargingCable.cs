@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 using Newtonsoft.Json.Linq;
 
@@ -171,54 +172,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 ChargingCable = default;
 
-                if (JSON?.HasValues != true)
+                if (JSON is null)
                 {
-                    ErrorResponse = "The given JSON object must not be null or empty!";
+                    ErrorResponse = "The given JSON object must not be null!";
                     return false;
                 }
 
                 #region Parse Length                            [optional]
 
-                JSON.ParseOptional("length",
-                                   "charging cable length",
-                                   Meter.TryParse,
-                                   out Meter? length,
-                                   out ErrorResponse);
-
-                if (ErrorResponse is not null)
+                if (!JsonValueParsing.TryReadOptional(JSON, "length", Meter.TryParse,
+                                                      out Meter? length, out ErrorResponse))
                     return false;
 
                 #endregion
 
                 #region Parse Resistance                        [optional]
 
-                JSON.ParseOptional("resistance",
-                                   "charging cable resistance",
-                                   Ohm.TryParse,
-                                   out Ohm? resistance,
-                                   out ErrorResponse);
-
-                if (ErrorResponse is not null)
+                // The wire format expresses cable resistance in microohms.
+                if (!JsonValueParsing.TryReadOptional(JSON, "resistance", Ohm.TryParse_µΩ,
+                                                      out Ohm? resistance, out ErrorResponse))
                     return false;
 
                 #endregion
 
                 #region Parse LossCompensationName              [optional]
 
-                var lossCompensationName = JSON["lossCompensationName"]?.Value<String>();
+                var nameToken = JSON["lossCompensationName"];
+                if (nameToken is not null && nameToken.Type is not (JTokenType.String or JTokenType.Null))
+                {
+                    ErrorResponse = "Invalid 'lossCompensationName': expected a string.";
+                    return false;
+                }
+                var lossCompensationName = nameToken?.Value<String>();
 
                 #endregion
 
                 #region Parse LossCompensationIdentification    [optional]
 
-                if (JSON.ParseOptional("lossCompensationIdentification",
-                                       "loss compensation identification",
-                                       out Int64? lossCompensationIdentification,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
+                if (!JsonValueParsing.TryReadOptional(JSON, "lossCompensationIdentification",
+                    (String text, out Int64 value) => Int64.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value),
+                    out Int64? lossCompensationIdentification, out ErrorResponse))
+                    return false;
 
                 #endregion
 

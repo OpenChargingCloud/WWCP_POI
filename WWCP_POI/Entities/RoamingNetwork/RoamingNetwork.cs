@@ -79,7 +79,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Initial checks
 
-            if (RoamingNetworks is null || !RoamingNetworks.Any())
+            if (RoamingNetworks is null)
                 return [];
 
             #endregion
@@ -231,7 +231,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region EMobilityProviders
 
-        private readonly ConcurrentDictionary<EMobilityProvider_Id, EMobilityProvider> eMobilityProviders;
+        private readonly ConcurrentDictionary<EMobilityProvider_Id, EMobilityProvider> eMobilityProviders = [];
 
         /// <summary>
         /// Return all e-mobility providers registered within this roaming network.
@@ -455,7 +455,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ChargingStationOperators
 
-        private readonly ConcurrentDictionary<ChargingStationOperator_Id, ChargingStationOperator> chargingStationOperators;
+        private readonly ConcurrentDictionary<ChargingStationOperator_Id, ChargingStationOperator> chargingStationOperators = [];
 
         /// <summary>
         /// Return all charging station operators registered within this roaming network.

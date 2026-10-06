@@ -274,7 +274,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (TryParse(JSON,
                          out var chargingConnector,
                          out var errorResponse,
-                         CustomChargingConnectorParser))
+                         CustomChargingConnectorParser,
+                         CustomChargingCableParser))
             {
                 return chargingConnector;
             }
@@ -360,7 +361,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (JSON.ParseOptionalJSON("cable",
                                            "charging cable",
-                                           ChargingCable.TryParse,
+                                           (JObject cableJSON, out ChargingCable? cable, out String? error) =>
+                                               ChargingCable.TryParse(cableJSON, out cable, out error, CustomChargingCableParser),
                                            out ChargingCable? chargingCable,
                                            out ErrorResponse))
                 {
@@ -462,6 +464,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                ChargingCable is not null
                                    ? new JProperty("cable",                ChargingCable.ToJSON(Embedded:  true,
                                                                                                 CustomChargingCableSerializer))
+                                   : null,
+
+                               Lockable.HasValue
+                                   ? new JProperty("lockable",             Lockable.Value)
                                    : null,
 
                                TariffIds.Any()

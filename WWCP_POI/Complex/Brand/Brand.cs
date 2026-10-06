@@ -73,7 +73,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// This is meant to be one electrical circuit which can charge a electric vehicle
     /// independently. Thus there could be multiple interdependent power sockets.
     /// </summary>
-    public class Brand : IHasId<Brand_Id>,
+    public partial class Brand : IHasId<Brand_Id>,
                          //IEntity<Brand_Id>,
                          IEquatable<Brand>,
                          IComparable<Brand>,

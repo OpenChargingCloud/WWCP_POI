@@ -17,6 +17,8 @@
 
 #region Usings
 
+using System.Collections.Immutable;
+
 using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -55,7 +57,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     }
 
 
-    public class AuthenticationModes : IEquatable<AuthenticationModes>,
+    public partial class AuthenticationModes : IEquatable<AuthenticationModes>,
                                        IComparable<AuthenticationModes>,
                                        IComparable
     {
@@ -90,20 +92,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             {
 
-                this.CardTypes  = CardTypes ?? new RFIDCardTypes[] { CardType };
-                this.BrandIds   = BrandIds  ?? new Brand_Id[0];
+                this.CardTypes  = ImmutableArray.Create(CardType);
+                this.BrandIds   = ImmutableArray<Brand_Id>.Empty;
 
             }
 
             public RFID(IEnumerable<RFIDCardTypes>  CardTypes,
-                        IEnumerable<Brand_Id>       BrandIds = null)
+                        IEnumerable<Brand_Id>?      BrandIds = null)
 
                 : base("RFID")
 
             {
 
-                this.CardTypes  = CardTypes ?? new RFIDCardTypes[0];
-                this.BrandIds   = BrandIds  ?? new Brand_Id[0];
+                this.CardTypes  = (CardTypes ?? []).ToImmutableArray();
+                this.BrandIds   = (BrandIds  ?? []).ToImmutableArray();
 
             }
 
@@ -285,7 +287,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             {
 
-                if (Number.IsNullOrEmpty())
+                if (String.IsNullOrWhiteSpace(Number))
                     throw new ArgumentNullException(nameof(Number), "The given SMS telephone number must not be null or empty!");
 
                 this.Number       = Number;
@@ -335,6 +337,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             {
 
+                ArgumentException.ThrowIfNullOrWhiteSpace(Number);
                 this.Number = Number;
 
             }
@@ -367,6 +370,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         public AuthenticationModes(String Type)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(Type);
             this.Type = Type;
         }
 

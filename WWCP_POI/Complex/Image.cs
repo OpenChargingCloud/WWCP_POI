@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 using Newtonsoft.Json.Linq;
 
@@ -231,27 +232,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Width       [optional]
 
-                if (JSON.ParseOptional("width",
-                                       "image width",
-                                       out UInt16? Width,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
+                if (!JsonValueParsing.TryReadOptional(JSON, "width", TryParseDimension,
+                                                      out UInt16? Width, out ErrorResponse))
+                    return false;
 
                 #endregion
 
                 #region Parse Height      [optional]
 
-                if (JSON.ParseOptional("height",
-                                       "image height",
-                                       out UInt16? Height,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
+                if (!JsonValueParsing.TryReadOptional(JSON, "height", TryParseDimension,
+                                                      out UInt16? Height, out ErrorResponse))
+                    return false;
 
                 #endregion
 
@@ -297,6 +288,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         #endregion
+
+        private static Boolean TryParseDimension(String text, out UInt16 dimension)
+            => UInt16.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out dimension);
 
         #region ToJSON(CustomImageSerializer = null)
 

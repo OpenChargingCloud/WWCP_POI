@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 using Newtonsoft.Json.Linq;
 
@@ -174,12 +175,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Latitude     [mandatory]
 
-                if (!JSON.ParseMandatory("latitude",
-                                         "latitude",
-                                         org.GraphDefined.Vanaheimr.Aegir.Latitude.TryParse,
-                                         out Latitude Latitude,
-                                         out ErrorResponse))
+                if (!JsonValueParsing.TryReadOptional(JSON, "latitude", TryParseLatitude,
+                                                      out Latitude? latitude, out ErrorResponse) ||
+                    !latitude.HasValue || !Double.IsFinite(latitude.Value.Value) ||
+                    latitude.Value.Value < -90 || latitude.Value.Value > 90)
                 {
+                    ErrorResponse ??= "Invalid or missing 'latitude': expected a value between -90 and 90.";
                     return false;
                 }
 
@@ -187,16 +188,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Longitude    [mandatory]
 
-                if (!JSON.ParseMandatory("longitude",
-                                         "longitude",
-                                         org.GraphDefined.Vanaheimr.Aegir.Longitude.TryParse,
-                                         out Longitude Longitude,
-                                         out ErrorResponse))
+                if (!JsonValueParsing.TryReadOptional(JSON, "longitude", TryParseLongitude,
+                                                      out Longitude? longitude, out ErrorResponse) ||
+                    !longitude.HasValue || !Double.IsFinite(longitude.Value.Value) ||
+                    longitude.Value.Value < -180 || longitude.Value.Value > 180)
                 {
+                    ErrorResponse ??= "Invalid or missing 'longitude': expected a value between -180 and 180.";
                     return false;
                 }
 
                 #endregion
+
+                if (!JsonValueParsing.TryReadOptional(JSON, "altitude", TryParseAltitude,
+                                                      out Altitude? altitude, out ErrorResponse) ||
+                    (altitude.HasValue && !Double.IsFinite(altitude.Value.Value)))
+                {
+                    ErrorResponse ??= "Invalid 'altitude': expected a finite value in metres.";
+                    return false;
+                }
 
                 #region Parse Name         [optional]
 
@@ -215,8 +224,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 AdditionalGeoLocation = new AdditionalGeoLocation(
                                             new GeoCoordinate(
-                                                Latitude,
-                                                Longitude
+                                                latitude.Value,
+                                                longitude.Value,
+                                                altitude
                                             ),
                                             Name
                                         );
@@ -240,6 +250,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        private static Boolean TryParseFiniteNumber(String text, out Double number)
+            => Double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out number) && Double.IsFinite(number);
+
+        private static Boolean TryParseLatitude(String text, out Latitude latitude)
+        {
+            latitude = default;
+            return TryParseFiniteNumber(text, out var number) && Latitude.TryParse(number, out latitude);
+        }
+
+        private static Boolean TryParseLongitude(String text, out Longitude longitude)
+        {
+            longitude = default;
+            return TryParseFiniteNumber(text, out var number) && Longitude.TryParse(number, out longitude);
+        }
+
+        private static Boolean TryParseAltitude(String text, out Altitude altitude)
+        {
+            altitude = default;
+            return TryParseFiniteNumber(text, out var number) && Altitude.TryParse(number, out altitude);
+        }
+
         #region ToJSON(CustomAdditionalGeoLocationSerializer = null)
 
         /// <summary>
@@ -251,8 +282,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var JSON = JSONObject.Create(
 
-                                 new JProperty("latitude",   GeoLocation.Latitude. Value.ToString()),
-                                 new JProperty("longitude",  GeoLocation.Longitude.Value.ToString()),
+                                 new JProperty("latitude",   GeoLocation.Latitude. Value.ToString("R", CultureInfo.InvariantCulture)),
+                                 new JProperty("longitude",  GeoLocation.Longitude.Value.ToString("R", CultureInfo.InvariantCulture)),
+
+                           GeoLocation.Altitude.HasValue
+                               ? new JProperty("altitude",   GeoLocation.Altitude.Value.Value)
+                               : null,
 
                            Name.IsNotNullOrEmpty()
                                ? new JProperty("name",       Name.                       ToJSON())

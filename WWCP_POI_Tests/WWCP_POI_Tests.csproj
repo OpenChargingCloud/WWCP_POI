@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\WWCP_POI\ChangeSets\RoamingNetworkChangeSet.cs" Link="ChangeSets\RoamingNetworkChangeSet.cs" />
+    <ProjectReference Include="..\WWCP_POI\WWCP_POI.csproj" />
   </ItemGroup>
 
 </Project>
