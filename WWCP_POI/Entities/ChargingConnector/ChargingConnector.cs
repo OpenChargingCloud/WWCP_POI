@@ -387,6 +387,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse TariffIds             [optional]
 
+                if (JSON["tariffIds"] is JArray tariffReferences)
+                {
+                    var seen = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (var token in tariffReferences)
+                    {
+                        if (token.Type != JTokenType.String || !ChargingTariff_Id.TryParse(token.Value<string>()!, out var tariffId))
+                        {
+                            ErrorResponse = "tariffIds: invalid tariff identifier.";
+                            return false;
+                        }
+                        if (!seen.Add(InfrastructureChangeSchema.Identity(InfrastructureEntityType.ChargingTariff, tariffId.ToString())))
+                        {
+                            ErrorResponse = "tariffIds: duplicate tariff reference.";
+                            return false;
+                        }
+                    }
+                }
+
                 if (JSON.ParseOptionalHashSet("tariffIds",
                                               "charging tariff identifications",
                                               ChargingTariff_Id.TryParse,

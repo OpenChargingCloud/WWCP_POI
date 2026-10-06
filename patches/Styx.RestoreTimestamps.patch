@@ -1,0 +1,16 @@
+diff --git a/Styx/Illias/Helpers/AInternalData.cs b/Styx/Illias/Helpers/AInternalData.cs
+index 37b60f0..31dd0ae 100644
+--- a/Styx/Illias/Helpers/AInternalData.cs
++++ b/Styx/Illias/Helpers/AInternalData.cs
+@@ -466,2 +466,11 @@ namespace org.GraphDefined.Vanaheimr.Illias
++        /// <summary>
++        /// Restore persisted timestamps without recording a new change or raising events.
++        /// Intended for deserialization into a newly constructed entity.
++        /// </summary>
++        protected void RestoreTimestamps(DateTimeOffset Created, DateTimeOffset LastChange)
++        {
++            this.created    = Created;
++            this.lastChange = LastChange;
++        }
+         protected void CloneFrom(AInternalData InternalData)
+         {

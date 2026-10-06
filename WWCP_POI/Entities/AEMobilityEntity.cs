@@ -46,6 +46,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     {
 
+        /// <summary>Restore persisted timestamps on a newly parsed entity without recording a change.</summary>
+        internal void RestoreSnapshotTimestamps(DateTimeOffset? created, DateTimeOffset? lastChange)
+            => RestoreTimestamps(created ?? Created, lastChange ?? LastChangeDate);
+
         #region Data
 
         /// <summary>
@@ -310,7 +314,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.Id          = Id;
             this.eTag        = null;
-            this.DataSource  = DataSource;
+            // Construction is not a data change; preserve the supplied creation/change timestamps.
+            this.dataSource  = DataSource;
 
 
             #region Name

@@ -18,6 +18,7 @@
 #region Usings
 
 using Newtonsoft.Json.Linq;
+using System.Collections.Immutable;
 
 using org.GraphDefined.Vanaheimr.Illias;
 
@@ -29,7 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A charging tariff element.
     /// </summary>
-    public struct ChargingTariffElement
+    public readonly partial struct ChargingTariffElement
     {
 
         #region Properties
@@ -76,13 +77,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Initial checks
 
-            if (!ChargingPriceComponents.Any())
+            ArgumentNullException.ThrowIfNull(ChargingPriceComponents);
+            var components = ChargingPriceComponents.ToImmutableArray();
+            if (components.IsEmpty)
                 throw new ArgumentNullException(nameof(ChargingPriceComponents),  "The given enumeration must not be empty!");
 
             #endregion
 
-            this.ChargingPriceComponents     = ChargingPriceComponents;
-            this.ChargingTariffRestrictions  = ChargingTariffRestrictions ?? Array.Empty<ChargingTariffRestriction>();
+            foreach (var component in components)
+                if (component.StepSize == 0 || !Enum.IsDefined(component.Type))
+                    throw new ArgumentException("Invalid price component.", nameof(ChargingPriceComponents));
+            var restrictions = ChargingTariffRestrictions?.ToImmutableArray() ?? [];
+            if (restrictions.Any(restriction => restriction is null))
+                throw new ArgumentException("Restrictions must not contain null.", nameof(ChargingTariffRestrictions));
+            this.ChargingPriceComponents     = components;
+            this.ChargingTariffRestrictions  = restrictions;
 
         }
 
@@ -97,12 +106,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingTariffRestriction">A tariff restriction.</param>
         public ChargingTariffElement(ChargingPriceComponent     ChargingPriceComponent,
                                      ChargingTariffRestriction  ChargingTariffRestriction)
-        {
-
-            this.ChargingPriceComponents     = new[] { ChargingPriceComponent };
-            this.ChargingTariffRestrictions  = new[] { ChargingTariffRestriction };
-
-        }
+            : this([ChargingPriceComponent], [ChargingTariffRestriction])
+        { }
 
         #endregion
 

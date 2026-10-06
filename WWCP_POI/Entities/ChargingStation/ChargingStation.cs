@@ -99,7 +99,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A charging station to charge an electric vehicle.
     /// </summary>
-    public class ChargingStation : AEMobilityEntity<ChargingStation_Id,
+    public partial class ChargingStation : AEMobilityEntity<ChargingStation_Id,
                                                     ChargingStationAdminStatusType,
                                                     ChargingStationStatusType>,
                                    IEquatable <ChargingStation>,
@@ -1387,7 +1387,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                DateTimeOffset?                                LastChange                     = null,
 
                                CustomDataNew?                                 CustomData                     = null,
-                               UserDefinedDictionary?                         InternalData                   = null)
+                               UserDefinedDictionary?                         InternalData                   = null,
+                               IEnumerable<DataLicense>?                      DataLicenses                   = null)
 
             : base(Id,
                    Name,
@@ -2707,7 +2708,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    ? new JProperty("dataSource",    DataSource)
                                    : null,
 
-                               !Embedded && DataLicenses != ChargingPool?.DataLicenses && DataLicenses.Any()
+                               DataLicenses.Any()
                                    ? ExpandDataLicenses.Switch(
                                        () => new JProperty("dataLicenseIds",  new JArray(DataLicenses.SafeSelect(dataLicense => dataLicense.Id.ToString()))),
                                        () => new JProperty("dataLicenses",    DataLicenses.ToJSON()))
@@ -2749,10 +2750,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                                                      ExpandDataLicenses:                ExpandDataLicenses)))
                                    : null,
 
-                               (!Embedded || GeoLocation         != ChargingPool?.GeoLocation)         ? new JProperty("geoLocation",          (GeoLocation ?? ChargingPool.GeoLocation).Value.  ToJSON(Embedded: true)) : null,
-                               (!Embedded || Address             != ChargingPool?.Address)             ? new JProperty("address",              (Address     ?? ChargingPool.Address).            ToJSON(Embedded: true)) : null,
+                               GeoLocation.HasValue && (!Embedded || ChargingPool?.GeoLocation.HasValue != true ||
+                                   !JToken.DeepEquals(GeoLocation.Value.ToJSON(), ChargingPool.GeoLocation.Value.ToJSON()))
+                                   ? new JProperty("geoLocation", GeoLocation.Value.ToJSON(Embedded: true)) : null,
+                               Address is not null && (!Embedded || Address != ChargingPool?.Address) ? new JProperty("address", Address.ToJSON(Embedded: true)) : null,
                                (!Embedded || AuthenticationModes != ChargingPool?.AuthenticationModes) ? new JProperty("authenticationModes",  AuthenticationModes.ToJSON())   : null,
-                               (!Embedded || HotlinePhoneNumber  != ChargingPool?.HotlinePhoneNumber)  ? new JProperty("hotlinePhoneNumber",   HotlinePhoneNumber. ToString()) : null,
+                               HotlinePhoneNumber.HasValue && (!Embedded || HotlinePhoneNumber != ChargingPool?.HotlinePhoneNumber) ? new JProperty("hotlinePhoneNumber", HotlinePhoneNumber.ToString()) : null,
                                (!Embedded || OpeningTimes        != ChargingPool?.OpeningTimes)        ? new JProperty("openingTimes",         OpeningTimes.       ToJSON())   : null,
 
                                IsFreeOfCharge

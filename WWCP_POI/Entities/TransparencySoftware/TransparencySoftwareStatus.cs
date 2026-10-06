@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 using Newtonsoft.Json.Linq;
 
@@ -33,7 +34,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// The transparency software status.
     /// This information will e.g. be used for the German Calibration Law.
     /// </summary>
-    public class TransparencySoftwareStatus : IEquatable<TransparencySoftwareStatus>,
+    public partial class TransparencySoftwareStatus : IEquatable<TransparencySoftwareStatus>,
                                               IComparable<TransparencySoftwareStatus>,
                                               IComparable
     {
@@ -68,13 +69,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The timestamp when the certificate becomes valid.
         /// </summary>
         [Optional]
-        public DateTime?             NotBefore               { get; }
+        public DateTimeOffset?       NotBefore               { get; }
 
         /// <summary>
         /// The timestamp when the certificate becomes invalid.
         /// </summary>
         [Optional]
-        public DateTime?             NotAfter                { get; }
+        public DateTimeOffset?       NotAfter                { get; }
 
         #endregion
 
@@ -93,16 +94,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           LegalStatus           LegalStatus,
                                           String?               Certificate         = null,
                                           String?               CertificateIssuer   = null,
-                                          DateTime?             NotBefore           = null,
-                                          DateTime?             NotAfter            = null)
+                                          DateTimeOffset?       NotBefore           = null,
+                                          DateTimeOffset?       NotAfter            = null)
         {
-
+            ArgumentNullException.ThrowIfNull(TransparencySoftware);
+            if (LegalStatus.IsNullOrEmpty)
+                throw new ArgumentException("A legal status is required.", nameof(LegalStatus));
+            if (NotBefore > NotAfter)
+                throw new ArgumentException("notBefore must not be later than notAfter.", nameof(NotAfter));
             this.TransparencySoftware  = TransparencySoftware;
             this.LegalStatus           = LegalStatus;
             this.Certificate           = Certificate;
             this.CertificateIssuer     = CertificateIssuer;
-            this.NotBefore             = NotBefore;
-            this.NotAfter              = NotAfter;
+            this.NotBefore             = NotBefore?.ToUniversalTime();
+            this.NotAfter              = NotAfter?.ToUniversalTime();
 
         }
 
@@ -117,13 +122,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="CustomTransparencySoftwareStatusParser">An optional delegate to parse custom transparency software status JSON objects.</param>
         public static TransparencySoftwareStatus Parse(JObject                                                   JSON,
-                                                       CustomJObjectParserDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusParser   = null)
+                                                       CustomJObjectParserDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusParser = null,
+                                                       CustomJObjectParserDelegate<TransparencySoftware>?        CustomTransparencySoftwareParser       = null)
         {
 
             if (TryParse(JSON,
                          out var transparencySoftwareStatus,
                          out var errorResponse,
-                         CustomTransparencySoftwareStatusParser))
+                         CustomTransparencySoftwareStatusParser,
+                         CustomTransparencySoftwareParser))
             {
                 return transparencySoftwareStatus!;
             }
@@ -145,9 +152,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="TransparencySoftware">The parsed transparency software.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
-        public static Boolean TryParse(JObject                                               JSON,
-                                       [NotNullWhen(true)]  out TransparencySoftwareStatus?  TransparencySoftware,
-                                       [NotNullWhen(false)] out String?                      ErrorResponse)
+        public static Boolean TryParse(JObject                                              JSON,
+                                       [NotNullWhen(true)] out TransparencySoftwareStatus?  TransparencySoftware,
+                                       [NotNullWhen(false)] out String?                     ErrorResponse)
 
             => TryParse(JSON,
                         out TransparencySoftware,
@@ -163,109 +170,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="CustomTransparencySoftwareStatusParser">An optional delegate to parse custom transparency software status JSON objects.</param>
         public static Boolean TryParse(JObject                                                   JSON,
-                                       [NotNullWhen(true)]  out TransparencySoftwareStatus?      TransparencySoftwareStatus,
+                                       [NotNullWhen(true)] out TransparencySoftwareStatus?       TransparencySoftwareStatus,
                                        [NotNullWhen(false)] out String?                          ErrorResponse,
-                                       CustomJObjectParserDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusParser   = null)
-        {
-
-            try
-            {
-
-                TransparencySoftwareStatus = default;
-
-                if (JSON?.HasValues != true)
-                {
-                    ErrorResponse = "The given JSON object must not be null or empty!";
-                    return false;
-                }
-
-                #region Parse TransparencySoftware    [mandatory]
-
-                if (!JSON.ParseMandatoryJSON("transparencySoftware",
-                                             "transparency software",
-                                             POI.TransparencySoftware.TryParse,
-                                             out TransparencySoftware? TransparencySoftware,
-                                             out ErrorResponse))
-                {
-                    return false;
-                }
-
-                #endregion
-
-                #region Parse LegalStatus             [mandatory]
-
-                if (!JSON.ParseMandatory("legalStatus",
-                                         "legal status",
-                                         POI.LegalStatus.TryParse,
-                                         out LegalStatus LegalStatus,
-                                         out ErrorResponse))
-                {
-                    return false;
-                }
-
-                #endregion
-
-                #region Parse Certificate             [optional]
-
-                var Certificate        = JSON.GetString("certificate");
-
-                #endregion
-
-                #region Parse CertificateIssuer       [optional]
-
-                var CertificateIssuer  = JSON.GetString("certificateIssuer");
-
-                #endregion
-
-                #region Parse NotBefore               [optional]
-
-                if (JSON.ParseOptional("notBefore",
-                                       "not before",
-                                       out DateTime? NotBefore,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
-
-                #endregion
-
-                #region Parse NotAfter                [optional]
-
-                if (JSON.ParseOptional("notAfter",
-                                       "not after",
-                                       out DateTime? NotAfter,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
-
-                #endregion
-
-
-                TransparencySoftwareStatus = new TransparencySoftwareStatus(TransparencySoftware,
-                                                                            LegalStatus,
-                                                                            Certificate,
-                                                                            CertificateIssuer,
-                                                                            NotBefore,
-                                                                            NotAfter);
-
-                if (CustomTransparencySoftwareStatusParser is not null)
-                    TransparencySoftwareStatus = CustomTransparencySoftwareStatusParser(JSON,
-                                                                                        TransparencySoftwareStatus);
-
-                return true;
-
-            }
-            catch (Exception e)
-            {
-                TransparencySoftwareStatus  = default;
-                ErrorResponse               = "The given JSON representation of a transparency software status is invalid: " + e.Message;
-                return false;
-            }
-
-        }
+                                       CustomJObjectParserDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusParser = null,
+                                       CustomJObjectParserDelegate<TransparencySoftware>?        CustomTransparencySoftwareParser       = null)
+            => TryParseDocument(JSON, out TransparencySoftwareStatus, out ErrorResponse,
+                                CustomTransparencySoftwareStatusParser, CustomTransparencySoftwareParser);
 
         #endregion
 
@@ -294,11 +204,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : null,
 
                            NotBefore.HasValue
-                               ? new JProperty("notBefore",              NotBefore.Value.ToISO8601())
+                               ? new JProperty("notBefore",              NotBefore.Value.ToString("O", CultureInfo.InvariantCulture))
                                : null,
 
                            NotAfter.HasValue
-                               ? new JProperty("notAfter",               NotAfter. Value.ToISO8601())
+                               ? new JProperty("notAfter",               NotAfter.Value.ToString("O", CultureInfo.InvariantCulture))
                                : null
 
                        );
@@ -466,15 +376,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (TransparencySoftwareStatus is null)
                 throw new ArgumentNullException(nameof(TransparencySoftwareStatus), "The give transparency software must not be null!");
 
-            var c = TransparencySoftware.Name.CompareTo(TransparencySoftwareStatus.TransparencySoftware.Name);
+            var c = TransparencySoftware.CompareTo(TransparencySoftwareStatus.TransparencySoftware);
 
             if (c == 0)
                 c = LegalStatus.              CompareTo(TransparencySoftwareStatus.LegalStatus);
 
-            // Certificate
-            // CertificateIssuer
-            // NotBefore
-            // NotAfter
+            if (c == 0)
+                c = StringComparer.Ordinal.Compare(Certificate, TransparencySoftwareStatus.Certificate);
+            if (c == 0)
+                c = StringComparer.Ordinal.Compare(CertificateIssuer, TransparencySoftwareStatus.CertificateIssuer);
+            if (c == 0)
+                c = Nullable.Compare(NotBefore, TransparencySoftwareStatus.NotBefore);
+            if (c == 0)
+                c = Nullable.Compare(NotAfter, TransparencySoftwareStatus.NotAfter);
 
             return c;
 
@@ -519,10 +433,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
               (CertificateIssuer is not null &&  TransparencySoftwareStatus.CertificateIssuer is not null && CertificateIssuer.            Equals(TransparencySoftwareStatus.CertificateIssuer)))           &&
 
             ((!NotBefore.        HasValue    && !TransparencySoftwareStatus.NotBefore.        HasValue)    ||
-              (NotBefore.        HasValue    &&  TransparencySoftwareStatus.NotBefore.        HasValue    && NotBefore.  Value.ToISO8601().Equals(TransparencySoftwareStatus.NotBefore.Value.ToISO8601()))) &&
+              (NotBefore.        HasValue    &&  TransparencySoftwareStatus.NotBefore.        HasValue    && NotBefore.Value.Equals(TransparencySoftwareStatus.NotBefore.Value))) &&
 
             ((!NotAfter.         HasValue    && !TransparencySoftwareStatus.NotAfter.         HasValue)    ||
-              (NotAfter.         HasValue    &&  TransparencySoftwareStatus.NotAfter.         HasValue    && NotAfter.   Value.ToISO8601().Equals(TransparencySoftwareStatus.NotAfter. Value.ToISO8601())));
+              (NotAfter.         HasValue    &&  TransparencySoftwareStatus.NotAfter.         HasValue    && NotAfter.Value.Equals(TransparencySoftwareStatus.NotAfter.Value)));
 
         #endregion
 

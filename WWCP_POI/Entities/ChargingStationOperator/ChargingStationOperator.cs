@@ -225,7 +225,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// e-mobility service provider. The required pricing information can either be public
     /// information or part of B2B contracts.
     /// </summary>
-    public class ChargingStationOperator : AEMobilityEntity<ChargingStationOperator_Id,
+    public partial class ChargingStationOperator : AEMobilityEntity<ChargingStationOperator_Id,
                                                             ChargingStationOperatorAdminStatusTypes,
                                                             ChargingStationOperatorStatusTypes>
     {
@@ -527,6 +527,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.RoamingNetwork = RoamingNetwork;
+            this.chargingPools = new EntityHashSet<ChargingStationOperator, ChargingPool_Id, ChargingPool>(this);
 
         }
 
@@ -4064,7 +4065,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data
 
-        private readonly ConcurrentDictionary<ChargingTariff_Id, ChargingTariff> chargingTariffs;
+        private readonly ConcurrentDictionary<ChargingTariff_Id, ChargingTariff> chargingTariffs = [];
 
         /// <summary>
         /// All charging tariffs registered within this charging station operator.
@@ -4873,7 +4874,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                    EMobilityProvider_Id?  EMobilityProviderId   = null)
         {
 
-            return Array.Empty<ChargingTariff>();
+            if (EMobilityProviderId is not null)
+                throw new NotSupportedException("Provider-specific tariff agreements are not represented in the POI model.");
+            if (ChargingConnectorId is not null && EVSEId is null)
+                throw new ArgumentException("Connector tariff queries require an EVSE identifier because connector IDs are local.", nameof(EVSEId));
+            if (ChargingPoolId is null && ChargingStationId is null && EVSEId is null)
+                return ChargingTariffs;
+
+            var ids = EVSEs.Where(evse =>
+                    (ChargingPoolId is null || evse.ChargingPool?.Id == ChargingPoolId) &&
+                    (ChargingStationId is null || evse.ChargingStation?.Id == ChargingStationId) &&
+                    (EVSEId is null || evse.Id == EVSEId))
+                .SelectMany(evse =>
+                {
+                    var connectors = evse.ChargingConnectors.Where(connector => ChargingConnectorId is null || connector.Id == ChargingConnectorId).ToArray();
+                    return ChargingConnectorId is not null && connectors.Length == 0 ? [] :
+                        evse.ChargingTariffIds.Concat(connectors.SelectMany(connector => connector.TariffIds));
+                }).ToHashSet();
+            return ChargingTariffs.Where(tariff => ids.Contains(tariff.Id)).ToArray();
 
         }
 
@@ -4884,7 +4902,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                    EMobilityProvider_Id?  EMobilityProviderId   = null)
         {
 
-            return Array.Empty<ChargingTariff_Id>();
+            return GetChargingTariffs(ChargingPoolId, ChargingStationId, EVSEId, ChargingConnectorId, EMobilityProviderId).Select(tariff => tariff.Id);
 
         }
 
@@ -5156,7 +5174,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               CustomJObjectSerializerDelegate<ChargingPool>?             CustomChargingPoolSerializer              = null,
                               CustomJObjectSerializerDelegate<ChargingStation>?          CustomChargingStationSerializer           = null,
                               CustomJObjectSerializerDelegate<EVSE>?                     CustomEVSESerializer                      = null,
-                              CustomJObjectSerializerDelegate<ChargingConnector>?         CustomChargingConnectorSerializer         = null)
+                              CustomJObjectSerializerDelegate<ChargingConnector>?         CustomChargingConnectorSerializer         = null,
+                              InfoStatus                                                  ExpandChargingTariffIds                    = InfoStatus.Expanded)
         {
 
             try
@@ -5165,6 +5184,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var json = JSONObject.Create(
 
                                      new JProperty("@id",                 Id.ToString()),
+
+                               ExpandChargingTariffIds != InfoStatus.Hidden && ChargingTariffs.Any()
+                                   ? ExpandChargingTariffIds.Switch(
+                                         () => new JProperty("chargingTariffIds", new JArray(ChargingTariffs.OrderBy(tariff => tariff.Id.ToString(), StringComparer.Ordinal).Select(tariff => tariff.Id.ToString()))),
+                                         () => new JProperty("chargingTariffs", new JArray(ChargingTariffs.OrderBy(tariff => tariff.Id.ToString(), StringComparer.Ordinal).Select(tariff => tariff.ToJSON(Embedded: true, ExpandBrandIds: ExpandBrandIds, ExpandDataLicenses: ExpandDataLicenses)))))
+                                   : null,
 
                                !Embedded
                                    ? new JProperty("@context",            JSONLDContext)
@@ -5240,10 +5265,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                                 ToJSON (Embedded:                           true,
                                                                                                         ExpandRoamingNetworkId:             InfoStatus.Hidden,
                                                                                                         ExpandChargingStationOperatorId:    InfoStatus.Hidden,
-                                                                                                        ExpandChargingStationIds:           InfoStatus.Expanded,
-                                                                                                        ExpandEVSEIds:                      InfoStatus.Expanded,
-                                                                                                        ExpandBrandIds:                     InfoStatus.ShowIdOnly,
-                                                                                                        ExpandDataLicenses:                 InfoStatus.Hidden,
+                                                                                                        ExpandChargingStationIds:           ExpandChargingStationIds,
+                                                                                                        ExpandEVSEIds:                      ExpandEVSEIds,
+                                                                                                        ExpandBrandIds:                     ExpandBrandIds,
+                                                                                                        ExpandDataLicenses:                 ExpandDataLicenses,
                                                                                                         CustomChargingPoolSerializer:       CustomChargingPoolSerializer,
                                                                                                         CustomChargingStationSerializer:    CustomChargingStationSerializer,
                                                                                                         CustomEVSESerializer:               CustomEVSESerializer,
@@ -5251,7 +5276,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    : null,
 
 
-                               ExpandChargingStationIds != InfoStatus.Hidden && ChargingStations.Any()
+                               ExpandChargingPoolIds != InfoStatus.Expanded && ExpandChargingStationIds != InfoStatus.Hidden && ChargingStations.Any()
                                    ? ExpandChargingStationIds.Switch(
 
                                          () => new JProperty("chargingStationIds",
@@ -5274,7 +5299,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    : null,
 
 
-                               ExpandEVSEIds != InfoStatus.Hidden && EVSEs.Any()
+                               ExpandChargingPoolIds != InfoStatus.Expanded && ExpandChargingStationIds != InfoStatus.Expanded && ExpandEVSEIds != InfoStatus.Hidden && EVSEs.Any()
                                    ? ExpandEVSEIds.Switch(
 
                                          () => new JProperty("EVSEIds",

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -27,7 +27,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A price component defines the pricing of a tariff.
     /// </summary>
-    public struct ChargingPriceComponent
+    public readonly partial struct ChargingPriceComponent
     {
 
         #region Properties
@@ -65,7 +65,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       Decimal                 Price,
                                       UInt32                  StepSize = 1)
         {
-
+            if (!Enum.IsDefined(Type))
+                throw new ArgumentOutOfRangeException(nameof(Type));
+            if (StepSize == 0)
+                throw new ArgumentOutOfRangeException(nameof(StepSize), "Billing steps must be positive.");
             this.Type      = Type;
             this.Price     = Price;
             this.StepSize  = StepSize;
@@ -101,7 +104,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => new (ChargingDimensionTypes.TIME,
                     Price,
-                    (UInt32) Math.Round(BillingIncrement.TotalSeconds, 0));
+                    BillingSeconds(BillingIncrement));
 
         #endregion
 
@@ -117,7 +120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => new (ChargingDimensionTypes.PARKING_TIME,
                     Price,
-                    (UInt32) Math.Round(BillingIncrement.TotalSeconds, 0));
+                    BillingSeconds(BillingIncrement));
 
         #endregion
 
@@ -130,7 +133,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public JObject ToJSON()
 
             => new JObject(new JProperty("type",      Type. ToString()),
-                           new JProperty("price",     Price.ToString("0.00")),
+                           new JProperty("price",     Price),
                            new JProperty("stepSize",  StepSize));
 
         #endregion

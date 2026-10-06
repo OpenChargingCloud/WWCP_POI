@@ -497,8 +497,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var c = OperatorId.CompareTo(ChargingTariffId.OperatorId);
 
             if (c == 0)
-                c = String.Compare(Suffix,
-                                   ChargingTariffId.Suffix,
+                c = String.Compare(Suffix?.Replace("*", ""),
+                                   ChargingTariffId.Suffix?.Replace("*", ""),
                                    StringComparison.OrdinalIgnoreCase);
 
             return c;
@@ -534,8 +534,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => OperatorId.Equals(ChargingTariffId.OperatorId) &&
 
-               String.Equals(Suffix.                 Replace("*", ""),
-                             ChargingTariffId.Suffix.Replace("*", ""),
+               String.Equals(Suffix?.Replace("*", ""),
+                             ChargingTariffId.Suffix?.Replace("*", ""),
                              StringComparison.OrdinalIgnoreCase);
 
         #endregion
@@ -552,8 +552,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             unchecked
             {
 
-                return OperatorId.               GetHashCode() ^
-                      (Suffix?.Replace("*", "")?.GetHashCode() ?? 0);
+                return (OperatorId.IsNullOrEmpty ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(OperatorId.ToString(OperatorIdFormats.ISO_STAR))) ^
+                       (Suffix is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Suffix.Replace("*", "")));
 
             }
         }

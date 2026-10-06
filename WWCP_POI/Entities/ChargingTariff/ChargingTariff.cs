@@ -18,6 +18,7 @@
 #region Usings
 
 using Newtonsoft.Json.Linq;
+using System.Collections.Immutable;
 
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
@@ -31,7 +32,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A charging tariff for charging an electric vehicle.
     /// </summary>
-    public class ChargingTariff : AEMobilityEntity<ChargingTariff_Id,
+    public partial class ChargingTariff : AEMobilityEntity<ChargingTariff_Id,
                                                    ChargingTariffAdminStatusTypes,
                                                    ChargingTariffStatusTypes>
     {
@@ -49,7 +50,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The charging station operator of this charging tariff.
         /// </summary>
         [Optional]
-        public ChargingStationOperator? Operator { get; }
+        public ChargingStationOperator Operator { get; }
 
 
         /// <summary>
@@ -95,8 +96,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Description">An optional (multi-language) description of this charging tariff.</param>
         public ChargingTariff(ChargingTariff_Id Id,
                               ChargingStationOperator Operator,
-                              I18NString Name,
-                              I18NString Description,
+                              I18NString? Name,
+                              I18NString? Description,
 
                               IEnumerable<ChargingTariffElement> TariffElements,
                               Currency Currency,
@@ -123,7 +124,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Initial checks
 
-            if (TariffElements is null || !TariffElements.Any())
+            ArgumentNullException.ThrowIfNull(Operator);
+            ArgumentNullException.ThrowIfNull(Currency);
+            ArgumentNullException.ThrowIfNull(TariffElements);
+            if (Id.OperatorId != Operator.Id)
+                throw new ArgumentException("The tariff identifier belongs to a different operator.", nameof(Id));
+            var elements = TariffElements.ToImmutableArray();
+            if (elements.IsEmpty)
                 throw new ArgumentNullException(nameof(TariffElements), "The given enumeration of tariff elements must not be null or empty!");
 
             #endregion
@@ -131,7 +138,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region Init data and properties
 
             this.Operator = Operator;
-            this.TariffElements = TariffElements;
+            foreach (var element in elements)
+                if (element.ChargingPriceComponents is null || !element.ChargingPriceComponents.Any())
+                    throw new ArgumentException("Invalid tariff element.", nameof(TariffElements));
+            this.TariffElements = elements;
             this.Currency = Currency;
 
             this.Brand = Brand;
@@ -166,7 +176,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                          Embedded
                              ? null
-                             : new JProperty("@context", "https://open.charging.cloud/contexts/wwcp+json/ChargingTariff"),
+                             : new JProperty("@context", JSONLDContext),
 
                          Name.IsNotNullOrEmpty()
                              ? new JProperty("name", Name.ToJSON())
@@ -176,14 +186,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              ? new JProperty("description", Description.ToJSON())
                              : null,
 
-                         Brand is not null
+                         Brand is not null && ExpandBrandIds != InfoStatus.Hidden
                              ? ExpandBrandIds.Switch(
                                    () => new JProperty("brandId", Brand.Id.ToString()),
-                                   () => new JProperty("brand", Brand.ToJSON()))
+                                   () => new JProperty("brand", Brand.ToJSON(ExpandDataLicenses: ExpandDataLicenses)))
                              : null,
 
-                         (DataSource is not null && !Embedded)
+                         DataSource is not null
                              ? new JProperty("dataSource", DataSource)
+                             : null,
+
+                         CustomData.HasValues
+                             ? new JProperty("customData", CustomData.ToJObject())
                              : null,
 
 

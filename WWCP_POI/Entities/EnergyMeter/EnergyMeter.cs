@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -56,7 +56,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const            String    JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/energyMeter";
 
-        private readonly        Decimal   EPSILON = 0.01m;
 
         /// <summary>
         /// The default max size of the energy meter admin status list.
@@ -213,7 +212,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.FirmwareVersion            = FirmwareVersion;
             this.PublicKeys                 = PublicKeys?.          Distinct() ?? [];
             this.PublicKeyCertificateChain  = PublicKeyCertificateChain;
-            this.TransparencySoftware       = TransparencySoftware?.Distinct() ?? [];
+            var software = TransparencySoftware?.Distinct().ToArray() ?? [];
+            if (software.Any(item => item is null))
+                throw new ArgumentException("Transparency software must not contain null.", nameof(TransparencySoftware));
+            this.TransparencySoftware = System.Collections.Immutable.ImmutableArray.CreateRange(software);
 
         }
 
@@ -228,7 +230,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="CustomEnergyMeterParser">An optional delegate to parse custom energy meter JSON objects.</param>
         public static EnergyMeter Parse(JObject                                    JSON,
-                                        CustomJObjectParserDelegate<EnergyMeter>?  CustomEnergyMeterParser   = null)
+                                        CustomJObjectParserDelegate<EnergyMeter>?  CustomEnergyMeterParser = null)
         {
 
             if (TryParse(JSON,
@@ -256,9 +258,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="EnergyMeter">The parsed energy meter.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
-        public static Boolean TryParse(JObject                                JSON,
-                                       [NotNullWhen(true)]  out EnergyMeter?  EnergyMeter,
-                                       [NotNullWhen(false)] out String?       ErrorResponse)
+        public static Boolean TryParse(JObject                               JSON,
+                                       [NotNullWhen(true)] out EnergyMeter?  EnergyMeter,
+                                       [NotNullWhen(false)] out String?      ErrorResponse)
 
             => TryParse(JSON,
                         out EnergyMeter,
@@ -274,9 +276,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="CustomEnergyMeterParser">An optional delegate to parse custom energy meter JSON objects.</param>
         public static Boolean TryParse(JObject                                    JSON,
-                                       [NotNullWhen(true)]  out EnergyMeter?      EnergyMeter,
+                                       [NotNullWhen(true)] out EnergyMeter?       EnergyMeter,
                                        [NotNullWhen(false)] out String?           ErrorResponse,
-                                       CustomJObjectParserDelegate<EnergyMeter>?  CustomEnergyMeterParser   = null)
+                                       CustomJObjectParserDelegate<EnergyMeter>?  CustomEnergyMeterParser = null)
         {
 
             try
@@ -291,6 +293,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 #region Parse Id                            [mandatory]
+
+                InfrastructureJson.Validate(JSON, JSONLDContext);
 
                 if (!JSON.ParseMandatory("id",
                                          "energy meter identification",
@@ -420,27 +424,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse TransparencySoftware          [optional]
 
-                if (JSON.ParseOptionalHashSet("transparencySoftware",
-                                              "transparency software",
-                                              TransparencySoftwareStatus.TryParse,
-                                              out HashSet<TransparencySoftwareStatus> transparencySoftware,
-                                              out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
+                var transparencySoftware = InfrastructureJson.Array(JSON, "transparencySoftware", token =>
+                    TransparencySoftwareStatus.Parse(InfrastructureJson.Entry(token)));
 
                 #endregion
 
                 #region Parse LastChange                    [mandatory]
 
-                if (!JSON.ParseMandatory("lastChange",
-                                         "last change",
-                                         out DateTime LastChange,
-                                         out ErrorResponse))
-                {
-                    return false;
-                }
+                var LastChange = TransparencyJson.Date(JSON, "lastChange") ?? throw new ArgumentException("lastChange: missing timestamp.");
 
                 #endregion
 
@@ -462,24 +453,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   PublicKeyCertificateChain,
                                   transparencySoftware,
 
-                                  null, // InitialAdminStatus
-                                  null, // InitialStatus
-
-                                  null, // MaxAdminStatusScheduleSize
-                                  null, // MaxStatusScheduleSize
-
-                                  null, // DataSource
-
-                                  LastChange,
-                                  null, // CustomData
-                                  null  // InternalData
+                                  DataSource: InfrastructureJson.Text(JSON, "dataSource"),
+                                  Created: InfrastructureJson.Date(JSON, "created"),
+                                  LastChange: LastChange,
+                                  CustomData: InfrastructureJson.CustomData(JSON)
 
                               );
-
-
+                InfrastructureJson.RestoreMetadata(JSON, EnergyMeter, EnergyMeterAdminStatusTypes.TryParse, EnergyMeterStatusTypes.TryParse);
                 if (CustomEnergyMeterParser is not null)
-                    EnergyMeter = CustomEnergyMeterParser(JSON,
-                                                          EnergyMeter);
+                    EnergyMeter = CustomEnergyMeterParser(JSON, EnergyMeter) ?? throw new ArgumentException("The custom energy meter parser returned null.");
 
                 return true;
 
@@ -568,14 +550,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                                                                                                                       CustomTransparencySoftwareSerializer))))
                                : null,
 
-                           Description is not null && Description.IsNotNullOrEmpty()
-                               ? new JProperty("description",                 Description.ToJSON())
-                               : null,
-
                                  new JProperty("lastChange",                  LastChangeDate. ToISO8601())
 
                        );
 
+            InfrastructureJson.SnapshotMetadata(json, this);
             return CustomEnergyMeterSerializer is not null
                        ? CustomEnergyMeterSerializer(this, json)
                        : json;

@@ -145,7 +145,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static Boolean TryParse(String Text, out LegalStatus LegalStatus)
         {
 
-            Text = Text.Trim();
+            Text = Text?.Trim() ?? "";
 
             if (Text.IsNotNullOrEmpty())
             {
@@ -367,7 +367,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override Int32 GetHashCode()
 
-            => InternalId?.ToLower().GetHashCode() ?? 0;
+            => InternalId is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(InternalId);
 
         #endregion
 

@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -34,12 +34,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// The charging transparency software.
     /// This information will e.g. be used for the German calibration law.
     /// </summary>
-    public class TransparencySoftware : IEquatable<TransparencySoftware>,
+    public partial class TransparencySoftware : IEquatable<TransparencySoftware>,
                                         IComparable<TransparencySoftware>,
                                         IComparable
     {
 
         #region Properties
+
+        private readonly OpenSourceLicense openSourceLicense;
 
         /// <summary>
         /// The name of the transparency software.
@@ -57,7 +59,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The Open Source license of the transparency software.
         /// </summary>
         [Mandatory]
-        public OpenSourceLicense  OpenSourceLicense       { get; }
+        public OpenSourceLicense OpenSourceLicense => openSourceLicense.Clone();
 
         /// <summary>
         /// The vendor of the transparency software.
@@ -115,10 +117,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     URL?               MoreInformation        = null,
                                     URL?               SourceCodeRepository   = null)
         {
-
+            ArgumentException.ThrowIfNullOrWhiteSpace(Name);
+            ArgumentException.ThrowIfNullOrWhiteSpace(Version);
+            ArgumentException.ThrowIfNullOrWhiteSpace(Vendor);
+            ArgumentNullException.ThrowIfNull(OpenSourceLicense);
+            if (OpenSourceLicense.Id.IsNullOrEmpty)
+                throw new ArgumentException("The license identifier must not be empty.", nameof(OpenSourceLicense));
+            foreach (var link in new[] { Logo, HowToUse, MoreInformation, SourceCodeRepository })
+                if (link is { } url && !Uri.TryCreate(url.ToString(), UriKind.Absolute, out _))
+                    throw new ArgumentException("Software links must be absolute URLs.");
             this.Name                  = Name;
             this.Version               = Version;
-            this.OpenSourceLicense     = OpenSourceLicense;
+            this.openSourceLicense     = OpenSourceLicense.Clone();
             this.Vendor                = Vendor;
 
             this.Logo                  = Logo;
@@ -139,7 +149,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="CustomTransparencySoftwareParser">An optional delegate to parse custom transparency software JSON objects.</param>
         public static TransparencySoftware Parse(JObject                                             JSON,
-                                                 CustomJObjectParserDelegate<TransparencySoftware>?  CustomTransparencySoftwareParser   = null)
+                                                 CustomJObjectParserDelegate<TransparencySoftware>?  CustomTransparencySoftwareParser = null)
         {
 
             if (TryParse(JSON,
@@ -167,9 +177,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="TransparencySoftware">The parsed transparency software.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
-        public static Boolean TryParse(JObject                                         JSON,
-                                       [NotNullWhen(true)]  out TransparencySoftware?  TransparencySoftware,
-                                       [NotNullWhen(false)] out String?                ErrorResponse)
+        public static Boolean TryParse(JObject                                        JSON,
+                                       [NotNullWhen(true)] out TransparencySoftware?  TransparencySoftware,
+                                       [NotNullWhen(false)] out String?               ErrorResponse)
 
             => TryParse(JSON,
                         out TransparencySoftware,
@@ -185,154 +195,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="CustomTransparencySoftwareParser">An optional delegate to parse custom transparency software JSON objects.</param>
         public static Boolean TryParse(JObject                                             JSON,
-                                       [NotNullWhen(true)]  out TransparencySoftware?      TransparencySoftware,
+                                       [NotNullWhen(true)] out TransparencySoftware?       TransparencySoftware,
                                        [NotNullWhen(false)] out String?                    ErrorResponse,
-                                       CustomJObjectParserDelegate<TransparencySoftware>?  CustomTransparencySoftwareParser   = null)
-        {
-
-            try
-            {
-
-                TransparencySoftware = default;
-
-                if (JSON?.HasValues != true)
-                {
-                    ErrorResponse = "The given JSON object must not be null or empty!";
-                    return false;
-                }
-
-                #region Parse Name                      [mandatory]
-
-                if (!JSON.ParseMandatoryText("name",
-                                             "name",
-                                             out String? Name,
-                                             out ErrorResponse))
-                {
-                    return false;
-                }
-
-                #endregion
-
-                #region Parse Version                   [mandatory]
-
-                if (!JSON.ParseMandatoryText("version",
-                                             "version",
-                                             out String? Version,
-                                             out ErrorResponse))
-                {
-                    return false;
-                }
-
-                #endregion
-
-                #region Parse OpenSourceLicense         [mandatory]
-
-                if (!JSON.ParseMandatoryJSON("openSourceLicense",
-                                             "legal status",
-                                             org.GraphDefined.Vanaheimr.Hermod.OpenSourceLicense.TryParse,
-                                             out OpenSourceLicense? OpenSourceLicense,
-                                             out ErrorResponse))
-                {
-                    return false;
-                }
-
-                #endregion
-
-                #region Parse Vendor                    [mandatory]
-
-                if (!JSON.ParseMandatoryText("vendor",
-                                             "vendor",
-                                             out String? Vendor,
-                                             out ErrorResponse))
-                {
-                    return false;
-                }
-
-                #endregion
-
-                #region Parse Logo                      [optional]
-
-                if (JSON.ParseOptional("logo",
-                                       "logo",
-                                       URL.TryParse,
-                                       out URL? Logo,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
-
-                #endregion
-
-                #region Parse HowToUse                  [optional]
-
-                if (JSON.ParseOptional("how_to_use",
-                                       "how to use",
-                                       URL.TryParse,
-                                       out URL? HowToUse,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
-
-                #endregion
-
-                #region Parse MoreInformation           [optional]
-
-                if (JSON.ParseOptional("more_information",
-                                       "more information",
-                                       URL.TryParse,
-                                       out URL? MoreInformation,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
-
-                #endregion
-
-                #region Parse SourceCodeRepository      [optional]
-
-                if (JSON.ParseOptional("source_code_repository",
-                                       "source code repository",
-                                       URL.TryParse,
-                                       out URL? SourceCodeRepository,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
-
-                #endregion
-
-
-                TransparencySoftware = new TransparencySoftware(
-                                           Name,
-                                           Version,
-                                           OpenSourceLicense,
-                                           Vendor,
-                                           Logo,
-                                           HowToUse,
-                                           MoreInformation,
-                                           SourceCodeRepository
-                                       );
-
-                if (CustomTransparencySoftwareParser is not null)
-                    TransparencySoftware = CustomTransparencySoftwareParser(JSON,
-                                                                            TransparencySoftware);
-
-                return true;
-
-            }
-            catch (Exception e)
-            {
-                TransparencySoftware  = default;
-                ErrorResponse         = "The given JSON representation of a transparency software is invalid: " + e.Message;
-                return false;
-            }
-
-        }
+                                       CustomJObjectParserDelegate<TransparencySoftware>?  CustomTransparencySoftwareParser = null)
+            => TryParseDocument(JSON, out TransparencySoftware, out ErrorResponse, CustomTransparencySoftwareParser);
 
         #endregion
 
@@ -349,7 +215,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                  new JProperty("name",                    Name),
                                  new JProperty("version",                 Version),
-                                 new JProperty("open_source_license",     OpenSourceLicense.   ToString()),
+                                 new JProperty("openSourceLicense",       openSourceLicense.ToJSON(Embedded: true)),
                                  new JProperty("vendor",                  Vendor),
 
                            Logo.                HasValue
@@ -535,28 +401,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (TransparencySoftware is null)
                 throw new ArgumentNullException(nameof(TransparencySoftware), "The give transparency software must not be null!");
 
-            var c = Name.                CompareTo(TransparencySoftware.Name);
+            var c = StringComparer.Ordinal.Compare(Name, TransparencySoftware.Name);
 
             if (c == 0)
-                c = Version.             CompareTo(TransparencySoftware.Version);
+                c = StringComparer.Ordinal.Compare(Version, TransparencySoftware.Version);
 
             if (c == 0)
-                c = OpenSourceLicense.Id.CompareTo(TransparencySoftware.OpenSourceLicense.Id);
+                c = openSourceLicense.Equals(TransparencySoftware.openSourceLicense) ? 0 :
+                    StringComparer.Ordinal.Compare(TransparencyJson.LicenseOrder(openSourceLicense), TransparencyJson.LicenseOrder(TransparencySoftware.openSourceLicense));
 
             if (c == 0)
-                c = Vendor.              CompareTo(TransparencySoftware.Vendor);
+                c = StringComparer.Ordinal.Compare(Vendor, TransparencySoftware.Vendor);
 
-            if (c == 0 && Logo.                HasValue && TransparencySoftware.Logo.                HasValue)
-                c = Logo.                Value.CompareTo(TransparencySoftware.Logo.                Value);
+            if (c == 0)
+                c = Nullable.Compare(Logo, TransparencySoftware.Logo);
 
-            if (c == 0 && HowToUse.            HasValue && TransparencySoftware.HowToUse.            HasValue)
-                c = HowToUse.            Value.CompareTo(TransparencySoftware.HowToUse.            Value);
+            if (c == 0)
+                c = Nullable.Compare(HowToUse, TransparencySoftware.HowToUse);
 
-            if (c == 0 && MoreInformation.     HasValue && TransparencySoftware.MoreInformation.     HasValue)
-                c = MoreInformation.     Value.CompareTo(TransparencySoftware.MoreInformation.     Value);
+            if (c == 0)
+                c = Nullable.Compare(MoreInformation, TransparencySoftware.MoreInformation);
 
-            if (c == 0 && SourceCodeRepository.HasValue && TransparencySoftware.SourceCodeRepository.HasValue)
-                c = SourceCodeRepository.Value.CompareTo(TransparencySoftware.SourceCodeRepository.Value);
+            if (c == 0)
+                c = Nullable.Compare(SourceCodeRepository, TransparencySoftware.SourceCodeRepository);
 
             return c;
 
@@ -593,7 +460,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                Name.             Equals(TransparencySoftware.Name)              &&
                Version.          Equals(TransparencySoftware.Version)           &&
-               OpenSourceLicense.Equals(TransparencySoftware.OpenSourceLicense) &&
+               openSourceLicense.Equals(TransparencySoftware.openSourceLicense) &&
                Vendor.           Equals(TransparencySoftware.Vendor)            &&
 
             ((!Logo.                HasValue && !TransparencySoftware.Logo.                HasValue) ||
@@ -624,7 +491,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 return Name.                 GetHashCode()       * 23 ^
                        Version.              GetHashCode()       * 19 ^
-                       OpenSourceLicense.    GetHashCode()       * 13 ^
+                       TransparencyJson.LicenseHash(openSourceLicense) * 13 ^
                        Vendor.               GetHashCode()       * 11 ^
                       (Logo?.                GetHashCode() ?? 0) * 7 ^
                       (HowToUse?.            GetHashCode() ?? 0) * 5 ^

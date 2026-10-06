@@ -108,7 +108,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// might provide a shared network access to aggregate and optimize communication
     /// with the EVSE Operator backend.
     /// </summary>
-    public class ChargingPool : AEMobilityEntity<ChargingPool_Id,
+    public partial class ChargingPool : AEMobilityEntity<ChargingPool_Id,
                                                  ChargingPoolAdminStatusType,
                                                  ChargingPoolStatusType>,
                                 IEquatable<ChargingPool>,
@@ -1163,7 +1163,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             DateTimeOffset?                            LastChange                       = null,
 
                             CustomDataNew?                             CustomData                       = null,
-                            UserDefinedDictionary?                     InternalData                     = null)
+                            UserDefinedDictionary?                     InternalData                     = null,
+                            IEnumerable<DataLicense>?                  DataLicenses                     = null)
 
             : base(Id,
                    Name,
@@ -2807,7 +2808,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    ? new JProperty("dataSource",   DataSource)
                                    : null,
 
-                               !Embedded && DataLicenses.Any()
+                               DataLicenses.Any()
                                    ? ExpandDataLicenses.Switch(
                                          () => new JProperty("dataLicenseIds",  new JArray(DataLicenses.SafeSelect(dataLicense => dataLicense.Id.ToString()))),
                                          () => new JProperty("dataLicenses",    DataLicenses.ToJSON())
@@ -2847,7 +2848,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    : null,
 
                                ParkingType.IsNotNullOrEmpty()
-                                   ? new JProperty("locationType",         ParkingType)
+                                   ? new JProperty("locationType",         ParkingType.ToString())
                                    : null,
 
                                Accessibility.HasValue
@@ -2883,7 +2884,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                                          ExpandRoamingNetworkId:             InfoStatus.Hidden,
                                                                                                          ExpandChargingStationOperatorId:    InfoStatus.Hidden,
                                                                                                          ExpandChargingPoolId:               InfoStatus.Hidden,
-                                                                                                         ExpandEVSEIds:                      InfoStatus.Expanded,
+                                                                                                         ExpandEVSEIds:                      ExpandEVSEIds,
                                                                                                          ExpandBrandIds:                     ExpandBrandIds,
                                                                                                          ExpandDataLicenses:                 ExpandDataLicenses,
                                                                                                          IncludeRemovedEVSEs:                IncludeRemovedChargingStations, // just for equivalent behavior!
@@ -2895,7 +2896,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    : null,
 
 
-                               ExpandEVSEIds != InfoStatus.Hidden && EVSEs.Any()
+                               ExpandChargingStationIds != InfoStatus.Expanded && ExpandEVSEIds != InfoStatus.Hidden && EVSEs.Any()
                                    ? ExpandEVSEIds.Switch(
 
                                          () => new JProperty("EVSEIds",

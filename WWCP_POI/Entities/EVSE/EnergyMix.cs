@@ -18,6 +18,7 @@
 #region Usings
 
 using Newtonsoft.Json.Linq;
+using System.Collections.Immutable;
 
 using org.GraphDefined.Vanaheimr.Illias;
 
@@ -29,7 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// An energy mix.
     /// </summary>
-    public class EnergyMix : IEquatable<EnergyMix>
+    public partial class EnergyMix : IEquatable<EnergyMix>
     {
 
         #region Properties
@@ -78,16 +79,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          I18NString?                                        AdditionalRemarks   = null)
         {
 
-            if (!EnergySources.Any())
-                throw new ArgumentException("The given energy sources must not be empty!",
-                                            nameof(EnergySources));
-
-            if (!EnvironmentalImpacts.Any())
-                throw new ArgumentException("The given environmental impacts must not be empty!",
-                                            nameof(EnergySources));
-
-            this.EnergySources         = EnergySources;
-            this.EnvironmentalImpacts  = EnvironmentalImpacts;
+            ArgumentNullException.ThrowIfNull(EnergySources);
+            ArgumentNullException.ThrowIfNull(EnvironmentalImpacts);
+            ArgumentNullException.ThrowIfNull(SupplierName);
+            ArgumentNullException.ThrowIfNull(ProductName);
+            var sources = EnergySources.ToImmutableArray();
+            var impacts = EnvironmentalImpacts.ToImmutableArray();
+            if (sources.Any(item => item.Value.IsNullOrEmpty || !float.IsFinite(item.Percent) || item.Percent < 0 || item.Percent > 100) ||
+                impacts.Any(item => item.Value.IsNullOrEmpty || !float.IsFinite(item.Percent) || item.Percent < 0 || item.Percent > 100))
+                throw new ArgumentException("Energy mix entries require a category and a percentage between zero and 100.");
+            if (sources.Select(item => item.Value).Distinct().Count() != sources.Length || impacts.Select(item => item.Value).Distinct().Count() != impacts.Length)
+                throw new ArgumentException("Energy mix categories must be unique.");
+            this.EnergySources         = sources;
+            this.EnvironmentalImpacts  = impacts;
             this.SupplierName          = SupplierName;
             this.ProductName           = ProductName;
             this.AdditionalRemarks     = AdditionalRemarks;
@@ -106,13 +110,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => JSONObject.Create(
 
-                         //new JProperty("energy_sources",  new JArray(
-                         //    EnergyMix.EnergySources.SafeSelect(energysource => energysource.ToJSON())
-                         //)),
-
-                         //new JProperty("environ_impact",  new JArray(
-                         //    EnergyMix.EnvironmentalImpacts.Select(environmentalimpact => environmentalimpact.ToJSON())
-                         //)),
+                         new JProperty("energySources", new JArray(EnergySources.Select(item =>
+                             new JObject(new JProperty("source", item.Value.ToString()), new JProperty("percent", item.Percent))))),
+                         new JProperty("environmentalImpacts", new JArray(EnvironmentalImpacts.Select(item =>
+                             new JObject(new JProperty("impact", item.Value.ToString()), new JProperty("percent", item.Percent))))),
 
                          new JProperty("supplierName",  SupplierName.ToJSON()),
                          new JProperty("productName",   ProductName. ToJSON()),
@@ -153,6 +154,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                SupplierName.       Equals(EnergyMix.SupplierName) &&
                ProductName.        Equals(EnergyMix.ProductName)  &&
+               EnergySources.SequenceEqual(EnergyMix.EnergySources) &&
+               EnvironmentalImpacts.SequenceEqual(EnergyMix.EnvironmentalImpacts) &&
 
                ((AdditionalRemarks is null     && EnergyMix.AdditionalRemarks is null) ||
                 (AdditionalRemarks is not null && EnergyMix.AdditionalRemarks is not null && AdditionalRemarks.Equals(EnergyMix.AdditionalRemarks)));

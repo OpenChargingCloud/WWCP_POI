@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -18,6 +18,8 @@
 #region Usings
 
 using Newtonsoft.Json.Linq;
+using System.Collections.Immutable;
+using System.Globalization;
 
 using org.GraphDefined.Vanaheimr.Illias;
 
@@ -29,7 +31,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A charging tariff restrictions class.
     /// </summary>
-    public class ChargingTariffRestriction
+    public partial class ChargingTariffRestriction
     {
 
         #region Properties
@@ -42,7 +44,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Start/end date, for example: 2015-12-24, valid from this day until that day (excluding that day).
         /// </summary>
-        public StartEndDateTime?       Date         { get; }
+        private readonly StartEndDateTime? date;
+        public StartEndDateTime? Date => date is null ? null : new(date.StartTime, date.EndTime);
 
         /// <summary>
         /// Minimum/Maximum used energy in kWh, for example 20, valid from this amount of energy is used.
@@ -87,24 +90,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Initial checks
 
-            if (!Time.   HasValue &&
-                 Date    is not null &&
-                !kWh.    HasValue &&
-                Power.   HasValue &&
-                Duration.HasValue &&
-                DayOfWeek is null)
-            {
-                throw new ArgumentNullException("All given parameter equals null is invalid!");
-            }
+            var days = DayOfWeek?.Distinct().ToImmutableArray() ?? [];
+            if (days.Any(day => !Enum.IsDefined(day)))
+                throw new ArgumentException("Invalid weekday.", nameof(DayOfWeek));
+            if (!(Time?.StartTime.HasValue == true || Time?.EndTime.HasValue == true || Date is not null ||
+                  kWh?.Min.HasValue == true || kWh?.Max.HasValue == true || Power?.Min.HasValue == true || Power?.Max.HasValue == true ||
+                  Duration?.Min.HasValue == true || Duration?.Max.HasValue == true || !days.IsEmpty))
+                throw new ArgumentException("At least one tariff restriction is required.");
+            if (kWh?.Min < 0 || kWh?.Max < 0 || kWh?.Min > kWh?.Max ||
+                Power?.Min < 0 || Power?.Max < 0 || Power?.Min > Power?.Max)
+                throw new ArgumentException("Energy and power restrictions must be nonnegative and ordered.");
+            if (Duration?.Min < TimeSpan.Zero || Duration?.Max < TimeSpan.Zero || Duration?.Min > Duration?.Max)
+                throw new ArgumentException("Duration restrictions must be nonnegative and ordered.");
 
             #endregion
 
             this.Time       = Time;
-            this.Date       = Date;
+            this.date       = Date is null ? null : new(Date.StartTime, Date.EndTime);
             this.kWh        = kWh;
             this.Power      = Power;
             this.Duration   = Duration;
-            this.DayOfWeek  = DayOfWeek is not null ? DayOfWeek.Distinct() : new DayOfWeek[0];
+            this.DayOfWeek  = days;
 
         }
 
@@ -194,15 +200,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    Time. HasValue && Time. Value.StartTime.HasValue ? new JProperty("startTime",  Time. Value.StartTime.Value.ToString())       : null,
                    Time. HasValue && Time. Value.EndTime.  HasValue ? new JProperty("endTime",    Time. Value.EndTime.  Value.ToString())       : null,
 
-                   kWh.  HasValue && kWh.  Value.Min.      HasValue ? new JProperty("minkWh",     kWh.  Value.Min.      Value.ToString("0.00")) : null,
-                   kWh.  HasValue && kWh.  Value.Max.      HasValue ? new JProperty("maxkWh",     kWh.  Value.Max.      Value.ToString("0.00")) : null,
+                   date is not null ? new JProperty("startDate", date.StartTime.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)) : null,
+                   date?.EndTime is { } endDate ? new JProperty("endDate", endDate.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)) : null,
+                   Duration?.Min is { } minDuration ? new JProperty("minDuration", (decimal) minDuration.Ticks / TimeSpan.TicksPerSecond) : null,
+                   Duration?.Max is { } maxDuration ? new JProperty("maxDuration", (decimal) maxDuration.Ticks / TimeSpan.TicksPerSecond) : null,
+                   kWh.  HasValue && kWh.  Value.Min.      HasValue ? new JProperty("minkWh",     kWh.Value.Min.Value) : null,
+                   kWh.  HasValue && kWh.  Value.Max.      HasValue ? new JProperty("maxkWh",     kWh.Value.Max.Value) : null,
 
-                   Power.HasValue && Power.Value.Min.      HasValue ? new JProperty("minPower",   Power.Value.Min.      Value.ToString("0.00")) : null,
-                   Power.HasValue && Power.Value.Max.      HasValue ? new JProperty("maxPower",   Power.Value.Max.      Value.ToString("0.00")) : null,
+                   Power.HasValue && Power.Value.Min.      HasValue ? new JProperty("minPower",   Power.Value.Min.Value) : null,
+                   Power.HasValue && Power.Value.Max.      HasValue ? new JProperty("maxPower",   Power.Value.Max.Value) : null,
 
                    DayOfWeek.Any()
                        ? new JProperty("day_of_week",
-                                       new JArray(DayOfWeek.Select(day => day.ToString().ToUpper())))
+                                       new JArray(DayOfWeek.Select(day => day.ToString().ToUpperInvariant())))
                        : null
 
                );
@@ -237,7 +247,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 return Time.     GetHashCode() * 41 ^
-                       Date.     GetHashCode() * 37 ^
+                       (Date?.GetHashCode() ?? 0) * 37 ^
                        kWh.      GetHashCode() * 31 ^
                        Power.    GetHashCode() * 23 ^
                        Duration. GetHashCode() * 17 ^

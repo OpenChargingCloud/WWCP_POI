@@ -63,7 +63,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                          new JProperty("@id",  eMobilityProvider.Id.ToString()),
 
-                         Embedded
+                         !Embedded
                              ? new JProperty("@context",  "https://open.charging.cloud/contexts/wwcp+json/eMobilityProvider")
                              : null,
 
@@ -73,7 +73,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              ? new JProperty("description", eMobilityProvider.Description.ToJSON())
                              : null,
 
-                         //eMobilityProvider.DataSource.  ToJSON("DataSource"),
+                         eMobilityProvider.DataSource is not null
+                             ? new JProperty("dataSource", eMobilityProvider.DataSource)
+                             : null,
 
                          ExpandDataLicenses.Switch(
                              () => new JProperty("dataLicenseIds",  new JArray(eMobilityProvider.DataLicenses.SafeSelect(license => license.Id.ToString()))),
@@ -109,7 +111,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          eMobilityProvider.Logo.IsNotNullOrEmpty()
                              ? new JProperty("logos",               JSONArray.Create(
                                                                         JSONObject.Create(
-                                                                            new JProperty("uri",          eMobilityProvider.Logo),
+                                                                                  new JProperty("uri",          eMobilityProvider.Logo),
                                                                             new JProperty("description",  I18NString.Empty.ToJSON())
                                                                         )
                                                                     ))
@@ -121,10 +123,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                          eMobilityProvider.HotlinePhoneNumber.HasValue
                              ? new JProperty("hotline",             eMobilityProvider.HotlinePhoneNumber.ToString())
-                             : null,
-
-                         eMobilityProvider.DataLicenses.Any()
-                             ? new JProperty("dataLicenses",        new JArray(eMobilityProvider.DataLicenses.Select(license => license.ToJSON())))
                              : null
 
                      );
@@ -287,7 +285,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// An E-Mobility Provider for lookups which allows to connect
     /// an optional remote E-Mobility Provider.
     /// </summary>
-    public class EMobilityProvider : AEMobilityEntity<EMobilityProvider_Id,
+    public partial class EMobilityProvider : AEMobilityEntity<EMobilityProvider_Id,
                                                       EMobilityProviderAdminStatusTypes,
                                                       EMobilityProviderStatusTypes>
     {
@@ -544,7 +542,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    MaxAdminStatusScheduleSize ?? DefaultMaxAdminStatusScheduleSize,
                    MaxStatusScheduleSize      ?? DefaultMaxStatusScheduleSize,
 
-                   null,
+                   DataSource,
                    Created,
                    LastChange,
 

@@ -1,5 +1,7 @@
 # JSON tests
 
+[Repository overview](../README.md) · [Architecture and validation](../docs/ARCHITECTURE.md) · [JSON contracts](../docs/JSON.md)
+
 Run the NUnit test project from the repository root:
 
 ```powershell
@@ -28,5 +30,54 @@ input, nested parser callbacks and decimal values under different cultures.
   explicitly clears a property. Absent values are now omitted when writing change sets.
   Operations validate their required values on construction and own copies of their JSON payloads.
 
-This suite does not yet establish complete snapshot deserialization of the operator/pool/station/EVSE
-hierarchy or canonical JSON for signature verification.
+## Infrastructure snapshots
+
+`RoamingNetwork.Parse(network.ToJSONSnapshot())` reads the nested operator/pool/station/EVSE/connector
+hierarchy and e-mobility providers. The snapshot also carries current admin and operational statuses
+with their timestamps, creation/change timestamps and custom data at every infrastructure level.
+Status history, runtime/internal data and properties absent from the existing POI serializers are
+not part of this snapshot contract. JSON is not yet canonical for signature verification.
+
+ID-only children require an explicit `InfrastructureJsonParsingContext` with resolvers returning
+JSON documents. Those documents are copied and parsed into new entities with correct parent links;
+mutable source entities are never attached directly. Unresolved references, duplicate IDs and
+contradictory parent/operator IDs fail without returning a partial hierarchy. Supplementary flat
+ID lists are validated against the reconstructed hierarchy. Flat expanded object lists and expanded
+ancestor objects are currently rejected; use a nested snapshot instead.
+
+Tests cover complete network roundtrips, reference resolution at each level, deep error paths,
+nonmutation of input and resolver documents, current statuses with historical timestamps, custom
+data, license metadata, opening hours and coordinates (including altitude) across cultures.
+
+EVSE electrical values use volts, amperes, watts and watt-hours without rounding; zero is retained.
+The legacy `averageVoltage` wire name continues to represent the model's `MaxVoltage` property.
+`currentType` remains an array of enum names. Charging modes are now a flat array; the parser also
+accepts the previously emitted nested arrays.
+
+Timestamp restoration uses Styx's protected `AInternalData.RestoreTimestamps` method. This additive
+dependency change avoids the normal property-change mechanism replacing a persisted timestamp
+with the time of deserialization.
+
+## Copy-on-write and change sets
+
+`CopyOnWriteChangeSetTests` exercises immutable storage sharing, atomic multi-operation batches,
+old-value/revision conflicts, nested additions and cascading removal, local connector IDs,
+timestamped status updates, versioned JSON reloads, signature verification hooks and concurrent
+branches/projections. A 1,000-EVSE fixture checks that a single EVSE update replaces exactly five
+entries (the EVSE and its four ancestors), rather than copying all entries. Tests also ensure that
+editing legacy compatibility objects does not edit the authoritative snapshot or another version.
+
+See the [ChangeSet guide](../docs/CHANGESETS.md) for the versioned API and operation rules, and
+the [domain details](../WWCP_POI/ChangeSets/README.md) for tariffs and transparency software.
+
+`ChargingTariffJsonTests` covers price precision and culture independence, legacy price strings,
+all restriction fields (including dates and fractional seconds), copied collection inputs, energy
+mixes, operator ownership and tariff resolvers. Snapshot and change-set tests cover tariff additions,
+price updates with shared infrastructure, assignment/removal ordering, dangling references and
+atomic rollback. Text parsers retain decimal precision through versioned JSON reloads.
+
+`TransparencySoftwareJsonTests` covers full and legacy license JSON, links, custom callbacks,
+certificate fields and UTC validity intervals with tick precision. Tests exercise defensive copies,
+complete ordering/equality/hash semantics, malformed nested data paths, energy meter metadata and
+full network snapshot reloads. Change-set tests replace an EVSE's `energyMeter` value, confirm
+sharing of unrelated EVSEs and verify atomic rollback on invalid software/status data.

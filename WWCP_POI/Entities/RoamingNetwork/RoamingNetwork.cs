@@ -122,7 +122,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// This can e.g. be a differentation of service levels (premiun, basic,
     /// discount) or allow a simplified testing (production, qa, featureX, ...)
     /// </summary>
-    public class RoamingNetwork : AEMobilityEntity<RoamingNetwork_Id,
+    public partial class RoamingNetwork : AEMobilityEntity<RoamingNetwork_Id,
                                                    RoamingNetworkAdminStatusType,
                                                    RoamingNetworkStatusType>
     {
@@ -231,7 +231,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region EMobilityProviders
 
-        private readonly ConcurrentDictionary<EMobilityProvider_Id, EMobilityProvider> eMobilityProviders = [];
+        private readonly ConcurrentDictionary<EMobilityProvider_Id, EMobilityProvider> projectedEMobilityProviders = [];
+
+        private ConcurrentDictionary<EMobilityProvider_Id, EMobilityProvider> eMobilityProviders
+        {
+            get { EnsureSnapshotProjection(); return projectedEMobilityProviders; }
+        }
 
         /// <summary>
         /// Return all e-mobility providers registered within this roaming network.
@@ -455,7 +460,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ChargingStationOperators
 
-        private readonly ConcurrentDictionary<ChargingStationOperator_Id, ChargingStationOperator> chargingStationOperators = [];
+        private readonly ConcurrentDictionary<ChargingStationOperator_Id, ChargingStationOperator> projectedChargingStationOperators = [];
+
+        private ConcurrentDictionary<ChargingStationOperator_Id, ChargingStationOperator> chargingStationOperators
+        {
+            get { EnsureSnapshotProjection(); return projectedChargingStationOperators; }
+        }
 
         /// <summary>
         /// Return all charging station operators registered within this roaming network.
@@ -985,6 +995,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         #endregion
+
+        /// <summary>
+        /// All charging tariffs registered with the operators of this roaming network.
+        /// </summary>
+        public IEnumerable<ChargingTariff> ChargingTariffs
+            => ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingTariffs);
 
         #region ChargingPools...
 
@@ -2249,11 +2265,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                                                 OrderBy(cso => cso).
                                                                                                                 ToJSON (Embedded: true,
                                                                                                                         ExpandRoamingNetworkId:                   InfoStatus.Hidden,
-                                                                                                                        ExpandChargingPoolIds:                    InfoStatus.Hidden,
-                                                                                                                        ExpandChargingStationIds:                 InfoStatus.Hidden,
-                                                                                                                        ExpandEVSEIds:                            InfoStatus.Hidden,
-                                                                                                                        ExpandBrandIds:                           InfoStatus.Hidden,
-                                                                                                                        ExpandDataLicenses:                       InfoStatus.Hidden,
+                                                                                                                        ExpandChargingPoolIds:                    ExpandChargingPoolIds,
+                                                                                                                        ExpandChargingStationIds:                 ExpandChargingStationIds,
+                                                                                                                        ExpandEVSEIds:                            ExpandEVSEIds,
+                                                                                                                        ExpandBrandIds:                           ExpandBrandIds,
+                                                                                                                        ExpandDataLicenses:                       ExpandDataLicenses,
                                                                                                                         CustomChargingStationOperatorSerializer:  CustomChargingStationOperatorSerializer,
                                                                                                                         CustomChargingPoolSerializer:             CustomChargingPoolSerializer,
                                                                                                                         CustomChargingStationSerializer:          CustomChargingStationSerializer,
@@ -2327,8 +2343,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                                                 OrderBy(emp => emp).
                                                                                                                 ToJSON (Embedded: true,
                                                                                                                         ExpandRoamingNetworkId:           InfoStatus.Hidden,
-                                                                                                                        ExpandBrandIds:                   InfoStatus.Hidden,
-                                                                                                                        ExpandDataLicenses:               InfoStatus.Hidden))))
+                                                                                                                        ExpandBrandIds:                   ExpandBrandIds,
+                                                                                                                        ExpandDataLicenses:               ExpandDataLicenses))))
                              : null
 
                          );

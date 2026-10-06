@@ -96,7 +96,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// This is meant to be one electrical circuit which can charge a electric vehicle
     /// independently. Thus there could be multiple interdependent power sockets.
     /// </summary>
-    public class EVSE : AEMobilityEntity<EVSE_Id,
+    public partial class EVSE : AEMobilityEntity<EVSE_Id,
                                          EVSEAdminStatusType,
                                          EVSEStatusType>,
                         IEquatable<EVSE>, IComparable<EVSE>
@@ -155,6 +155,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The charging station of this EVSE.
         /// </summary>
         public ChargingStation?                        ChargingStation             { get; }
+
+        /// <summary>Tariffs assigned directly to this EVSE; connector assignments are separate.</summary>
+        public System.Collections.Immutable.ImmutableArray<ChargingTariff_Id> ChargingTariffIds { get; private set; } = [];
+
+        public IEnumerable<ChargingTariff> ChargingTariffs
+            => Operator?.ChargingTariffs.Where(tariff => ChargingTariffIds.Any(id => id.Equals(tariff.Id))) ?? [];
 
         #region PhysicalReference
 
@@ -980,17 +986,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             };
 
-            //this.ChargingTariffs                    = ChargingTariffs is null
-            //                                              ? new ReactiveSet<ChargingTariff>()
-            //                                              : new ReactiveSet<ChargingTariff>(ChargingTariffs);
-            //this.ChargingTariffs.OnSetChanged      += (timestamp, reactiveSet, newItems, oldItems) =>
-            //{
-
-            //    PropertyChanged("ChargingTariffs",
-            //                    oldItems,
-            //                    newItems);
-
-            //};
+            this.ChargingTariffIds = System.Collections.Immutable.ImmutableArray.CreateRange(
+                ChargingTariffs?.Select(tariff => tariff.Id).Distinct() ?? []);
 
             this.CalibrationInfo                    = CalibrationInfo;
 
@@ -1352,10 +1349,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Embedded)
                 {
 
-                    if (geoLocation.HasValue && ChargingStation?.GeoLocation.HasValue == true && geoLocation.Value == ChargingStation.GeoLocation.Value)
+                    if (geoLocation.HasValue && ChargingStation?.GeoLocation.HasValue == true &&
+                        JToken.DeepEquals(geoLocation.Value.ToJSON(), ChargingStation.GeoLocation.Value.ToJSON()))
                         geoLocation  = null;
 
-                    if (geoLocation.HasValue && ChargingPool?.   GeoLocation.HasValue == true && geoLocation.Value == ChargingPool.   GeoLocation.Value)
+                    if (geoLocation.HasValue && ChargingPool?.GeoLocation.HasValue == true &&
+                        JToken.DeepEquals(geoLocation.Value.ToJSON(), ChargingPool.GeoLocation.Value.ToJSON()))
                         geoLocation  = null;
 
                 }
@@ -1371,8 +1370,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                              new JProperty("@id",                 Id.ToString()),
 
+                                       !ChargingTariffIds.IsEmpty
+                                           ? new JProperty("tariffIds", new JArray(ChargingTariffIds.Select(id => id.ToString())))
+                                           : null,
+
                                        !Embedded
                                            ? new JProperty("@context",            JSONLDContext)
+                                           : null,
+
+                                       Name.IsNotNullOrEmpty()
+                                           ? new JProperty("name",                Name.ToJSON())
+                                           : null,
+
+                                       PhysicalReference is not null
+                                           ? new JProperty("physicalReference",   PhysicalReference)
                                            : null,
 
                                        Description.IsNotNullOrEmpty()
@@ -1385,11 +1396,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  () => new JProperty("brand",     Brands.ToJSON()))
                                            : null,
 
-                                       !Embedded && DataSource != ChargingStation?.DataSource
+                                       DataSource is not null
                                            ? new JProperty("dataSource", DataSource)
                                            : null,
 
-                                       !Embedded && DataLicenses != ChargingStation?.DataLicenses && DataLicenses.Any()
+                                       DataLicenses.Any()
                                            ? ExpandDataLicenses.Switch(
                                                  () => new JProperty("dataLicenseIds",             new JArray(DataLicenses.SafeSelect(dataLicense => dataLicense.Id.ToString()))),
                                                  () => new JProperty("dataLicenses",               DataLicenses.ToJSON()))
@@ -1459,25 +1470,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            : null,
 
                                        ChargingModes.SafeAny()
-                                           ? new JProperty("chargingModes",         new JArray(ChargingModes.SafeSelect(chargingMode => chargingMode.ToText())))
+                                           ? new JProperty("chargingModes",         new JArray(ChargingModes.SelectMany(chargingMode => chargingMode.ToText()).Distinct()))
                                            : null,
 
                                              new JProperty("currentType",           CurrentType.ToText()),
 
-                                       MaxVoltage.HasValue && MaxVoltage.Value.Value > 0
-                                           ? new JProperty("averageVoltage",        Math.Round(MaxVoltage.Value.Value, 2))
+                                       MaxVoltage.HasValue
+                                           ? new JProperty("averageVoltage",        MaxVoltage.Value.Value)
                                            : null,
 
-                                       MaxCurrent.    HasValue && MaxCurrent.    Value.Value > 0
-                                           ? new JProperty("maxCurrent",            Math.Round(MaxCurrent.    Value.Value, 2))
+                                       MaxCurrent.    HasValue
+                                           ? new JProperty("maxCurrent",            MaxCurrent.Value.Value)
                                            : null,
 
-                                       MaxPower.      HasValue && MaxPower.      Value.Value > 0
-                                           ? new JProperty("maxPower",              Math.Round(MaxPower.      Value.Value, 2))
+                                       MaxPower.      HasValue
+                                           ? new JProperty("maxPower",              MaxPower.Value.Value)
                                            : null,
 
-                                       MaxCapacity.   HasValue && MaxCapacity.   Value.Value > 0
-                                           ? new JProperty("maxCapacity",           Math.Round(MaxCapacity.   Value.Value, 2))
+                                       MaxCapacity.   HasValue
+                                           ? new JProperty("maxCapacity",           MaxCapacity.Value.Value)
                                            : null,
 
                                        ChargingConnectors.Any()

@@ -436,7 +436,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => TryParse(Text,
                         out EVSEId,
-                        null);
+                        EVSEIdParsingMode.relaxed);
 
 
         /// <summary>
