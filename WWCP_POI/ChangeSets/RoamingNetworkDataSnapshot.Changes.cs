@@ -39,16 +39,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Apply the ordered operations atomically, sharing unchanged entities with this version.
         /// </summary>
-        /// <param name="changeSet">The operations and expected base revision.</param>
+        /// <param name="changeSet">The operations, expected base revision and before/after content identifiers.</param>
         /// <param name="verifySignature">An optional verifier, required for signed change sets.</param>
         public RoamingNetworkDataSnapshot ApplyChangeSet(RoamingNetworkChangeSet                  changeSet,
-                                                         Func<RoamingNetworkChangeSet, Boolean>?  verifySignature = null)
+                                                         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifySignature = null)
         {
 
             ArgumentNullException.ThrowIfNull(changeSet);
 
             ValidateChangeSet(changeSet);
-            VerifyChangeSetSignature(changeSet, verifySignature);
+            VerifyChangeSetSignatures(changeSet, verifySignature);
+
+            var result = ApplyOperations(changeSet);
+            ExpectETags(changeSet, "AfterETags", changeSet.AfterETags, result);
+            return result;
+
+        }
+
+        /// <summary>
+        /// Prepare an unsigned batch by calculating its source and resulting content identifiers.
+        /// All operations are validated on local immutable maps; no version is published.
+        /// </summary>
+        public RoamingNetworkChangeSet CreateChangeSet(String id,
+                                                       DateTimeOffset createdAt,
+                                                       ImmutableArray<RoamingNetworkChange> changes)
+        {
+            var before = ETags;
+            var pending = new RoamingNetworkChangeSet(id, Root.Id, Revision, createdAt, changes, before, before);
+            ValidateChangeSet(pending);
+            var result = ApplyOperations(pending);
+            return new RoamingNetworkChangeSet(id, Root.Id, Revision, pending.CreatedAt, changes, before,
+                                              ContentETags(pending, "AfterETags", result));
+        }
+
+        // Only preparation and the checked public applier can use this unpublished working result.
+        private RoamingNetworkDataSnapshot ApplyOperations(RoamingNetworkChangeSet changeSet)
+        {
 
             var map        = Entities;
             var references = TariffReferences;
@@ -108,30 +134,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Revision == Int64.MaxValue)
                 throw new RoamingNetworkChangeSetException(changeSet.Id, null, "The revision cannot be incremented further.");
 
+            ExpectETags(changeSet, "BeforeETags", changeSet.BeforeETags, this);
+
         }
 
-        private static void VerifyChangeSetSignature(RoamingNetworkChangeSet                  changeSet,
-                                                     Func<RoamingNetworkChangeSet, Boolean>?  verifySignature)
+        private static ImmutableArray<ETag> ContentETags(RoamingNetworkChangeSet changeSet, String field,
+                                                           RoamingNetworkDataSnapshot snapshot)
+        {
+            try { return snapshot.ETags; }
+            catch (Exception exception)
+            {
+                throw new RoamingNetworkChangeSetException(changeSet.Id, null,
+                    $"{field}: cannot compute canonical POI content identifiers.", exception);
+            }
+        }
+
+        private static void ExpectETags(RoamingNetworkChangeSet changeSet, String field,
+                                        ImmutableArray<ETag> expected, RoamingNetworkDataSnapshot snapshot)
+        {
+            var actual = ContentETags(changeSet, field, snapshot);
+            for (var index = 0; index < actual.Length; index++)
+                if (expected[index] != actual[index])
+                    throw new RoamingNetworkChangeSetException(changeSet.Id, null,
+                        $"{field} conflict: expected '{expected[index]}', actual '{actual[index]}'.");
+        }
+
+        private static void VerifyChangeSetSignatures(RoamingNetworkChangeSet                  changeSet,
+                                                     Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifySignature)
         {
 
-            if (changeSet.Signature is null)
+            if (changeSet.Signatures.IsEmpty)
                 return;
 
             if (verifySignature is null)
                 throw new RoamingNetworkChangeSetException(changeSet.Id, null, "A signed change set requires a signature verifier.");
 
-            try
+            for (var index = 0; index < changeSet.Signatures.Length; index++)
             {
-                if (!verifySignature(changeSet))
-                    throw new RoamingNetworkChangeSetException(changeSet.Id, null, "The change set signature is invalid.");
-            }
-            catch (RoamingNetworkChangeSetException)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                throw new RoamingNetworkChangeSetException(changeSet.Id, null, "Signature verification failed.", exception);
+                var signature = changeSet.Signatures[index];
+                try
+                {
+                    if (!verifySignature(changeSet, signature))
+                        throw new RoamingNetworkChangeSetException(changeSet.Id, null,
+                            $"Signatures[{index}] ('{signature.KeyId}'): signature is invalid.");
+                }
+                catch (RoamingNetworkChangeSetException)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    throw new RoamingNetworkChangeSetException(changeSet.Id, null,
+                        $"Signatures[{index}] ('{signature.KeyId}'): verification failed.", exception);
+                }
             }
 
         }
@@ -190,7 +245,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("The root network cannot be removed.");
 
             if (change.OldValue is { } expected)
-                Expect(expected, Json(entity.Key, map), "Entity document");
+            {
+                var expectedJSON = ReadJSON(expected.GetRawText());
+                POIRepresentation.RemoveETags(expectedJSON, key.Type.ToString());
+                Expect(JsonDocumentValue(MetrologyJson.NormalizeHierarchy(expectedJSON, key.Type).
+                                            ToString(Newtonsoft.Json.Formatting.None)),
+                       Json(entity.Key, map), "Entity document");
+            }
 
             var removed = Descendants(entity.Key, map).ToArray();
 
@@ -231,10 +292,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!entity.Properties.TryGetValue(property, out var actual))
                     throw new ArgumentException($"Property '{property}' is absent; it does not match the expected old value.");
 
-                Expect(PropertyValue(property, expected), actual, property);
+                Expect(PropertyValue(key.Type, property, expected), actual, property);
             }
 
-            var properties = entity.Properties.SetItem(property, PropertyValue(property, change.NewValue!.Value));
+            var replacement = new JObject(new JProperty(property, ReadToken(change.NewValue!.Value.GetRawText())));
+            POIRepresentation.RemoveETags(replacement, key.Type.ToString());
+            POIRepresentation.InitializeNestedMetadata(replacement, key.Type.ToString(), timestamp);
+            var properties = entity.Properties.SetItem(property, PropertyValue(key.Type, property,
+                JsonDocumentValue(replacement[property]!.ToString(Newtonsoft.Json.Formatting.None))));
 
             map = map.SetItem(key, entity.With(properties: properties));
 
@@ -362,9 +427,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        private static JsonElement PropertyValue(String       property,
-                                                 JsonElement  value)
+        private static JsonElement PropertyValue(InfrastructureEntityType type,
+                                                 String                   property,
+                                                 JsonElement              value)
         {
+
+            if (MetrologyJson.HasQuantities(type, property) && value.ValueKind != JsonValueKind.Null)
+                return JsonDocumentValue(MetrologyJson.NormalizeProperty(type, property, ReadToken(value.GetRawText())).
+                                             ToString(Newtonsoft.Json.Formatting.None));
 
             if (property is not ("status" or "adminStatus"))
                 return value;

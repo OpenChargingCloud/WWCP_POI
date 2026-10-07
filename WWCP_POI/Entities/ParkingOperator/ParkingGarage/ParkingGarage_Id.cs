@@ -27,7 +27,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of a parking building.
     /// </summary>
-    public class ParkingGarage_Id : IId,
+    public sealed class ParkingGarage_Id : IId,
                                     IEquatable<ParkingGarage_Id>,
                                     IComparable<ParkingGarage_Id>
 

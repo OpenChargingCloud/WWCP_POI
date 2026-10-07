@@ -29,7 +29,7 @@ using org.GraphDefined.Vanaheimr.Illias;
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
-    public partial class EVSE
+    public sealed partial class EVSE
     {
 
         #region Parse/TryParse
@@ -68,6 +68,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 ArgumentNullException.ThrowIfNull(ChargingStation);
                 InfrastructureJson.Validate(JSON, JSONLDContext);
+                if (CustomEVSEParser is null)
+                    InfrastructureJson.ValidateFields(JSON, "@id", "@context", "name", "description", "dataSource", "customData",
+                                                      "created", "lastChange", "status", "adminStatus", "physicalReference",
+                                                      "roamingNetworkId", "roamingNetwork", "chargingStationOperatorId", "chargingStationOperator",
+                                                      "chargingPoolId", "chargingPool", "chargingStationId", "chargingStation",
+                                                      "geoLocation", "brandId", "brand", "dataLicenses", "dataLicenseIds",
+                                                      "chargingModes", "currentType", "maxVoltage", "maxCurrent", "maxPower", "maxCapacity",
+                                                      "energyMeter", "isFreeOfCharge", "socketOutlets", "tariffIds",
+                                                      "address", "authenticationModes", "openingTimes");
 
                 var idText = InfrastructureJson.Text(JSON, "@id");
 
@@ -87,15 +96,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 InfrastructureJson.Unique(connectors, connector => connector.Id, "socketOutlets");
 
-                var currentType = JSON["currentType"] is { } current
-                                      ? InfrastructureJson.At("currentType", () => InfrastructureJson.Flags<CurrentTypes>(current))
+                var currentType = JSON["currentType"] is not null
+                                      ? InfrastructureJson.Array(JSON, "currentType", InfrastructureJson.Flags<CurrentTypes>).Reduce()
                                       : CurrentTypes.AC_ThreePhases;
 
                 var modes    = InfrastructureJson.Array(JSON, "chargingModes", InfrastructureJson.Flags<ChargingModes>);
-                var voltage  = InfrastructureJson.Scalar<Volt>(JSON, "averageVoltage", Volt.TryParse);
-                var amperage = InfrastructureJson.Scalar<Ampere>(JSON, "maxCurrent", Ampere.TryParse);
-                var power    = InfrastructureJson.Scalar<Watt>(JSON, "maxPower", Watt.TryParse);
-                var capacity = InfrastructureJson.Scalar<WattHour>(JSON, "maxCapacity", WattHour.TryParse);
+                var voltage  = MetrologyJson.Read<Volt>(JSON, "maxVoltage", Volt.TryParse);
+                var amperage = MetrologyJson.Read<Ampere>(JSON, "maxCurrent", Ampere.TryParse);
+                var power    = MetrologyJson.Read<Watt>(JSON, "maxPower", Watt.TryParse);
+                var capacity = MetrologyJson.Read<WattHour>(JSON, "maxCapacity", WattHour.TryParse);
 
                 if (voltage?.Value < 0 || amperage?.Value < 0 || power?.Value < 0 || capacity?.Value < 0)
                     throw new ArgumentException("Electrical limits must not be negative.");
@@ -149,7 +158,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static void ValidateInheritedStationData(JObject JSON, ChargingStation Station)
         {
 
-            // Legacy EVSE documents may include station data. It must agree with the supplied parent.
+            // Standalone EVSE exports include station data, which must agree with the supplied parent.
             foreach (var field in new[] { "address", "authenticationModes", "openingTimes" })
             {
                 if (JSON[field] is not { } inherited)

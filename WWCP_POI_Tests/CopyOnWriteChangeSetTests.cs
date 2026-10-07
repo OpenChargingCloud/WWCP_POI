@@ -72,7 +72,7 @@ namespace WWCP_POI_Tests
                               "currentType": [
                                 "DC"
                               ],
-                              "maxPower": 100000,
+                              "maxPower": "100000 W",
                               "socketOutlets": [
                                 {
                                   "@id": "1",
@@ -86,7 +86,7 @@ namespace WWCP_POI_Tests
                               "currentType": [
                                 "AC_ThreePhases"
                               ],
-                              "maxPower": 22000,
+                              "maxPower": "22000 W",
                               "socketOutlets": [
                                 {
                                   "@id": "1",
@@ -106,7 +106,7 @@ namespace WWCP_POI_Tests
 
         private static RoamingNetworkChangeSet Set(RoamingNetwork                 network,
                                                    params RoamingNetworkChange[]  changes)
-            => new("change-a", network.Id.ToString(), network.Revision, CommitTime, [.. changes]);
+            => network.CreateChangeSet("change-a", CommitTime, [.. changes]);
 
         [Test]
         public void Property_update_creates_a_new_version_and_shares_unchanged_entities()
@@ -117,7 +117,7 @@ namespace WWCP_POI_Tests
             var before = source.ToJSONSnapshot();
             var untouched = oldData.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E2");
             var changed = source.ApplyChangeSet(Set(source,
-                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", Json("100000"), Json("150000.125"))));
+                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", Json("\"100000 W\""), Json("\"150000.125 W\""))));
 
             Assert.That(changed, Is.Not.SameAs(source));
             Assert.That(changed.Revision, Is.EqualTo(1));
@@ -160,10 +160,10 @@ namespace WWCP_POI_Tests
 
             var source = Network();
             var changed = source.ApplyChangeSet(Set(source,
-                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", Json("100000"), Json("120000")),
-                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", Json("120000"), Json("150000"))));
+                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", Json("\"100000 W\""), Json("\"120000 W\"")),
+                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", Json("\"120000 W\""), Json("\"150000 W\""))));
 
-            Assert.That(changed.DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["maxPower"].GetInt32(), Is.EqualTo(150000));
+            Assert.That(changed.DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["maxPower"].GetString(), Is.EqualTo("150 kW"));
 
         }
 
@@ -173,14 +173,14 @@ namespace WWCP_POI_Tests
 
             var source = Network();
             var snapshot = source.DataSnapshot;
-            var set = Set(source,
-                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", Json("100000"), Json("120000")),
-                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E2", "maxPower", Json("999"), Json("150000")));
+            var set = new RoamingNetworkChangeSet("change-a", source.Id.ToString(), snapshot.Revision, CommitTime, [
+                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", Json("\"100000 W\""), Json("\"120000 W\"")),
+                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E2", "maxPower", Json("\"999 W\""), Json("\"150000 W\""))], snapshot.ETags, snapshot.ETags);
             var exception = Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(set));
 
             Assert.That(exception!.OperationIndex, Is.EqualTo(1));
             Assert.That(source.DataSnapshot, Is.SameAs(snapshot));
-            Assert.That(source.DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["maxPower"].GetDecimal(), Is.EqualTo(100000m));
+            Assert.That(source.DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["maxPower"].GetString(), Is.EqualTo("100 kW"));
             Assert.That(source.TryApplyChangeSet(set, out var result, out var error), Is.False);
             Assert.That(result, Is.Null);
             Assert.That(error, Does.Contain("Changes[1]"));
@@ -217,15 +217,15 @@ namespace WWCP_POI_Tests
         }
 
         [Test]
-        public void Mutable_compatibility_projections_do_not_modify_authoritative_snapshot_data()
+        public void Detached_dependency_texts_do_not_modify_immutable_entity_data()
         {
 
             var source = Network();
             var next = source.ApplyChangeSet(Set(source));
             var before = next.ToJSONSnapshot();
 
-            next.EVSEs.First().PhysicalReference = "local edit";
-            next.Name.Set(org.GraphDefined.Vanaheimr.Illias.I18NString.Create("Local name"));
+            var detachedName = next.Name.ToMutable();
+            detachedName.Set(org.GraphDefined.Vanaheimr.Illias.I18NString.Create("Local name"));
             Assert.That(JToken.DeepEquals(next.ToJSONSnapshot(), before), Is.True);
             Assert.That(source.EVSEs.First().PhysicalReference, Is.Null);
 
@@ -271,8 +271,8 @@ namespace WWCP_POI_Tests
 
             var source = Network();
 
-            Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(new("c", "network-a", 9, CommitTime, [])));
-            Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(new("c", "another-network", 0, CommitTime, [])));
+            Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(new("c", "network-a", 9, CommitTime, [], source.ETags, source.ETags)));
+            Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(new("c", "another-network", 0, CommitTime, [], source.ETags, source.ETags)));
             Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(Set(source,
                                                 RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", null, Json("-1")))));
             Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(Set(source,
@@ -285,11 +285,11 @@ namespace WWCP_POI_Tests
         {
 
             var source = Network();
-            var set = new RoamingNetworkChangeSet("signed", "network-a", 0, CommitTime, [], new("Ed25519", "key-a", "signature"));
+            var set = source.CreateChangeSet("signed", CommitTime, []).WithSignature(new("Ed25519", "key-a", "signature"));
 
             Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(set));
-            Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(set, _ => false));
-            Assert.That(source.ApplyChangeSet(set, _ => true).Revision, Is.EqualTo(1));
+            Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(set, (_, _) => false));
+            Assert.That(source.ApplyChangeSet(set, (_, _) => true).Revision, Is.EqualTo(1));
 
         }
 
@@ -409,11 +409,12 @@ namespace WWCP_POI_Tests
             Assert.That(key, Is.EqualTo(canonical));
             Assert.That(key.GetHashCode(), Is.EqualTo(canonical.GetHashCode()));
 
-            var change = RoamingNetworkChange.UpdateProperty("EVSE", "deabcE1", "maxPower", Json("100000"), Json("120000"));
-            var set = new RoamingNetworkChangeSet("c", "NETWORK-A", 0, CommitTime, [change]);
+            var change = RoamingNetworkChange.UpdateProperty("EVSE", "deabcE1", "maxPower", Json("\"100000 W\""), Json("\"120000 W\""));
+            var prepared = source.CreateChangeSet("c", CommitTime, [change]);
+            var set = new RoamingNetworkChangeSet("c", "NETWORK-A", 0, CommitTime, [change], prepared.BeforeETags, prepared.AfterETags);
 
             Assert.That(source.ApplyChangeSet(set).DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1")
-                                                               .Properties["maxPower"].GetDecimal(), Is.EqualTo(120000m));
+                                                               .Properties["maxPower"].GetString(), Is.EqualTo("120 kW"));
 
         }
 
@@ -429,14 +430,15 @@ namespace WWCP_POI_Tests
                                             {
 
                                                 versions[index] = source.ApplyChangeSet(Set(source,
-                                                                                        RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", Json("100000"), Json((120000 + index).ToString()))));
+                                                                                        RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "maxPower", Json("\"100000 W\""), Json(JsonSerializer.Serialize((120000 + index).ToString(System.Globalization.CultureInfo.InvariantCulture) + " W")))));
 
                                             });
 
             for (var index = 0; index < versions.Length; index++)
             {
                 Assert.That(versions[index].Revision, Is.EqualTo(1));
-                Assert.That(versions[index].DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["maxPower"].GetInt32(), Is.EqualTo(120000 + index));
+                Assert.That(versions[index].DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["maxPower"].GetString(),
+                            Is.EqualTo(((120000m + index) / 1000m).ToString(System.Globalization.CultureInfo.InvariantCulture) + " kW"));
                 Assert.That(versions[index].DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E2"),
                                                                         Is.SameAs(data.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E2")));
             }
@@ -467,7 +469,7 @@ namespace WWCP_POI_Tests
 
             var json = new JObject(new JProperty("@id", "network-a"), new JProperty("name", new JObject()));
             var evses = new JArray(Enumerable.Range(1, 1000).Select(index => new JObject(
-                                                new JProperty("@id", $"DE*ABC*E{index}"), new JProperty("currentType", new JArray("DC")), new JProperty("maxPower", 100000))));
+                                                new JProperty("@id", $"DE*ABC*E{index}"), new JProperty("currentType", new JArray("DC")), new JProperty("maxPower", "100 kW"))));
             var station = new JObject(new JProperty("@id", "DE*ABC*S1"), new JProperty("EVSEs", evses));
             var pool = new JObject(new JProperty("@id", "DE*ABC*P1"), new JProperty("chargingStations", new JArray(station)));
             var op = new JObject(new JProperty("@id", "DE*ABC"), new JProperty("chargingPools", new JArray(pool)));
@@ -477,7 +479,7 @@ namespace WWCP_POI_Tests
             var source = RoamingNetwork.Parse(json);
             var previous = source.DataSnapshot;
             var changed = source.ApplyChangeSet(Set(source,
-                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E500", "maxPower", Json("100000"), Json("120000"))));
+                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E500", "maxPower", Json("\"100000 W\""), Json("\"120000 W\""))));
             var replacementCount = previous.Entities.Count(entry => !ReferenceEquals(entry.Value, changed.DataSnapshot.Entities[entry.Key]));
 
             Assert.That(previous.Entities.Count, Is.EqualTo(1004));
@@ -523,7 +525,7 @@ namespace WWCP_POI_Tests
             var export = source.DataSnapshot.GetEntityJSON(InfrastructureEntityType.EVSE, "DE*ABC*E1");
 
             export["maxPower"] = 1;
-            Assert.That(source.DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["maxPower"].GetDecimal(), Is.EqualTo(100000m));
+            Assert.That(source.DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["maxPower"].GetString(), Is.EqualTo("100 kW"));
 
             RoamingNetworkChange operation;
 

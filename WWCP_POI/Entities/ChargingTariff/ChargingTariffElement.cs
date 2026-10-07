@@ -85,7 +85,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #endregion
 
             foreach (var component in components)
-                if (component.StepSize == 0 || !Enum.IsDefined(component.Type))
+                if (!component.IsValid)
                     throw new ArgumentException("Invalid price component.", nameof(ChargingPriceComponents));
             var restrictions = ChargingTariffRestrictions?.ToImmutableArray() ?? [];
             if (restrictions.Any(restriction => restriction is null))
@@ -121,7 +121,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public JObject ToJSON()
 
-            => JSONObject.Create(
+            => POIRepresentation.AddETags(this, JSONObject.Create(
 
                    new JProperty("priceComponents",
                                  new JArray(ChargingPriceComponents.
@@ -133,7 +133,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       Select(restriction => restriction.ToJSON())))
                        : null
 
-               );
+               ));
 
         #endregion
 

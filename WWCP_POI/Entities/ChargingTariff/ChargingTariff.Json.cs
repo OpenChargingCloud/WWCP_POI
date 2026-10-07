@@ -29,7 +29,7 @@ using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
-    public partial class ChargingTariff
+    public sealed partial class ChargingTariff
     {
 
         /// <summary>
@@ -121,7 +121,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 InfrastructureJson.Validate(JSON, JSONLDContext);
                 InfrastructureJson.ValidateFields(JSON,
                                                   "@id", "@context", "name", "description",
-                                                  "currency", "elements", "brand", "brandId", "URI", "energy_mix",
+                                                  "currency", "elements", "brand", "brandId", "uri", "energyMix",
                                                   "dataSource", "customData", "created", "lastChange", "status", "adminStatus",
                                                   "chargingStationOperatorId", "roamingNetworkId");
 
@@ -137,10 +137,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var elements = InfrastructureJson.Array(JSON, "elements",
                                                         token => ChargingTariffElement.Parse(InfrastructureJson.Entry(token)));
                 var brand    = ParseTariffBrand(JSON, Context);
-                var uri      = InfrastructureJson.Text(JSON, "URI");
+                var uri      = InfrastructureJson.Text(JSON, "uri");
 
                 if (uri is not null && !Uri.TryCreate(uri, UriKind.Absolute, out _))
-                    throw new ArgumentException("URI: expected an absolute URI.");
+                    throw new ArgumentException("uri: expected an absolute URI.");
 
                 var parsed = new ChargingTariff(id,
                                                Operator,
@@ -149,8 +149,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                elements,
                                                currency,
                                                Brand:      brand,
-                                               TariffURL:  InfrastructureJson.Scalar<URL>(JSON, "URI", URL.TryParse),
-                                               EnergyMix:  InfrastructureJson.Object(JSON, "energy_mix") is { } mix
+                                               TariffURL:  InfrastructureJson.Scalar<URL>(JSON, "uri", URL.TryParse),
+                                               EnergyMix:  InfrastructureJson.Object(JSON, "energyMix") is { } mix
                                                                ? POI.EnergyMix.Parse(mix)
                                                                : null,
                                                DataSource: InfrastructureJson.Text(JSON, "dataSource"),

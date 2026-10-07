@@ -27,7 +27,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of an Electric Vehicle parking space (EVPS Id).
     /// </summary>
-    public class ParkingSpaceGroup_Id : IId,
+    public sealed class ParkingSpaceGroup_Id : IId,
                                         IEquatable<ParkingSpaceGroup_Id>,
                                         IComparable<ParkingSpaceGroup_Id>
 

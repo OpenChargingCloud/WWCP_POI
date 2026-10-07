@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -34,7 +34,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// The charging transparency software.
     /// This information will e.g. be used for the German calibration law.
     /// </summary>
-    public partial class TransparencySoftware : IEquatable<TransparencySoftware>,
+    public sealed partial class TransparencySoftware : IEquatable<TransparencySoftware>,
                                         IComparable<TransparencySoftware>,
                                         IComparable
     {
@@ -102,7 +102,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Version">The version of the transparency software.</param>
         /// <param name="OpenSourceLicense">The Open Source license of the transparency software.</param>
         /// <param name="Vendor">The vendor of the transparency software.</param>
-        /// 
+        ///
         /// <param name="Logo">An optional URL where to find a small logo of the transparency software.</param>
         /// <param name="HowToUse">An optional URL where to find a manual how to use the transparency software.</param>
         /// <param name="MoreInformation">An optional URL where to find more information about the transparency software.</param>
@@ -223,22 +223,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : null,
 
                            HowToUse.            HasValue
-                               ? new JProperty("how_to_use",              HowToUse.            ToString())
+                               ? new JProperty("howToUse",              HowToUse.            ToString())
                                : null,
 
                            MoreInformation.     HasValue
-                               ? new JProperty("more_information",        MoreInformation.     ToString())
+                               ? new JProperty("moreInformation",        MoreInformation.     ToString())
                                : null,
 
                            SourceCodeRepository.HasValue
-                               ? new JProperty("source_code_repository",  SourceCodeRepository.ToString())
+                               ? new JProperty("sourceCodeRepository",  SourceCodeRepository.ToString())
                                : null
 
                        );
 
-            return CustomTransparencySoftwareSerializer is not null
+            return POIRepresentation.AddETags(this, CustomTransparencySoftwareSerializer is not null
                        ? CustomTransparencySoftwareSerializer(this, JSON)
-                       : JSON;
+                       : JSON);
 
         }
 

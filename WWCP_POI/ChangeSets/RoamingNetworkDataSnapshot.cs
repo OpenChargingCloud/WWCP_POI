@@ -32,10 +32,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// Persistent immutable infrastructure data. Applying a change set shares unchanged entities
-    /// and immutable map branches; mutable legacy POI projections are not part of this storage.
+    /// and immutable map branches; mutable runtime POI projections are not part of this storage.
     /// </summary>
     public sealed partial class RoamingNetworkDataSnapshot
     {
+
+        private readonly Lazy<ImmutableArray<ETag>> contentETags;
 
         #region Properties
 
@@ -81,6 +83,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Revision           = revision;
             AppliedChangeSetId = appliedChangeSetId;
             TariffReferences   = tariffReferences ?? TariffReferenceMap.Empty;
+            contentETags       = new(() => POIRepresentation.GetETags(this));
 
         }
 
@@ -111,17 +114,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public JObject ToJSON()
 
-            => ReadJSON(Export(Root));
+            => POIRepresentation.AddETags(this, ReadJSON(Export(Root)));
 
         /// <summary>
-        /// Write a nested snapshot directly, avoiding a complete intermediate JSON object tree.
+        /// Write a frozen snapshot, optionally including its derived POI content identifiers.
         /// </summary>
-        public void WriteTo(Utf8JsonWriter writer)
+        public void WriteTo(Utf8JsonWriter writer, Boolean IncludeETags = true)
         {
 
             ArgumentNullException.ThrowIfNull(writer);
 
-            WriteNode(writer, Root);
+            WriteNode(writer, Root, IncludeETags);
 
         }
 

@@ -34,67 +34,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A parking space.
     /// </summary>
-    public class ParkingSpace : AEMobilityEntity<ParkingSpace_Id,
+    public sealed partial class ParkingSpace : AImmutableEMobilityEntity<ParkingSpace_Id,
                                                  ParkingSpaceAdminStatusTypes,
                                                  ParkingSpaceStatusTypes>,
                                 IEquatable<ParkingSpace>, IComparable<ParkingSpace>, IComparable
     {
 
-        #region Data
-
-        #endregion
 
         #region Properties
 
-        #region Name
-
-        private I18NString _Name;
-
-        /// <summary>
-        /// The official (multi-language) name of the parking space.
-        /// </summary>
-        [Mandatory]
-        public I18NString Name
-        {
-
-            get
-            {
-                return _Name;
-            }
-
-            set
-            {
-                SetProperty<I18NString>(ref _Name, value);
-            }
-
-        }
-
-        #endregion
-
-        #region Description
-
-        private I18NString _Description;
-
-        /// <summary>
-        /// An optional additional (multi-language) description of the parking space.
-        /// </summary>
-        [Optional]
-        public I18NString Description
-        {
-
-            get
-            {
-                return _Description;
-            }
-
-            set
-            {
-                SetProperty<I18NString>(ref _Description, value);
-            }
-
-        }
-
-        #endregion
 
         #region OSM_WayId
 
@@ -112,7 +60,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _OSM_WayId;
             }
 
-            set
+            private set
             {
                 SetProperty<String>(ref _OSM_WayId, value);
             }
@@ -123,13 +71,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Geometry
 
-        private List<GeoCoordinate> _Geometry;
+        private readonly System.Collections.Immutable.ImmutableArray<GeoCoordinate> _Geometry;
 
         /// <summary>
         /// An optional polygon geometry of the parking space.
         /// </summary>
         [Optional]
-        public List<GeoCoordinate> Geometry
+        public System.Collections.Immutable.ImmutableArray<GeoCoordinate> Geometry
         {
             get
             {
@@ -151,13 +99,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Sensors
 
-        private ReactiveSet<String> _Sensors;
+        private readonly System.Collections.Immutable.ImmutableArray<String> _Sensors;
 
         /// <summary>
         /// Parking sensors at the parking space.
         /// </summary>
         [Optional]
-        public ReactiveSet<String> Sensors
+        public System.Collections.Immutable.ImmutableArray<String> Sensors
         {
             get
             {
@@ -173,13 +121,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ChargingStations
 
-        private ReactiveSet<ChargingStation> _ChargingStations;
+        private readonly System.Collections.Immutable.ImmutableArray<ChargingStation> _ChargingStations;
 
         /// <summary>
         /// Charging stations reachable from this parking space.
         /// </summary>
         [Optional]
-        public ReactiveSet<ChargingStation> ChargingStations
+        public System.Collections.Immutable.ImmutableArray<ChargingStation> ChargingStations
         {
             get
             {
@@ -191,9 +139,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Events
-
-        #endregion
 
         #region Constructor(s)
 
@@ -214,19 +159,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Create a new parking space having the given identification.
         /// </summary>
         /// <param name="Id">The unique identification of the parking space.</param>
-        public ParkingSpace(ParkingSpace_Id  Id)
-            : base(Id)
+        public ParkingSpace(ParkingSpace_Id Id, I18NString? Name = null, I18NString? Description = null,
+                              String? OSM_WayId = null, IEnumerable<GeoCoordinate>? Geometry = null,
+                              IEnumerable<ChargingStation>? ChargingStations = null, IEnumerable<String>? Sensors = null)
+            : base(Id, Name ?? I18NString.Create(Id.ToString()), Description)
         {
-
-            #region Init data and properties
-
-            this._Name              = new I18NString(Languages.en, Id.ToString());
-            this._Description       = new I18NString();
-            this._Geometry          = new List<GeoCoordinate>();
-            this._ChargingStations  = new ReactiveSet<ChargingStation>();
-
-            #endregion
-
+            this._OSM_WayId = OSM_WayId;
+            this._Geometry = ImmutablePOIValues.CopyItems(Geometry);
+            this._ChargingStations = ImmutablePOIValues.CopyItems(ChargingStations);
+            this._Sensors = ImmutablePOIValues.CopyItems(Sensors);
         }
 
         #endregion

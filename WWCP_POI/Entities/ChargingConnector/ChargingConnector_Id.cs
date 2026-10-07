@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -130,7 +130,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Parse the given number as a charging connector identification.
         /// </summary>
-        /// <param name="Number">A numeric representation of a charging connector identification.</param>
+        /// <param name="number">A numeric representation of a charging connector identification.</param>
         public static ChargingConnector_Id Parse(UInt16 Number)
         {
 
@@ -167,7 +167,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Try to parse the given number as a charging connector identification.
         /// </summary>
-        /// <param name="Number">A numeric representation of a charging connector identification.</param>
+        /// <param name="number">A numeric representation of a charging connector identification.</param>
         public static ChargingConnector_Id? TryParse(UInt16 Number)
         {
 
@@ -215,7 +215,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Try to parse the given number as a charging connector identification.
         /// </summary>
-        /// <param name="Number">A numeric representation of a charging connector identification.</param>
+        /// <param name="number">A numeric representation of a charging connector identification.</param>
         /// <param name="ChargingConnectorId">The parsed charging connector identification.</param>
         public static Boolean TryParse(UInt16 Number, out ChargingConnector_Id ChargingConnectorId)
         {

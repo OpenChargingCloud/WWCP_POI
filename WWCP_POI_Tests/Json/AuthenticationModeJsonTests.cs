@@ -58,7 +58,7 @@ namespace WWCP_POI_Tests.Json
 
             yield return new AuthenticationModes.NoAuthenticationRequired();
 
-            yield return new AuthenticationModes("VendorDefinedMode");
+            yield return AuthenticationModes.FromType("VendorDefinedMode");
 
         }
 
@@ -139,9 +139,9 @@ namespace WWCP_POI_Tests.Json
         [TestCase("{\"type\":\"RFID\",\"cardTypes\":[0]}")]
         [TestCase("{\"type\":\"RFID\",\"brandIds\":[\"\"]}")]
         [TestCase("{\"type\":\"SMS\"}")]
-        [TestCase("{\"type\":\"SMS\",\"Number\":123}")]
-        [TestCase("{\"type\":\"SMS\",\"Number\":\"123\",\"StationCode\":{}}")]
-        [TestCase("{\"type\":\"PhoneCall\",\"Number\":\" \"}")]
+        [TestCase("{\"type\":\"SMS\",\"number\":123}")]
+        [TestCase("{\"type\":\"SMS\",\"number\":\"123\",\"stationCode\":{}}")]
+        [TestCase("{\"type\":\"PhoneCall\",\"number\":\" \"}")]
         public void Invalid_authentication_json_is_rejected(string text)
         {
 

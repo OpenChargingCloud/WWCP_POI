@@ -32,7 +32,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A grid operator.
     /// </summary>
-    public class GridOperator : AEMobilityEntity<GridOperator_Id,
+    public sealed partial class GridOperator : AImmutableEMobilityEntity<GridOperator_Id,
                                                  GridOperatorAdminStatusTypes,
                                                  GridOperatorStatusTypes>,
                                 IEquatable <GridOperator>,
@@ -41,6 +41,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     {
 
         #region Data
+
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/gridOperator";
 
         /// <summary>
         /// The default max size of the admin status list.
@@ -74,7 +76,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _Logo;
             }
 
-            set
+            private set
             {
                 if (_Logo != value)
                     SetProperty(ref _Logo, value);
@@ -97,17 +99,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return _Address;
+                return ImmutablePOIValues.Copy(_Address);
             }
 
-            set
+            private set
             {
 
                 if (value is null)
                     _Address = value;
 
                 if (_Address != value)
-                    SetProperty(ref _Address, value);
+                    SetProperty(ref _Address, ImmutablePOIValues.Copy(value));
 
             }
 
@@ -131,7 +133,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _GeoLocation;
             }
 
-            set
+            private set
             {
 
                 //if (value is null)
@@ -162,7 +164,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _Telephone;
             }
 
-            set
+            private set
             {
                 if (_Telephone != value)
                     SetProperty(ref _Telephone, value);
@@ -188,7 +190,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _EMailAddress;
             }
 
-            set
+            private set
             {
                 if (_EMailAddress != value)
                     SetProperty(ref _EMailAddress, value);
@@ -214,7 +216,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _Homepage;
             }
 
-            set
+            private set
             {
                 if (_Homepage != value)
                     SetProperty(ref _Homepage, value);
@@ -240,7 +242,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _HotlinePhoneNumber;
             }
 
-            set
+            private set
             {
                 if (_HotlinePhoneNumber != value)
                     SetProperty(ref _HotlinePhoneNumber, value);
@@ -253,19 +255,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data licenses
 
-        private readonly ConcurrentDictionary<DataLicense_Id, DataLicense> dataLicenses = [];
+        private readonly System.Collections.Immutable.ImmutableArray<DataLicense> dataLicenses;
 
         /// <summary>
         /// The license of the roaming network data.
         /// </summary>
         [Mandatory]
         public IEnumerable<DataLicense> DataLicenses
-            => dataLicenses.Values;
+            => ImmutablePOIValues.CopyItems(dataLicenses);
 
         #endregion
 
 
-        public GridOperatorPriority Priority { get; set; }
+        public GridOperatorPriority Priority { get; }
 
         #endregion
 
@@ -292,7 +294,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             DateTime?                           LastChange                   = null,
 
                             CustomDataNew?                      CustomData                   = null,
-                            UserDefinedDictionary?              InternalData                 = null)
+                            UserDefinedDictionary?              InternalData                 = null,
+
+                            String? Logo = null, Address? Address = null, GeoCoordinate? GeoLocation = null,
+                            String? Telephone = null, String? EMailAddress = null, String? Homepage = null,
+                            String? HotlinePhoneNumber = null, IEnumerable<DataLicense>? DataLicenses = null)
 
             : base(Id,
                    Name,
@@ -312,7 +318,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
+            ArgumentNullException.ThrowIfNull(RoamingNetwork);
+            if (Id.IsNullOrEmpty)
+                throw new ArgumentException("A grid operator must have a non-empty ID.", nameof(Id));
             this.RoamingNetwork = RoamingNetwork;
+            this._Logo = Logo; this._Address = ImmutablePOIValues.Copy(Address);
+            this._GeoLocation = GeoLocation ?? default; this._Telephone = Telephone;
+            this._EMailAddress = EMailAddress; this._Homepage = Homepage; this._HotlinePhoneNumber = HotlinePhoneNumber;
+            this.Priority = Priority ?? default;
+            this.dataLicenses = ImmutablePOIValues.CopyItems(DataLicenses);
 
         }
 
@@ -379,7 +393,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                      );
 
-            return json;
+            if (!Embedded) json["@context"] = JSONLDContext;
+            if (_Address is not null) json["address"] = _Address.ToJSON(Embedded: true);
+            if (!_GeoLocation.Equals(default(GeoCoordinate))) json["geoLocation"] = InfrastructureJson.LocationJSON(_GeoLocation, true);
+            if (Telephone.IsNotNullOrEmpty()) json["telephone"] = Telephone;
+            if (EMailAddress.IsNotNullOrEmpty()) json["eMailAddress"] = EMailAddress;
+            if (Priority is not null) json["priority"] = Priority.Value;
+            return POIRepresentation.AddETags(this, InfrastructureJson.SnapshotMetadata(json, this));
 
         }
 

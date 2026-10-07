@@ -49,7 +49,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      Boolean               ExpandEVSEIds                   = false)
 
             => ParkingOperator is not null
-                   ? JSONObject.Create(
+                   ? POIRepresentation.AddETags(ParkingOperator, JSONObject.Create(
 
                          new JProperty("id",                        ParkingOperator.Id.ToString()),
 
@@ -100,7 +100,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          //                                           ? new JArray(ParkingOperator.EVSEs.             ToJSON(Embedded: true))
                          //                                           : new JArray(ParkingOperator.EVSEIds.           Select(id => id.ToString())))
 
-                     )
+                     ))
                    : null;
 
         #endregion
@@ -340,7 +340,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The parking operator is responsible for operating parking spaces.
     /// </summary>
-    public class ParkingOperator : AEMobilityEntity<ParkingOperator_Id,
+    public sealed partial class ParkingOperator : AImmutableEMobilityEntity<ParkingOperator_Id,
                                                     ParkingOperatorAdminStatusTypes,
                                                     ParkingOperatorStatusTypes>,
                                    IEquatable<ParkingOperator>, IComparable<ParkingOperator>, IComparable,
@@ -365,36 +365,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         public RoamingNetwork RoamingNetwork { get; }
 
-        #region Description
-
-        private I18NString _Description;
-
-        /// <summary>
-        /// An optional (multi-language) description of the ParkingSpace Operator.
-        /// </summary>
-        [Optional]
-        public I18NString Description
-        {
-
-            get
-            {
-                return _Description;
-            }
-
-            set
-            {
-
-                if (value is null)
-                    value = new I18NString();
-
-                if (_Description != value)
-                    SetProperty(ref _Description, value);
-
-            }
-
-        }
-
-        #endregion
 
         #region Logo
 
@@ -412,7 +382,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _Logo;
             }
 
-            set
+            private set
             {
                 if (_Logo != value)
                     SetProperty(ref _Logo, value);
@@ -435,17 +405,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return _Address;
+                return ImmutablePOIValues.Copy(_Address);
             }
 
-            set
+            private set
             {
 
                 if (value is null)
                     _Address = value;
 
                 if (_Address != value)
-                    SetProperty(ref _Address, value);
+                    SetProperty(ref _Address, ImmutablePOIValues.Copy(value));
 
             }
 
@@ -469,7 +439,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _GeoLocation;
             }
 
-            set
+            private set
             {
 
                 //if (value is null)
@@ -500,7 +470,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _Telephone;
             }
 
-            set
+            private set
             {
                 if (_Telephone != value)
                     SetProperty(ref _Telephone, value);
@@ -526,7 +496,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _EMailAddress;
             }
 
-            set
+            private set
             {
                 if (_EMailAddress != value)
                     SetProperty(ref _EMailAddress, value);
@@ -552,7 +522,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _Homepage;
             }
 
-            set
+            private set
             {
                 if (_Homepage != value)
                     SetProperty(ref _Homepage, value);
@@ -578,7 +548,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _HotlinePhoneNumber;
             }
 
-            set
+            private set
             {
                 if (_HotlinePhoneNumber != value)
                     SetProperty(ref _HotlinePhoneNumber, value);
@@ -591,14 +561,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region DataLicense
 
-        private List<DataLicense> _DataLicenses;
+        private readonly System.Collections.Immutable.ImmutableArray<DataLicense> _DataLicenses;
 
         /// <summary>
         /// The license of the charging station operator data.
         /// </summary>
         [Mandatory]
         public IEnumerable<DataLicense> DataLicenses
-            => _DataLicenses;
+            => ImmutablePOIValues.CopyItems(_DataLicenses);
 
         #endregion
 
@@ -628,7 +598,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                DateTimeOffset?                   LastChange                   = null,
 
                                CustomDataNew?                    CustomData                   = null,
-                               UserDefinedDictionary?            InternalData                 = null)
+                               UserDefinedDictionary?            InternalData                 = null,
+
+                            String? Logo = null, Address? Address = null, GeoCoordinate? GeoLocation = null,
+                            String? Telephone = null, String? EMailAddress = null, String? Homepage = null,
+                            String? HotlinePhoneNumber = null, IEnumerable<DataLicense>? DataLicenses = null,
+                            IEnumerable<ParkingGarage>? ParkingGarages = null,
+                            IEnumerable<ParkingSpace_Id>? InvalidParkingSpaceIds = null,
+                            IEnumerable<ParkingSpace_Id>? LocalParkingSpaceIds = null)
 
             : base(Id,
                    Name,
@@ -649,6 +626,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.RoamingNetwork = RoamingNetwork;
+            this._Logo = Logo; this._Address = ImmutablePOIValues.Copy(Address);
+            this._GeoLocation = GeoLocation ?? default; this._Telephone = Telephone;
+            this._EMailAddress = EMailAddress; this._Homepage = Homepage; this._HotlinePhoneNumber = HotlinePhoneNumber;
+            this._DataLicenses = ImmutablePOIValues.CopyItems(DataLicenses);
+            this.InvalidParkingSpaceIds = ImmutablePOIValues.CopyItems(InvalidParkingSpaceIds);
+            this.LocalParkingSpaceIds = ImmutablePOIValues.CopyItems(LocalParkingSpaceIds);
+            this._ParkingGarages = new EntityHashSet<ParkingOperator, ParkingGarage_Id, ParkingGarage>(this);
+            foreach (var garage in ParkingGarages ?? [])
+                if (_ParkingGarages.TryAdd(garage).Result != CommandResult.Success)
+                    throw new ArgumentException("Duplicate parking garage identifier.", nameof(ParkingGarages));
 
         }
 
@@ -670,120 +657,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ParkingGarageRemoval
-
-        //internal readonly IVotingNotificator<DateTime, ParkingOperator, ParkingGarage, Boolean> ParkingGarageRemoval;
-
-        ///// <summary>
-        ///// Called whenever an charging pool will be or was removed.
-        ///// </summary>
-        //public IVotingSender<DateTime, ParkingOperator, ParkingGarage, Boolean> OnParkingGarageRemoval
-
-        //    => ParkingGarageRemoval;
-
-        #endregion
-
 
         #region ParkingGarages
 
-        private EntityHashSet<ParkingOperator, ParkingGarage_Id, ParkingGarage> _ParkingGarages;
+        private readonly EntityHashSet<ParkingOperator, ParkingGarage_Id, ParkingGarage> _ParkingGarages;
 
         public IEnumerable<ParkingGarage> ParkingGarages
 
-            => _ParkingGarages;
-
-        #endregion
-
-        #region ParkingGarageAdminStatus(IncludePool = null)
-
-        //public IEnumerable<KeyValuePair<ParkingGarage_Id, ParkingGarageAdminStatusType>> ParkingGarageAdminStatus(Func<ParkingGarage, Boolean> IncludePool = null)
-
-        //    => _ParkingGarages.
-        //           Where  (pool => IncludePool is null || IncludePool(pool)).
-        //           OrderBy(pool => pool.Id).
-        //           Select (pool => new KeyValuePair<ParkingGarage_Id, ParkingGarageAdminStatusType>(pool.Id, pool.AdminStatus.Value));
-
-        #endregion
-
-
-        #region CreateNewParkingGarage(ParkingGarageId = null, Configurator = null, OnSuccess = null, OnError = null)
-
-        ///// <summary>
-        ///// Create and register a new charging pool having the given
-        ///// unique charging pool identification.
-        ///// </summary>
-        ///// <param name="ParkingGarageId">The unique identification of the new charging pool.</param>
-        ///// <param name="Configurator">An optional delegate to configure the new charging pool before its successful creation.</param>
-        ///// <param name="OnSuccess">An optional delegate to configure the new charging pool after its successful creation.</param>
-        ///// <param name="OnError">An optional delegate to be called whenever the creation of the charging pool failed.</param>
-        //public ParkingGarage CreateNewParkingGarage(ParkingGarage_Id                                   ParkingGarageId             = null,
-        //                                          Action<ParkingGarage>                              Configurator               = null,
-        //                                          RemoteParkingGarageCreatorDelegate                 RemoteParkingGarageCreator  = null,
-        //                                          ParkingGarageAdminStatusType                       AdminStatus                = ParkingGarageAdminStatusType.Operational,
-        //                                          ParkingGarageStatusType                            Status                     = ParkingGarageStatusType.Available,
-        //                                          Action<ParkingGarage>                              OnSuccess                  = null,
-        //                                          Action<ParkingOperator, ParkingGarage_Id>  OnError                    = null)
-
-        //{
-
-        //    #region Initial checks
-
-        //    if (ParkingGarageId is null)
-        //        ParkingGarageId = ParkingGarage_Id.Random(this.Id);
-
-        //    // Do not throw an exception when an OnError delegate was given!
-        //    if (_ParkingGarages.Any(pool => pool.Id == ParkingGarageId))
-        //    {
-        //        if (OnError is null)
-        //            throw new ParkingGarageAlreadyExists(ParkingGarageId, this.Id);
-        //        else
-        //            OnError?.Invoke(this, ParkingGarageId);
-        //    }
-
-        //    #endregion
-
-        //    var _ParkingGarage = new ParkingGarage(ParkingGarageId,
-        //                                         this,
-        //                                         Configurator,
-        //                                         RemoteParkingGarageCreator,
-        //                                         AdminStatus,
-        //                                         Status);
-
-
-        //    if (ParkingGarageAddition.SendVoting(Timestamp.Now, this, _ParkingGarage))
-        //    {
-        //        if (_ParkingGarages.TryAdd(_ParkingGarage))
-        //        {
-
-        //            _ParkingGarage.OnParkingSpaceDataChanged                    += UpdateParkingSpaceData;
-        //            _ParkingGarage.OnParkingSpaceStatusChanged                  += UpdateParkingSpaceStatus;
-        //            _ParkingGarage.OnParkingSpaceAdminStatusChanged             += UpdateParkingSpaceAdminStatus;
-
-        //            _ParkingGarage.OnParkingGarageDataChanged         += UpdateParkingGarageData;
-        //            _ParkingGarage.OnParkingGarageStatusChanged       += UpdateParkingGarageStatus;
-        //            _ParkingGarage.OnParkingGarageAdminStatusChanged  += UpdateParkingGarageAdminStatus;
-
-        //            _ParkingGarage.OnDataChanged                        += UpdateParkingGarageData;
-        //            _ParkingGarage.OnStatusChanged                      += UpdateParkingGarageStatus;
-        //            _ParkingGarage.OnAdminStatusChanged                 += UpdateParkingGarageAdminStatus;
-
-        //            _ParkingGarage.OnNewReservation                     += SendNewReservation;
-        //            _ParkingGarage.OnCancelReservationResponse               += SendOnCancelReservationResponse;
-        //            _ParkingGarage.OnNewChargingSession                 += SendNewChargingSession;
-        //            _ParkingGarage.OnNewChargeDetailRecord              += SendNewChargeDetailRecord;
-
-
-        //            OnSuccess?.Invoke(_ParkingGarage);
-        //            ParkingGarageAddition.SendNotification(Timestamp.Now, this, _ParkingGarage);
-
-        //            return _ParkingGarage;
-
-        //        }
-        //    }
-
-        //    return null;
-
-        //}
+            => System.Collections.Immutable.ImmutableArray.CreateRange(_ParkingGarages);
 
         #endregion
 
@@ -828,165 +709,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region RemoveParkingGarage(ParkingGarageId)
-
-        //public ParkingGarage RemoveParkingGarage(ParkingGarage_Id ParkingGarageId)
-        //{
-
-        //    ParkingGarage _ParkingGarage = null;
-
-        //    if (TryGetParkingGaragebyId(ParkingGarageId, out _ParkingGarage))
-        //    {
-
-        //        if (ParkingGarageRemoval.SendVoting(Timestamp.Now, this, _ParkingGarage))
-        //        {
-
-        //            if (_ParkingGarages.TryRemove(ParkingGarageId, out _ParkingGarage))
-        //            {
-
-        //                ParkingGarageRemoval.SendNotification(Timestamp.Now, this, _ParkingGarage);
-
-        //                return _ParkingGarage;
-
-        //            }
-
-        //        }
-
-        //    }
-
-        //    return null;
-
-        //}
-
-        #endregion
-
-        #region TryRemoveParkingGarage(ParkingGarageId, out ParkingGarage)
-
-        public Boolean TryRemoveParkingGarage(ParkingGarage_Id ParkingGarageId, out ParkingGarage ParkingGarage)
-        {
-
-            if (TryGetParkingGaragebyId(ParkingGarageId, out ParkingGarage))
-            {
-
-                if (ParkingGarageRemoval.SendVoting(EventTracking_Id.New, Timestamp.Now, this, ParkingGarage))
-                {
-
-                    if (_ParkingGarages.TryRemove(ParkingGarageId,
-                                                  out ParkingGarage,
-                                                  EventTracking_Id.New,
-                                                  null))
-                    {
-
-                        ParkingGarageRemoval.SendNotification(EventTracking_Id.New, Timestamp.Now, this, ParkingGarage);
-
-                        return true;
-
-                    }
-
-                }
-
-                return false;
-
-            }
-
-            return true;
-
-        }
-
-        #endregion
-
-        #region SetParkingGarageAdminStatus(ParkingGarageId, NewStatus)
-
-        //public void SetParkingGarageAdminStatus(ParkingGarage_Id                           ParkingGarageId,
-        //                                       Timestamped<ParkingGarageAdminStatusType>  NewStatus,
-        //                                       Boolean                                   SendUpstream = false)
-        //{
-
-        //    ParkingGarage _ParkingGarage = null;
-        //    if (TryGetParkingGaragebyId(ParkingGarageId, out _ParkingGarage))
-        //        _ParkingGarage.SetAdminStatus(NewStatus);
-
-        //}
-
-        #endregion
-
-        #region SetParkingGarageAdminStatus(ParkingGarageId, NewStatus, Timestamp)
-
-        //public void SetParkingGarageAdminStatus(ParkingGarage_Id              ParkingGarageId,
-        //                                       ParkingGarageAdminStatusType  NewStatus,
-        //                                       DateTime                     Timestamp)
-        //{
-
-        //    ParkingGarage _ParkingGarage  = null;
-        //    if (TryGetParkingGaragebyId(ParkingGarageId, out _ParkingGarage))
-        //        _ParkingGarage.SetAdminStatus(NewStatus, Timestamp);
-
-        //}
-
-        #endregion
-
-        #region SetParkingGarageAdminStatus(ParkingGarageId, StatusList, ChangeMethod = ChangeMethods.Replace)
-
-        //public void SetParkingGarageAdminStatus(ParkingGarage_Id                                        ParkingGarageId,
-        //                                       IEnumerable<Timestamped<ParkingGarageAdminStatusType>>  StatusList,
-        //                                       ChangeMethods                                          ChangeMethod  = ChangeMethods.Replace)
-        //{
-
-        //    ParkingGarage _ParkingGarage  = null;
-        //    if (TryGetParkingGaragebyId(ParkingGarageId, out _ParkingGarage))
-        //        _ParkingGarage.SetAdminStatus(StatusList, ChangeMethod);
-
-        //    //if (SendUpstream)
-        //    //{
-        //    //
-        //    //    RoamingNetwork.
-        //    //        SendParkingGarageAdminStatusDiff(new ParkingGarageAdminStatusDiff(Timestamp.Now,
-        //    //                                               ParkingOperatorId:    Id,
-        //    //                                               ParkingOperatorName:  Name,
-        //    //                                               NewStatus:         new List<KeyValuePair<ParkingGarage_Id, ParkingGarageAdminStatusType>>(),
-        //    //                                               ChangedStatus:     new List<KeyValuePair<ParkingGarage_Id, ParkingGarageAdminStatusType>>() {
-        //    //                                                                          new KeyValuePair<ParkingGarage_Id, ParkingGarageAdminStatusType>(ParkingGarageId, NewStatus.Value)
-        //    //                                                                      },
-        //    //                                               RemovedIds:        new List<ParkingGarage_Id>()));
-        //    //
-        //    //}
-
-        //}
-
-        #endregion
-
-
-        #region OnParkingGarageData/(Admin)StatusChanged
-
-        ///// <summary>
-        ///// An event fired whenever the static data of any subordinated charging pool changed.
-        ///// </summary>
-        //public event OnParkingGarageDataChangedDelegate         OnParkingGarageDataChanged;
-
-        ///// <summary>
-        ///// An event fired whenever the aggregated dynamic status of any subordinated charging pool changed.
-        ///// </summary>
-        //public event OnParkingGarageStatusChangedDelegate       OnParkingGarageStatusChanged;
-
-        ///// <summary>
-        ///// An event fired whenever the aggregated dynamic status of any subordinated charging pool changed.
-        ///// </summary>
-        //public event OnParkingGarageAdminStatusChangedDelegate  OnParkingGarageAdminStatusChanged;
-
-        #endregion
-
-        #region ParkingGarageAddition
-
-        //internal readonly IVotingNotificator<DateTime, ParkingGarage, ParkingGarage, Boolean> ParkingGarageAddition;
-
-        ///// <summary>
-        ///// Called whenever a charging station will be or was added.
-        ///// </summary>
-        //public IVotingSender<DateTime, ParkingOperator, ParkingGarage, Boolean> OnParkingGarageAddition
-
-        //    => ParkingGarageAddition;
-
-        #endregion
 
         #region ParkingGarageRemoval
 
@@ -998,82 +720,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IVotingSender<DateTimeOffset, ParkingOperator, ParkingGarage, Boolean> OnParkingGarageRemoval
 
             => ParkingGarageRemoval;
-
-        #endregion
-
-
-        #region (internal) UpdateParkingGarageData(Timestamp, ParkingGarage, OldStatus, NewStatus)
-
-        ///// <summary>
-        ///// Update the data of an charging pool.
-        ///// </summary>
-        ///// <param name="Timestamp">The timestamp when this change was detected.</param>
-        ///// <param name="ParkingGarage">The changed charging pool.</param>
-        ///// <param name="PropertyName">The name of the changed property.</param>
-        ///// <param name="OldValue">The old value of the changed property.</param>
-        ///// <param name="NewValue">The new value of the changed property.</param>
-        //internal async Task UpdateParkingGarageData(DateTime      Timestamp,
-        //                                           ParkingGarage  ParkingGarage,
-        //                                           String        PropertyName,
-        //                                           Object        OldValue,
-        //                                           Object        NewValue)
-        //{
-
-        //    var OnParkingGarageDataChangedLocal = OnParkingGarageDataChanged;
-        //    if (OnParkingGarageDataChangedLocal is not null)
-        //        await OnParkingGarageDataChangedLocal(Timestamp, ParkingGarage, PropertyName, OldValue, NewValue);
-
-        //}
-
-        #endregion
-
-        #region (internal) UpdateParkingGarageStatus(Timestamp, ParkingGarage, OldStatus, NewStatus)
-
-        ///// <summary>
-        ///// Update the current charging pool status.
-        ///// </summary>
-        ///// <param name="Timestamp">The timestamp when this change was detected.</param>
-        ///// <param name="ParkingGarage">The updated charging pool.</param>
-        ///// <param name="OldStatus">The old aggreagted charging station status.</param>
-        ///// <param name="NewStatus">The new aggreagted charging station status.</param>
-        //internal async Task UpdateParkingGarageStatus(DateTime                             Timestamp,
-        //                                             ParkingGarage                         ParkingGarage,
-        //                                             Timestamped<ParkingGarageStatusType>  OldStatus,
-        //                                             Timestamped<ParkingGarageStatusType>  NewStatus)
-        //{
-
-        //    var OnParkingGarageStatusChangedLocal = OnParkingGarageStatusChanged;
-        //    if (OnParkingGarageStatusChangedLocal is not null)
-        //        await OnParkingGarageStatusChangedLocal(Timestamp, ParkingGarage, OldStatus, NewStatus);
-
-        //    //if (StatusAggregationDelegate is not null)
-        //    //    _StatusSchedule.Insert(StatusAggregationDelegate(new ParkingGarageStatusReport(_ParkingGarages.Values)),
-        //    //                           Timestamp);
-
-        //}
-
-        #endregion
-
-        #region (internal) UpdateParkingGarageAdminStatus(Timestamp, ParkingGarage, OldStatus, NewStatus)
-
-        ///// <summary>
-        ///// Update the current charging pool admin status.
-        ///// </summary>
-        ///// <param name="Timestamp">The timestamp when this change was detected.</param>
-        ///// <param name="ParkingGarage">The updated charging pool.</param>
-        ///// <param name="OldStatus">The old aggreagted charging station status.</param>
-        ///// <param name="NewStatus">The new aggreagted charging station status.</param>
-        //internal async Task UpdateParkingGarageAdminStatus(DateTime                                  Timestamp,
-        //                                                  ParkingGarage                              ParkingGarage,
-        //                                                  Timestamped<ParkingGarageAdminStatusType>  OldStatus,
-        //                                                  Timestamped<ParkingGarageAdminStatusType>  NewStatus)
-        //{
-
-        //    var OnParkingGarageAdminStatusChangedLocal = OnParkingGarageAdminStatusChanged;
-        //    if (OnParkingGarageAdminStatusChangedLocal is not null)
-        //        await OnParkingGarageAdminStatusChangedLocal(Timestamp, ParkingGarage, OldStatus, NewStatus);
-
-        //}
 
         #endregion
 
@@ -1094,209 +740,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Charging stations
 
-        #region ParkingGarages
-
-        //public IEnumerable<ParkingGarage> ParkingGarages
-
-        //    => _ParkingGarages.
-        //           SelectMany(pool => pool.ParkingGarages);
-
-        #endregion
-
-        #region ParkingGarageIds
-
-        //public IEnumerable<ParkingGarage_Id> ParkingGarageIds
-
-        //    => _ParkingGarages.
-        //           SelectMany(pool    => pool.   ParkingGarages).
-        //           Select    (station => station.Id);
-
-        #endregion
-
-        #region ParkingGarageAdminStatus(IncludeStation = null)
-
-        //public IEnumerable<KeyValuePair<ParkingGarage_Id, ParkingGarageAdminStatusTypes>> ParkingGarageAdminStatus(Func<ParkingGarage, Boolean> IncludeStation = null)
-
-        //    => _ParkingGarages.
-        //           SelectMany(pool    => pool.ParkingGarages).
-        //           Where     (station => IncludeStation is null || IncludeStation(station)).
-        //           OrderBy   (station => station.Id).
-        //           Select    (station => new KeyValuePair<ParkingGarage_Id, ParkingGarageAdminStatusTypes>(station.Id, station.AdminStatus.Value));
-
-        #endregion
-
-
-        #region ContainsParkingGarage(ParkingGarage)
-
-        ///// <summary>
-        ///// Check if the given ParkingGarage is already present within the Charging Station Operator.
-        ///// </summary>
-        ///// <param name="ParkingGarage">A charging station.</param>
-        //public Boolean ContainsParkingGarage(ParkingGarage ParkingGarage)
-
-        //    => _ParkingGarages.Any(pool => pool.ContainsParkingGarage(ParkingGarage.Id));
-
-        #endregion
-
-        #region ContainsParkingGarage(ParkingGarageId)
-
-        ///// <summary>
-        ///// Check if the given ParkingGarage identification is already present within the Charging Station Operator.
-        ///// </summary>
-        ///// <param name="ParkingGarageId">The unique identification of the charging station.</param>
-        //public Boolean ContainsParkingGarage(ParkingGarage_Id ParkingGarageId)
-
-        //    => _ParkingGarages.Any(pool => pool.ContainsParkingGarage(ParkingGarageId));
-
-        #endregion
-
-        #region GetParkingGaragebyId(ParkingGarageId)
-
-        //public ParkingGarage GetParkingGaragebyId(ParkingGarage_Id ParkingGarageId)
-
-        //    => _ParkingGarages.
-        //           SelectMany    (pool    => pool.ParkingGarages).
-        //           FirstOrDefault(station => station.Id == ParkingGarageId);
-
-        #endregion
-
-        #region TryGetParkingGaragebyId(ParkingGarageId, out ParkingGarage ParkingGarage)
-
-        //public Boolean TryGetParkingGaragebyId(ParkingGarage_Id ParkingGarageId, out ParkingGarage ParkingGarage)
-        //{
-
-        //    ParkingGarage = _ParkingGarages.
-        //                          SelectMany    (pool    => pool.ParkingGarages).
-        //                          FirstOrDefault(station => station.Id == ParkingGarageId);
-
-        //    return ParkingGarage is not null;
-
-        //}
-
-        #endregion
-
-
-        #region SetParkingGarageStatus(ParkingGarageId, NewStatus)
-
-        //public void SetParkingGarageStatus(ParkingGarage_Id         ParkingGarageId,
-        //                                     ParkingGarageStatusTypes  NewStatus)
-        //{
-
-        //    ParkingGarage _ParkingGarage  = null;
-        //    if (TryGetParkingGaragebyId(ParkingGarageId, out _ParkingGarage))
-        //        _ParkingGarage.SetStatus(NewStatus);
-
-        //}
-
-        #endregion
-
-        #region SetParkingGarageStatus(ParkingGarageId, NewTimestampedStatus)
-
-        //public void SetParkingGarageStatus(ParkingGarage_Id                      ParkingGarageId,
-        //                                     Timestamped<ParkingGarageStatusTypes>  NewTimestampedStatus)
-        //{
-
-        //    ParkingGarage _ParkingGarage = null;
-        //    if (TryGetParkingGaragebyId(ParkingGarageId, out _ParkingGarage))
-        //        _ParkingGarage.SetStatus(NewTimestampedStatus);
-
-        //}
-
-        #endregion
-
-
-        #region SetParkingGarageAdminStatus(ParkingGarageId, NewStatus)
-
-        //public void SetParkingGarageAdminStatus(ParkingGarage_Id              ParkingGarageId,
-        //                                          ParkingGarageAdminStatusTypes  NewStatus)
-        //{
-
-        //    ParkingGarage _ParkingGarage  = null;
-        //    if (TryGetParkingGaragebyId(ParkingGarageId, out _ParkingGarage))
-        //        _ParkingGarage.SetAdminStatus(NewStatus);
-
-        //}
-
-        #endregion
-
-        #region SetParkingGarageAdminStatus(ParkingGarageId, NewTimestampedStatus)
-
-        //public void SetParkingGarageAdminStatus(ParkingGarage_Id                           ParkingGarageId,
-        //                                          Timestamped<ParkingGarageAdminStatusTypes>  NewTimestampedStatus)
-        //{
-
-        //    ParkingGarage _ParkingGarage = null;
-        //    if (TryGetParkingGaragebyId(ParkingGarageId, out _ParkingGarage))
-        //        _ParkingGarage.SetAdminStatus(NewTimestampedStatus);
-
-        //}
-
-        #endregion
-
-        #region SetParkingGarageAdminStatus(ParkingGarageId, NewStatus, Timestamp)
-
-        //public void SetParkingGarageAdminStatus(ParkingGarage_Id              ParkingGarageId,
-        //                                          ParkingGarageAdminStatusTypes  NewStatus,
-        //                                          DateTime                        Timestamp)
-        //{
-
-        //    ParkingGarage _ParkingGarage  = null;
-        //    if (TryGetParkingGaragebyId(ParkingGarageId, out _ParkingGarage))
-        //        _ParkingGarage.SetAdminStatus(NewStatus, Timestamp);
-
-        //}
-
-        #endregion
-
-        #region SetParkingGarageAdminStatus(ParkingGarageId, StatusList, ChangeMethod = ChangeMethods.Replace)
-
-        //public void SetParkingGarageAdminStatus(ParkingGarage_Id                                        ParkingGarageId,
-        //                                          IEnumerable<Timestamped<ParkingGarageAdminStatusTypes>>  StatusList,
-        //                                          ChangeMethods                                             ChangeMethod  = ChangeMethods.Replace)
-        //{
-
-        //    ParkingGarage _ParkingGarage  = null;
-        //    if (TryGetParkingGaragebyId(ParkingGarageId, out _ParkingGarage))
-        //        _ParkingGarage.SetAdminStatus(StatusList, ChangeMethod);
-
-        //    //if (SendUpstream)
-        //    //{
-        //    //
-        //    //    RoamingNetwork.
-        //    //        SendParkingGarageAdminStatusDiff(new ParkingGarageAdminStatusDiff(Timestamp.Now,
-        //    //                                               ParkingOperatorId:    Id,
-        //    //                                               ParkingOperatorName:  Name,
-        //    //                                               NewStatus:         new List<KeyValuePair<ParkingGarage_Id, ParkingGarageAdminStatusType>>(),
-        //    //                                               ChangedStatus:     new List<KeyValuePair<ParkingGarage_Id, ParkingGarageAdminStatusType>>() {
-        //    //                                                                          new KeyValuePair<ParkingGarage_Id, ParkingGarageAdminStatusType>(ParkingGarageId, NewStatus.Value)
-        //    //                                                                      },
-        //    //                                               RemovedIds:        new List<ParkingGarage_Id>()));
-        //    //
-        //    //}
-
-        //}
-
-        #endregion
-
-
-        #region OnParkingGarageData/(Admin)StatusChanged
-
-        ///// <summary>
-        ///// An event fired whenever the static data of any subordinated charging station changed.
-        ///// </summary>
-        //public event OnParkingGarageDataChangedDelegate         OnParkingGarageDataChanged;
-
-        ///// <summary>
-        ///// An event fired whenever the aggregated dynamic status of any subordinated charging station changed.
-        ///// </summary>
-        //public event OnParkingGarageStatusChangedDelegate       OnParkingGarageStatusChanged;
-
-        ///// <summary>
-        ///// An event fired whenever the aggregated admin status of any subordinated charging station changed.
-        ///// </summary>
-        //public event OnParkingGarageAdminStatusChangedDelegate  OnParkingGarageAdminStatusChanged;
-
-        #endregion
 
         #region ParkingSpaceAddition
 
@@ -1325,332 +768,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (internal) UpdateParkingGarageData(Timestamp, ParkingGarage, OldStatus, NewStatus)
-
-        ///// <summary>
-        ///// Update the data of a charging station.
-        ///// </summary>
-        ///// <param name="Timestamp">The timestamp when this change was detected.</param>
-        ///// <param name="ParkingGarage">The changed charging station.</param>
-        ///// <param name="PropertyName">The name of the changed property.</param>
-        ///// <param name="OldValue">The old value of the changed property.</param>
-        ///// <param name="NewValue">The new value of the changed property.</param>
-        //internal async Task UpdateParkingGarageData(DateTime         Timestamp,
-        //                                              ParkingGarage  ParkingGarage,
-        //                                              String           PropertyName,
-        //                                              Object           OldValue,
-        //                                              Object           NewValue)
-        //{
-
-        //    var OnParkingGarageDataChangedLocal = OnParkingGarageDataChanged;
-        //    if (OnParkingGarageDataChangedLocal is not null)
-        //        await OnParkingGarageDataChangedLocal(Timestamp, ParkingGarage, PropertyName, OldValue, NewValue);
-
-        //}
-
         #endregion
 
-        #region (internal) UpdateParkingGarageStatus(Timestamp, ParkingGarage, OldStatus, NewStatus)
-
-        ///// <summary>
-        ///// Update the current aggregated charging station status.
-        ///// </summary>
-        ///// <param name="Timestamp">The timestamp when this change was detected.</param>
-        ///// <param name="ParkingGarage">The updated charging station.</param>
-        ///// <param name="OldStatus">The old aggreagted charging station status.</param>
-        ///// <param name="NewStatus">The new aggreagted charging station status.</param>
-        //internal async Task UpdateParkingGarageStatus(DateTime                                Timestamp,
-        //                                                ParkingGarage                         ParkingGarage,
-        //                                                Timestamped<ParkingGarageStatusTypes>  OldStatus,
-        //                                                Timestamped<ParkingGarageStatusTypes>  NewStatus)
-        //{
-
-        //    var OnParkingGarageStatusChangedLocal = OnParkingGarageStatusChanged;
-        //    if (OnParkingGarageStatusChangedLocal is not null)
-        //        await OnParkingGarageStatusChangedLocal(Timestamp, ParkingGarage, OldStatus, NewStatus);
-
-        //}
-
-        #endregion
-
-        #region (internal) UpdateParkingGarageAdminStatus(Timestamp, ParkingGarage, OldStatus, NewStatus)
-
-        ///// <summary>
-        ///// Update the current aggregated charging station admin status.
-        ///// </summary>
-        ///// <param name="Timestamp">The timestamp when this change was detected.</param>
-        ///// <param name="ParkingGarage">The updated charging station.</param>
-        ///// <param name="OldStatus">The old aggreagted charging station admin status.</param>
-        ///// <param name="NewStatus">The new aggreagted charging station admin status.</param>
-        //internal async Task UpdateParkingGarageAdminStatus(DateTime                                     Timestamp,
-        //                                                     ParkingGarage                              ParkingGarage,
-        //                                                     Timestamped<ParkingGarageAdminStatusTypes>  OldStatus,
-        //                                                     Timestamped<ParkingGarageAdminStatusTypes>  NewStatus)
-        //{
-
-        //    var OnParkingGarageAdminStatusChangedLocal = OnParkingGarageAdminStatusChanged;
-        //    if (OnParkingGarageAdminStatusChangedLocal is not null)
-        //        await OnParkingGarageAdminStatusChangedLocal(Timestamp, ParkingGarage, OldStatus, NewStatus);
-
-        //}
-
-        #endregion
-
-        #endregion
-
-        #region Charging station groups
-
-        #region ParkingGarageGroupAddition
-
-        //internal readonly IVotingNotificator<DateTime, ParkingOperator, ParkingGarageGroup, Boolean> ParkingGarageGroupAddition;
-
-        ///// <summary>
-        ///// Called whenever a charging station group will be or was added.
-        ///// </summary>
-        //public IVotingSender<DateTime, ParkingOperator, ParkingGarageGroup, Boolean> OnParkingGarageGroupAddition
-
-        //    => ParkingGarageGroupAddition;
-
-        #endregion
-
-        #region ParkingGarageGroupRemoval
-
-        //internal readonly IVotingNotificator<DateTime, ParkingOperator, ParkingGarageGroup, Boolean> ParkingGarageGroupRemoval;
-
-        ///// <summary>
-        ///// Called whenever an charging station group will be or was removed.
-        ///// </summary>
-        //public IVotingSender<DateTime, ParkingOperator, ParkingGarageGroup, Boolean> OnParkingGarageGroupRemoval
-
-        //    => ParkingGarageGroupRemoval;
-
-        #endregion
-
-
-        #region ParkingGarageGroups
-
-        //private readonly SpecialHashSet<ParkingOperator, ParkingGarageGroup_Id, ParkingGarageGroup> _ParkingGarageGroups;
-
-        ///// <summary>
-        ///// All charging station groups registered within this Charging Station Operator.
-        ///// </summary>
-        //public IEnumerable<ParkingGarageGroup> ParkingGarageGroups
-
-        //    => _ParkingGarageGroups;
-
-        #endregion
-
-        #region CreateNewParkingGarageGroup(ParkingGarageGroupId = null, Configurator = null, OnSuccess = null, OnError = null)
-
-        /// <summary>
-        ///// Create and register a new charging group having the given
-        ///// unique charging group identification.
-        ///// </summary>
-        ///// <param name="ParkingGarageGroupId">The unique identification of the new charging group.</param>
-        ///// <param name="Configurator">An optional delegate to configure the new charging group before its successful creation.</param>
-        ///// <param name="OnSuccess">An optional delegate to configure the new charging group after its successful creation.</param>
-        ///// <param name="OnError">An optional delegate to be called whenever the creation of the charging group failed.</param>
-        //public ParkingGarageGroup CreateNewParkingGarageGroup(ParkingGarageGroup_Id                                   ParkingGarageGroupId  = null,
-        //                                                          Action<ParkingGarageGroup>                              Configurator            = null,
-        //                                                          Action<ParkingGarageGroup>                              OnSuccess               = null,
-        //                                                          Action<ParkingOperator, ParkingGarageGroup_Id>  OnError                 = null)
-        //{
-
-        //    #region Initial checks
-
-        //    if (ParkingGarageGroupId is null)
-        //        ParkingGarageGroupId = ParkingGarageGroup_Id.Random(this.Id);
-
-        //    // Do not throw an exception when an OnError delegate was given!
-        //    if (_ParkingGarageGroups.Contains(ParkingGarageGroupId))
-        //    {
-        //        if (OnError is null)
-        //            throw new ParkingGarageGroupAlreadyExists(ParkingGarageGroupId, this.Id);
-        //        else
-        //            OnError?.Invoke(this, ParkingGarageGroupId);
-        //    }
-
-        //    #endregion
-
-        //    var _ParkingGarageGroup = new ParkingGarageGroup(ParkingGarageGroupId, this);
-
-        //    if (Configurator is not null)
-        //        Configurator(_ParkingGarageGroup);
-
-        //    if (ParkingGarageGroupAddition.SendVoting(Timestamp.Now, this, _ParkingGarageGroup))
-        //    {
-        //        if (_ParkingGarageGroups.TryAdd(_ParkingGarageGroup))
-        //        {
-
-        //            _ParkingGarageGroup.OnParkingSpaceDataChanged                             += UpdateParkingSpaceData;
-        //            _ParkingGarageGroup.OnParkingSpaceStatusChanged                           += UpdateParkingSpaceStatus;
-        //            _ParkingGarageGroup.OnParkingSpaceAdminStatusChanged                      += UpdateParkingSpaceAdminStatus;
-
-        //            _ParkingGarageGroup.OnParkingGarageDataChanged                  += UpdateParkingGarageData;
-        //            _ParkingGarageGroup.OnParkingGarageStatusChanged                += UpdateParkingGarageStatus;
-        //            _ParkingGarageGroup.OnParkingGarageAdminStatusChanged           += UpdateParkingGarageAdminStatus;
-
-        //            //_ParkingGarageGroup.OnDataChanged                                 += UpdateParkingGarageGroupData;
-        //            //_ParkingGarageGroup.OnAdminStatusChanged                          += UpdateParkingGarageGroupAdminStatus;
-
-        //            OnSuccess?.Invoke(_ParkingGarageGroup);
-        //            ParkingGarageGroupAddition.SendNotification(Timestamp.Now, this, _ParkingGarageGroup);
-        //            return _ParkingGarageGroup;
-
-        //        }
-        //    }
-
-        //    return null;
-
-        //}
-
-        #endregion
-
-        #region GetOrCreateParkingGarageGroup(...)
-
-        //public ParkingGarageGroup GetOrCreateParkingGarageGroup(ParkingGarageGroup_Id                        ParkingGarageGroupId,
-        //                                                            Action<ParkingGarageGroup>                   Configurator            = null,
-        //                                                            Action<ParkingGarageGroup>                   OnSuccess               = null,
-        //                                                            Action<ParkingOperator, ParkingGarageGroup_Id>  OnError                 = null)
-        //{
-
-        //    ParkingGarageGroup _ParkingGarageGroup = null;
-
-        //    if (_ParkingGarageGroups.TryGet(ParkingGarageGroupId, out _ParkingGarageGroup))
-        //        return _ParkingGarageGroup;
-
-        //    return CreateNewParkingGarageGroup(ParkingGarageGroupId,
-        //                                         Configurator,
-        //                                         OnSuccess,
-        //                                         OnError);
-
-        //}
-
-        #endregion
-
-        #region TryGetParkingGarageGroup
-
-        //public Boolean TryGetParkingGarageGroup(ParkingGarageGroup_Id   ParkingGarageGroupId,
-        //                                          out ParkingGarageGroup  ParkingGarageGroup)
-
-        //    => _ParkingGarageGroups.TryGet(ParkingGarageGroupId, out ParkingGarageGroup);
-
-        #endregion
-
-        #endregion
 
         #region ParkingSpaces
 
-        #region ParkingSpaces
-
-        //public IEnumerable<ParkingSpace> ParkingSpaces
-
-        //    => _ParkingGarages.
-        //           SelectMany(v => v.ParkingGarages).
-        //           SelectMany(v => v.ParkingSpaces);
-
-        #endregion
-
-        #region ParkingSpaceIds
-
-        //public IEnumerable<ParkingSpace_Id> ParkingSpaceIds
-
-        //    => _ParkingGarages.
-        //           SelectMany(v => v.ParkingGarages).
-        //           SelectMany(v => v.ParkingSpaces).
-        //           Select    (v => v.Id);
-
-        #endregion
-
-        #region AllParkingSpaceStatus(IncludeParkingSpace = null)
-
-        //public IEnumerable<KeyValuePair<ParkingSpace_Id, ParkingSpaceStatusType>> AllParkingSpaceStatus(Func<ParkingSpace, Boolean>  IncludeParkingSpace = null)
-
-        //    => _ParkingGarages.
-        //           SelectMany(pool    => pool.ParkingGarages).
-        //           SelectMany(station => station.ParkingSpaces).
-        //           Where     (evse    => IncludeParkingSpace is null || IncludeParkingSpace(evse)).
-        //           OrderBy   (evse    => evse.Id).
-        //           Select    (evse    => new KeyValuePair<ParkingSpace_Id, ParkingSpaceStatusType>(evse.Id, evse.Status.Value));
-
-        #endregion
-
-
-        #region ContainsParkingSpace(ParkingSpace)
-
-        ///// <summary>
-        ///// Check if the given ParkingSpace is already present within the Charging Station Operator.
-        ///// </summary>
-        ///// <param name="ParkingSpace">An ParkingSpace.</param>
-        //public Boolean ContainsParkingSpace(ParkingSpace ParkingSpace)
-
-        //    => _ParkingGarages.Any(pool => pool.ContainsParkingSpace(ParkingSpace.Id));
-
-        #endregion
-
-        #region ContainsParkingSpace(ParkingSpaceId)
-
-        ///// <summary>
-        ///// Check if the given ParkingSpace identification is already present within the Charging Station Operator.
-        ///// </summary>
-        ///// <param name="ParkingSpaceId">The unique identification of an ParkingSpace.</param>
-        //public Boolean ContainsParkingSpace(ParkingSpace_Id ParkingSpaceId)
-
-        //    => _ParkingGarages.Any(pool => pool.ContainsParkingSpace(ParkingSpaceId));
-
-        #endregion
-
-        #region GetParkingSpacebyId(ParkingSpaceId)
-
-        //public ParkingSpace GetParkingSpacebyId(ParkingSpace_Id ParkingSpaceId)
-
-        //    => _ParkingGarages.
-        //           SelectMany    (pool    => pool.   ParkingGarages).
-        //           SelectMany    (station => station.ParkingSpaces).
-        //           FirstOrDefault(evse    => evse.Id == ParkingSpaceId);
-
-        #endregion
-
-        #region TryGetParkingSpacebyId(ParkingSpaceId, out ParkingSpace)
-
-        //public Boolean TryGetParkingSpacebyId(ParkingSpace_Id ParkingSpaceId, out ParkingSpace ParkingSpace)
-        //{
-
-        //    ParkingSpace = _ParkingGarages.
-        //               SelectMany    (pool    => pool.   ParkingGarages).
-        //               SelectMany    (station => station.ParkingSpaces).
-        //               FirstOrDefault(evse    => evse.Id == ParkingSpaceId);
-
-        //    return ParkingSpace is not null;
-
-        //}
-
-        #endregion
-
-
-        #region ValidParkingSpaceIds
-
-        //private readonly ReactiveSet<ParkingSpace_Id> _ValidParkingSpaceIds;
-
-        ///// <summary>
-        ///// A list of valid ParkingSpace Ids. All others will be filtered.
-        ///// </summary>
-        //public ReactiveSet<ParkingSpace_Id> ValidParkingSpaceIds
-        //{
-        //    get
-        //    {
-        //        return _ValidParkingSpaceIds;
-        //    }
-        //}
-
-        #endregion
 
         #region InvalidParkingSpaceIds
 
         /// <summary>
         /// A list of invalid ParkingSpace Ids.
         /// </summary>
-        public ReactiveSet<ParkingSpace_Id> InvalidParkingSpaceIds { get; }
+        public System.Collections.Immutable.ImmutableArray<ParkingSpace_Id> InvalidParkingSpaceIds { get; }
 
         #endregion
 
@@ -1659,284 +788,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// A list of manual ParkingSpace Ids which will not be touched automagically.
         /// </summary>
-        public ReactiveSet<ParkingSpace_Id> LocalParkingSpaceIds { get; }
+        public System.Collections.Immutable.ImmutableArray<ParkingSpace_Id> LocalParkingSpaceIds { get; }
 
         #endregion
 
-
-        #region SetParkingSpaceStatus(ParkingSpaceId, NewStatus)
-
-        //public void SetParkingSpaceStatus(ParkingSpace_Id         ParkingSpaceId,
-        //                          ParkingSpaceStatusType  NewStatus)
-        //{
-
-        //    ParkingSpace _ParkingSpace = null;
-        //    if (TryGetParkingSpacebyId(ParkingSpaceId, out _ParkingSpace))
-        //        _ParkingSpace.SetStatus(NewStatus);
-
-        //}
-
-        #endregion
-
-        #region SetParkingSpaceStatus(ParkingSpaceId, NewTimestampedStatus)
-
-        //public void SetParkingSpaceStatus(ParkingSpace_Id                      ParkingSpaceId,
-        //                          Timestamped<ParkingSpaceStatusType>  NewTimestampedStatus)
-        //{
-
-        //    ParkingSpace _ParkingSpace = null;
-        //    if (TryGetParkingSpacebyId(ParkingSpaceId, out _ParkingSpace))
-        //        _ParkingSpace.SetStatus(NewTimestampedStatus);
-
-        //}
-
-        #endregion
-
-        #region SetParkingSpaceStatus(ParkingSpaceId, NewStatus, Timestamp)
-
-        //public void SetParkingSpaceStatus(ParkingSpace_Id         ParkingSpaceId,
-        //                          ParkingSpaceStatusType  NewStatus,
-        //                          DateTime        Timestamp)
-        //{
-
-        //    ParkingSpace _ParkingSpace = null;
-        //    if (TryGetParkingSpacebyId(ParkingSpaceId, out _ParkingSpace))
-        //        _ParkingSpace.SetStatus(NewStatus, Timestamp);
-
-        //}
-
-        #endregion
-
-        #region SetParkingSpaceStatus(ParkingSpaceId, StatusList, ChangeMethod = ChangeMethods.Replace)
-
-        //public void SetParkingSpaceStatus(ParkingSpace_Id                                   ParkingSpaceId,
-        //                          IEnumerable<Timestamped<ParkingSpaceStatusType>>  StatusList,
-        //                          ChangeMethods                             ChangeMethod  = ChangeMethods.Replace)
-        //{
-
-        //    if (InvalidParkingSpaceIds.Contains(ParkingSpaceId))
-        //        return;
-
-        //    ParkingSpace _ParkingSpace  = null;
-        //    if (TryGetParkingSpacebyId(ParkingSpaceId, out _ParkingSpace))
-        //        _ParkingSpace.SetStatus(StatusList, ChangeMethod);
-
-        //}
-
-        #endregion
-
-        #region CalcParkingSpaceStatusDiff(ParkingSpaceStatus, IncludeParkingSpace = null)
-
-        //public ParkingSpaceStatusDiff CalcParkingSpaceStatusDiff(Dictionary<ParkingSpace_Id, ParkingSpaceStatusType>  ParkingSpaceStatus,
-        //                                         Func<ParkingSpace, Boolean>                  IncludeParkingSpace  = null)
-        //{
-
-        //    if (ParkingSpaceStatus is null || ParkingSpaceStatus.Count == 0)
-        //        return new ParkingSpaceStatusDiff(Timestamp.Now, Id, Name);
-
-        //    #region Get data...
-
-        //    var ParkingSpaceStatusDiff     = new ParkingSpaceStatusDiff(Timestamp.Now, Id, Name);
-
-        //    // Only ValidParkingSpaceIds!
-        //    // Do nothing with manual ParkingSpace Ids!
-        //    var CurrentParkingSpaceStates  = AllParkingSpaceStatus(IncludeParkingSpace).
-        //                                 //Where(KVP => ValidParkingSpaceIds. Contains(KVP.Key) &&
-        //                                 //            !ManualParkingSpaceIds.Contains(KVP.Key)).
-        //                                 ToDictionary(v => v.Key, v => v.Value);
-
-        //    var OldParkingSpaceIds         = new List<ParkingSpace_Id>(CurrentParkingSpaceStates.Keys);
-
-        //    #endregion
-
-        //    try
-        //    {
-
-        //        #region Find new and changed ParkingSpace states
-
-        //        // Only for ValidParkingSpaceIds!
-        //        // Do nothing with manual ParkingSpace Ids!
-        //        foreach (var NewParkingSpaceStatus in ParkingSpaceStatus)
-        //                                          //Where(KVP => ValidParkingSpaceIds. Contains(KVP.Key) &&
-        //                                          //            !ManualParkingSpaceIds.Contains(KVP.Key)))
-        //        {
-
-        //            // Add to NewParkingSpaceStates, if new ParkingSpace was found!
-        //            if (!CurrentParkingSpaceStates.ContainsKey(NewParkingSpaceStatus.Key))
-        //                ParkingSpaceStatusDiff.AddNewStatus(NewParkingSpaceStatus);
-
-        //            else
-        //            {
-
-        //                // Add to CHANGED, if state of known ParkingSpace changed!
-        //                if (CurrentParkingSpaceStates[NewParkingSpaceStatus.Key] != NewParkingSpaceStatus.Value)
-        //                    ParkingSpaceStatusDiff.AddChangedStatus(NewParkingSpaceStatus);
-
-        //                // Remove ParkingSpaceId, as it was processed...
-        //                OldParkingSpaceIds.Remove(NewParkingSpaceStatus.Key);
-
-        //            }
-
-        //        }
-
-        //        #endregion
-
-        //        #region Delete what is left in OldParkingSpaceIds!
-
-        //        ParkingSpaceStatusDiff.AddRemovedId(OldParkingSpaceIds);
-
-        //        #endregion
-
-        //        return ParkingSpaceStatusDiff;
-
-        //    }
-
-        //    catch (Exception e)
-        //    {
-
-        //        while (e.InnerException is not null)
-        //            e = e.InnerException;
-
-        //        DebugX.Log("GetParkingSpaceStatusDiff led to an exception: " + e.Message + Environment.NewLine + e.StackTrace);
-
-        //    }
-
-        //    // empty!
-        //    return new ParkingSpaceStatusDiff(Timestamp.Now, Id, Name);
-
-        //}
-
-        #endregion
-
-        #region ApplyParkingSpaceStatusDiff(ParkingSpaceStatusDiff)
-
-        //public ParkingSpaceStatusDiff ApplyParkingSpaceStatusDiff(ParkingSpaceStatusDiff ParkingSpaceStatusDiff)
-        //{
-
-        //    #region Initial checks
-
-        //    if (ParkingSpaceStatusDiff is null)
-        //        throw new ArgumentNullException(nameof(ParkingSpaceStatusDiff),  "The given ParkingSpace status diff must not be null!");
-
-        //    #endregion
-
-        //    foreach (var status in ParkingSpaceStatusDiff.NewStatus)
-        //        SetParkingSpaceStatus(status.Key, status.Value);
-
-        //    foreach (var status in ParkingSpaceStatusDiff.ChangedStatus)
-        //        SetParkingSpaceStatus(status.Key, status.Value);
-
-        //    return ParkingSpaceStatusDiff;
-
-        //}
-
-        #endregion
-
-
-        #region SetParkingSpaceAdminStatus(ParkingSpaceId, NewAdminStatus)
-
-        //public void SetParkingSpaceAdminStatus(ParkingSpace_Id              ParkingSpaceId,
-        //                               ParkingSpaceAdminStatusType  NewAdminStatus)
-        //{
-
-        //    ParkingSpace _ParkingSpace = null;
-        //    if (TryGetParkingSpacebyId(ParkingSpaceId, out _ParkingSpace))
-        //        _ParkingSpace.SetAdminStatus(NewAdminStatus);
-
-        //}
-
-        #endregion
-
-        #region SetParkingSpaceAdminStatus(ParkingSpaceId, NewTimestampedAdminStatus)
-
-        //public void SetParkingSpaceAdminStatus(ParkingSpace_Id                           ParkingSpaceId,
-        //                               Timestamped<ParkingSpaceAdminStatusType>  NewTimestampedAdminStatus)
-        //{
-
-        //    ParkingSpace _ParkingSpace = null;
-        //    if (TryGetParkingSpacebyId(ParkingSpaceId, out _ParkingSpace))
-        //        _ParkingSpace.SetAdminStatus(NewTimestampedAdminStatus);
-
-        //}
-
-        #endregion
-
-        #region SetParkingSpaceAdminStatus(ParkingSpaceId, NewAdminStatus, Timestamp)
-
-        //public void SetParkingSpaceAdminStatus(ParkingSpace_Id              ParkingSpaceId,
-        //                               ParkingSpaceAdminStatusType  NewAdminStatus,
-        //                               DateTime             Timestamp)
-        //{
-
-        //    ParkingSpace _ParkingSpace = null;
-        //    if (TryGetParkingSpacebyId(ParkingSpaceId, out _ParkingSpace))
-        //        _ParkingSpace.SetAdminStatus(NewAdminStatus, Timestamp);
-
-        //}
-
-        #endregion
-
-        #region SetParkingSpaceAdminStatus(ParkingSpaceId, AdminStatusList, ChangeMethod = ChangeMethods.Replace)
-
-        //public void SetParkingSpaceAdminStatus(ParkingSpace_Id                                        ParkingSpaceId,
-        //                               IEnumerable<Timestamped<ParkingSpaceAdminStatusType>>  AdminStatusList,
-        //                               ChangeMethods                                  ChangeMethod  = ChangeMethods.Replace)
-        //{
-
-        //    if (InvalidParkingSpaceIds.Contains(ParkingSpaceId))
-        //        return;
-
-        //    ParkingSpace _ParkingSpace  = null;
-        //    if (TryGetParkingSpacebyId(ParkingSpaceId, out _ParkingSpace))
-        //        _ParkingSpace.SetAdminStatus(AdminStatusList, ChangeMethod);
-
-        //}
-
-        #endregion
-
-        #region ApplyParkingSpaceAdminStatusDiff(ParkingSpaceAdminStatusDiff)
-
-        //public ParkingSpaceAdminStatusDiff ApplyParkingSpaceAdminStatusDiff(ParkingSpaceAdminStatusDiff ParkingSpaceAdminStatusDiff)
-        //{
-
-        //    #region Initial checks
-
-        //    if (ParkingSpaceAdminStatusDiff is null)
-        //        throw new ArgumentNullException(nameof(ParkingSpaceAdminStatusDiff),  "The given ParkingSpace admin status diff must not be null!");
-
-        //    #endregion
-
-        //    foreach (var status in ParkingSpaceAdminStatusDiff.NewStatus)
-        //        SetParkingSpaceAdminStatus(status.Key, status.Value);
-
-        //    foreach (var status in ParkingSpaceAdminStatusDiff.ChangedStatus)
-        //        SetParkingSpaceAdminStatus(status.Key, status.Value);
-
-        //    return ParkingSpaceAdminStatusDiff;
-
-        //}
-
-        #endregion
-
-
-        #region OnParkingSpaceData/(Admin)StatusChanged
-
-        ///// <summary>
-        ///// An event fired whenever the static data of any subordinated ParkingSpace changed.
-        ///// </summary>
-        //public event OnParkingSpaceDataChangedDelegate         OnParkingSpaceDataChanged;
-
-        ///// <summary>
-        ///// An event fired whenever the dynamic status of any subordinated ParkingSpace changed.
-        ///// </summary>
-        //public event OnParkingSpaceStatusChangedDelegate       OnParkingSpaceStatusChanged;
-
-        ///// <summary>
-        ///// An event fired whenever the admin status of any subordinated ParkingSpace changed.
-        ///// </summary>
-        //public event OnParkingSpaceAdminStatusChangedDelegate  OnParkingSpaceAdminStatusChanged;
-
-        #endregion
 
         #region ParkingSensorAddition
 
@@ -1968,89 +823,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-
-        #region (internal) UpdateParkingSpaceData(Timestamp, ParkingSpace, OldStatus, NewStatus)
-
-        ///// <summary>
-        ///// Update the data of an ParkingSpace.
-        ///// </summary>
-        ///// <param name="Timestamp">The timestamp when this change was detected.</param>
-        ///// <param name="ParkingSpace">The changed ParkingSpace.</param>
-        ///// <param name="PropertyName">The name of the changed property.</param>
-        ///// <param name="OldValue">The old value of the changed property.</param>
-        ///// <param name="NewValue">The new value of the changed property.</param>
-        //internal async Task UpdateParkingSpaceData(DateTime  Timestamp,
-        //                                   ParkingSpace      ParkingSpace,
-        //                                   String    PropertyName,
-        //                                   Object    OldValue,
-        //                                   Object    NewValue)
-        //{
-
-        //    var OnParkingSpaceDataChangedLocal = OnParkingSpaceDataChanged;
-        //    if (OnParkingSpaceDataChangedLocal is not null)
-        //        await OnParkingSpaceDataChangedLocal(Timestamp, ParkingSpace, PropertyName, OldValue, NewValue);
-
-        //}
-
-        #endregion
-
-        #region (internal) UpdateParkingSpaceAdminStatus(Timestamp, EventTrackingId, ParkingSpace, OldStatus, NewStatus)
-
-        ///// <summary>
-        ///// Update an ParkingSpace admin status.
-        ///// </summary>
-        ///// <param name="Timestamp">The timestamp when this change was detected.</param>
-        ///// <param name="EventTrackingId">An event tracking identification for correlating this request with other events.</param>
-        ///// <param name="ParkingSpace">The updated ParkingSpace.</param>
-        ///// <param name="OldStatus">The old ParkingSpace status.</param>
-        ///// <param name="NewStatus">The new ParkingSpace status.</param>
-        //internal async Task UpdateParkingSpaceAdminStatus(DateTime                          Timestamp,
-        //                                          EventTracking_Id                  EventTrackingId,
-        //                                          ParkingSpace                              ParkingSpace,
-        //                                          Timestamped<ParkingSpaceAdminStatusType>  OldStatus,
-        //                                          Timestamped<ParkingSpaceAdminStatusType>  NewStatus)
-        //{
-
-        //    var OnParkingSpaceAdminStatusChangedLocal = OnParkingSpaceAdminStatusChanged;
-        //    if (OnParkingSpaceAdminStatusChangedLocal is not null)
-        //        await OnParkingSpaceAdminStatusChangedLocal(Timestamp,
-        //                                            EventTrackingId,
-        //                                            ParkingSpace,
-        //                                            OldStatus,
-        //                                            NewStatus);
-
-        //}
-
-        #endregion
-
-        #region (internal) UpdateParkingSpaceStatus     (Timestamp, EventTrackingId, ParkingSpace, OldStatus, NewStatus)
-
-        ///// <summary>
-        ///// Update an ParkingSpace status.
-        ///// </summary>
-        ///// <param name="Timestamp">The timestamp when this change was detected.</param>
-        ///// <param name="EventTrackingId">An event tracking identification for correlating this request with other events.</param>
-        ///// <param name="ParkingSpace">The updated ParkingSpace.</param>
-        ///// <param name="OldStatus">The old ParkingSpace status.</param>
-        ///// <param name="NewStatus">The new ParkingSpace status.</param>
-        //internal async Task UpdateParkingSpaceStatus(DateTime                     Timestamp,
-        //                                     EventTracking_Id             EventTrackingId,
-        //                                     ParkingSpace                         ParkingSpace,
-        //                                     Timestamped<ParkingSpaceStatusType>  OldStatus,
-        //                                     Timestamped<ParkingSpaceStatusType>  NewStatus)
-        //{
-
-        //    var OnParkingSpaceStatusChangedLocal = OnParkingSpaceStatusChanged;
-        //    if (OnParkingSpaceStatusChangedLocal is not null)
-        //        await OnParkingSpaceStatusChangedLocal(Timestamp,
-        //                                       EventTrackingId,
-        //                                       ParkingSpace,
-        //                                       OldStatus,
-        //                                       NewStatus);
-
-        //}
-
-        #endregion
 
         #endregion
 

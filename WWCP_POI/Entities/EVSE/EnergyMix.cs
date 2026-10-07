@@ -30,7 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// An energy mix.
     /// </summary>
-    public partial class EnergyMix : IEquatable<EnergyMix>
+    public sealed partial class EnergyMix : IEquatable<EnergyMix>
     {
 
         #region Properties
@@ -48,17 +48,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The name or brand of the energy supplier.
         /// </summary>
-        public I18NString                                         SupplierName            { get; }
+        private readonly I18NString immutableSupplierName;
+        public I18NString SupplierName => immutableSupplierName.Clone();
 
         /// <summary>
         /// The name or brand of the energy product.
         /// </summary>
-        public I18NString                                         ProductName             { get; }
+        private readonly I18NString immutableProductName;
+        public I18NString ProductName => immutableProductName.Clone();
 
         /// <summary>
         /// Optional additional remarks.
         /// </summary>
-        public I18NString?                                        AdditionalRemarks       { get; }
+        private readonly I18NString? immutableAdditionalRemarks;
+        public I18NString? AdditionalRemarks => immutableAdditionalRemarks?.Clone();
 
         #endregion
 
@@ -92,9 +95,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("Energy mix categories must be unique.");
             this.EnergySources         = sources;
             this.EnvironmentalImpacts  = impacts;
-            this.SupplierName          = SupplierName;
-            this.ProductName           = ProductName;
-            this.AdditionalRemarks     = AdditionalRemarks;
+            this.immutableSupplierName          = (SupplierName).Clone();
+            this.immutableProductName           = (ProductName).Clone();
+            this.immutableAdditionalRemarks     = (AdditionalRemarks)?.Clone();
 
         }
 
@@ -108,12 +111,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public JObject ToJSON()
 
-            => JSONObject.Create(
+            => POIRepresentation.AddETags(this, JSONObject.Create(
 
                          new JProperty("energySources", new JArray(EnergySources.Select(item =>
-                             new JObject(new JProperty("source", item.Value.ToString()), new JProperty("percent", item.Percent))))),
+                             new JObject(new JProperty("source", item.Value.ToString()), new JProperty("percentage", MetrologyJson.Percent(item.Percent)))))),
                          new JProperty("environmentalImpacts", new JArray(EnvironmentalImpacts.Select(item =>
-                             new JObject(new JProperty("impact", item.Value.ToString()), new JProperty("percent", item.Percent))))),
+                             new JObject(new JProperty("impact", item.Value.ToString()), new JProperty("percentage", MetrologyJson.Percent(item.Percent)))))),
 
                          new JProperty("supplierName",  SupplierName.ToJSON()),
                          new JProperty("productName",   ProductName. ToJSON()),
@@ -122,7 +125,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        ? new JProperty("additionalRemarks",  AdditionalRemarks.ToJSON())
                        : null
 
-               );
+               ));
 
         #endregion
 

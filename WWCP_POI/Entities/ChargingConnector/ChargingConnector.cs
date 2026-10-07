@@ -33,7 +33,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// A charging connector to connect an electric vehicle (EV)
     /// to an Electric Vehicle Supply Equipment (EVSE).
     /// </summary>
-    public class ChargingConnector : IEquatable<ChargingConnector>
+    public sealed partial class ChargingConnector : IEquatable<ChargingConnector>
     {
 
         // See also: https://www.worldstandards.eu/cars/connector-types/
@@ -53,7 +53,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The parent EVSE of this charging connector.
         /// </summary>
         [InternalUseOnly]
-        public EVSE?                           EVSE                  { get; set; }
+        public EVSE?                           EVSE                  { get; }
 
         /// <summary>
         /// The optional charging connector identification.
@@ -70,8 +70,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The optional charging cable attached.
         /// </summary>
+        private ChargingCable? immutableChargingCable;
         [Optional]
-        public ChargingCable?                  ChargingCable         { get; }
+        public ChargingCable? ChargingCable
+        {
+            get => ImmutablePOIValues.Copy(immutableChargingCable);
+            private set => immutableChargingCable = ImmutablePOIValues.Copy(value);
+        }
 
         /// <summary>
         /// Whether the charging connector is lockable or not.
@@ -82,8 +87,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Optional tariff identifications that can be used with this charging connector.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<ChargingTariff_Id> immutableTariffIds = [];
         [Optional]
-        public IEnumerable<ChargingTariff_Id>  TariffIds             { get; }
+        public IEnumerable<ChargingTariff_Id> TariffIds
+        {
+            get => ImmutablePOIValues.CopyItems(immutableTariffIds);
+            private set => immutableTariffIds = ImmutablePOIValues.CopyItems(value);
+        }
 
         /// <summary>
         /// URL to the operator’s terms and conditions.
@@ -498,9 +508,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                            );
 
-                return CustomChargingConnectorSerializer is not null
+                return POIRepresentation.AddETags(this, CustomChargingConnectorSerializer is not null
                            ? CustomChargingConnectorSerializer(this, json)
-                           : json;
+                           : json);
 
             }
             catch (Exception e)

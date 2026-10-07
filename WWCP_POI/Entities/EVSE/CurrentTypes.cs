@@ -37,14 +37,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             switch (Text.Trim())
             {
 
-                case "AC_1_PHASE":
-                case "AC_1Phase":
                 case "AC_OnePhase":
                     CurrentType = CurrentTypes.AC_OnePhase;
                     return true;
 
-                case "AC_3_PHASE":
-                case "AC_3Phases":
                 case "AC_ThreePhases":
                     CurrentType = CurrentTypes.AC_ThreePhases;
                     return true;

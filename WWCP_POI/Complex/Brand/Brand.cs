@@ -73,7 +73,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// This is meant to be one electrical circuit which can charge a electric vehicle
     /// independently. Thus there could be multiple interdependent power sockets.
     /// </summary>
-    public partial class Brand : IHasId<Brand_Id>,
+    public sealed partial class Brand : IHasId<Brand_Id>,
                          //IEntity<Brand_Id>,
                          IEquatable<Brand>,
                          IComparable<Brand>,
@@ -99,12 +99,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The multi-language name of this brand.
         /// </summary>
-        public I18NString Name { get; }
+        private readonly I18NString immutableName;
+        public I18NString Name => immutableName.Clone();
 
         /// <summary>
         /// The optional multi-language description of this brand.
         /// </summary>
-        public I18NString Description { get; }
+        private readonly I18NString immutableDescription;
+        public I18NString Description => immutableDescription.Clone();
 
         /// <summary>
         /// The optional URL of a logo of this brand.
@@ -121,8 +123,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The optional data licenses of this brand.
         /// </summary>
+                private readonly System.Collections.Immutable.ImmutableArray<DataLicense> dataLicenses;
         [Optional]
-        public IEnumerable<DataLicense> DataLicenses { get; }
+        public IEnumerable<DataLicense> DataLicenses => ImmutablePOIValues.CopyItems(dataLicenses);
 
         #endregion
 
@@ -158,11 +161,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #endregion
 
             this.Id = Id;
-            this.Name = Name;
-            this.Description = Description ?? I18NString.Empty;
+            this.immutableName = (Name).Clone();
+            this.immutableDescription = (Description ?? I18NString.Empty).Clone();
             this.Logo = Logo;
             this.Homepage = Homepage;
-            this.DataLicenses = DataLicenses?.Distinct() ?? Array.Empty<DataLicense>();
+            this.dataLicenses = ImmutablePOIValues.CopyItems(DataLicenses?.Distinct());
 
         }
 
@@ -212,9 +215,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        );
 
-            return CustomBrandSerializer is not null
+            return POIRepresentation.AddETags(this, CustomBrandSerializer is not null
                        ? CustomBrandSerializer(this, json)
-                       : json;
+                       : json);
 
         }
 

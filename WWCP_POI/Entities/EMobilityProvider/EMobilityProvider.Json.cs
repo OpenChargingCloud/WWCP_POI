@@ -29,7 +29,7 @@ using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
-    public partial class EMobilityProvider
+    public sealed partial class EMobilityProvider
     {
 
         /// <summary>
@@ -81,17 +81,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var parsed = new EMobilityProvider(id,
                                                    RoamingNetwork,
+                                                   Priority: JSON["priority"] is { } rank && rank.Type != JTokenType.Null
+                                                                 ? rank.Type == JTokenType.Integer ? new EMobilityProviderPriority(rank.Value<Int32>())
+                                                                     : throw new ArgumentException("priority: expected an integer.") : null,
                                                    Name:        InfrastructureJson.Name(JSON, "name"),
                                                    Description: InfrastructureJson.Name(JSON, "description"),
                                                    DataSource:  InfrastructureJson.Text(JSON, "dataSource"),
                                                    CustomData:  InfrastructureJson.CustomData(JSON))
                 {
-                    Homepage           = InfrastructureJson.Scalar<URL>(JSON, "homepage", URL.TryParse),
-                    HotlinePhoneNumber = InfrastructureJson.Scalar<PhoneNumber>(JSON, "hotline", PhoneNumber.TryParse)
+                    _Homepage           = InfrastructureJson.Scalar<URL>(JSON, "homepage", URL.TryParse),
+                    _HotlinePhoneNumber = InfrastructureJson.Scalar<PhoneNumber>(JSON, "hotline", PhoneNumber.TryParse)
                 };
 
                 if (InfrastructureJson.Address(JSON) is { } address)
-                    parsed.Address = address;
+                    parsed._Address = address;
 
                 parsed.ParseProviderLogo(JSON);
 
@@ -131,7 +134,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("logos: this provider supports one logo.");
 
             if (logos.Count == 1)
-                Logo = logos[0];
+                _Logo = logos[0];
 
         }
 

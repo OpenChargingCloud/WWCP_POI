@@ -29,7 +29,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A parking product.
     /// </summary>
-    public class ParkingProduct : IEquatable <ParkingProduct>,
+    public sealed partial class ParkingProduct : IEquatable <ParkingProduct>,
                                   IComparable<ParkingProduct>
 
     {
@@ -61,10 +61,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Id"></param>
         /// <param name="MinDuration">The electric vehicle wants to charge at least for this amount of time.</param>
         /// <param name="StopParkingAfterTime">Stop parking after this amount of time.</param>
-        /// <param name="MinPower">The minimal parking power the electric vehicle accepts [kW].</param>
-        /// <param name="MaxPower">The maximum parking power the electric vehicle consumes [kW].</param>
-        /// <param name="MinEnergy">The electric vehicle wants to charge at least this amount of energy [kWh].</param>
-        /// <param name="StopChargingAfterKWh">Stop parking after this amount of charged energy [kWh].</param>
         public ParkingProduct(ParkingProduct_Id  Id,
                               TimeSpan?          MinDuration            = null,
                               TimeSpan?          StopParkingAfterTime   = null)

@@ -9,14 +9,12 @@ var before = roamingNetwork.DataSnapshot;
 var oldPower = before.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1")
                      .Properties["maxPower"];
 
-var changeSet = new RoamingNetworkChangeSet(
+var changeSet = before.CreateChangeSet(
     id: "change-42",
-    roamingNetworkId: roamingNetwork.Id.ToString(),
-    baseRevision: roamingNetwork.Revision,
     createdAt: DateTimeOffset.UtcNow,
     changes: [RoamingNetworkChange.UpdateProperty(
         "EVSE", "DE*ABC*E1", "maxPower", oldPower,
-        JsonSerializer.SerializeToElement(150_000m))]);
+        JsonSerializer.SerializeToElement("150 kW"))]);
 
 var next = roamingNetwork.ApplyChangeSet(changeSet);
 // roamingNetwork is still revision 0; next is revision 1.
@@ -24,26 +22,31 @@ var document = next.ToJSONSnapshot();
 var restored = RoamingNetwork.Parse(document);
 ```
 
-## Storage and compatibility
+## Storage and domain projection
 
-`DataSnapshot` captures a mutable legacy network once and becomes its authoritative versioned
+`DataSnapshot` captures an immutable POI network once and becomes its authoritative versioned
 data. A snapshot contains immutable entity documents and parent/child keys, backed by persistent
 `ImmutableDictionary`/`ImmutableHashSet` collections. Updates replace affected entries and their
-ancestors; unrelated entries and unchanged property values are shared. Applying a batch does not
-serialize or reparse the entire network. Capturing the initial network and exporting its JSON are
-proportional to the data size.
+ancestors; unrelated entries and unchanged property values are shared. Operation validation
+reconstructs affected nodes and their ancestors. Mandatory before/after ETag calculation additionally
+reconstructs the complete canonical POI projection and both encodings; it is proportional to the data
+size. Immutable snapshot identifiers are computed lazily and cached. `CreateChangeSet` prepares
+both arrays on unpublished immutable maps; `ApplyChangeSet` checks both before returning a result.
 
 For large data sets, read `DataSnapshot.Entities`, `GetEntity()` and `GetEntityJSON()` directly.
-`WriteTo(Utf8JsonWriter)` streams the complete snapshot without creating an intermediate JObject
+`WriteTo(Utf8JsonWriter, IncludeETags: false)` streams the complete snapshot without creating an intermediate JObject
 hierarchy. `GetEntityJSON()` returns a fresh, editable JSON document without exposing mutable storage.
 
-The old POI classes are still mutable **compatibility projections**, not immutable storage. On a
-newly applied network, accessing the existing operators/pools/stations/EVSE collections materializes
-the complete projection lazily, with fresh objects and parent pointers into that version. Editing
-these projections does not edit `DataSnapshot`, `ToJSONSnapshot()` or any later version. After
-capturing a snapshot, persist changes through change sets. `ToJSON()` remains the legacy projection
-serializer; use `ToJSONSnapshot()` for versioned persistence. A persisted snapshot carries its
-`revision` and `appliedChangeSetId`; reloading it preserves both.
+The eight domain classes have immutable static POI data. On a newly applied network, accessing
+operators/pools/stations/EVSE collections materializes the complete hierarchy lazily, with fresh
+objects and parent pointers into that version. Statuses and real-time measurements remain mutable
+inside the entities. Derivation captures their histories and values into independent runtime
+state, visiting the source hierarchy in addition to the persistent storage update.
+
+Static changes use ChangeSets. `ToJSONSnapshot()` exports the static version with current runtime
+statuses; `DataSnapshot.WriteTo()` exports the frozen baseline. Direct runtime changes do not edit
+`DataSnapshot`, POI timestamps or revision. A persisted snapshot carries its `revision` and
+`appliedChangeSetId`; reloading it preserves both.
 
 ## Operations
 
@@ -70,23 +73,55 @@ Snapshot key equality follows the domain's ID equality, including equivalent sep
 Omitting `OldValue` skips the precondition. A present JSON null expects a present null property;
 it does not match an absent property. A new JSON null clears a nullable property, and remains
 explicitly present in snapshot storage. Status/admin-status changes require an object containing
-`value` and `timestamp`; their timestamps are normalized to UTC. The compatibility status schedule
+`value` and `timestamp`; their timestamps are normalized to UTC. The runtime status schedule
 treats future timestamps as scheduled values rather than current values.
 
 Each successful batch increments the revision once, including an empty batch. Entity and ancestor
 change timestamps use the batch's `CreatedAt`; existing creation timestamps remain unchanged.
-New entities receive default metadata where omitted. Revision/network mismatches, invalid fields,
+New entities and nested POI replacements receive deterministic metadata defaults from `CreatedAt`
+where omitted. Required `BeforeETags` and `AfterETags` each contain JSON and CBOR SHA-256
+identifiers as `ImmutableArray<ETag>`. Each readonly value contains typed format/algorithm and
+immutable digest bytes. JSON uses `[format, algorithm, encoding, encodedDigest]`; CBOR ETag arrays use native digest
+bytes. Both JSON serializers have matching type converters. The readable `ToString()` form is
+`format:algorithm:encoding:digest`, with HEX by default. JSON supports explicit `hex` and canonical
+standard `base64`; both decode to the same byte-valued identifier. Transport encoding is outside
+ETag equality. The readable form supports logging and explicit text parsing. Both source
+identifiers are checked before operations, both result identifiers after
+timestamp updates. Content mismatches fail at batch level with no operation index.
+Revision/network mismatches, invalid fields,
 duplicates, wrong parents and failed preconditions abort the entire batch. `ApplyChangeSet()` throws
 `RoamingNetworkChangeSetException` with the operation index; `TryApplyChangeSet()` returns an error
 without a partial result. Independent branches may be built concurrently from the same snapshot.
 
+## Explicit merging
+
+`snapshot.TryMerge(left, right, out merged, out report)` validates both batches against the common
+source, including source/result ETags and optional signatures, then checks both execution orders.
+They must be valid and yield equal entity structure and complete stored properties, including
+frozen statuses. A compatible preview returns true and `MergeAvailable`, but `merged` is null.
+
+Use `merge: true, mergedChangeSetId: "new-id"` only after an explicit decision to combine the
+batches. The result is unsigned, preserves left-then-right operations and old-value checks, and
+has fresh result ETags. A single merge timestamp defaults to the later input timestamp; optional
+`createdAt` overrides it. Apply the result separately to the common source for one new revision.
+This API does not rewrite preconditions, deduplicate operations or merge elements within nested
+property arrays/objects. Structured issues report invalid input batches, failed original operations
+or order-dependent result fields. See [merge examples and boundaries](../../docs/CHANGESETS.md#merging-concurrent-batches).
+
 ## Signatures and boundaries
 
-A batch with a signature envelope requires a caller-provided `VerifySignature` callback and is
-rejected unless verification succeeds. No signature algorithm, key management, canonical JSON,
-commit hash, merge algorithm or full revision history is implemented here. The numeric base revision
-is optimistic concurrency metadata, not a cryptographic identity of a branch. `AppliedChangeSetId`
-records the latest batch, not an audit log.
+A batch's `Signatures` array contains equal peer envelopes. Signed batches require a caller-provided
+`VerifySignature(batch, signature)` callback for every peer; one failure rejects the whole batch.
+`Sign`/`TrySign` append signatures using Styx `COSEAlgorithm` and asymmetric keys, while
+`VerifySignature`/`VerifySignatures` supply cryptographic checks with application-trusted public keys.
+`WithSignature` appends an externally prepared envelope. The `wwcp-poi-changeset-json-v1` profile
+binds the before/after arrays, header, complete operations, multilingual `Description` and arbitrary
+JSON `Metadata`, together with the peer's algorithm/key ID/profile/encoding. Description/metadata
+edits return an unsigned copy; the peer array is excluded to permit independent additional signers.
+Canonical JSON and deterministic CBOR SHA-256 POI identities bind the source and result data.
+Key management, a history-bound commit identity, automatic conflict resolution and durable history
+remain future work. `AppliedChangeSetId` records
+the latest batch; applications persist the batches separately for an audit log.
 
 The snapshot retains the existing POI snapshot contract: current timestamped statuses, entity
 timestamps and custom data, but no status history or properties absent from the POI serializers.
@@ -95,7 +130,7 @@ timestamps and custom data, but no status history or properties absent from the 
 
 Operators own `chargingTariffs`; EVSEs and connectors reference them through `tariffIds`. Tariffs
 are independent immutable entity nodes, so changing a price shares the entire station subtree.
-`elements`, `currency`, `brand`, `URI` and `energy_mix` can be updated as tariff properties.
+`elements`, `currency`, `brand`, `uri` and `energyMix` can be updated as tariff properties.
 Price components and restrictions are nested tariff values; replace `elements` to edit them.
 
 `TariffReferences` is a persistent reverse index of tariff keys to EVSE/connector keys. It is built
@@ -105,17 +140,18 @@ or replace its assignments, then remove it in the same batch. Removing an operat
 its infrastructure assignments and its tariffs atomically. Operations observe preceding operations
 in order; add a tariff before assigning it.
 
-Legacy `GetChargingTariffs()`/`GetChargingTariffIds()` now return registered tariffs without filters,
+`GetChargingTariffs()`/`GetChargingTariffIds()` now return registered tariffs without filters,
 or assigned tariffs for the supplied pool/station/EVSE/connector. Connector queries require an EVSE
 scope and include the EVSE's direct assignments. Provider-specific tariff agreements are not modeled;
 passing an EMobilityProvider filter raises `NotSupportedException`.
 
-Tariff JSON retains the existing field names. Prices and energy/power bounds are now decimal JSON
-numbers without cent rounding; old invariant decimal strings remain readable. Date restrictions
+Tariff prices are decimal JSON numbers without cent rounding. Energy/power bounds and energy/current
+billing steps use unit-bearing strings. Restrictions write `minEnergy`/`maxEnergy` and expose
+typed `Range<WattHour?>` and `Range<Watt?>` bounds in C#. Date restrictions
 use `startDate`/`endDate` as ISO timestamps; duration restrictions use `minDuration`/`maxDuration`
-in seconds with TimeSpan tick precision. Billing increments require positive whole seconds.
-Energy mixes include their `energySources` and `environmentalImpacts` arrays. Missing arrays in old
-JSON mean unknown composition; the original serializer did not store those values.
+with unit-bearing seconds and TimeSpan tick precision. Billing increments require positive quantities.
+Energy mixes include `energySources` and `environmentalImpacts` arrays with unit-bearing `percentage`
+strings. Both arrays are required; use `[]` for unknown composition.
 
 Use `RoamingNetwork.Parse(string)` or `ChargingTariff.Parse(string, operator)` to load numeric prices
 without converting them to binary floating point first. When supplying a JObject, load it with
@@ -140,20 +176,29 @@ var change = RoamingNetworkChange.UpdateProperty(
     JsonSerializer.SerializeToElement(meter));
 ```
 
+Pools and stations can additionally own zero or more meters under `energyMeters`.
+Each meter can specify an optional `role` such as `grid`, `pv` or `battery`. Replace the owner's
+complete `energyMeters` array to change membership, roles or transparency information; use `[]`
+to clear it. IDs must be unique within the owner. Direct pool/station meters retain independent
+mutable operational/admin status schedules, which are captured when deriving a network version
+and overlaid by `ToJSONSnapshot()`. Explicitly replacing the array keeps its supplied statuses.
+
+`ChargingPool.gridConnectionPoint` optionally describes the public-grid connection. It has a
+mandatory `gridOperator` reference/document and an optional `energyMeter`. Replace this complete
+property to change its connection data; JSON null removes it. Operator and meter runtime histories
+are independently preserved across unrelated ChangeSets. See [Grid connections](../../docs/GRIDCONNECTIONS.md).
+
 The replacement is validated through the energy meter and software/status parsers before commit.
 Invalid software, non-string certificate fields and reversed validity intervals abort the batch. Other
 EVSEs and their data are shared unchanged. The meter's own `lastChange` is supplied in the property
 document; the change set updates the owning EVSE and its ancestor timestamps automatically.
 
-The current software JSON uses `openSourceLicense` as a complete license object (`@id`,
-`description`, `URLs`). The parser also accepts `id`, legacy `open_source_license` strings and
-license strings under `openSourceLicense`. Known legacy license IDs resolve to the predefined
-license; unknown strings retain their ID and available description text. Old strings cannot restore
-original URLs or multilingual metadata omitted by the old serializer.
+Software JSON requires `openSourceLicense` as a license object (`@id`, `description`, `URLs`).
+String licenses and alternative property names are rejected.
 
 `TransparencySoftwareStatus.NotBefore`/`NotAfter` and their constructor parameters are now nullable
 `DateTimeOffset` values normalized to UTC. JSON retains all seven fractional second digits.
-Timezone-free legacy timestamps are read as UTC. Legal status values remain extensible; parsing
+Timestamp strings require an explicit offset or `Z`. Legal status values remain extensible; parsing
 checks their representation, not certificate authenticity or legal approval. Software links and
 license URLs must be absolute. Software/status comparisons cover all serialized fields, and nested
 license metadata and the meter's software collection are copied defensively.
@@ -170,11 +215,15 @@ separate files. The snapshot implementation is grouped by responsibility:
 | --- | --- |
 | `RoamingNetworkDataSnapshot.cs` | Immutable data, lookup and initial capture |
 | `RoamingNetworkDataSnapshot.Changes.cs` | Batch validation and ordered add/remove/property operations |
+| `RoamingNetworkDataSnapshot.Merge.cs` | Explicit merge preparation, input checks and comparison of both execution orders |
+| `RoamingNetworkChangeSetMergeResult.cs` | Immutable merge status, notices and structured issues |
+| `RoamingNetworkChangeSet.Signing.cs` | Canonical signature input, Styx signing and peer verification |
 | `RoamingNetworkDataSnapshot.Import.cs` | Hierarchy import, metadata normalization and subtree traversal |
 | `RoamingNetworkDataSnapshot.Validation.cs` | Domain validation through small ancestor projections |
 | `RoamingNetworkDataSnapshot.TariffReferences.cs` | Incremental reverse tariff index |
 | `RoamingNetworkDataSnapshot.Json.cs` | Entity JSON and direct nested export |
-| `RoamingNetwork.CopyOnWrite.cs` | Roaming network API and lazy legacy hierarchy projection |
+| `RoamingNetwork.CopyOnWrite.cs` | Roaming network API and lazy immutable hierarchy projection |
+| `RoamingNetwork.RuntimeState.cs` | Independent runtime histories and measurements for derived versions |
 
 All partial snapshot files operate on the same immutable storage. This source organization does
 not introduce extra copies of entities or JSON trees.

@@ -132,7 +132,7 @@ namespace WWCP_POI_Tests.Json
                                                                 Assert.That(parsed.MinPower, Is.EqualTo(source.MinPower));
                                                                 Assert.That(parsed.MaxPower, Is.EqualTo(source.MaxPower));
                                                                 Assert.That(parsed.MinEnergy, Is.EqualTo(source.MinEnergy));
-                                                                Assert.That(parsed.StopChargingAfterKWh, Is.EqualTo(source.StopChargingAfterKWh));
+                                                                Assert.That(parsed.StopChargingAfterEnergy, Is.EqualTo(source.StopChargingAfterEnergy));
                                                                 Assert.That(parsed.MaxB2BServiceCosts, Is.EqualTo(source.MaxB2BServiceCosts));
                                                                 Assert.That(parsed.IntermediateCDRs, Is.EqualTo(intermediateCDRs));
 
@@ -166,7 +166,7 @@ namespace WWCP_POI_Tests.Json
         [TestCase("minPower")]
         [TestCase("maxPower")]
         [TestCase("minEnergy")]
-        [TestCase("stopChargingAfterKWh")]
+        [TestCase("stopChargingAfterEnergy")]
         [TestCase("maxB2BServiceCosts")]
         [TestCase("intermediateCDRs")]
         public void Product_rejects_invalid_optional_value(string field)

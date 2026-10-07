@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -40,44 +40,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (dataSnapshot is not null)
-                return dataSnapshot.ToJSON();
-
-            var json = ToJSON(
-                           ExpandChargingStationOperatorIds:       InfoStatus.Expanded,
-                           ExpandChargingPoolIds:                  InfoStatus.Expanded,
-                           ExpandChargingStationIds:               InfoStatus.Expanded,
-                           ExpandEVSEIds:                          InfoStatus.Expanded,
-                           ExpandBrandIds:                         InfoStatus.Expanded,
-                           ExpandDataLicenses:                     InfoStatus.Expanded,
-                           ExpandEMobilityProviderId:              InfoStatus.Expanded,
-                           CustomChargingStationOperatorSerializer: (entity, document) => InfrastructureJson.SnapshotMetadata(document, entity),
-                           CustomChargingPoolSerializer:            (entity, document) => InfrastructureJson.SnapshotMetadata(document, entity),
-                           CustomChargingStationSerializer:         (entity, document) => InfrastructureJson.SnapshotMetadata(document, entity),
-                           CustomEVSESerializer:                    (entity, document) => InfrastructureJson.SnapshotMetadata(document, entity));
-
-            InfrastructureJson.SnapshotMetadata(json, this);
-            AddProviderSnapshotMetadata(json);
-
-            return json;
-
-        }
-
-        private void AddProviderSnapshotMetadata(JObject json)
-        {
-
-            if (json["eMobilityProviders"] is not JArray providers)
-                return;
-
-            var byId = EMobilityProviders.ToDictionary(provider => provider.Id.ToString());
-
-            foreach (var document in providers.OfType<JObject>())
             {
-                var id = document["@id"]!.Value<String>()!;
-
-                InfrastructureJson.SnapshotMetadata(document, byId[id]);
+                var persisted = dataSnapshot.ToJSON();
+                WriteCurrentRuntimeStatuses(persisted);
+                return persisted;
             }
 
+            var json = POIRepresentation.WithoutETags(() => POIJSON.Document(this));
+            return POIRepresentation.AddETags(this, json);
+
         }
+
+        internal JObject? GetCapturedSnapshotDocument()
+            => dataSnapshot?.ToJSON();
 
         #endregion
 

@@ -29,7 +29,7 @@ using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
-    public partial class ChargingStationOperator
+    public sealed partial class ChargingStationOperator
     {
 
         #region Parse/TryParse
@@ -93,16 +93,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                          DataSource:  InfrastructureJson.Text(JSON, "dataSource"),
                                                          CustomData:  InfrastructureJson.CustomData(JSON))
                 {
-                    Address            = InfrastructureJson.Address(JSON),
-                    Homepage           = InfrastructureJson.Scalar<URL>(JSON, "homepage", URL.TryParse),
-                    HotlinePhoneNumber = InfrastructureJson.Scalar<PhoneNumber>(JSON, "hotline", PhoneNumber.TryParse)
+                    address            = InfrastructureJson.Address(JSON),
+                    homepage           = InfrastructureJson.Scalar<URL>(JSON, "homepage", URL.TryParse),
+                    hotlinePhoneNumber = InfrastructureJson.Scalar<PhoneNumber>(JSON, "hotline", PhoneNumber.TryParse)
                 };
 
                 parsed.ParseOperatorLogo(JSON);
-                parsed.DataLicenses.AddRange(InfrastructureJson.Licenses(JSON));
+                parsed.immutableDataLicenses = parsed.immutableDataLicenses.AddRange(InfrastructureJson.Licenses(JSON));
 
                 foreach (var brand in InfrastructureJson.Brands(JSON, context: Context))
-                    parsed.Brands.Add(brand);
+                    parsed.immutableBrands = parsed.immutableBrands.Add(brand);
 
                 var tariffIds = parsed.ParseOperatorTariffs(JSON, Context);
 
@@ -152,7 +152,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("logos: this operator supports one logo.");
 
             if (logos.Count == 1)
-                Logo = logos[0];
+                logo = logos[0];
 
         }
 

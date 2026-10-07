@@ -27,7 +27,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The priority of an e-mobility provider.
     /// </summary>
-    public class EMobilityProviderPriority
+    public sealed class EMobilityProviderPriority
     {
 
         public Int32 Value { get; }

@@ -27,7 +27,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of a parking sensor.
     /// </summary>
-    public class ParkingSensor_Id : IId,
+    public sealed class ParkingSensor_Id : IId,
                                     IEquatable<ParkingSensor_Id>,
                                     IComparable<ParkingSensor_Id>
 

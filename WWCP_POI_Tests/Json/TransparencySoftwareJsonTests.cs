@@ -96,7 +96,7 @@ namespace WWCP_POI_Tests.Json
         private static RoamingNetworkChangeSet Set(RoamingNetwork  network,
                                                    JsonElement     oldMeter,
                                                    JsonElement     newMeter)
-            => new("transparency-change", network.Id.ToString(), network.Revision, DateTimeOffset.Parse("2026-10-06T12:00:00Z"),
+            => network.CreateChangeSet("transparency-change", DateTimeOffset.Parse("2026-10-06T12:00:00Z"),
                 [RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "energyMeter", oldMeter, newMeter)]);
 
         [TestCase("en-US")]
@@ -137,10 +137,10 @@ namespace WWCP_POI_Tests.Json
         }
 
         [Test]
-        public void Minimal_software_omits_optional_links_and_accepts_license_id_alias()
+        public void Minimal_software_omits_optional_links()
         {
 
-            var json = JObject.Parse("""{"name":"Verifier","version":"1","vendor":"Vendor","openSourceLicense":{"id":"MIT"}}""");
+            var json = JObject.Parse("""{"name":"Verifier","version":"1","vendor":"Vendor","openSourceLicense":{"@id":"MIT"}}""");
             var parsed = TransparencySoftware.Parse(json);
 
             Assert.That(parsed.Logo, Is.Null);
@@ -152,7 +152,7 @@ namespace WWCP_POI_Tests.Json
 
         [TestCase("open_source_license")]
         [TestCase("openSourceLicense")]
-        public void Legacy_license_strings_are_read_and_rewritten_as_complete_objects(string field)
+        public void License_strings_are_rejected(string field)
         {
 
             var json = Software().ToJSON();
@@ -160,14 +160,9 @@ namespace WWCP_POI_Tests.Json
             json.Remove("openSourceLicense");
             json[field] = OpenSourceLicense.MIT.ToString();
 
-            var restored = TransparencySoftware.Parse(json);
-
-            Assert.That(restored.OpenSourceLicense, Is.EqualTo(OpenSourceLicense.MIT));
-            Assert.That(restored.ToJSON()["openSourceLicense"], Is.TypeOf<JObject>());
+            Assert.That(TransparencySoftware.TryParse(json, out _, out _), Is.False);
             json[field] = "custom-license: Custom license terms";
-            restored = TransparencySoftware.Parse(json);
-            Assert.That(restored.OpenSourceLicense.Id.ToString(), Is.EqualTo("custom-license"));
-            Assert.That(restored.OpenSourceLicense.Description.FirstText(), Is.EqualTo("Custom license terms"));
+            Assert.That(TransparencySoftware.TryParse(json, out _, out _), Is.False);
 
         }
 
@@ -191,9 +186,9 @@ namespace WWCP_POI_Tests.Json
         [TestCase("version", "true")]
         [TestCase("vendor", "{}")]
         [TestCase("logo", "12")]
-        [TestCase("how_to_use", "\"relative/path\"")]
-        [TestCase("more_information", "[]")]
-        [TestCase("source_code_repository", "\"\"")]
+        [TestCase("howToUse", "\"relative/path\"")]
+        [TestCase("moreInformation", "[]")]
+        [TestCase("sourceCodeRepository", "\"\"")]
         [TestCase("openSourceLicense", "false")]
         [TestCase("openSourceLicense", "{\"@id\":\"MIT\",\"id\":\"Apache-2.0\"}")]
         [TestCase("openSourceLicense", "{\"@id\":\"MIT\",\"URLs\":[42]}")]
@@ -211,14 +206,14 @@ namespace WWCP_POI_Tests.Json
         }
 
         [Test]
-        public void Conflicting_legacy_and_current_licenses_are_rejected()
+        public void Unknown_license_property_is_rejected()
         {
 
             var json = Software().ToJSON();
 
             json["open_source_license"] = "Apache-2.0";
             Assert.That(TransparencySoftware.TryParse(json, out _, out var error), Is.False);
-            Assert.That(error, Does.Contain("only one"));
+            Assert.That(error, Does.Contain("open_source_license"));
 
         }
 
@@ -299,12 +294,18 @@ namespace WWCP_POI_Tests.Json
         [TestCase("2026-01-01T12:30:00.1234567+02:00")]
         [TestCase("2026-01-01T10:30:00.1234567Z")]
         [TestCase("2026-01-01T10:30:00.1234567")]
-        public void Validity_timestamps_normalize_offsets_and_legacy_timezone_free_values(string timestamp)
+        public void Validity_timestamps_require_offsets_and_normalize_to_UTC(string timestamp)
         {
 
             var json = Status().ToJSON();
 
             json["notBefore"] = timestamp;
+
+            if (!timestamp.EndsWith('Z') && !timestamp.Contains('+'))
+            {
+                Assert.That(TransparencySoftwareStatus.TryParse(json, out _, out _), Is.False);
+                return;
+            }
 
             var parsed = TransparencySoftwareStatus.Parse(json);
 

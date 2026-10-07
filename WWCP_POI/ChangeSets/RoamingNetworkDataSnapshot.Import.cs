@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -44,6 +44,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var copy = (JObject) document.DeepClone();
+            POIRepresentation.RemoveETags(copy, type.ToString());
             var text = InfrastructureJson.Text(copy, "@id") ??
                        throw new ArgumentException("Missing '@id'.");
             var key  = Key(type, text, parent?.Id);
@@ -57,9 +58,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             InfrastructureChangeSchema.ValidateFields(type, copy);
 
             if (timestamp is { } time)
+            {
                 InfrastructureChangeSchema.InitializeMetadata(type, copy, time);
+                POIRepresentation.InitializeNestedMetadata(copy, type.ToString(), time);
+            }
 
             NormalizeImportedTimestamps(copy);
+            MetrologyJson.NormalizeEntity(copy, type);
 
             copy.Remove("revision");
             copy.Remove("appliedChangeSetId");

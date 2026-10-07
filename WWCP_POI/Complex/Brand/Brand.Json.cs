@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Newtonsoft.Json.Linq;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
@@ -8,7 +8,9 @@ namespace cloud.charging.open.protocols.WWCP.POI;
 
 public partial class Brand
 {
-    /// <summary>Parse a brand. ID-only licenses retain their identity; expanded licenses retain their metadata.</summary>
+    /// <summary>
+    /// Parse a brand. ID-only licenses retain their identity; expanded licenses retain their metadata.
+    /// </summary>
     public static Brand Parse(JObject JSON, CustomJObjectParserDelegate<Brand>? CustomBrandParser = null)
     {
         if (TryParse(JSON, out var brand, out var error, CustomBrandParser))
@@ -16,12 +18,16 @@ public partial class Brand
         throw new ArgumentException($"Invalid brand JSON: {error}", nameof(JSON));
     }
 
-    /// <summary>Try to parse a brand without throwing for invalid input.</summary>
+    /// <summary>
+    /// Try to parse a brand without throwing for invalid input.
+    /// </summary>
     public static bool TryParse(JObject JSON, [NotNullWhen(true)] out Brand? brand,
                                 [NotNullWhen(false)] out string? error)
         => TryParse(JSON, out brand, out error, null);
 
-    /// <summary>Try to parse a brand and optionally apply a custom parser.</summary>
+    /// <summary>
+    /// Try to parse a brand and optionally apply a custom parser.
+    /// </summary>
     public static bool TryParse(JObject JSON, [NotNullWhen(true)] out Brand? brand,
                                 [NotNullWhen(false)] out string? error,
                                 CustomJObjectParserDelegate<Brand>? CustomBrandParser)
@@ -60,14 +66,7 @@ public partial class Brand
                         licenses.Add(new DataLicense(licenseId));
                     else if (entry is JObject licenseJSON)
                     {
-                        // Hermod writes '@id' but its license parser currently expects 'id'.
-                        // Normalize a copy, preserving the caller's original document.
-                        var document = (JObject) licenseJSON.DeepClone();
-                        document["id"] ??= document["@id"]?.DeepClone();
-                        document["URLs"] ??= new JArray();
-                        if (!DataLicense.TryParse(document, out var license, out var licenseError) || license is null)
-                            throw new ArgumentException($"Invalid data license: {licenseError}");
-                        licenses.Add(license);
+                        licenses.Add(InfrastructureJson.ParseDataLicense(licenseJSON));
                     }
                     else
                         throw new ArgumentException("Invalid data license: expected an identifier or an object.");

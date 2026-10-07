@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -42,7 +42,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// An energy meter.
     /// </summary>
-    public class EnergyMeter : AEMobilityEntity<EnergyMeter_Id,
+    public sealed partial class EnergyMeter : AImmutableEMobilityEntity<EnergyMeter_Id,
                                                 EnergyMeterAdminStatusTypes,
                                                 EnergyMeterStatusTypes>,
                                IEquatable<EnergyMeter>,
@@ -70,6 +70,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
         #region Properties
+
+        /// <summary>
+        /// The optional measurement role, e.g. "grid", "pv" or "battery".
+        /// Values are trimmed and normalized to lowercase; additional roles are supported.
+        /// </summary>
+        [Optional]
+        public String?                                  Role                         { get; }
 
         /// <summary>
         /// The optional manufacturer of the energy meter.
@@ -116,8 +123,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The optional enumeration of public keys used for signing the energy meter values.
         /// </summary>
-        [Optional]
-        public IEnumerable<PublicKey>                   PublicKeys                   { get; }
+        private readonly System.Collections.Immutable.ImmutableArray<PublicKey> publicKeys;
+        public IEnumerable<PublicKey> PublicKeys => ImmutablePOIValues.CopyItems(publicKeys);
 
         /// <summary>
         /// One or multiple optional certificates for the public key of the energy meter.
@@ -148,7 +155,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Id">The identification of the energy meter.</param>
         /// <param name="Name">An optional name of the energy meter.</param>
         /// <param name="Description">An optional multi-language description of the energy meter.</param>
-        /// 
+        ///
         /// <param name="Manufacturer">An optional manufacturer of the energy meter.</param>
         /// <param name="ManufacturerURL">An optional URL to the manufacturer of the energy meter.</param>
         /// <param name="Model">An optional model of the energy meter.</param>
@@ -159,7 +166,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="PublicKeys">The optional public key of the energy meter used for signing the energy meter values.</param>
         /// <param name="PublicKeyCertificateChain">One or multiple optional certificates for the public key of the energy meter.</param>
         /// <param name="TransparencySoftware">An enumeration of transparency software and their legal status, which can be used to validate the charging session data.</param>
-        /// 
+        /// <param name="Role">An optional measurement role, e.g. "grid", "pv" or "battery".</param>
+        ///
         /// <param name="LastChange">The timestamp when this energy meter was last updated (or created).</param>
         public EnergyMeter(EnergyMeter_Id                             Id,
                            I18NString?                                Name                         = null,
@@ -186,7 +194,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            DateTimeOffset?                            LastChange                   = null,
 
                            CustomDataNew?                             CustomData                   = null,
-                           UserDefinedDictionary?                     InternalData                 = null)
+                           UserDefinedDictionary?                     InternalData                 = null,
+                           String?                                    Role                         = null)
 
             : base(Id,
                    Name,
@@ -203,6 +212,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
+            if (Role is not null && String.IsNullOrWhiteSpace(Role))
+                throw new ArgumentException("role: must be a non-empty string when supplied.", nameof(Role));
+            this.Role                       = Role?.Trim().ToLowerInvariant();
             this.Manufacturer               = Manufacturer;
             this.ManufacturerURL            = ManufacturerURL;
             this.Model                      = Model;
@@ -210,7 +222,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.SerialNumber               = SerialNumber;
             this.HardwareVersion            = HardwareVersion;
             this.FirmwareVersion            = FirmwareVersion;
-            this.PublicKeys                 = PublicKeys?.          Distinct() ?? [];
+            this.publicKeys = ImmutablePOIValues.CopyItems(PublicKeys?.Distinct());
             this.PublicKeyCertificateChain  = PublicKeyCertificateChain;
             var software = TransparencySoftware?.Distinct().ToArray() ?? [];
             if (software.Any(item => item is null))
@@ -398,8 +410,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (JSON.ParseOptionalHashSet("publicKeys",
                                               "energy meter public keys",
-                                              ECCPublicKey.TryParse,
-                                              out HashSet<ECCPublicKey> PublicKeys,
+                                              PublicKey.TryParse,
+                                              out HashSet<PublicKey> PublicKeys,
                                               out ErrorResponse))
                 {
                     if (ErrorResponse is not null)
@@ -456,7 +468,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   DataSource: InfrastructureJson.Text(JSON, "dataSource"),
                                   Created: InfrastructureJson.Date(JSON, "created"),
                                   LastChange: LastChange,
-                                  CustomData: InfrastructureJson.CustomData(JSON)
+                                  CustomData: InfrastructureJson.CustomData(JSON),
+                                  Role: InfrastructureJson.Text(JSON, "role")
 
                               );
                 InfrastructureJson.RestoreMetadata(JSON, EnergyMeter, EnergyMeterAdminStatusTypes.TryParse, EnergyMeterStatusTypes.TryParse);
@@ -508,6 +521,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                ? new JProperty("description",                 Description.ToJSON())
                                : null,
 
+                           Role is not null
+                               ? new JProperty("role",                        Role)
+                               : null,
+
                            Manufacturer is not null
                                ? new JProperty("manufacturer",                Manufacturer)
                                : null,
@@ -555,9 +572,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        );
 
             InfrastructureJson.SnapshotMetadata(json, this);
-            return CustomEnergyMeterSerializer is not null
+            return POIRepresentation.AddETags(this, CustomEnergyMeterSerializer is not null
                        ? CustomEnergyMeterSerializer(this, json)
-                       : json;
+                       : json);
 
         }
 
@@ -569,8 +586,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Clone this object.
         /// </summary>
         public EnergyMeter Clone()
-
-            => new (
+        {
+            var copy = new EnergyMeter(
 
                    Id.Clone(),
                    Name.       IsNotNullOrEmpty() ? Name.       Clone() : I18NString.Empty,
@@ -599,9 +616,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    LastChangeDate,
 
                    CustomData,
-                   InternalData
+                   InternalData,
+                   Role
 
                );
+
+            copy.SetAdminStatus(AdminStatusSchedule());
+            copy.SetStatus(StatusSchedule());
+            return copy;
+        }
 
         #endregion
 
@@ -763,6 +786,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var c = Id.CompareTo(EnergyMeter.Id);
 
             if (c == 0)
+                c = String.Compare(Role, EnergyMeter.Role, StringComparison.Ordinal);
+
+            if (c == 0)
                 c = LastChangeDate.ToISO8601().CompareTo(EnergyMeter.LastChangeDate.ToISO8601());
 
             if (c == 0)
@@ -839,6 +865,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => EnergyMeter is not null &&
 
                Id.                    Equals(EnergyMeter.Id) &&
+               String.Equals(Role, EnergyMeter.Role, StringComparison.Ordinal) &&
                //LastChangeDate.ToISO8601().Equals(EnergyMeter.LastChangeDate.ToISO8601()) &&
 
              ((Model is null && EnergyMeter.Model is null) ||
@@ -881,25 +908,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Get the hash code of this object.
         /// </summary>
         public override Int32 GetHashCode()
-        {
-            unchecked
-            {
-
-                return Id.                        GetHashCode()        * 37 ^
-                      (Model?.                    GetHashCode()  ?? 0) * 31 ^
-                      (ModelURL?.                 GetHashCode()  ?? 0) * 29 ^
-                      (HardwareVersion?.          GetHashCode()  ?? 0) * 23 ^
-                      (FirmwareVersion?.          GetHashCode()  ?? 0) * 19 ^
-                      (Manufacturer?.             GetHashCode()  ?? 0) * 17 ^
-                      (ManufacturerURL?.          GetHashCode()  ?? 0) * 13 ^
-                      (PublicKeys?.               CalcHashCode() ?? 0) * 11 ^
-                      (PublicKeyCertificateChain?.GetHashCode()  ?? 0) * 7 ^
-                      (TransparencySoftware?.    CalcHashCode() ?? 0) * 5 ^
-                      (Description?.              GetHashCode()  ?? 0) * 3 ^
-                       LastChangeDate.            GetHashCode();
-
-            }
-        }
+            => Id.GetHashCode();
 
         #endregion
 

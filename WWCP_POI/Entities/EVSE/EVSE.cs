@@ -96,7 +96,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// This is meant to be one electrical circuit which can charge a electric vehicle
     /// independently. Thus there could be multiple interdependent power sockets.
     /// </summary>
-    public partial class EVSE : AEMobilityEntity<EVSE_Id,
+    public sealed partial class EVSE : AImmutableEMobilityEntity<EVSE_Id,
                                          EVSEAdminStatusType,
                                          EVSEStatusType>,
                         IEquatable<EVSE>, IComparable<EVSE>
@@ -156,11 +156,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ChargingStation?                        ChargingStation             { get; }
 
-        /// <summary>Tariffs assigned directly to this EVSE; connector assignments are separate.</summary>
+        /// <summary>
+        /// Tariffs assigned directly to this EVSE; connector assignments are separate.
+        /// </summary>
         public System.Collections.Immutable.ImmutableArray<ChargingTariff_Id> ChargingTariffIds { get; private set; } = [];
 
         public IEnumerable<ChargingTariff> ChargingTariffs
-            => Operator?.ChargingTariffs.Where(tariff => ChargingTariffIds.Any(id => id.Equals(tariff.Id))) ?? [];
+            => ImmutablePOIValues.CopyItems(Operator?.ChargingTariffs.Where(tariff => ChargingTariffIds.Any(id => id.Equals(tariff.Id))) ?? []);
 
         #region PhysicalReference
 
@@ -178,14 +180,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return physicalReference;
             }
 
-            set
-            {
-
-                if (physicalReference != value)
-                    SetProperty(ref physicalReference,
-                                value);
-
-            }
 
         }
 
@@ -199,26 +193,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional enumeration of links to photos related to the EVSE.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<URL> immutablePhotoURLs = [];
         [Optional, SlowData]
-        public ReactiveSet<URL>                         PhotoURLs                   { get; }
+        public System.Collections.Immutable.ImmutableArray<URL> PhotoURLs
+            => ImmutablePOIValues.CopyItems(immutablePhotoURLs);
 
         /// <summary>
         /// An enumeration of all brands registered for this EVSE.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<Brand> immutableBrands = [];
         [Optional, SlowData]
-        public ReactiveSet<Brand>                       Brands                      { get; }
+        public System.Collections.Immutable.ImmutableArray<Brand> Brands
+            => ImmutablePOIValues.CopyItems(immutableBrands);
 
         /// <summary>
         /// All e-mobility related Root-CAs, e.g. ISO 15118-2/-20, available at this EVSE.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<RootCAInfo> immutableMobilityRootCAs = [];
         [Optional, SlowData]
-        public ReactiveSet<RootCAInfo>                  MobilityRootCAs             { get; }
+        public System.Collections.Immutable.ImmutableArray<RootCAInfo> MobilityRootCAs
+            => ImmutablePOIValues.CopyItems(immutableMobilityRootCAs);
 
         /// <summary>
         /// An enumeration of all data license(s) of this EVSE.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<DataLicense> immutableDataLicenses = [];
         [Optional, SlowData]
-        public ReactiveSet<DataLicense>                 DataLicenses                { get; }
+        public System.Collections.Immutable.ImmutableArray<DataLicense> DataLicenses
+            => ImmutablePOIValues.CopyItems(immutableDataLicenses);
 
         /// <summary>
         /// The optional URL where certificates, identifiers and public keys related to the calibration
@@ -229,8 +231,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An enumeration of all supported charging modes of this EVSE.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<ChargingModes> immutableChargingModes = [];
         [Mandatory, SlowData]
-        public ReactiveSet<ChargingModes>               ChargingModes               { get; }
+        public System.Collections.Immutable.ImmutableArray<ChargingModes> ChargingModes
+            => ImmutablePOIValues.CopyItems(immutableChargingModes);
 
 
         #region CurrentType
@@ -249,14 +253,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return currentType;
             }
 
-            set
-            {
-
-                if (currentType != value)
-                    SetProperty(ref currentType,
-                                value);
-
-            }
 
         }
 
@@ -265,7 +261,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region MaxVoltage
 
-        private Volt? averageVoltage;
+        private Volt? maxVoltage;
 
         /// <summary>
         /// The maximum voltage.
@@ -276,27 +272,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return averageVoltage;
+                return maxVoltage;
             }
 
-            set
-            {
-
-                if (value is not null)
-                {
-
-                    if (!averageVoltage.HasValue)
-                        averageVoltage = value;
-
-                    else if (Math.Abs(averageVoltage.Value.Value - value.Value.Value) > EPSILON)
-                        SetProperty(ref averageVoltage,
-                                    value);
-
-                }
-                else
-                    DeleteProperty(ref averageVoltage);
-
-            }
 
         }
 
@@ -304,7 +282,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region MaxVoltageRealTime
 
-        private Timestamped<Volt>? averageVoltageRealTime;
+        private Timestamped<Volt>? maxVoltageRealTime;
 
         /// <summary>
         /// The real-time maximum voltage.
@@ -315,7 +293,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return averageVoltageRealTime;
+                return maxVoltageRealTime;
             }
 
             set
@@ -324,13 +302,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (value is not null)
                 {
 
-                    if (!averageVoltageRealTime.HasValue || Math.Abs(averageVoltageRealTime.Value.Value.Value - value.Value.Value.Value) > EPSILON)
-                        SetProperty(ref averageVoltageRealTime,
+                    if (!maxVoltageRealTime.HasValue || Math.Abs(maxVoltageRealTime.Value.Value.Value - value.Value.Value.Value) > EPSILON)
+                        SetProperty(ref maxVoltageRealTime,
                                     value);
 
                 }
                 else
-                    DeleteProperty(ref averageVoltage);
+                    DeleteProperty(ref maxVoltage);
 
             }
 
@@ -361,25 +339,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return maxCurrent;
             }
 
-            set
-            {
-
-                if (value is not null)
-                {
-
-                    if (!maxCurrent.HasValue)
-                        SetProperty(ref maxCurrent,
-                                    value);
-
-                    else if (Math.Abs(maxCurrent.Value.Value - value.Value.Value) > EPSILON)
-                        SetProperty(ref maxCurrent,
-                                    value);
-
-                }
-                else
-                    DeleteProperty(ref maxCurrent);
-
-            }
 
         }
 
@@ -445,21 +404,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return maxPower;
             }
 
-            set
-            {
-
-                if (value is not null)
-                {
-
-                    if (!maxPower.HasValue || Math.Abs(maxPower.Value.Value - value.Value.Value) > EPSILON)
-                        SetProperty(ref maxPower,
-                                    value);
-
-                }
-                else
-                    DeleteProperty(ref maxPower);
-
-            }
 
         }
 
@@ -524,25 +468,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return maxCapacity;
             }
 
-            set
-            {
-
-                if (value is not null)
-                {
-
-                    if (!maxCapacity.HasValue)
-                        SetProperty(ref maxCapacity,
-                                    value);
-
-                    else if (Math.Abs(maxCapacity.Value.Value - value.Value.Value) > EPSILON)
-                        SetProperty(ref maxCapacity,
-                                    value);
-
-                }
-                else
-                    DeleteProperty(ref maxCapacity);
-
-            }
 
         }
 
@@ -604,10 +529,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return energyMix ?? ChargingStation?.EnergyMix;
+                return ImmutablePOIValues.Copy(energyMix ?? ChargingStation?.EnergyMix);
             }
 
-            set
+            private set
             {
 
                 if (value != energyMix && value != ChargingStation?.EnergyMix)
@@ -712,12 +637,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return maxReservationDuration;
             }
 
-            set
-            {
-                if (maxReservationDuration.TotalSeconds != value.TotalSeconds)
-                    SetProperty(ref maxReservationDuration,
-                                value);
-            }
 
         }
 
@@ -739,12 +658,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return isFreeOfCharge;
             }
 
-            set
-            {
-                if (isFreeOfCharge != value)
-                    SetProperty(ref isFreeOfCharge,
-                                value);
-            }
 
         }
 
@@ -767,16 +680,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return energyMeter;
             }
 
-            set
-            {
-
-                if (value is not null)
-                    SetProperty(ref energyMeter, value);
-
-                else
-                    DeleteProperty(ref energyMeter);
-
-            }
 
         }
 
@@ -790,7 +693,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         [Mandatory, SlowData]
         public IEnumerable<ChargingConnector>           ChargingConnectors
-            => chargingConnectors.Values;
+            => ImmutablePOIValues.CopyItems(chargingConnectors.Values);
 
         /// <summary>
         /// The timestamp of the last status update.
@@ -832,26 +735,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Id">The unique identification of the EVSE.</param>
         /// <param name="ChargingStation">The charging station hosting this EVSE.</param>
-        /// 
+        ///
         /// <param name="RemoteEVSECreator">A delegate to attach a remote EVSE.</param>
         /// <param name="InitialAdminStatus">An optional initial admin status of the EVSE.</param>
         /// <param name="InitialStatus">An optional initial status of the EVSE.</param>
         /// <param name="MaxAdminStatusScheduleSize">An optional max length of the admin staus schedule.</param>
         /// <param name="MaxStatusScheduleSize">An optional max length of the staus schedule.</param>
-        /// 
+        ///
         /// <param name="Name">An optional multi-language text e.g. printed on the outside of the EVSE for visual identification.</param>
         /// <param name="Description">An optional multi-language description of this EVSE.</param>
-        /// 
+        ///
         /// <param name="PhotoURLs">An optional enumeration of links to photos related to the EVSE.</param>
         /// <param name="Brands">An optional enumeration of brands registered for this EVSE.</param>
         /// <param name="DataLicenses">An optional enumeration of data license(s) of this EVSE.</param>
         /// <param name="ChargingModes">An optional enumeration of the supported charging modes of this EVSE.</param>
-        /// 
+        ///
         /// <param name="DataSource"></param>
         /// <param name="LastChange"></param>
-        /// 
+        ///
         /// <param name="Configurator">A delegate to configure the newly created EVSE.</param>
-        /// 
+        ///
         /// <param name="CustomData">Optional customer specific data, e.g. in combination with custom parsers and serializers.</param>
         /// <param name="InternalData">Optional internal data.</param>
         public EVSE(EVSE_Id                              Id,
@@ -922,69 +825,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.physicalReference                  = PhysicalReference;
             this.GeoLocation                        = GeoLocation;
-            this.PhysicalReference                  = PhysicalReference;
+            this.physicalReference                  = PhysicalReference;
             this.GeoLocation                        = GeoLocation;
 
-            this.PhotoURLs                          = PhotoURLs is null
+            this.immutablePhotoURLs                          = PhotoURLs is null
                                                           ? []
-                                                          : [.. PhotoURLs];
-            this.PhotoURLs.OnSetChanged            += (timestamp, sender, newItems, oldItems) => {
+                                                          : [.. ImmutablePOIValues.CopyItems(PhotoURLs)];
 
-                PropertyChanged("PhotoURLs",
-                                oldItems,
-                                newItems);
 
-            };
-
-            this.Brands                             = Brands is null
+            this.immutableBrands                             = Brands is null
                                                           ? []
-                                                          : [.. Brands];
-            this.Brands.OnSetChanged               += (timestamp, sender, newItems, oldItems) => {
-
-                PropertyChanged("DataLicenses",
-                                oldItems,
-                                newItems);
-
-            };
+                                                          : [.. ImmutablePOIValues.CopyItems(Brands)];
 
 
-            this.MobilityRootCAs = new ReactiveSet<RootCAInfo>();
+            this.immutableMobilityRootCAs = [];
 
             if (MobilityRootCAs is not null)
                 foreach (var mobilityRootCA in MobilityRootCAs)
-                    this.MobilityRootCAs.Add(mobilityRootCA);
+                    this.immutableMobilityRootCAs = this.immutableMobilityRootCAs.Add(ImmutablePOIValues.Copy(mobilityRootCA));
 
-            this.MobilityRootCAs.OnSetChanged       += (timestamp, sender, newItems, oldItems) => {
 
-                PropertyChanged("MobilityRootCAs",
-                                oldItems,
-                                newItems);
-
-            };
-
-            this.DataLicenses                   = DataLicenses is null
+            this.immutableDataLicenses                   = DataLicenses is null
                                                       ? []
-                                                      : [.. DataLicenses];
-            this.DataLicenses.OnSetChanged     += (timestamp, reactiveSet, newItems, oldItems) =>
-            {
+                                                      : [.. ImmutablePOIValues.CopyItems(DataLicenses)];
 
-                PropertyChanged("DataLicenses",
-                                oldItems,
-                                newItems);
 
-            };
-
-            this.ChargingModes                      = ChargingModes is null
+            this.immutableChargingModes                      = ChargingModes is null
                                                           ? []
-                                                          : [.. ChargingModes];
-            this.ChargingModes.OnSetChanged        += (timestamp, reactiveSet, newItems, oldItems) =>
-            {
+                                                          : [.. ImmutablePOIValues.CopyItems(ChargingModes)];
 
-                PropertyChanged("ChargingModes",
-                                oldItems,
-                                newItems);
-
-            };
 
             this.ChargingTariffIds = System.Collections.Immutable.ImmutableArray.CreateRange(
                 ChargingTariffs?.Select(tariff => tariff.Id).Distinct() ?? []);
@@ -993,8 +862,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.currentType                        = CurrentType ?? CurrentTypes.AC_ThreePhases;
 
-            this.averageVoltage                     = MaxVoltage;
-            this.averageVoltageRealTime             = MaxVoltageRealTime;
+            this.maxVoltage                     = MaxVoltage;
+            this.maxVoltageRealTime             = MaxVoltageRealTime;
 
             this.MaxVoltagePrognoses            = MaxVoltagePrognoses is null
                                                           ? []
@@ -1054,20 +923,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             };
 
-            this.energyMix                          = EnergyMix;
+            this.energyMix                          = ImmutablePOIValues.Copy(EnergyMix);
             this.energyMixRealTime                  = EnergyMixRealTime;
             this.energyMixPrognoses                 = EnergyMixPrognoses;
 
-            this.energyMeter                        = EnergyMeter;
+            this.energyMeter                        = ImmutablePOIValues.Copy(EnergyMeter);
 
-            this.IsFreeOfCharge                     = IsFreeOfCharge ?? false;
+            this.isFreeOfCharge                     = IsFreeOfCharge ?? false;
 
-            this.chargingConnectors                 = ChargingConnectors is null
-                                                          ? new ConcurrentDictionary<ChargingConnector_Id, ChargingConnector>()
-                                                          : new ConcurrentDictionary<ChargingConnector_Id, ChargingConnector>(ChargingConnectors.ToDictionary(cc => cc.Id, cc => cc));
-
-            foreach (var chargingConnector in this.ChargingConnectors)
-                chargingConnector.EVSE = this;
+            this.chargingConnectors = new ConcurrentDictionary<ChargingConnector_Id, ChargingConnector>(
+                (ChargingConnectors ?? []).Select(connector => new ChargingConnector(
+                    this, connector.Id, connector.Type, connector.ChargingCable,
+                    connector.Lockable, connector.TariffIds, connector.TermsAndConditions))
+                .ToDictionary(connector => connector.Id));
 
             this.LastStatusUpdate                   = LastStatusUpdate;
 
@@ -1085,56 +953,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                          => UpdateStatus     (timestamp, eventTrackingId, newStatus, oldStatus, dataSource);
 
             #endregion
-
-        }
-
-        #endregion
-
-
-        #region UpdateWith(OtherEVSE)
-
-        /// <summary>
-        /// Update this EVSE with the data of the other EVSE.
-        /// </summary>
-        /// <param name="OtherEVSE">Another EVSE.</param>
-        public EVSE UpdateWith(EVSE OtherEVSE)
-        {
-
-            Name.                   Set    (OtherEVSE.Name);
-            Description.            Set    (OtherEVSE.Description);
-
-            Brands.                 Replace(OtherEVSE.Brands);
-            ChargingModes.          Replace(OtherEVSE.ChargingModes);
-            //ChargingConnectors.     Replace(OtherEVSE.ChargingConnectors);
-            DataLicenses.           Replace(OtherEVSE.DataLicenses);
-            MaxVoltagePrognoses.    Replace(OtherEVSE.MaxVoltagePrognoses);
-            MaxCurrentPrognoses.    Replace(OtherEVSE.MaxCurrentPrognoses);
-            MaxPowerPrognoses.      Replace(OtherEVSE.MaxPowerPrognoses);
-            MaxCapacityPrognoses.   Replace(OtherEVSE.MaxCapacityPrognoses);
-
-            CurrentType                = OtherEVSE.CurrentType;
-            MaxVoltage                 = OtherEVSE.MaxVoltage;
-            MaxVoltageRealTime         = OtherEVSE.MaxVoltageRealTime;
-            MaxCurrent                 = OtherEVSE.MaxCurrent;
-            MaxCurrentRealTime         = OtherEVSE.MaxCurrentRealTime;
-            MaxPower                   = OtherEVSE.MaxPower;
-            MaxPowerRealTime           = OtherEVSE.MaxPowerRealTime;
-            MaxCapacity                = OtherEVSE.MaxCapacity;
-            MaxCapacityRealTime        = OtherEVSE.MaxCapacityRealTime;
-            EnergyMix                  = OtherEVSE.EnergyMix;               //ToDo: Implement Equality!
-            EnergyMixRealTime          = OtherEVSE.EnergyMixRealTime;       //ToDo: Implement Equality!
-            EnergyMixPrognoses         = OtherEVSE.EnergyMixPrognoses;      //ToDo: Implement Equality!
-            EnergyMeter                = OtherEVSE.EnergyMeter;             //ToDo: Implement Equality!
-            IsFreeOfCharge             = OtherEVSE.IsFreeOfCharge;
-            MaxReservationDuration     = OtherEVSE.MaxReservationDuration;
-
-            if (OtherEVSE.AdminStatus.Timestamp > AdminStatus.Timestamp)
-                AdminStatus            = OtherEVSE.AdminStatus;
-
-            if (OtherEVSE.Status.     Timestamp > Status.     Timestamp)
-                Status                 = OtherEVSE.Status;
-
-            return this;
 
         }
 
@@ -1350,11 +1168,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
 
                     if (geoLocation.HasValue && ChargingStation?.GeoLocation.HasValue == true &&
-                        JToken.DeepEquals(geoLocation.Value.ToJSON(), ChargingStation.GeoLocation.Value.ToJSON()))
+                        JToken.DeepEquals(InfrastructureJson.LocationJSON(geoLocation.Value), InfrastructureJson.LocationJSON(ChargingStation.GeoLocation.Value)))
                         geoLocation  = null;
 
                     if (geoLocation.HasValue && ChargingPool?.GeoLocation.HasValue == true &&
-                        JToken.DeepEquals(geoLocation.Value.ToJSON(), ChargingPool.GeoLocation.Value.ToJSON()))
+                        JToken.DeepEquals(InfrastructureJson.LocationJSON(geoLocation.Value), InfrastructureJson.LocationJSON(ChargingPool.GeoLocation.Value)))
                         geoLocation  = null;
 
                 }
@@ -1454,7 +1272,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            : null,
 
                                        geoLocation.HasValue
-                                           ? new JProperty("geoLocation",           geoLocation.Value.ToJSON(Embedded: true))
+                                           ? new JProperty("geoLocation",           InfrastructureJson.LocationJSON(geoLocation.Value, true))
                                            : null,
 
                                        !Embedded && ChargingStation is not null && ChargingPool is not null && (ChargingStation.Address is not null  || ChargingPool.Address is not null)
@@ -1476,19 +1294,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              new JProperty("currentType",           CurrentType.ToText()),
 
                                        MaxVoltage.HasValue
-                                           ? new JProperty("averageVoltage",        MaxVoltage.Value.Value)
+                                           ? new JProperty("maxVoltage",        MetrologyJson.Text(MaxVoltage.Value))
                                            : null,
 
                                        MaxCurrent.    HasValue
-                                           ? new JProperty("maxCurrent",            MaxCurrent.Value.Value)
+                                           ? new JProperty("maxCurrent",            MetrologyJson.Text(MaxCurrent.Value))
                                            : null,
 
                                        MaxPower.      HasValue
-                                           ? new JProperty("maxPower",              MaxPower.Value.Value)
+                                           ? new JProperty("maxPower",              MetrologyJson.Text(MaxPower.Value))
                                            : null,
 
                                        MaxCapacity.   HasValue
-                                           ? new JProperty("maxCapacity",           MaxCapacity.Value.Value)
+                                           ? new JProperty("maxCapacity",           MetrologyJson.Text(MaxCapacity.Value))
                                            : null,
 
                                        ChargingConnectors.Any()
@@ -1510,9 +1328,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                  );
 
-                return CustomEVSESerializer is not null
+                return POIRepresentation.AddETags(this, CustomEVSESerializer is not null
                            ? CustomEVSESerializer(this, json)
-                           : json;
+                           : json);
 
             }
             catch (Exception e)

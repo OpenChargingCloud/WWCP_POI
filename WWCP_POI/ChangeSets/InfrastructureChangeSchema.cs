@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -79,7 +79,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Identifier equality
 
         // Preserve wire spelling while comparing identifiers according to their domain semantics.
-        // Some legacy ID hash implementations do not agree with their case-insensitive equality.
+        // Some dependency ID hash implementations do not agree with their case-insensitive equality.
         internal static String Identity(InfrastructureEntityType  type,
                                         String                    text)
 
@@ -149,27 +149,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ],
                 [InfrastructureEntityType.EMobilityProvider] =
                 [
-                    "address", "logos", "homepage", "hotline", "dataLicenses", "dataLicenseIds"
+                    "address", "logos", "homepage", "hotline", "dataLicenses", "dataLicenseIds", "priority"
                 ],
                 [InfrastructureEntityType.ChargingPool] =
                 [
                     "address", "geoLocation", "locationType", "accessibility", "authenticationModes",
-                    "hotlinePhoneNumber", "openingTimes", "brands", "dataLicenses", "dataLicenseIds"
+                    "hotlinePhoneNumber", "openingTimes", "brands", "dataLicenses", "dataLicenseIds",
+                    "energyMeters", "gridConnectionPoint",
+                    "timeZone", "chargingWhenClosed", "locationLanguages", "facilities", "services", "relatedLocations", "mobilityRootCAs", "evRoamingPartners"
                 ],
                 [InfrastructureEntityType.ChargingStation] =
                 [
                     "address", "geoLocation", "authenticationModes", "hotlinePhoneNumber", "openingTimes",
-                    "isFreeOfCharge", "brands", "dataLicenses", "dataLicenseIds"
+                    "isFreeOfCharge", "brands", "dataLicenses", "dataLicenseIds", "energyMeters",
+                    "chargingWhenClosed", "accessibility", "locationLanguage", "physicalReference", "paymentOptions", "features", "vehicleTypes", "images", "serviceIdentification", "modelCode", "published", "disabled", "mobilityRootCAs", "evRoamingPartners", "certificationInfo", "calibrationInfo"
                 ],
                 [InfrastructureEntityType.EVSE] =
                 [
                     "physicalReference", "geoLocation", "brand", "isFreeOfCharge", "chargingModes",
-                    "currentType", "averageVoltage", "maxCurrent", "maxPower", "maxCapacity",
-                    "energyMeter", "dataLicenses", "dataLicenseIds", "tariffIds"
+                    "currentType", "maxVoltage", "maxCurrent", "maxPower", "maxCapacity",
+                    "energyMeter", "dataLicenses", "dataLicenseIds", "tariffIds",
+                    "photoURLs", "mobilityRootCAs", "energyMix", "calibrationInfo"
                 ],
                 [InfrastructureEntityType.ChargingTariff] =
                 [
-                    "elements", "currency", "brand", "URI", "energy_mix"
+                    "elements", "currency", "brand", "uri", "energyMix"
                 ],
                 [InfrastructureEntityType.ChargingConnector] =
                 [
@@ -195,7 +199,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var property in document.Properties())
             {
-                if (property.Name is "@id" or "@context" or "created" or "lastChange")
+                if (property.Name is "@id" or "@context" or "created" or "lastChange" or "ETags")
                     continue;
 
                 if (type == InfrastructureEntityType.RoamingNetwork && property.Name is "revision" or "appliedChangeSetId")
@@ -237,8 +241,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 _                                         => "operational"
             };
 
-            document["created"]     ??= time;
-            document["lastChange"]  ??= time;
+            document["created"] = (InfrastructureJson.Date(document, "created") ?? timestamp).
+                                      ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+            document["lastChange"] = (InfrastructureJson.Date(document, "lastChange") ?? timestamp).
+                                         ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
             document["status"]      ??= new JObject(new JProperty("value", status),      new JProperty("timestamp", time));
             document["adminStatus"] ??= new JObject(new JProperty("value", adminStatus), new JProperty("timestamp", time));
 

@@ -28,7 +28,7 @@ using org.GraphDefined.Vanaheimr.Illias;
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
-    public partial class ChargingStation
+    public sealed partial class ChargingStation
     {
 
         #region Parse/TryParse
@@ -92,9 +92,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  Brands:              InfrastructureJson.Brands(JSON, context: Context),
                                                  DataLicenses:        InfrastructureJson.Licenses(JSON),
                                                  DataSource:          InfrastructureJson.Text(JSON, "dataSource"),
-                                                 CustomData:          InfrastructureJson.CustomData(JSON));
+                                                 CustomData:          InfrastructureJson.CustomData(JSON),
+                                                 EnergyMeters:        InfrastructureJson.Array(JSON, "energyMeters",
+                                                                                             token => EnergyMeter.Parse(InfrastructureJson.Entry(token))));
 
-                parsed.IsFreeOfCharge = InfrastructureJson.Boolean(JSON, "isFreeOfCharge") ?? false;
+                parsed.isFreeOfCharge = InfrastructureJson.Boolean(JSON, "isFreeOfCharge") ?? false;
                 parsed.ParseStationEVSEs(JSON, Context);
 
                 InfrastructureJson.RestoreMetadata(JSON, parsed, ChargingStationAdminStatusType.TryParse, ChargingStationStatusType.TryParse);

@@ -37,7 +37,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// An asymmetric elliptic curve cryptographic public key.
     /// </summary>
-    public class ECCPublicKey : PublicKey
+    public sealed partial class ECCPublicKey : PublicKey
     {
 
         #region Data
@@ -1362,9 +1362,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        );
 
-            return CustomPublicKeySerializer is not null
+            return POIRepresentation.AddETags(this, CustomPublicKeySerializer is not null
                        ? CustomPublicKeySerializer(this, json)
-                       : json;
+                       : json);
 
         }
 

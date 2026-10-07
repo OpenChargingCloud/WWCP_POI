@@ -35,67 +35,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// A car park beside a street, a tall building or
     /// an underground garage providing parking spaces.
     /// </summary>
-    public class ParkingGarage : AEMobilityEntity<ParkingGarage_Id,
+    public sealed partial class ParkingGarage : AImmutableEMobilityEntity<ParkingGarage_Id,
                                                   ParkingGarageAdminStatusTypes,
                                                   ParkingGarageStatusTypes>,
                                  IEquatable<ParkingGarage>, IComparable<ParkingGarage>, IComparable
     {
 
-        #region Data
-
-        #endregion
 
         #region Properties
 
-        #region Name
-
-        private I18NString _Name;
-
-        /// <summary>
-        /// The official (multi-language) name of the parking space.
-        /// </summary>
-        [Mandatory]
-        public I18NString Name
-        {
-
-            get
-            {
-                return _Name;
-            }
-
-            set
-            {
-                SetProperty<I18NString>(ref _Name, value);
-            }
-
-        }
-
-        #endregion
-
-        #region Description
-
-        private I18NString _Description;
-
-        /// <summary>
-        /// An optional additional (multi-language) description of the parking space.
-        /// </summary>
-        [Optional]
-        public I18NString Description
-        {
-
-            get
-            {
-                return _Description;
-            }
-
-            set
-            {
-                SetProperty<I18NString>(ref _Description, value);
-            }
-
-        }
-
-        #endregion
 
         #region OSM_WayId
 
@@ -113,7 +61,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _OSM_WayId;
             }
 
-            set
+            private set
             {
                 SetProperty<String>(ref _OSM_WayId, value);
             }
@@ -124,13 +72,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Geometry
 
-        private List<GeoCoordinate> _Geometry;
+        private readonly System.Collections.Immutable.ImmutableArray<GeoCoordinate> _Geometry;
 
         /// <summary>
         /// An optional polygon geometry of the parking space.
         /// </summary>
         [Optional]
-        public List<GeoCoordinate> Geometry
+        public System.Collections.Immutable.ImmutableArray<GeoCoordinate> Geometry
         {
             get
             {
@@ -142,13 +90,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ChargingStations
 
-        private List<ChargingStation> _ChargingStations;
+        private readonly System.Collections.Immutable.ImmutableArray<ChargingStation> _ChargingStations;
 
         /// <summary>
         /// Charging stations reachable from this parking space.
         /// </summary>
         [Optional]
-        public List<ChargingStation> ChargingStations
+        public System.Collections.Immutable.ImmutableArray<ChargingStation> ChargingStations
         {
             get
             {
@@ -170,9 +118,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Events
-
-        #endregion
 
         #region Constructor(s)
 
@@ -193,26 +138,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Create a new parking sensor having the given identification.
         /// </summary>
         /// <param name="Id">The unique identification of the parking sensor.</param>
-        internal ParkingGarage(ParkingGarage_Id  Id)
-            : base(Id)
+        public ParkingGarage(ParkingGarage_Id Id, I18NString? Name = null, I18NString? Description = null,
+                              String? OSM_WayId = null, IEnumerable<GeoCoordinate>? Geometry = null,
+                              IEnumerable<ChargingStation>? ChargingStations = null)
+            : base(Id, Name ?? I18NString.Create(Id.ToString()), Description)
         {
-
-            #region Initial checks
-
-            if (Id is null)
-                throw new ArgumentNullException(nameof(Id), "The unique identification of the parking space must not be null!");
-
-            #endregion
-
-            #region Init data and properties
-
-            this._Name              = new I18NString(Languages.en, Id.ToString());
-            this._Description       = new I18NString();
-            this._Geometry          = new List<GeoCoordinate>();
-            this._ChargingStations  = new List<ChargingStation>();
-
-            #endregion
-
+            this._OSM_WayId = OSM_WayId;
+            this._Geometry = ImmutablePOIValues.CopyItems(Geometry);
+            this._ChargingStations = ImmutablePOIValues.CopyItems(ChargingStations);
         }
 
         #endregion

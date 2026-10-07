@@ -67,8 +67,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 InfrastructureJson.ValidateFields(JSON,
                                                   "startTime", "endTime", "startDate", "endDate",
-                                                  "minkWh", "maxkWh", "minPower", "maxPower",
-                                                  "minDuration", "maxDuration", "day_of_week");
+                                                  "minEnergy", "maxEnergy", "minPower", "maxPower",
+                                                  "minDuration", "maxDuration", "daysOfWeek");
 
                 var startTime   = ParseRestrictionTime(JSON, "startTime");
                 var endTime     = ParseRestrictionTime(JSON, "endTime");
@@ -78,9 +78,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (startDate is null && endDate is not null)
                     throw new ArgumentException("startDate: required when endDate is supplied.");
 
-                var minDuration = ParseRestrictionSeconds(JSON, "minDuration");
-                var maxDuration = ParseRestrictionSeconds(JSON, "maxDuration");
-                var weekdays    = InfrastructureJson.Array(JSON, "day_of_week", ParseRestrictionWeekday);
+                var minDuration = MetrologyJson.ReadDuration(JSON, "minDuration");
+                var maxDuration = MetrologyJson.ReadDuration(JSON, "maxDuration");
+                var weekdays    = InfrastructureJson.Array(JSON, "daysOfWeek", ParseRestrictionWeekday);
 
                 result = new ChargingTariffRestriction(
                              Time:      startTime is null && endTime is null
@@ -89,8 +89,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              Date:      startDate is null
                                             ? null
                                             : new StartEndDateTime(startDate.Value, endDate),
-                             kWh:       ParseRestrictionRange(JSON, "minkWh", "maxkWh"),
-                             Power:     ParseRestrictionRange(JSON, "minPower", "maxPower"),
+                             Energy:    ParseRestrictionEnergy(JSON),
+                             Power:     ParseRestrictionPower(JSON),
                              Duration:  minDuration is null && maxDuration is null
                                             ? null
                                             : new TimeSpanMinMax(minDuration, maxDuration),
@@ -125,31 +125,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        private static DecimalMinMax? ParseRestrictionRange(JObject JSON, String MinField, String MaxField)
+        private static Range<WattHour?>? ParseRestrictionEnergy(JObject JSON)
         {
-
-            var min = TariffJson.Decimal(JSON, MinField);
-            var max = TariffJson.Decimal(JSON, MaxField);
-
-            return min is null && max is null
-                       ? null
-                       : new DecimalMinMax(min, max);
-
+            var min = MetrologyJson.Read<WattHour>(JSON, "minEnergy", WattHour.TryParse);
+            var max = MetrologyJson.Read<WattHour>(JSON, "maxEnergy", WattHour.TryParse);
+            return min is null && max is null ? null : new Range<WattHour?>(min, max);
         }
 
-        private static TimeSpan? ParseRestrictionSeconds(JObject JSON, String Field)
+        private static Range<Watt?>? ParseRestrictionPower(JObject JSON)
         {
-
-            if (TariffJson.Decimal(JSON, Field) is not { } seconds)
-                return null;
-
-            var ticks = checked(seconds * TimeSpan.TicksPerSecond);
-
-            if (ticks != Decimal.Truncate(ticks))
-                throw new ArgumentException($"{Field}: exceeds TimeSpan precision.");
-
-            return TimeSpan.FromTicks(checked((Int64) ticks));
-
+            var min = MetrologyJson.Read<Watt>(JSON, "minPower", Watt.TryParse);
+            var max = MetrologyJson.Read<Watt>(JSON, "maxPower", Watt.TryParse);
+            return min is null && max is null ? null : new Range<Watt?>(min, max);
         }
 
         private static DayOfWeek ParseRestrictionWeekday(JToken Token)

@@ -59,7 +59,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    ? null
 
-                   : JSONObject.Create(
+                   : POIRepresentation.AddETags(eMobilityProvider, JSONObject.Create(
 
                          new JProperty("@id",  eMobilityProvider.Id.ToString()),
 
@@ -125,7 +125,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              ? new JProperty("hotline",             eMobilityProvider.HotlinePhoneNumber.ToString())
                              : null
 
-                     );
+                     ));
 
         #endregion
 
@@ -285,16 +285,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// An E-Mobility Provider for lookups which allows to connect
     /// an optional remote E-Mobility Provider.
     /// </summary>
-    public partial class EMobilityProvider : AEMobilityEntity<EMobilityProvider_Id,
+    public sealed partial class EMobilityProvider : AImmutableEMobilityEntity<EMobilityProvider_Id,
                                                       EMobilityProviderAdminStatusTypes,
                                                       EMobilityProviderStatusTypes>
     {
 
-        #region Data
-
-        #endregion
 
         #region Properties
+
+        /// <summary>
+        /// The optional immutable provider priority.
+        /// </summary>
+        public EMobilityProviderPriority? Priority { get; }
 
 
         public RoamingNetwork  RoamingNetwork { get; }
@@ -316,11 +318,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _Logo;
             }
 
-            set
-            {
-                if (_Logo != value)
-                    SetProperty(ref _Logo, value);
-            }
 
         }
 
@@ -335,7 +332,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         [Mandatory]
         public IEnumerable<DataLicense> DataLicenses
-            => dataLicenses.Values;
+            => ImmutablePOIValues.CopyItems(dataLicenses.Values);
 
         #endregion
 
@@ -352,19 +349,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return _Address;
+                return ImmutablePOIValues.Copy(_Address);
             }
 
-            set
-            {
-
-                if (value is null)
-                    _Address = value;
-
-                if (_Address != value)
-                    SetProperty(ref _Address, value);
-
-            }
 
         }
 
@@ -386,16 +373,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _GeoLocation;
             }
 
-            set
-            {
-
-                //if (value is null)
-                //    value = new GeoCoordinate(Latitude.Parse(0), Longitude.Parse(0));
-
-                if (_GeoLocation != value)
-                    SetProperty(ref _GeoLocation, value);
-
-            }
 
         }
 
@@ -417,11 +394,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _Telephone;
             }
 
-            set
-            {
-                if (_Telephone != value)
-                    SetProperty(ref _Telephone, value);
-            }
 
         }
 
@@ -443,11 +415,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _EMailAddress;
             }
 
-            set
-            {
-                if (_EMailAddress != value)
-                    SetProperty(ref _EMailAddress, value);
-            }
 
         }
 
@@ -469,11 +436,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _Homepage;
             }
 
-            set
-            {
-                if (_Homepage != value)
-                    SetProperty(ref _Homepage, value);
-            }
 
         }
 
@@ -495,11 +457,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _HotlinePhoneNumber;
             }
 
-            set
-            {
-                if (_HotlinePhoneNumber != value)
-                    SetProperty(ref _HotlinePhoneNumber, value);
-            }
 
         }
 
@@ -552,11 +509,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.RoamingNetwork = RoamingNetwork;
+            this.Priority = Priority;
 
         }
 
         #endregion
-
 
 
         #region (private) LogEvent(Logger, LogHandler, ...)
@@ -609,7 +566,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region (virtual) HandleErrors(Module, Caller, ErrorResponse)
 
-        public virtual Task HandleErrors(String  Module,
+        public override Task HandleErrors(String  Module,
                                          String  Caller,
                                          String  ErrorResponse)
         {
@@ -622,7 +579,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region (virtual) HandleErrors(Module, Caller, ExceptionOccurred)
 
-        public virtual Task HandleErrors(String     Module,
+        public override Task HandleErrors(String     Module,
                                          String     Caller,
                                          Exception  ExceptionOccurred)
         {

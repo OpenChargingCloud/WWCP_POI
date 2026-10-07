@@ -32,7 +32,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A charging tariff for charging an electric vehicle.
     /// </summary>
-    public partial class ChargingTariff : AEMobilityEntity<ChargingTariff_Id,
+    public sealed partial class ChargingTariff : AImmutableEMobilityEntity<ChargingTariff_Id,
                                                    ChargingTariffAdminStatusTypes,
                                                    ChargingTariffStatusTypes>
     {
@@ -56,8 +56,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An enumeration of tariff elements.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<ChargingTariffElement> immutableTariffElements = [];
         [Mandatory]
-        public IEnumerable<ChargingTariffElement> TariffElements { get; }
+        public IEnumerable<ChargingTariffElement> TariffElements
+        {
+            get => ImmutablePOIValues.CopyItems(immutableTariffElements);
+            private set => immutableTariffElements = ImmutablePOIValues.CopyItems(value);
+        }
 
         /// <summary>
         /// ISO 4217 code of the currency used for this tariff.
@@ -69,8 +74,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional brand for this charging tariff.
         /// </summary>
+        private Brand? immutableBrand;
         [Optional]
-        public Brand? Brand { get; }
+        public Brand? Brand
+        {
+            get => ImmutablePOIValues.Copy(immutableBrand);
+            private set => immutableBrand = ImmutablePOIValues.Copy(value);
+        }
 
         /// <summary>
         /// An URI for more information about this tariff.
@@ -81,8 +91,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The energy mix.
         /// </summary>
+        private EnergyMix? immutableEnergyMix;
         [Optional]
-        public EnergyMix? EnergyMix { get; }
+        public EnergyMix? EnergyMix
+        {
+            get => ImmutablePOIValues.Copy(immutableEnergyMix);
+            private set => immutableEnergyMix = ImmutablePOIValues.Copy(value);
+        }
 
         #endregion
 
@@ -170,7 +185,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               InfoStatus ExpandDataLicenses = InfoStatus.ShowIdOnly)
 
 
-            => JSONObject.Create(
+            => POIRepresentation.AddETags(this, JSONObject.Create(
 
                                new JProperty("@id", Id.ToString()),
 
@@ -208,17 +223,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                new JProperty("currency", Currency.ISOCode),
 
 
-
-
                          TariffURL is not null
-                             ? new JProperty("URI", TariffURL.ToString())
+                             ? new JProperty("uri", TariffURL.ToString())
                              : null,
 
                          EnergyMix is not null
-                             ? new JProperty("energy_mix", EnergyMix.ToJSON())
+                             ? new JProperty("energyMix", EnergyMix.ToJSON())
                              : null
 
-                        );
+                        ));
 
         #endregion
 

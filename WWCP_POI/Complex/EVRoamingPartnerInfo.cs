@@ -25,14 +25,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
 
-    public class EVRoamingPartnerInfo
+    public sealed partial class EVRoamingPartnerInfo
     {
 
         public EMobilityProvider_Id   EMPId        { get; }
-        public I18NString             Name         { get; }
+        private readonly I18NString immutableName;
+        public I18NString Name => immutableName.Clone();
         public DateTime?              NotBefore    { get; }
         public DateTime?              NotAfter     { get; }
-        public I18NString             Comment      { get; }
+        private readonly I18NString immutableComment;
+        public I18NString Comment => immutableComment.Clone();
 
         public EVRoamingPartnerInfo(EMobilityProvider_Id  EMPId,
                                     I18NString?           Name,
@@ -42,10 +44,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.EMPId      = EMPId;
-            this.Name       = Name    ?? I18NString.Empty;
-            this.NotBefore  = NotBefore;
-            this.NotAfter   = NotAfter;
-            this.Comment    = Comment ?? I18NString.Empty;
+            this.immutableName       = (Name    ?? I18NString.Empty).Clone();
+            this.NotBefore  = NotBefore?.ToUniversalTime();
+            this.NotAfter   = NotAfter?.ToUniversalTime();
+            this.immutableComment    = (Comment ?? I18NString.Empty).Clone();
 
         }
 

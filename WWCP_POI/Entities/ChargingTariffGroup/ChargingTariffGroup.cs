@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+using System.Collections.Immutable;
 #region Usings
 
 using System;
@@ -32,7 +33,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A charging tariff group.
     /// </summary>
-    public class ChargingTariffGroup : AEMobilityEntity<ChargingTariffGroup_Id,
+    public sealed partial class ChargingTariffGroup : AImmutableEMobilityEntity<ChargingTariffGroup_Id,
                                                         ChargingTariffGroupAdminStatusTypes,
                                                         ChargingTariffGroupStatusTypes>,
                                        IEquatable<ChargingTariffGroup>, IComparable<ChargingTariffGroup>, IComparable,
@@ -41,7 +42,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data
 
-        private readonly Dictionary<ChargingTariff_Id, ChargingTariff> _ChargingTariffs;
+        private readonly ImmutableDictionary<ChargingTariff_Id, ChargingTariff> _ChargingTariffs;
 
         #endregion
 
@@ -50,7 +51,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional (multi-language) description of this group.
         /// </summary>
-        public I18NString  Description   { get; }
+
 
         /// <summary>
         /// Return all charging stations registered within this charging station group.
@@ -122,6 +123,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        public ChargingTariffGroup WithMembers(IEnumerable<ChargingTariff> members)
+        {
+            var copy = new ChargingTariffGroup(Id, Operator, Description, members);
+            copy.SetAdminStatus(AdminStatusSchedule());
+            copy.SetStatus(StatusSchedule());
+            copy.RestoreSnapshotTimestamps(Created, Timestamp.Now);
+            return copy;
+        }
+        public ChargingTariffGroup WithMember(ChargingTariff tariff)
+            => WithMembers(ChargingTariffs.Where(value => value.Id != tariff.Id).Append(tariff));
+        public ChargingTariffGroup WithoutMember(ChargingTariff_Id id)
+            => WithMembers(ChargingTariffs.Where(value => value.Id != id));
+
+        public Newtonsoft.Json.Linq.JObject ToJSON(Boolean Embedded = false)
+        {
+            var json = InfrastructureJson.SnapshotMetadata(new Newtonsoft.Json.Linq.JObject(
+                   new Newtonsoft.Json.Linq.JProperty("@id", Id.ToString()),
+                   new Newtonsoft.Json.Linq.JProperty("description", Description.ToJSON()),
+                   new Newtonsoft.Json.Linq.JProperty("chargingStationOperatorId", Operator.Id.ToString()),
+                   new Newtonsoft.Json.Linq.JProperty("chargingTariffIds", new Newtonsoft.Json.Linq.JArray(
+                       ChargingTariffIds.OrderBy(id => id).Select(id => id.ToString())))), this);
+            if (!Embedded)
+                json["@context"] = "https://open.charging.cloud/contexts/wwcp+json/ChargingTariffGroup";
+            return POIRepresentation.AddETags(this, json);
+        }
+
         #region Constructor(s)
 
         /// <summary>
@@ -130,18 +158,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Id">The unique identification of the charging station group.</param>
         /// <param name="Operator">The charging station operator of this charging station group.</param>
         /// <param name="Description">An optional (multi-language) description of this charging station group.</param>
-        internal ChargingTariffGroup(ChargingTariffGroup_Id   Id,
+        public ChargingTariffGroup(ChargingTariffGroup_Id   Id,
                                      ChargingStationOperator  Operator,
-                                     I18NString               Description  = null)
+                                     I18NString? Description = null, IEnumerable<ChargingTariff>? Members = null)
 
-            : base(Id)
+            : base(Id, Description: Description)
 
         {
 
             this.Operator                = Operator ?? throw new ArgumentNullException(nameof(Operator), "The charging station operator must not be null!");
-            this.Description             = Description ?? new I18NString();
 
-            this._ChargingTariffs        = new Dictionary<ChargingTariff_Id, ChargingTariff>();
+
+            if (Id.OperatorId != Operator.Id)
+                throw new ArgumentException("Group identifier belongs to a different operator.", nameof(Id));
+            this._ChargingTariffs = (Members ?? []).ToImmutableDictionary(tariff => tariff.Id);
+            if (_ChargingTariffs.Values.Any(tariff => tariff.Operator.Id != Operator.Id))
+                throw new ArgumentException("A tariff belongs to a different operator.", nameof(Members));
 
 
             this.ChargingTariffAddition  = new VotingNotificator<DateTimeOffset, ChargingTariffGroup, ChargingTariff, Boolean>(() => new VetoVote(), true);
@@ -150,107 +182,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         #endregion
-
-
-        #region CreateChargingTariff     (Id,       Description, OnSuccess = null, OnError = null)
-
-        /// <summary>
-        /// Create and register a new charging tariff having the given
-        /// unique charging tariff identification.
-        /// </summary>
-        /// <param name="Id">The unique identification of the charging tariff.</param>
-        /// <param name="Name">The official (multi-language) name of this charging tariff.</param>
-        /// <param name="Description">An optional (multi-language) description of this charging tariff.</param>
-        /// <param name="OnSuccess">An optional delegate to configure the new charging tariff after its successful creation.</param>
-        /// <param name="OnError">An optional delegate to be called whenever the creation of the charging tariff failed.</param>
-        public ChargingTariff CreateChargingTariff(ChargingTariff_Id                                    Id,
-                                                   I18NString                                           Name,
-                                                   I18NString                                           Description,
-                                                   Brand?                                               Brand,
-                                                   URL?                                                 TariffURL,
-                                                   Currency                                             Currency,
-                                                   EnergyMix?                                           EnergyMix,
-                                                   IEnumerable<ChargingTariffElement>                   TariffElements,
-
-                                                   Action<ChargingTariff>?                              OnSuccess   = null,
-                                                   Action<ChargingStationOperator, ChargingTariff_Id>?  OnError     = null)
-
-        {
-
-            lock (_ChargingTariffs)
-            {
-
-                #region Initial checks
-
-                if (_ChargingTariffs.ContainsKey(Id))
-                {
-
-                    //if (OnError is not null)
-                    //    OnError?.Invoke(this, Id);
-
-                    throw new ArgumentException("Invalid tariff!");
-
-                }
-
-                #endregion
-
-                var _ChargingTariff = new ChargingTariff(Id,
-                                                         null,
-                                                         Name,
-                                                         Description,
-                                                         TariffElements,
-                                                         Currency,
-                                                         Brand,
-                                                         TariffURL,
-                                                         EnergyMix);
-
-
-                if (ChargingTariffAddition.SendVoting(EventTracking_Id.New, Timestamp.Now, this, _ChargingTariff))
-                {
-
-                    _ChargingTariffs.Add(_ChargingTariff.Id, _ChargingTariff);
-
-                    //_ChargingTariff.OnEVSEDataChanged                             += UpdateEVSEData;
-                    //_ChargingTariff.OnEVSEStatusChanged                           += UpdateEVSEStatus;
-                    //_ChargingTariff.OnEVSEAdminStatusChanged                      += UpdateEVSEAdminStatus;
-
-                    //_ChargingTariff.OnChargingStationDataChanged                  += UpdateChargingStationData;
-                    //_ChargingTariff.OnChargingStationStatusChanged                += UpdateChargingStationStatus;
-                    //_ChargingTariff.OnChargingStationAdminStatusChanged           += UpdateChargingStationAdminStatus;
-
-                    ////_ChargingTariff.OnDataChanged                                 += UpdateChargingTariffData;
-                    ////_ChargingTariff.OnAdminStatusChanged                          += UpdateChargingTariffAdminStatus;
-
-                    OnSuccess?.Invoke(_ChargingTariff);
-
-                    ChargingTariffAddition.SendNotification(EventTracking_Id.New, Timestamp.Now,
-                                                            this,
-                                                            _ChargingTariff);
-
-                    return _ChargingTariff;
-
-                }
-
-                return null;
-
-            }
-
-        }
-
-        #endregion
-
-
-        public ChargingTariffGroup Add(ChargingTariff Tariff)
-        {
-
-            lock (_ChargingTariffs)
-            {
-                _ChargingTariffs.Add(Tariff.Id, Tariff);
-            }
-
-            return this;
-
-        }
 
 
         #region ContainsId(ChargingTariffId)

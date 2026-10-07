@@ -79,7 +79,9 @@ namespace WWCP_POI_Tests
                 RoamingNetworkChange.Remove("ChargingStation", "DE*ABC*S2"),
                 RoamingNetworkChange.UpdateProperty("ChargingStation", "DE*ABC*S3", "status", Json("\"Available\""), Json("\"Unavailable\""))
                                                 ],
-                                                new RoamingNetworkChangeSetSignature("Ed25519", "key-1", "signature-bytes"));
+                                                [ETag.Parse("json:sha256:hex:" + new String('0', 64)), ETag.Parse("cbor:sha256:hex:" + new String('0', 64))],
+                                                [ETag.Parse("json:sha256:hex:" + new String('1', 64)), ETag.Parse("cbor:sha256:hex:" + new String('1', 64))],
+                                                [new RoamingNetworkChangeSetSignature("Ed25519", "key-1", "signature-bytes")]);
             var json = JsonSerializer.Serialize(set);
             var restored = JsonSerializer.Deserialize<RoamingNetworkChangeSet>(json);
 
@@ -94,7 +96,7 @@ namespace WWCP_POI_Tests
             Assert.That(restored.Changes[2].PropertyName, Is.EqualTo("status"));
             Assert.That(restored.Changes[2].OldValue!.Value.GetString(), Is.EqualTo("Available"));
             Assert.That(restored.Changes[2].NewValue!.Value.GetString(), Is.EqualTo("Unavailable"));
-            Assert.That(restored.Signature, Is.EqualTo(set.Signature));
+            Assert.That(restored.Signatures, Is.EqualTo(set.Signatures));
 
         }
 
@@ -103,10 +105,10 @@ namespace WWCP_POI_Tests
         {
 
             Assert.That(() => new RoamingNetworkChangeSet("c", "rn", -1, DateTimeOffset.UtcNow,
-                                                                                          ImmutableArray<RoamingNetworkChange>.Empty),
+                                                                                          ImmutableArray<RoamingNetworkChange>.Empty, default, default),
                                                         Throws.TypeOf<ArgumentOutOfRangeException>());
             Assert.That(() => new RoamingNetworkChangeSet("c", "rn", 0, DateTimeOffset.UtcNow,
-                                                                                          default),
+                                                                                          default, default, default),
                                                         Throws.ArgumentException);
 
         }

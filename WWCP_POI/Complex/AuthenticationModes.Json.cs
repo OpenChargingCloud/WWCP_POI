@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Newtonsoft.Json.Linq;
 using org.GraphDefined.Vanaheimr.Illias;
 
@@ -6,7 +6,9 @@ namespace cloud.charging.open.protocols.WWCP.POI;
 
 public partial class AuthenticationModes
 {
-    /// <summary>Parse an authentication mode, including RFID, SMS and phone-call details.</summary>
+    /// <summary>
+    /// Parse an authentication mode, including RFID, SMS and phone-call details.
+    /// </summary>
     public static AuthenticationModes Parse(JObject JSON,
         CustomJObjectParserDelegate<AuthenticationModes>? CustomAuthenticationModeParser = null)
     {
@@ -15,13 +17,17 @@ public partial class AuthenticationModes
         throw new ArgumentException($"Invalid authentication mode JSON: {error}", nameof(JSON));
     }
 
-    /// <summary>Try to parse an authentication mode without throwing for invalid input.</summary>
+    /// <summary>
+    /// Try to parse an authentication mode without throwing for invalid input.
+    /// </summary>
     public static bool TryParse(JObject JSON,
         [NotNullWhen(true)] out AuthenticationModes? mode,
         [NotNullWhen(false)] out string? error)
         => TryParse(JSON, out mode, out error, null);
 
-    /// <summary>Try to parse an authentication mode and optionally apply a custom parser.</summary>
+    /// <summary>
+    /// Try to parse an authentication mode and optionally apply a custom parser.
+    /// </summary>
     public static bool TryParse(JObject JSON,
         [NotNullWhen(true)] out AuthenticationModes? mode,
         [NotNullWhen(false)] out string? error,
@@ -72,13 +78,17 @@ public partial class AuthenticationModes
                     break;
 
                 case "SMS":
-                    var stationCode = JSON["StationCode"];
+                    if (CustomAuthenticationModeParser is null)
+                        InfrastructureJson.ValidateFields(JSON, "type", "number", "stationCode");
+                    var stationCode = JSON["stationCode"];
                     if (stationCode is not null && stationCode.Type is not (JTokenType.String or JTokenType.Null))
-                        throw new ArgumentException("'StationCode' must be a string.");
+                        throw new ArgumentException("'stationCode' must be a string.");
                     mode = new SMS(ReadNumber(JSON), stationCode?.Value<string>());
                     break;
 
                 case "PhoneCall":
+                    if (CustomAuthenticationModeParser is null)
+                        InfrastructureJson.ValidateFields(JSON, "type", "number");
                     mode = new PhoneCall(ReadNumber(JSON));
                     break;
 
@@ -117,7 +127,7 @@ public partial class AuthenticationModes
     }
 
     private static string ReadNumber(JObject json)
-        => json["Number"]?.Type == JTokenType.String && !string.IsNullOrWhiteSpace(json["Number"]!.Value<string>())
-               ? json["Number"]!.Value<string>()!
-               : throw new ArgumentException("Missing or invalid 'Number': expected a non-empty string.");
+        => json["number"]?.Type == JTokenType.String && !string.IsNullOrWhiteSpace(json["number"]!.Value<string>())
+               ? json["number"]!.Value<string>()!
+               : throw new ArgumentException("Missing or invalid 'number': expected a non-empty string.");
 }

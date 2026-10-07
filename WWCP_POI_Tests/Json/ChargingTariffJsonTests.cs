@@ -47,7 +47,7 @@ namespace WWCP_POI_Tests.Json
                 "en": "Detailed tariff"
               },
               "currency": "EUR",
-              "URI": "https://example.org/tariff",
+              "uri": "https://example.org/tariff",
               "dataSource": "tariff-feed",
               "created": "2026-01-01T00:00:00Z",
               "lastChange": "2026-02-01T00:00:00Z",
@@ -69,12 +69,12 @@ namespace WWCP_POI_Tests.Json
                     {
                       "type": "ENERGY",
                       "price": 0.456789,
-                      "stepSize": 1000
+                      "stepSize": "1 kWh"
                     },
                     {
                       "type": "TIME",
-                      "price": "1.2345",
-                      "stepSize": 300
+                      "price": 1.2345,
+                      "stepSize": "300 s"
                     }
                   ],
                   "restrictions": [
@@ -83,13 +83,13 @@ namespace WWCP_POI_Tests.Json
                       "endTime": "20:00",
                       "startDate": "2026-01-01T00:00:00Z",
                       "endDate": "2027-01-01T00:00:00Z",
-                      "minkWh": 0.1234567,
-                      "maxkWh": 42.9876543,
-                      "minPower": 0,
-                      "maxPower": 350.123,
-                      "minDuration": 0.0000001,
-                      "maxDuration": 3600.25,
-                      "day_of_week": [
+                      "minEnergy": "0.1234567 kWh",
+                      "maxEnergy": "42.9876543 kWh",
+                      "minPower": "0 W",
+                      "maxPower": "350.123 kW",
+                      "minDuration": "0.0000001 s",
+                      "maxDuration": "3600.25 s",
+                      "daysOfWeek": [
                         "MONDAY",
                         "FRIDAY"
                       ]
@@ -97,7 +97,7 @@ namespace WWCP_POI_Tests.Json
                   ]
                 }
               ],
-              "energy_mix": {
+              "energyMix": {
                 "supplierName": {
                   "en": "Supplier"
                 },
@@ -110,13 +110,13 @@ namespace WWCP_POI_Tests.Json
                 "energySources": [
                   {
                     "source": "solar",
-                    "percent": 100
+                    "percentage": "100 %"
                   }
                 ],
                 "environmentalImpacts": [
                   {
                     "impact": "CO2",
-                    "percent": 0
+                    "percentage": "0 %"
                   }
                 ]
               }
@@ -188,7 +188,7 @@ namespace WWCP_POI_Tests.Json
         private static JsonElement Json(string text) => JsonSerializer.Deserialize<JsonElement>(text);
         private static RoamingNetworkChangeSet Set(RoamingNetwork                 network,
                                                    params RoamingNetworkChange[]  changes)
-            => new("tariff-change", network.Id.ToString(), network.Revision, DateTimeOffset.Parse("2026-10-06T12:00:00Z"), [.. changes]);
+            => network.CreateChangeSet("tariff-change", DateTimeOffset.Parse("2026-10-06T12:00:00Z"), [.. changes]);
 
         [TestCase("de-DE")]
         [TestCase("en-US")]
@@ -203,7 +203,7 @@ namespace WWCP_POI_Tests.Json
 
                 CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
 
-                var component = new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.123456789123456789m, 1000);
+                var component = ChargingPriceComponent.Energy(0.123456789123456789m, WattHour.FromKWh(1));
                 var json = component.ToJSON();
 
                 Assert.That(json["price"]!.Type, Is.EqualTo(JTokenType.Float));
@@ -213,8 +213,8 @@ namespace WWCP_POI_Tests.Json
                 var parsed = ChargingPriceComponent.Parse(JObject.Load(reader));
 
                 Assert.That(parsed.Price, Is.EqualTo(component.Price));
-                Assert.That(parsed.StepSize, Is.EqualTo(1000));
-                Assert.That(ChargingPriceComponent.Parse(JObject.Parse("""{"type":"FLAT","price":"0.123456789123456789","stepSize":1}""")).Price,
+                Assert.That(parsed.EnergyStep, Is.EqualTo(WattHour.FromKWh(1)));
+                Assert.That(ChargingPriceComponent.Parse(JObject.Parse("""{"type":"FLAT","price":0.123456789123456789}""")).Price,
                                                                 Is.EqualTo(component.Price));
 
             }
@@ -243,13 +243,13 @@ namespace WWCP_POI_Tests.Json
         }
 
         [Test]
-        public void Billing_increment_requires_positive_whole_seconds()
+        public void Billing_increment_requires_positive_typed_duration()
         {
 
-            Assert.That(ChargingPriceComponent.ChargingTime(1m, TimeSpan.FromMinutes(5)).StepSize, Is.EqualTo(300));
-            Assert.Throws<ArgumentOutOfRangeException>(() => ChargingPriceComponent.ChargingTime(1m, TimeSpan.FromMilliseconds(500)));
-            Assert.Throws<ArgumentOutOfRangeException>(() => ChargingPriceComponent.ParkingTime(1m, TimeSpan.Zero));
-            Assert.Throws<ArgumentOutOfRangeException>(() => ChargingPriceComponent.ChargingTime(1m, TimeSpan.FromSeconds(-1)));
+            Assert.That(ChargingPriceComponent.ChargingTime(1m, TimeSpan.FromMinutes(5)).DurationStep, Is.EqualTo(TimeSpan.FromMinutes(5)));
+            Assert.That(ChargingPriceComponent.ChargingTime(1m, TimeSpan.FromMilliseconds(500)).DurationStep, Is.EqualTo(TimeSpan.FromMilliseconds(500)));
+            Assert.Throws<ArgumentException>(() => ChargingPriceComponent.ParkingTime(1m, TimeSpan.Zero));
+            Assert.Throws<ArgumentException>(() => ChargingPriceComponent.ChargingTime(1m, TimeSpan.FromSeconds(-1)));
 
         }
 
@@ -262,8 +262,8 @@ namespace WWCP_POI_Tests.Json
             var output = restriction.ToJSON();
             var restored = ChargingTariffRestriction.Parse(JObject.Parse(output.ToString()));
 
-            Assert.That(restored.kWh!.Value.Min, Is.EqualTo(0.1234567m));
-            Assert.That(restored.Power!.Value.Max, Is.EqualTo(350.123m));
+            Assert.That(restored.Energy!.Value.Min, Is.EqualTo(WattHour.FromKWh(0.1234567m)));
+            Assert.That(restored.Power!.Value.Max, Is.EqualTo(Watt.FromKW(350.123m)));
             Assert.That(restored.Duration!.Value.Min!.Value.Ticks, Is.EqualTo(1));
             Assert.That(restored.Duration!.Value.Max, Is.EqualTo(TimeSpan.FromMilliseconds(3600250)));
             Assert.That(restored.Date!.EndTime, Is.EqualTo(DateTimeOffset.Parse("2027-01-01T00:00:00Z")));
@@ -279,7 +279,7 @@ namespace WWCP_POI_Tests.Json
         [TestCase("{\"minDuration\":0.00000001}")]
         [TestCase("{\"endDate\":\"2027-01-01\"}")]
         [TestCase("{\"startDate\":\"2027-01-01\",\"endDate\":\"2026-01-01\"}")]
-        [TestCase("{\"day_of_week\":[\"8\"]}")]
+        [TestCase("{\"daysOfWeek\":[\"8\"]}")]
         [TestCase("{\"startTime\":\"invalid\"}")]
         [TestCase("{\"unknown\":1}")]
         public void Invalid_restrictions_are_rejected(string json)
@@ -303,7 +303,7 @@ namespace WWCP_POI_Tests.Json
             var element = new ChargingTariffElement(components, restrictions);
 
             components[0] = ChargingPriceComponent.FlatRate(2m);
-            restrictions[0] = ChargingTariffRestriction.MinkWh(99m);
+            restrictions[0] = ChargingTariffRestriction.MinEnergy(WattHour.FromKWh(99m));
             weekdays[0] = DayOfWeek.Friday;
             date.EndTime = null;
             restriction.Date!.EndTime = null;
@@ -332,7 +332,7 @@ namespace WWCP_POI_Tests.Json
         [TestCase("currency", "USDXXX")]
         [TestCase("@id", "DE*DEF*T1")]
         [TestCase("@context", "https://wrong.example/")]
-        [TestCase("URI", "invalid")]
+        [TestCase("uri", "invalid")]
         public void Invalid_tariff_fields_are_rejected(string  field,
                                                        string  value)
         {
@@ -410,7 +410,7 @@ namespace WWCP_POI_Tests.Json
 
             var source = Network();
             var added = source.ApplyChangeSet(Set(source,
-                                                RoamingNetworkChange.Add("ChargingTariff", "DE*ABC*T2", Json("""{"@id":"DE*ABC*T2","currency":"EUR","elements":[{"priceComponents":[{"type":"FLAT","price":2.12345,"stepSize":1}]}]}"""), "ChargingStationOperator", "DE*ABC"),
+                                                RoamingNetworkChange.Add("ChargingTariff", "DE*ABC*T2", Json("""{"@id":"DE*ABC*T2","currency":"EUR","elements":[{"priceComponents":[{"type":"FLAT","price":2.12345}]}]}"""), "ChargingStationOperator", "DE*ABC"),
                                                 RoamingNetworkChange.UpdateProperty("ChargingConnector", "1", "tariffIds", null, Json("[\"DE*ABC*T2\"]"), "EVSE", "DE*ABC*E2")));
 
             Assert.That(added.ChargingTariffs.Count(), Is.EqualTo(2));
@@ -505,7 +505,7 @@ namespace WWCP_POI_Tests.Json
 
             var network = Network();
             var next = network.ApplyChangeSet(Set(network, RoamingNetworkChange.UpdateProperty("ChargingTariff", "DE*ABC*T1", "elements", null,
-                                                Json("""[{"priceComponents":[{"type":"ENERGY","price":0.123456789123456789123456789,"stepSize":1}]}]"""))));
+                                                Json("""[{"priceComponents":[{"type":"ENERGY","price":0.123456789123456789123456789,"stepSize":"1 Wh"}]}]"""))));
             var document = next.ToJSONSnapshot().ToString();
 
             Assert.That(document, Does.Contain("0.123456789123456789123456789"));
@@ -525,7 +525,7 @@ namespace WWCP_POI_Tests.Json
 
             var source = Network();
             var added = source.ApplyChangeSet(Set(source, RoamingNetworkChange.Add("ChargingStationOperator", "DE*DEF", Json("""
-            {"@id":"DE*DEF","name":{},"chargingTariffs":[{"@id":"DE*DEF*T1","currency":"EUR","elements":[{"priceComponents":[{"type":"FLAT","price":1,"stepSize":1}]}]}]}
+            {"@id":"DE*DEF","name":{},"chargingTariffs":[{"@id":"DE*DEF*T1","currency":"EUR","elements":[{"priceComponents":[{"type":"FLAT","price":1}]}]}]}
             """))));
             var index = added.DataSnapshot.TariffReferences;
             var exception = Assert.Throws<RoamingNetworkChangeSetException>(() => added.ApplyChangeSet(Set(added,
@@ -569,17 +569,17 @@ namespace WWCP_POI_Tests.Json
         }
 
         [Test]
-        public void Energy_mix_legacy_data_and_full_composition_roundtrip()
+        public void Energy_mix_unknown_and_full_composition_roundtrip()
         {
 
-            var full = EnergyMix.Parse((JObject)JObject.Parse(TariffDocument)["energy_mix"]!);
+            var full = EnergyMix.Parse((JObject)JObject.Parse(TariffDocument)["energyMix"]!);
 
             Assert.That(EnergyMix.Parse(full.ToJSON()), Is.EqualTo(full));
 
-            var legacy = EnergyMix.Parse(JObject.Parse("""{"supplierName":{"en":"Supplier"},"productName":{"en":"Unknown composition"}}"""));
+            var unknown = EnergyMix.Parse(JObject.Parse("""{"supplierName":{"en":"Supplier"},"productName":{"en":"Unknown composition"},"energySources":[],"environmentalImpacts":[]}"""));
 
-            Assert.That(legacy.EnergySources, Is.Empty);
-            Assert.That(legacy.EnvironmentalImpacts, Is.Empty);
+            Assert.That(unknown.EnergySources, Is.Empty);
+            Assert.That(unknown.EnvironmentalImpacts, Is.Empty);
             Assert.That(EnergyMix.TryParse(JObject.Parse("""{"energySources":[{"source":"solar","percent":101}]}"""), out _, out _), Is.False);
 
         }
@@ -617,7 +617,7 @@ namespace WWCP_POI_Tests.Json
         }
 
         [Test]
-        public async Task Legacy_operator_add_and_lookup_use_tariff_ID_equality()
+        public void Immutable_operator_import_and_lookup_use_tariff_ID_equality()
         {
 
             var op = Operator();
@@ -625,10 +625,11 @@ namespace WWCP_POI_Tests.Json
 
             json["@id"] = "DE*ABC*Tab*c";
 
-            var tariff = ChargingTariff.Parse(json, op);
-
-            await op.AddChargingTariff(tariff);
-            Assert.That(op.GetChargingTariff(ChargingTariff_Id.Parse("DEABCTABC")), Is.SameAs(tariff));
+            var imported = ChargingStationOperator.Parse(new JObject(
+                new JProperty("@id", op.Id.ToString()),
+                new JProperty("chargingTariffs", new JArray(json))), op.RoamingNetwork);
+            var tariff = imported.ChargingTariffs.Single();
+            Assert.That(imported.GetChargingTariff(ChargingTariff_Id.Parse("DEABCTABC")), Is.SameAs(tariff));
 
         }
 

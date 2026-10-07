@@ -106,7 +106,7 @@ namespace WWCP_POI_Tests.Json
         public void Deserializer_rejects_missing_changeset_header_fields(string field)
         {
 
-            var source = new RoamingNetworkChangeSet("change-1", "rn-1", 0, DateTimeOffset.UtcNow, []);
+            var source = new RoamingNetwork(RoamingNetwork_Id.Parse("rn-1")).CreateChangeSet("change-1", DateTimeOffset.UtcNow, []);
             var json = System.Text.Json.Nodes.JsonNode.Parse(JsonSerializer.Serialize(source))!.AsObject();
 
             json.Remove(field);

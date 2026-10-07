@@ -41,7 +41,7 @@ namespace WWCP_POI_Tests.Json
             var source = new ChargingCable(Meter.From_m(5.25m), Ohm.Parse_µΩ("1250.5"), "Calibration A", long.MaxValue);
             var json = source.ToJSON(embedded)!;
 
-            Assert.That(json["resistance"]!.Value<decimal>(), Is.EqualTo(1250.5m));
+            Assert.That(json["resistance"]!.Value<string>(), Is.EqualTo("1250.5 µΩ"));
             Assert.That(json.ContainsKey("@context"), Is.EqualTo(!embedded));
 
             var parsed = ChargingCable.Parse(JObject.Parse(json.ToString()));

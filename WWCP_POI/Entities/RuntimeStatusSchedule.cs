@@ -1,0 +1,517 @@
+/*
+ * Copyright (c) 2010-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
+ * This file is part of Styx <https://www.github.com/Vanaheimr/Styx>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#region Usings
+
+using System.Collections;
+
+#endregion
+
+using org.GraphDefined.Vanaheimr.Illias;
+
+namespace cloud.charging.open.protocols.WWCP.POI
+{
+
+    /// <summary>
+    /// A list of timestamped status entries.
+    /// </summary>
+    /// <typeparam name="T">The type of the status entries.</typeparam>
+    public class RuntimeStatusSchedule<T> : IEnumerable<Timestamped<T>>
+    {
+
+        #region Data
+
+        /// <summary>
+        /// The maximum size of the status history.
+        /// </summary>
+        public const UInt16 DefaultMaxStatusListSize = 100;
+
+        private readonly List<Timestamped<T>> statusSchedule;
+
+        #endregion
+
+        #region Helpers
+
+        private IEnumerable<Timestamped<T>> Normalize(IEnumerable<Timestamped<T>> StatusList)
+
+            => StatusList.
+                   GroupBy(status => status.Timestamp.ToISO8601()).
+                   Select (group  => group.Last()).
+                   OrderByDescending(status => status.Timestamp).
+                   Take(MaxStatusHistorySize);
+
+        #endregion
+
+        #region Properties
+
+        #region CurrentStatus
+
+        private Timestamped<T> currentStatus;
+
+        /// <summary>
+        /// The current status.
+        /// </summary>
+        public Timestamped<T> CurrentStatus
+
+            => CheckCurrentStatus();
+
+        #endregion
+
+        #region CurrentValue
+
+        /// <summary>
+        /// The current status value.
+        /// </summary>
+        public T CurrentValue
+
+            => CheckCurrentStatus().Value;
+
+        #endregion
+
+        #region NextStatus
+
+        private Timestamped<T>? nextStatus;
+
+        /// <summary>
+        /// The next status.
+        /// </summary>
+        public Timestamped<T>? NextStatus
+        {
+            get
+            {
+                CheckCurrentStatus();
+                return nextStatus;
+            }
+        }
+
+        #endregion
+
+
+        #region MaxStatusHistorySize
+
+        /// <summary>
+        /// The maximum number of stored status entries.
+        /// </summary>
+        public UInt16 MaxStatusHistorySize { get; internal set; }
+
+        #endregion
+
+        #endregion
+
+        #region Events
+
+        /// <summary>
+        /// A delegate called whenever the current status changed.
+        /// </summary>
+        /// <param name="Timestamp">The timestamp when this change was detected.</param>
+        /// <param name="EventTrackingId">An event tracking identification for correlating this request with other events.</param>
+        /// <param name="RuntimeStatusSchedule">The status schedule.</param>
+        /// <param name="NewStatus">The new timestamped status.</param>
+        /// <param name="OldStatus">The old timestamped status.</param>
+        /// <param name="DataSource">An optional data source or context for the status update.</param>
+        public delegate Task OnStatusChangedDelegate(DateTimeOffset     Timestamp,
+                                                     EventTracking_Id   EventTrackingId,
+                                                     RuntimeStatusSchedule<T>  RuntimeStatusSchedule,
+                                                     Timestamped<T>     NewStatus,
+                                                     Timestamped<T>     OldStatus,
+                                                     Context?           DataSource);
+
+        /// <summary>
+        /// An event fired whenever the current status changed.
+        /// </summary>
+        public event OnStatusChangedDelegate? OnStatusChanged;
+
+        #endregion
+
+        #region Constructor(s)
+
+        #region RuntimeStatusSchedule(               MaxStatusListSize = DefaultMaxStatusListSize)
+
+        /// <summary>
+        /// Create a new status schedule.
+        /// </summary>
+        /// <param name="MaxStatusListSize">The maximum number of stored status entries.</param>
+        public RuntimeStatusSchedule(UInt16 MaxStatusListSize = DefaultMaxStatusListSize)
+        {
+
+            this.MaxStatusHistorySize  = MaxStatusListSize;
+            this.statusSchedule        = new List<Timestamped<T>>();
+
+        }
+
+        #endregion
+
+        #region RuntimeStatusSchedule(InitialValue,  MaxStatusListSize = DefaultMaxStatusListSize)
+
+        /// <summary>
+        /// Create a new status schedule.
+        /// </summary>
+        /// <param name="InitialValue">An initial value.</param>
+        /// <param name="MaxStatusListSize">The maximum number of stored status entries.</param>
+        public RuntimeStatusSchedule(T      InitialValue,
+                              UInt16 MaxStatusListSize = DefaultMaxStatusListSize)
+
+            : this(MaxStatusListSize)
+
+        {
+
+            statusSchedule.Add(InitialValue);
+            CheckCurrentStatus();
+
+        }
+
+
+        /// <summary>
+        /// Create a new status schedule.
+        /// </summary>
+        /// <param name="InitialValue">An initial timestamped value.</param>
+        /// <param name="MaxStatusListSize">The maximum number of stored status entries.</param>
+        public RuntimeStatusSchedule(Timestamped<T>  InitialValue,
+                              UInt16          MaxStatusListSize = DefaultMaxStatusListSize)
+
+            : this(MaxStatusListSize)
+
+        {
+
+            statusSchedule.Add(InitialValue);
+            CheckCurrentStatus();
+
+        }
+
+        #endregion
+
+        #region RuntimeStatusSchedule(InitialValues, MaxStatusListSize = DefaultMaxStatusListSize)
+
+        /// <summary>
+        /// Create a new status schedule.
+        /// </summary>
+        /// <param name="InitialValues">Initial values.</param>
+        /// <param name="MaxStatusListSize">The maximum number of stored status entries.</param>
+        public RuntimeStatusSchedule(IEnumerable<T>  InitialValues,
+                              UInt16          MaxStatusListSize = DefaultMaxStatusListSize)
+
+            : this(MaxStatusListSize)
+
+        {
+
+            if (InitialValues.IsNeitherNullNorEmpty())
+            {
+                var Now = Timestamp.Now;
+                statusSchedule.AddRange(InitialValues.Select(_ => new Timestamped<T>(Now, _)));
+                statusSchedule.Sort((Status1, Status2) => Status2.Timestamp.CompareTo(Status1.Timestamp));
+                CheckCurrentStatus();
+            }
+
+        }
+
+
+        /// <summary>
+        /// Create a new status schedule.
+        /// </summary>
+        /// <param name="InitialValues">Initial timestamped values.</param>
+        /// <param name="MaxStatusListSize">The maximum number of stored status entries.</param>
+        public RuntimeStatusSchedule(IEnumerable<Timestamped<T>>  InitialValues,
+                              UInt16                       MaxStatusListSize = DefaultMaxStatusListSize)
+
+            : this(MaxStatusListSize)
+
+        {
+
+            if (InitialValues.IsNeitherNullNorEmpty())
+            {
+                statusSchedule.AddRange(Normalize(InitialValues));
+                CheckCurrentStatus();
+            }
+
+        }
+
+        #endregion
+
+        #endregion
+
+
+        #region Insert(NewStatus, DataSource = null)
+
+        /// <summary>
+        /// Insert a new status entry.
+        /// </summary>
+        /// <param name="NewStatus">A new status.</param>
+        public RuntimeStatusSchedule<T> Insert(T         NewStatus,
+                                        Context?  DataSource   = null)
+
+            => Insert(NewStatus,
+                      Timestamp.Now,
+                      DataSource);
+
+        #endregion
+
+        #region Insert(NewTimestampedStatus, DataSource = null)
+
+        /// <summary>
+        /// Insert a new status entry.
+        /// </summary>
+        /// <param name="NewTimestampedStatus">A new timestamped status.</param>
+        public RuntimeStatusSchedule<T> Insert(Timestamped<T>  NewTimestampedStatus,
+                                        Context?        DataSource   = null)
+
+            => Insert(NewTimestampedStatus.Value,
+                      NewTimestampedStatus.Timestamp,
+                      DataSource);
+
+        #endregion
+
+        #region Insert(Value, Timestamp, DataSource = null)
+
+        /// <summary>
+        /// Insert a new status entry.
+        /// </summary>
+        /// <param name="Value">The value of the new status entry.</param>
+        /// <param name="Timestamp">The timestamp of the new status entry.</param>
+        /// <param name="DataSource">An optional data source or context for the status update.</param>
+        public RuntimeStatusSchedule<T> Insert(T               Value,
+                                        DateTimeOffset  Timestamp,
+                                        Context?        DataSource   = null)
+        {
+
+            lock (statusSchedule)
+            {
+
+                CheckCurrentStatus();
+
+                // Ignore 'insert' if the values are the same
+                if (statusSchedule.Count == 0 ||
+                    !EqualityComparer<T>.Default.Equals(Value, currentStatus.Value))
+                {
+
+                    var oldStatus          = currentStatus;
+
+                    // Remove any old status having the same timestamp!
+                    var newStatusSchedule  = statusSchedule.
+                                                 Where (status => status.Timestamp.ToISO8601() != Timestamp.ToISO8601()).
+                                                 ToList();
+
+                    newStatusSchedule.Add(
+                        new Timestamped<T>(Timestamp, Value)
+                    );
+
+                    statusSchedule.Clear();
+                    statusSchedule.AddRange(
+                        newStatusSchedule.
+                            OrderByDescending(v => v.Timestamp).
+                            Take(MaxStatusHistorySize)
+                    );
+
+                    // Will also call the change-events!
+                    CheckCurrentStatus(
+                        null,
+                        DataSource
+                    );
+
+                }
+
+            }
+
+            return this;
+
+        }
+
+        #endregion
+
+        #region Insert (StatusList, DataSource = null)
+
+        /// <summary>
+        /// Insert the given enumeration of status entries.
+        /// </summary>
+        /// <param name="StatusList">An enumeration of status entries.</param>
+        /// <param name="DataSource">An optional data source or context for the status update.</param>
+        public RuntimeStatusSchedule<T> Insert(IEnumerable<Timestamped<T>>  StatusList,
+                                        Context?                     DataSource   = null)
+        {
+
+            lock (statusSchedule)
+            {
+
+                var oldStatus          = currentStatus;
+
+                // Remove any old status having the same timestamp!
+                var newStatusSchedule  = Normalize(statusSchedule.Concat(StatusList)).
+                                             ToArray();
+
+                statusSchedule.Clear();
+                statusSchedule.AddRange(newStatusSchedule);
+
+                CheckCurrentStatus(oldStatus,
+                                   DataSource);
+
+            }
+
+            return this;
+
+        }
+
+        #endregion
+
+        #region Set    (StatusList, ChangeMethod = Replace, DataSource = null)
+
+        /// <summary>
+        /// Set the given enumeration of status entries.
+        /// </summary>
+        /// <param name="StatusList">An enumeration of status entries.</param>
+        /// <param name="ChangeMethod">A change method.</param>
+        /// <param name="DataSource">An optional data source or context for the status update.</param>
+        public RuntimeStatusSchedule<T> Set(IEnumerable<Timestamped<T>>  StatusList,
+                                     ChangeMethods                ChangeMethod   = ChangeMethods.Replace,
+                                     Context?                     DataSource     = null)
+
+            => ChangeMethod == ChangeMethods.Insert
+                   ? Insert (StatusList, DataSource)
+                   : Replace(StatusList, DataSource);
+
+        #endregion
+
+        #region Replace(StatusList, DataSource = null)
+
+        /// <summary>
+        /// Insert the given enumeration of status entries.
+        /// </summary>
+        /// <param name="StatusList">An enumeration of status entries.</param>
+        /// <param name="DataSource">An optional data source or context for the status update.</param>
+        public RuntimeStatusSchedule<T> Replace(IEnumerable<Timestamped<T>>  StatusList,
+                                         Context?                     DataSource   = null)
+        {
+
+            lock (statusSchedule)
+            {
+
+                var oldStatus          = currentStatus;
+
+                // Remove any status having the same timestamp!
+                var newStatusSchedule  = Normalize(StatusList).
+                                             ToArray();
+
+                statusSchedule.Clear();
+                statusSchedule.AddRange(newStatusSchedule);
+
+                CheckCurrentStatus(oldStatus,
+                                   DataSource);
+
+            }
+
+            return this;
+
+        }
+
+        #endregion
+
+
+        #region (private) CheckCurrentStatus(OldStatus = null, DataSource = null)
+
+        private Timestamped<T> CheckCurrentStatus(Timestamped<T>?  OldStatus    = null,
+                                                  Context?         DataSource   = null)
+        {
+
+            var callChangeEvents  = false;
+            var oldStatus         = OldStatus ?? currentStatus;
+
+            lock (statusSchedule)
+            {
+
+                var now            = Timestamp.Now;
+
+                var historyList    = statusSchedule.
+                                         Where(status => status.Timestamp <= now).
+                                         OrderByDescending(status => status.Timestamp).
+                                         ToArray();
+
+                if (historyList.Length > 0)
+                    currentStatus  = historyList.First();
+
+                var futureList     = statusSchedule.
+                                         Where(status => status.Timestamp  > now).
+                                         OrderBy(status => status.Timestamp).
+                                         ToArray();
+
+                    nextStatus     = futureList.Length > 0
+                                         ? futureList.First()
+                                         : null;
+
+                callChangeEvents   = !EqualityComparer<T>.Default.Equals(
+                                          currentStatus.Value,
+                                          oldStatus.Value
+                                      );
+
+            }
+
+            if (callChangeEvents)
+            {
+
+                OnStatusChanged?.Invoke(
+                    Timestamp.Now,
+                    EventTracking_Id.New,
+                    this,
+                    currentStatus,
+                    oldStatus,
+                    DataSource
+                );
+
+                //DebugX.Log($"RuntimeStatusSchedule: Current status changed from '{oldStatus}' to '{currentStatus}'!");
+
+            }
+
+            return currentStatus;
+
+        }
+
+        #endregion
+
+
+        #region IEnumerable<Timestamped<T>> Members
+
+        /// <summary>
+        /// Return a status enumerator.
+        /// </summary>
+        public IEnumerator<Timestamped<T>> GetEnumerator()
+
+            => statusSchedule.
+                   OrderByDescending(status => status.Timestamp).
+                   GetEnumerator();
+
+        /// <summary>
+        /// Return a status enumerator.
+        /// </summary>
+        IEnumerator IEnumerable.GetEnumerator()
+
+            => statusSchedule.
+                   OrderByDescending(status => status.Timestamp).
+                   GetEnumerator();
+
+        #endregion
+
+        #region (override) ToString()
+
+        /// <summary>
+        /// Return a text representation of this object.
+        /// </summary>
+        public override String ToString()
+
+            => currentStatus.ToString();
+
+        #endregion
+
+    }
+
+}

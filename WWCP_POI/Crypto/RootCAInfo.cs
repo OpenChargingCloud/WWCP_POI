@@ -27,16 +27,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
 
-    public class RootCAInfo
+    public sealed partial class RootCAInfo
     {
 
-        public I18NString             Name         { get; }
+        private readonly I18NString immutableName;
+        public I18NString Name => immutableName.Clone();
         public RootCAProtocol         Protocol     { get; }
         public ECPublicKeyParameters  PublicKey    { get; }
         public DateTime               NotBefore    { get; }
         public DateTime               NotAfter     { get; }
         public String                 Algorithm    { get; }
-        public I18NString             Comment      { get; }
+        private readonly I18NString immutableComment;
+        public I18NString Comment => immutableComment.Clone();
 
         public RootCAInfo(I18NString             Name,
                           RootCAProtocol         Protocol,
@@ -47,13 +49,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                           I18NString?            Comment     = null)
         {
 
-            this.Name       = Name;
+            this.immutableName       = (Name).Clone();
             this.Protocol   = Protocol;
             this.PublicKey  = PublicKey;
-            this.NotBefore  = NotBefore;
-            this.NotAfter   = NotAfter;
+            this.NotBefore  = NotBefore.ToUniversalTime();
+            this.NotAfter   = NotAfter.ToUniversalTime();
             this.Algorithm  = Algorithm ?? "P-256";
-            this.Comment    = Comment   ?? I18NString.Empty;
+            this.immutableComment    = (Comment   ?? I18NString.Empty).Clone();
 
         }
 

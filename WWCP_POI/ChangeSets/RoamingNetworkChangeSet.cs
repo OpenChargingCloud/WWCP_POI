@@ -18,7 +18,11 @@
 #region Usings
 
 using System.Collections.Immutable;
+using System.Text.Json;
 using System.Text.Json.Serialization;
+
+using org.GraphDefined.Vanaheimr.Illias;
+using Newtonsoft.Json.Linq;
 
 #endregion
 
@@ -27,9 +31,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// An immutable, serializable batch of changes to one roaming network. The base revision
-    /// allows the copy-on-write applier to reject changes built against stale data.
+    /// and before/after content identifiers bind the batch to its source and resulting POI data.
     /// </summary>
-    public sealed record RoamingNetworkChangeSet
+    [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+    public sealed partial record RoamingNetworkChangeSet
     {
         /// <summary>
         /// Creates a change set.
@@ -40,7 +45,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        Int64                                 baseRevision,
                                        DateTimeOffset                        createdAt,
                                        ImmutableArray<RoamingNetworkChange>  changes,
-                                       RoamingNetworkChangeSetSignature?     signature        = null)
+                                       ImmutableArray<ETag>                  beforeETags,
+                                       ImmutableArray<ETag>                  afterETags,
+                                       ImmutableArray<RoamingNetworkChangeSetSignature> signatures = default,
+                                       ImmutableDictionary<String, String>? description      = null,
+                                       ImmutableDictionary<String, JsonElement>? metadata    = null)
         {
 
             Id = Required(id, nameof(id));
@@ -57,9 +66,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             BaseRevision = baseRevision;
-            CreatedAt = createdAt;
+            CreatedAt = createdAt.ToUniversalTime();
             Changes = changes;
-            Signature = signature;
+            BeforeETags = ETag.ValidatePair(beforeETags, nameof(beforeETags));
+            AfterETags = ETag.ValidatePair(afterETags, nameof(afterETags));
+            Signatures = signatures.IsDefault ? ImmutableArray<RoamingNetworkChangeSetSignature>.Empty : signatures;
+            if (Signatures.Any(signature => signature is null))
+                throw new ArgumentException("Signatures must not contain null entries.", nameof(signatures));
+            Description = CopyDescription(description);
+            Metadata = CopyMetadata(metadata);
 
         }
 
@@ -94,9 +109,128 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<RoamingNetworkChange> Changes { get; private init; }
 
         /// <summary>
-        /// An optional signature envelope for caller-provided verification.
+        /// The canonical JSON and CBOR identifiers of the expected source POI content.
         /// </summary>
-        public RoamingNetworkChangeSetSignature? Signature { get; }
+        [JsonInclude, JsonRequired]
+        public ImmutableArray<ETag> BeforeETags { get; private init; }
+
+        /// <summary>
+        /// The canonical JSON and CBOR identifiers required after all operations and timestamp updates.
+        /// </summary>
+        [JsonInclude, JsonRequired]
+        public ImmutableArray<ETag> AfterETags { get; private init; }
+
+        /// <summary>
+        /// Equal peer signatures over the complete batch; an empty array means unsigned.
+        /// </summary>
+        [JsonInclude, JsonRequired]
+        public ImmutableArray<RoamingNetworkChangeSetSignature> Signatures { get; private init; }
+
+        /// <summary>
+        /// Immutable commit descriptions by language label, included in the signature.
+        /// </summary>
+        [JsonInclude, JsonRequired]
+        public ImmutableDictionary<String, String> Description { get; private init; }
+
+        /// <summary>
+        /// Immutable application metadata with detached JSON values, included in the signature.
+        /// </summary>
+        [JsonInclude, JsonRequired]
+        public ImmutableDictionary<String, JsonElement> Metadata { get; private init; }
+
+        /// <summary>
+        /// Append an equal peer signature envelope without changing the batch's signed content.
+        /// </summary>
+        public RoamingNetworkChangeSet WithSignature(RoamingNetworkChangeSetSignature signature)
+        {
+            ArgumentNullException.ThrowIfNull(signature);
+            return WithSignatures(Signatures.Add(signature));
+        }
+
+        /// <summary>
+        /// Return an immutable copy with the supplied peer signature array.
+        /// </summary>
+        public RoamingNetworkChangeSet WithSignatures(ImmutableArray<RoamingNetworkChangeSetSignature> signatures)
+            => new(Id, RoamingNetworkId, BaseRevision, CreatedAt, Changes, BeforeETags, AfterETags,
+                   signatures, Description, Metadata);
+
+        /// <summary>
+        /// Return an unsigned copy, preserving the complete batch and its commit metadata.
+        /// </summary>
+        public RoamingNetworkChangeSet WithoutSignatures()
+            => WithSignatures([]);
+
+        /// <summary>
+        /// Replace all commit descriptions, returning an unsigned batch with unchanged operations/ETags.
+        /// </summary>
+        public RoamingNetworkChangeSet WithDescription(ImmutableDictionary<String, String> description)
+        {
+            ArgumentNullException.ThrowIfNull(description);
+            return new(Id, RoamingNetworkId, BaseRevision, CreatedAt, Changes, BeforeETags, AfterETags,
+                       description: description, metadata: Metadata);
+        }
+
+        /// <summary>
+        /// Copy multilingual Illias text into immutable descriptions and clear the old signature.
+        /// </summary>
+        public RoamingNetworkChangeSet WithDescription(I18NString description)
+        {
+            ArgumentNullException.ThrowIfNull(description);
+            return WithDescription(description.ToJSON().Properties().ToImmutableDictionary(
+                property => property.Name, property => property.Value.Value<String>()!, StringComparer.Ordinal));
+        }
+
+        /// <summary>
+        /// Add or replace one language's description, returning an unsigned batch.
+        /// </summary>
+        public RoamingNetworkChangeSet WithDescription(String language, String text)
+            => WithDescription(Description.SetItem(Required(language, nameof(language)),
+                                                   text ?? throw new ArgumentNullException(nameof(text))));
+
+        /// <summary>
+        /// Replace all application metadata, copying its values and clearing the old signature.
+        /// </summary>
+        public RoamingNetworkChangeSet WithMetadata(ImmutableDictionary<String, JsonElement> metadata)
+        {
+            ArgumentNullException.ThrowIfNull(metadata);
+            return new(Id, RoamingNetworkId, BaseRevision, CreatedAt, Changes, BeforeETags, AfterETags,
+                       description: Description, metadata: metadata);
+        }
+
+        /// <summary>
+        /// Add or replace one metadata value, returning an unsigned batch.
+        /// </summary>
+        public RoamingNetworkChangeSet WithMetadata(String key, JsonElement value)
+            => WithMetadata(Metadata.SetItem(Required(key, nameof(key)), value));
+
+        /// <summary>
+        /// Serialize an application value as JSON metadata and clear the old signature.
+        /// </summary>
+        public RoamingNetworkChangeSet WithMetadata<T>(String key, T value)
+            => WithMetadata(key, JsonSerializer.SerializeToElement(value));
+
+        private static ImmutableDictionary<String, String> CopyDescription(ImmutableDictionary<String, String>? description)
+        {
+            var result = ImmutableDictionary.CreateBuilder<String, String>(StringComparer.Ordinal);
+            if (description is not null)
+                foreach (var entry in description)
+                    result.Add(Required(entry.Key, nameof(description)),
+                               entry.Value ?? throw new ArgumentException("Description text must not be null.", nameof(description)));
+            return result.ToImmutable();
+        }
+
+        private static ImmutableDictionary<String, JsonElement> CopyMetadata(ImmutableDictionary<String, JsonElement>? metadata)
+        {
+            var result = ImmutableDictionary.CreateBuilder<String, JsonElement>(StringComparer.Ordinal);
+            if (metadata is not null)
+                foreach (var entry in metadata)
+                {
+                    var key = Required(entry.Key, nameof(metadata));
+                    ValidateSigningJSON(entry.Value);
+                    result.Add(key, entry.Value.Clone());
+                }
+            return result.ToImmutable();
+        }
 
         private static String Required(String  value,
                                        String  parameterName)

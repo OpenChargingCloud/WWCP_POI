@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Diagnostics.CodeAnalysis;
+using System.Collections.Immutable;
 
 using Newtonsoft.Json.Linq;
 
@@ -38,10 +39,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private Boolean snapshotProjectionMaterialized = true;
         private Boolean snapshotProjectionMaterializing;
 
+        private Action<RoamingNetwork>? restoreRuntimeState;
+
         /// <summary>
         /// Capture the current POI data once as authoritative immutable versioned data.
-        /// Subsequent changes must use ApplyChangeSet. Legacy entities are mutable, isolated
-        /// projections; editing them does not edit this captured snapshot.
+        /// Static changes must use ApplyChangeSet. Runtime status updates remain local
+        /// to the domain objects and do not edit this captured snapshot or its revision.
         /// </summary>
         public RoamingNetworkDataSnapshot DataSnapshot
         {
@@ -69,12 +72,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region ApplyChangeSet/TryApplyChangeSet
 
         /// <summary>
+        /// Prepare an unsigned ChangeSet bound to the canonical source and resulting POI content.
+        /// </summary>
+        public RoamingNetworkChangeSet CreateChangeSet(String id,
+                                                       DateTimeOffset createdAt,
+                                                       ImmutableArray<RoamingNetworkChange> changes)
+            => DataSnapshot.CreateChangeSet(id, createdAt, changes);
+
+        /// <summary>
+        /// Check two ChangeSets against this network's frozen source snapshot. By default only
+        /// a notice is returned; merge=true prepares a new unsigned batch for separate application.
+        /// Runtime values changed directly after snapshot capture are outside this merge check.
+        /// </summary>
+        public Boolean TryMerge(RoamingNetworkChangeSet                  left,
+                                RoamingNetworkChangeSet                  right,
+                                out RoamingNetworkChangeSet?             mergedChangeSet,
+                                out RoamingNetworkChangeSetMergeResult   result,
+                                Boolean                                  merge             = false,
+                                String?                                  mergedChangeSetId = null,
+                                DateTimeOffset?                          createdAt         = null,
+                                Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifySignature = null)
+            => DataSnapshot.TryMerge(left, right, out mergedChangeSet, out result,
+                                     merge, mergedChangeSetId, createdAt, verifySignature);
+
+        /// <summary>
         /// Apply all operations atomically to a new immutable version, leaving this version unchanged.
-        /// Legacy hierarchy objects in the returned network are materialized only when requested.
-        /// Signed batches require a caller-provided verifier; signing/canonicalization is not supplied here.
+        /// Immutable hierarchy objects are materialized only when requested. Runtime state
+        /// is captured now and restored into independent schedules in the returned version.
+        /// Both source and result content identifiers must match the batch's declared ETags.
+        /// Every peer signature requires a caller-provided verifier using trusted keys.
+        /// ChangeSet.Sign/VerifySignature provide the built-in canonical signing profile.
         /// </summary>
         public RoamingNetwork ApplyChangeSet(RoamingNetworkChangeSet                  changeSet,
-                                             Func<RoamingNetworkChangeSet, Boolean>?  VerifySignature = null)
+                                             Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? VerifySignature = null)
         {
 
             var snapshot = DataSnapshot.ApplyChangeSet(changeSet, VerifySignature);
@@ -82,6 +112,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             result.dataSnapshot                   = snapshot;
             result.snapshotProjectionMaterialized = false;
+            result.restoreRuntimeState            = CaptureRuntimeState(changeSet, result);
 
             return result;
 
@@ -93,7 +124,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryApplyChangeSet(RoamingNetworkChangeSet                  changeSet,
                                          [NotNullWhen(true)] out RoamingNetwork?  network,
                                          [NotNullWhen(false)] out String?         error,
-                                         Func<RoamingNetworkChangeSet, Boolean>?  VerifySignature = null)
+                                         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? VerifySignature = null)
         {
 
             network = null;
@@ -114,7 +145,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Materialize the legacy hierarchy
+        #region Materialize the immutable hierarchy
 
         private void EnsureSnapshotProjection()
         {
@@ -129,6 +160,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 try
                 {
                     MaterializeSnapshotProjection(dataSnapshot);
+                    restoreRuntimeState?.Invoke(this);
+                    restoreRuntimeState = null;
                     snapshotProjectionMaterialized = true;
                 }
                 finally

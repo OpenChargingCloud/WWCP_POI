@@ -33,7 +33,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// This class references images related to an EVSE in terms of a file name or uri.
     /// </summary>
-    public class Image : IEquatable<Image>,
+    public sealed partial class Image : IEquatable<Image>,
                          IComparable<Image>,
                          IComparable
     {
@@ -321,9 +321,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        );
 
-            return CustomImageSerializer is not null
+            return POIRepresentation.AddETags(this, CustomImageSerializer is not null
                        ? CustomImageSerializer(this, JSON)
-                       : JSON;
+                       : JSON);
 
         }
 

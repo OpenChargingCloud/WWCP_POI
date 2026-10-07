@@ -28,7 +28,7 @@ using org.GraphDefined.Vanaheimr.Illias;
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
-    public partial class ChargingPool
+    public sealed partial class ChargingPool
     {
 
         #region Parse/TryParse
@@ -93,13 +93,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               Brands:             InfrastructureJson.Brands(JSON, context: Context),
                                               DataLicenses:       InfrastructureJson.Licenses(JSON),
                                               DataSource:         InfrastructureJson.Text(JSON, "dataSource"),
-                                              CustomData:         InfrastructureJson.CustomData(JSON));
+                                              CustomData:         InfrastructureJson.CustomData(JSON),
+                                              EnergyMeters:       InfrastructureJson.Array(JSON, "energyMeters",
+                                                                                          token => EnergyMeter.Parse(InfrastructureJson.Entry(token))),
+                                              GridConnectionPoint: InfrastructureJson.Object(JSON, "gridConnectionPoint") is { } point
+                                                                       ? InfrastructureJson.At("gridConnectionPoint", () => POI.GridConnectionPoint.Parse(point, Operator.RoamingNetwork))
+                                                                       : null);
 
                 var authenticationModes = InfrastructureJson.Array(JSON, "authenticationModes",
                                                                    token => POI.AuthenticationModes.Parse(InfrastructureJson.Entry(token)));
 
                 foreach (var mode in authenticationModes)
-                    parsed.AuthenticationModes.Add(mode);
+                    parsed.immutableAuthenticationModes = parsed.immutableAuthenticationModes.Add(mode);
 
                 parsed.ParsePoolStations(JSON, Context);
 

@@ -31,7 +31,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// An asymmetric cryptographic public key.
     /// </summary>
-    public class PublicKey : ACustomData,
+    public partial class PublicKey : AImmutableCustomData,
                              IEquatable<PublicKey>
     {
 
@@ -40,8 +40,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The cryptographic public key.
         /// </summary>
+                private readonly Byte[] keyBytes;
         [Mandatory]
-        public   Byte[]               Value            { get; protected set; }
+        public Byte[] Value => keyBytes.ToArray();
 
         /// <summary>
         /// The optional cryptographic algorithm of the public key.
@@ -84,7 +85,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
-            this.Value          = Value;
+            this.keyBytes       = Value.ToArray();
             this.Algorithm      = Algorithm;
             this.Serialization  = Serialization ?? CryptoSerialization.RAW;
             this.Encoding       = Encoding      ?? CryptoEncoding.     NONE;
@@ -92,7 +93,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             unchecked
             {
 
-                hashCode = this.Value.        GetHashCode()       * 11 ^
+                hashCode = this.keyBytes.Aggregate(17, (hash, item) => unchecked(hash * 31 + item))       * 11 ^
                           (this.Algorithm?.   GetHashCode() ?? 0) *  7 ^
                            this.Serialization.GetHashCode()       *  5 ^
                            this.Encoding.     GetHashCode()       *  3 ^
@@ -579,9 +580,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        );
 
-            return CustomPublicKeySerializer is not null
+            return POIRepresentation.AddETags(this, CustomPublicKeySerializer is not null
                        ? CustomPublicKeySerializer(this, json)
-                       : json;
+                       : json);
 
         }
 

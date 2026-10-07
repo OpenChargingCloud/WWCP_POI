@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -122,7 +122,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// This can e.g. be a differentation of service levels (premiun, basic,
     /// discount) or allow a simplified testing (production, qa, featureX, ...)
     /// </summary>
-    public partial class RoamingNetwork : AEMobilityEntity<RoamingNetwork_Id,
+    public sealed partial class RoamingNetwork : AImmutableEMobilityEntity<RoamingNetwork_Id,
                                                    RoamingNetworkAdminStatusType,
                                                    RoamingNetworkStatusType>
     {
@@ -158,7 +158,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         [Mandatory]
         public IEnumerable<DataLicense> DataLicenses
-            => dataLicenses.Values;
+            => ImmutablePOIValues.CopyItems(dataLicenses.Values);
 
         #endregion
 
@@ -242,90 +242,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return all e-mobility providers registered within this roaming network.
         /// </summary>
         public IEnumerable<EMobilityProvider> EMobilityProviders
-            => eMobilityProviders.Values;
-
-        #endregion
-
-
-        #region AddEMobilityProvider                      (EMobilityProvider, ..., OnAdded = null, ...)
-
-        /// <summary>
-        /// Add the given charging station operator.
-        /// </summary>
-        /// <param name="EMobilityProvider">A charging station operator.</param>
-        /// <param name="EventTrackingId">An optional unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<AddEMobilityProviderResult>
-
-            AddEMobilityProvider(EMobilityProvider  EMobilityProvider,
-                                 EventTracking_Id?  EventTrackingId   = null,
-                                 User_Id?           CurrentUserId     = null)
-
-        {
-
-            var eventTrackingId = EventTrackingId ?? EventTracking_Id.New;
-
-            if (eMobilityProviders.ContainsKey(EMobilityProvider.Id))
-                return AddEMobilityProviderResult.ArgumentError(
-                           EMobilityProvider,
-                           $"The given charging station operator identification '{EMobilityProvider.Id}' already exists!".ToI18NString(),
-                           eventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            if (EMobilityProvider.Id.Length < MinEMobilityProviderIdLength)
-                return AddEMobilityProviderResult.ArgumentError(
-                           EMobilityProvider,
-                           $"The given charging station operator identification '{EMobilityProvider.Id}' is too short!".ToI18NString(),
-                           eventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            if (EMobilityProvider.Name.IsNullOrEmpty())
-                return AddEMobilityProviderResult.ArgumentError(
-                           EMobilityProvider,
-                           "The given charging station operator name must not be null!".ToI18NString(),
-                           eventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            if (EMobilityProvider.Name.FirstText().Length < MinEMobilityProviderNameLength)
-                return AddEMobilityProviderResult.ArgumentError(
-                           EMobilityProvider,
-                           $"The given charging station operator name '{EMobilityProvider.Name}' is too short!".ToI18NString(),
-                           eventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-
-
-            if (eMobilityProviders.TryAdd(EMobilityProvider.Id, EMobilityProvider))
-                return AddEMobilityProviderResult.Success(
-                           EMobilityProvider,
-                           eventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            return AddEMobilityProviderResult.Error(
-                       EMobilityProvider,
-                       I18NString.Empty,
-                       eventTrackingId,
-                       Id,
-                       this,
-                       this
-                   );
-
-        }
+            => ImmutablePOIValues.CopyItems(eMobilityProviders.Values);
 
         #endregion
 
@@ -402,63 +319,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region RemoveEMobilityProvider    (EMobilityProviderId)
-
-        public EMobilityProvider? RemoveEMobilityProvider(EMobilityProvider_Id EMobilityProviderId)
-        {
-
-            if (eMobilityProviders.TryRemove(EMobilityProviderId, out var eMobilityProvider))
-                return eMobilityProvider;
-
-            return null;
-
-        }
-
-        public EMobilityProvider? RemoveEMobilityProvider(EMobilityProvider_Id? EMobilityProviderId)
-        {
-
-            if (EMobilityProviderId.HasValue &&
-                eMobilityProviders.TryRemove(EMobilityProviderId.Value, out var eMobilityProvider))
-            {
-                return eMobilityProvider;
-            }
-
-            return null;
-
-        }
-
-        #endregion
-
-        #region TryRemoveEMobilityProvider (EMobilityProviderId, out EMobilityProvider)
-
-        public Boolean TryRemoveEMobilityProvider(EMobilityProvider_Id                        EMobilityProviderId,
-                                                  [NotNullWhen(true)] out EMobilityProvider?  EMobilityProvider)
-
-            => eMobilityProviders.TryRemove(EMobilityProviderId, out EMobilityProvider);
-
-        public Boolean TryRemoveEMobilityProvider(EMobilityProvider_Id?                       EMobilityProviderId,
-                                                  [NotNullWhen(true)] out EMobilityProvider?  EMobilityProvider)
-
-        {
-
-            if (!EMobilityProviderId.HasValue)
-            {
-                EMobilityProvider = null;
-                return false;
-            }
-
-            return eMobilityProviders.TryRemove(EMobilityProviderId.Value, out EMobilityProvider);
-
-        }
-
-        #endregion
 
         #endregion
 
 
-        #region Charging Station Operators...
-
-        #region ChargingStationOperators
+        #region Charging station operators
 
         private readonly ConcurrentDictionary<ChargingStationOperator_Id, ChargingStationOperator> projectedChargingStationOperators = [];
 
@@ -468,441 +333,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// Return all charging station operators registered within this roaming network.
+        /// The operators in this immutable network version.
         /// </summary>
         public IEnumerable<ChargingStationOperator> ChargingStationOperators
-            => chargingStationOperators.Values;
-
-        #endregion
-
-
-        #region AddChargingStationOperator           (ChargingStationOperator,      ..., OnAdded = null, ...)
-
-        /// <summary>
-        /// Add the given charging station operator.
-        /// </summary>
-        /// <param name="ChargingStationOperator">A charging station operator.</param>
-        /// <param name="EventTrackingId">An optional unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<AddChargingStationOperatorResult>
-
-            AddChargingStationOperator(ChargingStationOperator  ChargingStationOperator,
-                                       EventTracking_Id?        EventTrackingId                               = null,
-                                       User_Id?                 CurrentUserId                                 = null)
-
-        {
-
-            var eventTrackingId = EventTrackingId ?? EventTracking_Id.New;
-
-            if (chargingStationOperators.ContainsKey(ChargingStationOperator.Id))
-                return AddChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           Description:              $"The given charging station operator identification '{ChargingStationOperator.Id}' already exists!".ToI18NString(),
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );;
-
-            if (ChargingStationOperator.Id.Length < MinChargingStationOperatorIdLength)
-                return AddChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           Description:              $"The given charging station operator identification '{ChargingStationOperator.Id}' is too short!".ToI18NString(),
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-            if (ChargingStationOperator.Name.IsNullOrEmpty())
-                return AddChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           Description:              $"The given charging station operator name must not be null or empty!".ToI18NString(),
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-            if (ChargingStationOperator.Name.FirstText().Length < MinChargingStationOperatorNameLength)
-                return AddChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           Description:              $"The given charging station operator name '{ChargingStationOperator.Name}' is too short!".ToI18NString(),
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-            var now = Timestamp.Now;
-
-            if (chargingStationOperators.TryAdd(ChargingStationOperator.Id, ChargingStationOperator))
-            {
-
-                //ChargingStationOperator.OnDataChanged                              += UpdateChargingStationOperatorData;
-                //ChargingStationOperator.OnStatusChanged                            += UpdateChargingStationOperatorStatus;
-                //ChargingStationOperator.OnAdminStatusChanged                       += UpdateChargingStationOperatorAdminStatus;
-
-                //ChargingStationOperator.OnChargingPoolAddition.   OnVoting         += (eventTrackingId, timestamp, userId, cso, pool, vote)      => ChargingPoolAddition.   SendVoting      (eventTrackingId, timestamp, userId, cso, pool, vote);
-                //ChargingStationOperator.OnChargingPoolAddition.   OnNotification   += SendChargingPoolAdded;
-                //ChargingStationOperator.OnChargingPoolDataChanged                  += UpdateChargingPoolData;
-                //ChargingStationOperator.OnChargingPoolAdminStatusChanged           += UpdateChargingPoolAdminStatus;
-                //ChargingStationOperator.OnChargingPoolStatusChanged                += UpdateChargingPoolStatus;
-                //ChargingStationOperator.OnChargingPoolRemoval.    OnVoting         += (eventTrackingId, timestamp, userId, cso, pool, vote)      => ChargingPoolRemoval.    SendVoting      (eventTrackingId, timestamp, userId, cso, pool, vote);
-                //ChargingStationOperator.OnChargingPoolRemoval.    OnNotification   += (eventTrackingId, timestamp, userId, cso, pool)            => ChargingPoolRemoval.    SendNotification(eventTrackingId, timestamp, userId, cso, pool);
-
-                //ChargingStationOperator.OnChargingStationAddition.OnVoting         += (eventTrackingId, timestamp, userId, pool, station, vote)  => ChargingStationAddition.SendVoting      (eventTrackingId, timestamp, userId, pool, station, vote);
-                //ChargingStationOperator.OnChargingStationAddition.OnNotification   += SendChargingStationAdded;
-                //ChargingStationOperator.OnChargingStationDataChanged               += UpdateChargingStationData;
-                //ChargingStationOperator.OnChargingStationAdminStatusChanged        += UpdateChargingStationAdminStatus;
-                //ChargingStationOperator.OnChargingStationStatusChanged             += UpdateChargingStationStatus;
-                //ChargingStationOperator.OnChargingStationRemoval. OnVoting         += (eventTrackingId, timestamp, userId, pool, station, vote)  => ChargingStationRemoval. SendVoting      (eventTrackingId, timestamp, userId, pool, station, vote);
-                //ChargingStationOperator.OnChargingStationRemoval. OnNotification   += (eventTrackingId, timestamp, userId, pool, station)        => ChargingStationRemoval. SendNotification(eventTrackingId, timestamp, userId, pool, station);
-
-                //ChargingStationOperator.OnEVSEAddition.           OnVoting         += (eventTrackingId, timestamp, userId, station, evse, vote)  => EVSEAddition.           SendVoting      (eventTrackingId, timestamp, userId, station, evse, vote);
-                //ChargingStationOperator.OnEVSEAddition.           OnNotification   += SendEVSEAdded;
-                //ChargingStationOperator.OnEVSEDataChanged                          += UpdateEVSEData;
-                //ChargingStationOperator.OnEVSEAdminStatusChanged                   += UpdateEVSEAdminStatus;
-                //ChargingStationOperator.OnEVSEStatusChanged                        += UpdateEVSEStatus;
-                //ChargingStationOperator.OnEVSERemoval.            OnVoting         += (eventTrackingId, timestamp, userId, station, evse, vote)  => EVSERemoval.            SendVoting      (eventTrackingId, timestamp, userId, station, evse, vote);
-                //ChargingStationOperator.OnEVSERemoval.            OnNotification   += (eventTrackingId, timestamp, userId, station, evse)        => EVSERemoval.            SendNotification(eventTrackingId, timestamp, userId, station, evse);
-
-            }
-
-            return AddChargingStationOperatorResult.Success(
-                       ChargingStationOperator:  ChargingStationOperator,
-                       EventTrackingId:          eventTrackingId,
-                       SenderId:                 Id,
-                       Sender:                   this,
-                       RoamingNetwork:           this
-                   );
-
-        }
-
-        #endregion
-
-        #region AddChargingStationOperatorIfNotExists(ChargingStationOperator,      ..., OnAdded = null, ...)
-
-        /// <summary>
-        /// Add the given user.
-        /// </summary>
-        /// <param name="User">A new user.</param>
-        /// <param name="SkipDefaultNotifications">Do not apply the default notifications settings for new users.</param>
-        /// <param name="OnAdded">A delegate run whenever the user has been added successfully.</param>
-        /// <param name="EventTrackingId">An optional unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<AddChargingStationOperatorResult>
-
-            AddChargingStationOperatorIfNotExists(ChargingStationOperator  ChargingStationOperator,
-                                                  Boolean                  SkipNewUserNotifications   = false,
-                                                  EventTracking_Id?        EventTrackingId            = null,
-                                                  User_Id?                 CurrentUserId              = null)
-
-        {
-
-            var eventTrackingId = EventTrackingId ?? EventTracking_Id.New;
-
-            if (chargingStationOperators.TryGetValue(ChargingStationOperator.Id, out var existingChargingStationOperator))
-                return AddChargingStationOperatorResult.Exists(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-            if (ChargingStationOperator.Id.Length < MinChargingStationOperatorIdLength)
-                return AddChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           Description:              $"The given charging station operator identification '{ChargingStationOperator.Id}' is too short!".ToI18NString(),
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-            if (ChargingStationOperator.Name.IsNullOrEmpty())
-                return AddChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           Description:              $"The given charging station operator name must not be null or empty!".ToI18NString(),
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-            if (ChargingStationOperator.Name.FirstText().Length < MinChargingStationOperatorNameLength)
-                return AddChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           Description:              $"The given user name '{ChargingStationOperator.Name}' is too short!".ToI18NString(),
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-
-            if (chargingStationOperators.TryAdd(ChargingStationOperator.Id, ChargingStationOperator))
-                return AddChargingStationOperatorResult.Success(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-            return AddChargingStationOperatorResult.Error(
-                       ChargingStationOperator:  ChargingStationOperator,
-                       EventTrackingId:          eventTrackingId,
-                       Description:              I18NString.Empty,
-                       SenderId:                 Id,
-                       Sender:                   this,
-                       RoamingNetwork:           this
-                   );
-
-        }
-
-        #endregion
-
-        #region AddOrUpdateChargingStationOperator   (ChargingStationOperator,      ..., OnAdded = null, OnUpdated = null, ...)
-
-        /// <summary>
-        /// Add or update the given user to/within the API.
-        /// </summary>
-        /// <param name="ChargingStationOperator">A user.</param>
-        /// <param name="SkipNewChargingStationOperatorNotifications">Do not send notifications for this user addition.</param>
-        /// <param name="SkipChargingStationOperatorUpdatedNotifications">Do not send the updated user information e-mail to the new user.</param>
-        /// <param name="OnAdded">A delegate run whenever the user has been added successfully.</param>
-        /// <param name="OnUpdated">A delegate run whenever the user has been updated successfully.</param>
-        /// <param name="EventTrackingId">An optional unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<AddOrUpdateChargingStationOperatorResult>
-
-            AddOrUpdateChargingStationOperator(ChargingStationOperator  ChargingStationOperator,
-                                               EventTracking_Id?        EventTrackingId   = null,
-                                               User_Id?                 CurrentUserId     = null)
-
-        {
-
-            var eventTrackingId = EventTrackingId ?? EventTracking_Id.New;
-
-            //if (ChargingStationOperator.API is not null && ChargingStationOperator.API != this)
-            //    return AddOrUpdateChargingStationOperatorResult.ArgumentError(ChargingStationOperator,
-            //                                               eventTrackingId,
-            //                                               nameof(ChargingStationOperator.API),
-            //                                               "The given user is already attached to another API!");
-
-            if (ChargingStationOperator.Id.Length < MinChargingStationOperatorIdLength)
-                return AddOrUpdateChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           Description:              $"The given charging station operator identification '{ChargingStationOperator.Id}' is too short!".ToI18NString(),
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-            if (ChargingStationOperator.Name.IsNullOrEmpty())
-                return AddOrUpdateChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           EventTrackingId:          eventTrackingId,
-                           Description:              $"The given charging station operator name must not be null or empty!".ToI18NString(),
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-            if (ChargingStationOperator.Name.FirstText().Length < MinChargingStationOperatorNameLength)
-                return AddOrUpdateChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           EventTrackingId:          eventTrackingId,
-                           Description:              $"The given charging station operator name '{ChargingStationOperator.Name}' is too short!".ToI18NString(),
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-
-            if (chargingStationOperators.TryGetValue(ChargingStationOperator.Id, out var oldChargingStationOperator))
-            {
-
-                chargingStationOperators.TryRemove(oldChargingStationOperator.Id, out _);
-
-                //ChargingStationOperator.CopyAllLinkedDataFrom(OldChargingStationOperator);
-
-            }
-
-
-            if (chargingStationOperators.TryAdd(ChargingStationOperator.Id, ChargingStationOperator))
-            {
-
-                if (oldChargingStationOperator is null)
-                    return AddOrUpdateChargingStationOperatorResult.Added(
-                               ChargingStationOperator:  ChargingStationOperator,
-                               EventTrackingId:          eventTrackingId,
-                               SenderId:                 Id,
-                               Sender:                   this,
-                               RoamingNetwork:           this
-                           );
-
-                return AddOrUpdateChargingStationOperatorResult.Updated(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-            }
-
-            return AddOrUpdateChargingStationOperatorResult.Error(
-                       ChargingStationOperator:  ChargingStationOperator,
-                       EventTrackingId:          eventTrackingId,
-                       Description:              I18NString.Empty,
-                       SenderId:                 Id,
-                       Sender:                   this,
-                       RoamingNetwork:           this
-                   );
-
-        }
-
-        #endregion
-
-        #region UpdateChargingStationOperator        ((New)ChargingStationOperator, ...,                 OnUpdated = null, ...)
-
-        /// <summary>
-        /// Update the given charging station operator to/within the API.
-        /// </summary>
-        /// <param name="NewChargingStationOperator">A charging station operator.</param>
-        /// <param name="SkipChargingStationOperatorUpdatedNotifications">Do not send the updated charging station operator notifications.</param>
-        /// <param name="OnUpdated">A delegate run whenever the charging station operator has been updated successfully.</param>
-        /// <param name="EventTrackingId">An optional unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<UpdateChargingStationOperatorResult>
-
-            UpdateChargingStationOperator(ChargingStationOperator  NewChargingStationOperator,
-                                          EventTracking_Id?        EventTrackingId   = null,
-                                          User_Id?                 CurrentUserId     = null)
-
-        {
-
-            var eventTrackingId = EventTrackingId ?? EventTracking_Id.New;
-
-            if (!chargingStationOperators.TryGetValue(NewChargingStationOperator.Id, out var oldChargingStationOperator))
-                return UpdateChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  NewChargingStationOperator,
-                           Description:              $"The given user '{NewChargingStationOperator.Id}' does not exists in this API!".ToI18NString(),
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-
-            chargingStationOperators.TryRemove(oldChargingStationOperator.Id, out _);
-
-            //ChargingStationOperator.CopyAllLinkedDataFrom(oldChargingStationOperator);
-
-            var result  = chargingStationOperators.TryAdd(NewChargingStationOperator.Id, NewChargingStationOperator);
-            var now     = Timestamp.Now;
-
-            return UpdateChargingStationOperatorResult.Success(
-                       ChargingStationOperator:  NewChargingStationOperator,
-                       EventTrackingId:          eventTrackingId,
-                       SenderId:                 Id,
-                       Sender:                   this,
-                       RoamingNetwork:           this
-                   );
-
-        }
-
-        #endregion
-
-
-        #region (protected internal virtual) _CanRemoveChargingStationOperator(ChargingStationOperator)
-
-        /// <summary>
-        /// Determines whether the charging station operator can safely be removed from the API.
-        /// </summary>
-        /// <param name="ChargingStationOperator">The charging station operator to be removed.</param>
-        protected internal virtual I18NString? _CanRemoveChargingStationOperator(ChargingStationOperator ChargingStationOperator)
-        {
-
-            //if (ChargingStationOperator.ChargingStationOperator2Organization_OutEdges.Any())
-            //    return new I18NString(Languages.en, "The user is still member of an organization!");
-
-            return null;
-
-        }
-
-        #endregion
-
-        #region RemoveChargingStationOperator        (ChargingStationOperator,      ...,                 OnRemoved = null, ...)
-
-        /// <summary>
-        /// Remove the given charging station operator.
-        /// </summary>
-        /// <param name="ChargingStationOperator">The charging station operator to be removed.</param>
-        /// <param name="OnRemoved">A delegate run whenever the charging station operator has been removed successfully.</param>
-        /// <param name="EventTrackingId">An optional unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<DeleteChargingStationOperatorResult>
-
-            RemoveChargingStationOperator(ChargingStationOperator  ChargingStationOperator,
-                                          EventTracking_Id?        EventTrackingId   = null,
-                                          User_Id?                 CurrentUserId     = null)
-
-        {
-
-            var eventTrackingId = EventTrackingId ?? EventTracking_Id.New;
-
-            //if (ChargingStationOperator.API != this)
-            //    return RemoveChargingStationOperatorResult.ArgumentError(
-            //               ChargingStationOperator,
-            //               eventTrackingId,
-            //               nameof(ChargingStationOperator),
-            //               "The given user is not attached to this API!"
-            //           );
-
-            if (!chargingStationOperators.ContainsKey(ChargingStationOperator.Id))
-                return DeleteChargingStationOperatorResult.ArgumentError(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           Description:              $"The given user does not exists in this API!".ToI18NString(),
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this
-                       );
-
-
-            var canBeRemoved  = _CanRemoveChargingStationOperator(ChargingStationOperator);
-
-            if (canBeRemoved is not null)
-                return DeleteChargingStationOperatorResult.CanNotBeRemoved(
-                           ChargingStationOperator:  ChargingStationOperator,
-                           EventTrackingId:          eventTrackingId,
-                           SenderId:                 Id,
-                           Sender:                   this,
-                           RoamingNetwork:           this,
-                           Description:              canBeRemoved
-                       );
-
-
-            var result  = chargingStationOperators.TryRemove(ChargingStationOperator.Id, out _);
-            var now     = Timestamp.Now;
-
-            return DeleteChargingStationOperatorResult.Success(
-                       ChargingStationOperator:  ChargingStationOperator,
-                       EventTrackingId:          eventTrackingId,
-                       SenderId:                 Id,
-                       Sender:                   this,
-                       RoamingNetwork:           this
-                   );
-
-        }
-
-        #endregion
-
+            => ImmutablePOIValues.CopyItems(chargingStationOperators.Values);
 
         #region ChargingStationOperatorExists    (ChargingStationOperator)
 
@@ -1000,7 +434,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// All charging tariffs registered with the operators of this roaming network.
         /// </summary>
         public IEnumerable<ChargingTariff> ChargingTariffs
-            => ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingTariffs);
+            => ImmutablePOIValues.CopyItems(ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingTariffs));
 
         #region ChargingPools...
 
@@ -1011,7 +445,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<ChargingPool> ChargingPools
 
-            => chargingStationOperators.Values.SelectMany(cso => cso.ChargingPools);
+            => ImmutablePOIValues.CopyItems(chargingStationOperators.Values.SelectMany(cso => cso.ChargingPools));
 
         #endregion
 
@@ -1253,7 +687,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<ChargingStation> ChargingStations
 
-            => chargingStationOperators.Values.SelectMany(cso => cso.ChargingStations);
+            => ImmutablePOIValues.CopyItems(chargingStationOperators.Values.SelectMany(cso => cso.ChargingStations));
 
         #endregion
 
@@ -1406,7 +840,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         public async Task SetChargingStationAdminStatus(ChargingStation_Id                                         ChargingStationId,
                                                         IEnumerable<Timestamped<ChargingStationAdminStatusType>>  CurrentAdminStatusList)
-        { 
+        {
 
             if (TryGetChargingStationOperatorById(ChargingStationId.OperatorId, out var chargingStationOperator) &&
                 chargingStationOperator is not null)
@@ -1556,7 +990,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<EVSE> EVSEs
 
-            => chargingStationOperators.Values.SelectMany(cso => cso.EVSEs);
+            => ImmutablePOIValues.CopyItems(chargingStationOperators.Values.SelectMany(cso => cso.EVSEs));
 
         #endregion
 
@@ -1778,7 +1212,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<EnergyMeter> EnergyMeters
 
-            => energyMeters.Values;
+            => ImmutablePOIValues.CopyItems(energyMeters.Values);
 
         #endregion
 
@@ -1884,7 +1318,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return all smart cities registered within this roaming network.
         /// </summary>
         public IEnumerable<GridOperator> GridOperators
-            => gridOperators.Values;
+            => ImmutablePOIValues.CopyItems(gridOperators.Values);
 
         #endregion
 
@@ -1896,8 +1330,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorAdminStatusTypes>>>> GridOperatorsAdminStatus
 
-            => gridOperators.Values.
-                   Select(emp => new KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorAdminStatusTypes>>>(emp.Id, emp.AdminStatusSchedule()));
+            => ImmutablePOIValues.CopyItems(gridOperators.Values.
+                   Select(emp => new KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorAdminStatusTypes>>>(emp.Id, emp.AdminStatusSchedule())));
 
         #endregion
 
@@ -1908,60 +1342,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorStatusTypes>>>> GridOperatorsStatus
 
-            => gridOperators.Values.
-                   Select(emp => new KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorStatusTypes>>>(emp.Id, emp.StatusSchedule()));
+            => ImmutablePOIValues.CopyItems(gridOperators.Values.
+                   Select(emp => new KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorStatusTypes>>>(emp.Id, emp.StatusSchedule())));
 
         #endregion
 
-
-        #region CreateNewGridOperator(GridOperatorId, Configurator = null)
-
-        /// <summary>
-        /// Create and register a new e-mobility (service) provider having the given
-        /// unique smart city identification.
-        /// </summary>
-        /// <param name="GridOperatorId">The unique identification of the new smart city.</param>
-        /// <param name="Name">The official (multi-language) name of the smart city.</param>
-        /// <param name="Description">An optional (multi-language) description of the smart city.</param>
-        /// <param name="Configurator">An optional delegate to configure the new smart city before its successful creation.</param>
-        /// <param name="OnSuccess">An optional delegate to configure the new smart city after its successful creation.</param>
-        /// <param name="OnError">An optional delegate to be called whenever the creation of the smart city failed.</param>
-        public GridOperator? CreateNewGridOperator(GridOperator_Id                           GridOperatorId,
-                                                   I18NString?                               Name                       = null,
-                                                   I18NString?                               Description                = null,
-                                                   GridOperatorPriority?                     Priority                   = null,
-                                                   GridOperatorAdminStatusTypes              AdminStatus                = GridOperatorAdminStatusTypes.Available,
-                                                   GridOperatorStatusTypes                   Status                     = GridOperatorStatusTypes.Available,
-                                                   Action<GridOperator>?                     Configurator               = null,
-                                                   Action<GridOperator>?                     OnSuccess                  = null,
-                                                   Action<RoamingNetwork, GridOperator_Id>?  OnError                    = null)
-        {
-
-            var gridOperator = new GridOperator(
-                                   GridOperatorId,
-                                   this,
-                                   Name,
-                                   Description,
-                                   Priority,
-                                   AdminStatus,
-                                   Status
-                               );
-
-
-            if (gridOperators.TryAdd(gridOperator.Id, gridOperator))
-            {
-
-                // Link events!
-
-                return gridOperator;
-
-            }
-
-            return null;
-
-        }
-
-        #endregion
 
         #region ContainsGridOperator(GridOperator)
 
@@ -2004,28 +1389,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region RemoveGridOperator(GridOperatorId)
-
-        public GridOperator? RemoveGridOperator(GridOperator_Id GridOperatorId)
-        {
-
-            if (gridOperators.TryRemove(GridOperatorId, out var gridOperator))
-                return gridOperator;
-
-            return null;
-
-        }
-
-        #endregion
-
-        #region TryRemoveGridOperator(GridOperatorId, out GridOperator)
-
-        public Boolean TryRemoveGridOperator(GridOperator_Id                        GridOperatorId,
-                                             [NotNullWhen(true)] out GridOperator?  GridOperator)
-
-            => gridOperators.TryRemove(GridOperatorId, out GridOperator);
-
-        #endregion
 
         #endregion
 
@@ -2041,7 +1404,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<ParkingOperator> ParkingOperators
 
-            => parkingOperators.Values;
+            => ImmutablePOIValues.CopyItems(parkingOperators.Values);
 
         #endregion
 
@@ -2053,9 +1416,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorAdminStatusTypes>>>> ParkingOperatorAdminStatus
 
-            => parkingOperators.Values.
+            => ImmutablePOIValues.CopyItems(parkingOperators.Values.
                    Select(pop => new KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorAdminStatusTypes>>>(pop.Id,
-                                                                                                                                 pop.AdminStatusSchedule()));
+                                                                                                                                 pop.AdminStatusSchedule())));
 
         #endregion
 
@@ -2066,75 +1429,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorStatusTypes>>>> ParkingOperatorStatus
 
-            => parkingOperators.Values.
+            => ImmutablePOIValues.CopyItems(parkingOperators.Values.
                    Select(pop => new KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorStatusTypes>>>(pop.Id,
-                                                                                                                            pop.StatusSchedule()));
-
-        #endregion
-
-
-        #region CreateNewParkingOperator(Id, Name = null, Description = null, Configurator = null, OnSuccess = null, OnError = null)
-
-        /// <summary>
-        /// Create and register a new parking operator having the given
-        /// unique parking operator identification.
-        /// </summary>
-        /// <param name="Id">The unique identification of the new parking operator.</param>
-        /// <param name="Name">The official (multi-language) name of the parking operator.</param>
-        /// <param name="Description">An optional (multi-language) description of the parking operator.</param>
-        /// <param name="Configurator">An optional delegate to configure the new parking operator before its successful creation.</param>
-        /// <param name="OnSuccess">An optional delegate to configure the new parking operator after its successful creation.</param>
-        /// <param name="OnError">An optional delegate to be called whenever the creation of the parking operator failed.</param>
-        public ParkingOperator? CreateNewParkingOperator(ParkingOperator_Id                           Id,
-                                                         I18NString?                                  Name                           = null,
-                                                         I18NString?                                  Description                    = null,
-                                                         ParkingOperatorAdminStatusTypes?             InititalAdminStatus            = ParkingOperatorAdminStatusTypes.Operational,
-                                                         ParkingOperatorStatusTypes?                  InititalStatus                 = ParkingOperatorStatusTypes.Available,
-                                                         Action<ParkingOperator>?                     OnSuccess                      = null,
-                                                         Action<RoamingNetwork, ParkingOperator_Id>?  OnError                        = null)
-
-        {
-
-            var parkingOperator = new ParkingOperator(Id,
-                                                      this,
-                                                      Name,
-                                                      Description,
-                                                      InititalAdminStatus,
-                                                      InititalStatus);
-
-
-            if (parkingOperators.TryAdd(parkingOperator.Id, parkingOperator))
-                return parkingOperator;
-
-            return null;
-
-        }
-
-        #endregion
-
-        #region CreateParkingSpace(ParkingSpaceId, Configurator = null, OnSuccess = null, OnError = null)
-
-        /// <summary>
-        /// Create and register a new parking space having the given
-        /// unique parking space identification.
-        /// </summary>
-        /// <param name="ParkingSpaceId">The unique identification of the new charging pool.</param>
-        /// <param name="Configurator">An optional delegate to configure the new charging pool before its successful creation.</param>
-        /// <param name="OnSuccess">An optional delegate to configure the new charging pool after its successful creation.</param>
-        /// <param name="OnError">An optional delegate to be called whenever the creation of the charging pool failed.</param>
-        public ParkingSpace CreateParkingSpace(ParkingSpace_Id                                    ParkingSpaceId,
-                                               Action<ParkingSpace>?                              Configurator   = null,
-                                               Action<ParkingSpace>?                              OnSuccess      = null,
-                                               Action<ChargingStationOperator, ParkingSpace_Id>?  OnError        = null)
-        {
-
-            var parkingSpace = new ParkingSpace(ParkingSpaceId);
-
-            Configurator?.Invoke(parkingSpace);
-
-            return parkingSpace;
-
-        }
+                                                                                                                            pop.StatusSchedule())));
 
         #endregion
 
@@ -2180,28 +1477,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region RemoveParkingOperator(ParkingOperatorId)
-
-        public ParkingOperator? RemoveParkingOperator(ParkingOperator_Id ParkingOperatorId)
-        {
-
-            if (parkingOperators.TryRemove(ParkingOperatorId, out var parkingOperator))
-                return parkingOperator;
-
-            return null;
-
-        }
-
-        #endregion
-
-        #region TryRemoveParkingOperator(ParkingOperatorId, out ParkingOperator)
-
-        public Boolean TryRemoveParkingOperator(ParkingOperator_Id                        ParkingOperatorId,
-                                                [NotNullWhen(true)] out ParkingOperator?  ParkingOperator)
-
-            => parkingOperators.TryRemove(ParkingOperatorId, out ParkingOperator);
-
-        #endregion
 
         #endregion
 
@@ -2349,14 +1624,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                          );
 
-            return CustomRoamingNetworkSerializer is not null
+            return POIRepresentation.AddETags(this, CustomRoamingNetworkSerializer is not null
                        ? CustomRoamingNetworkSerializer(this, JSON)
-                       : JSON;
+                       : JSON);
 
         }
 
         #endregion
-
 
 
         #region (private) LogEvent(Logger, LogHandler, ...)
@@ -2377,7 +1651,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    );
 
         #endregion
-
 
 
         #region Operator overloading

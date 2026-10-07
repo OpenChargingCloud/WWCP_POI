@@ -11,16 +11,29 @@ A `RoamingNetworkChangeSet` is an immutable, ordered batch:
 | `Id` | Application-supplied identifier for this batch |
 | `RoamingNetworkId` | Target network's domain identifier |
 | `BaseRevision` | Exact revision of the source snapshot |
+| `BeforeETags` | Required `ImmutableArray<ETag>` of JSON and CBOR source content identifiers |
+| `AfterETags` | Required `ImmutableArray<ETag>` of JSON and CBOR result identifiers after timestamp updates |
 | `CreatedAt` | Timestamp used for changed entities and their ancestors |
 | `Changes` | Immutable operation array; an initialized empty array is valid |
-| `Signature` | Optional `Algorithm`, `KeyId`, `Value` envelope |
+| `Description` | Immutable language-to-text map, signed commit descriptions; `{}` when empty |
+| `Metadata` | Immutable string-to-JSON-value map, signed application metadata; `{}` when empty |
+| `Signatures` | Immutable array of equal peer envelopes (`Algorithm`, `KeyId`, `Value`, `Profile`, `Encoding`); `[]` when unsigned |
 
 An operation specifies `Kind`, `EntityType`, `EntityId` and operation-specific values.
 Entity type names match `InfrastructureEntityType` exactly, including case. Property names
 are the JSON contract's names, not necessarily the corresponding C# property names.
 
 The constructors check operation shape and clone JSON payloads. Entity existence, valid domain
-IDs, ownership and business data are checked when the batch is applied.
+IDs, ownership and business data are checked when the batch is prepared or applied. Both ETag
+arrays contain exactly one initialized JSON `ETag` followed by one CBOR `ETag`, both SHA-256.
+Each readonly value stores typed format/algorithm and immutable digest bytes. JSON uses
+`["json", "sha256", "hex", "<64 lowercase hex digits>"]` and the corresponding `"cbor"` tuple;
+CBOR ETags use a digest byte string. Packed text is available through `ToString()` for logging.
+Missing, reordered, default or malformed entries are rejected.
+JSON's fourth field contains the digest encoded according to the explicit third field: `hex`
+or `base64`. HEX is the default output; Base64 uses the standard alphabet and canonical padding.
+The applier compares decoded digest bytes, so changing that transport encoding preserves the
+same source/result identity. Unknown encodings and unlabelled JSON tuples are rejected.
 
 ## 1. Read the authoritative source
 
@@ -37,7 +50,8 @@ var oldPower = evse.Properties["maxPower"];
 ```
 
 Capture the source snapshot once when preparing a batch. Derive its old values and
-`BaseRevision` from that same snapshot.
+`BaseRevision` and `BeforeETags` from that same snapshot. `snapshot.CreateChangeSet` does this
+automatically and computes `AfterETags` from a locally derived, validated result.
 
 ## 2. Update a property
 
@@ -47,25 +61,60 @@ var update = RoamingNetworkChange.UpdateProperty(
     entityId: "DE*ABC*E1",
     propertyName: "maxPower",
     oldValue: oldPower,
-    newValue: JsonSerializer.SerializeToElement(150_000m));
+    newValue: JsonSerializer.SerializeToElement("150 kW"));
 
-var batch = new RoamingNetworkChangeSet(
+var batch = snapshot.CreateChangeSet(
     id: "power-update-1",
-    roamingNetworkId: network.Id.ToString(),
-    baseRevision: snapshot.Revision,
     createdAt: DateTimeOffset.UtcNow,
     changes: [update]);
 
 var next = network.ApplyChangeSet(batch);
 ```
 
+Preparation returns an unsigned, content-bound batch without publishing a network version.
+It validates all operations and supplies the target ID, base revision and both ETag arrays.
+`network.CreateChangeSet(...)` is the convenience entry point using `network.DataSnapshot`.
+Invalid operations fail during preparation with the same operation context as application.
+
+To receive a batch, deserialize it and call `ApplyChangeSet`; do not recompute or overwrite its
+declared ETags on the receiving server. To sign a prepared batch, add descriptions/metadata with
+`batch.WithDescription(...)`/`WithMetadata(...)`, then use `Sign` or `TrySign`. Every sign call appends
+an equal peer signature over the full batch, commit metadata and its own signing header.
+`WithSignature(envelope)` can append an external signature. See [the signing profile](SIGNATURES.md).
+
+The constructor remains available when expected states are already known:
+
+```csharp
+var received = new RoamingNetworkChangeSet(
+    batch.Id, batch.RoamingNetworkId, batch.BaseRevision, batch.CreatedAt,
+    batch.Changes, batch.BeforeETags, batch.AfterETags,
+    batch.Signatures, batch.Description, batch.Metadata);
+```
+
+Every constructed batch requires both ETag arrays. JSON additionally requires `Description`,
+`Metadata` and `Signatures` properties, which can be empty. Signature arrays cannot contain null.
+Unknown top-level ChangeSet/signature-envelope JSON fields are rejected by System.Text.Json;
+application extension fields belong in `Metadata`. The singular `Signature` field is not supported.
+
 `OldValue` is optional. Passing C# `null` skips its precondition. When supplied, the applier
-checks the currently stored JSON value using `JsonElement.DeepEquals`; status values are first
-normalized by the status-property reader.
+checks the currently stored JSON value using `JsonElement.DeepEquals`; status values and supported
+metrological quantities are first normalized. Equivalent units such as `"150000 W"` and `"150 kW"`
+therefore compare equally. Quantities require unit-bearing strings; numbers and unitless strings
+are rejected. Quantities in complete Remove preconditions are normalized recursively.
 
 `UpdateProperty` replaces a complete top-level property. It is not a JSON Pointer/path operation.
 For example, update a tariff's `elements` array to change one price component, or replace an EVSE's
-`energyMeter` object to change its transparency-software status.
+`energyMeter` object to change its transparency-software status. For a station, replace its
+complete `energyMeters` array to add/remove meters, edit their roles or change their transparency
+information. Pools support the same property. Use an empty array to remove all directly owned meters. This array is an
+owner property; meters do not introduce separate ChangeSet entity types. An explicit replacement
+keeps the supplied meter statuses; unrelated changes preserve independent copies of current
+meter status histories in the derived network version.
+
+A pool's optional `gridConnectionPoint` is also replaced as a complete property. Its grid
+operator is mandatory; its meter is optional. JSON null removes the connection point.
+An explicit replacement keeps the supplied operator/meter statuses. They remain mutable at
+runtime and are independently captured for unrelated ChangeSets, without changing POI timestamps.
 
 ### Missing values and explicit null
 
@@ -92,7 +141,7 @@ var stationDocument = JsonSerializer.Deserialize<JsonElement>("""
         {
           "@id": "DE*ABC*E2",
           "currentType": [ "DC" ],
-          "maxPower": 200000,
+          "maxPower": "200 kW",
           "socketOutlets": [ { "@id": "1", "type": "CCS" } ]
         }
       ]
@@ -106,9 +155,7 @@ var add = RoamingNetworkChange.Add(
     parentEntityType: "ChargingPool",
     parentEntityId: "DE*ABC*P1");
 
-var addition = new RoamingNetworkChangeSet(
-    "station-add-1", network.Id.ToString(), snapshot.Revision,
-    DateTimeOffset.UtcNow, [add]);
+var addition = snapshot.CreateChangeSet("station-add-1", DateTimeOffset.UtcNow, [add]);
 
 var extended = network.ApplyChangeSet(addition);
 ```
@@ -125,9 +172,7 @@ connectors and tariffs require explicit parent type/ID when added. The root netw
 ```csharp
 var remove = RoamingNetworkChange.Remove("ChargingStation", "DE*ABC*S1");
 
-var removal = new RoamingNetworkChangeSet(
-    "station-remove-1", network.Id.ToString(), snapshot.Revision,
-    DateTimeOffset.UtcNow, [remove]);
+var removal = snapshot.CreateChangeSet("station-remove-1", DateTimeOffset.UtcNow, [remove]);
 
 var reduced = network.ApplyChangeSet(removal);
 ```
@@ -190,6 +235,16 @@ Use the status vocabulary accepted by the target entity's parser. `status` and `
 require an object containing `value` and `timestamp`. The status timestamp describes when the
 status takes effect; the batch's `CreatedAt` describes the change's entity metadata.
 
+Status updates also remain available directly on domain objects through `Status`, `AdminStatus`
+and schedule methods. Those runtime updates do not change the immutable baseline, its revision
+or static timestamps. A status operation in a ChangeSet explicitly versions that status value;
+old-value checks compare the stored baseline, not the live runtime status.
+
+`RoamingNetwork.ApplyChangeSet()` carries the current runtime histories and measurements into
+independent objects in the new version. They are captured when the call runs, even if the new
+hierarchy is materialized later. Explicit status/admin-status operations override the corresponding
+copied history. Added or removed/readded subtrees start with their supplied status values.
+
 ## Ordering, conflicts and errors
 
 Operations observe preceding operations in the same batch. This makes a two-step property update,
@@ -212,7 +267,7 @@ else
 
 Use `ApplyChangeSet()` and catch `RoamingNetworkChangeSetException` when structured error details
 are needed. `ChangeSetId` identifies the rejected batch; `OperationIndex` identifies the zero-based
-operation, or is null for target/revision/signature failures.
+operation, or is null for target/revision/signature/content-identifier failures.
 
 The library does not keep a global current head, deduplicate ChangeSet IDs or automatically retry
 stale batches. Replaying the same batch on the same immutable source can derive another successor.
@@ -222,6 +277,127 @@ Applications should coordinate their current-head update, for example within a l
 transaction, and decide how to rebuild or reject stale operations. Two branches can have equal
 revision numbers; they are not interchangeable solely because those numbers match.
 
+### Before and after content checks
+
+Application checks the target, exact revision and `BeforeETags` before invoking a supplied
+signature verifier or applying any operations. Every signature is passed to the per-peer verifier;
+any failure aborts the batch. It then derives the candidate on immutable maps,
+updates managed timestamps/revision and checks **both** `AfterETags` before returning it.
+A mismatch raises a batch-level `RoamingNetworkChangeSetException` with `OperationIndex == null`
+and an error naming `BeforeETags` or `AfterETags`, with the expected and actual identifier.
+`TryApplyChangeSet` returns false and no successor. There is no public unchecked apply mode.
+
+The identifiers describe the [static POI profile](ETAGS-CBOR.md), including owned children and
+static metadata. Runtime statuses and revision bookkeeping are excluded. Direct runtime updates
+therefore retain these identifiers. Status ChangeSets also touch `lastChange`, which participates
+in the digest. Empty batches still advance the revision and touch the root; if content and its
+timestamp remain identical, the ETags can remain identical as well.
+
+Missing timestamps on newly added nodes and nested POI replacements are filled deterministically
+using `CreatedAt`, preserving supplied timestamps; a supplied creation/change timestamp supplies
+its missing counterpart for nested values. No replica's local clock supplies hashed defaults.
+Receiver-side old-value checks still apply, including explicit status preconditions whose runtime
+values are outside the ETag profile. Content hashes establish data agreement; signatures and
+authorization establish which sender may request that transition. History/replay persistence is
+the application's responsibility.
+
+Preparation and application hash the complete canonical POI projection; this is an additional
+whole-hierarchy cost alongside the persistent map updates. Snapshot ETags are computed once
+on first access and cached safely for concurrent readers.
+
+## Merging concurrent batches
+
+Use `source.TryMerge(left, right, out mergedChangeSet, out result, ...)` on the **common source**
+snapshot. The network convenience method delegates to `network.DataSnapshot`. The method returns
+true when the requested check/preparation succeeds. In the default preview mode, a true return
+still leaves `mergedChangeSet == null`: inspect `result.Status`, `RequiresExplicitMerge` and
+`Message`, then let the application/user explicitly choose whether to prepare the merge.
+
+```csharp
+var left = snapshot.CreateChangeSet("branch-a", timestampA,
+    [RoamingNetworkChange.UpdateProperty(
+        "EVSE", "DE*ABC*E1", "maxPower", oldPower,
+        JsonSerializer.SerializeToElement("150 kW"))]);
+var right = snapshot.CreateChangeSet("branch-b", timestampB,
+    [RoamingNetworkChange.UpdateProperty(
+        "EVSE", "DE*ABC*E1", "physicalReference", null,
+        JsonSerializer.SerializeToElement("Bay 7"))]);
+
+if (snapshot.TryMerge(left, right, out _, out var preview))
+    Console.WriteLine(preview.Message);
+
+// Explicit preparation after the application/user accepts that notice:
+if (snapshot.TryMerge(left, right, out var merged, out var report,
+                      merge: true, mergedChangeSetId: "merge-a-b"))
+{
+    var combined = snapshot.ApplyChangeSet(merged!);
+    // Revision increases once. BeforeETags = common source; AfterETags = combined result.
+}
+else
+{
+    foreach (var issue in report.Issues)
+        Console.WriteLine($"{issue.ChangeSetId} / {issue.OperationIndex}: {issue.Message}");
+}
+```
+
+### Checks and result
+
+1. Apply each incoming batch independently against the source on unpublished immutable maps.
+   Network/revision, both source/result ETag pairs, signatures, operations and domain constraints
+   must pass. An invalid batch gives `InvalidInput`. Signed inputs require `verifySignature(batch, signature)`
+   for every peer; one failure rejects the merge.
+2. Execute left then right, and right then left, preserving each batch's operation order and
+   original old-value preconditions. Both local candidates use one fixed merge timestamp.
+3. Compare entity membership, ancestry, children and **all** stored properties using
+   `JsonElement.DeepEquals`. This includes frozen runtime values excluded from ETags.
+   Failed operations or different outcomes give `Conflicts`.
+4. Preview returns `MergeAvailable`, `RequiresExplicitMerge == true` and no batch. Explicit
+   preparation (`merge: true`) additionally requires a nonempty new `mergedChangeSetId`, distinct
+   from both input IDs. It returns `Merged` and a new unsigned, content-bound ChangeSet.
+
+`result.Issues` is immutable. Failed operations carry the original `ChangeSetId` and zero-based
+`OperationIndex`, plus the entity/property when available; their message identifies the attempted
+order. Differing results identify the entity and affected property or structural relation.
+No failure returns a partial batch or edits the source. `CanMerge` describes success for the
+requested mode; an invalid requested ID gives `InvalidInput` even if the operations are compatible.
+
+### Conflict granularity and timestamps
+
+Updates of distinct properties on the same entity can merge. Differing unconditional writes to
+the same property produce different outcomes and are rejected. A deletion versus a descendant
+update/addition, duplicate additions, wrong ancestry, stale old values or broken tariff references
+fail operation validation. Connector scope uses domain key equality, so two local connector IDs
+under different EVSEs are independent.
+
+Nested values remain atomic properties: two replacements of `energyMeters`, `gridConnectionPoint`,
+`elements`, `customData` or a multilingual `name` are not recursively combined. This is a
+conservative merge of unchanged operations: no precondition rebasing, operation deduplication,
+winning-writer policy or automatic conflict resolution occurs. Even two identical conditional
+writes can conflict when the second still expects the original old value. A combination requiring
+one particular order is reported rather than silently reordered.
+
+The timestamp defaults deterministically to the later input `CreatedAt`; pass `createdAt` to
+choose another fixed timestamp. Preview and preparation should use the same timestamp. Changed
+entities/ancestors use it, and omitted metadata on additions/nested replacements defaults to it.
+Explicitly supplied creation timestamps are preserved. A precondition depending on an input
+batch's timestamp can therefore fail under a different merge timestamp and is reported.
+
+The output concatenates left operations then right operations, keeps the common source revision
+and `BeforeETags`, and calculates fresh JSON/CBOR `AfterETags` from the combined candidate. It has
+no signature: verified source signatures authenticate the source batches, not this new header and
+result. The merged batch starts with empty descriptions/metadata and signatures; add its own commit
+metadata and append new signatures using `Sign` when required. Original commit metadata remains
+on the input batches retained by the application. Swapping the arguments yields
+the same checked content at the same merge timestamp, although the operation order and batch
+identity can differ.
+
+Apply the merged batch to the common source, yielding revision `source.Revision + 1`. It is not
+a patch for either already-applied branch successor, and there is no implicit current-head update.
+Applications must coordinate publication and store both input batches and the merge relationship
+for an audit history; the output batch does not contain a commit ancestry graph. Direct runtime
+updates after snapshot capture remain outside this check. Network application carries those live
+histories into the new version using its existing runtime-state rules.
+
 ## Editable fields and persistence
 
 The complete allowlist is in
@@ -229,8 +405,8 @@ The complete allowlist is in
 Common editable fields include name, description, source, custom data and current statuses.
 Additional fields depend on the entity type.
 
-IDs, parent links, child collections, `created`, `lastChange`, `revision` and
-`appliedChangeSetId` are managed through operations and cannot be changed as top-level properties.
+IDs, parent links, child collections, `created`, `lastChange`, `revision`, `appliedChangeSetId`
+and derived `ETags` are managed through operations and cannot be changed as top-level properties.
 Nested owner properties are validated as complete replacements.
 
 
@@ -244,17 +420,18 @@ The following fields are additional; connectors use only their listed fields.
 | --- | --- |
 | RoamingNetwork | `dataLicenses`, `dataLicenseIds` |
 | ChargingStationOperator | `address`, `logos`, `homepage`, `hotline`, `brands`, `dataLicenses`, `dataLicenseIds` |
-| EMobilityProvider | `address`, `logos`, `homepage`, `hotline`, `dataLicenses`, `dataLicenseIds` |
-| ChargingPool | `address`, `geoLocation`, `locationType`, `accessibility`, `authenticationModes`, `hotlinePhoneNumber`, `openingTimes`, `brands`, `dataLicenses`, `dataLicenseIds` |
-| ChargingStation | `address`, `geoLocation`, `authenticationModes`, `hotlinePhoneNumber`, `openingTimes`, `isFreeOfCharge`, `brands`, `dataLicenses`, `dataLicenseIds` |
-| EVSE | `physicalReference`, `geoLocation`, `brand`, `isFreeOfCharge`, `chargingModes`, `currentType`, `averageVoltage`, `maxCurrent`, `maxPower`, `maxCapacity`, `energyMeter`, `dataLicenses`, `dataLicenseIds`, `tariffIds` |
-| ChargingTariff | `elements`, `currency`, `brand`, `URI`, `energy_mix` |
+| EMobilityProvider | `address`, `logos`, `homepage`, `hotline`, `priority`, `dataLicenses`, `dataLicenseIds` |
+| ChargingPool | `address`, `geoLocation`, `locationType`, `accessibility`, `authenticationModes`, `hotlinePhoneNumber`, `openingTimes`, `timeZone`, `chargingWhenClosed`, `locationLanguages`, `facilities`, `services`, `relatedLocations`, `mobilityRootCAs`, `evRoamingPartners`, `brands`, `dataLicenses`, `dataLicenseIds`, `energyMeters`, `gridConnectionPoint` |
+| ChargingStation | `address`, `geoLocation`, `authenticationModes`, `hotlinePhoneNumber`, `openingTimes`, `isFreeOfCharge`, `chargingWhenClosed`, `accessibility`, `locationLanguage`, `physicalReference`, `paymentOptions`, `features`, `vehicleTypes`, `images`, `serviceIdentification`, `modelCode`, `published`, `disabled`, `mobilityRootCAs`, `evRoamingPartners`, `certificationInfo`, `calibrationInfo`, `brands`, `dataLicenses`, `dataLicenseIds`, `energyMeters` |
+| EVSE | `physicalReference`, `geoLocation`, `brand`, `isFreeOfCharge`, `chargingModes`, `currentType`, `maxVoltage`, `maxCurrent`, `maxPower`, `maxCapacity`, `energyMeter`, `photoURLs`, `mobilityRootCAs`, `energyMix`, `calibrationInfo`, `dataLicenses`, `dataLicenseIds`, `tariffIds` |
+| ChargingTariff | `elements`, `currency`, `brand`, `uri`, `energyMix` |
 | ChargingConnector | `type`, `cable`, `lockable`, `tariffIds`, `termsAndConditions` |
 
 The allowlist controls which fields may be addressed; the entity's parser still controls accepted
 values. Being listed does not make a mandatory field nullable or permit an invalid nested value.
 
-Persist the version with `ToJSONSnapshot()` or `DataSnapshot.WriteTo()`. Persist ChangeSets
+Persist the static version and current statuses with `ToJSONSnapshot()`, or the frozen baseline
+with `DataSnapshot.WriteTo()`. Persist ChangeSets
 separately if the application needs a history. The snapshot stores only the latest
 `AppliedChangeSetId`; it does not retain the batches that created earlier versions.
 

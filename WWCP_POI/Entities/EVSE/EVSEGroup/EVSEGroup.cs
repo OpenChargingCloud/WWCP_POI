@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 
 using Newtonsoft.Json.Linq;
 
@@ -69,7 +70,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     //    public AutoIncludeMemberIds(IEnumerable<ChargingStation_Id> AllowedMemberIds)
     //    {
 
-    //        this._AllowedMemberIds = new List<ChargingStation_Id>(AllowedMemberIds);
+    //        this._AllowedMemberIds = (MemberIds ?? []).ToImmutableHashSet();
 
     //    }
 
@@ -78,7 +79,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     //}
-
 
 
     /// <summary>
@@ -108,7 +108,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    ? null
 
-                   : JSONObject.Create(
+                   : POIRepresentation.AddETags(EVSEGroup, JSONObject.Create(
 
                          new JProperty("@id", EVSEGroup.Id.ToString()),
 
@@ -189,7 +189,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                        Select (evse   => evse.  ToJSON(Embedded: true)))
                                                      : null))
 
-                        );
+                        ));
 
         #endregion
 
@@ -258,7 +258,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A group of EVSEs.
     /// </summary>
-    public class EVSEGroup : AEMobilityEntity<EVSEGroup_Id,
+    public sealed partial class EVSEGroup : AImmutableEMobilityEntity<EVSEGroup_Id,
                                               EVSEGroupAdminStatusTypes,
                                               EVSEGroupStatusTypes>,
                              IEquatable<EVSEGroup>, IComparable<EVSEGroup>, IComparable,
@@ -284,22 +284,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The official (multi-language) name of this group.
         /// </summary>
-        [Mandatory]
-        public I18NString               Name           { get; }
+
 
         /// <summary>
         /// An optional (multi-language) description of this group.
         /// </summary>
-        [Optional]
-        public I18NString               Description    { get; }
-
 
 
         /// <summary>
         /// An optional (multi-language) brand name for this group.
         /// </summary>
-        [Optional]
-        public Brand                    Brand          { get; }
+        private readonly Brand? brand;
+        public Brand? Brand => ImmutablePOIValues.Copy(brand);
 
         /// <summary>
         /// The priority of this group relative to all other groups.
@@ -314,19 +310,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region DataLicense
 
-        private ReactiveSet<DataLicense> _DataLicenses;
 
         /// <summary>
         /// The license of the group data.
         /// </summary>
-        [Optional]
-        public IEnumerable<DataLicense> DataLicenses { get; }
+        private readonly ImmutableArray<DataLicense> dataLicenses;
+        public IEnumerable<DataLicense> DataLicenses => ImmutablePOIValues.CopyItems(dataLicenses);
 
         #endregion
 
 
-
-        private HashSet<EVSE_Id> _AllowedMemberIds;
+        private readonly ImmutableHashSet<EVSE_Id> _AllowedMemberIds;
 
         public IEnumerable<EVSE_Id> AllowedMemberIds
             => _AllowedMemberIds;
@@ -338,7 +332,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region EVSEs
 
-        private readonly ConcurrentDictionary<EVSE_Id, EVSE> _EVSEs;
+        private readonly ImmutableDictionary<EVSE_Id, EVSE> _EVSEs;
 
         /// <summary>
         /// Return all EVSEs registered within this EVSE group.
@@ -449,6 +443,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        public EVSEGroup WithMembers(IEnumerable<EVSE> members)
+        {
+            var values = members.ToImmutableArray();
+            var copy = new EVSEGroup(Id, Operator, Name, Description, Brand, Priority, Tariff, DataLicenses,
+                                  Members: values, MemberIds: values.Select(value => value.Id), AutoIncludeEVSEIds: _ => true, AutoIncludeEVSEs: _ => true,
+                                  StatusAggregationDelegate: StatusAggregationDelegate,
+                                  MaxGroupStatusListSize: statusSchedule.MaxStatusHistorySize,
+                                  MaxGroupAdminStatusListSize: adminStatusSchedule.MaxStatusHistorySize);
+            copy.SetAdminStatus(AdminStatusSchedule());
+            copy.SetStatus(StatusSchedule());
+            copy.RestoreSnapshotTimestamps(Created, Timestamp.Now);
+            return copy;
+        }
+        public EVSEGroup WithMember(EVSE member)
+            => WithMembers(EVSEs.Where(value => value.Id != member.Id).Append(member));
+        public EVSEGroup WithoutMember(EVSE_Id id)
+            => WithMembers(EVSEs.Where(value => value.Id != id));
+
         #region Constructor(s)
 
         /// <summary>
@@ -458,22 +471,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Operator">The charging station operator of this EVSE group.</param>
         /// <param name="Name">The official (multi-language) name of this EVSE group.</param>
         /// <param name="Description">An optional (multi-language) description of this EVSE group.</param>
-        /// 
+        ///
         /// <param name="Members">An enumeration of charging stations member building this EVSE group.</param>
         /// <param name="MemberIds">An enumeration of charging station identifications which are building this EVSE group.</param>
         /// <param name="AutoIncludeStations">A delegate deciding whether to include new charging stations automatically into this group.</param>
-        /// 
+        ///
         /// <param name="StatusAggregationDelegate">A delegate called to aggregate the dynamic status of all subordinated charging stations.</param>
         /// <param name="MaxGroupStatusListSize">The default size of the EVSE group status list.</param>
         /// <param name="MaxGroupAdminStatusListSize">The default size of the EVSE group admin status list.</param>
-        internal EVSEGroup(EVSEGroup_Id                                  Id,
+        public EVSEGroup(EVSEGroup_Id                                  Id,
                            ChargingStationOperator                       Operator,
                            I18NString                                    Name,
-                           I18NString                                    Description                   = null,
+                           I18NString?                                    Description                   = null,
 
-                           Brand                                         Brand                         = null,
+                           Brand?                                         Brand                         = null,
                            Priority?                                     Priority                      = null,
-                           ChargingTariff                                Tariff                        = null,
+                           ChargingTariff?                                Tariff                        = null,
                            IEnumerable<DataLicense>                  DataLicenses                  = null,
 
                            IEnumerable<EVSE>                             Members                       = null,
@@ -485,7 +498,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            UInt16                                        MaxGroupStatusListSize        = DefaultMaxGroupStatusListSize,
                            UInt16                                        MaxGroupAdminStatusListSize   = DefaultMaxGroupAdminStatusListSize)
 
-            : base(Id)
+            : base(Id, Name, Description, MaxAdminStatusScheduleSize: MaxGroupAdminStatusListSize, MaxStatusScheduleSize: MaxGroupStatusListSize)
 
         {
 
@@ -502,18 +515,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region Init data and properties
 
             this.Operator                    = Operator;
-            this.Name                        = Name;
-            this.Description                 = Description ?? new I18NString();
 
-            this.Brand                       = Brand;
+
+            this.brand = ImmutablePOIValues.Copy(Brand);
             this.Priority                    = Priority;
             this.Tariff                      = Tariff;
-            this.DataLicenses                = DataLicenses?.Any() == true ? new ReactiveSet<DataLicense>(DataLicenses) : new ReactiveSet<DataLicense>();
+            this.dataLicenses = ImmutablePOIValues.CopyItems(DataLicenses);
 
-            this._AllowedMemberIds           = MemberIds is not null ? new HashSet<EVSE_Id>(MemberIds) : new HashSet<EVSE_Id>();
+            var candidates = (Members ?? []).ToImmutableArray();
+            this._AllowedMemberIds = (MemberIds ?? candidates.Select(candidate => candidate.Id)).ToImmutableHashSet();
+            if (Id.OperatorId != Operator.Id || _AllowedMemberIds.Any(id => id.OperatorId != Operator.Id) ||
+                Tariff is not null && Tariff.Operator.Id != Operator.Id)
+                throw new ArgumentException("Group configuration belongs to a different operator.");
             this.AutoIncludeEVSEIds          = AutoIncludeEVSEIds ?? (MemberIds is null ? (Func<EVSE_Id, Boolean>) (evseid => true) : evseid => false);
-            this.AutoIncludeEVSEs            = AutoIncludeEVSEs   ?? (MemberIds is null ? (Func<EVSE,   Boolean>) (evse   => true) : evse   => false);
-            this._EVSEs                      = new ConcurrentDictionary<EVSE_Id, EVSE>();
+            this.AutoIncludeEVSEs = AutoIncludeEVSEs ?? (_ => true);
+
 
             this.StatusAggregationDelegate   = StatusAggregationDelegate;
 
@@ -551,35 +567,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #endregion
 
 
-            if (Members?.Any() == true)
-                Members.ForEach(evse => Add(evse));
+            foreach (var candidate in candidates)
+                if (candidate.Id.OperatorId != Operator.Id)
+                    throw new ArgumentException("A group member belongs to a different operator.", nameof(Members));
+            this._EVSEs = candidates.Where(candidate =>
+                (MemberIds is null || _AllowedMemberIds.Contains(candidate.Id) || this.AutoIncludeEVSEIds(candidate.Id)) && this.AutoIncludeEVSEs(candidate))
+                .ToImmutableDictionary(candidate => candidate.Id);
 
         }
 
         #endregion
-
-
-        public EVSEGroup Add(EVSE EVSE)
-        {
-
-            if (_AllowedMemberIds.Contains(EVSE.Id) &&
-                AutoIncludeEVSEs(EVSE))
-            {
-                _EVSEs.TryAdd(EVSE.Id, EVSE);
-            }
-
-            return this;
-
-        }
-
-        public EVSEGroup Add(EVSE_Id EVSEId)
-        {
-
-            _AllowedMemberIds.Add(EVSEId);
-
-            return this;
-
-        }
 
 
         #region ContainsEVSE(EVSE)

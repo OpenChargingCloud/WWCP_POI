@@ -29,7 +29,7 @@ using org.GraphDefined.Vanaheimr.Hermod;
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
-    public partial class RoamingNetwork
+    public sealed partial class RoamingNetwork
     {
 
         #region Parse/TryParse JSON text

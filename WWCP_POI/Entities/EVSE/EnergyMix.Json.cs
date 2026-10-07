@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -63,6 +63,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   "energySources", "environmentalImpacts",
                                                   "supplierName", "productName", "additionalRemarks");
 
+                if (JSON["energySources"] is not JArray || JSON["environmentalImpacts"] is not JArray)
+                    throw new ArgumentException("energySources and environmentalImpacts: expected composition arrays; use [] for unknown composition.");
+
                 var sources = InfrastructureJson.Array(JSON, "energySources",
                                                        token => ParsePercentage<EnergySourceCategories>(token, "source", EnergySourceCategories.TryParse));
 
@@ -103,20 +106,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var document = InfrastructureJson.Entry(Token);
 
-            InfrastructureJson.ValidateFields(document, CategoryField, "percent");
+            InfrastructureJson.ValidateFields(document, CategoryField, "percentage");
 
             var text = InfrastructureJson.Text(document, CategoryField);
 
             if (text is null || !CategoryParser(text, out var category))
                 throw new ArgumentException($"{CategoryField}: invalid category.");
 
-            var percent = TariffJson.Decimal(document, "percent") ??
-                          throw new ArgumentException("percent: missing percentage.");
-
-            if (percent < 0 || percent > 100)
-                throw new ArgumentException("percent: expected a value between zero and 100.");
-
-            return new PercentageOf<T>(category, (Single) percent);
+            var percent = MetrologyJson.ReadPercent(document, "percentage");
+            return new PercentageOf<T>(category, percent);
 
         }
 

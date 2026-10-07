@@ -99,7 +99,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A charging station to charge an electric vehicle.
     /// </summary>
-    public partial class ChargingStation : AEMobilityEntity<ChargingStation_Id,
+    public sealed partial class ChargingStation : AImmutableEMobilityEntity<ChargingStation_Id,
                                                     ChargingStationAdminStatusType,
                                                     ChargingStationStatusType>,
                                    IEquatable <ChargingStation>,
@@ -170,20 +170,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// All brands registered for this charging station.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<Brand> immutableBrands = [];
         [Optional, SlowData]
-        public ReactiveSet<Brand>                    Brands                      { get; }
+        public System.Collections.Immutable.ImmutableArray<Brand> Brands
+            => ImmutablePOIValues.CopyItems(immutableBrands);
 
         /// <summary>
         /// All e-mobility related Root-CAs, e.g. ISO 15118-2/-20, available at this charging station.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<RootCAInfo> immutableMobilityRootCAs = [];
         [Optional, SlowData]
-        public IEnumerable<RootCAInfo>               MobilityRootCAs             { get; }
+        public IEnumerable<RootCAInfo> MobilityRootCAs
+        {
+            get => ImmutablePOIValues.CopyItems(immutableMobilityRootCAs);
+            private set => immutableMobilityRootCAs = ImmutablePOIValues.CopyItems(value);
+        }
 
         /// <summary>
         /// An optional enumeration of EV roaming partners.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<EVRoamingPartnerInfo> immutableEVRoamingPartners = [];
         [Optional, SlowData]
-        public IEnumerable<EVRoamingPartnerInfo>     EVRoamingPartners           { get; }
+        public IEnumerable<EVRoamingPartnerInfo> EVRoamingPartners
+        {
+            get => ImmutablePOIValues.CopyItems(immutableEVRoamingPartners);
+            private set => immutableEVRoamingPartners = ImmutablePOIValues.CopyItems(value);
+        }
 
 
         /// <summary>
@@ -200,8 +212,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The license of the charging station data.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<DataLicense> immutableDataLicenses = [];
         [Mandatory, SlowData]
-        public IEnumerable<DataLicense>              DataLicenses                { get; }
+        public IEnumerable<DataLicense> DataLicenses
+        {
+            get => ImmutablePOIValues.CopyItems(immutableDataLicenses);
+            private set => immutableDataLicenses = ImmutablePOIValues.CopyItems(value);
+        }
 
 
         #region Address
@@ -217,22 +234,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return address;
+                return ImmutablePOIValues.Copy(address);
             }
 
-            set
-            {
-
-                if (value is null)
-                    DeleteProperty(ref address);
-
-                else if (value != address &&
-                         value != ChargingPool?.Address)
-                {
-                    SetProperty(ref address, value);
-                }
-
-            }
 
         }
 
@@ -254,18 +258,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return openStreetMapNodeId;
             }
 
-            set
-            {
-
-                if (value is null)
-                    DeleteProperty(ref openStreetMapNodeId);
-
-                else if (value != openStreetMapNodeId)
-                {
-                    SetProperty(ref openStreetMapNodeId, value);
-                }
-
-            }
 
         }
 
@@ -287,19 +279,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return geoLocation;
             }
 
-            set
-            {
-
-                if (value is null)
-                    DeleteProperty(ref geoLocation);
-
-                else if (value != geoLocation &&
-                         value != ChargingPool?.GeoLocation)
-                {
-                    SetProperty(ref geoLocation, value);
-                }
-
-            }
 
         }
 
@@ -319,22 +298,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return entranceAddress;
+                return ImmutablePOIValues.Copy(entranceAddress);
             }
 
-            set
-            {
-
-                if (value is null)
-                    DeleteProperty(ref entranceAddress);
-
-                else if (value != entranceAddress &&
-                         value != ChargingPool?.EntranceAddress)
-                {
-                    SetProperty(ref entranceAddress, value);
-                }
-
-            }
 
         }
 
@@ -357,19 +323,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return entranceLocation;
             }
 
-            set
-            {
-
-                if (value is null)
-                    DeleteProperty(ref entranceLocation);
-
-                else if (value != entranceLocation &&
-                         value != ChargingPool?.EntranceLocation)
-                {
-                    SetProperty(ref entranceLocation, value);
-                }
-
-            }
 
         }
 
@@ -380,33 +333,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional (multi-language) description of how to find the charging station.
         /// </summary>
+        private ImmutableI18NString immutableArrivalInstructions = ImmutableI18NString.Empty;
         [Optional]
-        public I18NString ArrivalInstructions { get; }
+        public ImmutableI18NString ArrivalInstructions
+        {
+            get => ImmutablePOIValues.Copy(immutableArrivalInstructions);
+            private set => immutableArrivalInstructions = ImmutablePOIValues.Copy(value);
+        }
 
         #endregion
 
         #region OpeningTimes
 
-        private OpeningTimes openingTimes;
+        private ImmutableOpeningTimes openingTimes;
 
         /// <summary>
         /// The opening times of this charging station (non recursive).
         /// </summary>
-        public OpeningTimes OpeningTimes
+        public ImmutableOpeningTimes OpeningTimes
         {
 
             get
             {
-                return openingTimes;
+                return ImmutablePOIValues.Copy(openingTimes);
             }
 
-            set
-            {
-                if (value != openingTimes)
-                {
-                    SetProperty(ref openingTimes, value);
-                }
-            }
 
         }
 
@@ -417,8 +368,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Parking spaces located at the charging station.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<ParkingSpace> immutableParkingSpaces = [];
         [Optional]
-        public ReactiveSet<ParkingSpace>                ParkingSpaces           { get; }
+        public System.Collections.Immutable.ImmutableArray<ParkingSpace> ParkingSpaces
+            => ImmutablePOIValues.CopyItems(immutableParkingSpaces);
 
         #endregion
 
@@ -427,8 +380,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// User interface features of the charging station.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<UIFeatures> immutableUIFeatures = [];
         [Optional]
-        public ReactiveSet<UIFeatures>                  UIFeatures              { get; }
+        public System.Collections.Immutable.ImmutableArray<UIFeatures> UIFeatures
+            => ImmutablePOIValues.CopyItems(immutableUIFeatures);
 
         #endregion
 
@@ -437,8 +392,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The authentication options an EV driver can use.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<AuthenticationModes> immutableAuthenticationModes = [];
         [Mandatory]
-        public ReactiveSet<AuthenticationModes>         AuthenticationModes     { get; }
+        public System.Collections.Immutable.ImmutableArray<AuthenticationModes> AuthenticationModes
+            => ImmutablePOIValues.CopyItems(immutableAuthenticationModes);
 
         #endregion
 
@@ -447,8 +404,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The payment options an EV driver can use.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<PaymentOptions> immutablePaymentOptions = [];
         [Mandatory]
-        public ReactiveSet<PaymentOptions>              PaymentOptions          { get; }
+        public System.Collections.Immutable.ImmutableArray<PaymentOptions> PaymentOptions
+            => ImmutablePOIValues.CopyItems(immutablePaymentOptions);
 
         #endregion
 
@@ -472,7 +431,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            set
+            private set
             {
 
                 if (value != accessibility && value != ChargingPool?.Accessibility)
@@ -497,8 +456,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Charging features of the charging station.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<ChargingStationFeature> immutableFeatures = [];
         [Optional]
-        public ReactiveSet<ChargingStationFeature>                    Features                { get; }
+        public System.Collections.Immutable.ImmutableArray<ChargingStationFeature> Features
+            => ImmutablePOIValues.CopyItems(immutableFeatures);
 
         #endregion
 
@@ -507,8 +468,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// URIs of photos of this charging station.
         /// </summary>
+        private System.Collections.Immutable.ImmutableArray<URL> immutablePhotoURLs = [];
         [Optional]
-        public ReactiveSet<URL>                         PhotoURLs               { get; }
+        public System.Collections.Immutable.ImmutableArray<URL> PhotoURLs
+            => ImmutablePOIValues.CopyItems(immutablePhotoURLs);
 
         #endregion
 
@@ -528,13 +491,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return physicalReference;
             }
 
-            set
-            {
-
-                if (physicalReference != value)
-                    SetProperty(ref physicalReference, value);
-
-            }
 
         }
 
@@ -556,13 +512,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return locationLanguage;
             }
 
-            set
-            {
-
-                if (locationLanguage != value)
-                    SetProperty(ref locationLanguage, value);
-
-            }
 
         }
 
@@ -584,21 +533,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return hotlinePhoneNumber;
             }
 
-            set
-            {
-
-                if (hotlinePhoneNumber != value)
-                {
-
-                    if (value is null)
-                        DeleteProperty(ref hotlinePhoneNumber);
-
-                    else
-                        SetProperty(ref hotlinePhoneNumber, value);
-
-                }
-
-            }
 
         }
 
@@ -620,21 +554,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return chargingWhenClosed;
             }
 
-            set
-            {
-
-                if (chargingWhenClosed != value)
-                {
-
-                    if (value is null)
-                        DeleteProperty(ref chargingWhenClosed);
-
-                    else
-                        SetProperty(ref chargingWhenClosed, value);
-
-                }
-
-            }
 
         }
 
@@ -655,10 +574,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return exitAddress ?? ChargingPool?.ExitAddress;
+                return ImmutablePOIValues.Copy(exitAddress ?? ChargingPool?.ExitAddress);
             }
 
-            set
+            private set
             {
 
                 if (value != exitAddress && value != ChargingPool?.ExitAddress)
@@ -699,7 +618,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            set
+            private set
             {
 
                 if (value != exitLocation && value != ChargingPool?.ExitLocation)
@@ -720,9 +639,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        public IEnumerable<Image>                      Images                   { get; }
+        private System.Collections.Immutable.ImmutableArray<Image> immutableImages = [];
+        public IEnumerable<Image> Images
+        {
+            get => ImmutablePOIValues.CopyItems(immutableImages);
+            private set => immutableImages = ImmutablePOIValues.CopyItems(value);
+        }
 
-        public IEnumerable<VehicleType>                VehicleTypes             { get; }
+        private System.Collections.Immutable.ImmutableArray<VehicleType> immutableVehicleTypes = [];
+        public IEnumerable<VehicleType> VehicleTypes
+        {
+            get => ImmutablePOIValues.CopyItems(immutableVehicleTypes);
+            private set => immutableVehicleTypes = ImmutablePOIValues.CopyItems(value);
+        }
 
 
         #region GridConnection
@@ -741,30 +670,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return gridConnection;
             }
 
-            set
-            {
-
-                if (value != gridConnection)
-                {
-
-                    if (value is null)
-                        DeleteProperty(ref gridConnection);
-
-                    else
-                        SetProperty(ref gridConnection, value);
-
-                }
-
-            }
 
         }
 
         #endregion
 
         /// <summary>
-        /// An optional energy meter located at the energy source of this charging station.
+        /// The directly owned energy meters, for example at the grid or photovoltaic connection.
+        /// Membership and POI data are immutable; each meter retains mutable runtime statuses.
         /// </summary>
-        public EnergyMeter?                           UpstreamEnergyMeter      { get; set; }
+        public System.Collections.Immutable.ImmutableArray<EnergyMeter> EnergyMeters { get; }
 
 
         #region MaxCurrent
@@ -783,25 +698,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return maxCurrent;
             }
 
-            set
-            {
-
-                if (value is not null)
-                {
-
-                    if (!maxCurrent.HasValue)
-                        SetProperty(ref maxCurrent,
-                                    value);
-
-                    else if (Math.Abs(maxCurrent.Value - value.Value) > EPSILON)
-                        SetProperty(ref maxCurrent,
-                                    value);
-
-                }
-                else
-                    DeleteProperty(ref maxCurrent);
-
-            }
 
         }
 
@@ -862,25 +758,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return maxPower;
             }
 
-            set
-            {
-
-                if (value is not null)
-                {
-
-                    if (!maxPower.HasValue)
-                        SetProperty(ref maxPower,
-                                    value);
-
-                    else if (Math.Abs(maxPower.Value - value.Value) > EPSILON)
-                        SetProperty(ref maxPower,
-                                    value);
-
-                }
-                else
-                    DeleteProperty(ref maxPower);
-
-            }
 
         }
 
@@ -941,25 +818,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return maxCapacity;
             }
 
-            set
-            {
-
-                if (value is not null)
-                {
-
-                    if (!maxCapacity.HasValue)
-                        SetProperty(ref maxCapacity,
-                                    value);
-
-                    else if (Math.Abs(maxCapacity.Value - value.Value) > EPSILON)
-                        SetProperty(ref maxCapacity,
-                                    value);
-
-                }
-                else
-                    DeleteProperty(ref maxCapacity);
-
-            }
 
         }
 
@@ -1017,10 +875,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return energyMix ?? ChargingPool?.EnergyMix;
+                return ImmutablePOIValues.Copy(energyMix ?? ChargingPool?.EnergyMix);
             }
 
-            set
+            private set
             {
 
                 if (value != energyMix && value != ChargingPool?.EnergyMix)
@@ -1109,7 +967,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-
         #region MaxReservationDuration
 
         private TimeSpan maxReservationDuration;
@@ -1126,11 +983,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return maxReservationDuration;
             }
 
-            set
-            {
-                SetProperty(ref maxReservationDuration,
-                            value);
-            }
 
         }
 
@@ -1152,11 +1004,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return isFreeOfCharge;
             }
 
-            set
-            {
-                SetProperty(ref isFreeOfCharge,
-                            value);
-            }
 
         }
 
@@ -1175,13 +1022,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _IsHubjectCompatible;
             }
 
-            set
-            {
-
-                if (_IsHubjectCompatible != value)
-                    SetProperty(ref _IsHubjectCompatible, value);
-
-            }
 
         }
 
@@ -1200,13 +1040,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return _DynamicInfoAvailable;
             }
 
-            set
-            {
-
-                if (_DynamicInfoAvailable != value)
-                    SetProperty(ref _DynamicInfoAvailable, value);
-
-            }
 
         }
 
@@ -1229,13 +1062,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return serviceIdentification;
             }
 
-            set
-            {
-
-                if (serviceIdentification != value)
-                    SetProperty(ref serviceIdentification, value);
-
-            }
 
         }
 
@@ -1257,13 +1083,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return modelCode;
             }
 
-            set
-            {
-
-                if (modelCode != value)
-                    SetProperty(ref modelCode, value);
-
-            }
 
         }
 
@@ -1282,13 +1101,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return hubjectStationId;
             }
 
-            set
-            {
-
-                if (hubjectStationId != value)
-                    SetProperty<String>(ref hubjectStationId, value);
-
-            }
 
         }
 
@@ -1336,12 +1148,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Id">The unique identification of the charging station pool.</param>
         /// <param name="ChargingPool">The parent charging pool.</param>
-        /// 
+        /// <param name="EnergyMeters">Optional directly owned energy meters, with unique IDs within this station.</param>
+        ///
         /// <param name="InitialAdminStatus">An optional initial admin status of the EVSE.</param>
         /// <param name="InitialStatus">An optional initial status of the EVSE.</param>
         /// <param name="MaxAdminStatusScheduleSize">An optional max length of the admin staus list.</param>
         /// <param name="MaxStatusScheduleSize">An optional max length of the staus list.</param>
-        /// 
+        ///
         /// <param name="Configurator">A delegate to configure the newly created charging station.</param>
         /// <param name="RemoteChargingStationCreator">A delegate to attach a remote charging station.</param>
         public ChargingStation(ChargingStation_Id                             Id,
@@ -1388,7 +1201,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                CustomDataNew?                                 CustomData                     = null,
                                UserDefinedDictionary?                         InternalData                   = null,
-                               IEnumerable<DataLicense>?                      DataLicenses                   = null)
+                               IEnumerable<DataLicense>?                      DataLicenses                   = null,
+                               IEnumerable<EnergyMeter>?                      EnergyMeters                   = null)
 
             : base(Id,
                    Name,
@@ -1409,9 +1223,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.ChargingPool                        = ChargingPool;
 
-            this.address                             = Address;
+            this.EnergyMeters = ImmutablePOIValues.CopyEnergyMeters(EnergyMeters);
+
+            this.address                             = ImmutablePOIValues.Copy(Address);
             this.geoLocation                         = GeoLocation;
-            this.openingTimes                        = OpeningTimes                  ?? OpeningTimes.Open24Hours;
+            this.openingTimes                        = ImmutablePOIValues.Copy(OpeningTimes                  ?? OpeningTimes.Open24Hours);
             this.hotlinePhoneNumber                  = HotlinePhoneNumber;
             this.physicalReference                   = PhysicalReference;
             this.chargingWhenClosed                  = ChargingWhenClosed;
@@ -1430,119 +1246,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Published                           = Published                     ?? true;
             this.Disabled                            = Disabled                      ?? false;
 
-            this.Brands                              = [];
+            this.immutableBrands                              = [];
 
             if (Brands is not null)
                 foreach (var brand in Brands)
-                    this.Brands.Add(brand);
-
-            this.Brands.OnSetChanged                += (timestamp, sender, newItems, oldItems) => {
-
-                PropertyChanged("Brands",
-                                oldItems,
-                                newItems);
-
-            };
+                    this.immutableBrands = this.immutableBrands.Add(ImmutablePOIValues.Copy(brand));
 
 
-            this.UIFeatures                          = [];
-            this.UIFeatures.OnSetChanged            += (timestamp, sender, newItems, oldItems) => {
+            this.immutableUIFeatures                          = [];
 
-                PropertyChanged("UIFeatures",
-                                oldItems,
-                                newItems);
 
-            };
-
-            this.AuthenticationModes                 = [];
+            this.immutableAuthenticationModes                 = [];
 
             if (AuthenticationModes is not null)
                 foreach (var authenticationMode in AuthenticationModes)
-                    this.AuthenticationModes.Add(authenticationMode);
+                    this.immutableAuthenticationModes = this.immutableAuthenticationModes.Add(ImmutablePOIValues.Copy(authenticationMode));
 
-            this.AuthenticationModes.OnSetChanged   += (timestamp, sender, newItems, oldItems) => {
 
-                PropertyChanged("AuthenticationModes",
-                                oldItems,
-                                newItems);
-
-            };
-
-            this.PaymentOptions                      = [];
+            this.immutablePaymentOptions                      = [];
 
             if (PaymentOptions is not null)
                 foreach (var paymentOption in PaymentOptions)
-                    this.PaymentOptions.Add(paymentOption);
+                    this.immutablePaymentOptions = this.immutablePaymentOptions.Add(ImmutablePOIValues.Copy(paymentOption));
 
-            this.PaymentOptions.OnSetChanged        += (timestamp, sender, newItems, oldItems) => {
 
-                PropertyChanged("PaymentOptions",
-                                oldItems,
-                                newItems);
-
-            };
-
-            this.Features                            = [];
+            this.immutableFeatures                            = [];
 
             if (Features is not null)
                 foreach (var feature in Features)
-                    this.Features.Add(feature);
+                    this.immutableFeatures = this.immutableFeatures.Add(ImmutablePOIValues.Copy(feature));
 
-            this.Features.OnSetChanged              += (timestamp, sender, newItems, oldItems) => {
 
-                PropertyChanged("Features",
-                                oldItems,
-                                newItems);
+            this.immutableParkingSpaces                       = [];
 
-            };
 
-            this.ParkingSpaces                       = [];
-            this.ParkingSpaces.OnSetChanged         += (timestamp, sender, newItems, oldItems) => {
+            this.immutableParkingSpaces                       = [];
 
-                PropertyChanged("ParkingSpaces",
-                                oldItems,
-                                newItems);
 
-            };
+            this.immutablePhotoURLs                           = [];
 
-            this.ParkingSpaces                       = [];
-            this.ParkingSpaces.OnSetChanged         += (timestamp, sender, newItems, oldItems) => {
-
-                PropertyChanged("ParkingSpaces",
-                                oldItems,
-                                newItems);
-
-            };
-
-            this.PhotoURLs                           = [];
-            this.PhotoURLs.OnSetChanged             += (timestamp, sender, newItems, oldItems) => {
-
-                PropertyChanged("PhotoURLs",
-                                oldItems,
-                                newItems);
-
-            };
 
             this.ArrivalInstructions = ArrivalInstructions ?? I18NString.Empty;
-
-            this.ArrivalInstructions.OnPropertyChanged += (timestamp,
-                                                           eventTrackingId,
-                                                           sender,
-                                                           propertyName,
-                                                           newValue,
-                                                           oldValue,
-                                                           dataSource) =>
-            {
-
-                PropertyChanged("ArrivalInstructions",
-                                newValue,
-                                oldValue,
-                                dataSource,
-                                eventTrackingId);
-
-                return Task.CompletedTask;
-
-            };
 
 
             this.MaxCurrentPrognoses                = [];
@@ -1899,581 +1643,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region AddEVSE           (Id, Configurator = null, RemoteEVSECreator = null, ...)
-
-        /// <summary>
-        /// Add a new EVSE.
-        /// </summary>
-        /// <param name="EVSE">An EVSE.</param>
-        /// 
-        /// <param name="OnSuccess">An optional delegate to be called after the successful addition of the EVSE.</param>
-        /// <param name="OnError">An optional delegate to be called whenever the addition of the new EVSE failed.</param>
-        /// 
-        /// <param name="SkipAddedNotifications">Whether to skip sending the 'OnAdded' event.</param>
-        /// <param name="AllowInconsistentOperatorIds">A delegate to decide whether to allow inconsistent charging station operator identifications.</param>
-        /// <param name="EventTrackingId">An unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<AddEVSEResult> AddEVSE(EVSE                                                EVSE,
-
-                                                 Action<EVSE,                   EventTracking_Id>?   OnSuccess                      = null,
-                                                 Action<ChargingStation, EVSE, EventTracking_Id>?   OnError                        = null,
-
-                                                 Boolean                                              SkipAddedNotifications         = false,
-                                                 Func<ChargingStationOperator_Id, EVSE_Id, Boolean>?  AllowInconsistentOperatorIds   = null,
-                                                 EventTracking_Id?                                    EventTrackingId                = null,
-                                                 User_Id?                                             CurrentUserId                  = null)
-        {
-
-            #region Initial checks
-
-            EventTrackingId              ??= EventTracking_Id.New;
-            AllowInconsistentOperatorIds ??= ((chargingStationOperatorId, chargingStationId) => false);
-
-            if (EVSE.Id.OperatorId != Operator?.Id && !AllowInconsistentOperatorIds(Operator.Id, EVSE.Id))
-                return AddEVSEResult.ArgumentError(
-                           EVSE,
-                           $"The operator identification of the given EVSE '{EVSE.Id.OperatorId}' is invalid!".ToI18NString(),
-                           EventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            #endregion
-
-            if (evses.TryAdd(EVSE,
-                             Connect,
-                             EventTrackingId,
-                             CurrentUserId).Result == CommandResult.Success)
-            {
-
-                //ToDo: Persistency
-                await Task.Delay(1);
-
-                OnSuccess?.Invoke(EVSE,
-                                  EventTrackingId);
-
-                return AddEVSEResult.Success(
-                           EVSE,
-                           EventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            }
-
-            OnError?.Invoke(this,
-                            EVSE,
-                            EventTrackingId);
-
-            return AddEVSEResult.Error(
-                       EVSE,
-                       "Error!".ToI18NString(),
-                       EventTrackingId,
-                       Id,
-                       this,
-                       this
-                   );
-
-        }
-
-        #endregion
-
-        #region AddEVSEIfNotExists(Id, Configurator = null, RemoteEVSECreator = null, ...)
-
-        /// <summary>
-        /// Add a new EVSE, but do not fail when this EVSE already exists.
-        /// </summary>
-        /// <param name="EVSE">An EVSE.</param>
-        /// 
-        /// <param name="OnSuccess">An optional delegate to be called after the successful addition of the EVSE.</param>
-        /// 
-        /// <param name="SkipAddedNotifications">Whether to skip sending the 'OnAdded' event.</param>
-        /// <param name="AllowInconsistentOperatorIds">A delegate to decide whether to allow inconsistent charging station operator identifications.</param>
-        /// <param name="EventTrackingId">An unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<AddEVSEResult> AddEVSEIfNotExists(EVSE                                                EVSE,
-
-                                                            Action<EVSE, EventTracking_Id>?                     OnSuccess                      = null,
-
-                                                            Boolean                                              SkipAddedNotifications         = false,
-                                                            Func<ChargingStationOperator_Id, EVSE_Id, Boolean>?  AllowInconsistentOperatorIds   = null,
-                                                            EventTracking_Id?                                    EventTrackingId                = null,
-                                                            User_Id?                                             CurrentUserId                  = null)
-        {
-
-            #region Initial checks
-
-            EventTrackingId              ??= EventTracking_Id.New;
-            AllowInconsistentOperatorIds ??= ((chargingStationOperatorId, chargingStationId) => false);
-
-            if (EVSE.Id.OperatorId != Operator?.Id && !AllowInconsistentOperatorIds(Operator.Id, EVSE.Id))
-                return AddEVSEResult.ArgumentError(
-                           EVSE,
-                           $"The operator identification of the given EVSE '{EVSE.Id.OperatorId}' is invalid!".ToI18NString(),
-                           EventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            #endregion
-
-            if (evses.TryAdd(EVSE,
-                             Connect,
-                             EventTrackingId,
-                             CurrentUserId).Result == CommandResult.Success)
-            {
-
-                //ToDo: Persistency
-                await Task.Delay(1);
-
-                OnSuccess?.Invoke(EVSE,
-                                  EventTrackingId);
-
-                return AddEVSEResult.Success(
-                           EVSE,
-                           EventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            }
-
-            return AddEVSEResult.NoOperation(
-                       EVSE,
-                       EventTrackingId,
-                       Id,
-                       this,
-                       this
-                   );
-
-        }
-
-        #endregion
-
-        #region AddOrUpdateEVSE   (Id, Configurator = null, RemoteEVSECreator = null, ...)
-
-        /// <summary>
-        /// Add a new or update an existing EVSE.
-        /// </summary>
-        /// <param name="EVSE">An EVSE.</param>
-        /// 
-        /// <param name="OnAdditionSuccess">An optional delegate to be called after the successful addition of the EVSE.</param>
-        /// <param name="OnUpdateSuccess">An optional delegate to be called after the successful update of the EVSE.</param>
-        /// <param name="OnError">An optional delegate to be called whenever the addition of the new EVSE failed.</param>
-        /// 
-        /// <param name="SkipAddOrUpdatedUpdatedNotifications">Whether to skip sending the 'OnAddedOrUpdated' event.</param>
-        /// <param name="AllowInconsistentOperatorIds">A delegate to decide whether to allow inconsistent charging station operator identifications.</param>
-        /// <param name="EventTrackingId">An unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<AddOrUpdateEVSEResult> AddOrUpdateEVSE(EVSE                                                EVSE,
-
-                                                                 Action<EVSE,                   EventTracking_Id>?   OnAdditionSuccess                      = null,
-                                                                 Action<EVSE,            EVSE, EventTracking_Id>?   OnUpdateSuccess                        = null,
-                                                                 Action<ChargingStation, EVSE, EventTracking_Id>?   OnError                                = null,
-
-                                                                 Boolean                                              SkipAddOrUpdatedUpdatedNotifications   = false,
-                                                                 Func<ChargingStationOperator_Id, EVSE_Id, Boolean>?  AllowInconsistentOperatorIds           = null,
-                                                                 EventTracking_Id?                                    EventTrackingId                        = null,
-                                                                 User_Id?                                             CurrentUserId                          = null)
-        {
-
-            #region Initial checks
-
-            EventTrackingId              ??= EventTracking_Id.New;
-            AllowInconsistentOperatorIds ??= ((chargingStationOperatorId, evseId) => false);
-
-            if (EVSE.Id.OperatorId != Operator?.Id && !AllowInconsistentOperatorIds(Operator.Id, EVSE.Id))
-                return AddOrUpdateEVSEResult.ArgumentError(
-                           EVSE,
-                           $"The operator identification of the given EVSE '{EVSE.Id.OperatorId}' is invalid!".ToI18NString(),
-                           EventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            #endregion
-
-
-            if (evses.TryGet(EVSE.Id, out var existingEVSE) &&
-                existingEVSE is not null)
-            {
-
-                if (evses.TryUpdate(EVSE.Id,
-                                    EVSE,
-                                    existingEVSE,
-                                    EventTrackingId,
-                                    CurrentUserId))
-                {
-
-                    //ToDo: Persistency
-                    await Task.Delay(1);
-
-                    Connect(EVSE);
-
-                    OnUpdateSuccess?.Invoke(EVSE,
-                                            existingEVSE,
-                                            EventTrackingId);
-
-                    return AddOrUpdateEVSEResult.Updated(
-                               EVSE,
-                               EventTrackingId,
-                               Id,
-                               this,
-                               this
-                           );
-
-                }
-                else
-                {
-
-                    OnError?.Invoke(this,
-                                    EVSE,
-                                    EventTrackingId);
-
-                    return AddOrUpdateEVSEResult.Error(
-                               EVSE,
-                               "Error!".ToI18NString(),
-                               EventTrackingId,
-                               Id,
-                               this,
-                               this
-                           );
-
-                }
-
-            }
-
-            else
-            {
-
-                if (evses.TryAdd(EVSE,
-                                 EventTrackingId,
-                                 CurrentUserId).Result == CommandResult.Success)
-                {
-
-                    //ToDo: Persistency
-                    await Task.Delay(1);
-
-                    Connect(EVSE);
-
-                    OnAdditionSuccess?.Invoke(EVSE,
-                                              EventTrackingId);
-
-                    return AddOrUpdateEVSEResult.Added(
-                               EVSE,
-                               EventTrackingId,
-                               Id,
-                               this,
-                               this
-                           );
-
-                }
-                else
-                {
-
-                    OnError?.Invoke(this,
-                                    EVSE,
-                                    EventTrackingId);
-
-                    return AddOrUpdateEVSEResult.Error(
-                               EVSE,
-                               "Error!".ToI18NString(),
-                               EventTrackingId,
-                               Id,
-                               this,
-                               this
-                           );
-
-                }
-
-            }
-
-        }
-
-        #endregion
-
-        #region UpdateEVSE        (Id, Configurator = null, RemoteEVSECreator = null, ...)
-
-        /// <summary>
-        /// Update the given EVSE.
-        /// </summary>
-        /// <param name="EVSE">An EVSE.</param>
-        /// 
-        /// <param name="OnSuccess">An optional delegate to be called after the successful update of the EVSE.</param>
-        /// <param name="OnError">An optional delegate to be called whenever the addition of the new EVSE failed.</param>
-        /// 
-        /// <param name="SkipUpdatedNotifications">Whether to skip sending the 'OnUpdated' event.</param>
-        /// <param name="AllowInconsistentOperatorIds">A delegate to decide whether to allow inconsistent charging station operator identifications.</param>
-        /// <param name="EventTrackingId">An unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<UpdateEVSEResult> UpdateEVSE(EVSE                                                EVSE,
-
-                                                       Action<EVSE,            EVSE, EventTracking_Id>?   OnSuccess                      = null,
-                                                       Action<ChargingStation, EVSE, EventTracking_Id>?   OnError                        = null,
-
-                                                       Boolean                                              SkipUpdatedNotifications       = false,
-                                                       Func<ChargingStationOperator_Id, EVSE_Id, Boolean>?  AllowInconsistentOperatorIds   = null,
-                                                       EventTracking_Id?                                    EventTrackingId                = null,
-                                                       User_Id?                                             CurrentUserId                  = null)
-        {
-
-            #region Initial checks
-
-            EventTrackingId              ??= EventTracking_Id.New;
-            AllowInconsistentOperatorIds ??= ((chargingStationOperatorId, evseId) => false);
-
-            if (EVSE.Id.OperatorId != Operator?.Id && !AllowInconsistentOperatorIds(Operator.Id, EVSE.Id))
-                return UpdateEVSEResult.ArgumentError(
-                           EVSE,
-                           $"The operator identification of the given EVSE '{EVSE.Id.OperatorId}' is invalid!".ToI18NString(),
-                           EventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            #endregion
-
-
-            if (evses.TryGet(EVSE.Id, out var existingEVSE) &&
-                existingEVSE is not null)
-            {
-
-                if (evses.TryUpdate(EVSE.Id,
-                                    EVSE,
-                                    existingEVSE,
-                                    EventTrackingId,
-                                    CurrentUserId))
-                {
-
-                    //ToDo: Persistency
-                    await Task.Delay(1);
-
-                    Connect(EVSE);
-
-                    OnSuccess?.Invoke(EVSE,
-                                      existingEVSE,
-                                      EventTrackingId);
-
-                    return UpdateEVSEResult.Success(
-                               EVSE,
-                               EventTrackingId,
-                               Id,
-                               this,
-                               this
-                           );
-
-                }
-                else
-                {
-
-                    OnError?.Invoke(this,
-                                    EVSE,
-                                    EventTrackingId);
-
-                    return UpdateEVSEResult.Error(
-                               EVSE,
-                               "Error!".ToI18NString(),
-                               EventTrackingId,
-                               Id,
-                               this,
-                               this
-                           );
-
-                }
-
-            }
-
-            else
-                return UpdateEVSEResult.Error(
-                           EVSE,
-                           "Error!".ToI18NString(),
-                           EventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-        }
-
-        #endregion
-
-        #region UpdateEVSE        (Id, Configurator = null, RemoteEVSECreator = null, ...)
-
-        /// <summary>
-        /// Update the given EVSE.
-        /// </summary>
-        /// <param name="EVSE">An EVSE.</param>
-        /// <param name="UpdateDelegate">A delegate for updating the given EVSE.</param>
-        /// 
-        /// <param name="OnSuccess">An optional delegate to be called after the successful update of the EVSE.</param>
-        /// <param name="OnError">An optional delegate to be called whenever the addition of the new EVSE failed.</param>
-        /// 
-        /// <param name="SkipUpdatedNotifications">Whether to skip sending the 'OnUpdated' event.</param>
-        /// <param name="AllowInconsistentOperatorIds">A delegate to decide whether to allow inconsistent charging station operator identifications.</param>
-        /// <param name="EventTrackingId">An unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<UpdateEVSEResult> UpdateEVSE(EVSE                                                EVSE,
-                                                       Action<EVSE>                                        UpdateDelegate,
-
-                                                       Action<EVSE,            EVSE, EventTracking_Id>?   OnSuccess                      = null,
-                                                       Action<ChargingStation, EVSE, EventTracking_Id>?   OnError                        = null,
-
-                                                       Boolean                                              SkipUpdatedNotifications       = false,
-                                                       Func<ChargingStationOperator_Id, EVSE_Id, Boolean>?  AllowInconsistentOperatorIds   = null,
-                                                       EventTracking_Id?                                    EventTrackingId                = null,
-                                                       User_Id?                                             CurrentUserId                  = null)
-        {
-
-            #region Initial checks
-
-            EventTrackingId              ??= EventTracking_Id.New;
-            AllowInconsistentOperatorIds ??= ((chargingStationOperatorId, evseId) => false);
-
-            if (EVSE.Id.OperatorId != Operator?.Id && !AllowInconsistentOperatorIds(Operator.Id, EVSE.Id))
-                return UpdateEVSEResult.ArgumentError(
-                           EVSE,
-                           $"The operator identification of the given EVSE '{EVSE.Id.OperatorId}' is invalid!".ToI18NString(),
-                           EventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            #endregion
-
-
-            if (evses.TryGet(EVSE.Id, out var existingEVSE) &&
-                existingEVSE is not null)
-            {
-
-                if (evses.TryUpdate(EVSE.Id,
-                                    EVSE,
-                                    existingEVSE,
-                                    EventTrackingId,
-                                    CurrentUserId))
-                {
-
-                    //ToDo: Persistency
-                    await Task.Delay(1);
-
-                    Connect(EVSE);
-
-                    OnSuccess?.Invoke(EVSE,
-                                      existingEVSE,
-                                      EventTrackingId);
-
-                    return UpdateEVSEResult.Success(
-                               EVSE,
-                               EventTrackingId,
-                               Id,
-                               this,
-                               this
-                           );
-
-                }
-                else
-                {
-
-                    OnError?.Invoke(this,
-                                    EVSE,
-                                    EventTrackingId);
-
-                    return UpdateEVSEResult.Error(
-                               EVSE,
-                               "Error!".ToI18NString(),
-                               EventTrackingId,
-                               Id,
-                               this,
-                               this
-                           );
-
-                }
-
-            }
-
-            else
-                return UpdateEVSEResult.Error(
-                           EVSE,
-                           "Error!".ToI18NString(),
-                           EventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-        }
-
-        #endregion
-
-        #region RemoveEVSE(EVSEId)
-
-        /// <summary>
-        /// Remove the given EVSE.
-        /// </summary>
-        /// <param name="Id">The unique identification of the EVSE.</param>
-        /// 
-        /// <param name="OnSuccess">An optional delegate to be called after the successful removal of the EVSE.</param>
-        /// <param name="OnError">An optional delegate to be called whenever the removal of the new EVSE failed.</param>
-        /// 
-        /// <param name="SkipRemovedNotifications">Whether to skip sending the 'OnRemoved' event.</param>
-        /// <param name="EventTrackingId">An unique event tracking identification for correlating this request with other events.</param>
-        /// <param name="CurrentUserId">An optional user identification initiating this command/request.</param>
-        public async Task<DeleteEVSEResult> RemoveEVSE(EVSE_Id                                             Id,
-
-                                                       Action<EVSE,                   EventTracking_Id>?  OnSuccess                  = null,
-                                                       Action<ChargingStation, EVSE, EventTracking_Id>?  OnError                    = null,
-
-                                                       Boolean                                             SkipRemovedNotifications   = false,
-                                                       EventTracking_Id?                                   EventTrackingId            = null,
-                                                       User_Id?                                            CurrentUserId              = null)
-        {
-
-            #region Initial checks
-
-            EventTrackingId ??= EventTracking_Id.New;
-
-            #endregion
-
-            if (evses.TryRemove(Id,
-                                out var evse,
-                                EventTrackingId,
-                                null) &&
-                evse is not null)
-            {
-
-                OnSuccess?.Invoke(evse,
-                                  EventTrackingId);
-
-                return DeleteEVSEResult.Success(
-                           evse,
-                           EventTrackingId,
-                           Id,
-                           this,
-                           this
-                       );
-
-            }
-
-
-            return DeleteEVSEResult.ArgumentError(
-                       Id,
-                       "error".ToI18NString(),
-                       EventTrackingId,
-                       this.Id,
-                       this,
-                       this
-                   );
-
-        }
-
-        #endregion
-
 
         #region ContainsEVSE(EVSE)
 
@@ -2535,132 +1704,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-
-        #region (internal) UpdateEVSEData       (Timestamp, EventTrackingId, EVSE, NewValue,       OldValue       = null, DataSource = null)
-
-        /// <summary>
-        /// Update the static data of an EVSE.
-        /// </summary>
-        /// <param name="Timestamp">The timestamp when this change was detected.</param>
-        /// <param name="EventTrackingId">An optional event tracking identification for correlating this request with other events.</param>
-        /// <param name="EVSE">The changed EVSE.</param>
-        /// <param name="PropertyName">The name of the changed property.</param>
-        /// <param name="NewValue">The new value of the changed property.</param>
-        /// <param name="OldValue">The optional old value of the changed property.</param>
-        /// <param name="DataSource">An optional data source or context for the EVSE data update.</param>
-        internal async Task UpdateEVSEData(DateTimeOffset    Timestamp,
-                                           EventTracking_Id  EventTrackingId,
-                                           EVSE             EVSE,
-                                           String            PropertyName,
-                                           Object?           NewValue,
-                                           Object?           OldValue     = null,
-                                           Context?          DataSource   = null)
-        {
-
-            try
-            {
-
-                var onEVSEDataChanged = OnEVSEDataChanged;
-                if (onEVSEDataChanged is not null)
-                    await onEVSEDataChanged(Timestamp,
-                                            EventTrackingId,
-                                            EVSE,
-                                            PropertyName,
-                                            NewValue,
-                                            OldValue,
-                                            DataSource);
-
-            }
-            catch (Exception e)
-            {
-                DebugX.LogException(e, $"ChargingStation '{Id}'.UpdateEVSEData of EVSE '{EVSE.Id}' property '{PropertyName}' from '{OldValue?.ToString() ?? "-"}' to '{NewValue?.ToString() ?? "-"}'");
-            }
-
-        }
-
-        #endregion
-
-        #region (internal) UpdateEVSEAdminStatus(Timestamp, EventTrackingId, EVSE, NewAdminStatus, OldAdminStatus = null, DataSource = null)
-
-        /// <summary>
-        /// Update the current admin status of an EVSE.
-        /// </summary>
-        /// <param name="Timestamp">The timestamp when this change was detected.</param>
-        /// <param name="EventTrackingId">An event tracking identification for correlating this request with other events.</param>
-        /// <param name="EVSE">The updated EVSE.</param>
-        /// <param name="NewAdminStatus">The new EVSE admin status.</param>
-        /// <param name="OldAdminStatus">The optional old EVSE admin status.</param>
-        /// <param name="DataSource">An optional data source or context for the EVSE admin status update.</param>
-        internal async Task UpdateEVSEAdminStatus(DateTimeOffset                     Timestamp,
-                                                  EventTracking_Id                   EventTrackingId,
-                                                  EVSE                              EVSE,
-                                                  Timestamped<EVSEAdminStatusType>   NewAdminStatus,
-                                                  Timestamped<EVSEAdminStatusType>?  OldAdminStatus   = null,
-                                                  Context?                           DataSource       = null)
-        {
-
-            try
-            {
-
-                var onEVSEAdminStatusChanged = OnEVSEAdminStatusChanged;
-                if (onEVSEAdminStatusChanged is not null)
-                    await onEVSEAdminStatusChanged(Timestamp,
-                                                   EventTrackingId,
-                                                   EVSE,
-                                                   NewAdminStatus,
-                                                   OldAdminStatus,
-                                                   DataSource);
-
-            }
-            catch (Exception e)
-            {
-                DebugX.LogException(e, $"ChargingStation '{Id}'.UpdateEVSEAdminStatus of EVSE '{EVSE.Id}' from '{OldAdminStatus?.ToString() ?? "-"}' to '{NewAdminStatus}'");
-            }
-
-        }
-
-        #endregion
-
-        #region (internal) UpdateEVSEStatus     (Timestamp, EventTrackingId, EVSE, NewStatus,      OldStatus      = null, DataSource = null)
-
-        /// <summary>
-        /// Update the current status of an EVSE.
-        /// </summary>
-        /// <param name="Timestamp">The timestamp when this change was detected.</param>
-        /// <param name="EventTrackingId">An event tracking identification for correlating this request with other events.</param>
-        /// <param name="EVSE">The updated EVSE.</param>
-        /// <param name="NewStatus">The new EVSE status.</param>
-        /// <param name="OldStatus">The optional old EVSE status.</param>
-        /// <param name="DataSource">An optional data source or context for the EVSE status update.</param>
-        internal async Task UpdateEVSEStatus(DateTimeOffset                Timestamp,
-                                             EventTracking_Id              EventTrackingId,
-                                             EVSE                         EVSE,
-                                             Timestamped<EVSEStatusType>   NewStatus,
-                                             Timestamped<EVSEStatusType>?  OldStatus    = null,
-                                             Context?                      DataSource   = null)
-        {
-
-            try
-            {
-
-                var onEVSEStatusChanged = OnEVSEStatusChanged;
-                if (onEVSEStatusChanged is not null)
-                    await onEVSEStatusChanged(Timestamp,
-                                              EventTrackingId,
-                                              EVSE,
-                                              NewStatus,
-                                              OldStatus,
-                                              DataSource);
-
-            }
-            catch (Exception e)
-            {
-                DebugX.LogException(e, $"ChargingStation '{Id}'.UpdateEVSEStatus of EVSE '{EVSE.Id}' from '{OldStatus}' to '{NewStatus}'");
-            }
-
-        }
-
-        #endregion
 
         #endregion
 
@@ -2751,8 +1794,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    : null,
 
                                GeoLocation.HasValue && (!Embedded || ChargingPool?.GeoLocation.HasValue != true ||
-                                   !JToken.DeepEquals(GeoLocation.Value.ToJSON(), ChargingPool.GeoLocation.Value.ToJSON()))
-                                   ? new JProperty("geoLocation", GeoLocation.Value.ToJSON(Embedded: true)) : null,
+                                   !JToken.DeepEquals(InfrastructureJson.LocationJSON(GeoLocation.Value), InfrastructureJson.LocationJSON(ChargingPool.GeoLocation.Value)))
+                                   ? new JProperty("geoLocation", InfrastructureJson.LocationJSON(GeoLocation.Value, true)) : null,
                                Address is not null && (!Embedded || Address != ChargingPool?.Address) ? new JProperty("address", Address.ToJSON(Embedded: true)) : null,
                                (!Embedded || AuthenticationModes != ChargingPool?.AuthenticationModes) ? new JProperty("authenticationModes",  AuthenticationModes.ToJSON())   : null,
                                HotlinePhoneNumber.HasValue && (!Embedded || HotlinePhoneNumber != ChargingPool?.HotlinePhoneNumber) ? new JProperty("hotlinePhoneNumber", HotlinePhoneNumber.ToString()) : null,
@@ -2760,6 +1803,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                IsFreeOfCharge
                                    ? new JProperty("isFreeOfCharge", IsFreeOfCharge)
+                                   : null,
+
+                               !EnergyMeters.IsEmpty
+                                   ? new JProperty("energyMeters", new JArray(
+                                         EnergyMeters.OrderBy(meter => meter.Id.ToString(), StringComparer.Ordinal).
+                                                      Select(meter => meter.ToJSON(Embedded: true))))
                                    : null,
 
                                ExpandEVSEIds != InfoStatus.Hidden && EVSEs.Any()
@@ -2808,9 +1857,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                          );
 
-                return CustomChargingStationSerializer is not null
+                return POIRepresentation.AddETags(this, CustomChargingStationSerializer is not null
                            ? CustomChargingStationSerializer(this, json)
-                           : json;
+                           : json);
 
             }
             catch (Exception e)
@@ -2822,53 +1871,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            new JProperty("stackTrace",  e.StackTrace)
                        );
             }
-
-        }
-
-        #endregion
-
-
-        #region UpdateWith(OtherChargingStation)
-
-        /// <summary>
-        /// Update this charging station with the data of the other charging station.
-        /// </summary>
-        /// <param name="OtherChargingStation">Another charging station.</param>
-        public ChargingStation UpdateWith(ChargingStation OtherChargingStation)
-        {
-
-            Name.               Set    (OtherChargingStation.Name);
-            Description.        Set    (OtherChargingStation.Description);
-
-            Brands.             Replace(OtherChargingStation.Brands);
-            UIFeatures.         Replace(OtherChargingStation.UIFeatures);
-            AuthenticationModes.Replace(OtherChargingStation.AuthenticationModes);
-            PaymentOptions.     Replace(OtherChargingStation.PaymentOptions);
-            PhotoURLs.          Replace(OtherChargingStation.PhotoURLs);
-            Features.           Replace(OtherChargingStation.Features);
-
-            ArrivalInstructions.Set    (OtherChargingStation.ArrivalInstructions);
-            HotlinePhoneNumber        = OtherChargingStation.HotlinePhoneNumber;
-
-            Address                   = OtherChargingStation.Address;
-            OpenStreetMapNodeId       = OtherChargingStation.OpenStreetMapNodeId;
-            GeoLocation               = OtherChargingStation.GeoLocation;
-            EntranceAddress           = OtherChargingStation.EntranceAddress;
-            EntranceLocation          = OtherChargingStation.EntranceLocation;
-            OpeningTimes              = OtherChargingStation.OpeningTimes;
-            //ParkingSpaces             = OtherChargingStation.ParkingSpaces;
-            Accessibility             = OtherChargingStation.Accessibility;
-            GridConnection            = OtherChargingStation.GridConnection;
-            ExitAddress               = OtherChargingStation.ExitAddress;
-            ExitLocation              = OtherChargingStation.ExitLocation;
-
-            if (OtherChargingStation.AdminStatus.Timestamp > AdminStatus.Timestamp)
-                AdminStatus           = OtherChargingStation.AdminStatus;
-
-            if (OtherChargingStation.Status.     Timestamp > Status.     Timestamp)
-                Status                = OtherChargingStation.Status;
-
-            return this;
 
         }
 
@@ -3098,6 +2100,91 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        internal async Task UpdateEVSEData(DateTimeOffset    Timestamp,
+                                           EventTracking_Id  EventTrackingId,
+                                           EVSE             EVSE,
+                                           String            PropertyName,
+                                           Object?           NewValue,
+                                           Object?           OldValue     = null,
+                                           Context?          DataSource   = null)
+        {
+
+            try
+            {
+
+                var onEVSEDataChanged = OnEVSEDataChanged;
+                if (onEVSEDataChanged is not null)
+                    await onEVSEDataChanged(Timestamp,
+                                            EventTrackingId,
+                                            EVSE,
+                                            PropertyName,
+                                            NewValue,
+                                            OldValue,
+                                            DataSource);
+
+            }
+            catch (Exception e)
+            {
+                DebugX.LogException(e, $"ChargingStation '{Id}'.UpdateEVSEData of EVSE '{EVSE.Id}' property '{PropertyName}' from '{OldValue?.ToString() ?? "-"}' to '{NewValue?.ToString() ?? "-"}'");
+            }
+
+        }
+
+        internal async Task UpdateEVSEAdminStatus(DateTimeOffset                     Timestamp,
+                                                  EventTracking_Id                   EventTrackingId,
+                                                  EVSE                              EVSE,
+                                                  Timestamped<EVSEAdminStatusType>   NewAdminStatus,
+                                                  Timestamped<EVSEAdminStatusType>?  OldAdminStatus   = null,
+                                                  Context?                           DataSource       = null)
+        {
+
+            try
+            {
+
+                var onEVSEAdminStatusChanged = OnEVSEAdminStatusChanged;
+                if (onEVSEAdminStatusChanged is not null)
+                    await onEVSEAdminStatusChanged(Timestamp,
+                                                   EventTrackingId,
+                                                   EVSE,
+                                                   NewAdminStatus,
+                                                   OldAdminStatus,
+                                                   DataSource);
+
+            }
+            catch (Exception e)
+            {
+                DebugX.LogException(e, $"ChargingStation '{Id}'.UpdateEVSEAdminStatus of EVSE '{EVSE.Id}' from '{OldAdminStatus?.ToString() ?? "-"}' to '{NewAdminStatus}'");
+            }
+
+        }
+
+        internal async Task UpdateEVSEStatus(DateTimeOffset                Timestamp,
+                                             EventTracking_Id              EventTrackingId,
+                                             EVSE                         EVSE,
+                                             Timestamped<EVSEStatusType>   NewStatus,
+                                             Timestamped<EVSEStatusType>?  OldStatus    = null,
+                                             Context?                      DataSource   = null)
+        {
+
+            try
+            {
+
+                var onEVSEStatusChanged = OnEVSEStatusChanged;
+                if (onEVSEStatusChanged is not null)
+                    await onEVSEStatusChanged(Timestamp,
+                                              EventTrackingId,
+                                              EVSE,
+                                              NewStatus,
+                                              OldStatus,
+                                              DataSource);
+
+            }
+            catch (Exception e)
+            {
+                DebugX.LogException(e, $"ChargingStation '{Id}'.UpdateEVSEStatus of EVSE '{EVSE.Id}' from '{OldStatus}' to '{NewStatus}'");
+            }
+
+        }
     }
 
 }

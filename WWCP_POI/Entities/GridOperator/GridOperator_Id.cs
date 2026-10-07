@@ -30,7 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of an Electric Vehicle Service Provider (EVSP Id).
     /// </summary>
-    public class GridOperator_Id : IId,
+    public sealed class GridOperator_Id : IId,
                                         IEquatable <GridOperator_Id>,
                                         IComparable<GridOperator_Id>
 

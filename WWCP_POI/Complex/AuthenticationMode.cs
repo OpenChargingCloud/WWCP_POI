@@ -62,7 +62,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        IComparable
     {
 
-        public class FreeCharging : AuthenticationModes
+        public sealed class FreeCharging : AuthenticationModes
         {
 
             public FreeCharging()
@@ -73,7 +73,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class RFID : AuthenticationModes
+        public sealed class RFID : AuthenticationModes
         {
 
             #region Properties
@@ -113,11 +113,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             public override JObject ToJSON()
 
-                => new (
+                => POIRepresentation.AddETags(this, new (
                        new JProperty("type",       Type),
                        new JProperty("cardTypes",  new JArray(CardTypes.Select(cardType => cardType.ToString()))),
                        new JProperty("brandIds",   new JArray(BrandIds. Select(brandId  => brandId. ToString())))
-                   );
+                   ));
 
             public override String ToString()
 
@@ -128,7 +128,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class PINPAD : AuthenticationModes
+        public sealed class PINPAD : AuthenticationModes
         {
 
             public PINPAD()
@@ -139,7 +139,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class ISO15118_PLC : AuthenticationModes
+        public sealed class ISO15118_PLC : AuthenticationModes
         {
 
             public ISO15118_PLC()    // ISO/IEC 15118 PLC
@@ -150,7 +150,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class ISO15118_Air : AuthenticationModes
+        public sealed class ISO15118_Air : AuthenticationModes
         {
 
             public ISO15118_Air()    // ISO/IEC 15118 Over-the-Air
@@ -161,7 +161,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class REMOTE : AuthenticationModes
+        public sealed class REMOTE : AuthenticationModes
         {
 
             public REMOTE()
@@ -172,7 +172,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class CreditCard : AuthenticationModes
+        public sealed class CreditCard : AuthenticationModes
         {
 
             public CreditCard()
@@ -183,7 +183,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class DebitCard : AuthenticationModes
+        public sealed class DebitCard : AuthenticationModes
         {
 
             public DebitCard()
@@ -194,7 +194,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class PrepaidCard : AuthenticationModes
+        public sealed class PrepaidCard : AuthenticationModes
         {
 
             public PrepaidCard()
@@ -205,7 +205,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class NFC : AuthenticationModes
+        public sealed class NFC : AuthenticationModes
         {
 
             public NFC()
@@ -216,7 +216,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class Bluetooth : AuthenticationModes
+        public sealed class Bluetooth : AuthenticationModes
         {
 
             public Bluetooth()
@@ -228,7 +228,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
 
-        public class WLAN : AuthenticationModes
+        public sealed class WLAN : AuthenticationModes
         {
 
             public WLAN()
@@ -239,7 +239,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class NoAuthenticationRequired : AuthenticationModes
+        public sealed class NoAuthenticationRequired : AuthenticationModes
         {
 
             public NoAuthenticationRequired()
@@ -251,23 +251,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
 
-        /// <summary>
-        /// Only for OICP compatibility! Do not use!
-        /// </summary>
-        [Obsolete]
-        public class DirectPayment : AuthenticationModes
-        {
-
-            public DirectPayment()
-
-                : base("DirectPayment")
-
-            { }
-
-        }
-
-
-        public class SMS : AuthenticationModes
+        public sealed class SMS : AuthenticationModes
         {
 
             #region Properties
@@ -300,16 +284,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             public override JObject ToJSON()
 
-                => JSONObject.Create(
+                => POIRepresentation.AddETags(this, JSONObject.Create(
 
                        new JProperty("type",    Type),
-                       new JProperty("Number",  Number),
+                       new JProperty("number",  Number),
 
                        StationCode is not null && StationCode.IsNotNullOrEmpty()
-                           ? new JProperty("StationCode",  StationCode)
+                           ? new JProperty("stationCode",  StationCode)
                            : null
 
-                   );
+                   ));
 
             public override String ToString()
 
@@ -320,7 +304,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public class PhoneCall : AuthenticationModes
+        public sealed class PhoneCall : AuthenticationModes
         {
 
             #region Properties
@@ -347,10 +331,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             public override JObject ToJSON()
 
-                => new JObject(
+                => POIRepresentation.AddETags(this, new JObject(
                        new JProperty("type",    Type),
-                       new JProperty("Number",  Number)
-                   );
+                       new JProperty("number",  Number)
+                   ));
 
             public override String ToString()
 
@@ -368,7 +352,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Constructor(s)
 
-        public AuthenticationModes(String Type)
+        private AuthenticationModes(String Type)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(Type);
             this.Type = Type;
@@ -405,8 +389,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         //public static AuthenticationModes REMOTE
         //    => new REMOTE();
 
-        //public static AuthenticationModes DirectPayment
-        //    => new DirectPayment();
 
         //public static AuthenticationModes NoAuthenticationRequired
         //    => new NoAuthenticationRequired();
@@ -426,7 +408,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         public virtual JObject ToJSON()
-            => new JObject(new JProperty("type", Type));
+            => POIRepresentation.AddETags(this, new JObject(new JProperty("type", Type)));
 
 
         #region IComparable<AuthenticationModes> Members
@@ -522,7 +504,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     }
 
 
-    //public class Unknown : AuthenticationModes
+    //public sealed class Unknown : AuthenticationModes
     //{
 
     //    public Unknown()

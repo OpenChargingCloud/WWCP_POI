@@ -65,7 +65,7 @@ namespace WWCP_POI_Tests.Json
                               "currentType": [
                                 "DC"
                               ],
-                              "maxPower": 150000.125,
+                              "maxPower": "150000.125 W",
                               "socketOutlets": [
                                 {
                                   "@id": "1",
@@ -397,9 +397,9 @@ namespace WWCP_POI_Tests.Json
                 var station = (JObject)pool["chargingStations"]![0]!;
                 var evse = (JObject)station["EVSEs"]![0]!;
 
-                pool["geoLocation"] = JObject.Parse("{\"lat\":52.125,\"lng\":13.625,\"alt\":25.125}");
-                station["geoLocation"] = JObject.Parse("{\"lat\":52.126,\"lng\":13.626,\"alt\":26.125}");
-                evse["geoLocation"] = JObject.Parse("{\"lat\":52.127,\"lng\":13.627,\"alt\":27.125}");
+                pool["geoLocation"] = JObject.Parse("{\"lat\":52.125,\"lng\":13.625,\"alt\":\"25.125 m\"}");
+                station["geoLocation"] = JObject.Parse("{\"lat\":52.126,\"lng\":13.626,\"alt\":\"26.125 m\"}");
+                evse["geoLocation"] = JObject.Parse("{\"lat\":52.127,\"lng\":13.627,\"alt\":\"27.125 m\"}");
 
                 var json = Expanded(RoamingNetwork.Parse(input));
                 var parsed = RoamingNetwork.Parse(JObject.Parse(json.ToString()));
@@ -481,9 +481,9 @@ namespace WWCP_POI_Tests.Json
             var station = (JObject)pool["chargingStations"]![0]!;
             var evse = (JObject)station["EVSEs"]![0]!;
 
-            pool["geoLocation"] = JObject.Parse("{\"lat\":52,\"lng\":13,\"alt\":20}");
-            station["geoLocation"] = JObject.Parse("{\"lat\":52,\"lng\":13,\"alt\":21}");
-            evse["geoLocation"] = JObject.Parse("{\"lat\":52,\"lng\":13,\"alt\":22}");
+            pool["geoLocation"] = JObject.Parse("{\"lat\":52,\"lng\":13,\"alt\":\"20 m\"}");
+            station["geoLocation"] = JObject.Parse("{\"lat\":52,\"lng\":13,\"alt\":\"21 m\"}");
+            evse["geoLocation"] = JObject.Parse("{\"lat\":52,\"lng\":13,\"alt\":\"22 m\"}");
 
             var parsed = RoamingNetwork.Parse(Expanded(RoamingNetwork.Parse(input)));
             var parsedStation = parsed.ChargingStations.Single(item => item.Id.ToString() == "DE*ABC*S1");
@@ -526,7 +526,7 @@ namespace WWCP_POI_Tests.Json
 
             foreach (var entity in new[] { pool, station, evse })
             {
-                entity["geoLocation"] = JObject.Parse("{\"lat\":52,\"lng\":13,\"alt\":20}");
+                entity["geoLocation"] = JObject.Parse("{\"lat\":52,\"lng\":13,\"alt\":\"20 m\"}");
             }
 
             foreach (var entity in new[] { pool, station })

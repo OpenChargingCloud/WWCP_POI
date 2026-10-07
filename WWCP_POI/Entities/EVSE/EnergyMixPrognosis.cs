@@ -135,14 +135,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                EnergySources.       Select(energysource        => new JObject(
                                                                                       new JProperty("timestamp",   energysource.       Timestamp.  ToISO8601()),
                                                                                       new JProperty("category",    energysource.       Value.Value.ToString()),
-                                                                                      new JProperty("percentage",  energysource.       Value.Percent)
+                                                                                      new JProperty("percentage",  MetrologyJson.Percent(energysource.Value.Percent))
                                                                                   ))),
 
                            new JProperty("environmentalImpacts",  new JArray(
                                EnvironmentalImpacts.Select(environmentalImpact => new JObject(
                                                                                       new JProperty("timestamp",   environmentalImpact.Timestamp.  ToISO8601()),
                                                                                       new JProperty("impact",      environmentalImpact.Value.Value.ToString()),
-                                                                                      new JProperty("percentage",  environmentalImpact.Value.Percent)
+                                                                                      new JProperty("percentage",  MetrologyJson.Percent(environmentalImpact.Value.Percent))
                                                                                   )))
                            )),
 

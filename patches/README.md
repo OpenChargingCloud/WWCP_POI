@@ -2,13 +2,22 @@
 
 [Repository overview](../README.md)
 
-`Styx.RestoreTimestamps.patch` records the one source change made outside this repository:
+`Styx.RestoreTimestamps.patch` retains an earlier timestamp-helper change outside this repository:
 `../Styx/Styx/Illias/Helpers/AInternalData.cs` gained the protected
 `RestoreTimestamps(DateTimeOffset Created, DateTimeOffset LastChange)` method.
 
 The method restores persisted creation/change timestamps directly, without property-change events.
-`AEMobilityEntity.RestoreSnapshotTimestamps()` calls it during JSON deserialization.
-The current POI sources require this API in their Styx dependency.
+Current POI entities use the local `AImmutableInternalData.RestoreTimestamps` implementation
+through `AImmutableEMobilityEntity.RestoreSnapshotTimestamps()`; the unused mutable
+`AEMobilityEntity` base has been removed. This patch is retained as a record and is not a
+prerequisite of the current immutable POI metadata implementation.
+
+The current serialization contract uses Styx canonical JSON, deterministic CBOR and
+metrological tag 44252. The local readonly `ETag` value type serializes as a JSON/CBOR tuple,
+with an explicit `hex`/`base64` encoding in JSON and native digest bytes in CBOR.
+ChangeSets bind both source/result ETags; nested defaults
+derive from the fixed batch timestamp. See [ETags/CBOR](../docs/ETAGS-CBOR.md) and
+[ChangeSets](../docs/CHANGESETS.md) for the current dependency/API contract.
 
 ## Applying the patch
 

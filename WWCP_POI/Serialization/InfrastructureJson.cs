@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -25,6 +25,7 @@ using Newtonsoft.Json.Linq;
 using org.GraphDefined.Vanaheimr.Aegir;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 #endregion
 
@@ -67,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var property in json.Properties())
             {
-                if (!fields.Contains(property.Name))
+                if (property.Name != "ETags" && !fields.Contains(property.Name))
                     throw new ArgumentException($"Unknown property '{property.Name}'.");
             }
 
@@ -152,6 +153,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             where T : struct
         {
 
+            if (json[field] is { } token && token.Type is not (JTokenType.String or JTokenType.Null))
+                throw new ArgumentException($"{field}: expected a string.");
+
             if (!JsonValueParsing.TryReadOptional(json, field, parser, out var value, out var error))
                 throw new ArgumentException(error);
 
@@ -170,15 +174,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return ((JValue) token).Value switch
                 {
                     DateTimeOffset offset => offset,
-                    DateTime dateTime     => new DateTimeOffset(
-                                                 dateTime.Kind == DateTimeKind.Unspecified
-                                                     ? DateTime.SpecifyKind(dateTime, DateTimeKind.Utc)
-                                                     : dateTime),
+                    DateTime dateTime when dateTime.Kind != DateTimeKind.Unspecified => new DateTimeOffset(dateTime),
                     _                     => throw new ArgumentException($"{field}: invalid timestamp.")
                 };
             }
 
             if (token.Type != JTokenType.String ||
+                !System.Text.RegularExpressions.Regex.IsMatch(token.Value<String>()!, @"(?:Z|[+-][0-9]{2}:[0-9]{2})$") ||
                 !DateTimeOffset.TryParse(token.Value<String>(),
                                          CultureInfo.InvariantCulture,
                                          DateTimeStyles.RoundtripKind,
@@ -192,21 +194,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// Read flag values, including the nested arrays emitted by older serializers.
+        /// Read a single named flag from a flat array.
         /// </summary>
         internal static T Flags<T>(JToken token)
             where T : struct, Enum
         {
-
-            if (token is JArray array)
-            {
-                var bits = 0;
-
-                foreach (var entry in array)
-                    bits |= Convert.ToInt32(Flags<T>(entry));
-
-                return (T) Enum.ToObject(typeof(T), bits);
-            }
 
             if (token.Type != JTokenType.String ||
                 !Enum.TryParse<T>(token.Value<String>(), out var flag) ||
@@ -222,6 +214,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
         #region Read location, custom data and address
+
+        internal static JObject LocationJSON(GeoCoordinate coordinate, Boolean embedded = false)
+        {
+            var json = coordinate.ToJSON(Embedded: embedded);
+            if (coordinate.Altitude is { } altitude) json["alt"] = MetrologyJson.AltitudeText(altitude.Value);
+            return json;
+        }
 
         internal static GeoCoordinate? Location(JObject json)
         {
@@ -414,23 +413,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return new DataLicense(id);
             });
 
-            licenses.AddRange(Array(json, "dataLicenses", token =>
-            {
-                var copy = (JObject) Entry(token).DeepClone();
-
-                copy["id"]   ??= copy["@id"]?.DeepClone();
-                copy["URLs"] ??= new JArray();
-
-                if (!DataLicense.TryParse(copy, out var license, out var error) || license is null)
-                    throw new ArgumentException(error);
-
-                return license;
-            }));
+            licenses.AddRange(Array(json, "dataLicenses", token => ParseDataLicense(Entry(token))));
 
             Unique(licenses, license => license.Id, "dataLicenses");
 
             return licenses;
 
+        }
+
+        internal static DataLicense ParseDataLicense(JObject json)
+        {
+            Validate(json, DataLicense.JSONLDContext);
+            ValidateFields(json, "@id", "@context", "description", "URLs");
+            var text = Text(json, "@id");
+            if (text is null || !DataLicense_Id.TryParse(text, out var id))
+                throw new ArgumentException("@id: invalid or missing data license identifier.");
+            var links = Array(json, "URLs", token =>
+            {
+                if (token.Type != JTokenType.String || !Uri.TryCreate(token.Value<String>(), UriKind.Absolute, out _) ||
+                    !URL.TryParse(token.Value<String>()!, out var url))
+                    throw new ArgumentException("URLs: expected an absolute URL string.");
+                return url;
+            });
+            return new DataLicense(id, Name(json, "description") ?? I18NString.Empty, links.ToArray());
         }
 
         internal static List<Brand> Brands(JObject                            json,
@@ -556,9 +561,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Restore and serialize snapshot metadata
 
+
+
         internal static void RestoreMetadata<TId, TAdmin, TStatus>(
             JObject                                    json,
-            AEMobilityEntity<TId, TAdmin, TStatus>       entity,
+            AImmutableEMobilityEntity<TId, TAdmin, TStatus>       entity,
             JsonValueParsing.ScalarParser<TAdmin>      adminParser,
             JsonValueParsing.ScalarParser<TStatus>     statusParser)
 
@@ -599,9 +606,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
+
+
         internal static JObject SnapshotMetadata<TId, TAdmin, TStatus>(
             JObject                                    json,
-            AEMobilityEntity<TId, TAdmin, TStatus>       entity)
+            AImmutableEMobilityEntity<TId, TAdmin, TStatus>       entity)
 
             where TId     : IId
             where TAdmin  : IComparable
@@ -635,12 +644,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                       tariff)));
             }
 
+            POIAdditionalProperties.Write(json, entity);
+
             // Snapshot fields describe the node's own values, including overrides equal to its parent.
             if (entity is EVSE meterOwner && meterOwner.EnergyMeter is { } meter)
                 json["energyMeter"] = SnapshotMetadata(meter.ToJSON(Embedded: true), meter);
 
             if (entity is EVSE evse && evse.GeoLocation is { } evseLocation)
-                json["geoLocation"] = evseLocation.ToJSON(Embedded: true);
+                json["geoLocation"] = InfrastructureJson.LocationJSON(evseLocation, true);
 
             if (entity is ChargingStation station)
                 SnapshotStationProperties(json, station);
@@ -653,7 +664,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (station.GeoLocation is { } location)
-                json["geoLocation"] = location.ToJSON(Embedded: true);
+                json["geoLocation"] = InfrastructureJson.LocationJSON(location, true);
 
             if (station.Address is { } address)
                 json["address"] = address.ToJSON(Embedded: true);

@@ -1,185 +1,120 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
- *
- * Licensed under the Affero GPL license, Version 3.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.gnu.org/licenses/agpl.html
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Licensed under the Affero GPL license, Version 3.0.
  */
 
-#region Usings
-
 using Newtonsoft.Json.Linq;
+using org.GraphDefined.Vanaheimr.Illias;
 
-#endregion
+namespace cloud.charging.open.protocols.WWCP.POI;
 
-namespace cloud.charging.open.protocols.WWCP.POI
+/// <summary>
+/// A tariff price and its dimension-specific, explicitly typed billing increment.
+/// </summary>
+public readonly partial struct ChargingPriceComponent
 {
+    /// <summary>
+    /// The billed tariff dimension.
+    /// </summary>
+    public ChargingDimensionTypes Type { get; }
 
     /// <summary>
-    /// A price component defines the pricing of a tariff.
+    /// The monetary price per tariff unit.
     /// </summary>
-    public readonly partial struct ChargingPriceComponent
+    public Decimal Price { get; }
+
+    /// <summary>
+    /// The energy billing increment, present for energy pricing.
+    /// </summary>
+    public WattHour? EnergyStep { get; }
+
+    /// <summary>
+    /// The current billing increment, present for current pricing.
+    /// </summary>
+    public Ampere? CurrentStep { get; }
+
+    /// <summary>
+    /// The time billing increment, present for charging or parking time pricing.
+    /// </summary>
+    public TimeSpan? DurationStep { get; }
+
+    private ChargingPriceComponent(ChargingDimensionTypes type, Decimal price,
+                                    WattHour? energyStep = null, Ampere? currentStep = null, TimeSpan? durationStep = null)
     {
-
-        #region Properties
-
-        /// <summary>
-        /// Type of tariff dimension.
-        /// </summary>
-        public ChargingDimensionTypes  Type        { get; }
-
-        /// <summary>
-        /// Price per unit for this tariff dimension.
-        /// </summary>
-        public Decimal                 Price       { get; }
-
-        /// <summary>
-        /// Minimum amount to be billed. This unit will be billed in this step_size blocks.
-        /// </summary>
-        /// <example>
-        /// If type is time and step_size is 300, then time will be billed in blocks of 5 minutes,
-        /// so if 6 minutes is used, 10 minutes (2 blocks of step_size) will be billed.
-        /// </example>
-        public UInt32                  StepSize    { get; }
-
-        #endregion
-
-        #region Constructor(s)
-
-        /// <summary>
-        /// Create a new price component defining the pricing of a tariff.
-        /// </summary>
-        /// <param name="Type">Type of tariff dimension.</param>
-        /// <param name="Price">Price per unit for this tariff dimension.</param>
-        /// <param name="StepSize">Minimum amount to be billed. This unit will be billed in this step_size blocks.</param>
-        public ChargingPriceComponent(ChargingDimensionTypes  Type,
-                                      Decimal                 Price,
-                                      UInt32                  StepSize = 1)
-        {
-            if (!Enum.IsDefined(Type))
-                throw new ArgumentOutOfRangeException(nameof(Type));
-            if (StepSize == 0)
-                throw new ArgumentOutOfRangeException(nameof(StepSize), "Billing steps must be positive.");
-            this.Type      = Type;
-            this.Price     = Price;
-            this.StepSize  = StepSize;
-
-        }
-
-        #endregion
-
-
-        #region Flat(Price, BillingIncrement)
-
-        /// <summary>
-        /// Create a new flat rate price component.
-        /// </summary>
-        /// <param name="Price">Flat rate price.</param>
-        public static ChargingPriceComponent FlatRate(Decimal  Price)
-
-            => new (ChargingDimensionTypes.FLAT,
-                    Price,
-                    1);
-
-        #endregion
-
-        #region ChargingTime(Price, BillingIncrement)
-
-        /// <summary>
-        /// Create a new time-based charging price component.
-        /// </summary>
-        /// <param name="Price">Price per time span.</param>
-        /// <param name="BillingIncrement">The minimum granularity of time in seconds that you will be billed.</param>
-        public static ChargingPriceComponent ChargingTime(Decimal   Price,
-                                                          TimeSpan  BillingIncrement)
-
-            => new (ChargingDimensionTypes.TIME,
-                    Price,
-                    BillingSeconds(BillingIncrement));
-
-        #endregion
-
-        #region ParkingTime(Price, BillingIncrement)
-
-        /// <summary>
-        /// Create a new time-based parking price component.
-        /// </summary>
-        /// <param name="Price">Price per time span.</param>
-        /// <param name="BillingIncrement">The minimum granularity of time in seconds that you will be billed.</param>
-        public static ChargingPriceComponent ParkingTime(Decimal   Price,
-                                                         TimeSpan  BillingIncrement)
-
-            => new (ChargingDimensionTypes.PARKING_TIME,
-                    Price,
-                    BillingSeconds(BillingIncrement));
-
-        #endregion
-
-
-        #region ToJSON()
-
-        /// <summary>
-        /// Return a JSON representation of this object.
-        /// </summary>
-        public JObject ToJSON()
-
-            => new JObject(new JProperty("type",      Type. ToString()),
-                           new JProperty("price",     Price),
-                           new JProperty("stepSize",  StepSize));
-
-        #endregion
-
-        #region Clone()
-
-        /// <summary>
-        /// Clone this object.
-        /// </summary>
-        public ChargingPriceComponent Clone()
-
-            => new (Type,
-                    Price,
-                    StepSize);
-
-        #endregion
-
-
-        #region (override) GetHashCode()
-
-        /// <summary>
-        /// Get the hash code of this object.
-        /// </summary>
-        public override Int32 GetHashCode()
-        {
-            unchecked
-            {
-                return Type.GetHashCode() * 23 ^ Price.GetHashCode() * 17 ^ StepSize.GetHashCode();
-            }
-        }
-
-        #endregion
-
-        #region (override) ToString()
-
-        /// <summary>
-        /// Get a string representation of this object.
-        /// </summary>
-        public override String ToString()
-
-            => String.Concat("type: ",       Type.    ToString(),
-                             ", price: ",    Price.   ToString(),
-                             ", step size:", StepSize.ToString());
-
-        #endregion
-
+        Type = type;
+        Price = price;
+        EnergyStep = energyStep;
+        CurrentStep = currentStep;
+        DurationStep = durationStep;
+        if (!IsValid) throw new ArgumentException("A billing increment must be positive and match the tariff dimension.");
     }
 
+    internal Boolean IsValid => Type switch
+    {
+        ChargingDimensionTypes.FLAT => EnergyStep is null && CurrentStep is null && DurationStep is null,
+        ChargingDimensionTypes.ENERGY => EnergyStep > WattHour.AdditiveIdentity && CurrentStep is null && DurationStep is null,
+        ChargingDimensionTypes.MAX_CURRENT or ChargingDimensionTypes.MIN_CURRENT =>
+            CurrentStep > Ampere.AdditiveIdentity && EnergyStep is null && DurationStep is null,
+        ChargingDimensionTypes.TIME or ChargingDimensionTypes.PARKING_TIME =>
+            DurationStep > TimeSpan.Zero && EnergyStep is null && CurrentStep is null,
+        _ => false
+    };
+
+    /// <summary>
+    /// Create a flat fee without a physical billing increment.
+    /// </summary>
+    public static ChargingPriceComponent FlatRate(Decimal Price) => new(ChargingDimensionTypes.FLAT, Price);
+
+    /// <summary>
+    /// Create energy pricing with a typed energy increment.
+    /// </summary>
+    public static ChargingPriceComponent Energy(Decimal Price, WattHour BillingIncrement)
+        => new(ChargingDimensionTypes.ENERGY, Price, energyStep: BillingIncrement);
+
+    /// <summary>
+    /// Create maximum-current pricing with a typed current increment.
+    /// </summary>
+    public static ChargingPriceComponent MaximumCurrent(Decimal Price, Ampere BillingIncrement)
+        => new(ChargingDimensionTypes.MAX_CURRENT, Price, currentStep: BillingIncrement);
+
+    /// <summary>
+    /// Create minimum-current pricing with a typed current increment.
+    /// </summary>
+    public static ChargingPriceComponent MinimumCurrent(Decimal Price, Ampere BillingIncrement)
+        => new(ChargingDimensionTypes.MIN_CURRENT, Price, currentStep: BillingIncrement);
+
+    /// <summary>
+    /// Create charging-time pricing with a typed duration increment.
+    /// </summary>
+    public static ChargingPriceComponent ChargingTime(Decimal Price, TimeSpan BillingIncrement)
+        => new(ChargingDimensionTypes.TIME, Price, durationStep: BillingIncrement);
+
+    /// <summary>
+    /// Create parking-time pricing with a typed duration increment.
+    /// </summary>
+    public static ChargingPriceComponent ParkingTime(Decimal Price, TimeSpan BillingIncrement)
+        => new(ChargingDimensionTypes.PARKING_TIME, Price, durationStep: BillingIncrement);
+
+    /// <summary>
+    /// Return JSON with an explicit SI unit on each physical billing increment.
+    /// </summary>
+    public JObject ToJSON()
+    {
+        if (!IsValid) throw new InvalidOperationException("Invalid price component.");
+        var json = new JObject(new JProperty("type", Type.ToString()), new JProperty("price", Price));
+        if (EnergyStep is { } energy) json["stepSize"] = MetrologyJson.Text(energy);
+        if (CurrentStep is { } current) json["stepSize"] = MetrologyJson.Text(current);
+        if (DurationStep is { } duration) json["stepSize"] = MetrologyJson.DurationText(duration);
+        return POIRepresentation.AddETags(this, json);
+    }
+
+    /// <summary>
+    /// Return this immutable value.
+    /// </summary>
+    public ChargingPriceComponent Clone() => this;
+
+    public override Int32 GetHashCode() => HashCode.Combine(Type, Price, EnergyStep, CurrentStep, DurationStep);
+
+    public override String ToString() => ToJSON().ToString(Newtonsoft.Json.Formatting.None);
 }

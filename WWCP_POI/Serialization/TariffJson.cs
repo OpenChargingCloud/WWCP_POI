@@ -46,11 +46,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (JSON[Field] is not { } token)
                 return null;
 
-            var text = token.Type == JTokenType.String
-                           ? token.Value<String>()
-                           : token.ToString(Formatting.None);
+            var text = token.ToString(Formatting.None);
 
-            if (token.Type is not (JTokenType.Float or JTokenType.Integer or JTokenType.String) ||
+            if (token.Type is not (JTokenType.Float or JTokenType.Integer) ||
                 !System.Decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
             {
                 throw new ArgumentException($"{Field}: expected an invariant decimal number.");

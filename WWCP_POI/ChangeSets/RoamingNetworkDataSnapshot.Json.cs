@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -71,7 +71,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Write nested JSON directly
 
         private void WriteNode(Utf8JsonWriter           writer,
-                               InfrastructureEntityKey  key)
+                               InfrastructureEntityKey  key,
+                               Boolean                   includeETags = false)
         {
 
             var entity = Entities[key];
@@ -88,6 +89,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (key == Root)
                 WriteRevisionMetadata(writer);
+
+            if (includeETags && key == Root)
+            {
+                writer.WritePropertyName("ETags");
+                writer.WriteStartArray();
+                foreach (var tag in ETags) tag.WriteTo(writer);
+                writer.WriteEndArray();
+            }
 
             writer.WriteEndObject();
 

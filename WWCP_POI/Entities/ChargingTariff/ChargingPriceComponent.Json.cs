@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -20,6 +20,8 @@
 using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
+
+using org.GraphDefined.Vanaheimr.Illias;
 
 #endregion
 
@@ -51,7 +53,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// Try to parse a price component with a positive integral billing step.
+        /// Try to parse a price component with a positive, explicitly typed billing step.
         /// </summary>
         public static Boolean TryParse(JObject                           JSON,
                                        out ChargingPriceComponent        result,
@@ -73,12 +75,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var price = TariffJson.Decimal(JSON, "price") ??
                             throw new ArgumentException("price: missing price.");
 
-                var step = JSON["stepSize"];
-
-                if (step is null || step.Type != JTokenType.Integer || !UInt32.TryParse(step.ToString(), out var size))
-                    throw new ArgumentException("stepSize: expected an unsigned integer.");
-
-                result = new ChargingPriceComponent(type, price, size);
+                if (type == ChargingDimensionTypes.FLAT && JSON["stepSize"] is not null)
+                    throw new ArgumentException("stepSize: flat fees have no physical billing increment.");
+                result = type switch
+                {
+                    ChargingDimensionTypes.FLAT => FlatRate(price),
+                    ChargingDimensionTypes.ENERGY => Energy(price, MetrologyJson.Read<WattHour>(JSON, "stepSize", WattHour.TryParse) ??
+                                                                    throw new ArgumentException("stepSize: missing energy increment.")),
+                    ChargingDimensionTypes.MAX_CURRENT => MaximumCurrent(price, MetrologyJson.Read<Ampere>(JSON, "stepSize", Ampere.TryParse) ??
+                                                                                throw new ArgumentException("stepSize: missing current increment.")),
+                    ChargingDimensionTypes.MIN_CURRENT => MinimumCurrent(price, MetrologyJson.Read<Ampere>(JSON, "stepSize", Ampere.TryParse) ??
+                                                                                throw new ArgumentException("stepSize: missing current increment.")),
+                    ChargingDimensionTypes.TIME => ChargingTime(price, MetrologyJson.ReadDuration(JSON, "stepSize") ??
+                                                                       throw new ArgumentException("stepSize: missing duration increment.")),
+                    ChargingDimensionTypes.PARKING_TIME => ParkingTime(price, MetrologyJson.ReadDuration(JSON, "stepSize") ??
+                                                                             throw new ArgumentException("stepSize: missing duration increment.")),
+                    _ => throw new ArgumentException("type: unsupported tariff dimension.")
+                };
 
                 return true;
             }
@@ -92,24 +105,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Validate billing increment
 
-        private static UInt32 BillingSeconds(TimeSpan Increment)
-        {
-
-            if (Increment.Ticks <= 0 ||
-                Increment.Ticks % TimeSpan.TicksPerSecond != 0 ||
-                Increment.TotalSeconds > UInt32.MaxValue)
-            {
-                throw new ArgumentOutOfRangeException("increment",
-                                                      "Billing increments must be positive whole seconds within UInt32 range.");
-            }
-
-            return (UInt32) Increment.TotalSeconds;
-
-        }
-
-        #endregion
 
     }
 

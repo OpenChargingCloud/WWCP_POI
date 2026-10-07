@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -34,7 +34,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// The transparency software status.
     /// This information will e.g. be used for the German Calibration Law.
     /// </summary>
-    public partial class TransparencySoftwareStatus : IEquatable<TransparencySoftwareStatus>,
+    public sealed partial class TransparencySoftwareStatus : IEquatable<TransparencySoftwareStatus>,
                                               IComparable<TransparencySoftwareStatus>,
                                               IComparable
     {
@@ -213,9 +213,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        );
 
-            return CustomTransparencySoftwareStatusSerializer is not null
+            return POIRepresentation.AddETags(this, CustomTransparencySoftwareStatusSerializer is not null
                        ? CustomTransparencySoftwareStatusSerializer(this, JSON)
-                       : JSON;
+                       : JSON);
 
         }
 

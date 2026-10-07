@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -32,7 +32,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     {
 
         /// <summary>
-        /// Parse software properties and a complete or legacy license representation.
+        /// Parse software properties and a complete license object.
         /// </summary>
         private static Boolean TryParseDocument(JObject                                             JSON,
                                                 [NotNullWhen(true)]  out TransparencySoftware?      result,
@@ -46,6 +46,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
                 ArgumentNullException.ThrowIfNull(JSON);
+                if (custom is null)
+                    InfrastructureJson.ValidateFields(JSON, "name", "version", "openSourceLicense", "vendor", "logo",
+                                                      "howToUse", "moreInformation", "sourceCodeRepository");
 
                 var parsed = new TransparencySoftware(
                                  Name:                 TransparencyJson.RequiredText(JSON, "name"),
@@ -53,9 +56,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  OpenSourceLicense:    InfrastructureJson.At("openSourceLicense", () => TransparencyJson.License(JSON)),
                                  Vendor:               TransparencyJson.RequiredText(JSON, "vendor"),
                                  Logo:                 TransparencyJson.Link(JSON, "logo"),
-                                 HowToUse:             TransparencyJson.Link(JSON, "how_to_use"),
-                                 MoreInformation:      TransparencyJson.Link(JSON, "more_information"),
-                                 SourceCodeRepository: TransparencyJson.Link(JSON, "source_code_repository")
+                                 HowToUse:             TransparencyJson.Link(JSON, "howToUse"),
+                                 MoreInformation:      TransparencyJson.Link(JSON, "moreInformation"),
+                                 SourceCodeRepository: TransparencyJson.Link(JSON, "sourceCodeRepository")
                              );
 
                 result = custom is null

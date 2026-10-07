@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -32,9 +32,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// An abstract e-mobility entity.
     /// </summary>
-    public abstract class AEMobilityEntity<TId,
+    public abstract class AImmutableEMobilityEntity<TId,
                                            TAdminStatus,
-                                           TStatus> : AInternalData,
+                                           TStatus> : AImmutableInternalData,
+                                                      IImmutablePOI,
                                                       IEntity<TId>,
                                                       IHasId<TId>,
                                                       IAdminStatus<TAdminStatus>,
@@ -46,9 +47,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     {
 
-        /// <summary>Restore persisted timestamps on a newly parsed entity without recording a change.</summary>
+        /// <summary>
+        /// Content identifiers of the immutable POI data; runtime states are excluded.
+        /// </summary>
+        public System.Collections.Immutable.ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
+
+        /// <summary>
+        /// Restore persisted timestamps on a newly parsed entity without recording a change.
+        /// </summary>
         internal void RestoreSnapshotTimestamps(DateTimeOffset? created, DateTimeOffset? lastChange)
             => RestoreTimestamps(created ?? Created, lastChange ?? LastChangeDate);
+
+        internal (UInt16 Admin, UInt16 Status) RuntimeHistorySizes
+            => (adminStatusSchedule.MaxStatusHistorySize, statusSchedule.MaxStatusHistorySize);
+
+        internal void RestoreRuntimeHistorySizes((UInt16 Admin, UInt16 Status) sizes)
+        {
+            adminStatusSchedule.MaxStatusHistorySize = sizes.Admin;
+            statusSchedule.MaxStatusHistorySize = sizes.Status;
+        }
 
         #region Data
 
@@ -75,14 +92,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The multi-language name of this entity.
         /// </summary>
+        private readonly ImmutableI18NString immutableName;
         [Optional]
-        public I18NString              Name                     { get; }
+        public ImmutableI18NString Name => immutableName;
 
         /// <summary>
         /// The multi-language description of this entity.
         /// </summary>
+        private readonly ImmutableI18NString immutableDescription;
         [Optional]
-        public I18NString              Description              { get; }
+        public ImmutableI18NString Description => immutableDescription;
 
 
         #region AdminStatus
@@ -111,7 +130,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region AdminStatusSchedule
 
-        protected readonly StatusSchedule<TAdminStatus> adminStatusSchedule;
+        protected readonly RuntimeStatusSchedule<TAdminStatus> adminStatusSchedule;
 
         /// <summary>
         /// The charging station admin status schedule.
@@ -169,7 +188,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region StatusSchedule
 
-        protected readonly StatusSchedule<TStatus> statusSchedule;
+        protected readonly RuntimeStatusSchedule<TStatus> statusSchedule;
 
         /// <summary>
         /// The charging station status schedule.
@@ -209,27 +228,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// A unique status identification of this entity.
         /// </summary>
         [Mandatory]
-        public String? ETag
-        {
-
-            get
-            {
-                return eTag;
-            }
-
-            set
-            {
-
-                if (value is not null)
-                    SetProperty(ref eTag,
-                                value);
-
-                else
-                    DeleteProperty(ref eTag);
-
-            }
-
-        }
+        public String? ETag => eTag;
 
         #endregion
 
@@ -241,27 +240,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The source of this information, e.g. the WWCP importer used.
         /// </summary>
         [Optional]
-        public String? DataSource
-        {
-
-            get
-            {
-                return dataSource;
-            }
-
-            set
-            {
-
-                if (value is not null)
-                    SetProperty(ref dataSource,
-                                value);
-
-                else
-                    DeleteProperty(ref dataSource);
-
-            }
-
-        }
+        public String? DataSource => dataSource;
 
         #endregion
 
@@ -273,16 +252,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        I18NString IEntity.Name => Name.ToMutable();
+        I18NString IEntity.Description => Description.ToMutable();
+
         #region Constructor(s)
 
         /// <summary>
         /// Create a new abstract entity.
         /// </summary>
         /// <param name="Id">The unique entity identification.</param>
-        /// 
+        ///
         /// <param name="CustomData">Optional customer specific data, e.g. in combination with custom parsers and serializers.</param>
         /// <param name="InternalData">Optional internal data.</param>
-        public AEMobilityEntity(TId                         Id,
+        public AImmutableEMobilityEntity(TId                         Id,
                                 I18NString?                 Name                         = null,
                                 I18NString?                 Description                  = null,
 
@@ -318,60 +300,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.dataSource  = DataSource;
 
 
-            #region Name
+            immutableName = (Name ?? I18NString.Empty).Clone();
 
-            this.Name                  = Name        ?? I18NString.Empty;
-
-            this.Name.OnPropertyChanged += (timestamp,
-                                            eventTrackingId,
-                                            sender,
-                                            propertyName,
-                                            newValue,
-                                            oldValue,
-                                            dataSource) =>
-            {
-
-                PropertyChanged("name",
-                                newValue,
-                                oldValue,
-                                dataSource,
-                                eventTrackingId);
-
-                return Task.CompletedTask;
-
-            };
-
-            #endregion
-
-            #region Description
-
-            this.Description           = Description ?? I18NString.Empty;
-
-            this.Description.OnPropertyChanged += (timestamp,
-                                                   eventTrackingId,
-                                                   sender,
-                                                   propertyName,
-                                                   newValue,
-                                                   oldValue,
-                                                   dataSource) =>
-            {
-
-                PropertyChanged("description",
-                                newValue,
-                                oldValue,
-                                dataSource,
-                                eventTrackingId);
-
-                return Task.CompletedTask;
-
-            };
-
-            #endregion
+            immutableDescription = (Description ?? I18NString.Empty).Clone();
 
 
             #region AdminStatusSchedule
 
-            this.adminStatusSchedule   = new StatusSchedule<TAdminStatus>(MaxAdminStatusScheduleSize);
+            this.adminStatusSchedule   = new RuntimeStatusSchedule<TAdminStatus>(MaxAdminStatusScheduleSize);
 
             if (InitialAdminStatus.HasValue)
                 this.adminStatusSchedule.Insert(InitialAdminStatus.Value);
@@ -380,7 +316,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region StatusSchedule
 
-            this.statusSchedule = new StatusSchedule<TStatus>(MaxStatusScheduleSize);
+            this.statusSchedule = new RuntimeStatusSchedule<TStatus>(MaxStatusScheduleSize);
 
             if (InitialStatus.     HasValue)
                 this.statusSchedule.     Insert(InitialStatus.Value);

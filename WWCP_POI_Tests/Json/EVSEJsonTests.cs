@@ -87,15 +87,11 @@ namespace WWCP_POI_Tests.Json
         }
 
         [Test]
-        public void Older_nested_mode_arrays_are_read_and_normalized()
+        public void Nested_mode_arrays_are_rejected()
         {
 
             var json = JObject.Parse("{\"@id\":\"DE*ABC*E1\",\"currentType\":[\"AC_OnePhase\",\"DC\"],\"chargingModes\":[[\"Mode_3\",\"Mode_4\"]]}");
-            var parsed = EVSE.Parse(json, Station());
-
-            Assert.That(parsed.CurrentType, Is.EqualTo(CurrentTypes.AC_OnePhase | CurrentTypes.DC));
-            Assert.That(parsed.ToJSON(Embedded: true)!["chargingModes"]!.ToString(),
-                                                        Is.EqualTo(new JArray("Mode_3", "Mode_4").ToString()));
+            Assert.That(EVSE.TryParse(json, Station(), out _, out _), Is.False);
 
         }
 

@@ -32,7 +32,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A charging product.
     /// </summary>
-    public class ChargingProduct : IEquatable<ChargingProduct>,
+    public sealed partial class ChargingProduct : IEquatable<ChargingProduct>,
                                    IComparable<ChargingProduct>,
                                    IComparable
     {
@@ -83,7 +83,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Stop charging after this amount of charged energy [kWh].
         /// </summary>
-        public WattHour?           StopChargingAfterKWh    { get; }
+        public WattHour?           StopChargingAfterEnergy    { get; }
 
         public Decimal?            MaxB2BServiceCosts      { get; }
 
@@ -102,14 +102,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="MinPower">The minimal charging power the electric vehicle accepts.</param>
         /// <param name="MaxPower">The maximum charging power the electric vehicle consumes.</param>
         /// <param name="MinEnergy">The electric vehicle wants to charge at least this amount of energy [Wh].</param>
-        /// <param name="StopChargingAfterKWh">Stop charging after this amount of charged energy [Wh].</param>
+        /// <param name="StopChargingAfterEnergy">Stop charging after this amount of charged energy [Wh].</param>
         public ChargingProduct(ChargingProduct_Id  Id,
                                TimeSpan?           MinDuration             = null,
                                TimeSpan?           StopChargingAfterTime   = null,
                                Watt?               MinPower                = null,
                                Watt?               MaxPower                = null,
                                WattHour?           MinEnergy               = null,
-                               WattHour?           StopChargingAfterKWh    = null,
+                               WattHour?           StopChargingAfterEnergy    = null,
                                Decimal?            MaxB2BServiceCosts      = null,
                                Boolean?            IntermediateCDRs        = null)
         {
@@ -120,7 +120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.MinPower               = MinPower;
             this.MaxPower               = MaxPower;
             this.MinEnergy              = MinEnergy;
-            this.StopChargingAfterKWh   = StopChargingAfterKWh;
+            this.StopChargingAfterEnergy   = StopChargingAfterEnergy;
             this.MaxB2BServiceCosts     = MaxB2BServiceCosts;
             this.IntermediateCDRs       = IntermediateCDRs;
 
@@ -183,27 +183,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : new JProperty("@context",                JSONLDContext),
 
                            MinDuration.HasValue
-                               ? new JProperty("minDuration",             MinDuration.          Value.TotalSeconds)
+                               ? new JProperty("minDuration",             MetrologyJson.DurationText(MinDuration.Value))
                                : null,
 
                            StopChargingAfterTime.HasValue
-                               ? new JProperty("stopChargingAfterTime",   StopChargingAfterTime.Value.TotalSeconds)
+                               ? new JProperty("stopChargingAfterTime",   MetrologyJson.DurationText(StopChargingAfterTime.Value))
                                : null,
 
                            MinPower.HasValue
-                               ? new JProperty("minPower",                MinPower.             Value.Value)
+                               ? new JProperty("minPower",                MetrologyJson.Text(MinPower.Value))
                                : null,
 
                            MaxPower.HasValue
-                               ? new JProperty("maxPower",                MaxPower.             Value.Value)
+                               ? new JProperty("maxPower",                MetrologyJson.Text(MaxPower.Value))
                                : null,
 
                            MinEnergy.HasValue
-                               ? new JProperty("minEnergy",               MinEnergy.            Value.Value)
+                               ? new JProperty("minEnergy",               MetrologyJson.Text(MinEnergy.Value))
                                : null,
 
-                           StopChargingAfterKWh.HasValue
-                               ? new JProperty("stopChargingAfterKWh",    StopChargingAfterKWh. Value.Value)
+                           StopChargingAfterEnergy.HasValue
+                               ? new JProperty("stopChargingAfterEnergy", MetrologyJson.Text(StopChargingAfterEnergy.Value))
                                : null,
 
                            MaxB2BServiceCosts.HasValue
@@ -216,15 +216,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        );
 
-            return CustomChargingProductSerializer is not null
+            return POIRepresentation.AddETags(this, CustomChargingProductSerializer is not null
                        ? CustomChargingProductSerializer(this, json)
-                       : json;
+                       : json);
 
         }
 
         #endregion
 
-        /// <summary>Parse a charging product, including optional duration, power, energy and cost limits.</summary>
+        /// <summary>
+        /// Parse a charging product, including optional duration, power, energy and cost limits.
+        /// </summary>
         public static ChargingProduct Parse(JObject JSON)
         {
             if (TryParse(JSON, out var product, out var error))
@@ -261,20 +263,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                if (!JsonValueParsing.TryReadOptional(JSON, "minDuration", TryParseSeconds,
-                                                      out TimeSpan? minDuration, out ErrorResponse) ||
-                    !JsonValueParsing.TryReadOptional(JSON, "stopChargingAfterTime", TryParseSeconds,
-                                                      out TimeSpan? stopChargingAfterTime, out ErrorResponse) ||
-                    !JsonValueParsing.TryReadOptional(JSON, "minPower", Watt.TryParse,
+                InfrastructureJson.Validate(JSON, JSONLDContext);
+                InfrastructureJson.ValidateFields(JSON, "@id", "@context", "minDuration", "stopChargingAfterTime",
+                                                  "minPower", "maxPower", "minEnergy", "stopChargingAfterEnergy",
+                                                  "maxB2BServiceCosts", "intermediateCDRs");
+                var minDuration = MetrologyJson.ReadDuration(JSON, "minDuration");
+                var stopChargingAfterTime = MetrologyJson.ReadDuration(JSON, "stopChargingAfterTime");
+                var maxB2BServiceCosts = TariffJson.Decimal(JSON, "maxB2BServiceCosts");
+                if (!MetrologyJson.TryRead(JSON, "minPower", Watt.TryParse,
                                                       out Watt? minPower, out ErrorResponse) ||
-                    !JsonValueParsing.TryReadOptional(JSON, "maxPower", Watt.TryParse,
+                    !MetrologyJson.TryRead(JSON, "maxPower", Watt.TryParse,
                                                       out Watt? maxPower, out ErrorResponse) ||
-                    !JsonValueParsing.TryReadOptional(JSON, "minEnergy", WattHour.TryParse,
+                    !MetrologyJson.TryRead(JSON, "minEnergy", WattHour.TryParse,
                                                       out WattHour? minEnergy, out ErrorResponse) ||
-                    !JsonValueParsing.TryReadOptional(JSON, "stopChargingAfterKWh", WattHour.TryParse,
-                                                      out WattHour? stopChargingAfterKWh, out ErrorResponse) ||
-                    !JsonValueParsing.TryReadOptional(JSON, "maxB2BServiceCosts", TryParseCosts,
-                                                      out Decimal? maxB2BServiceCosts, out ErrorResponse))
+                    !MetrologyJson.TryRead(JSON, "stopChargingAfterEnergy",
+                                          WattHour.TryParse,
+                                                      out WattHour? stopChargingAfterEnergy, out ErrorResponse))
                     return false;
 
                 var intermediateToken = JSON["intermediateCDRs"];
@@ -295,7 +299,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       minPower,
                                       maxPower,
                                       minEnergy,
-                                      stopChargingAfterKWh,
+                                      stopChargingAfterEnergy,
                                       maxB2BServiceCosts,
                                       intermediateCDRs
 
@@ -313,20 +317,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return false;
 
         }
-
-        private static Boolean TryParseSeconds(String text, out TimeSpan duration)
-        {
-            duration = default;
-            if (!Double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) ||
-                !Double.IsFinite(seconds))
-                return false;
-            duration = TimeSpan.FromSeconds(seconds);
-            return true;
-        }
-
-        private static Boolean TryParseCosts(String text, out Decimal costs)
-            => Decimal.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out costs);
-
 
         #region Operator overloading
 

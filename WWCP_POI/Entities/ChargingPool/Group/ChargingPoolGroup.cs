@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 
 using org.GraphDefined.Vanaheimr.Aegir;
 using org.GraphDefined.Vanaheimr.Hermod;
@@ -107,9 +108,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    ? null
 
-                   : JSONObject.Create(
+                   : POIRepresentation.AddETags(ChargingPoolGroup, JSONObject.Create(
 
                          new JProperty("@id", ChargingPoolGroup.Id.ToString()),
+                         new JProperty("chargingPoolIds", new JArray(ChargingPoolGroup.ChargingPoolIds.OrderBy(id => id).Select(id => id.ToString()))),
 
                          Embedded
                              ? null
@@ -188,7 +190,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                        Select (evse   => evse.  ToJSON(Embedded: true)))
                                                      : null))
 
-                        );
+                        ));
 
         #endregion
 
@@ -260,11 +262,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// might provide a shared network access to aggregate and optimize communication
     /// with the EVSE Operator backend.
     /// </summary>
-    public class ChargingPoolGroup : AEMobilityEntity<ChargingPoolGroup_Id,
+    public sealed partial class ChargingPoolGroup : AImmutableEMobilityEntity<ChargingPoolGroup_Id,
                                                       ChargingPoolGroupAdminStatusTypes,
                                                       ChargingPoolGroupStatusTypes>,
                                      IEquatable<ChargingPoolGroup>, IComparable<ChargingPoolGroup>, IComparable,
-                                     IEnumerable<ChargingStation>
+                                     IEnumerable<ChargingPool>
     {
 
         #region Data
@@ -286,8 +288,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional (multi-language) brand name for this group.
         /// </summary>
-        [Optional]
-        public Brand                    Brand          { get; }
+        private readonly Brand? brand;
+        public Brand? Brand => ImmutablePOIValues.Copy(brand);
 
         /// <summary>
         /// The priority of this group relative to all other groups.
@@ -304,37 +306,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The license of the group data.
         /// </summary>
-        [Mandatory]
-        public IEnumerable<DataLicense> DataLicenses { get; }
+        private readonly ImmutableArray<DataLicense> dataLicenses;
+        public IEnumerable<DataLicense> DataLicenses => ImmutablePOIValues.CopyItems(dataLicenses);
 
 
+        private readonly ImmutableHashSet<ChargingPool_Id> _AllowedMemberIds;
 
-        private HashSet<ChargingStation_Id> _AllowedMemberIds;
-
-        public IEnumerable<ChargingStation_Id> AllowedMemberIds
+        public IEnumerable<ChargingPool_Id> AllowedMemberIds
             => _AllowedMemberIds;
 
-        public Func<ChargingStation, Boolean> AutoIncludeStations { get; }
+        public Func<ChargingPool, Boolean> AutoIncludePools { get; }
 
 
         public ChargingPoolGroup     ParentGroup    { get; }
 
         #region ChargingStations
 
-        private readonly ConcurrentDictionary<ChargingStation_Id, ChargingStation> _ChargingStations;
+        private readonly ImmutableDictionary<ChargingPool_Id, ChargingPool> _ChargingPools;
 
         /// <summary>
         /// Return all charging stations registered within this charging station group.
         /// </summary>
+        public IEnumerable<ChargingPool> ChargingPools
+            => _ChargingPools.Values;
+
         public IEnumerable<ChargingStation> ChargingStations
-            => _ChargingStations.Values;
+            => ChargingPools.SelectMany(pool => pool.ChargingStations);
 
 
         /// <summary>
         /// Return all charging station identifications registered within this charging station group.
         /// </summary>
-        public IEnumerable<ChargingStation_Id> ChargingStationIds
-            => ChargingStations.SafeSelect(station => station.Id);
+        public IEnumerable<ChargingPool_Id> ChargingPoolIds => ChargingPools.Select(pool => pool.Id);
+        public IEnumerable<ChargingStation_Id> ChargingStationIds => ChargingStations.Select(station => station.Id);
 
         /// <summary>
         /// Return all EVSEs registered within this charging station group.
@@ -427,6 +431,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        public ChargingPoolGroup WithMembers(IEnumerable<ChargingPool> members)
+        {
+            var values = members.ToImmutableArray();
+            var copy = new ChargingPoolGroup(Id, Operator, Name, Description, Brand, Priority, Tariff, DataLicenses,
+                                  Members: values, MemberIds: values.Select(value => value.Id), AutoIncludePools: _ => true,
+                                  StatusAggregationDelegate: StatusAggregationDelegate,
+                                  MaxGroupStatusListSize: statusSchedule.MaxStatusHistorySize,
+                                  MaxGroupAdminStatusListSize: adminStatusSchedule.MaxStatusHistorySize);
+            copy.SetAdminStatus(AdminStatusSchedule());
+            copy.SetStatus(StatusSchedule());
+            copy.RestoreSnapshotTimestamps(Created, Timestamp.Now);
+            return copy;
+        }
+        public ChargingPoolGroup WithMember(ChargingPool member)
+            => WithMembers(ChargingPools.Where(value => value.Id != member.Id).Append(member));
+        public ChargingPoolGroup WithoutMember(ChargingPool_Id id)
+            => WithMembers(ChargingPools.Where(value => value.Id != id));
+
         #region Constructor(s)
 
         /// <summary>
@@ -436,35 +459,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Operator">The charging station operator of this charging station group.</param>
         /// <param name="Name">The official (multi-language) name of this charging station group.</param>
         /// <param name="Description">An optional (multi-language) description of this charging station group.</param>
-        /// 
+        ///
         /// <param name="Members">An enumeration of charging stations member building this charging station group.</param>
         /// <param name="MemberIds">An enumeration of charging station identifications which are building this charging station group.</param>
-        /// <param name="AutoIncludeStations">A delegate deciding whether to include new charging stations automatically into this group.</param>
-        /// 
+        /// <param name="AutoIncludePools">A delegate deciding whether to include new charging stations automatically into this group.</param>
+        ///
         /// <param name="StatusAggregationDelegate">A delegate called to aggregate the dynamic status of all subordinated charging stations.</param>
         /// <param name="MaxGroupStatusListSize">The default size of the charging station group status list.</param>
         /// <param name="MaxGroupAdminStatusListSize">The default size of the charging station group admin status list.</param>
-        internal ChargingPoolGroup(ChargingPoolGroup_Id                                             Id,
+        public ChargingPoolGroup(ChargingPoolGroup_Id                                             Id,
                                       ChargingStationOperator                                            Operator,
                                       I18NString                                                          Name,
-                                      I18NString                                                          Description                   = null,
+                                      I18NString?                                                          Description                   = null,
 
-                                      Brand                                                               Brand                         = null,
+                                      Brand?                                                               Brand                         = null,
                                       Priority?                                                           Priority                      = null,
-                                      ChargingTariff                                                      Tariff                        = null,
+                                      ChargingTariff?                                                      Tariff                        = null,
                                       IEnumerable<DataLicense>                                            DataLicenses                  = null,
 
-                                      IEnumerable<ChargingStation>                                       Members                       = null,
-                                      IEnumerable<ChargingStation_Id>                                     MemberIds                     = null,
-                                      Func<ChargingStation, Boolean>                                     AutoIncludeStations           = null,
+                                      IEnumerable<ChargingPool>                                       Members                       = null,
+                                      IEnumerable<ChargingPool_Id>                                     MemberIds                     = null,
+                                      Func<ChargingPool, Boolean>                                     AutoIncludePools           = null,
 
                                       Func<ChargingStationStatusReport, ChargingPoolGroupStatusTypes>  StatusAggregationDelegate     = null,
                                       UInt16                                                              MaxGroupStatusListSize        = DefaultMaxGroupStatusListSize,
                                       UInt16                                                              MaxGroupAdminStatusListSize   = DefaultMaxGroupAdminStatusListSize)
 
-            : base(Id,
-                   Name,
-                   Description)
+            : base(Id, Name, Description, MaxAdminStatusScheduleSize: MaxGroupAdminStatusListSize, MaxStatusScheduleSize: MaxGroupStatusListSize)
 
         {
 
@@ -482,48 +503,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.Operator                    = Operator;
 
-            this.Brand                       = Brand;
+            this.brand = ImmutablePOIValues.Copy(Brand);
             this.Priority                    = Priority;
             this.Tariff                      = Tariff;
-            this.DataLicenses                = DataLicenses;
+            this.dataLicenses = ImmutablePOIValues.CopyItems(DataLicenses);
 
-            this._AllowedMemberIds           = MemberIds is not null ? new HashSet<ChargingStation_Id>(MemberIds) : new HashSet<ChargingStation_Id>();
-            this.AutoIncludeStations         = AutoIncludeStations ?? (MemberIds is null ? (Func<ChargingStation, Boolean>) (station => true) : station => false);
-            this._ChargingStations           = new ConcurrentDictionary<ChargingStation_Id, ChargingStation>();
+            var candidates = (Members ?? []).ToImmutableArray();
+            this._AllowedMemberIds = (MemberIds ?? candidates.Select(candidate => candidate.Id)).ToImmutableHashSet();
+            if (Id.OperatorId != Operator.Id || _AllowedMemberIds.Any(id => id.OperatorId != Operator.Id) ||
+                Tariff is not null && Tariff.Operator.Id != Operator.Id)
+                throw new ArgumentException("Group configuration belongs to a different operator.");
+            this.AutoIncludePools = AutoIncludePools ?? (_ => true);
+
 
             this.StatusAggregationDelegate   = StatusAggregationDelegate;
 
             #endregion
 
-            if (Members?.Any() == true)
-                Members.ForEach(station => Add(station));
+            foreach (var candidate in candidates)
+                if (candidate.Id.OperatorId != Operator.Id)
+                    throw new ArgumentException("A group member belongs to a different operator.", nameof(Members));
+            this._ChargingPools = candidates.Where(candidate =>
+                (MemberIds is null || _AllowedMemberIds.Contains(candidate.Id)) && this.AutoIncludePools(candidate))
+                .ToImmutableDictionary(candidate => candidate.Id);
 
         }
 
         #endregion
-
-
-        public ChargingPoolGroup Add(ChargingStation Station)
-        {
-
-            if (_AllowedMemberIds.Contains(Station.Id) &&
-                AutoIncludeStations(Station))
-            {
-                _ChargingStations.TryAdd(Station.Id, Station);
-            }
-
-            return this;
-
-        }
-
-        public ChargingPoolGroup Add(ChargingStation_Id StationId)
-        {
-
-            _AllowedMemberIds.Add(StationId);
-
-            return this;
-
-        }
 
 
         #region (internal) UpdateEVSEData       (Timestamp, EventTrackingId, EVSE, OldStatus, NewStatus)
@@ -710,23 +716,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
          //   if (StatusAggregationDelegate is not null)
          //       _StatusSchedule.Insert(Timestamp,
-         //                              StatusAggregationDelegate(new ChargingStationStatusReport(_ChargingStations.Values)));
+         //                              StatusAggregationDelegate(new ChargingStationStatusReport(_ChargingPools.Values)));
 
         }
 
         #endregion
 
 
-        #region IEnumerable<ChargingStation> Members
+        #region IEnumerable<ChargingPool> Members
 
         System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
         {
-            return ChargingStations.GetEnumerator();
+            return ChargingPools.GetEnumerator();
         }
 
-        public IEnumerator<ChargingStation> GetEnumerator()
+        public IEnumerator<ChargingPool> GetEnumerator()
         {
-            return ChargingStations.GetEnumerator();
+            return ChargingPools.GetEnumerator();
         }
 
         #endregion

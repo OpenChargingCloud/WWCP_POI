@@ -33,7 +33,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// This class defines a geo location. The geodetic system to be used is WGS 84.
     /// </summary>
-    public readonly struct AdditionalGeoLocation : IEquatable<AdditionalGeoLocation>
+    public readonly partial struct AdditionalGeoLocation : IEquatable<AdditionalGeoLocation>
     {
 
         #region Properties
@@ -48,8 +48,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// An optional name for this geo location in the local language or as written at the location
         /// </summary>
         /// <example>The street name of a parking lot entrance or it's number.</example>
+                private readonly I18NString? immutableName;
         [Optional]
-        public I18NString?    Name           { get; }
+        public I18NString? Name => immutableName?.Clone();
 
         #endregion
 
@@ -67,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.GeoLocation  = GeoLocation;
-            this.Name         = Name;
+            this.immutableName         = (Name)?.Clone();
 
         }
 
@@ -199,13 +200,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                if (!JsonValueParsing.TryReadOptional(JSON, "altitude", TryParseAltitude,
-                                                      out Altitude? altitude, out ErrorResponse) ||
-                    (altitude.HasValue && !Double.IsFinite(altitude.Value.Value)))
-                {
-                    ErrorResponse ??= "Invalid 'altitude': expected a finite value in metres.";
-                    return false;
-                }
+                var altitudeValue = MetrologyJson.ReadAltitude(JSON, "altitude");
+                var altitude = altitudeValue is { } height ? Altitude.Parse(height) : (Altitude?) null;
 
                 #region Parse Name         [optional]
 
@@ -265,12 +261,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return TryParseFiniteNumber(text, out var number) && Longitude.TryParse(number, out longitude);
         }
 
-        private static Boolean TryParseAltitude(String text, out Altitude altitude)
-        {
-            altitude = default;
-            return TryParseFiniteNumber(text, out var number) && Altitude.TryParse(number, out altitude);
-        }
-
         #region ToJSON(CustomAdditionalGeoLocationSerializer = null)
 
         /// <summary>
@@ -286,7 +276,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  new JProperty("longitude",  GeoLocation.Longitude.Value.ToString("R", CultureInfo.InvariantCulture)),
 
                            GeoLocation.Altitude.HasValue
-                               ? new JProperty("altitude",   GeoLocation.Altitude.Value.Value)
+                               ? new JProperty("altitude",   MetrologyJson.AltitudeText(GeoLocation.Altitude.Value.Value))
                                : null,
 
                            Name.IsNotNullOrEmpty()
@@ -295,9 +285,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        );
 
-            return CustomAdditionalGeoLocationSerializer is not null
+            return POIRepresentation.AddETags(this, CustomAdditionalGeoLocationSerializer is not null
                        ? CustomAdditionalGeoLocationSerializer(this, JSON)
-                       : JSON;
+                       : JSON);
 
         }
 

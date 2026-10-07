@@ -33,7 +33,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A charging cable with loss compensation characteristics.
     /// </summary>
-    public class ChargingCable : IEquatable<ChargingCable>
+    public sealed partial class ChargingCable : IEquatable<ChargingCable>
     {
 
         #region Data
@@ -180,7 +180,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Length                            [optional]
 
-                if (!JsonValueParsing.TryReadOptional(JSON, "length", Meter.TryParse,
+                if (!MetrologyJson.TryRead(JSON, "length", Meter.TryParse,
                                                       out Meter? length, out ErrorResponse))
                     return false;
 
@@ -188,8 +188,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Resistance                        [optional]
 
-                // The wire format expresses cable resistance in microohms.
-                if (!JsonValueParsing.TryReadOptional(JSON, "resistance", Ohm.TryParse_µΩ,
+                if (!MetrologyJson.TryRead(JSON, "resistance", Ohm.TryParse,
                                                       out Ohm? resistance, out ErrorResponse))
                     return false;
 
@@ -255,11 +254,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             : null,
 
                         Length.    HasValue
-                            ? new JProperty("length",                           Length.    Value.m)
+                            ? new JProperty("length",                           MetrologyJson.Text(Length.Value))
                             : null,
 
                         Resistance.HasValue
-                            ? new JProperty("resistance",                       Resistance.Value.µΩ)
+                            ? new JProperty("resistance",                       MetrologyJson.Text(Resistance.Value))
                             : null,
 
                         LossCompensationName.IsNotNullOrEmpty()
@@ -272,9 +271,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         );
 
-            return CustomChargingCableSerializer is not null
+            return POIRepresentation.AddETags(this, CustomChargingCableSerializer is not null
                         ? CustomChargingCableSerializer(this, json)
-                        : json;
+                        : json);
 
         }
 

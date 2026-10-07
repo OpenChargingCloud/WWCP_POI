@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -31,7 +31,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A charging tariff restrictions class.
     /// </summary>
-    public partial class ChargingTariffRestriction
+    public sealed partial class ChargingTariffRestriction
     {
 
         #region Properties
@@ -48,14 +48,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public StartEndDateTime? Date => date is null ? null : new(date.StartTime, date.EndTime);
 
         /// <summary>
-        /// Minimum/Maximum used energy in kWh, for example 20, valid from this amount of energy is used.
+        /// Minimum/maximum used energy as typed watt-hour quantities.
         /// </summary>
-        public DecimalMinMax?          kWh          { get; }
+        public Range<WattHour?>?       Energy       { get; }
 
         /// <summary>
-        /// Minimum/Maximum power in kW, for example 0, valid from this charging speed.
+        /// Minimum/maximum charging power as typed watt quantities.
         /// </summary>
-        public DecimalMinMax?          Power        { get; }
+        public Range<Watt?>?           Power        { get; }
 
         /// <summary>
         /// Minimum/Maximum duration in seconds, valid for a duration from x seconds.
@@ -76,14 +76,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Time">Start/end time of day, for example "13:30 - 19:45", valid from this time of the day.</param>
         /// <param name="Date">Start/end date, for example: 2015-12-24, valid from this day until that day (excluding that day).</param>
-        /// <param name="kWh">Minimum/Maximum used energy in kWh, for example 20, valid from this amount of energy is used.</param>
-        /// <param name="Power">Minimum/Maximum power in kW, for example 0, valid from this charging speed.</param>
+        /// <param name="Energy">Minimum/maximum used energy as typed watt-hour quantities.</param>
+        /// <param name="Power">Minimum/maximum charging power as typed watt quantities.</param>
         /// <param name="Duration">Minimum/Maximum duration in seconds, valid for a duration from x seconds.</param>
         /// <param name="DayOfWeek">Minimum/Maximum duration in seconds, valid for a duration from x seconds.</param>
         public ChargingTariffRestriction(TimeRange?               Time        = null,
                                          StartEndDateTime?        Date        = null,
-                                         DecimalMinMax?           kWh         = null,
-                                         DecimalMinMax?           Power       = null,
+                                         Range<WattHour?>?        Energy      = null,
+                                         Range<Watt?>?            Power       = null,
                                          TimeSpanMinMax?          Duration    = null,
                                          IEnumerable<DayOfWeek>?  DayOfWeek   = null)
         {
@@ -94,11 +94,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (days.Any(day => !Enum.IsDefined(day)))
                 throw new ArgumentException("Invalid weekday.", nameof(DayOfWeek));
             if (!(Time?.StartTime.HasValue == true || Time?.EndTime.HasValue == true || Date is not null ||
-                  kWh?.Min.HasValue == true || kWh?.Max.HasValue == true || Power?.Min.HasValue == true || Power?.Max.HasValue == true ||
+                  Energy?.Min.HasValue == true || Energy?.Max.HasValue == true || Power?.Min.HasValue == true || Power?.Max.HasValue == true ||
                   Duration?.Min.HasValue == true || Duration?.Max.HasValue == true || !days.IsEmpty))
                 throw new ArgumentException("At least one tariff restriction is required.");
-            if (kWh?.Min < 0 || kWh?.Max < 0 || kWh?.Min > kWh?.Max ||
-                Power?.Min < 0 || Power?.Max < 0 || Power?.Min > Power?.Max)
+            if (Energy?.Min < WattHour.AdditiveIdentity || Energy?.Max < WattHour.AdditiveIdentity || Energy?.Min > Energy?.Max ||
+                Power?.Min < Watt.AdditiveIdentity || Power?.Max < Watt.AdditiveIdentity || Power?.Min > Power?.Max)
                 throw new ArgumentException("Energy and power restrictions must be nonnegative and ordered.");
             if (Duration?.Min < TimeSpan.Zero || Duration?.Max < TimeSpan.Zero || Duration?.Min > Duration?.Max)
                 throw new ArgumentException("Duration restrictions must be nonnegative and ordered.");
@@ -107,7 +107,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.Time       = Time;
             this.date       = Date is null ? null : new(Date.StartTime, Date.EndTime);
-            this.kWh        = kWh;
+            this.Energy     = Energy;
             this.Power      = Power;
             this.Duration   = Duration;
             this.DayOfWeek  = days;
@@ -117,25 +117,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) MinkWh(MinkWh)
+        #region (static) MinEnergy(MinEnergy)
 
         /// <summary>
-        /// Create a new MinkWh tariff restriction.
+        /// Create a new MinEnergy tariff restriction.
         /// </summary>
-        /// <param name="MinkWh">The minimum kWh value.</param>
-        public static ChargingTariffRestriction MinkWh(Decimal MinkWh)
-            => new (kWh: DecimalMinMax.FromMin(MinkWh));
+        /// <param name="MinEnergy">The minimum energy quantity.</param>
+        public static ChargingTariffRestriction MinEnergy(WattHour MinEnergy)
+            => new (Energy: new Range<WattHour?>(MinEnergy, null));
 
         #endregion
 
-        #region (static) MinkWh(MaxkWh)
+        #region (static) MaxEnergy(MaxEnergy)
 
         /// <summary>
-        /// Create a new MaxkWh tariff restriction.
+        /// Create a new MaxEnergy tariff restriction.
         /// </summary>
-        /// <param name="MaxkWh">The maximum kWh value.</param>
-        public static ChargingTariffRestriction MaxkWh(Decimal MaxkWh)
-            => new (kWh: DecimalMinMax.FromMax(MaxkWh));
+        /// <param name="MaxEnergy">The maximum energy quantity.</param>
+        public static ChargingTariffRestriction MaxEnergy(WattHour MaxEnergy)
+            => new (Energy: new Range<WattHour?>(null, MaxEnergy));
 
         #endregion
 
@@ -145,19 +145,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Create a new MinPower tariff restriction.
         /// </summary>
         /// <param name="MinPower">The minimum power value.</param>
-        public static ChargingTariffRestriction MinPower(Decimal MinPower)
-            => new (Power: DecimalMinMax.FromMin(MinPower));
+        public static ChargingTariffRestriction MinPower(Watt MinPower)
+            => new (Power: new Range<Watt?>(MinPower, null));
 
         #endregion
 
-        #region (static) MinPower(MaxPower)
+        #region (static) MaxPower(MaxPower)
 
         /// <summary>
         /// Create a new MaxPower tariff restriction.
         /// </summary>
         /// <param name="MaxPower">The maximum power value.</param>
-        public static ChargingTariffRestriction MaxPower(Decimal MaxPower)
-            => new (Power: DecimalMinMax.FromMax(MaxPower));
+        public static ChargingTariffRestriction MaxPower(Watt MaxPower)
+            => new (Power: new Range<Watt?>(null, MaxPower));
 
         #endregion
 
@@ -191,7 +191,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public JObject ToJSON()
 
-            => JSONObject.Create(
+            => POIRepresentation.AddETags(this, JSONObject.Create(
 
                    //new JProperty("type",       _Type.    ToString()),
                    //new JProperty("type", _Type.ToString()),
@@ -202,20 +202,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    date is not null ? new JProperty("startDate", date.StartTime.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)) : null,
                    date?.EndTime is { } endDate ? new JProperty("endDate", endDate.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)) : null,
-                   Duration?.Min is { } minDuration ? new JProperty("minDuration", (decimal) minDuration.Ticks / TimeSpan.TicksPerSecond) : null,
-                   Duration?.Max is { } maxDuration ? new JProperty("maxDuration", (decimal) maxDuration.Ticks / TimeSpan.TicksPerSecond) : null,
-                   kWh.  HasValue && kWh.  Value.Min.      HasValue ? new JProperty("minkWh",     kWh.Value.Min.Value) : null,
-                   kWh.  HasValue && kWh.  Value.Max.      HasValue ? new JProperty("maxkWh",     kWh.Value.Max.Value) : null,
+                   Duration?.Min is { } minDuration ? new JProperty("minDuration", MetrologyJson.DurationText(minDuration)) : null,
+                   Duration?.Max is { } maxDuration ? new JProperty("maxDuration", MetrologyJson.DurationText(maxDuration)) : null,
+                   Energy.  HasValue && Energy.  Value.Min.      HasValue ? new JProperty("minEnergy", MetrologyJson.Text(Energy.Value.Min.Value)) : null,
+                   Energy.  HasValue && Energy.  Value.Max.      HasValue ? new JProperty("maxEnergy", MetrologyJson.Text(Energy.Value.Max.Value)) : null,
 
-                   Power.HasValue && Power.Value.Min.      HasValue ? new JProperty("minPower",   Power.Value.Min.Value) : null,
-                   Power.HasValue && Power.Value.Max.      HasValue ? new JProperty("maxPower",   Power.Value.Max.Value) : null,
+                   Power.HasValue && Power.Value.Min.      HasValue ? new JProperty("minPower", MetrologyJson.Text(Power.Value.Min.Value)) : null,
+                   Power.HasValue && Power.Value.Max.      HasValue ? new JProperty("maxPower", MetrologyJson.Text(Power.Value.Max.Value)) : null,
 
                    DayOfWeek.Any()
-                       ? new JProperty("day_of_week",
+                       ? new JProperty("daysOfWeek",
                                        new JArray(DayOfWeek.Select(day => day.ToString().ToUpperInvariant())))
                        : null
 
-               );
+               ));
 
         #endregion
 
@@ -228,7 +228,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => new (Time,
                     Date,
-                    kWh,
+                    Energy,
                     Power,
                     Duration,
                     DayOfWeek);
@@ -248,7 +248,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 return Time.     GetHashCode() * 41 ^
                        (Date?.GetHashCode() ?? 0) * 37 ^
-                       kWh.      GetHashCode() * 31 ^
+                       Energy.      GetHashCode() * 31 ^
                        Power.    GetHashCode() * 23 ^
                        Duration. GetHashCode() * 17 ^
                        DayOfWeek.GetHashCode();
