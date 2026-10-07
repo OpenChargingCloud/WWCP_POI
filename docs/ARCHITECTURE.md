@@ -47,6 +47,12 @@ Each `InfrastructureEntitySnapshot` contains:
 Child arrays are separated from the properties during import. A station node therefore does not
 contain copies of every EVSE document; it contains their keys. JSON export reconstructs the nesting.
 
+Canonical JSON/CBOR content and complete versioned exports use these stored properties directly.
+Valid optional absence/null distinctions survive reload and precondition checks. Managed timestamps
+are initialized once during import; owned relations export as sorted arrays including `[]`.
+Lazy domain materialization retains static serialization documents and overlays runtime data only
+when requested. This additional domain-side storage is independent of persistent-map sharing.
+
 Supported metrological properties are normalized at import and property update to invariant
 unit-bearing strings. Numbers, unitless strings and alternative field names are rejected;
 equivalent unit representations also normalize before ChangeSet precondition comparisons.
@@ -77,8 +83,9 @@ Connector IDs are local. Connector `1` under EVSE `DE*ABC*E1` and connector `1` 
 On a network without a captured snapshot, the first access to `DataSnapshot` serializes its
 current nested POI data and imports that representation into immutable storage. Accessing
 `Revision` or applying a ChangeSet also triggers this capture. A newly captured network starts
-at revision zero. Parsing a versioned snapshot with a `revision` restores its immutable version
-during parsing.
+at revision zero. Every network import captures immutable storage during parsing, using supplied
+revision metadata or revision zero. Only initial managed timestamps and owned collection defaults
+are filled from the parsed projection; optional static property presence remains the supplied content.
 
 Static properties and parent links cannot be reassigned after construction. Collection inputs are
 materialized and detached; public static collections use immutable arrays or detached enumerations.
@@ -355,7 +362,7 @@ It does not represent provider-specific commercial tariff agreements.
 | --- | --- |
 | Initial capture | Whole serialized hierarchy and reference-index construction |
 | Scalar property update | Changed property, entity/ancestor entries and validation; group/parking validation can resolve larger context |
-| Before/after ETag calculation | Complete canonical POI projection and both encodings; lazily cached per immutable snapshot |
+| Before/after ETag calculation | Complete stored static hierarchy and both canonical encodings; lazily cached per immutable snapshot |
 | `CreateChangeSet()` | Local validated map update plus calculation of source/result identifiers |
 | `Sign()` / signature verification | Canonical complete operation/metadata payload plus cryptographic work per peer; does not hash the entire infrastructure again |
 | `TryMerge()` | Two checked input applications, two combined candidate executions and a comparison of all stored entities/properties; explicit preparation also hashes the combined result |
@@ -386,12 +393,15 @@ domain hierarchy materialization use a per-network lock. Concurrent runtime upda
 entities are not made transactional by that lock; applications needing a coherent runtime view
 must coordinate those updates with export/derivation. `ApplyRuntimeUpdate()` resolves targets
 under the network lock and checks an optional expected current status under its schedule lock.
-Applications must also serialize runtime delivery and static head publication; retaining references
-to older versions does not redirect their subsequent updates. See [runtime publication](RUNTIME.md#publication-and-concurrency).
+`RoamingNetworkHistory` serializes scoped runtime delivery with static head publication through
+one gate. Applications using the domain APIs directly must coordinate those operations themselves;
+retaining references to older versions does not redirect subsequent updates. See
+[runtime publication](RUNTIME.md#publication-and-concurrency).
 
 Two ChangeSets based on the same revision can independently produce two successors with the same
-numeric revision. The application must coordinate publication of its current head and resolve
-divergence. Mandatory `BeforeETags` distinguish different static contents at the same revision.
+numeric revision. Revisions count along the first-parent chain. History publication compares the
+expected typed commit ID and candidate's first parent with the current head; applications still
+resolve divergence. Mandatory `BeforeETags` distinguish static contents at the same revision.
 `TryMerge` on their common source checks both batches and requires both combined execution orders
 to produce the same complete static content. Runtime updates are outside this merge. Default calls return
 a notice only; explicit preparation creates a new unsigned ChangeSet with combined result ETags.
@@ -400,8 +410,43 @@ signatures are not inherited. Whole-property operations remain atomic replacemen
 old-value preconditions are reported for caller resolution. Explicit element operations permit
 independent ID-based collection edits and distinct nested property changes without replacing
 their complete owner collection. See [merging](CHANGESETS.md#merging-concurrent-batches).
-Content-equivalent versions share identifiers even if their histories differ; commit ancestry,
-history persistence and global head publication remain application responsibilities.
+Content-equivalent versions share static identifiers even if their histories differ. The separate
+`wwcp-poi-commit-json-v1` identity binds ordered ancestry, state tags, revision and unsigned batch
+content. Equal batch/commit peer signatures are retained outside this identity. Static JSON/CBOR
+history archives preserve a checkpoint, original commits and head; recovery replays every branch.
+File-backed publication flushes/replaces the archive before changing the in-memory head. Global
+replica coordination and archive rollback policy remain application work.
+See [commit history](HISTORY.md) for identity, signatures, leases and durability boundaries.
+
+`RoamingNetworkHistory.TryMerge` compares retained base/left/right static states, including known
+ID-based nested relations, and prepares a delta against the left tip. Compatible identical writes
+collapse once. Structured conflicts support explicit branch/removal/custom choices; the combined
+graph and scheduled operations pass normal ownership/reference/domain validation. The new unsigned
+commit records both parents and authenticated audit metadata without inheriting input signatures.
+Preparation remains separate from publication and excludes runtime. See [three-way integration](MERGING.md).
+
+Merge candidate validation first checks ownership, then collects all currently missing/out-of-scope
+references using the normal operation validator's rules, then projects domain objects. Reference
+conflicts identify consumer, property and typed target; ordinary schema/order failures retain
+`InvalidResult`. A whole-subtree resolution is followed by complete revalidation before remaining
+issues are processed; repeated unresolved addresses terminate without loops. Accepted decisions
+retain chronological audit order and related target identities. Tests exercise structural changes,
+scoped connectors, group/parking constraints, criss-cross bases and gated resolver reentry/failure.
+
+Incremental replication announces the retained DAG frontier and exports the requested ancestry
+minus acknowledged ancestry in count/byte-bounded JSON/CBOR pages. Import validates into temporary
+immutable maps and persists once before retaining a whole page. A separate expected-head adoption
+API previews descendants across all parents and explicitly selects the original retained commit.
+First-parent adoption replays batches with local runtime; secondary-parent adoption derives the
+validated target and transfers only lifetimes proven on both first-parent branches. Divergence
+requires explicit merge. See [replication contracts and limits](REPLICATION.md).
+
+Bootstrap captures a frozen static CBOR archive and a manifest binding its checkpoint/head, counts,
+complete digest and ordered fragment digests. Bounded JSON/CBOR fragments are installed as flushed
+disk receipts under a staging writer lease; reopening verifies the ordered prefix. Complete profile,
+hash, trust and all-branch replay checks precede preview/explicit activation into a new history.
+No current head is switched by staging. Runtime is initialized locally; original signed envelopes
+are retained. Transfer bounds do not make archive construction/replay streaming. See [bootstrap](BOOTSTRAP.md).
 
 ## 10. Source organization and extending the model
 
@@ -411,6 +456,15 @@ history persistence and global head publication remain application responsibilit
 | [Serialization](../WWCP_POI/Serialization) | Shared value parsing, metadata and reference resolvers |
 | [ChangeSet records](../WWCP_POI/ChangeSets/RoamingNetworkChangeSet.cs) | Immutable batches, operations and signature envelope |
 | [Signing](../WWCP_POI/ChangeSets/RoamingNetworkChangeSet.Signing.cs) | Canonical signing input, Styx asymmetric signing and equal peer verification |
+| [History](../WWCP_POI/History) | Typed commit identity, ancestry signing, retained branches, atomic head gate and archive recovery |
+| [History replication](../WWCP_POI/History/RoamingNetworkHistory.Replication.cs) | Retained frontier, bounded original commit pages and atomic import |
+| [Head adoption](../WWCP_POI/History/RoamingNetworkHistory.Adoption.cs) | Expected-head preview/selection across all parents and local lifetime policy |
+| [Bootstrap integration](../WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs) | Frozen archive export, manifest checks, complete replay and new archive activation |
+| [Bootstrap receiver](../WWCP_POI/History/RoamingNetworkBootstrapReceiver.cs) | Bounded staging, flushed receipts, restart, current trust validation and explicit activation |
+| [Bootstrap manifest](../WWCP_POI/History/RoamingNetworkBootstrapManifest.cs) | Immutable transfer identity, counts/digests, receiver limits and exact JSON/CBOR contracts |
+| [Bootstrap fragments](../WWCP_POI/History/RoamingNetworkBootstrapChunk.cs) | Frozen source session and detached bounded binary fragment codecs |
+| [History merge](../WWCP_POI/History/RoamingNetworkHistory.Merge.cs) | Best common ancestors, structured resolution and explicit integration commits |
+| [State merge planner](../WWCP_POI/History/POIThreeWayMerge.cs) | Static comparison, addressed delta synthesis and dependency scheduling |
 | [Snapshot storage](../WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.cs) | Immutable maps, lookup and initial capture |
 | [Changes](../WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Changes.cs) | Batch checks and operation application |
 | [Element paths](../WWCP_POI/ChangeSets/POIElementPathSegment.cs) | Immutable schema-property/element-ID ownership steps |
@@ -421,6 +475,7 @@ history persistence and global head publication remain application responsibilit
 | [Import](../WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Import.cs) | Hierarchy import and timestamp normalization |
 | [Validation](../WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Validation.cs) | Small domain projections for validation |
 | [Entity references](../WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.References.cs) | Reverse graph reference index |
+| [Static content profile](../WWCP_POI/Serialization/POIContentProfile.cs) | Fixed static-v1 declaration and unsupported-profile rejection |
 | [JSON export](../WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Json.cs) | Property JSON and direct nested writing |
 | [RoamingNetwork integration](../WWCP_POI/ChangeSets/RoamingNetwork.CopyOnWrite.cs) | Public API and lazy domain projection |
 | [Runtime retention](../WWCP_POI/ChangeSets/RoamingNetwork.RuntimeState.cs) | Independent schedules/measurements and preservation by owner/identity |
@@ -445,4 +500,10 @@ The immutability audit and `IImmutablePOI` contract also cover the remaining sup
 and parking-space groups. Derived ETags are generated from the complete static domain projection;
 runtime Removed statuses never filter its owned membership. ETags are not editable snapshot
 properties. JSON and CBOR share their domain validation and metrological schema.
-See [ETags and CBOR](ETAGS-CBOR.md) for the audited types and encoding profile.
+See [ETags and CBOR](ETAGS-CBOR.md) for the audited types and encoding profile, and
+[interoperability](INTEROPERABILITY.md) for static-v1 rules, fixed bytes and executed workflow tests.
+The profile declaration is transport metadata; commits bind it explicitly into their identity.
+Unchanged reference sets preserve the reverse-index root. The cached tariff subset shares identity
+when that root is shared, rather than rebuilding the subset on every access.
+An internal archive write observer, exposed only to the friend test assembly, provides reproducible
+failure/process-exit stages around persistence. It is not an application extension API.

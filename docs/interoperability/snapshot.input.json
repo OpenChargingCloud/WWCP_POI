@@ -1,0 +1,41 @@
+{
+  "@id": "interop-network",
+  "name": { "de": "Ladeverbund", "en": "Charging network" },
+  "created": "2026-01-01T00:00:00Z",
+  "lastChange": "2026-01-02T12:00:00+02:00",
+  "customData": {
+    "vendorId": "example.org",
+    "status": "customer content",
+    "ETags": ["customer content"],
+    "contentProfile": "customer content",
+    "reading": "250 kW",
+    "literal": "é",
+    "decimal": 1.250,
+    "optional": null
+  },
+  "chargingStationOperators": [{
+    "@id": "DE*ABC", "name": {"en":"Operator"},
+    "created": "2026-01-01T00:00:00Z", "lastChange": "2026-01-01T00:00:00Z",
+    "chargingPools": [{
+      "@id": "DE*ABC*P1", "name": {"en":"Pool"},
+      "created": "2026-01-01T00:00:00Z", "lastChange": "2026-01-01T00:00:00Z",
+      "energyMeters": [{"id":"pool-meter","role":"grid", "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}],
+      "gridConnectionPoint": {
+        "gridOperator": {"id":"DE*GRD","name":{"en":"Grid"}, "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"},
+        "nominalVoltage": "400 V", "nominalFrequency": "50 Hz",
+        "contractedImportPower": "250000 W", "contractedImportApparentPower": "300 kVA"
+      },
+      "chargingStations": [{
+        "@id": "DE*ABC*S1", "name":{"en":"Station"},
+        "created": "2026-01-01T00:00:00Z", "lastChange": "2026-01-01T00:00:00Z",
+        "energyMeters": [{"id":"station-meter","role":"pv", "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}],
+        "EVSEs": [{
+          "@id":"DE*ABC*E1", "currentType":["DC"], "maxPower":"100000 W",
+          "created": "2026-01-01T00:00:00Z", "lastChange": "2026-01-01T00:00:00Z",
+          "physicalReference": null,
+          "socketOutlets":[{"@id":"1","type":"CCS","lockable":false}]
+        }]
+      }]
+    }]
+  }]
+}

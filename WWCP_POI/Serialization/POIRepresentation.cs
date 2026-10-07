@@ -34,13 +34,14 @@ public static class POIRepresentation
         if (IncludeRuntime && value is RoamingNetworkDataSnapshot)
             throw new ArgumentException("A static DataSnapshot has no runtime state. Export a RoamingNetwork to include current statuses.", nameof(IncludeRuntime));
         var kind = Kind(value);
-        var json = Document(value);
+        var json = Document(value, IncludeRuntime);
         Prepare(json, kind, IncludeRuntime, IncludeVersionMetadata);
         Visit(json, kind, "", (document, type, path) =>
         {
             if (path.Length > 0 && !TaggedKinds.Contains(type)) return;
             var staticContent = (JObject) document.DeepClone();
             Prepare(staticContent, type, false);
+            document[POIContentProfile.PropertyName] = POIContentProfile.Id;
             document["ETags"] = TagsJSON(Tags(staticContent, type), DigestEncoding);
         });
         return json;
@@ -90,6 +91,16 @@ public static class POIRepresentation
         var declarations = ReadDeclarations(json, kind);
         RemoveETags(json, kind);
         var value = parser(json);
+        if (value is not (RoamingNetwork or RoamingNetworkDataSnapshot))
+        {
+            var projection = WithoutETags(() => POIJSON.Document(value));
+            var content = POISnapshotRepresentation.CompleteImport(json, projection, kind);
+            if (Enum.TryParse<InfrastructureEntityType>(kind, out var type))
+                content = MetrologyJson.NormalizeHierarchy(content, type);
+            MetrologyJson.NormalizeReadings(content, kind);
+            NormalizeStaticTimestamps(content, kind);
+            POISnapshotRepresentation.Bind(value, content);
+        }
         ValidateDeclarations(declarations, Document(value), Kind(value));
         return value;
     }
@@ -123,7 +134,10 @@ public static class POIRepresentation
     internal static JObject AddETags(IImmutablePOI value, JObject json)
     {
         if (untaggedSerializationDepth == 0)
+        {
+            json[POIContentProfile.PropertyName] = POIContentProfile.Id;
             json["ETags"] = TagsJSON(value.ETags);
+        }
         return json;
     }
 
@@ -190,7 +204,7 @@ public static class POIRepresentation
         return CBORValue.FromMap(entries);
     }
 
-    private static Boolean IsMeasurement(String kind, String field)
+    internal static Boolean IsMeasurement(String kind, String field)
         => kind switch
         {
             nameof(EVSE) => field is "maxVoltage" or "maxCurrent" or "maxPower" or "maxCapacity" or
@@ -234,6 +248,18 @@ public static class POIRepresentation
     internal static Boolean IsRuntimeProperty(String kind, String field)
         => RuntimeEntityKinds.Contains(kind) && RuntimeFields.Contains(field, StringComparer.Ordinal);
 
+    internal static void NormalizeStaticTimestamps(JObject json, String kind)
+        => Visit(json, kind, "", (document, type, _) => {
+            IEnumerable<String> fields = type switch {
+                nameof(TransparencySoftwareStatus) or nameof(RootCAInfo) or nameof(EVRoamingPartnerInfo) => ["notBefore", "notAfter"],
+                nameof(ChargingTariffRestriction) => ["startDate", "endDate"],
+                _ => RuntimeEntityKinds.Contains(type) ? ["created", "lastChange"] : []
+            };
+            foreach (var field in fields)
+                if (InfrastructureJson.Date(document, field) is { } date)
+                    document[field] = date.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+        });
+
     internal static void RemoveRuntime(JObject json, String kind)
         => Visit(json, kind, "", (document, type, _) =>
         {
@@ -256,6 +282,7 @@ public static class POIRepresentation
         => Visit(json, kind, "", (document, type, _) =>
         {
             document.Remove("ETags");
+            document.Remove(POIContentProfile.PropertyName);
             if (!includeRuntime && RuntimeEntityKinds.Contains(type))
             {
                 foreach (var field in RuntimeFields)
@@ -268,7 +295,7 @@ public static class POIRepresentation
             }
         });
 
-    private static String? ChildKind(String kind, String field)
+    internal static String? ChildKind(String kind, String field)
         => field switch
         {
             "chargingStationOperators" when kind == nameof(RoamingNetwork) => nameof(ChargingStationOperator),
@@ -318,7 +345,7 @@ public static class POIRepresentation
             _ => null
         };
 
-    private static void Visit(JObject document, String kind, String path, Action<JObject, String, String> action)
+    internal static void Visit(JObject document, String kind, String path, Action<JObject, String, String> action, Boolean stablePaths = false)
     {
         action(document, kind, path);
         foreach (var property in document.Properties().ToArray())
@@ -326,10 +353,18 @@ public static class POIRepresentation
             var childKind = ChildKind(kind, property.Name);
             if (childKind is null) continue;
             var childPath = path + "/" + Escape(property.Name);
-            if (property.Value is JObject child) Visit(child, childKind, childPath, action);
+            if (property.Value is JObject child) Visit(child, childKind, childPath, action, stablePaths);
             if (property.Value is JArray children)
                 for (var index = 0; index < children.Count; index++)
-                    if (children[index] is JObject item) Visit(item, childKind, childPath + "/" + index, action);
+                    if (children[index] is JObject item)
+                    {
+                        var selector = index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        if (stablePaths && Enum.TryParse<InfrastructureEntityType>(childKind, out var type) &&
+                            InfrastructureChangeSchema.Relations.TryGetValue(type, out var relation) && relation.Parent.ToString() == kind &&
+                            relation.Field == property.Name && item[InfrastructureChangeSchema.IdField(type)]?.Value<String>() is { } id)
+                            selector = "@id=" + InfrastructureChangeSchema.Identity(type, id);
+                        Visit(item, childKind, childPath + "/" + Escape(selector), action, stablePaths);
+                    }
         }
     }
 
@@ -340,8 +375,14 @@ public static class POIRepresentation
         var declarations = ImmutableDictionary.CreateBuilder<String, ImmutableArray<ETag>>(StringComparer.Ordinal);
         Visit(json, kind, "", (document, _, path) =>
         {
-            if (document["ETags"] is { } tags) declarations.Add(path, ReadTags(tags));
-        });
+            if (document[POIContentProfile.PropertyName] is { } profile)
+                POIContentProfile.Require(profile.Type == JTokenType.String ? profile.Value<String>() : null);
+            if (document["ETags"] is { } tags)
+            {
+                POIContentProfile.Require(document[POIContentProfile.PropertyName]?.Value<String>());
+                declarations.Add(path, ReadTags(tags));
+            }
+        }, stablePaths: true);
         return declarations.ToImmutable();
     }
 
@@ -353,7 +394,12 @@ public static class POIRepresentation
     }
 
     internal static void RemoveETags(JObject json, String kind)
-        => Visit(json, kind, "", (document, _, _) => document.Remove("ETags"));
+        => Visit(json, kind, "", (document, _, _) => {
+            if (document[POIContentProfile.PropertyName] is { } profile)
+                POIContentProfile.Require(profile.Type == JTokenType.String ? profile.Value<String>() : null);
+            document.Remove("ETags");
+            document.Remove(POIContentProfile.PropertyName);
+        });
 
     /// <summary>
     /// Assign deterministic metadata defaults to nested POI nodes introduced by a ChangeSet.
@@ -387,7 +433,7 @@ public static class POIRepresentation
             if (!expected.SequenceEqual(Tags(content, type)))
                 throw new ArgumentException($"{path}/ETags: content identifiers do not match the reconstructed POI content.");
             remaining.Remove(path);
-        });
+        }, stablePaths: true);
         if (remaining.Count != 0)
             throw new ArgumentException("ETags: a declared POI node is missing after reconstruction.");
     }
@@ -402,6 +448,19 @@ public static class POIRepresentation
            typeof(AuthenticationModes).IsAssignableFrom(type) ? nameof(AuthenticationModes) :
            typeof(PublicKey).IsAssignableFrom(type) ? nameof(PublicKey) : type.Name;
 
-    private static JObject Document(IImmutablePOI value)
-        => WithoutETags(() => POIJSON.Document(value));
+    private static JObject Document(IImmutablePOI value, Boolean includeRuntime = false)
+    {
+        if (value is RoamingNetwork network)
+        {
+            var document = network.DataSnapshot.GetDocument();
+            if (includeRuntime) network.WriteCurrentRuntimeStatuses(document);
+            return document;
+        }
+        if (value is RoamingNetworkDataSnapshot snapshot) return snapshot.GetDocument();
+        var retained = POISnapshotRepresentation.Get(value);
+        if (retained is null) return WithoutETags(() => POIJSON.Document(value));
+        if (includeRuntime)
+            POISnapshotRepresentation.OverlayRuntime(retained, WithoutETags(() => POIJSON.Document(value)), Kind(value));
+        return retained;
+    }
 }

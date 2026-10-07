@@ -73,7 +73,7 @@ namespace WWCP_POI_Tests.Json
                 Assert.That(parsed.MaxPower, Is.EqualTo(source.MaxPower));
                 Assert.That(parsed.MaxVoltage, Is.EqualTo(source.MaxVoltage));
                 Assert.That(parsed.MaxCapacity, Is.EqualTo(source.MaxCapacity));
-                Assert.That(JToken.DeepEquals(parsed.ToJSON(Embedded: true, IncludeCustomData: true), json), Is.True);
+                Assert.That(JsonViews.EqualViews(parsed.ToJSON(Embedded: true, IncludeCustomData: true), json), Is.True);
                 Assert.That(JToken.DeepEquals(json, before), Is.True);
 
             }

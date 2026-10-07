@@ -56,6 +56,9 @@ public sealed partial class RoamingNetworkDataSnapshot
     }
 
     private static IEnumerable<InfrastructureEntityKey> ReferenceKeys(InfrastructureEntitySnapshot entity)
+        => ReferenceTargets(entity).Select(reference => reference.Key);
+
+    private static IEnumerable<(String Field, InfrastructureEntityKey Key)> ReferenceTargets(InfrastructureEntitySnapshot entity)
     {
         foreach (var relation in ReferenceFields(entity.Key.Type))
         {
@@ -71,7 +74,7 @@ public sealed partial class RoamingNetworkDataSnapshot
                 var key = Key(relation.Type, value.GetString()!);
                 if (!seen.Add(key))
                     throw new ArgumentException($"{relation.Field}: duplicate reference '{key.Id}'.");
-                yield return key;
+                yield return (relation.Field, key);
             }
         }
     }
@@ -87,26 +90,40 @@ public sealed partial class RoamingNetworkDataSnapshot
     {
         foreach (var reference in ReferenceKeys(entity))
         {
-            if (!map.TryGetValue(reference, out var target))
-                throw new ArgumentException($"Reference from '{entity.Key}' to '{reference}' cannot be resolved.");
-            if (entity.Key.Type is InfrastructureEntityType.EVSE or InfrastructureEntityType.ChargingConnector or
-                InfrastructureEntityType.EVSEGroup or InfrastructureEntityType.ChargingStationGroup or
-                InfrastructureEntityType.ChargingPoolGroup or InfrastructureEntityType.ChargingTariffGroup)
-            {
-                if (Ancestor(entity, InfrastructureEntityType.ChargingStationOperator, map) !=
-                    Ancestor(target, InfrastructureEntityType.ChargingStationOperator, map))
-                    throw new ArgumentException($"Reference '{reference}' belongs to a different charging station operator.");
-            }
-            else if (reference.Type is InfrastructureEntityType.ParkingSpace or InfrastructureEntityType.ParkingSensor)
-            {
-                if (Ancestor(entity, InfrastructureEntityType.ParkingOperator, map) != target.Parent)
-                    throw new ArgumentException($"Reference '{reference}' belongs to a different parking operator.");
-            }
+            if (ReferenceError(entity, reference, map) is { } error) throw new ArgumentException(error);
             var consumers = references.TryGetValue(reference, out var existing)
                                 ? existing : ImmutableHashSet<InfrastructureEntityKey>.Empty;
             references = references.SetItem(reference, consumers.Add(entity.Key));
         }
         return references;
+    }
+
+    // Normal operation validation and merge diagnostics use the same reference/scope rules.
+    private static String? ReferenceError(InfrastructureEntitySnapshot entity, InfrastructureEntityKey reference, EntityMap map)
+    {
+        if (!map.TryGetValue(reference, out var target))
+            return $"Reference from '{entity.Key}' to '{reference}' cannot be resolved.";
+        if (entity.Key.Type is InfrastructureEntityType.EVSE or InfrastructureEntityType.ChargingConnector or
+            InfrastructureEntityType.EVSEGroup or InfrastructureEntityType.ChargingStationGroup or
+            InfrastructureEntityType.ChargingPoolGroup or InfrastructureEntityType.ChargingTariffGroup)
+        {
+            if (Ancestor(entity, InfrastructureEntityType.ChargingStationOperator, map) !=
+                Ancestor(target, InfrastructureEntityType.ChargingStationOperator, map))
+                return $"Reference '{reference}' belongs to a different charging station operator.";
+        }
+        else if (reference.Type is InfrastructureEntityType.ParkingSpace or InfrastructureEntityType.ParkingSensor)
+        {
+            if (Ancestor(entity, InfrastructureEntityType.ParkingOperator, map) != target.Parent)
+                return $"Reference '{reference}' belongs to a different parking operator.";
+        }
+        return null;
+    }
+
+    private static ReferenceMap RefreshReferences(InfrastructureEntitySnapshot before, InfrastructureEntitySnapshot after,
+                                                  EntityMap map, ReferenceMap references)
+    {
+        if (ReferenceKeys(before).ToHashSet().SetEquals(ReferenceKeys(after))) return references;
+        return AddReferences(after, map, RemoveReferences(before, references));
     }
 
     private static ReferenceMap RemoveReferences(InfrastructureEntitySnapshot entity, ReferenceMap references)

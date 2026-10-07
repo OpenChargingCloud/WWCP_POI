@@ -2,7 +2,7 @@
 
 [Repository overview](../README.md) · [ChangeSets](CHANGESETS.md) · [Runtime](RUNTIME.md) · [Signatures](SIGNATURES.md)
 
-All independently owned [graph types](GRAPH.md) support `Add`, `Remove` and `UpdateProperty`
+All independently owned [graph types](GRAPH.md) support `Add`, `Remove`, `UpdateProperty` and `RemoveProperty`
 operations. Nested owned values now have explicit operations as well. They address an existing
 graph owner and a structured `ElementPath`, rather than array indices or arbitrary JSON pointers.
 
@@ -37,6 +37,11 @@ old value; omit its precondition to set it. Explicit JSON null and absence remai
 | `RemoveElement` | Remove one array element or clear an optional singleton | Target must exist; optional complete old value |
 | `ReplaceElement` | Replace one existing element/singleton completely | Target must exist; optional complete old value |
 | `UpdateElementProperty` | Replace one static property on the selected object | Target must exist; optional previous property value |
+| `RemoveElementProperty` | Remove one existing optional static property completely | Target/property must exist; optional previous value; no new value |
+
+Property removal retains absence rather than writing JSON null. IDs, managed timestamps and
+required domain content remain protected. Removing ordinary metadata preserves the surrounding
+runtime histories; removing a whole nested runtime slot resets that slot's lifetime.
 
 `GetElementValue()` returns a detached `JsonElement` for complete element preconditions.
 `GetElementPropertyValue()` reads an existing property. Both use the same identity/ownership rules
@@ -154,6 +159,11 @@ editing, duplicate additions, incompatible replacements, failed preconditions or
 are conflicts. It does not rewrite preconditions or automatically choose a value. An original failed
 element operation is reported with its graph owner, `ElementPath`, property and operation index.
 Whole-result differences can still be reported at the enclosing owner property.
+
+For retained/published branches, `RoamingNetworkHistory.TryMerge(leftId, rightId, ...)` instead
+compares base/left/right static states and synthesizes a new delta against the left tip. Known
+collections use these same schema identities and element operations; compatible identical writes
+collapse once, and structured conflicts accept explicit choices. See [three-way integration](MERGING.md).
 
 ## JSON and signing
 

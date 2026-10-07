@@ -47,7 +47,7 @@ namespace WWCP_POI_Tests.Json
             var parsed = RoamingNetwork.Parse(json);
 
             Assert.That(parsed.Id, Is.EqualTo(source.Id));
-            Assert.That(JToken.DeepEquals(parsed.ToJSON(Embedded: embedded), json), Is.True);
+            Assert.That(JsonViews.EqualViews(parsed.ToJSON(Embedded: embedded), json), Is.True);
             Assert.That(JToken.DeepEquals(json, before), Is.True);
 
         }
@@ -58,7 +58,7 @@ namespace WWCP_POI_Tests.Json
 
             var json = new RoamingNetwork(RoamingNetwork_Id.Parse("network-a")).ToJSON();
 
-            Assert.That(JToken.DeepEquals(RoamingNetwork.Parse(json).ToJSON(), json), Is.True);
+            Assert.That(JsonViews.EqualViews(RoamingNetwork.Parse(json).ToJSON(), json), Is.True);
 
         }
 
@@ -67,10 +67,11 @@ namespace WWCP_POI_Tests.Json
         {
 
             var json = JObject.Parse("{\"@id\":\"network-a\",\"name\":{},\"dataLicenseIds\":[\"license-a\"]}");
+            foreach (var field in new[] { "gridOperators", "parkingOperators", "chargingStationManufacturers" }) json[field] = new JArray();
             var parsed = RoamingNetwork.Parse(json);
 
             Assert.That(parsed.DataLicenses.Single().Id.ToString(), Is.EqualTo("license-a"));
-            Assert.That(JToken.DeepEquals(parsed.ToJSON(Embedded: true), json), Is.True);
+            Assert.That(JsonViews.EqualViews(parsed.ToJSON(Embedded: true), json), Is.True);
 
         }
 

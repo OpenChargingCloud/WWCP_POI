@@ -17,6 +17,18 @@ The entity JSON contract uses names such as `@id`, `chargingStationOperators`, `
 These layers are deliberately distinct. A ChangeSet's `NewValue` can contain a POI document
 without renaming the document's properties.
 
+## Profile declarations
+
+Tagged POI documents declare `contentProfile: "wwcp-poi-static-v1"`; complete tagged parsers require
+it when ETags are present. Fresh untagged input may omit it. The declaration is transport metadata,
+excluded from immutable storage/digest inputs. Same-named customer fields remain content.
+Commit/archive headers require `ContentProfile` with the same value; commit IDs/signatures bind it.
+See [profile relationships, canonical bytes and fixed references](INTEROPERABILITY.md).
+
+Ordinary entity `ToJSON` views can omit content/timestamps needed by their full static validators.
+Their view roundtrip tests compare presentation fields independently of derived validators;
+complete snapshot/transport tests validate the exact ETags and canonical bytes.
+
 ## 2. Network snapshots
 
 Complete documents include network-owned manufacturers/grid/parking operators and operator-owned
@@ -35,9 +47,16 @@ var jsonText = network.ToJSONSnapshot().ToString();
 var restored = RoamingNetwork.Parse(jsonText);
 ```
 
-A versioned snapshot restores its revision metadata and immutable storage. Parsing an ordinary
-unversioned nested document reconstructs the immutable POI domain hierarchy; subsequent capture creates
-revision zero.
+A versioned snapshot restores its revision metadata and immutable storage. An ordinary
+unversioned nested document is also captured during import and starts at revision zero.
+Valid optional property presence and explicit nulls remain in storage. Managed timestamps receive
+initial defaults once; owned graph arrays have the canonical empty value `[]` when empty.
+Hashes and complete transports read stored static properties directly, preserving old-value
+preconditions across reloads. See [property defaults](ETAGS-CBOR.md#versioned-property-presence-and-defaults).
+
+`RoamingNetworkDataSnapshot.Parse(string/JObject)` validates declared ETags and returns only static
+storage. For a domain network use the shared `POIRepresentation.ParseJSON` to validate ETags;
+ordinary entity `Parse` methods perform domain parsing and do not themselves check those declarations.
 
 Status history, internal/runtime data and domain properties absent from the existing serializers
 are outside this persistence contract. Do not assume that every member of a POI class is
@@ -139,6 +158,16 @@ Nested operations additionally carry an immutable `ElementPath` array of `Proper
 element operations require a nonempty path. Unknown operation/path fields are rejected. The
 [element guide](ELEMENT-OPERATIONS.md#json-and-signing) lists operation shapes and examples.
 
+`RemoveProperty` uses an empty path; `RemoveElementProperty` requires an existing addressed
+object. Both require `PropertyName`, forbid `NewValue` and optionally carry `OldValue`, including
+explicit JSON null. Application removes the key and validates the remaining data. This differs
+from `UpdateProperty`/`UpdateElementProperty` writing a present null value.
+
+History three-way merge metadata uses the reserved `Metadata.wwcpPOIMerge` object with its profile,
+typed ancestor/left/right commit tuples and sequential explicit resolution records. These remain
+ordinary JSON values in ChangeSet CBOR so their v2 signing representation is preserved. See
+[merge audit metadata](MERGING.md#audit-metadata-and-signatures).
+
 With default System.Text.Json options, a property update is represented as follows:
 
 ```json
@@ -221,7 +250,9 @@ An explicitly prepared `TryMerge` result is an ordinary unsigned ChangeSet with 
 contract: common-source `BeforeETags`, combined ordered operations and freshly calculated
 `AfterETags`. Source signatures and commit metadata are not copied. Add the merge's own description
 and metadata before signing it. Preview and conflict reports do not create a batch
-for interchange; commit ancestry remains application history. See [merging](CHANGESETS.md#merging-concurrent-batches).
+for interchange. `RoamingNetworkCommit` supplies ordered ancestry and a typed deterministic ID;
+`RoamingNetworkHistory` retains and publishes these envelopes. See
+[merging](CHANGESETS.md#merging-concurrent-batches) and [history](HISTORY.md).
 
 Each signed array entry has this shape (the Base64 placeholder is illustrative):
 
@@ -348,6 +379,10 @@ using serialized documents in a cryptographic interchange contract.
 
 ## POI ETags and CBOR
 
+ChangeSets have a separate `ToCBOR` / `ParseCBOR` / `TryParseCBOR` transport retaining signatures,
+ordered operations, metadata and optional/null payloads. Its numeric wrapper preserves the v2
+signing profile's JSON number spelling. See [ChangeSet CBOR](CHANGESET-CBOR.md).
+
 `IImmutablePOI.ETags` provides canonical JSON and deterministic CBOR SHA-256 identifiers.
 The properties use typed immutable `ETag` values. JSON uses `[format, algorithm, encoding, encodedDigest]`;
 CBOR uses `[format, algorithm, digestBytes]`, with a native 32-byte byte string. Textual
@@ -361,3 +396,29 @@ explicit `ETag.ToJSON(encoding)` supports both encodings. All import paths honor
 Use `ToJSONWithETags()` or `ToCBOR()` for complete static POI exports, and `ParseCBOR` for
 the second import format. See [ETags and CBOR](ETAGS-CBOR.md) for the exact content boundary,
 parent contexts and ETag verification.
+
+## Incremental history messages
+
+`RoamingNetworkReplicationState` declares `wwcp-poi-replication-state-v1`, the required
+`ContentProfile`, typed checkpoint/head IDs and retained `KnownTips`. `RoamingNetworkCommitPack`
+declares `wwcp-poi-commit-pack-v1`, the required `ContentProfile`, the original `CheckpointCommit`,
+typed `Tip`, Boolean `Complete` and ordered original `Commits`. Both contracts have exact JSON
+and native CBOR codecs. All commit IDs use structured `json` SHA-256 tuples in either transport.
+The checkpoint envelope has peer signatures but no static checkpoint snapshot or runtime data.
+
+Input parsers impose configurable raw byte/count limits before commit construction. Atomic import
+verifies trust, parents, replay and resulting state before retaining the entire page. The message's
+routing/completion declarations never select a head. See [replication](REPLICATION.md) for exact
+field tables, bounds, missing-parent outcomes and explicit adoption.
+
+## Bootstrap messages
+
+`RoamingNetworkBootstrapManifest` declares `wwcp-poi-bootstrap-manifest-v1`, required content/archive
+profiles, typed manifest/checkpoint/head/archive identifiers, archive/chunk/commit counts and ordered
+SHA-256 fragment digests. JSON explicitly labels their Base64 encoding; CBOR carries byte strings.
+`RoamingNetworkBootstrapChunk` declares `wwcp-poi-bootstrap-chunk-v1`, required `ContentProfile`,
+typed `Manifest`, zero-based `Index` and binary `Data` (labelled Base64 in JSON, native bytes in CBOR).
+Fragments may split any CBOR token; they are verified/staged before the complete deterministic archive
+is decoded. Exact parsers impose local byte/count bounds and recompute the manifest identity.
+These messages contain no runtime and do not select an existing head. Complete field tables,
+canonical identity, resume and preview/activation rules are in [bootstrap](BOOTSTRAP.md).

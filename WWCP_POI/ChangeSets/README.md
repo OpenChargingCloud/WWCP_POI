@@ -29,9 +29,16 @@ data. A snapshot contains immutable entity documents and parent/child keys, back
 `ImmutableDictionary`/`ImmutableHashSet` collections. Updates replace affected entries and their
 ancestors; unrelated entries and unchanged property values are shared. Operation validation
 reconstructs affected nodes and their ancestors; groups/parking resolve additional reference context. Mandatory before/after ETag calculation additionally
-reconstructs the complete canonical POI projection and both encodings; it is proportional to the data
+exports the complete stored static hierarchy and both canonical encodings; it is proportional to the data
 size. Immutable snapshot identifiers are computed lazily and cached. `CreateChangeSet` prepares
 both arrays on unpublished immutable maps; `ApplyChangeSet` checks both before returning a result.
+
+Static exports and hashes retain stored optional properties, including valid explicit nulls.
+Network import captures supplied revision metadata or revision zero; managed timestamp defaults
+are fixed once and owned graph arrays export as sorted arrays including `[]`.
+`RoamingNetworkDataSnapshot.Parse` and `ParseCBOR` validate declared ETags on reload.
+Complete ChangeSet CBOR exchange preserves all peer signatures and their v2 signing input;
+see [binary transport](../../docs/CHANGESET-CBOR.md).
 
 For large data sets, read `DataSnapshot.Entities`, `GetEntity()` and `GetEntityJSON()` directly.
 `WriteTo(Utf8JsonWriter, IncludeETags: false)` streams the complete snapshot without creating an intermediate JObject
@@ -71,7 +78,9 @@ licenses, cables and energy meters use owner property or addressed element opera
   the value produced by preceding operations in the same batch. IDs, ancestry, child arrays,
   creation/change timestamps and revision fields cannot be replaced as properties. Moving a subtree
   is an explicit remove followed by add beneath its new parent.
-- **AddElement/RemoveElement/ReplaceElement/UpdateElementProperty:** target one nested value via
+- **RemoveProperty:** removes an existing editable optional key, has no `NewValue` and permits
+  an `OldValue` precondition. Remaining domain content/references are validated; absence differs from null.
+- **AddElement/RemoveElement/ReplaceElement/UpdateElementProperty/RemoveElementProperty:** target one nested value via
   an immutable schema-property/ID `ElementPath`. Individual preconditions and deterministic ID
   ordering enable disjoint nested edits. See [supported paths and examples](../../docs/ELEMENT-OPERATIONS.md).
 
@@ -131,9 +140,14 @@ binds the before/after arrays, header, complete operations, multilingual `Descri
 JSON `Metadata`, together with the peer's algorithm/key ID/profile/encoding. Description/metadata
 edits return an unsigned copy; the peer array is excluded to permit independent additional signers.
 Canonical JSON and deterministic CBOR SHA-256 POI identities bind the source and result data.
-Key management, a history-bound commit identity, automatic conflict resolution and durable history
-remain future work. `AppliedChangeSetId` records
-the latest batch; applications persist the batches separately for an audit log.
+`RoamingNetworkHistory` retains original batches and static snapshots, supplies a typed ancestry-bound
+commit identity and publishes/persists heads against an expected prior commit. Independent commit
+signatures authenticate ordered parents. `AppliedChangeSetId` alone records only the latest batch;
+use the [history archive](../../docs/HISTORY.md) for retained ancestry and replay recovery.
+`RoamingNetworkHistory.TryMerge` now integrates retained/published branches via three-way static
+comparison and structured explicit resolution. It prepares a fresh commit against the left tip
+with both parents and signed ancestor/resolution metadata. See [branch integration](../../docs/MERGING.md).
+Key management, recursive virtual bases and rebase remain application work or roadmap extensions.
 
 The snapshot retains the existing POI snapshot contract: current timestamped statuses, entity
 timestamps and custom data, but no status history or properties absent from the POI serializers.
@@ -230,6 +244,7 @@ separate files. The snapshot implementation is grouped by responsibility:
 | File | Responsibility |
 | --- | --- |
 | `RoamingNetworkDataSnapshot.cs` | Immutable data, lookup and initial capture |
+| `RoamingNetworkChangeSet.CBOR.cs` | Deterministic batch transport with native ETags and exact signed-value preservation |
 | `RoamingNetworkDataSnapshot.Changes.cs` | Batch validation and ordered add/remove/property operations |
 | `RoamingNetworkDataSnapshot.Merge.cs` | Explicit merge preparation, input checks and comparison of both execution orders |
 | `RoamingNetworkChangeSetMergeResult.cs` | Immutable merge status, notices and structured issues |
@@ -243,3 +258,9 @@ separate files. The snapshot implementation is grouped by responsibility:
 
 All partial snapshot files operate on the same immutable storage. This source organization does
 not introduce extra copies of entities or JSON trees.
+
+## Interoperability evidence
+
+The fixed [static-v1 profile](../../docs/INTEROPERABILITY.md) supplies exact JSON/CBOR/digest/signature
+references and executed replica, resolution, expected-head race and archive-recovery workflows.
+Commit IDs/signatures bind the profile explicitly; static ETag inputs exclude its transport declaration.

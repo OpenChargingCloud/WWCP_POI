@@ -134,7 +134,12 @@ internal static class MetrologyJson
     }
 
     internal static JToken NormalizeProperty(InfrastructureEntityType type, String field, JToken value)
-        => POIRepresentation.WithoutETags(() => NormalizePropertyCore(type, field, value));
+        => POIRepresentation.WithoutETags(() => {
+            var wrapper = new JObject(new JProperty(field, NormalizePropertyCore(type, field, value).DeepClone()));
+            NormalizeReadings(wrapper, type.ToString());
+            POIRepresentation.NormalizeStaticTimestamps(wrapper, type.ToString());
+            return wrapper[field]!;
+        });
 
     private static JToken NormalizePropertyCore(InfrastructureEntityType type, String field, JToken value)
     {
@@ -161,12 +166,13 @@ internal static class MetrologyJson
         if (type == InfrastructureEntityType.ChargingTariff && field == "elements")
         {
             if (value is not JArray elements) throw new ArgumentException("elements: expected an array.");
-            return new JArray(elements.Select(token => ChargingTariffElement.Parse(InfrastructureJson.Entry(token)).ToJSON()));
+            return new JArray(elements.Select(token => PreserveQuantityShape(InfrastructureJson.Entry(token),
+                ChargingTariffElement.Parse(InfrastructureJson.Entry(token)).ToJSON(), nameof(ChargingTariffElement))));
         }
         if (type is InfrastructureEntityType.ChargingTariff or InfrastructureEntityType.EVSE && field == "energyMix")
-            return EnergyMix.Parse(InfrastructureJson.Entry(value)).ToJSON();
+            return PreserveQuantityShape(InfrastructureJson.Entry(value), EnergyMix.Parse(InfrastructureJson.Entry(value)).ToJSON(), nameof(EnergyMix));
         if (type == InfrastructureEntityType.ChargingConnector && field == "cable")
-            return ChargingCable.Parse(InfrastructureJson.Entry(value)).ToJSON(Embedded: true)!;
+            return PreserveQuantityShape(InfrastructureJson.Entry(value), ChargingCable.Parse(InfrastructureJson.Entry(value)).ToJSON(Embedded: true)!, nameof(ChargingCable));
         if (type == InfrastructureEntityType.ChargingPool && field == "gridConnectionPoint")
         {
             var point = (JObject) InfrastructureJson.Entry(value).DeepClone();
@@ -181,6 +187,28 @@ internal static class MetrologyJson
             return point;
         }
         return value;
+    }
+
+    // Canonicalize readings without manufacturing defaults or dropping explicit optional nulls.
+    private static JObject PreserveQuantityShape(JObject source, JObject normalized, String kind)
+    {
+        var copy = (JObject) source.DeepClone();
+        foreach (var property in copy.Properties().ToArray())
+        {
+            if (POIRepresentation.IsMeasurement(kind, property.Name) && property.Value.Type != JTokenType.Null &&
+                normalized[property.Name] is { } reading)
+                property.Value = reading.DeepClone();
+            else if (POIRepresentation.ChildKind(kind, property.Name) is { } childKind)
+            {
+                if (property.Value is JObject child && normalized[property.Name] is JObject normalizedChild)
+                    property.Value = PreserveQuantityShape(child, normalizedChild, childKind);
+                else if (property.Value is JArray children && normalized[property.Name] is JArray normalizedChildren)
+                    for (var index = 0; index < children.Count; index++)
+                        if (children[index] is JObject item && index < normalizedChildren.Count && normalizedChildren[index] is JObject normalizedItem)
+                            children[index] = PreserveQuantityShape(item, normalizedItem, childKind);
+            }
+        }
+        return copy;
     }
 
     internal static Boolean HasQuantities(InfrastructureEntityType type, String field)
@@ -208,6 +236,34 @@ internal static class MetrologyJson
             if (!ReferenceEquals(normalized, property.Value)) property.Value = normalized;
         }
     }
+
+    internal static void NormalizeReadings(JObject json, String kind)
+        => POIRepresentation.Visit(json, kind, "", (document, type, _) => {
+            foreach (var property in document.Properties().ToArray())
+            {
+                if (property.Value.Type != JTokenType.String || !POIRepresentation.IsMeasurement(type, property.Name)) continue;
+                switch (property.Name)
+                {
+                    case "nominalVoltage": case "maxVoltage": Normalize<Volt>(document, property.Name, Volt.TryParse); break;
+                    case "maxCurrent": Normalize<Ampere>(document, property.Name, Ampere.TryParse); break;
+                    case "minPower": case "maxPower": case "contractedImportPower": case "contractedExportPower":
+                        Normalize<Watt>(document, property.Name, Watt.TryParse); break;
+                    case "minEnergy": case "maxEnergy": case "maxCapacity": case "stopChargingAfterEnergy":
+                        Normalize<WattHour>(document, property.Name, WattHour.TryParse); break;
+                    case "contractedImportApparentPower": case "contractedExportApparentPower":
+                        Normalize<VoltAmpere>(document, property.Name, VoltAmpere.TryParse); break;
+                    case "nominalFrequency": Normalize<Hertz>(document, property.Name, Hertz.TryParse); break;
+                    case "length": Normalize<Meter>(document, property.Name, Meter.TryParse); break;
+                    case "resistance": Normalize<Ohm>(document, property.Name, Ohm.TryParse); break;
+                    case "alt": case "altitude": document[property.Name] = AltitudeText(ReadAltitude(document, property.Name)!.Value); break;
+                    case "percentage": document[property.Name] = Percent(ReadPercent(document, property.Name)); break;
+                    case "minDuration": case "maxDuration": case "stopChargingAfterTime": case "stopParkingAfterTime":
+                        document[property.Name] = DurationText(ReadDuration(document, property.Name)!.Value); break;
+                    case "stepSize":
+                        document[property.Name] = ChargingPriceComponent.Parse(document).ToJSON()[property.Name]!.DeepClone(); break;
+                }
+            }
+        });
 
     internal static JObject NormalizeHierarchy(JObject json, InfrastructureEntityType type)
     {

@@ -38,12 +38,3 @@ public partial class ParkingOperator
     public static ParkingOperator ParseCBOR(ReadOnlySpan<Byte> data, RoamingNetwork network, IEnumerable<ChargingStation>? stations = null)
         => POIRepresentation.ParseCBOR(data, json => Parse(json, network, stations));
 }
-
-public partial class RoamingNetworkDataSnapshot
-{
-    /// <summary>
-    /// Reconstruct a frozen data snapshot from a CBOR POI hierarchy.
-    /// </summary>
-    public static RoamingNetworkDataSnapshot ParseCBOR(ReadOnlySpan<Byte> data)
-        => POIRepresentation.ParseCBOR(data, json => RoamingNetwork.Parse(json).DataSnapshot);
-}

@@ -16,6 +16,15 @@ version. Each ChangeSet carries canonical JSON and CBOR SHA-256 identifiers of b
 expected source and expected result. The receiver checks both before accepting the new
 version. The previous version remains available, and unchanged immutable data is shared.
 
+`RoamingNetworkHistory` retains these versions as deterministic commits, including their original
+batches and ordered parents. It publishes a new head against the expected previous commit ID and
+can persist/recover the complete static history as a CBOR archive. Equal peer commit signatures
+authenticate ancestry without changing the commit ID. Bounded incremental JSON/CBOR pages
+exchange missing ancestry atomically. A separate preview/explicit adoption API selects retained
+descendants, including merges reached through a second parent, while carrying local runtime lifetimes.
+New replicas can bootstrap a frozen checkpoint and complete history through bounded, resumable
+JSON/CBOR fragments. Validation previews precede explicit activation into a separate history.
+
 ## Documentation
 
 | Document | Contents |
@@ -25,7 +34,13 @@ version. The previous version remains available, and unchanged immutable data is
 | [Owned graph and references](docs/GRAPH.md) | Ownership collections, groups, manufacturers, parking, reference validation and deletion |
 | [Nested element operations](docs/ELEMENT-OPERATIONS.md) | IDs, structured owner paths, individual collection edits and merge behavior |
 | [Runtime updates](docs/RUNTIME.md) | Scoped status instructions, preconditions, history retention and static head publication |
+| [Interoperability profile and references](docs/INTEROPERABILITY.md) | Static-v1 byte contracts, fixed JSON/CBOR/signature vectors and replica/recovery workflows |
 | [ETags and CBOR](docs/ETAGS-CBOR.md) | Immutability audit, canonical content identifiers, metrological CBOR and roundtrips |
+| [ChangeSet CBOR](docs/CHANGESET-CBOR.md) | Complete binary exchange preserving signed values, paths and all peer signatures |
+| [Commit history and atomic heads](docs/HISTORY.md) | Typed commit IDs, ancestry, publication, duplicate delivery, signatures and archive recovery |
+| [Incremental replication](docs/REPLICATION.md) | Retained-tip announcements, bounded commit pages, atomic import and explicit head adoption |
+| [Bootstrap new replicas](docs/BOOTSTRAP.md) | Frozen archive fragments, local limits, disk staging, restart and explicit validated activation |
+| [Integrating retained branches](docs/MERGING.md) | Three-way comparison, best common ancestors, structured conflicts and explicit merge commits |
 | [JSON contracts](docs/JSON.md) | Network snapshots, ChangeSet JSON, reference resolution, precision and explicit units |
 | [Greenfield model](docs/GREENFIELD.md) | Removed format variants, typed quantities and remaining dependency boundaries |
 | [Grid connections](docs/GRIDCONNECTIONS.md) | Pool energy meters, grid connection points, operators, electrical ratings and location identifiers |
@@ -88,10 +103,12 @@ ownership slots. Equal IDs do not automatically share configuration or runtime; 
 
 - JSON and CBOR parsing/serialization of the nested network hierarchy, providers, tariffs and support values.
 - Typed immutable ETags over canonical JSON and deterministic CBOR SHA-256 POI content.
+- Explicit `wwcp-poi-static-v1` transport declarations, bound into commit identity/signatures.
+- Published byte/digest/signature/merge/archive references with automated replica and crash-recovery coverage.
 - Current operational/admin statuses, timestamps and custom data in network snapshots.
 - Sealed infrastructure, support and group types with immutable POI data and mutable runtime statuses.
 - Immutable entity storage with persistent dictionaries and sets.
-- Atomic, ordered `Add`, `Remove` and `UpdateProperty` ChangeSet operations.
+- Atomic, ordered `Add`, `Remove`, `UpdateProperty` and explicit property-removal operations.
 - Addressed nested Add/Remove/Replace/property edits with immutable owner paths and element IDs.
 - Mandatory before/after JSON and CBOR ETag checks, revision checks and optional expected-old-value checks.
 - ChangeSet preparation that computes both expected states before exchange or signing.
@@ -100,14 +117,31 @@ ownership slots. Equal IDs do not automatically share configuration or runtime; 
 - Lazy domain hierarchies with independent runtime schedules for each network version.
 - Canonical ChangeSet signing/verification with Styx, equal peer signatures and a verifier per signature.
 - Immutable multilingual commit descriptions and arbitrary JSON metadata, covered by every signature.
+- Deterministic ChangeSet CBOR exchange preserving signed values, peer signatures and native ETag digest bytes.
+- Versioned JSON/CBOR reloads retaining valid optional-property presence and explicit nulls.
+- Deterministic typed commit IDs binding ordered ancestry, resulting state and unsigned batch content.
+- Atomic expected-head publication, retained branches and conflicting batch-ID/duplicate detection.
+- Equal peer commit signatures binding ancestry, separate from existing batch signatures.
+- Static JSON/CBOR history archives and file persistence with writer leases and replay-based recovery.
+- Scoped runtime delivery through the same history gate as static head publication.
+- Three-way integration of retained/published branches with structured base/left/right conflicts.
+- Explicit conflict resolution and fresh unsigned merge commits with authenticated audit metadata.
+- Bounded incremental JSON/CBOR commit exchange, including all merge parents and atomic page import.
+- Explicit expected-head adoption with previews, divergence notices and conservative local runtime retention.
+- Bounded bootstrap fragments with frozen manifests, disk receipts, restart, complete validation and explicit activation.
 - NUnit coverage for JSON roundtrips, conflicts, storage sharing and schema validation.
 
 The “git for charging data” idea now includes cryptographic POI content identities and
 ChangeSets binding source and result states, signed descriptions/metadata and multiple peer
-signatures. Durable history, automatic conflict resolution and a network synchronization protocol
-are future work. Numeric revisions provide optimistic concurrency control; the ETags distinguish
-different static data at the same revision. They describe POI content, while a commit identity
-covering history, operations and signatures still needs a separate profile.
+signatures, retained ancestry and recoverable head publication. Numeric revisions count along
+the first-parent chain; static ETags distinguish data at the same revision, and commit IDs bind
+that data to ordered operations, metadata and history. The history merge API integrates already-published
+branches against a retained ancestor and prepares explicit resolutions as a fresh commit. Additional
+parents recorded by the generic commit API remain explicit ancestry claims. Recursive virtual merge
+bases, rebase, a streaming archive codec and an HTTP synchronization service remain future work.
+The transport-independent incremental exchange/adoption contract has dedicated JSON/CBOR,
+atomic failure, runtime lifetime, concurrency and persistence/recovery coverage. Peer signatures
+remain separate from commit identity.
 
 ## Quick start
 
@@ -177,6 +211,48 @@ var json = next.ToJSONSnapshot().ToString();
 var restored = RoamingNetwork.Parse(json);
 ```
 
+For static persistence use `next.DataSnapshot.ToCBOR(IncludeVersionMetadata: true)` and
+`RoamingNetworkDataSnapshot.ParseCBOR(...)`, or the ETag-validating JSON
+`RoamingNetworkDataSnapshot.Parse(...)`. An unversioned import starts at revision zero.
+Include version metadata to continue applying batches after reload.
+
+ChangeSets now have their own binary transport:
+
+```csharp
+var bytes = changeSet.ToCBOR();
+var received = RoamingNetworkChangeSet.ParseCBOR(bytes);
+var replicaNext = replica.ApplyChangeSet(received); // verifier required when signed
+```
+
+To retain the transition and publish its head atomically:
+
+```csharp
+using var history = new RoamingNetworkHistory(network);
+var source = history.Head;
+var commit = history.PrepareCommit(source.Id, changeSet);
+if (!history.TryPublish(source.Id, commit, out var result))
+    throw new InvalidOperationException($"{result.Outcome}: {result.Error}");
+
+Console.WriteLine(result.Head.Id); // Deterministic commit identity, including ancestry.
+var archive = history.ToCBOR();   // Static checkpoint, original commits/peers and head.
+using var recoveredHistory = RoamingNetworkHistory.ParseCBOR(archive);
+```
+
+Use `CreatePersistent(path, network)` / `Open(path)` for integrated CBOR file persistence and
+recovery. Signed batches/commits require configured verifiers; authorization can require keys or
+quorum. Route runtime status instructions through `history.ApplyRuntimeUpdate(...)` to share the
+publication gate. See [history and atomic heads](docs/HISTORY.md) for contracts and boundaries.
+
+Signed batches keep all signatures and their v2 signing bytes. Native metrological readings,
+exact JSON-number spelling and optional payload presence are described in
+[ChangeSet CBOR](docs/CHANGESET-CBOR.md).
+
+Static hashes and complete exports read the stored snapshot properties directly. Valid explicit
+`null` differs from an absent optional property; both survive reload and old-value checks.
+Managed creation/change timestamps receive initial defaults once, and owned graph collections
+export as ID-sorted arrays, including `[]`. This corrects the previous Domain-projection-based
+hash input: re-export snapshots and prepare/sign batches against the current ETags.
+
 Power values use explicit SI units. Use `ToJSONSnapshot()` for versioned persistence with
 current statuses. Static POI changes use ChangeSets; constructors and parsers create the initial
 immutable hierarchy. Public static setters and in-place Add/Remove/UpdateWith factory APIs have
@@ -211,10 +287,13 @@ children as independently addressed nodes. JSON/CBOR network imports resolve gro
 references automatically. The persistent `References` index rejects dangling or out-of-scope links
 and prevents deletion of referenced members. See [graph ownership](docs/GRAPH.md).
 
-Nested owned values support `AddElement`, `RemoveElement`, `ReplaceElement` and
-`UpdateElementProperty`, with a typed `ElementPath`. Meters, brands, licenses, group membership
+Nested owned values support `AddElement`, `RemoveElement`, `ReplaceElement`,
+`UpdateElementProperty` and `RemoveElementProperty`, with a typed `ElementPath`. Meters, brands, licenses, group membership
 and parking/tariff references can be changed individually. Optional singletons use their
 owner/property slot. See [element operations](docs/ELEMENT-OPERATIONS.md).
+
+`RemoveProperty`/`RemoveElementProperty` delete existing optional keys completely, preserving
+absence instead of writing a present JSON null. Remaining domain data and references are validated.
 
 Pool and station `MaxCurrent`, `MaxPower` and `MaxCapacity` use immutable Styx `Ampere`, `Watt`
 and `WattHour` quantities supplied through their constructors. They roundtrip as SI strings such
@@ -263,6 +342,110 @@ verified via `verifySignature` and are not copied; sign the new batch separately
 `network.TryMerge(...)` delegates to its static `DataSnapshot`. Applying to the common source
 produces one successor. Applications coordinate publication of their current head and retain
 branch successors as needed. See [merge details](docs/CHANGESETS.md#merging-concurrent-batches).
+
+For retained branches, including an already-published left tip, use the history's state comparison:
+
+```csharp
+if (history.TryMerge(history.Head.Id, retainedRight.Id, out _, out var preview))
+    Console.WriteLine(preview.Message); // Preview does not create a commit.
+
+if (history.TryMerge(history.Head.Id, retainedRight.Id, out var prepared, out var report,
+                     merge: true, mergedChangeSetId: "integrate-44") && prepared is not null)
+{
+    // Sign the fresh batch/commit as required, then publish against its exact first parent.
+    history.TryPublish(prepared.Parents[0], prepared, out var publication);
+}
+```
+
+`resolveConflict:` accepts explicit base/left/right/removal/custom-value choices. Reports include
+stable scoped paths and all three JSON values; multiple best ancestors require explicit selection.
+The prepared batch targets the left state and records ancestor/tips/resolutions in signed metadata.
+It rechecks ownership/references and uses addressed element edits for supported collections.
+Missing or out-of-scope references return `Reference` conflicts with the consumer in `Entity`,
+the affected `PropertyName` and typed target in `RelatedEntity`. All currently affected consumers
+and targets are reported. Whole-subtree choices are revalidated immediately, so repaired issues
+drop out and repeated invalid choices terminate. Creation/owner changes remain structural choices;
+connectors retain their EVSE scope. Criss-cross histories require an explicit best-ancestor choice.
+Recreating a referenced target can require an explicit consumer detach transition when the generated
+merge delta has no legal operation order; no temporary detach/restore operations are inferred.
+See [three-way integration](docs/MERGING.md) for preparation, signing and boundaries.
+
+## Exchange missing commits and adopt a retained head
+
+The receiver announces all retained branch tips. The sender returns bounded original commits
+in parent-before-child order, including both sides of a merge. Import validates an entire page
+before retaining it and preserves the receiver's current head and runtime. Keep the requested tip
+fixed and refresh the receiver announcement between pages:
+
+```csharp
+var target = sender.GetReplicationState().Head;
+var expected = receiver.Head.Id;
+RoamingNetworkCommitPack page;
+do
+{
+    if (!sender.TryCreateCommitPack(receiver.GetReplicationState(), target, out var outgoing, out var export))
+        throw new InvalidOperationException(export.Error);
+    page = RoamingNetworkCommitPack.ParseCBOR(outgoing.ToCBOR());
+    if (!receiver.TryImportCommitPack(page, out var import))
+        throw new InvalidOperationException(import.Error);
+}
+while (!page.Complete);
+
+if (!receiver.TryAdoptHead(expected, target, out var preview))
+    throw new InvalidOperationException(preview.Error);
+if (preview.Outcome == RoamingNetworkHeadAdoptionOutcome.AdoptionAvailable &&
+    !receiver.TryAdoptHead(expected, target, out var adopted, adopt: true))
+    throw new InvalidOperationException(adopted.Error);
+```
+
+`TryAdoptHead` previews by default. A merge whose second parent is the receiver's current head
+can be selected without creating another commit or changing its signatures. Divergent tips return
+`Diverged` and require explicit `TryMerge`; ancestors never rewind the head. Runtime survives only
+where its lifetime can be proved, and uncertain branch lifetimes start with domain defaults.
+Different checkpoints return `CheckpointMismatch` and require separate explicit archive bootstrap.
+See [replication](docs/REPLICATION.md) for wire profiles, limits, outcomes and runtime policy.
+
+## Bootstrap a new replica
+
+`CreateBootstrap()` freezes the original checkpoint, head, retained branches and peer signatures.
+Its manifest binds the complete deterministic CBOR archive and ordered fragment digests. JSON
+transports binary fragments as explicitly labelled Base64; CBOR uses native byte strings.
+
+```csharp
+var source = sender.CreateBootstrap(chunkBytes: 64 * 1024);
+var manifest = RoamingNetworkBootstrapManifest.ParseCBOR(source.Manifest.ToCBOR());
+var expectedManifest = manifest.Id; // Retain independently from the staging directory.
+using var receiver = RoamingNetworkBootstrapReceiver.Create(stagingDirectory, manifest);
+while (receiver.NextChunk < manifest.ChunkCount)
+{
+    var chunk = RoamingNetworkBootstrapChunk.ParseCBOR(source.CreateChunk(receiver.NextChunk).ToCBOR());
+    if (!receiver.TryAcceptChunk(chunk, out var receipt))
+        throw new InvalidOperationException(receipt.Error);
+}
+
+if (!receiver.TryActivate(expectedManifest, out _, out var preview,
+    verifyBatchSignature: VerifyBatch, verifyCommitSignature: VerifyCommit,
+    authorizeCommit: AuthorizeCommit, authorizeBootstrap: AuthorizeBootstrap))
+    throw new InvalidOperationException(preview.Error);
+if (!receiver.TryActivate(expectedManifest, out var replica, out var activation,
+    activate: true, archivePath: newArchivePath,
+    verifyBatchSignature: VerifyBatch, verifyCommitSignature: VerifyCommit,
+    authorizeCommit: AuthorizeCommit, authorizeBootstrap: AuthorizeBootstrap))
+    throw new InvalidOperationException(activation.Error);
+// Explicitly select replica in the application, and dispose it when finished.
+```
+
+Reopen an interrupted transfer with `Open(stagingDirectory, expectedManifest)` and request its
+`NextChunk` from the same frozen source. Receipts are flushed and installed before acknowledgement;
+reopening verifies them again. Preview/activation checks profiles, all digests, original signatures,
+authorization and replay of every branch. Existing histories/archives are never replaced by bootstrap.
+The new history starts with fresh local runtime and can continue incremental exchange immediately.
+Authenticate the selected manifest/channel or pin its identity and expected head in application policy.
+
+`RoamingNetworkBootstrapLimits` bounds raw archive, chunk/count/commit and encoded message sizes.
+Source export and final replay still materialize a complete archive; fragment bounds do not bound
+total replay memory or work. See [bootstrap](docs/BOOTSTRAP.md) for contracts, failure outcomes,
+trust, staging lifecycle and executed tests.
 
 ## Sign ChangeSets with descriptions and metadata
 
@@ -331,7 +514,18 @@ dotnet test WWCP_POI_Tests/WWCP_POI_Tests.csproj
 
 The library targets `net10.0`, with nullable reference types and implicit usings enabled.
 POI documents use Newtonsoft.Json; immutable storage and ChangeSet payloads use System.Text.Json.
-The tests use NUnit.
+The tests use NUnit. The full run on 2026-10-07 passed **509 tests**, with one skipped child-process
+worker (executed separately by the crash tests). The explicit reference generator is excluded from
+ordinary discovery. The **61 new replication/adoption cases** cover exact count/byte bounds,
+multi-page JSON/CBOR exchange, atomic rollback of states/peers/batch IDs, signed merge adoption,
+local runtime lifetimes, expected-head races, gated runtime delivery and persistence/recovery.
+The suite also covers fixed cryptographic references, domain JSON and immutable storage.
+The **32 bootstrap cases** cover bounded JSON/CBOR fragments, restart, corruption, failed receipts,
+full trust/replay validation, preview/activation, fresh runtime and incremental continuation.
+The **34 structural merge cases** cover deletion/recreation/addition/owner conflicts, precise
+reference diagnostics and choices, connector scopes, signed resolution recovery, criss-cross
+ancestor selection, resolver reentry/exceptions and unschedulable referenced replacements.
+See the [profile and reference vectors](docs/INTEROPERABILITY.md) and [test coverage](WWCP_POI_Tests/README.md).
 
 ## License
 
@@ -344,7 +538,10 @@ The source files carry the GNU Affero General Public License, version 3.0 notice
 `ToString()` displays `json:sha256:hex:<hex>` or `cbor:sha256:hex:<hex>`. The digests use
 Styx canonical JSON and deterministic CBOR with metrological extensions. Both describe the full
 static POI hierarchy, including static timestamps and owned children. Dynamic statuses, measurements,
-revision metadata and derived ETags are excluded. Servers using the same profile can compare
+revision metadata and derived ETags are excluded. The fixed profile is `POIContentProfile.Id` (`wwcp-poi-static-v1`), declared as `contentProfile`
+on tagged POI transports. Commit/archive headers require `ContentProfile`; commit identities and
+ancestry signatures bind it. These declarations are excluded from static state hash inputs.
+Complete tagged imports reject missing/unsupported declarations. Servers using this profile can compare
 the corresponding identifiers to check content agreement.
 
 The first field identifies the **hashed representation**, independently of the transport format.
@@ -366,8 +563,8 @@ var bytes = network.ToCBOR(IncludeVersionMetadata: true);
 var replica = RoamingNetwork.ParseCBOR(bytes);
 
 var batch = network.CreateChangeSet("change-43", DateTimeOffset.UtcNow, [/* operations */]);
-// Transfer JsonSerializer.Serialize(batch) to a replica of this source version.
-var next = replica.ApplyChangeSet(batch);
+var received = RoamingNetworkChangeSet.ParseCBOR(batch.ToCBOR());
+var next = replica.ApplyChangeSet(received);
 ```
 
 The default `ToCBOR()` exports static content without revision bookkeeping; parsing it starts
@@ -391,7 +588,7 @@ Runtime updates retain POI ETags; static ChangeSets reject operational status fi
 Empty batches advance revision and touch the root; unchanged content
 can still have the same ETags when the timestamp is also unchanged.
 
-Hash verification traverses the complete canonical POI projection. Snapshot identifiers are
+Hash verification traverses the complete stored static hierarchy. Snapshot identifiers are
 computed lazily and cached; the immutable storage update continues to share unchanged entries.
 See [ETags and CBOR](docs/ETAGS-CBOR.md) for the complete profile and
 [ChangeSets](docs/CHANGESETS.md) for preparation, validation order and errors.

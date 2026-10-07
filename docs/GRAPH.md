@@ -63,6 +63,14 @@ A target cannot be removed while surviving consumers reference it. Removing an o
 first removes references originating inside that subtree; references from outside still prevent
 deletion. Ordered batches must detach surviving references before removing their targets.
 
+History merge can combine independently valid branches into an invalid reference graph: for example,
+one deletes a target while another adds a consumer. It now reports `Reference` with consumer `Entity`,
+`PropertyName` and typed `RelatedEntity`, collecting all current missing/out-of-scope targets before
+domain projection. Whole-consumer subtree choices are validated again; keeping an invalid reference
+does not resurrect the target or waive operator scope. Temporary detach/restore instructions whose
+final state is unchanged are not inferred from branch state comparison. See [structural merge and
+reference conflicts](MERGING.md#reference-conflicts).
+
 For EVSE/station/pool groups, `allowedMemberIds` is an admission list, not active membership.
 It can contain future IDs from the same operator; these IDs do not require target nodes and do
 not protect deletion. Every active member must be allowed. Omitting the list defaults it to the
@@ -127,9 +135,10 @@ Other added graph nodes receive deterministic missing timestamps from the batch'
 Network/operator ETags include the owned node documents. Group ETags include group configuration
 and member IDs, while each owned member's content is hashed through its infrastructure location.
 A change to a member can leave the group's ETag unchanged and still change the network ETags.
-Empty owned collections are part of the complete domain projection. This expanded projection
-changes content identifiers calculated before graph integration; recalculate state identifiers
-and prepare/sign new batches against the expanded profile.
+Empty owned graph collections export as `[]`. Complete network hashes use stored static properties,
+including valid optional nulls, without a domain serialization roundtrip. Graph expansion and the
+stored-property profile change earlier content identifiers; recalculate them and prepare/sign new
+batches against the current profile. See [snapshot defaults](ETAGS-CBOR.md#versioned-property-presence-and-defaults).
 
 Grid connection points continue to embed an independent immutable GridOperator description,
 including its network ID. A network's `gridOperators` registry is separately owned. An equal

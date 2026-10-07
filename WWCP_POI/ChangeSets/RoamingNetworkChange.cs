@@ -78,7 +78,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             var elementOperation = kind is RoamingNetworkChangeKind.AddElement or RoamingNetworkChangeKind.RemoveElement or
-                                           RoamingNetworkChangeKind.ReplaceElement or RoamingNetworkChangeKind.UpdateElementProperty;
+                                           RoamingNetworkChangeKind.ReplaceElement or RoamingNetworkChangeKind.UpdateElementProperty or
+                                           RoamingNetworkChangeKind.RemoveElementProperty;
             if (elementOperation && (elementPath.IsDefaultOrEmpty || elementPath.Any(segment => segment is null)))
                 throw new ArgumentException("Element operations require a nonempty path without null segments.", nameof(elementPath));
             if (!elementOperation && !elementPath.IsDefaultOrEmpty)
@@ -101,6 +102,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     throw new ArgumentException("ReplaceElement requires a new value and no property name.");
                 case RoamingNetworkChangeKind.UpdateElementProperty when !newValue.HasValue || String.IsNullOrWhiteSpace(propertyName):
                     throw new ArgumentException("UpdateElementProperty requires a property name and a new value.");
+                case RoamingNetworkChangeKind.RemoveProperty or RoamingNetworkChangeKind.RemoveElementProperty
+                    when newValue.HasValue || String.IsNullOrWhiteSpace(propertyName):
+                    throw new ArgumentException("Property removal requires a property name and no new value.");
             }
 
             Kind = kind;
@@ -254,5 +258,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static String Required(String  value,
                                        String  parameterName)
             => !String.IsNullOrWhiteSpace(value) ? value : throw new ArgumentException("Value must not be empty.", parameterName);
+
+        /// <summary>
+        /// Remove an existing optional entity property, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(String entityType, String entityId, String propertyName,
+                                                          JsonElement? oldValue = null, String? parentEntityType = null,
+                                                          String? parentEntityId = null)
+            => new(RoamingNetworkChangeKind.RemoveProperty, entityType, entityId, propertyName, oldValue, null,
+                   parentEntityType, parentEntityId);
+
+        /// <summary>
+        /// Remove an existing optional element property without clearing the element's runtime lifetime.
+        /// </summary>
+        public static RoamingNetworkChange RemoveElementProperty(String entityType, String entityId,
+                                                                 ImmutableArray<POIElementPathSegment> elementPath,
+                                                                 String propertyName, JsonElement? oldValue = null,
+                                                                 String? parentEntityType = null, String? parentEntityId = null)
+            => new(RoamingNetworkChangeKind.RemoveElementProperty, entityType, entityId, propertyName, oldValue, null,
+                   parentEntityType, parentEntityId, elementPath);
     }
 }

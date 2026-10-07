@@ -57,14 +57,14 @@ namespace WWCP_POI_Tests.Json
             var parsed = Brand.Parse(json);
 
             Assert.That(JToken.DeepEquals(json, before), Is.True, "Parsing must not mutate the input JSON.");
-            Assert.That(JToken.DeepEquals(parsed.ToJSON(embedded, expansion), json), Is.True);
+            Assert.That(JsonViews.EqualViews(parsed.ToJSON(embedded, expansion), json), Is.True);
             Assert.That(parsed.Id, Is.EqualTo(source.Id));
             Assert.That(parsed.DataLicenses.Single().Id, Is.EqualTo(source.DataLicenses.Single().Id));
 
             if (expanded)
             {
                 Assert.That(parsed.DataLicenses.Single().URLs, Is.EqualTo(source.DataLicenses.Single().URLs));
-                Assert.That(JToken.DeepEquals(parsed.DataLicenses.Single().Description.ToJSON(),
+                Assert.That(JsonViews.EqualViews(parsed.DataLicenses.Single().Description.ToJSON(),
                                                                                          source.DataLicenses.Single().Description.ToJSON()), Is.True);
             }
 
@@ -80,7 +80,7 @@ namespace WWCP_POI_Tests.Json
             Assert.That(parsed.DataLicenses, Is.Empty);
             Assert.That(parsed.Homepage, Is.Null);
             Assert.That(parsed.Logo, Is.Null);
-            Assert.That(JToken.DeepEquals(parsed.ToJSON(Embedded: true), json), Is.True);
+            Assert.That(JsonViews.EqualViews(parsed.ToJSON(Embedded: true), json), Is.True);
 
         }
 
@@ -137,7 +137,7 @@ namespace WWCP_POI_Tests.Json
                                                                 Assert.That(parsed.IntermediateCDRs, Is.EqualTo(intermediateCDRs));
 
                                                             });
-                Assert.That(JToken.DeepEquals(parsed.ToJSON(), json), Is.True);
+                Assert.That(JsonViews.EqualViews(parsed.ToJSON(), json), Is.True);
 
             }
             finally
@@ -157,7 +157,7 @@ namespace WWCP_POI_Tests.Json
             var source = new ChargingProduct(ChargingProduct_Id.Parse("product-a"));
             var json = source.ToJSON(embedded);
 
-            Assert.That(JToken.DeepEquals(ChargingProduct.Parse(json).ToJSON(embedded), json), Is.True);
+            Assert.That(JsonViews.EqualViews(ChargingProduct.Parse(json).ToJSON(embedded), json), Is.True);
 
         }
 

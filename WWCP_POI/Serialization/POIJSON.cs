@@ -16,7 +16,7 @@ internal static class POIJSON
         var json = value switch
         {
             RoamingNetwork network => Network(network),
-            RoamingNetworkDataSnapshot snapshot => Network(RoamingNetwork.Parse(snapshot.ToJSON())),
+            RoamingNetworkDataSnapshot snapshot => snapshot.GetDocument(),
             ChargingStationOperator entity => Operator(entity),
             ChargingPool entity => Pool(entity),
             ChargingStation entity => Station(entity),
@@ -116,7 +116,8 @@ internal static class POIJSON
 
     private static JObject Network(RoamingNetwork entity)
     {
-        var json = entity.GetCapturedSnapshotDocument() ?? entity.ToJSON(
+        if (entity.GetCapturedSnapshotDocument() is { } captured) return captured;
+        var json = entity.ToJSON(
             ExpandChargingStationOperatorIds: InfoStatus.Hidden,
             ExpandChargingPoolIds: InfoStatus.Hidden,
             ExpandChargingStationIds: InfoStatus.Hidden,

@@ -39,20 +39,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public JObject ToJSONSnapshot()
         {
 
-            if (dataSnapshot is not null)
-            {
-                var persisted = dataSnapshot.ToJSON();
-                WriteCurrentRuntimeStatuses(persisted);
-                return persisted;
-            }
-
-            var json = POIRepresentation.WithoutETags(() => POIJSON.Document(this));
-            return POIRepresentation.AddETags(this, json);
+            var persisted = DataSnapshot.ToJSON();
+            WriteCurrentRuntimeStatuses(persisted);
+            return persisted;
 
         }
 
         internal JObject? GetCapturedSnapshotDocument()
-            => dataSnapshot?.ToJSON();
+            => dataSnapshot?.GetDocument();
 
         #endregion
 

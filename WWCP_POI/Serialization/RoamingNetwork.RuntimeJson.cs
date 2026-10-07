@@ -25,7 +25,7 @@ public sealed partial class RoamingNetwork
     /// <summary>
     /// Overlay current runtime state without editing the persistent POI version.
     /// </summary>
-    private void WriteCurrentRuntimeStatuses(JObject document)
+    internal void WriteCurrentRuntimeStatuses(JObject document)
     {
         var states = new Dictionary<InfrastructureEntityKey, (JObject Admin, JObject Status)>();
         var meters = new Dictionary<InfrastructureEntityKey, Dictionary<String, (JObject Admin, JObject Status)>>();

@@ -41,7 +41,23 @@ Runtime schedules, forecasts, status reports/diffs, command results, parsers and
 are not POI nodes and do not acquire a blanket immutability guarantee. Group predicates and
 status aggregation delegates describe application runtime behavior and are not serialized.
 
+## Explicit content profile
+
+The static contract is `POIContentProfile.Id`, **`wwcp-poi-static-v1`**. Tagged complete JSON/CBOR
+transports declare `contentProfile` at their schema-owned tagged nodes; complete parsers require
+this supported declaration when ETags are present. Fresh untagged input may omit it. The
+transport declaration is excluded from static storage and both digest inputs; customer fields
+with that name remain content. Commits bind `ContentProfile` into their identity and signatures.
+See [interoperability contracts and fixed references](INTEROPERABILITY.md) for byte rules,
+profile relationships, cross-replica tests and the development-envelope change.
+
 ## Two identifiers
+
+These two identifiers describe static **state**. The separate typed `RoamingNetworkCommitId`
+hashes the canonical `wwcp-poi-commit-json-v1` header, ordered parents and unsigned batch content.
+It remains a JSON digest in CBOR transport; a transport encoding does not change its hash input.
+Both peer signature arrays are excluded. See [history identity](HISTORY.md#state-identity-and-commit-identity)
+for wire tuples, ancestry and archive recovery.
 
 `IImmutablePOI.ETags`, `BeforeETags` and `AfterETags` use `ImmutableArray<ETag>` with exactly
 two entries: canonical JSON, then deterministic CBOR. Each identifier is a `readonly struct`
@@ -117,7 +133,9 @@ RFC 8259 JSON format, with ordinal object-property order; it is not an RFC 8785 
 The CBOR identifier is SHA-256 of Styx CBOR using `CBORWriterOptions.Canonical`, which applies
 the RFC 8949 core deterministic encoding requirements.
 
-Both encodings use the same complete, schema-defined POI projection. Owned infrastructure
+For networks and data snapshots both encodings use the authoritative stored static properties,
+without reconstructing them through a domain serializer. Standalone support values retain their
+explicit adapters; complete imported values retain their static wire properties. Owned infrastructure
 children are expanded and sorted by ordinal wire ID, including children with a runtime
 `Removed` status. Ancestors and group members remain references. Tariff element, restriction
 and price-component order remains content. Static timestamps, data source, custom data and
@@ -134,7 +152,7 @@ electrical limits, with SI strings in JSON and metrological values in CBOR. Thei
 measurements and forecasts remain excluded.
 
 Operational/admin statuses and histories, real-time measurements, forecasts, internal data,
-revision bookkeeping and **all derived POI `ETags` arrays** are excluded. Exclusion follows
+revision/profile transport bookkeeping and **all derived POI `ETags` arrays** are excluded. Exclusion follows
 the POI schema: a customer property named `status` or `ETags` inside `customData` still
 participates in the digest. Legal transparency-software status is immutable content.
 
@@ -144,6 +162,31 @@ These are POI content validators. An export with current runtime statuses can ch
 transport bytes while retaining the same POI ETags. A ChangeSet that changes static
 `lastChange` metadata also changes the content identifiers. Operational status updates use the
 separate runtime API and never modify that metadata.
+
+## Versioned property presence and defaults
+
+Every network import captures immutable storage, with revision zero when no revision is supplied.
+Valid optional properties retain their presence: absent, explicit null, zero, false and an empty
+value collection are distinct static documents. SI normalization changes only the readings and
+keeps other supplied properties, including optional nulls in cables, tariff values and energy mixes.
+An old-value check for JSON null matches a stored null and rejects an absent property.
+
+Two schema defaults are materialized: managed `created`/`lastChange` timestamps use the initially
+constructed node's values when omitted/null, and owned graph relations export as ID-sorted arrays
+including `[]`. These values are then carried by the snapshot; reloading an export does not choose
+new timestamps. ID-only ownership views are resolved and expanded before capture. Separate imports
+with newly generated timestamps are separate static content, even if their other facts agree.
+
+Domain nodes reconstructed from a snapshot retain its static property document for complete ETag
+and CBOR exports. Current runtime exports overlay statuses without rewriting static properties.
+Domain `ToJSON()` expansion views remain presentation APIs; use the complete snapshot transports
+for persistence. Parsed/materialized graph nodes receive detached serialization documents; this
+adds storage alongside the domain projection and is separate from persistent-map structural sharing.
+
+The stored-property hash input replaces the previous domain reconstruction input. Optional nulls,
+absent/default properties and parent-reference projection can therefore produce different digests
+than earlier builds. Re-export existing snapshots and prepare/sign batches against the new identifiers;
+there is no alternate old-input hash mode. The v2 ChangeSet signing profile itself is unchanged.
 
 ## API
 
@@ -161,6 +204,8 @@ var canonicalCBORBytes = network.ToCanonicalCBOR();
 
 // Preserve revision bookkeeping without runtime data.
 var versionCBOR = network.ToCBOR(IncludeVersionMetadata: true);
+var staticReload = RoamingNetworkDataSnapshot.ParseCBOR(versionCBOR);
+var jsonReload = RoamingNetworkDataSnapshot.Parse(network.DataSnapshot.ToJSON());
 
 // Include current operational/admin statuses as an independent transport choice.
 // The identifiers still describe static POI content.
@@ -273,3 +318,13 @@ Every signature binds the same batch content; its peer signature array is exclud
 can be added independently. See [signatures](SIGNATURES.md).
 The v2 signing input also binds every operation's complete `ElementPath`. This changes ChangeSet
 signature bytes/profile, not the static POI ETag profiles.
+
+## Bootstrap transfer identities
+
+[Bootstrap](BOOTSTRAP.md) adds a CBOR ETag for the complete frozen archive, including original
+peer envelopes and the captured head reference, and a JSON ETag for its canonical manifest.
+These are distinct from static POI state identifiers and commit IDs. Fragment SHA-256 digests
+cover raw byte slices and have no representation label because a slice may not be valid CBOR
+on its own. JSON carries explicitly encoded Base64 bytes; CBOR uses native byte strings.
+Manifest hashes detect corruption; application channel/expected-identity policy authenticates
+the chosen archive and head. Existing state/commit/signature/reference byte profiles are unchanged.

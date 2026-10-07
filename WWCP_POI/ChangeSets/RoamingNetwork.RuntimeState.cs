@@ -29,31 +29,56 @@ public sealed partial class RoamingNetwork
     /// New identities and removed/recreated subtrees start with their domain runtime defaults.
     /// </summary>
     private Action<RoamingNetwork> CaptureRuntimeState(RoamingNetworkChangeSet changeSet, RoamingNetwork result)
+        => CaptureRuntimeState([(changeSet, DataSnapshot)], result, false);
+
+    private Action<RoamingNetwork> CaptureRuntimeState(
+        ImmutableArray<(RoamingNetworkChangeSet Batch, RoamingNetworkDataSnapshot Source)> lifetimeHistory,
+        RoamingNetwork result, Boolean requireOwnerContinuity)
     {
         var restore = new List<Action<RoamingNetwork>>();
-        var changed = changeSet.Changes;
+        var changed = lifetimeHistory.SelectMany(history => history.Batch.Changes).ToImmutableArray();
         var removed = new HashSet<(InfrastructureEntityType, String)>();
-        foreach (var change in changed.Where(change => change.Kind == RoamingNetworkChangeKind.Remove))
+        foreach (var history in lifetimeHistory)
+        foreach (var change in history.Batch.Changes.Where(change => change.Kind == RoamingNetworkChangeKind.Remove))
         {
             var type = InfrastructureChangeSchema.Type(change.EntityType);
             var pending = new Stack<InfrastructureEntityKey>();
             var key = new InfrastructureEntityKey(type, change.EntityId,
                                                   type == InfrastructureEntityType.ChargingConnector ? change.ParentEntityId : null);
-            if (!DataSnapshot.Entities.ContainsKey(key)) continue;
+            if (!history.Source.Entities.ContainsKey(key)) continue;
             pending.Push(key);
             while (pending.TryPop(out var removedKey))
             {
                 removed.Add((removedKey.Type, InfrastructureChangeSchema.Identity(removedKey.Type, removedKey.Id)));
-                foreach (var child in DataSnapshot.Entities[removedKey].Children) pending.Push(child);
+                foreach (var child in history.Source.Entities[removedKey].Children) pending.Push(child);
             }
         }
 
-        Boolean Replaced(InfrastructureEntityType type, String id, String property)
+        Boolean DirectReset(InfrastructureEntityType type, String id, String property)
             => removed.Contains((type, InfrastructureChangeSchema.Identity(type, id))) || changed.Any(change =>
                    InfrastructureChangeSchema.Type(change.EntityType) == type &&
                    InfrastructureChangeSchema.Identity(type, change.EntityId) == InfrastructureChangeSchema.Identity(type, id) &&
                    (change.Kind is RoamingNetworkChangeKind.Add or RoamingNetworkChangeKind.Remove ||
-                    change.Kind == RoamingNetworkChangeKind.UpdateProperty && change.PropertyName == property));
+                    (change.Kind is RoamingNetworkChangeKind.UpdateProperty or RoamingNetworkChangeKind.RemoveProperty) && change.PropertyName == property));
+
+        Boolean Replaced(InfrastructureEntityType type, String id, String property)
+        {
+            if (DirectReset(type, id, property)) return true;
+            if (!requireOwnerContinuity) return false;
+            var key = new InfrastructureEntityKey(type, id);
+            while (DataSnapshot.Entities.TryGetValue(key, out var source))
+            {
+                if (!result.DataSnapshot.Entities.TryGetValue(key, out var target) || source.Parent != target.Parent ||
+                    DirectReset(key.Type, key.Id, "")) return true;
+                if (source.Parent is not { } parent) return false;
+                key = parent;
+            }
+            return true;
+        }
+
+        Boolean ResetsNested(InfrastructureEntityType type, String id, ImmutableArray<POIElementPathSegment> path)
+            => lifetimeHistory.Any(history => ResetsNestedRuntime(history.Batch, type, id, path) ||
+                requireOwnerContinuity && !ContainsRuntimeSlot(history.Source, type, id, path));
 
         void Capture<TId, TAdmin, TStatus>(AImmutableEMobilityEntity<TId, TAdmin, TStatus> source,
                                           InfrastructureEntityType type,
@@ -108,15 +133,15 @@ public sealed partial class RoamingNetwork
             var electrical = CaptureElectrical(entity);
             var aggregate = entity.StatusAggregationDelegate;
             var meterRuntime = entity.EnergyMeters.ToDictionary(meter => meter.Id.ToString(),
-                                                                meter => CaptureMeterRuntime(meter, ResetsNestedRuntime(changeSet,
+                                                                meter => CaptureMeterRuntime(meter, ResetsNested(
                                                                     InfrastructureEntityType.ChargingPool, entity.Id.ToString(), [new("energyMeters", meter.Id.ToString())])),
                                                                 StringComparer.OrdinalIgnoreCase);
             var sourcePoint = entity.GridConnectionPoint;
             var connectionMeterRuntime = CaptureMeterRuntime(sourcePoint?.EnergyMeter,
-                sourcePoint?.EnergyMeter is { } sourceMeter && ResetsNestedRuntime(changeSet, InfrastructureEntityType.ChargingPool,
+                sourcePoint?.EnergyMeter is { } sourceMeter && ResetsNested(InfrastructureEntityType.ChargingPool,
                     entity.Id.ToString(), [new("gridConnectionPoint", sourcePoint.Id), new("energyMeter", sourceMeter.Id.ToString())]));
             var gridOperatorRuntime = CaptureNestedRuntime(sourcePoint?.GridOperator,
-                sourcePoint is not null && ResetsNestedRuntime(changeSet, InfrastructureEntityType.ChargingPool,
+                sourcePoint is not null && ResetsNested(InfrastructureEntityType.ChargingPool,
                     entity.Id.ToString(), [new("gridConnectionPoint", sourcePoint.Id), new("gridOperator", sourcePoint.GridOperator.Id.ToString())]));
             var connectionPointId = entity.GridConnectionPoint?.Id;
             restore.Add(target =>
@@ -141,7 +166,7 @@ public sealed partial class RoamingNetwork
             var electrical = CaptureElectrical(entity);
             var aggregate = entity.StatusAggregationDelegate;
             var meterRuntime = entity.EnergyMeters.ToDictionary(meter => meter.Id.ToString(),
-                                                                meter => CaptureMeterRuntime(meter, ResetsNestedRuntime(changeSet,
+                                                                meter => CaptureMeterRuntime(meter, ResetsNested(
                                                                     InfrastructureEntityType.ChargingStation, entity.Id.ToString(), [new("energyMeters", meter.Id.ToString())])),
                                                                 StringComparer.OrdinalIgnoreCase);
             restore.Add(target =>
@@ -172,7 +197,7 @@ public sealed partial class RoamingNetwork
             var powerForecast = entity.MaxPowerPrognoses.ToImmutableArray();
             var capacityForecast = entity.MaxCapacityPrognoses.ToImmutableArray();
             var meterRuntime = CaptureMeterRuntime(entity.EnergyMeter,
-                entity.EnergyMeter is { } sourceMeter && ResetsNestedRuntime(changeSet, InfrastructureEntityType.EVSE,
+                entity.EnergyMeter is { } sourceMeter && ResetsNested(InfrastructureEntityType.EVSE,
                     entity.Id.ToString(), [new("energyMeter", sourceMeter.Id.ToString())]));
             restore.Add(target =>
             {

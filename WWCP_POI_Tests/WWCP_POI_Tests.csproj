@@ -18,4 +18,8 @@
     <ProjectReference Include="..\WWCP_POI\WWCP_POI.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\docs\interoperability\*.json;..\docs\interoperability\*.cbor" Link="InteropVectors\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

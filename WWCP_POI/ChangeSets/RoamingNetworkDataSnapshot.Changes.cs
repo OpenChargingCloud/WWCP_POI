@@ -94,9 +94,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     {
                         RoamingNetworkChangeKind.Add            => AddEntity(change, key, parent, map, references, changeSet.CreatedAt),
                         RoamingNetworkChangeKind.Remove         => RemoveEntity(change, key, parent, map, references, changeSet.CreatedAt),
-                        RoamingNetworkChangeKind.UpdateProperty => UpdateEntityProperty(change, key, parent, map, references, changeSet.CreatedAt),
+                        RoamingNetworkChangeKind.UpdateProperty or RoamingNetworkChangeKind.RemoveProperty
+                                                                => UpdateEntityProperty(change, key, parent, map, references, changeSet.CreatedAt),
                         RoamingNetworkChangeKind.AddElement or RoamingNetworkChangeKind.RemoveElement or
-                        RoamingNetworkChangeKind.ReplaceElement or RoamingNetworkChangeKind.UpdateElementProperty
+                        RoamingNetworkChangeKind.ReplaceElement or RoamingNetworkChangeKind.UpdateElementProperty or
+                        RoamingNetworkChangeKind.RemoveElementProperty
                                                                 => ApplyElementChange(change, key, parent, map, references, changeSet.CreatedAt),
                         _                                       => throw new ArgumentException("Unsupported change kind.")
                     };
@@ -304,19 +306,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Expect(PropertyValue(key.Type, property, expected), actual, property);
             }
 
-            var replacement = new JObject(new JProperty(property, ReadToken(change.NewValue!.Value.GetRawText())));
-            POIRepresentation.RequireStatic(replacement, key.Type.ToString());
-            POIRepresentation.RemoveETags(replacement, key.Type.ToString());
-            POIRepresentation.InitializeNestedMetadata(replacement, key.Type.ToString(), timestamp);
-            var properties = entity.Properties.SetItem(property, PropertyValue(key.Type, property,
-                JsonDocumentValue(replacement[property]!.ToString(Newtonsoft.Json.Formatting.None))));
+            var properties = entity.Properties;
+            if (change.Kind == RoamingNetworkChangeKind.RemoveProperty)
+            {
+                if (!properties.ContainsKey(property)) throw new ArgumentException($"Property '{property}' is absent.");
+                properties = properties.Remove(property);
+            }
+            else
+            {
+                var replacement = new JObject(new JProperty(property, ReadToken(change.NewValue!.Value.GetRawText())));
+                POIRepresentation.RequireStatic(replacement, key.Type.ToString());
+                POIRepresentation.RemoveETags(replacement, key.Type.ToString());
+                POIRepresentation.InitializeNestedMetadata(replacement, key.Type.ToString(), timestamp);
+                properties = properties.SetItem(property, PropertyValue(key.Type, property,
+                    JsonDocumentValue(replacement[property]!.ToString(Newtonsoft.Json.Formatting.None))));
+            }
 
             map = map.SetItem(key, entity.With(properties: properties));
 
             Validate(key, map);
 
-            references = RemoveReferences(entity, references);
-            references = AddReferences(map[key], map, references);
+            references = RefreshReferences(entity, map[key], map, references);
 
             return (Touch(key, map, timestamp), references);
 

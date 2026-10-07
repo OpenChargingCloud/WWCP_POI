@@ -26,16 +26,45 @@ planned are not guarantees of the current API.
   replacements preserve independent runtime histories by owner and child identity.
 - Tagged JSON/CBOR exports preserve revisions through `IncludeVersionMetadata` independently
   of the `IncludeRuntime` flag.
+- ChangeSet CBOR exchange preserves the complete v2 signed batch, including numeric/string
+  spelling, optional/null payloads, ordered paths and all peer signatures; header ETags use bytes.
+- Static hashes and complete exports read stored properties directly. Import captures revision
+  zero or supplied version metadata, retains valid optional nulls, initializes timestamps once
+  and canonicalizes empty owned graph arrays. Snapshot JSON/CBOR parsers validate declared ETags.
+- Typed commit IDs bind ancestry, static state and complete unsigned batches; equal commit peers
+  use a separate ancestry-signing profile. Retained history provides expected-head publication,
+  duplicate detection, static JSON/CBOR archives and file-backed replay recovery. Revisions count
+  along the first-parent chain; scoped runtime delivery shares the publication gate.
+- History three-way merges compare retained ancestor/left/right static states, combine compatible
+  duplicate/disjoint edits and report structured conflicts. Explicit resolutions prepare a fresh
+  unsigned merge commit against the left tip with signed audit metadata. Optional property removal
+  retains absence; addressed known collections use stable IDs. Multiple best ancestors require a choice.
 - Addressed nested operations use immutable ownership paths and existing element identities.
   Per-element/property preconditions, deterministic touched collection ordering and tariff-index
   maintenance enable disjoint nested edits. Built-in signing uses v2 and binds every path.
 - Runtime capture detects explicit removal/reintroduction and temporary identity/slot replacement
   within a batch, so reused final IDs do not silently inherit an earlier runtime lifetime.
+- Incremental JSON/CBOR exchange announces retained DAG tips and bounds commit pages by count/bytes.
+  Atomic import validates ancestry, trust and replay before retention, without selecting a head.
+  Preview/explicit expected-head adoption accepts descendants through any parent and conservatively
+  transfers local runtime lifetimes. Dedicated exchange/adoption/persistence fixtures add 61
+  passing cases, including exact boundaries, atomic failures, concurrency and disk recovery.
+- Bootstrap freezes a complete static archive and original peers into a manifest-bound sequence
+  of bounded JSON/CBOR fragments. Verified disk receipts allow restart; complete hash/trust/replay
+  validation precedes explicit activation into a separate new history with fresh runtime.
+  Its 32 passing cases cover corruption, receipt failures, limits, activation and continuation.
+- Structural merge validation collects missing/out-of-scope reference conflicts with typed consumers,
+  fields and targets. Accepted whole-subtree choices are revalidated before processing stale issues;
+  repeated invalid choices terminate. Its 34 passing cases cover owner/descendant deletion,
+  recreation/addition/ownership, connector scope, reference/group/parking constraints, explicit
+  ancestor choices in criss-cross histories, resolver reentry/exceptions and unschedulable replacement.
 - The README distinguishes static versioning from live runtime values and explains CBOR
   revision transport. The historical Styx patch no longer claims a current Git metadata failure.
 
-The library and existing test project compile with these corrections (0 errors, 378 warnings in the graph package build). Existing status/operation
-fixtures were adapted to the separated APIs; no tests were added or executed for these packages.
+The interoperable static profile is now **`wwcp-poi-static-v1`**, declared in tagged transports and
+bound into commit IDs/signatures. Fixed JSON/CBOR/state/commit/signature/merge/archive references
+are published. The full NUnit run on 2026-10-07 passed **509 tests**, with one skipped child
+worker that is executed separately by the process-crash tests. See [interoperability](INTEROPERABILITY.md).
 
 ## Current type coverage
 
@@ -72,8 +101,9 @@ runtime defaults. [Runtime updates](RUNTIME.md) documents target slots, JSON, no
 limitations and the application gate needed to serialize delivery with head publication.
 
 Measurements/forecasts retain their direct runtime APIs. Runtime authentication, replay policy,
-batch transactions and an integrated head publication service remain application work or future
-extensions; the status instruction API does not implement those features.
+and batch transactions remain application work or future extensions. The history package now
+routes scoped status delivery and static publication through one gate; the status instruction
+API itself does not implement those features.
 
 ## 2. Complete addressing and collection operations — partly implemented
 
@@ -93,10 +123,10 @@ operators remain independent descriptions rather than aliases of network registr
 Value collections without IDs still need an explicit identity decision if finer operations are
 required; array indices are not stable identities. Parking space groups do not yet have space
 membership, and parking products have no graph owner. Unifying embedded GridOperator descriptions
-with registry references remains a contract decision. The next package is the ChangeSet CBOR
-transport and consistent versioned reload semantics below.
+with registry references remains a contract decision. History, atomic publication and explicit
+three-way integration of already-published divergent heads are available below.
 
-## 3. Complete versioned snapshot transports — partly implemented
+## 3. Complete versioned snapshot transports — implemented
 
 Canonical static content, version metadata and current-status export now have independent
 options. Default `ToCBOR()` omits revision metadata; use `IncludeVersionMetadata: true` to
@@ -104,40 +134,89 @@ continue the numeric revision chain after reload. `IncludeRuntime: true` additio
 current statuses. `ToJSONWithETags()` has the same flags; `DataSnapshot` accepts only static
 export. `ToJSONSnapshot()` exports the version with current statuses.
 
-Add a complete ChangeSet CBOR codec and specify that transport choices do not alter the signed
-logical batch. Define static defaults and absent/null property handling consistently across reloads.
+The [ChangeSet CBOR codec](CHANGESET-CBOR.md) transfers all peer envelopes without changing
+the v2 signing input. Native ETags and lossless schema-defined metrological values coexist with
+exact JSON number/string spelling and optional payload presence.
 
-## 4. Add history, publication and integration of divergent heads — planned
+The authoritative [stored-property profile](ETAGS-CBOR.md#versioned-property-presence-and-defaults)
+retains valid optional absence/null distinctions and defines initial timestamp and empty owned-array
+defaults. Versioned JSON/CBOR imports retain revision metadata and static preconditions. The hash
+input changed from domain reconstruction to stored properties; re-export and reprepare batches.
+The fixed static-v1 profile and references now cover signed two-peer roundtrips, optional presence,
+raw signed number/SI spelling and continued exchange after JSON/CBOR reload. No alternate old-input
+hash profile exists.
 
-Define a stable commit content identity binding parent identities, state identifiers, ordered
-operations and commit metadata. Keep peer signatures separate so appending another signature
-does not change that commit identity. Persist original batches, snapshots and merge ancestry.
+## 4. Add history, publication and integration of divergent heads — partly implemented
 
-Add atomic head publication against an expected prior head, duplicate detection and recovery
-after restart. Decide whether numeric revisions are shared chain coordinates or local indexes;
-the current applier requires exact `BaseRevision` equality in addition to matching ETags.
+The [history package](HISTORY.md) adds a typed canonical JSON SHA-256 commit identity binding
+ordered parents, state identifiers, revision bookkeeping and complete unsigned batch content.
+Both peer arrays are excluded; an independent commit signing profile authenticates ancestry.
+Retained branches expose original batches, descriptions/metadata and cached static snapshots.
 
-Extend common-source `TryMerge` with integration when one branch has already been published,
-using a retained common ancestor. Provide structured base/left/right conflicts and explicit
-resolution. Specify compatible duplicate writes rather than relying only on whether unchanged
-operation sequences commute. A prepared merge requires its own metadata and signatures.
+Expected-head publication, first-parent duplicate detection, conflicting batch-ID rejection,
+JSON/CBOR archives and file-backed replay recovery are implemented. A shared gate routes scoped
+runtime status delivery alongside publication. File persistence uses a writer lease, flushed
+sibling temporary archive and rename before head installation. Numeric revisions count along
+the first-parent chain; branches can share revisions. The applier still requires exact
+`BaseRevision` equality and both static ETags. Executed tests now cover identity/signature vectors,
+peer/duplicate delivery, concurrent expected-head publication and signed JSON/CBOR archive recovery.
 
-## 5. Freeze interoperable profiles and exchange behavior — planned
+Additional parents record explicit ancestry without automatically integrating their data.
+Tests inject failures before archive replacement and terminate a child process immediately before/after
+replacement, proving old/new archive recovery for those stages. Power-loss/filesystem-failure simulation,
+archive scalability and cached-snapshot performance remain to be established.
 
-Version the static projection/canonicalization profile explicitly. Publish fixed JSON, CBOR,
-ETag and signature vectors, including equivalent units, custom data and timestamps.
-Clarify that static creation/change metadata and wire identifier spelling are content; independently
-importing equivalent facts with different defaults need not produce the same static ETags.
+[Three-way integration](MERGING.md) now supports already-published branches, compatible identical
+writes/removals, disjoint ID-based collection edits, structured base/left/right conflicts and
+explicit choices. It prepares an unsigned commit against the left tip, records ancestor/tips/
+decisions in batch metadata, validates the combined graph/references and schedules a legal operation
+sequence. Candidate failure or missing resolution creates no commit. Multiple best common ancestors
+require explicit selection. Executed tests cover disjoint property/meter edits, structured conflicts,
+custom SI resolutions, absence/null choices and signed merge/archive exchange.
 
-Specify missing-commit retrieval, bootstrap, divergent heads and application trust policy.
-Signature validity alone does not specify authorized keys, required distinct signers or quorum.
+Recursive virtual merge bases, rebase and multi-tip integration APIs remain planned. Validation
+cycles or operation dependencies that cannot be scheduled are reported rather than weakening
+domain constraints. Fixed disjoint/resolved merge references and workflow tests are published.
+The 34 [structural merge cases](MERGING.md#structural-merge-evidence) now exercise deletion/recreation,
+ownership, missing and out-of-scope references, scoped connectors, criss-cross ambiguity, explicit
+ancestor choices and resolver reentry/exception rollback. Operation-history lifetime proofs for
+reused creation metadata and exhaustive graph/reference combinations remain additional work.
 
-## 6. Establish complete workflows and performance evidence — planned
+## 5. Freeze interoperable profiles and exchange behavior — partly implemented
 
-The reference workflow should cover two replicas with different runtime statuses and equal static
-ETags, signed transition exchange, before/after rejection, concurrent edits, explicit merge,
-versioned JSON/CBOR reload, continued exchange and duplicate delivery.
+The [static-v1 profile](INTEROPERABILITY.md) fixes stored-property projection, canonicalization and
+normalization; transport declarations reject unknown profiles and commits explicitly bind it.
+Fixed reference files cover JSON/CBOR state bytes, ETags, unsigned identity/signing bytes,
+two-peer signatures, custom data, timestamps, optional presence and disjoint/resolved merge archives.
 
-Dedicated ETag, CBOR, cryptographic signing, multiple-signature, nested-operation and merge
-coverage remains to be added. Measure full-projection hashing and runtime capture separately from persistent-map updates
-before adding caches or a Merkle profile.
+[Incremental replication](REPLICATION.md) now provides bounded missing-ancestry pages, atomic
+retention, explicit expected-head adoption and divergence notices. Secondary-parent adoption
+selects the original merge and uses conservative local lifetime proofs. Different checkpoints
+require explicit [bootstrap](BOOTSTRAP.md), now available as bounded resumable archive fragments
+with preview/activation. Source export and final replay still materialize a complete archive;
+a streaming archive codec remains planned. Transport/key
+negotiation, authorized keys/distinct signers/quorum and external archive rollback policy remain
+application work. Executed dedicated fixtures cover exact page bounds, atomic rejection,
+original signed merge adoption, runtime lifetimes, changed trust, concurrent heads and recovery.
+
+## 6. Establish complete workflows and performance evidence — partly implemented
+
+Executed workflows cover independent replicas with different runtime statuses and equal static IDs,
+signed transition exchange, both before/after digest rejections, published concurrent edits, explicit
+merge, signed JSON/CBOR archive reload, continued exchange and duplicate delivery. Tests also cover
+malformed transports, unchanged signature identity after added peers, ancestry/signature tampering,
+required signer counts, writer leases, persistence failures and abrupt process exit around replacement.
+
+Executed replication evidence now covers bounded multi-page JSON/CBOR transfer, exact UTF-8/CBOR
+byte and count limits, indivisible oversized commits, atomic rejection of a later commit, checkpoint
+mismatch, missing/out-of-order parents, repeated delivery, changed trust/additional peers, adoption
+races, gated runtime delivery, second-parent lifetime resets and persistent retry/recovery. Existing
+archive-bootstrap workflows remain covered as well. The 32 new [bootstrap cases](BOOTSTRAP.md)
+cover interrupted transfer/reopen, exact limits, corruption, complete trust/replay validation,
+explicit activation, fresh runtime and continued incremental exchange. See also
+[replication fixture details](REPLICATION.md#implementation-and-evidence).
+
+Broader nested/graph/ownership combinations, operation-history lifetime proofs, recursive merge bases
+and performance remain additional work. There is no power-loss simulation or independently
+implemented remote peer yet. Measure full static hashing, import/materialization, archive rewrite/replay
+and runtime capture before adding caches or a Merkle profile.

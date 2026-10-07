@@ -12,6 +12,18 @@ namespace cloud.charging.open.protocols.WWCP.POI;
 public sealed partial class RoamingNetwork
 {
     /// <summary>
+    /// Check that the identified nested runtime slot existed in an original static source state.
+    /// </summary>
+    private static Boolean ContainsRuntimeSlot(RoamingNetworkDataSnapshot snapshot, InfrastructureEntityType ownerType,
+                                               String ownerId, ImmutableArray<POIElementPathSegment> path)
+    {
+        var key = new InfrastructureEntityKey(ownerType, ownerId);
+        return snapshot.Entities.TryGetValue(key, out var owner) &&
+               owner.Properties.TryGetValue(path[0].PropertyName, out var value) &&
+               ContainsRuntimeIdentity(JToken.Parse(value.GetRawText()), POIElementSchema.Child(ownerType.ToString(), path[0].PropertyName), path, 0);
+    }
+
+    /// <summary>
     /// A removed/reintroduced ownership slot starts a new runtime lifetime, even when the
     /// final static child ID equals its original ID. Unrelated static edits preserve histories.
     /// </summary>
@@ -28,6 +40,12 @@ public sealed partial class RoamingNetwork
             {
                 case RoamingNetworkChangeKind.RemoveElement:
                     if (RuntimePathPrefix(ownerType.ToString(), change.ElementPath, runtimePath)) return true;
+                    continue;
+                case RoamingNetworkChangeKind.RemoveProperty:
+                    if (RuntimePathPrefix(ownerType.ToString(), [new(change.PropertyName!)], runtimePath)) return true;
+                    continue;
+                case RoamingNetworkChangeKind.RemoveElementProperty:
+                    if (RuntimePathPrefix(ownerType.ToString(), change.ElementPath.Add(new(change.PropertyName!)), runtimePath)) return true;
                     continue;
                 case RoamingNetworkChangeKind.ReplaceElement:
                     prefix = change.ElementPath;

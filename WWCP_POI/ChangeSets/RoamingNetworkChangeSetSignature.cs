@@ -21,8 +21,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// An immutable signature envelope. The built-in profile binds its algorithm, key ID,
-    /// profile and encoding together with the complete batch; Value carries Base64 signature bytes.
+    /// An immutable peer envelope used by the batch and commit signing profiles.
+    /// Profile selects the signed content; Value carries Base64 signature bytes.
     /// </summary>
     [JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
     public sealed record RoamingNetworkChangeSetSignature

@@ -27,6 +27,12 @@ canonical algorithm label, encoding, Base64 and cryptographic signature. ECDSA b
 Styx COSE primitive's fixed-width `r || s` representation. This profile uses those primitives
 directly; the envelope is not a serialized COSE_Sign/COSE_Sign1 message.
 
+The batch's [CBOR transport](CHANGESET-CBOR.md) retains the same v2 signing input and every
+peer envelope. Optional payload presence, SI string spelling and JSON number spelling are
+preserved, including distinctions such as `1.0` versus `1e0`. The transport does not sign CBOR
+bytes or automatically verify signatures on import. Verification and application still use
+trusted keys supplied by the caller.
+
 Private keys are never retained in a ChangeSet or exported. Applications resolve trusted public
 keys and decide which signers may modify their data. `WithSignature` appends an externally generated
 envelope; `WithSignatures` explicitly replaces the array and `WithoutSignatures` removes it.
@@ -241,16 +247,51 @@ execution orders on strictly static storage. Runtime updates are outside the sig
 
 The combined header, operation sequence and result ETags constitute a new batch. Source signatures
 are not copied and do not authenticate it. Add the merge's own descriptions/metadata and sign it
-separately with `Sign`. Persist the original batches and their merge relationship separately
-if an audit trail is required. No cryptographic ancestry or automatic head publication is provided.
+separately with `Sign`. `RoamingNetworkHistory` retains the original batches and their explicit
+parent relationships, and provides expected-head publication. `RoamingNetworkCommit` has an
+independent ancestry-binding signing profile; the merged batch's v2 signature alone does not
+authenticate that ancestry. A common-source merged batch remains inapplicable to an already
+advanced branch head.
 See [merge semantics](CHANGESETS.md#merging-concurrent-batches).
 
-For a future distributed commit model, the remaining design work includes:
+## Commit signatures and history trust
 
-- A commit identity binding ancestry, ordered operations and signatures beyond the existing before/after POI content identities.
-- Additional signing profiles/transports beyond the implemented canonical JSON v2 profile.
-- Key resolution, trust policy, revocation and signer authorization.
-- Replay/history persistence and publication of the current head.
-- Automatic conflict resolution/rebasing beyond the explicit common-source merge, auditability and transport behavior.
+`RoamingNetworkCommit.Sign`/`TrySign` and `VerifySignature`/`VerifySignatures` implement
+`wwcp-poi-commit-signature-json-v1` with Styx asymmetric algorithms and COSE keys. The canonical
+preimage binds profile, algorithm, key ID, Base64 encoding, deterministic commit ID and complete
+unsigned commit content, including ordered parents. It uses the same immutable envelope type
+with the new `Profile`. All commit peers are equal; both signature arrays are excluded from
+commit identity and commit signing input. Adding peers preserves commit IDs and earlier signatures.
 
-These are architectural next steps. They are not implemented guarantees of the current library.
+History has separate per-peer batch and commit verifiers, plus optional whole-commit authorization
+for required keys/quorum. Recovery verifies supplied trust and replays every branch before
+accepting the archived head. The archive's head reference remains mutable bookkeeping outside
+individual commit signatures; external expected-head policy can prevent accepting an older valid
+archive. See [history profiles and trust](HISTORY.md#trust-and-peer-signatures).
+
+Key resolution, revocation, sender authorization, runtime authentication and network exchange
+remain application policy. History three-way integration prepares new unsigned batches/commits
+with signed `wwcpPOIMerge` ancestor/tip/resolution metadata. It rechecks consumed ancestry trust;
+original peers are retained on their original commits. See [merge trust](MERGING.md#audit-metadata-and-signatures).
+Fixed two-peer batch/commit signing bytes, signatures and signed merge/archive references are
+published and verified by the [interoperability tests](INTEROPERABILITY.md). Commit signing includes
+the static `ContentProfile` through the complete unsigned commit. Recursive virtual bases, rebase,
+key lifecycle and trust/key negotiation remain roadmap work. Incremental [commit pages](REPLICATION.md)
+retain original signatures and recheck incoming/combined peers and consumed local ancestry.
+Announcements and page routing/completion fields are unauthenticated hints; the application
+authenticates their channel. Explicit adoption reauthorizes local/target ancestry and selects the
+original signed commit without creating new signing content.
+
+[Bootstrap](BOOTSTRAP.md) retains both original peer arrays and revalidates every commit/branch
+under fresh callbacks on each preview or activation. The archive and manifest digests also bind
+the captured peer envelopes and head, but they do not authenticate the selected sender or prevent
+a self-consistent replacement. Independently pin/authenticate the manifest and use optional
+`authorizeBootstrap` policy for expected checkpoint/head/archive and rollback decisions.
+Successful validation does not switch the application's existing replica; activation returns a
+separate history with fresh local runtime and optionally persists only to a new archive path.
+
+Merge reference resolutions optionally add a typed `RelatedEntity` target/parent to the ordered
+`wwcpPOIMerge.Resolutions` audit entries. This remains part of the signed batch and deterministic
+commit identity. Revalidating a whole-subtree choice drops obsolete unresolved issues without
+discarding accepted chronological decisions. Existing property-only merge vectors are unchanged;
+structural/reference resolution recovery is checked with the normal two-peer verifiers.

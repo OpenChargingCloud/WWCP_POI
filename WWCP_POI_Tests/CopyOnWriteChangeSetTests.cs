@@ -305,7 +305,7 @@ namespace WWCP_POI_Tests
                 source.DataSnapshot.WriteTo(writer);
             }
 
-            Assert.That(JsonElement.DeepEquals(Json(System.Text.Encoding.UTF8.GetString(stream.ToArray())), Json(source.ToJSONSnapshot().ToString())), Is.True);
+            Assert.That(JsonElement.DeepEquals(Json(System.Text.Encoding.UTF8.GetString(stream.ToArray())), Json(source.DataSnapshot.ToJSON().ToString())), Is.True);
 
         }
 

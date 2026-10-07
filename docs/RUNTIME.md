@@ -153,6 +153,21 @@ Thus editing a meter's role, serial number or transparency metadata does not res
 operational lifetime. Replacing its runtime history is a separate explicit runtime instruction.
 See [element operations](ELEMENT-OPERATIONS.md) for individual static meter edits and removal.
 
+## Runtime when adopting a retained head
+
+`RoamingNetworkHistory.TryAdoptHead` previews by default and requires `adopt: true` to select a
+retained descendant against an expected head ID. It uses the same runtime/publication gate.
+First-parent fast-forward replays original batches, preserving the existing lifetime rules.
+Secondary-parent merge adoption derives the validated target snapshot and captures current local
+runtime only where both first-parent branches prove uninterrupted identity/ownership lifetimes.
+Removal, recreation, owner changes or temporary nested-slot replacement invalidate that proof.
+Objects introduced since the shared ancestor can therefore start with domain defaults even when
+the merge retains their receiver-branch static data. Foreign runtime is never imported.
+
+Runtime schedules/measurements/forecasts are copied independently before persistence and head
+publication. A failed adoption leaves the old head/network in place. Commit pages retain static
+history without selecting a head or changing local runtime. See [replication and lifetime proofs](REPLICATION.md).
+
 ## Publication and concurrency
 
 Target resolution uses the network's lock; expected-current-status validation and schedule
@@ -160,25 +175,27 @@ mutation share the schedule lock. Direct domain setters use that schedule lock a
 History enumeration returns a detached copy. These locks do not create a transaction across
 entities or make a separate application head store atomic.
 
-Serialize runtime delivery and static head derivation/publication through the application's
-same gate when no arriving runtime update may be lost between capture and publication:
+`RoamingNetworkHistory` routes scoped runtime delivery and static head publication through its
+shared gate, so arriving status instructions are applied to the published network:
 
 ```csharp
-// current is the application's published RoamingNetwork; headGate is its shared lock.
-lock (headGate)
-{
-    current = current.ApplyChangeSet(batch, VerifySignature: verifier);
-}
+var source = history.Head;
+var commit = history.PrepareCommit(source.Id, batch);
+if (!history.TryPublish(source.Id, commit, out var result))
+    throw new InvalidOperationException(result.Error);
 
-lock (headGate)
-{
-    current.ApplyRuntimeUpdate(receivedRuntimeUpdate);
-}
+history.ApplyRuntimeUpdate(receivedRuntimeUpdate);
 ```
 
-Route each instruction to `current` while holding that gate. Writing through an entity reference
+The history's configured verifiers authenticate supplied batch/commit peers. Runtime status
+delivery does not change or persist the static commit head. Applications using `ApplyChangeSet`
+directly must supply their own publication gate. Writing through an entity reference
 retained from an older version bypasses this publication discipline. Coherent runtime exports
-also require application coordination. A repository/head publication service is still planned.
+and direct measurements/forecasts also require application coordination. Static archive recovery
+starts fresh runtime schedules; see [history and atomic heads](HISTORY.md).
+The same rule applies to [bootstrap activation](BOOTSTRAP.md): transfer contains only static
+history, the returned replica starts fresh schedules/measurements/forecasts, and the application's
+existing history/runtime is untouched. Apply local runtime updates after explicitly selecting it.
 
 Runtime notifications follow the existing schedule events. A synchronous notification handler
 can throw after the schedule has been changed; runtime application does not provide the static

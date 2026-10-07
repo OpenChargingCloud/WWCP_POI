@@ -38,6 +38,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     {
 
         private readonly Lazy<ImmutableArray<ETag>> contentETags;
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ReferenceMap, ReferenceMap> tariffIndexes = new();
 
         #region Properties
 
@@ -70,7 +71,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The tariff subset of the complete reverse reference index.
         /// </summary>
         public ReferenceMap TariffReferences
-            => References.Where(entry => entry.Key.Type == InfrastructureEntityType.ChargingTariff).ToImmutableDictionary();
+            => tariffIndexes.GetValue(References, references => references.Where(entry => entry.Key.Type == InfrastructureEntityType.ChargingTariff).ToImmutableDictionary());
 
         #endregion
 

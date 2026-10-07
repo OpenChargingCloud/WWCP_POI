@@ -64,7 +64,7 @@ internal static class POIElementSchema
         => TryChild(ownerKind, property) ??
            throw new ArgumentException($"{ownerKind}.{property}: no addressed element relation is defined.");
 
-    private static Relation? TryChild(String ownerKind, String property)
+    internal static Relation? TryChild(String ownerKind, String property)
         => (ownerKind, property) switch
         {
             (nameof(ChargingPool) or nameof(ChargingStation), "energyMeters") => Meter(true),

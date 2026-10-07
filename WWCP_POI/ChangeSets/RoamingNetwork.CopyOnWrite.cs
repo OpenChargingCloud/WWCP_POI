@@ -51,7 +51,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             get
             {
                 lock (snapshotLock)
-                    return dataSnapshot ??= RoamingNetworkDataSnapshot.Capture(ToJSONSnapshot(), 0);
+                {
+                    if (dataSnapshot is null)
+                    {
+                        dataSnapshot = RoamingNetworkDataSnapshot.Capture(POIRepresentation.WithoutETags(() => POIJSON.Document(this)), 0);
+                        POISnapshotRepresentation.Bind(this, dataSnapshot.GetDocument());
+                    }
+                    return dataSnapshot;
+                }
             }
         }
 
@@ -145,6 +152,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        /// <summary>
+        /// Derive an already validated static state while carrying only provably continuous local runtime.
+        /// </summary>
+        internal RoamingNetwork DeriveRetainedSnapshot(RoamingNetworkDataSnapshot snapshot,
+            ImmutableArray<(RoamingNetworkChangeSet Batch, RoamingNetworkDataSnapshot Source)> lifetimeHistory)
+        {
+            var result = Parse(RoamingNetworkDataSnapshot.OwnJSON(snapshot.Entities[snapshot.Root]));
+            result.dataSnapshot                   = snapshot;
+            result.snapshotProjectionMaterialized = false;
+            result.restoreRuntimeState            = CaptureRuntimeState(lifetimeHistory, result, true);
+            return result;
+        }
+
         #region Materialize the immutable hierarchy
 
         private void EnsureSnapshotProjection()
@@ -160,6 +180,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 try
                 {
                     MaterializeSnapshotProjection(dataSnapshot);
+                    POISnapshotRepresentation.Bind(this, dataSnapshot.GetDocument());
                     restoreRuntimeState?.Invoke(this);
                     restoreRuntimeState = null;
                     snapshotProjectionMaterialized = true;
@@ -212,15 +233,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         internal void RestoreVersionedSnapshot(JObject json)
         {
 
-            if (json["revision"] is not { } revision)
-                return;
-
-            if (revision.Type != JTokenType.Integer || !Int64.TryParse(revision.ToString(), out var number) || number < 0)
+            var revision = json["revision"];
+            var number = 0L;
+            if (revision is not null && (revision.Type != JTokenType.Integer || !Int64.TryParse(revision.ToString(), out number) || number < 0))
                 throw new ArgumentException("revision: expected a nonnegative Int64.");
 
             var changeSetId = InfrastructureJson.Text(json, "appliedChangeSetId");
 
-            dataSnapshot = RoamingNetworkDataSnapshot.Capture(json, number, changeSetId);
+            if (revision is null && changeSetId is not null)
+                throw new ArgumentException("appliedChangeSetId requires revision metadata.");
+            var projection = POIRepresentation.WithoutETags(() => POIJSON.Document(this));
+            var content = POISnapshotRepresentation.CompleteImport(json, projection, nameof(RoamingNetwork), ownedGraph: true);
+            dataSnapshot = RoamingNetworkDataSnapshot.Capture(content, number, changeSetId);
+            POISnapshotRepresentation.Bind(this, dataSnapshot.GetDocument());
 
         }
 

@@ -223,62 +223,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 writer.WriteString("KeyId", keyId);
                 writer.WriteString("Encoding", "base64");
                 writer.WritePropertyName("ChangeSet");
-                writer.WriteStartObject();
-                writer.WriteString("Id", Id);
-                writer.WriteString("RoamingNetworkId", RoamingNetworkId);
-                writer.WriteNumber("BaseRevision", BaseRevision);
-                writer.WriteString("CreatedAt", CreatedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
-                WriteSigningETags(writer, "BeforeETags", BeforeETags);
-                WriteSigningETags(writer, "AfterETags", AfterETags);
-                writer.WritePropertyName("Description");
-                writer.WriteStartObject();
-                foreach (var entry in Description)
-                    writer.WriteString(entry.Key, entry.Value);
-                writer.WriteEndObject();
-                writer.WritePropertyName("Metadata");
-                writer.WriteStartObject();
-                foreach (var entry in Metadata)
-                {
-                    writer.WritePropertyName(entry.Key);
-                    ValidateSigningJSON(entry.Value);
-                    entry.Value.WriteTo(writer);
-                }
-                writer.WriteEndObject();
-                writer.WritePropertyName("Changes");
-                writer.WriteStartArray();
-                foreach (var operation in Changes)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteString("Kind", operation.Kind.ToString());
-                    writer.WriteString("EntityType", operation.EntityType);
-                    writer.WriteString("EntityId", operation.EntityId);
-                    if (operation.PropertyName is { } property)
-                        writer.WriteString("PropertyName", property);
-                    if (operation.ParentEntityType is { } parentType)
-                        writer.WriteString("ParentEntityType", parentType);
-                    if (operation.ParentEntityId is { } parentId)
-                        writer.WriteString("ParentEntityId", parentId);
-                    writer.WritePropertyName("ElementPath");
-                    writer.WriteStartArray();
-                    foreach (var segment in operation.ElementPath)
-                    {
-                        writer.WriteStartObject();
-                        writer.WriteString("PropertyName", segment.PropertyName);
-                        if (segment.ElementId is { } elementId)
-                            writer.WriteString("ElementId", elementId);
-                        writer.WriteEndObject();
-                    }
-                    writer.WriteEndArray();
-                    WriteSigningValue(writer, "OldValue", operation.OldValue);
-                    WriteSigningValue(writer, "NewValue", operation.NewValue);
-                    writer.WriteEndObject();
-                }
-                writer.WriteEndArray();
-                writer.WriteEndObject();
+                WriteUnsignedContent(writer);
                 writer.WriteEndObject();
             }
             using var document = JsonDocument.Parse(stream.ToArray());
             return CanonicalJSON.ToUTF8Bytes(document);
+        }
+
+        // Shared by the v2 batch signature and the commit identity profile.
+        internal void WriteUnsignedContent(Utf8JsonWriter writer)
+        {
+            writer.WriteStartObject();
+            writer.WriteString("Id", Id);
+            writer.WriteString("RoamingNetworkId", RoamingNetworkId);
+            writer.WriteNumber("BaseRevision", BaseRevision);
+            writer.WriteString("CreatedAt", CreatedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            WriteSigningETags(writer, "BeforeETags", BeforeETags);
+            WriteSigningETags(writer, "AfterETags", AfterETags);
+            writer.WritePropertyName("Description");
+            writer.WriteStartObject();
+            foreach (var entry in Description)
+                writer.WriteString(entry.Key, entry.Value);
+            writer.WriteEndObject();
+            writer.WritePropertyName("Metadata");
+            writer.WriteStartObject();
+            foreach (var entry in Metadata)
+            {
+                writer.WritePropertyName(entry.Key);
+                ValidateSigningJSON(entry.Value);
+                entry.Value.WriteTo(writer);
+            }
+            writer.WriteEndObject();
+            writer.WritePropertyName("Changes");
+            writer.WriteStartArray();
+            foreach (var operation in Changes)
+            {
+                writer.WriteStartObject();
+                writer.WriteString("Kind", operation.Kind.ToString());
+                writer.WriteString("EntityType", operation.EntityType);
+                writer.WriteString("EntityId", operation.EntityId);
+                if (operation.PropertyName is { } property)
+                    writer.WriteString("PropertyName", property);
+                if (operation.ParentEntityType is { } parentType)
+                    writer.WriteString("ParentEntityType", parentType);
+                if (operation.ParentEntityId is { } parentId)
+                    writer.WriteString("ParentEntityId", parentId);
+                writer.WritePropertyName("ElementPath");
+                writer.WriteStartArray();
+                foreach (var segment in operation.ElementPath)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("PropertyName", segment.PropertyName);
+                    if (segment.ElementId is { } elementId)
+                        writer.WriteString("ElementId", elementId);
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+                WriteSigningValue(writer, "OldValue", operation.OldValue);
+                WriteSigningValue(writer, "NewValue", operation.NewValue);
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+            writer.WriteEndObject();
         }
 
         private static void WriteSigningETags(Utf8JsonWriter writer, String field,
@@ -301,7 +307,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
         }
 
-        private static void ValidateSigningJSON(JsonElement value)
+        internal static void ValidateSigningJSON(JsonElement value)
         {
             if (value.ValueKind == JsonValueKind.Undefined)
                 throw new ArgumentException("Undefined JSON values cannot be signed or stored as metadata.");

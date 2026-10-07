@@ -32,6 +32,8 @@ infer physical units from property names, or maintain alternate input representa
 | ChangeSet state binding | Required `BeforeETags` and `AfterETags`, each JSON then CBOR; no revision-only or unchecked application path |
 | Static/runtime updates | Strictly static `DataSnapshot` and ChangeSet payloads; separate immutable `RoamingNetworkRuntimeUpdate` instructions |
 | Version transport | Independent `IncludeVersionMetadata` and `IncludeRuntime` flags on tagged JSON/CBOR exports |
+| Stored-property profile | Static network hashes/exports use immutable storage, preserving valid optional null/absence distinctions; initial timestamp and owned-array defaults are explicit |
+| ChangeSet binary transport | Deterministic CBOR, native header ETags and exact v2 signed-value preservation including all peer signatures; [wire contract](CHANGESET-CBOR.md) |
 | Nested addressing | Immutable schema-property/ID `ElementPath`; explicit Add/Remove/Replace/UpdateElementProperty operations; no array-index targets |
 | Complete signed addresses | `wwcp-poi-changeset-json-v2` binds every operation's complete ordered element path |
 

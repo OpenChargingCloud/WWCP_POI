@@ -257,7 +257,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var property in document.Properties())
             {
-                if (property.Name == IdField(type) || property.Name is "@context" or "ETags" ||
+                if (property.Name == IdField(type) || property.Name is "@context" or "ETags" or POIContentProfile.PropertyName ||
                     HasMetadata(type) && property.Name is "created" or "lastChange")
                     continue;
 

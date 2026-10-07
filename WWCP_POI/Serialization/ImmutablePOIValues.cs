@@ -47,7 +47,7 @@ internal static class ImmutablePOIValues
             PublicKey key => new PublicKey(key.Value.ToArray(), key.Algorithm, key.Serialization, key.Encoding,
                                            key.CustomData is { } custom ? CustomData.Parse(custom.ToJSON()) : null),
             ChargingCable cable => cable,
-            ChargingTariffElement element => element.Clone(),
+            ChargingTariffElement element => element,
             AdditionalGeoLocation location => location.Clone(),
             RootCAInfo root => root.Clone(),
             EVRoamingPartnerInfo partner => partner.Clone(),

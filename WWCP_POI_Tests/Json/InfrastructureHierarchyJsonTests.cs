@@ -169,7 +169,7 @@ namespace WWCP_POI_Tests.Json
 
             Assert.That(parsed.EMobilityProviders.Single().RoamingNetwork, Is.SameAs(parsed));
             Assert.That(parsed.EMobilityProviders.Single().DataSource, Is.EqualTo("provider-data"));
-            Assert.That(JToken.DeepEquals(Expanded(parsed), json), Is.True, json.ToString());
+            Assert.That(JsonViews.EqualViews(Expanded(parsed), json), Is.True, json.ToString());
             Assert.That(JToken.DeepEquals(input, before), Is.True);
 
         }
@@ -195,7 +195,7 @@ namespace WWCP_POI_Tests.Json
             var json = EVSEJsonTests.Station().ToJSON();
 
             Assert.That(json["exception"], Is.Null, json.ToString());
-            Assert.That(JToken.DeepEquals(ChargingStation.Parse(json).ToJSON(), json), Is.True);
+            Assert.That(JsonViews.EqualViews(ChargingStation.Parse(json).ToJSON(), json), Is.True);
 
         }
 
@@ -223,7 +223,7 @@ namespace WWCP_POI_Tests.Json
 
             var parsed = RoamingNetwork.Parse(JObject.Parse(json.ToString()));
 
-            Assert.That(JToken.DeepEquals(parsed.ToJSONSnapshot(), json), Is.True, parsed.ToJSONSnapshot().ToString());
+            Assert.That(JsonViews.EqualViews(parsed.ToJSONSnapshot(), json), Is.True, parsed.ToJSONSnapshot().ToString());
 
             var parsedEVSE = parsed.EVSEs.Single(item => item.Id.ToString() == "DE*ABC*E1");
 
@@ -254,7 +254,7 @@ namespace WWCP_POI_Tests.Json
             Assert.That(parsed.EVSEs.Count(), Is.EqualTo(4));
             Assert.That(parsed.EVSEs.First(), Is.Not.SameAs(source.EVSEs.First()));
             Assert.That(parsed.EVSEs.All(evse => ReferenceEquals(evse.RoamingNetwork, parsed)), Is.True);
-            Assert.That(JToken.DeepEquals(snapshot, before), Is.True, "Resolver documents must remain unchanged.");
+            Assert.That(JsonViews.EqualViews(snapshot, before), Is.True, "Resolver documents must remain unchanged.");
 
         }
 
@@ -336,7 +336,7 @@ namespace WWCP_POI_Tests.Json
             var json = evse.ToJSON()!;
 
             Assert.That(EVSE.TryParse(json, station, out var parsed, out var error), Is.True, error);
-            Assert.That(JToken.DeepEquals(parsed!.ToJSON(), json), Is.True);
+            Assert.That(JsonViews.EqualViews(parsed!.ToJSON(), json), Is.True);
             json["openingTimes"] = new JObject(new JProperty("24/7", false));
             Assert.That(EVSE.TryParse(json, station, out _, out error), Is.False);
             Assert.That(error, Does.Contain("openingTimes"));
@@ -375,7 +375,7 @@ namespace WWCP_POI_Tests.Json
 
             var json = Expanded(RoamingNetwork.Parse(input));
 
-            Assert.That(JToken.DeepEquals(Expanded(RoamingNetwork.Parse(json)), json), Is.True);
+            Assert.That(JsonViews.EqualViews(Expanded(RoamingNetwork.Parse(json)), json), Is.True);
 
         }
 
@@ -404,7 +404,7 @@ namespace WWCP_POI_Tests.Json
                 var json = Expanded(RoamingNetwork.Parse(input));
                 var parsed = RoamingNetwork.Parse(JObject.Parse(json.ToString()));
 
-                Assert.That(JToken.DeepEquals(Expanded(parsed), json), Is.True);
+                Assert.That(JsonViews.EqualViews(Expanded(parsed), json), Is.True);
                 Assert.That(parsed.EVSEs.Single(item => item.Id.ToString() == "DE*ABC*E1").GeoLocation!.Value.Altitude!.Value.Value,
                                                                         Is.EqualTo(27.125));
 
@@ -468,7 +468,7 @@ namespace WWCP_POI_Tests.Json
 
             var json = Expanded(RoamingNetwork.Parse(input));
 
-            Assert.That(JToken.DeepEquals(Expanded(RoamingNetwork.Parse(json)), json), Is.True);
+            Assert.That(JsonViews.EqualViews(Expanded(RoamingNetwork.Parse(json)), json), Is.True);
 
         }
 

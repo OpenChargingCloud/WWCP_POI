@@ -132,7 +132,7 @@ public sealed partial class RoamingNetworkDataSnapshot
             {
                 var expectedToken = ReadToken(expected.GetRawText());
                 JToken actual = selected!;
-                if (change.Kind == RoamingNetworkChangeKind.UpdateElementProperty)
+                if (change.Kind is RoamingNetworkChangeKind.UpdateElementProperty or RoamingNetworkChangeKind.RemoveElementProperty)
                 {
                     POIElementSchema.Property(relation.Kind, change.PropertyName!);
                     actual = (selected as JObject)?[change.PropertyName!] ??
@@ -167,12 +167,18 @@ public sealed partial class RoamingNetworkDataSnapshot
             }
             else
             {
-                var replacement = ReadToken(change.NewValue!.Value.GetRawText());
-                if (change.Kind == RoamingNetworkChangeKind.UpdateElementProperty)
+                var replacement = change.NewValue is { } newValue ? ReadToken(newValue.GetRawText()) : null;
+                if (change.Kind is RoamingNetworkChangeKind.UpdateElementProperty or RoamingNetworkChangeKind.RemoveElementProperty)
                 {
                     POIElementSchema.Property(relation.Kind, change.PropertyName!);
                     var current = selected as JObject ?? throw new ArgumentException("A reference has no editable object properties.");
-                    current[change.PropertyName!] = replacement;
+                    if (change.Kind == RoamingNetworkChangeKind.RemoveElementProperty)
+                    {
+                        if (current.Property(change.PropertyName!) is not { } existing)
+                            throw new ArgumentException($"{change.PropertyName}: the property is absent.");
+                        existing.Remove();
+                    }
+                    else current[change.PropertyName!] = replacement;
                     POIElementSchema.ValidateDocument(current, relation.Kind);
                     var normalized = POIElementSchema.Normalize(relation.Kind, current);
                     if (!ReferenceEquals(normalized, current))
@@ -185,8 +191,8 @@ public sealed partial class RoamingNetworkDataSnapshot
                 }
                 else
                 {
-                    relation.ValidateValue(replacement, segment);
-                    replacement = POIElementSchema.Normalize(relation.Kind, replacement);
+                    relation.ValidateValue(replacement!, segment);
+                    replacement = POIElementSchema.Normalize(relation.Kind, replacement!);
                     if (change.Kind == RoamingNetworkChangeKind.ReplaceElement && selected is JObject oldObject &&
                         replacement is JObject newObject && POIElementSchema.HasManagedMetadata(relation.Kind) &&
                         relation.ReadId(oldObject) is { } existingId && relation.Matches(newObject, existingId))
@@ -227,8 +233,7 @@ public sealed partial class RoamingNetworkDataSnapshot
             PropertyValue(key.Type, rootProperty, JsonTokenValue(document[rootProperty]!)));
         map = map.SetItem(key, entity.With(properties: properties));
         Validate(key, map);
-        references = RemoveReferences(entity, references);
-        references = AddReferences(map[key], map, references);
+        references = RefreshReferences(entity, map[key], map, references);
         return (Touch(key, map, timestamp), references);
     }
 

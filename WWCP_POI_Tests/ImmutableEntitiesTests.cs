@@ -36,7 +36,7 @@ public sealed class ImmutableEntitiesTests
           "chargingStationOperators":[{
             "@id":"DE*ABC", "name":{"en":"Operator"},
             "chargingTariffs":[{"@id":"DE*ABC*T1", "currency":"EUR",
-              "elements":[{"priceComponents":[{"type":"ENERGY","price":0.25,"stepSize":1000}]}]}],
+              "elements":[{"priceComponents":[{"type":"ENERGY","price":0.25,"stepSize":"1 kWh"}]}]}],
             "chargingPools":[{"@id":"DE*ABC*P1", "chargingStations":[{
               "@id":"DE*ABC*S1", "EVSEs":[{"@id":"DE*ABC*E1","maxPower":"100000 W",
                 "status":{"value":"available","timestamp":"2026-01-01T00:00:00Z"},

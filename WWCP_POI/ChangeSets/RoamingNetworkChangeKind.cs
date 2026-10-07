@@ -52,6 +52,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Edit one static property on an existing addressed nested object.
         /// </summary>
-        UpdateElementProperty
+        UpdateElementProperty,
+
+        /// <summary>
+        /// Remove an optional static property, preserving absence rather than writing JSON null.
+        /// </summary>
+        RemoveProperty,
+
+        /// <summary>
+        /// Remove an optional static property from an existing addressed nested object.
+        /// </summary>
+        RemoveElementProperty
     }
 }

@@ -35,6 +35,15 @@ or `base64`. HEX is the default output; Base64 uses the standard alphabet and ca
 The applier compares decoded digest bytes, so changing that transport encoding preserves the
 same source/result identity. Unknown encodings and unlabelled JSON tuples are rejected.
 
+The complete batch also supports `ToCBOR`, `ParseCBOR` and `TryParseCBOR`. The deterministic
+map preserves all signatures and their signing input, structured paths, operation order,
+description/metadata and omitted versus explicitly null payloads. The two ETag arrays use
+native digest bytes. See the [binary transport contract](CHANGESET-CBOR.md).
+
+Read old values from the authoritative snapshot: an absent property and a stored JSON null are
+different preconditions. Static JSON/CBOR reloads retain that distinction; no domain serializer
+is used to replace the stored properties with constructor defaults.
+
 ## 1. Read the authoritative source
 
 The examples below assume the network from the [quick start](../README.md#quick-start).
@@ -108,7 +117,7 @@ therefore compare equally. Quantities require unit-bearing strings; numbers and 
 are rejected. Quantities in complete Remove preconditions are normalized recursively.
 
 `UpdateProperty` replaces a complete top-level property. For individual nested edits use
-`AddElement`, `RemoveElement`, `ReplaceElement` and `UpdateElementProperty` with a structured
+`AddElement`, `RemoveElement`, `ReplaceElement`, `UpdateElementProperty` and `RemoveElementProperty` with a structured
 `ElementPath`; see [nested element operations](ELEMENT-OPERATIONS.md). `GetElementValue()` and
 `GetElementPropertyValue()` provide detached element/property preconditions.
 
@@ -138,8 +147,10 @@ point ID or child ID starts a new runtime lifetime; see [runtime updates](RUNTIM
 | Empty JSON array | Replace an array-valued property with an empty collection |
 
 An absent property does not match an expected explicit JSON null. Property updates do not delete
-the property key. Use explicit null only for nullable fields; mandatory fields and collection
-parsers may reject it.
+the property key. Use `RemoveProperty` or addressed `RemoveElementProperty` to remove an existing
+optional property completely. Removal has no `NewValue`, permits an `OldValue` precondition and
+validates the remaining object/relationships. Managed fields and required domain data stay protected.
+Use explicit null only for nullable fields; mandatory fields and collection parsers may reject it.
 
 ## 3. Add a nested station
 
@@ -304,7 +315,7 @@ belong to the separate runtime API. Content hashes establish data agreement; sig
 authorization establish which sender may request that transition. History/replay persistence is
 the application's responsibility.
 
-Preparation and application hash the complete canonical POI projection; this is an additional
+Preparation and application hash the complete stored static hierarchy; this is an additional
 whole-hierarchy cost alongside the persistent map updates. Snapshot ETags are computed once
 on first access and cached safely for concurrent readers.
 
@@ -401,8 +412,14 @@ identity can differ.
 
 Apply the merged batch to the common source, yielding revision `source.Revision + 1`. It is not
 a patch for either already-applied branch successor, and there is no implicit current-head update.
-Applications must coordinate publication and store both input batches and the merge relationship
-for an audit history; the output batch does not contain a commit ancestry graph. Direct runtime
+`RoamingNetworkHistory` retains both original batches and explicit additional-parent relationships
+and coordinates expected-head publication. The output batch itself has no ancestry graph; its
+commit envelope supplies that history. A common-source merge cannot be published on an already
+advanced branch head; integration must prepare a new batch against that head. See
+[history and ancestry](HISTORY.md#revision-and-ancestry). `RoamingNetworkHistory.TryMerge` now
+prepares that new batch using retained ancestor/left/right static states and explicit structured
+resolutions; its commit has `[leftId, rightId]` parents and signed merge audit metadata. See
+[three-way integration](MERGING.md). Direct runtime
 updates after snapshot capture remain outside this check. Network application carries those live
 histories into the new version using its existing runtime-state rules.
 
@@ -444,9 +461,12 @@ storage; zero is preserved and null clears an optional limit. Negative limits an
 unitless values fail validation. Real-time limits/prognoses remain outside the editable allowlist.
 
 Persist the static version and current statuses with `ToJSONSnapshot()`, or only the static version
-with `DataSnapshot.WriteTo()`. Persist ChangeSets
-separately if the application needs a history. The snapshot stores only the latest
-`AppliedChangeSetId`; it does not retain the batches that created earlier versions.
+with `DataSnapshot.WriteTo()`. The snapshot stores only the latest `AppliedChangeSetId`; it does
+not retain the batches that created earlier versions. Use `RoamingNetworkHistory` for retained
+commits, branch snapshots, duplicate detection and expected-head publication. Its static JSON/CBOR
+archives retain the original batches and all peers; `CreatePersistent`/`Open` provide integrated
+file persistence and replay recovery. [History contracts](HISTORY.md) define first-parent revisions
+and the separation of static state tags, commit identity and peer signatures.
 
 See [JSON](JSON.md) for ChangeSet serialization, [signatures](SIGNATURES.md) for verified batches
 and [domain details](../WWCP_POI/ChangeSets/README.md) for tariffs and transparency software.

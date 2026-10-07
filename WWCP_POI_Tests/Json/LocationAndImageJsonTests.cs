@@ -59,7 +59,7 @@ namespace WWCP_POI_Tests.Json
 
                 Assert.That(parsed.GeoLocation, Is.EqualTo(source.GeoLocation));
                 Assert.That(parsed.GeoLocation.Altitude, Is.EqualTo(source.GeoLocation.Altitude));
-                Assert.That(JToken.DeepEquals(parsed.Name!.ToJSON(), source.Name!.ToJSON()), Is.True);
+                Assert.That(JsonViews.EqualViews(parsed.Name!.ToJSON(), source.Name!.ToJSON()), Is.True);
 
             }
             finally
@@ -119,7 +119,7 @@ namespace WWCP_POI_Tests.Json
             var parsed = Image.Parse(JObject.Parse(source.ToJSON().ToString()));
 
             Assert.That(parsed, Is.EqualTo(source));
-            Assert.That(JToken.DeepEquals(parsed.ToJSON(), json), Is.True);
+            Assert.That(JsonViews.EqualViews(parsed.ToJSON(), json), Is.True);
 
         }
 

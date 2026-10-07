@@ -120,7 +120,7 @@ namespace WWCP_POI_Tests.Json
                 Assert.That(parsed, Is.EqualTo(source));
                 Assert.That(parsed.GetHashCode(), Is.EqualTo(source.GetHashCode()));
                 Assert.That(parsed.CompareTo(source), Is.Zero);
-                Assert.That(JToken.DeepEquals(parsed.ToJSON(), json), Is.True);
+                Assert.That(JsonViews.EqualViews(parsed.ToJSON(), json), Is.True);
                 Assert.That(JToken.DeepEquals(json, before), Is.True);
                 Assert.That(json["open_source_license"], Is.Null);
                 Assert.That(json["openSourceLicense"]!["@id"]!.Value<string>(), Is.EqualTo("MIT"));
@@ -238,7 +238,7 @@ namespace WWCP_POI_Tests.Json
                 Assert.That(parsed.NotBefore!.Value.Offset, Is.EqualTo(TimeSpan.Zero));
                 Assert.That(parsed.NotBefore.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(1234567));
                 Assert.That(parsed.NotAfter!.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(7654321));
-                Assert.That(JToken.DeepEquals(parsed.ToJSON(), source.ToJSON()), Is.True);
+                Assert.That(JsonViews.EqualViews(parsed.ToJSON(), source.ToJSON()), Is.True);
 
             }
             finally
@@ -410,7 +410,7 @@ namespace WWCP_POI_Tests.Json
             links[0] = URL.Parse("https://example.org/changed");
             description.Set(Languages.en, "Changed");
             software.OpenSourceLicense.Description.Set(Languages.en, "Changed again");
-            Assert.That(JToken.DeepEquals(software.ToJSON(), before), Is.True);
+            Assert.That(JsonViews.EqualViews(software.ToJSON(), before), Is.True);
             Assert.That(software.Clone(), Is.EqualTo(software));
             Assert.That(Status().Clone(), Is.EqualTo(Status()));
 
@@ -507,7 +507,7 @@ namespace WWCP_POI_Tests.Json
             Assert.That(meter.CustomData.ToJObject()["serial"]!.Value<int>(), Is.EqualTo(123));
             Assert.That(meter.LastChangeDate, Is.EqualTo(DateTimeOffset.Parse("2026-01-01T00:00:00Z")));
             Assert.That(meter.Created, Is.EqualTo(DateTimeOffset.Parse("2025-01-01T00:00:00Z")));
-            Assert.That(JToken.DeepEquals(json, restored.ToJSONSnapshot()), Is.True);
+            Assert.That(JsonViews.EqualViews(json, restored.ToJSONSnapshot()), Is.True);
 
         }
 

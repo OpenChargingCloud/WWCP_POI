@@ -66,6 +66,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
+        internal JObject GetDocument()
+            => ReadJSON(Export(Root));
+
         #endregion
 
         #region Write nested JSON directly
@@ -88,7 +91,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             WriteChildren(writer, entity);
 
             if (key == Root)
+            {
+                writer.WriteString(POIContentProfile.PropertyName, POIContentProfile.Id);
                 WriteRevisionMetadata(writer);
+            }
 
             if (includeETags && key == Root)
             {
@@ -106,12 +112,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    InfrastructureEntitySnapshot  entity)
         {
 
-            foreach (var group in entity.Children.GroupBy(child => child.Type).OrderBy(group => group.Key))
+            foreach (var relation in InfrastructureChangeSchema.Relations.Where(relation => relation.Value.Parent == entity.Key.Type).
+                         OrderBy(relation => relation.Value.Field, StringComparer.Ordinal))
             {
-                writer.WritePropertyName(InfrastructureChangeSchema.Relations[group.Key].Field);
+                writer.WritePropertyName(relation.Value.Field);
                 writer.WriteStartArray();
 
-                foreach (var child in group.OrderBy(child => child.Id, StringComparer.Ordinal))
+                foreach (var child in entity.Children.Where(child => child.Type == relation.Key).OrderBy(child => child.Id, StringComparer.Ordinal))
                     WriteNode(writer, child);
 
                 writer.WriteEndArray();

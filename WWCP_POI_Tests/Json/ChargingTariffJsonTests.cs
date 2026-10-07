@@ -214,7 +214,7 @@ namespace WWCP_POI_Tests.Json
 
                 Assert.That(parsed.Price, Is.EqualTo(component.Price));
                 Assert.That(parsed.EnergyStep, Is.EqualTo(WattHour.FromKWh(1)));
-                Assert.That(ChargingPriceComponent.Parse(JObject.Parse("""{"type":"FLAT","price":0.123456789123456789}""")).Price,
+                Assert.That(ChargingPriceComponent.Parse("""{"type":"FLAT","price":0.123456789123456789}""").Price,
                                                                 Is.EqualTo(component.Price));
 
             }
@@ -268,7 +268,7 @@ namespace WWCP_POI_Tests.Json
             Assert.That(restored.Duration!.Value.Max, Is.EqualTo(TimeSpan.FromMilliseconds(3600250)));
             Assert.That(restored.Date!.EndTime, Is.EqualTo(DateTimeOffset.Parse("2027-01-01T00:00:00Z")));
             Assert.That(restored.DayOfWeek, Is.EqualTo(new[] { DayOfWeek.Monday, DayOfWeek.Friday }));
-            Assert.That(JToken.DeepEquals(output, restored.ToJSON()), Is.True);
+            Assert.That(JsonViews.EqualViews(output, restored.ToJSON()), Is.True);
 
         }
 
@@ -376,7 +376,7 @@ namespace WWCP_POI_Tests.Json
             Assert.That(tariff.AdminStatus.Value, Is.EqualTo(ChargingTariffAdminStatusTypes.Planned));
             Assert.That(tariff.CustomData.ToJObject()["counter"]!.Value<int>(), Is.EqualTo(42));
             Assert.That(restored.EVSEs.Single(evse => evse.Id.ToString() == "DE*ABC*E1").ChargingTariffs.Single(), Is.SameAs(tariff));
-            Assert.That(JToken.DeepEquals(snapshot, restored.ToJSONSnapshot()), Is.True);
+            Assert.That(JsonViews.EqualViews(snapshot, restored.ToJSONSnapshot()), Is.True);
             Assert.That(source.DataSnapshot.TariffReferences.Single().Value.Count, Is.EqualTo(2));
 
         }
@@ -531,7 +531,7 @@ namespace WWCP_POI_Tests.Json
             var exception = Assert.Throws<RoamingNetworkChangeSetException>(() => added.ApplyChangeSet(Set(added,
                                                 RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E2", "tariffIds", null, Json("[\"DE*DEF*T1\"]")))));
 
-            Assert.That(exception!.Message, Does.Contain("different operator"));
+            Assert.That(exception!.Message, Does.Contain("different").And.Contain("operator"));
             Assert.That(added.DataSnapshot.TariffReferences, Is.SameAs(index));
 
         }

@@ -71,7 +71,7 @@ namespace WWCP_POI_Tests.Json
 
             Assert.That(parsed.GetType(), Is.EqualTo(source.GetType()));
             Assert.That(parsed.Type, Is.EqualTo(source.Type));
-            Assert.That(JToken.DeepEquals(parsed.ToJSON(), json), Is.True);
+            Assert.That(JsonViews.EqualViews(parsed.ToJSON(), json), Is.True);
 
         }
 

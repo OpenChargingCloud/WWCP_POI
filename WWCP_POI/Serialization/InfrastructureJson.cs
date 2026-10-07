@@ -57,7 +57,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 FloatParseHandling = FloatParseHandling.Decimal
             };
 
-            return JToken.ReadFrom(reader);
+            var token = JToken.ReadFrom(reader, new JsonLoadSettings {
+                DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error
+            });
+            if (reader.Read())
+                throw new ArgumentException("Unexpected content after the JSON value.");
+            return token;
 
         }
 
@@ -65,10 +70,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             ArgumentNullException.ThrowIfNull(json);
+            if (json[POIContentProfile.PropertyName] is { } profile)
+                POIContentProfile.Require(profile.Type == JTokenType.String ? profile.Value<String>() : null);
 
             foreach (var property in json.Properties())
             {
-                if (property.Name != "ETags" && !fields.Contains(property.Name))
+                if (property.Name != "ETags" && property.Name != POIContentProfile.PropertyName && !fields.Contains(property.Name))
                     throw new ArgumentException($"Unknown property '{property.Name}'.");
             }
 
@@ -78,6 +85,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             ArgumentNullException.ThrowIfNull(json);
+            if (json[POIContentProfile.PropertyName] is { } profile)
+                POIContentProfile.Require(profile.Type == JTokenType.String ? profile.Value<String>() : null);
 
             if (json["exception"] is not null)
                 throw new ArgumentException("Cannot parse a serializer error document.");
