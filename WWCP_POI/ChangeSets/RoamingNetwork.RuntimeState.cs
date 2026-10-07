@@ -25,7 +25,8 @@ public sealed partial class RoamingNetwork
     /// <summary>
     /// Capture runtime state at derivation time. A derived version owns independent
     /// schedules, including when its hierarchy is not materialized until later.
-    /// Explicit status operations and newly added subtrees retain their batch values.
+    /// Existing nested entities retain runtime histories across static property replacements.
+    /// New identities and removed/recreated subtrees start with their domain runtime defaults.
     /// </summary>
     private Action<RoamingNetwork> CaptureRuntimeState(RoamingNetworkChangeSet changeSet, RoamingNetwork result)
     {
@@ -51,7 +52,8 @@ public sealed partial class RoamingNetwork
             => removed.Contains((type, InfrastructureChangeSchema.Identity(type, id))) || changed.Any(change =>
                    InfrastructureChangeSchema.Type(change.EntityType) == type &&
                    InfrastructureChangeSchema.Identity(type, change.EntityId) == InfrastructureChangeSchema.Identity(type, id) &&
-                   (change.Kind != RoamingNetworkChangeKind.UpdateProperty || change.PropertyName == property));
+                   (change.Kind is RoamingNetworkChangeKind.Add or RoamingNetworkChangeKind.Remove ||
+                    change.Kind == RoamingNetworkChangeKind.UpdateProperty && change.PropertyName == property));
 
         void Capture<TId, TAdmin, TStatus>(AImmutableEMobilityEntity<TId, TAdmin, TStatus> source,
                                           InfrastructureEntityType type,
@@ -63,20 +65,39 @@ public sealed partial class RoamingNetwork
             var admin = source.AdminStatusSchedule().ToImmutableArray();
             var status = source.StatusSchedule().ToImmutableArray();
             var historySizes = source.RuntimeHistorySizes;
-            var copyAdmin = !Replaced(type, source.Id.ToString()!, "adminStatus");
-            var copyStatus = !Replaced(type, source.Id.ToString()!, "status");
+            var copyRuntime = !Replaced(type, source.Id.ToString()!, "");
             Action<RoamingNetwork> apply = target =>
             {
-                if (find(target) is not { } entity) return;
+                if (!copyRuntime || find(target) is not { } entity) return;
                 entity.RestoreRuntimeHistorySizes(historySizes);
-                if (copyAdmin) entity.SetAdminStatus(admin);
-                if (copyStatus) entity.SetStatus(status);
+                entity.SetAdminStatus(admin);
+                entity.SetStatus(status);
             };
             if (type == InfrastructureEntityType.RoamingNetwork) apply(result);
             else restore.Add(apply);
         }
 
         Capture(this, InfrastructureEntityType.RoamingNetwork, target => target);
+        foreach (var entity in GridOperators)
+            Capture(entity, InfrastructureEntityType.GridOperator, target => target.FindGraphRuntimeEntity(InfrastructureEntityType.GridOperator, entity.Id.ToString()) as GridOperator);
+        foreach (var entity in ParkingOperators)
+            Capture(entity, InfrastructureEntityType.ParkingOperator, target => target.FindGraphRuntimeEntity(InfrastructureEntityType.ParkingOperator, entity.Id.ToString()) as ParkingOperator);
+        foreach (var entity in EVSEGroups)
+            Capture(entity, InfrastructureEntityType.EVSEGroup, target => target.FindGraphRuntimeEntity(InfrastructureEntityType.EVSEGroup, entity.Id.ToString()) as EVSEGroup);
+        foreach (var entity in ChargingStationGroups)
+            Capture(entity, InfrastructureEntityType.ChargingStationGroup, target => target.FindGraphRuntimeEntity(InfrastructureEntityType.ChargingStationGroup, entity.Id.ToString()) as ChargingStationGroup);
+        foreach (var entity in ChargingPoolGroups)
+            Capture(entity, InfrastructureEntityType.ChargingPoolGroup, target => target.FindGraphRuntimeEntity(InfrastructureEntityType.ChargingPoolGroup, entity.Id.ToString()) as ChargingPoolGroup);
+        foreach (var entity in ChargingTariffGroups)
+            Capture(entity, InfrastructureEntityType.ChargingTariffGroup, target => target.FindGraphRuntimeEntity(InfrastructureEntityType.ChargingTariffGroup, entity.Id.ToString()) as ChargingTariffGroup);
+        foreach (var entity in ParkingGarages)
+            Capture(entity, InfrastructureEntityType.ParkingGarage, target => target.FindGraphRuntimeEntity(InfrastructureEntityType.ParkingGarage, entity.Id.ToString()) as ParkingGarage);
+        foreach (var entity in ParkingSpaces)
+            Capture(entity, InfrastructureEntityType.ParkingSpace, target => target.FindGraphRuntimeEntity(InfrastructureEntityType.ParkingSpace, entity.Id.ToString()) as ParkingSpace);
+        foreach (var entity in ParkingSensors)
+            Capture(entity, InfrastructureEntityType.ParkingSensor, target => target.FindGraphRuntimeEntity(InfrastructureEntityType.ParkingSensor, entity.Id.ToString()) as ParkingSensor);
+        foreach (var entity in ParkingSpaceGroups)
+            Capture(entity, InfrastructureEntityType.ParkingSpaceGroup, target => target.FindGraphRuntimeEntity(InfrastructureEntityType.ParkingSpaceGroup, entity.Id.ToString()) as ParkingSpaceGroup);
         foreach (var entity in ChargingStationOperators)
             Capture(entity, InfrastructureEntityType.ChargingStationOperator, target => target.GetChargingStationOperatorById(entity.Id));
         foreach (var entity in EMobilityProviders)
@@ -87,23 +108,27 @@ public sealed partial class RoamingNetwork
             var electrical = CaptureElectrical(entity);
             var aggregate = entity.StatusAggregationDelegate;
             var meterRuntime = entity.EnergyMeters.ToDictionary(meter => meter.Id.ToString(),
-                                                                CaptureMeterRuntime,
+                                                                meter => CaptureMeterRuntime(meter, ResetsNestedRuntime(changeSet,
+                                                                    InfrastructureEntityType.ChargingPool, entity.Id.ToString(), [new("energyMeters", meter.Id.ToString())])),
                                                                 StringComparer.OrdinalIgnoreCase);
-            var connectionMeterRuntime = CaptureMeterRuntime(entity.GridConnectionPoint?.EnergyMeter);
-            var gridOperatorRuntime = CaptureNestedRuntime(entity.GridConnectionPoint?.GridOperator);
+            var sourcePoint = entity.GridConnectionPoint;
+            var connectionMeterRuntime = CaptureMeterRuntime(sourcePoint?.EnergyMeter,
+                sourcePoint?.EnergyMeter is { } sourceMeter && ResetsNestedRuntime(changeSet, InfrastructureEntityType.ChargingPool,
+                    entity.Id.ToString(), [new("gridConnectionPoint", sourcePoint.Id), new("energyMeter", sourceMeter.Id.ToString())]));
+            var gridOperatorRuntime = CaptureNestedRuntime(sourcePoint?.GridOperator,
+                sourcePoint is not null && ResetsNestedRuntime(changeSet, InfrastructureEntityType.ChargingPool,
+                    entity.Id.ToString(), [new("gridConnectionPoint", sourcePoint.Id), new("gridOperator", sourcePoint.GridOperator.Id.ToString())]));
+            var connectionPointId = entity.GridConnectionPoint?.Id;
             restore.Add(target =>
             {
                 if (target.GetChargingPoolById(entity.Id) is not { } pool ||
                     Replaced(InfrastructureEntityType.ChargingPool, entity.Id.ToString(), "")) return;
                 electrical(pool);
                 pool.StatusAggregationDelegate = aggregate;
-                if (!Replaced(InfrastructureEntityType.ChargingPool, entity.Id.ToString(), "energyMeters"))
-                {
-                    foreach (var meter in pool.EnergyMeters)
-                        if (meterRuntime.TryGetValue(meter.Id.ToString(), out var restoreMeter))
-                            restoreMeter(meter);
-                }
-                if (!Replaced(InfrastructureEntityType.ChargingPool, entity.Id.ToString(), "gridConnectionPoint"))
+                foreach (var meter in pool.EnergyMeters)
+                    if (meterRuntime.TryGetValue(meter.Id.ToString(), out var restoreMeter))
+                        restoreMeter(meter);
+                if (String.Equals(connectionPointId, pool.GridConnectionPoint?.Id, StringComparison.Ordinal))
                 {
                     connectionMeterRuntime(pool.GridConnectionPoint?.EnergyMeter);
                     gridOperatorRuntime(pool.GridConnectionPoint?.GridOperator);
@@ -116,7 +141,8 @@ public sealed partial class RoamingNetwork
             var electrical = CaptureElectrical(entity);
             var aggregate = entity.StatusAggregationDelegate;
             var meterRuntime = entity.EnergyMeters.ToDictionary(meter => meter.Id.ToString(),
-                                                                CaptureMeterRuntime,
+                                                                meter => CaptureMeterRuntime(meter, ResetsNestedRuntime(changeSet,
+                                                                    InfrastructureEntityType.ChargingStation, entity.Id.ToString(), [new("energyMeters", meter.Id.ToString())])),
                                                                 StringComparer.OrdinalIgnoreCase);
             restore.Add(target =>
             {
@@ -124,12 +150,9 @@ public sealed partial class RoamingNetwork
                     Replaced(InfrastructureEntityType.ChargingStation, entity.Id.ToString(), "")) return;
                 electrical(station);
                 station.StatusAggregationDelegate = aggregate;
-                if (!Replaced(InfrastructureEntityType.ChargingStation, entity.Id.ToString(), "energyMeters"))
-                {
-                    foreach (var meter in station.EnergyMeters)
-                        if (meterRuntime.TryGetValue(meter.Id.ToString(), out var restoreMeter))
-                            restoreMeter(meter);
-                }
+                foreach (var meter in station.EnergyMeters)
+                    if (meterRuntime.TryGetValue(meter.Id.ToString(), out var restoreMeter))
+                        restoreMeter(meter);
             });
         }
         foreach (var entity in ChargingTariffs)
@@ -148,7 +171,9 @@ public sealed partial class RoamingNetwork
             var currentForecast = entity.MaxCurrentPrognoses.ToImmutableArray();
             var powerForecast = entity.MaxPowerPrognoses.ToImmutableArray();
             var capacityForecast = entity.MaxCapacityPrognoses.ToImmutableArray();
-            var meterRuntime = CaptureMeterRuntime(entity.EnergyMeter);
+            var meterRuntime = CaptureMeterRuntime(entity.EnergyMeter,
+                entity.EnergyMeter is { } sourceMeter && ResetsNestedRuntime(changeSet, InfrastructureEntityType.EVSE,
+                    entity.Id.ToString(), [new("energyMeter", sourceMeter.Id.ToString())]));
             restore.Add(target =>
             {
                 if (target.GetEVSEById(entity.Id) is not { } evse ||
@@ -164,8 +189,7 @@ public sealed partial class RoamingNetwork
                 evse.MaxCurrentPrognoses.Replace(currentForecast);
                 evse.MaxPowerPrognoses.Replace(powerForecast);
                 evse.MaxCapacityPrognoses.Replace(capacityForecast);
-                if (!Replaced(InfrastructureEntityType.EVSE, entity.Id.ToString(), "energyMeter"))
-                    meterRuntime(evse.EnergyMeter);
+                meterRuntime(evse.EnergyMeter);
             });
         }
 
@@ -198,11 +222,11 @@ public sealed partial class RoamingNetwork
         };
     }
 
-    private static Action<EnergyMeter?> CaptureMeterRuntime(EnergyMeter? source)
-        => CaptureNestedRuntime(source);
+    private static Action<EnergyMeter?> CaptureMeterRuntime(EnergyMeter? source, Boolean reset = false)
+        => CaptureNestedRuntime(source, reset);
 
     private static Action<AImmutableEMobilityEntity<TId, TAdmin, TStatus>?> CaptureNestedRuntime<TId, TAdmin, TStatus>(
-        AImmutableEMobilityEntity<TId, TAdmin, TStatus>? source)
+        AImmutableEMobilityEntity<TId, TAdmin, TStatus>? source, Boolean reset = false)
         where TId : IId
         where TAdmin : IComparable
         where TStatus : IComparable
@@ -210,9 +234,11 @@ public sealed partial class RoamingNetwork
         var admin = source?.AdminStatusSchedule().ToImmutableArray();
         var status = source?.StatusSchedule().ToImmutableArray();
         var sizes = source?.RuntimeHistorySizes;
+        var id = source is not null ? source.Id : default!;
         return target =>
         {
-            if (target is null || admin is null || status is null || sizes is null) return;
+            if (reset || target is null || admin is null || status is null || sizes is null ||
+                !EqualityComparer<TId>.Default.Equals(id, target.Id)) return;
             target.RestoreRuntimeHistorySizes(sizes.Value);
             target.SetAdminStatus(admin.Value);
             target.SetStatus(status.Value);

@@ -45,14 +45,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var copy = (JObject) document.DeepClone();
             POIRepresentation.RemoveETags(copy, type.ToString());
-            var text = InfrastructureJson.Text(copy, "@id") ??
-                       throw new ArgumentException("Missing '@id'.");
+            POIRepresentation.RemoveRuntime(copy, type.ToString());
+            var idField = InfrastructureChangeSchema.IdField(type);
+            var text = InfrastructureJson.Text(copy, idField) ??
+                       throw new ArgumentException($"Missing '{idField}'.");
             var key  = Key(type, text, parent?.Id);
 
             if (map.ContainsKey(key))
                 throw new ArgumentException($"Duplicate entity '{key}'.");
 
-            copy["@id"] = key.Id;
+            copy[idField] = key.Id;
 
             ValidateImportParent(copy, parent);
             InfrastructureChangeSchema.ValidateFields(type, copy);
@@ -123,15 +125,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 if (InfrastructureJson.Date(document, field) is { } date)
                     document[field] = date.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-            }
-
-            foreach (var field in new[] { "status", "adminStatus" })
-            {
-                if (InfrastructureJson.Object(document, field) is { } state &&
-                    InfrastructureJson.Date(state, "timestamp") is { } date)
-                {
-                    state["timestamp"] = date.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-                }
             }
 
         }

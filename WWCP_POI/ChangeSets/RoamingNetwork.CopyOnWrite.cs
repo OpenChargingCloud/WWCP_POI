@@ -42,7 +42,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private Action<RoamingNetwork>? restoreRuntimeState;
 
         /// <summary>
-        /// Capture the current POI data once as authoritative immutable versioned data.
+        /// Capture static POI data once as authoritative immutable versioned data, without runtime fields.
         /// Static changes must use ApplyChangeSet. Runtime status updates remain local
         /// to the domain objects and do not edit this captured snapshot or its revision.
         /// </summary>
@@ -80,9 +80,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => DataSnapshot.CreateChangeSet(id, createdAt, changes);
 
         /// <summary>
-        /// Check two ChangeSets against this network's frozen source snapshot. By default only
+        /// Check two ChangeSets against this network's static source snapshot. By default only
         /// a notice is returned; merge=true prepares a new unsigned batch for separate application.
-        /// Runtime values changed directly after snapshot capture are outside this merge check.
+        /// Runtime values are never stored or compared by this merge check.
         /// </summary>
         public Boolean TryMerge(RoamingNetworkChangeSet                  left,
                                 RoamingNetworkChangeSet                  right,
@@ -195,6 +195,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var provider in providers)
                 projectedEMobilityProviders.TryAdd(provider.Id, provider);
+
+            var children = new JObject();
+            foreach (var type in new[] { InfrastructureEntityType.GridOperator, InfrastructureEntityType.ChargingStationManufacturer, InfrastructureEntityType.ParkingOperator })
+                children[InfrastructureChangeSchema.Relations[type].Field] = new JArray(
+                    snapshot.Entities[snapshot.Root].Children.Where(key => key.Type == type).
+                        Select(key => snapshot.GetEntityJSON(key.Type, key.Id)));
+            ParseNetworkChildren(children);
 
         }
 

@@ -32,6 +32,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
     {
         Add,
         Remove,
-        UpdateProperty
+        UpdateProperty,
+
+        /// <summary>
+        /// Add one nested collection element or absent optional singleton.
+        /// </summary>
+        AddElement,
+
+        /// <summary>
+        /// Remove one existing nested collection element or optional singleton.
+        /// </summary>
+        RemoveElement,
+
+        /// <summary>
+        /// Replace one existing addressed nested element or singleton.
+        /// </summary>
+        ReplaceElement,
+
+        /// <summary>
+        /// Edit one static property on an existing addressed nested object.
+        /// </summary>
+        UpdateElementProperty
     }
 }

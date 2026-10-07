@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | POI entities and nested network snapshots | Newtonsoft.Json `JObject` / `JArray` | Entity `Parse` / `TryParse`, `ToJSON`, `ToJSONSnapshot` |
 | Immutable property values and ChangeSet payloads | System.Text.Json `JsonElement` | ChangeSet constructors and `JsonSerializer` |
+| Scoped runtime status instructions | System.Text.Json immutable records | `RoamingNetworkRuntimeUpdate`, `JsonSerializer`, `ApplyRuntimeUpdate` |
 
 The entity JSON contract uses names such as `@id`, `chargingStationOperators`, `EVSEs`,
 `socketOutlets` and `tariffIds`. ChangeSet JSON uses the C# property names by default:
@@ -17,6 +18,13 @@ These layers are deliberately distinct. A ChangeSet's `NewValue` can contain a P
 without renaming the document's properties.
 
 ## 2. Network snapshots
+
+Complete documents include network-owned manufacturers/grid/parking operators and operator-owned
+EVSE/station/pool/tariff groups. Parking operators own `parkingGarages`, `parkingSpaces`,
+`parkingSensors` and `parkingSpaceGroups`. These arrays contain expanded objects; group members
+and parking links are ID strings. Grid/parking operator identities use `id`, other graph nodes
+use `@id`. Import resolves infrastructure before groups and parking; see [graph contract](GRAPH.md).
+
 
 `RoamingNetwork.ToJSONSnapshot()` writes the nested hierarchy, current timestamped operational
 and admin statuses, entity creation/change timestamps, custom data and the supported POI fields.
@@ -38,17 +46,17 @@ persisted merely because it exists in C#.
 `ToJSON()` retains expansion controls and custom callbacks. Use `ToJSONSnapshot()` for the
 authoritative static version with current runtime statuses, including the operational/admin
 statuses of directly owned pool/station energy meters, EVSE meters and grid-connection-point
-meters, plus referenced grid operators. They remain in their instances and their current values
+meters, plus embedded and registered grid operators, groups and parking entities. They remain in their instances and their current values
 are overlaid by `ToJSONSnapshot()`. Direct runtime changes do not increase `revision` or change
 entity timestamps. Entities whose runtime status is `Removed` remain in
 the snapshot; removing POI nodes requires a ChangeSet Remove operation.
 
-`DataSnapshot.ToJSON()`, `GetEntityJSON()` and `WriteTo()` export the frozen baseline, including
-statuses captured at import/capture or changed explicitly by a ChangeSet. They do not overlay
-later runtime changes. Reimporting a `ToJSONSnapshot()` document preserves its current statuses
-and revision, while making those statuses the newly imported baseline.
+`DataSnapshot.ToJSON()`, `GetEntityJSON()` and `WriteTo()` export only static data. Import/capture
+removes schema-defined runtime fields before storing entity documents. Reimporting a
+`ToJSONSnapshot()` document restores its current statuses in domain objects and its revision;
+its `DataSnapshot` remains strictly static. Customer fields inside `customData` are preserved.
 
-For frozen-baseline export without a complete intermediate `JObject` tree:
+For static version export without a complete intermediate `JObject` tree:
 
 ```csharp
 using System.Text.Json;
@@ -61,6 +69,18 @@ network.DataSnapshot.WriteTo(writer);
 
 `GetEntityJSON(type, id, parentId)` exports a fresh document for a subtree. `GetEntity()` returns
 the immutable node itself. Connector lookups require their EVSE scope.
+
+### Pool and station electrical limits
+
+`maxCurrent`, `maxPower` and `maxCapacity` are optional SI strings mapped to Styx `Ampere`,
+`Watt` and `WattHour`, for example `"125 A"`, `"250 kW"` and `"20 kWh"`. Zero is retained;
+negative values, numeric JSON and strings without units are rejected. Absent or null values
+represent no local limit. Serialization writes canonical unit-bearing strings and CBOR uses
+the corresponding metrological values. These static values are included in both content ETags.
+ChangeSet old-value checks normalize equivalent explicit units, such as `"250 kW"` and `"250000 W"`.
+
+Real-time limits and prognoses remain mutable timestamped quantities within the entity. They
+are excluded from the static profile and are not added to the snapshot persistence contract.
 
 ### Pool and station energy meters
 
@@ -91,6 +111,7 @@ The constructor detaches the input meters, including their runtime schedules. Th
 `EnergyMeters` collection exposes those stored instances so their statuses can still change.
 Replace the complete `energyMeters` property through a pool/station `UpdateProperty` ChangeSet;
 use `[]` to clear it. Meters remain nested owner properties in the versioned graph.
+For individual membership/metadata changes use addressed [element operations](ELEMENT-OPERATIONS.md).
 
 ### Grid connection points
 
@@ -101,15 +122,22 @@ Parsing into a supplied pool/network validates that network reference; standalon
 reconstructs a network reference from that ID. The operator is not automatically registered
 as an independent graph node. An absent or null connection point means no grid connection point.
 
-Replace the complete `gridConnectionPoint` property to edit it; JSON null removes it. An explicit
-replacement retains supplied operator/meter statuses, while unrelated changes preserve current
-runtime histories independently. Electrical properties use Styx `Volt`, `Hertz`, `Watt` and
+Replace the complete `gridConnectionPoint` property to edit it; JSON null removes it. Static
+replacement payloads reject runtime fields. Operator/meter histories are independently preserved
+when owner, connection-point identity and child ID match. Electrical properties use Styx `Volt`, `Hertz`, `Watt` and
 `VoltAmpere` value types. JSON writes invariant unit-bearing strings such as `"400 V"`,
 `"50 Hz"`, `"250 kW"` and `"300 kVA"`. Numbers and unitless strings are rejected.
 See [Grid connections](GRIDCONNECTIONS.md)
 for fields and units.
+Connection-point and child properties can also be edited via structured element paths; whole
+property replacement remains available.
 
 ## 3. ChangeSet JSON
+
+Nested operations additionally carry an immutable `ElementPath` array of `PropertyName`/optional
+`ElementId` objects. Original graph operations use `[]` and can omit that field on input. New
+element operations require a nonempty path. Unknown operation/path fields are rejected. The
+[element guide](ELEMENT-OPERATIONS.md#json-and-signing) lists operation shapes and examples.
 
 With default System.Text.Json options, a property update is represented as follows:
 
@@ -132,6 +160,7 @@ With default System.Text.Json options, a property update is represented as follo
       "Kind": "UpdateProperty",
       "EntityType": "EVSE",
       "EntityId": "DE*ABC*E1",
+      "ElementPath": [],
       "PropertyName": "maxPower",
       "OldValue": "100 kW",
       "NewValue": "150 kW"
@@ -201,7 +230,7 @@ Each signed array entry has this shape (the Base64 placeholder is illustrative):
   "Algorithm": "Ed25519",
   "KeyId": "acme:alice",
   "Value": "<canonical Base64 signature bytes>",
-  "Profile": "wwcp-poi-changeset-json-v1",
+  "Profile": "wwcp-poi-changeset-json-v2",
   "Encoding": "base64"
 }
 ```
@@ -285,9 +314,14 @@ quantities recursively. Raw ChangeSet payloads retain the caller's representatio
 verification; use unit strings when preparing new batches.
 
 Snapshot/entity/status timestamp handling is defined by its parser. Managed snapshot timestamps
-and status updates are normalized to UTC. Timestamp strings require an explicit offset or `Z`.
+and separate runtime status instructions are normalized to UTC. Timestamp strings require an explicit offset or `Z`.
 Creation/change timestamps are restored without firing ordinary
 property mutation updates.
+
+Runtime instructions use their own [JSON contract](RUNTIME.md#json-contract). Static ChangeSets
+reject operational statuses, including in nested replacement documents and Remove preconditions.
+`IncludeVersionMetadata` on `ToJSONWithETags()` and `ToCBOR()` exports revision information
+independently of `IncludeRuntime`; see [snapshot transport](ETAGS-CBOR.md#api).
 
 See the [test wire conventions](../WWCP_POI_Tests/README.md#wire-conventions) for cable,
 coordinate, product and authentication details.

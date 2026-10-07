@@ -684,13 +684,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region MaxCurrent
 
-        private Decimal? maxCurrent;
+        private readonly Ampere? maxCurrent;
 
         /// <summary>
-        /// The maximum current [Ampere].
+        /// The immutable maximum current, represented by a typed SI quantity.
         /// </summary>
-        [Mandatory, SlowData]
-        public Decimal? MaxCurrent
+        [Optional, SlowData]
+        public Ampere? MaxCurrent
         {
 
             get
@@ -705,13 +705,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region MaxCurrentRealTime
 
-        private Timestamped<Decimal>? maxCurrentRealTime;
+        private Timestamped<Ampere>? maxCurrentRealTime;
 
         /// <summary>
-        /// The real-time maximum current [Ampere].
+        /// The real-time maximum current, represented by a typed SI quantity.
         /// </summary>
         [Optional, FastData]
-        public Timestamped<Decimal>? MaxCurrentRealTime
+        public Timestamped<Ampere>? MaxCurrentRealTime
         {
 
             get
@@ -736,21 +736,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
         /// <summary>
-        /// Prognoses on future values of the maximum current [Ampere].
+        /// Prognoses on future values of the maximum current as typed SI quantities.
         /// </summary>
         [Optional, FastData]
-        public ReactiveSet<Timestamped<Decimal>>        MaxCurrentPrognoses     { get; }
+        public ReactiveSet<Timestamped<Ampere>>         MaxCurrentPrognoses     { get; }
 
 
         #region MaxPower
 
-        private Decimal? maxPower;
+        private readonly Watt? maxPower;
 
         /// <summary>
-        /// The maximum power [kWatt].
+        /// The immutable maximum power, represented by a typed SI quantity.
         /// </summary>
         [Optional, SlowData]
-        public Decimal? MaxPower
+        public Watt? MaxPower
         {
 
             get
@@ -765,13 +765,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region MaxPowerRealTime
 
-        private Timestamped<Decimal>? maxPowerRealTime;
+        private Timestamped<Watt>? maxPowerRealTime;
 
         /// <summary>
-        /// The real-time maximum power [kWatt].
+        /// The real-time maximum power, represented by a typed SI quantity.
         /// </summary>
         [Optional, FastData]
-        public Timestamped<Decimal>? MaxPowerRealTime
+        public Timestamped<Watt>? MaxPowerRealTime
         {
 
             get
@@ -796,21 +796,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
         /// <summary>
-        /// Prognoses on future values of the maximum power [kWatt].
+        /// Prognoses on future values of the maximum power as typed SI quantities.
         /// </summary>
         [Optional, FastData]
-        public ReactiveSet<Timestamped<Decimal>>        MaxPowerPrognoses       { get; }
+        public ReactiveSet<Timestamped<Watt>>           MaxPowerPrognoses       { get; }
 
 
         #region MaxCapacity
 
-        private Decimal? maxCapacity;
+        private readonly WattHour? maxCapacity;
 
         /// <summary>
-        /// The maximum capacity [kWh].
+        /// The immutable maximum energy capacity, represented by a typed SI quantity.
         /// </summary>
-        [Mandatory]
-        public Decimal? MaxCapacity
+        [Optional, SlowData]
+        public WattHour? MaxCapacity
         {
 
             get
@@ -825,13 +825,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region MaxCapacityRealTime
 
-        private Timestamped<Decimal>? maxCapacityRealTime;
+        private Timestamped<WattHour>? maxCapacityRealTime;
 
         /// <summary>
-        /// The real-time maximum capacity [kWh].
+        /// The real-time maximum energy capacity, represented by a typed SI quantity.
         /// </summary>
-        [Mandatory]
-        public Timestamped<Decimal>? MaxCapacityRealTime
+        [Optional, FastData]
+        public Timestamped<WattHour>? MaxCapacityRealTime
         {
 
             get
@@ -856,10 +856,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
         /// <summary>
-        /// Prognoses on future values of the maximum capacity [kWh].
+        /// Prognoses on future values of the maximum energy capacity as typed SI quantities.
         /// </summary>
         [Mandatory]
-        public ReactiveSet<Timestamped<Decimal>>        MaxCapacityPrognoses    { get; }
+        public ReactiveSet<Timestamped<WattHour>>       MaxCapacityPrognoses    { get; }
 
 
         #region EnergyMix
@@ -1202,7 +1202,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                CustomDataNew?                                 CustomData                     = null,
                                UserDefinedDictionary?                         InternalData                   = null,
                                IEnumerable<DataLicense>?                      DataLicenses                   = null,
-                               IEnumerable<EnergyMeter>?                      EnergyMeters                   = null)
+                               IEnumerable<EnergyMeter>?                      EnergyMeters                   = null,
+                               Ampere?                                        MaxCurrent                     = null,
+                               Watt?                                          MaxPower                       = null,
+                               WattHour?                                      MaxCapacity                    = null)
 
             : base(Id,
                    Name,
@@ -1220,6 +1223,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             #region Init data and properties
+
+            if (MaxCurrent?.Value < 0)
+                throw new ArgumentOutOfRangeException(nameof(MaxCurrent), "Must not be negative.");
+            if (MaxPower?.Value < 0)
+                throw new ArgumentOutOfRangeException(nameof(MaxPower), "Must not be negative.");
+            if (MaxCapacity?.Value < 0)
+                throw new ArgumentOutOfRangeException(nameof(MaxCapacity), "Must not be negative.");
+
+            this.maxCurrent                          = MaxCurrent;
+            this.maxPower                            = MaxPower;
+            this.maxCapacity                         = MaxCapacity;
 
             this.ChargingPool                        = ChargingPool;
 
@@ -1856,6 +1870,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    : null
 
                          );
+
+                MetrologyJson.WriteElectricalLimits(json, MaxCurrent, MaxPower, MaxCapacity);
 
                 return POIRepresentation.AddETags(this, CustomChargingStationSerializer is not null
                            ? CustomChargingStationSerializer(this, json)

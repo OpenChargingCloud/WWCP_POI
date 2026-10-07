@@ -139,6 +139,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 parsed.ParseDataLicenses(JSON);
                 parsed.ParseChargingStationOperators(JSON, Context);
                 parsed.ParseEMobilityProviders(JSON, Context);
+                parsed.ParseNetworkChildren(JSON);
                 parsed.ValidateInfrastructureReferences(JSON);
 
                 InfrastructureJson.RestoreMetadata(JSON,

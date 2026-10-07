@@ -77,7 +77,7 @@ namespace WWCP_POI_Tests
                                                 [
                                                     RoamingNetworkChange.Add("ChargingStation", "DE*ABC*S1", Json("{\"name\":\"North\"}")),
                 RoamingNetworkChange.Remove("ChargingStation", "DE*ABC*S2"),
-                RoamingNetworkChange.UpdateProperty("ChargingStation", "DE*ABC*S3", "status", Json("\"Available\""), Json("\"Unavailable\""))
+                RoamingNetworkChange.UpdateProperty("ChargingStation", "DE*ABC*S3", "dataSource", Json("\"source-a\""), Json("\"source-b\""))
                                                 ],
                                                 [ETag.Parse("json:sha256:hex:" + new String('0', 64)), ETag.Parse("cbor:sha256:hex:" + new String('0', 64))],
                                                 [ETag.Parse("json:sha256:hex:" + new String('1', 64)), ETag.Parse("cbor:sha256:hex:" + new String('1', 64))],
@@ -93,9 +93,9 @@ namespace WWCP_POI_Tests
             Assert.That(restored.Changes[0].Kind, Is.EqualTo(RoamingNetworkChangeKind.Add));
             Assert.That(restored.Changes[0].NewValue!.Value.GetProperty("name").GetString(), Is.EqualTo("North"));
             Assert.That(restored.Changes[1].Kind, Is.EqualTo(RoamingNetworkChangeKind.Remove));
-            Assert.That(restored.Changes[2].PropertyName, Is.EqualTo("status"));
-            Assert.That(restored.Changes[2].OldValue!.Value.GetString(), Is.EqualTo("Available"));
-            Assert.That(restored.Changes[2].NewValue!.Value.GetString(), Is.EqualTo("Unavailable"));
+            Assert.That(restored.Changes[2].PropertyName, Is.EqualTo("dataSource"));
+            Assert.That(restored.Changes[2].OldValue!.Value.GetString(), Is.EqualTo("source-a"));
+            Assert.That(restored.Changes[2].NewValue!.Value.GetString(), Is.EqualTo("source-b"));
             Assert.That(restored.Signatures, Is.EqualTo(set.Signatures));
 
         }

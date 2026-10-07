@@ -23,7 +23,7 @@ using System.Text.Json;
 using Newtonsoft.Json.Linq;
 
 using EntityMap          = System.Collections.Immutable.ImmutableDictionary<cloud.charging.open.protocols.WWCP.POI.InfrastructureEntityKey, cloud.charging.open.protocols.WWCP.POI.InfrastructureEntitySnapshot>;
-using TariffReferenceMap = System.Collections.Immutable.ImmutableDictionary<cloud.charging.open.protocols.WWCP.POI.InfrastructureEntityKey, System.Collections.Immutable.ImmutableHashSet<cloud.charging.open.protocols.WWCP.POI.InfrastructureEntityKey>>;
+using ReferenceMap = System.Collections.Immutable.ImmutableDictionary<cloud.charging.open.protocols.WWCP.POI.InfrastructureEntityKey, System.Collections.Immutable.ImmutableHashSet<cloud.charging.open.protocols.WWCP.POI.InfrastructureEntityKey>>;
 
 #endregion
 
@@ -31,8 +31,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// Persistent immutable infrastructure data. Applying a change set shares unchanged entities
-    /// and immutable map branches; mutable runtime POI projections are not part of this storage.
+    /// Persistent immutable static infrastructure data, without runtime statuses or measurements.
+    /// Applying a change set shares unchanged entities and immutable map branches.
     /// </summary>
     public sealed partial class RoamingNetworkDataSnapshot
     {
@@ -62,10 +62,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public String? AppliedChangeSetId { get; }
 
         /// <summary>
-        /// Tariff keys mapped to EVSEs and connectors using them;
-        /// maintained incrementally across versions.
+        /// Referenced entity keys mapped to their consumers, maintained incrementally across versions.
         /// </summary>
-        public TariffReferenceMap TariffReferences { get; }
+        public ReferenceMap References { get; }
+
+        /// <summary>
+        /// The tariff subset of the complete reverse reference index.
+        /// </summary>
+        public ReferenceMap TariffReferences
+            => References.Where(entry => entry.Key.Type == InfrastructureEntityType.ChargingTariff).ToImmutableDictionary();
 
         #endregion
 
@@ -75,14 +80,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            EntityMap                entities,
                                            Int64                    revision,
                                            String?                  appliedChangeSetId,
-                                           TariffReferenceMap?      tariffReferences   = null)
+                                           ReferenceMap?           references = null)
         {
 
             Root               = root;
             Entities           = entities;
             Revision           = revision;
             AppliedChangeSetId = appliedChangeSetId;
-            TariffReferences   = tariffReferences ?? TariffReferenceMap.Empty;
+            References         = references ?? ReferenceMap.Empty;
             contentETags       = new(() => POIRepresentation.GetETags(this));
 
         }
@@ -139,7 +144,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var map        = EntityMap.Empty;
             var root       = Import(document, InfrastructureEntityType.RoamingNetwork, null, ref map, null);
-            var references = TariffReferenceMap.Empty;
+            var references = ReferenceMap.Empty;
 
             foreach (var entity in map.Values)
                 references = AddReferences(entity, map, references);

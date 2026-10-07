@@ -53,6 +53,11 @@ Capture the source snapshot once when preparing a batch. Derive its old values a
 `BaseRevision` and `BeforeETags` from that same snapshot. `snapshot.CreateChangeSet` does this
 automatically and computes `AfterETags` from a locally derived, validated result.
 
+The same node operations address the owned groups, manufacturers, grid/parking operators and
+parking children. The [graph contract](GRAPH.md) lists parent types, JSON fields, identity fields
+and reference scopes. Referenced members must be detached before deletion; group and parking
+reference arrays support element operations.
+
 ## 2. Update a property
 
 ```csharp
@@ -97,24 +102,30 @@ Unknown top-level ChangeSet/signature-envelope JSON fields are rejected by Syste
 application extension fields belong in `Metadata`. The singular `Signature` field is not supported.
 
 `OldValue` is optional. Passing C# `null` skips its precondition. When supplied, the applier
-checks the currently stored JSON value using `JsonElement.DeepEquals`; status values and supported
+checks the currently stored static JSON value using `JsonElement.DeepEquals`; supported
 metrological quantities are first normalized. Equivalent units such as `"150000 W"` and `"150 kW"`
 therefore compare equally. Quantities require unit-bearing strings; numbers and unitless strings
 are rejected. Quantities in complete Remove preconditions are normalized recursively.
 
-`UpdateProperty` replaces a complete top-level property. It is not a JSON Pointer/path operation.
+`UpdateProperty` replaces a complete top-level property. For individual nested edits use
+`AddElement`, `RemoveElement`, `ReplaceElement` and `UpdateElementProperty` with a structured
+`ElementPath`; see [nested element operations](ELEMENT-OPERATIONS.md). `GetElementValue()` and
+`GetElementPropertyValue()` provide detached element/property preconditions.
+
+`UpdateProperty` is not a JSON Pointer/path operation.
 For example, update a tariff's `elements` array to change one price component, or replace an EVSE's
 `energyMeter` object to change its transparency-software status. For a station, replace its
 complete `energyMeters` array to add/remove meters, edit their roles or change their transparency
 information. Pools support the same property. Use an empty array to remove all directly owned meters. This array is an
-owner property; meters do not introduce separate ChangeSet entity types. An explicit replacement
-keeps the supplied meter statuses; unrelated changes preserve independent copies of current
-meter status histories in the derived network version.
+owner property; meters do not introduce separate ChangeSet entity types. Replacement payloads
+must contain only static meter data. Existing meters retain independent copies of their current
+status histories when both owner and meter ID remain the same, including array replacements.
 
 A pool's optional `gridConnectionPoint` is also replaced as a complete property. Its grid
 operator is mandatory; its meter is optional. JSON null removes the connection point.
-An explicit replacement keeps the supplied operator/meter statuses. They remain mutable at
-runtime and are independently captured for unrelated ChangeSets, without changing POI timestamps.
+Replacement payloads must exclude operator/meter runtime fields. Matching child identities retain
+their histories when the pool and connection-point identity remain the same. A changed connection
+point ID or child ID starts a new runtime lifetime; see [runtime updates](RUNTIME.md).
 
 ### Missing values and explicit null
 
@@ -216,34 +227,26 @@ var connector = snapshot.GetEntity(
 For other existing node types, the parent can be omitted on update/removal. If supplied,
 it must match the stored parent.
 
-## 6. Status updates
+## 6. Static and runtime boundaries
 
-```csharp
-var statusValue = JsonSerializer.SerializeToElement(new
-{
-    value = "charging",
-    timestamp = DateTimeOffset.UtcNow.ToString("O")
-});
+`status`, `adminStatus`, operational histories, measurements and forecasts are not editable
+ChangeSet fields. Add payloads, complete Remove preconditions and nested property replacements
+also reject embedded runtime fields rather than silently discarding them. Use
+`DataSnapshot.GetEntityJSON()` or the static `ToJSONWithETags()` export for operation documents.
+Customer-defined `customData.status` remains static; the legal/certificate status of
+`TransparencySoftwareStatus` is static as well.
 
-var statusUpdate = RoamingNetworkChange.UpdateProperty(
-    "EVSE", "DE*ABC*E1", "status",
-    oldValue: evse.Properties["status"],
-    newValue: statusValue);
-```
+`RoamingNetwork.ApplyChangeSet()` captures current runtime histories and measurements into
+independent objects in the new version, even if its hierarchy is materialized later. Existing
+nested meters and grid operators retain histories by owner and child identity, also across static
+property replacements. New identities and removed/readded owner subtrees start with domain
+runtime defaults. No runtime values are stored in `DataSnapshot` or compared by static old-value
+checks or `TryMerge`.
 
-Use the status vocabulary accepted by the target entity's parser. `status` and `adminStatus`
-require an object containing `value` and `timestamp`. The status timestamp describes when the
-status takes effect; the batch's `CreatedAt` describes the change's entity metadata.
-
-Status updates also remain available directly on domain objects through `Status`, `AdminStatus`
-and schedule methods. Those runtime updates do not change the immutable baseline, its revision
-or static timestamps. A status operation in a ChangeSet explicitly versions that status value;
-old-value checks compare the stored baseline, not the live runtime status.
-
-`RoamingNetwork.ApplyChangeSet()` carries the current runtime histories and measurements into
-independent objects in the new version. They are captured when the call runs, even if the new
-hierarchy is materialized later. Explicit status/admin-status operations override the corresponding
-copied history. Added or removed/readded subtrees start with their supplied status values.
+Use `RoamingNetworkRuntimeUpdate` and `ApplyRuntimeUpdate()` for explicit status/admin-status
+instructions; local domain setters and schedule methods remain available. Runtime updates do
+not advance revision or alter static timestamps/ETags. See [runtime updates](RUNTIME.md) for
+current-status preconditions, history replacement and coordinating updates with head publication.
 
 ## Ordering, conflicts and errors
 
@@ -289,15 +292,15 @@ and an error naming `BeforeETags` or `AfterETags`, with the expected and actual 
 
 The identifiers describe the [static POI profile](ETAGS-CBOR.md), including owned children and
 static metadata. Runtime statuses and revision bookkeeping are excluded. Direct runtime updates
-therefore retain these identifiers. Status ChangeSets also touch `lastChange`, which participates
-in the digest. Empty batches still advance the revision and touch the root; if content and its
+therefore retain these identifiers. Static ChangeSets reject operational status fields.
+Empty batches still advance the revision and touch the root; if content and its
 timestamp remain identical, the ETags can remain identical as well.
 
 Missing timestamps on newly added nodes and nested POI replacements are filled deterministically
 using `CreatedAt`, preserving supplied timestamps; a supplied creation/change timestamp supplies
 its missing counterpart for nested values. No replica's local clock supplies hashed defaults.
-Receiver-side old-value checks still apply, including explicit status preconditions whose runtime
-values are outside the ETag profile. Content hashes establish data agreement; signatures and
+Receiver-side old-value checks compare only static data. Runtime current-status preconditions
+belong to the separate runtime API. Content hashes establish data agreement; signatures and
 authorization establish which sender may request that transition. History/replay persistence is
 the application's responsibility.
 
@@ -349,7 +352,7 @@ else
 2. Execute left then right, and right then left, preserving each batch's operation order and
    original old-value preconditions. Both local candidates use one fixed merge timestamp.
 3. Compare entity membership, ancestry, children and **all** stored properties using
-   `JsonElement.DeepEquals`. This includes frozen runtime values excluded from ETags.
+   `JsonElement.DeepEquals`. Storage contains only static data; runtime updates are outside this merge.
    Failed operations or different outcomes give `Conflicts`.
 4. Preview returns `MergeAvailable`, `RequiresExplicitMerge == true` and no batch. Explicit
    preparation (`merge: true`) additionally requires a nonempty new `mergedChangeSetId`, distinct
@@ -369,8 +372,13 @@ update/addition, duplicate additions, wrong ancestry, stale old values or broken
 fail operation validation. Connector scope uses domain key equality, so two local connector IDs
 under different EVSEs are independent.
 
-Nested values remain atomic properties: two replacements of `energyMeters`, `gridConnectionPoint`,
-`elements`, `customData` or a multilingual `name` are not recursively combined. This is a
+Explicit element operations use owner paths and stable IDs, allowing independent collection edits
+and distinct properties within one nested object to commute. Identity arrays touched by those
+operations use deterministic ordinal wire-ID order. Failed original operations include their
+`ElementPath` in the merge report.
+
+Whole-value replacements of `energyMeters`, `gridConnectionPoint`, `elements`, `customData` or a
+multilingual `name` are still not recursively combined. This is a
 conservative merge of unchanged operations: no precondition rebasing, operation deduplication,
 winning-writer policy or automatic conflict resolution occurs. Even two identical conditional
 writes can conflict when the second still expects the original old value. A combination requiring
@@ -402,7 +410,7 @@ histories into the new version using its existing runtime-state rules.
 
 The complete allowlist is in
 [`InfrastructureChangeSchema`](../WWCP_POI/ChangeSets/InfrastructureChangeSchema.cs).
-Common editable fields include name, description, source, custom data and current statuses.
+Common editable fields include name, description, source and custom data.
 Additional fields depend on the entity type.
 
 IDs, parent links, child collections, `created`, `lastChange`, `revision`, `appliedChangeSetId`
@@ -413,7 +421,7 @@ Nested owner properties are validated as complete replacements.
 ### Current editable-property reference
 
 All node types except connectors accept the shared fields:
-`name`, `description`, `dataSource`, `customData`, `status`, `adminStatus`.
+`name`, `description`, `dataSource`, `customData`.
 The following fields are additional; connectors use only their listed fields.
 
 | Entity | Additional editable JSON properties |
@@ -421,8 +429,8 @@ The following fields are additional; connectors use only their listed fields.
 | RoamingNetwork | `dataLicenses`, `dataLicenseIds` |
 | ChargingStationOperator | `address`, `logos`, `homepage`, `hotline`, `brands`, `dataLicenses`, `dataLicenseIds` |
 | EMobilityProvider | `address`, `logos`, `homepage`, `hotline`, `priority`, `dataLicenses`, `dataLicenseIds` |
-| ChargingPool | `address`, `geoLocation`, `locationType`, `accessibility`, `authenticationModes`, `hotlinePhoneNumber`, `openingTimes`, `timeZone`, `chargingWhenClosed`, `locationLanguages`, `facilities`, `services`, `relatedLocations`, `mobilityRootCAs`, `evRoamingPartners`, `brands`, `dataLicenses`, `dataLicenseIds`, `energyMeters`, `gridConnectionPoint` |
-| ChargingStation | `address`, `geoLocation`, `authenticationModes`, `hotlinePhoneNumber`, `openingTimes`, `isFreeOfCharge`, `chargingWhenClosed`, `accessibility`, `locationLanguage`, `physicalReference`, `paymentOptions`, `features`, `vehicleTypes`, `images`, `serviceIdentification`, `modelCode`, `published`, `disabled`, `mobilityRootCAs`, `evRoamingPartners`, `certificationInfo`, `calibrationInfo`, `brands`, `dataLicenses`, `dataLicenseIds`, `energyMeters` |
+| ChargingPool | `address`, `geoLocation`, `locationType`, `accessibility`, `authenticationModes`, `hotlinePhoneNumber`, `openingTimes`, `timeZone`, `chargingWhenClosed`, `locationLanguages`, `facilities`, `services`, `relatedLocations`, `mobilityRootCAs`, `evRoamingPartners`, `brands`, `dataLicenses`, `dataLicenseIds`, `energyMeters`, `gridConnectionPoint`, `maxCurrent`, `maxPower`, `maxCapacity` |
+| ChargingStation | `address`, `geoLocation`, `authenticationModes`, `hotlinePhoneNumber`, `openingTimes`, `isFreeOfCharge`, `chargingWhenClosed`, `accessibility`, `locationLanguage`, `physicalReference`, `paymentOptions`, `features`, `vehicleTypes`, `images`, `serviceIdentification`, `modelCode`, `published`, `disabled`, `mobilityRootCAs`, `evRoamingPartners`, `certificationInfo`, `calibrationInfo`, `brands`, `dataLicenses`, `dataLicenseIds`, `energyMeters`, `maxCurrent`, `maxPower`, `maxCapacity` |
 | EVSE | `physicalReference`, `geoLocation`, `brand`, `isFreeOfCharge`, `chargingModes`, `currentType`, `maxVoltage`, `maxCurrent`, `maxPower`, `maxCapacity`, `energyMeter`, `photoURLs`, `mobilityRootCAs`, `energyMix`, `calibrationInfo`, `dataLicenses`, `dataLicenseIds`, `tariffIds` |
 | ChargingTariff | `elements`, `currency`, `brand`, `uri`, `energyMix` |
 | ChargingConnector | `type`, `cable`, `lockable`, `tariffIds`, `termsAndConditions` |
@@ -430,10 +438,16 @@ The following fields are additional; connectors use only their listed fields.
 The allowlist controls which fields may be addressed; the entity's parser still controls accepted
 values. Being listed does not make a mandatory field nullable or permit an invalid nested value.
 
-Persist the static version and current statuses with `ToJSONSnapshot()`, or the frozen baseline
+Pool/station electrical limits use `Ampere`, `Watt` and `WattHour` in the domain and explicit
+SI strings in operation values. Equivalent unit strings are normalized for preconditions and
+storage; zero is preserved and null clears an optional limit. Negative limits and numeric or
+unitless values fail validation. Real-time limits/prognoses remain outside the editable allowlist.
+
+Persist the static version and current statuses with `ToJSONSnapshot()`, or only the static version
 with `DataSnapshot.WriteTo()`. Persist ChangeSets
 separately if the application needs a history. The snapshot stores only the latest
 `AppliedChangeSetId`; it does not retain the batches that created earlier versions.
 
 See [JSON](JSON.md) for ChangeSet serialization, [signatures](SIGNATURES.md) for verified batches
 and [domain details](../WWCP_POI/ChangeSets/README.md) for tariffs and transparency software.
+The [element guide](ELEMENT-OPERATIONS.md) defines nested relations, metadata and runtime lifetimes.

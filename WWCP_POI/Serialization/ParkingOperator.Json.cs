@@ -24,7 +24,10 @@ public partial class ParkingOperator
              DataLicenses: InfrastructureJson.Licenses(json),
              ParkingGarages: InfrastructureJson.Array(json, "parkingGarages", token => ParkingGarage.Parse(InfrastructureJson.Entry(token), available)),
              InvalidParkingSpaceIds: InfrastructureJson.Array(json, "invalidParkingSpaceIds", token => ParkingSpace_Id.Parse(POIReferenceJSON.Id(token))),
-             LocalParkingSpaceIds: InfrastructureJson.Array(json, "localParkingSpaceIds", token => ParkingSpace_Id.Parse(POIReferenceJSON.Id(token))));
+             LocalParkingSpaceIds: InfrastructureJson.Array(json, "localParkingSpaceIds", token => ParkingSpace_Id.Parse(POIReferenceJSON.Id(token))),
+             ParkingSpaces: InfrastructureJson.Array(json, "parkingSpaces", token => ParkingSpace.Parse(InfrastructureJson.Entry(token), available)),
+             ParkingSensors: InfrastructureJson.Array(json, "parkingSensors", token => ParkingSensor.Parse(InfrastructureJson.Entry(token), available)),
+             ParkingSpaceGroups: InfrastructureJson.Array(json, "parkingSpaceGroups", token => ParkingSpaceGroup.Parse(InfrastructureJson.Entry(token), available)));
         InfrastructureJson.RestoreMetadata(json, result, ParkingOperatorAdminStatusTypes.TryParse, ParkingOperatorStatusTypes.TryParse);
         return result;
     }

@@ -24,12 +24,12 @@ namespace cloud.charging.open.protocols.WWCP.POI;
 /// </summary>
 internal interface IRuntimeElectricalState
 {
-    Timestamped<Decimal>? MaxCurrentRealTime { get; set; }
-    Timestamped<Decimal>? MaxPowerRealTime { get; set; }
-    Timestamped<Decimal>? MaxCapacityRealTime { get; set; }
-    ReactiveSet<Timestamped<Decimal>> MaxCurrentPrognoses { get; }
-    ReactiveSet<Timestamped<Decimal>> MaxPowerPrognoses { get; }
-    ReactiveSet<Timestamped<Decimal>> MaxCapacityPrognoses { get; }
+    Timestamped<Ampere>? MaxCurrentRealTime { get; set; }
+    Timestamped<Watt>? MaxPowerRealTime { get; set; }
+    Timestamped<WattHour>? MaxCapacityRealTime { get; set; }
+    ReactiveSet<Timestamped<Ampere>> MaxCurrentPrognoses { get; }
+    ReactiveSet<Timestamped<Watt>> MaxPowerPrognoses { get; }
+    ReactiveSet<Timestamped<WattHour>> MaxCapacityPrognoses { get; }
     Timestamped<EnergyMix>? EnergyMixRealTime { get; set; }
     EnergyMixPrognosis? EnergyMixPrognoses { get; set; }
     EnergyMixPrognosis? OwnEnergyMixPrognoses { get; set; }

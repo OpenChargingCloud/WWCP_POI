@@ -1,0 +1,149 @@
+# Owned graph nodes and references
+
+[Repository overview](../README.md) · [Architecture](ARCHITECTURE.md) · [Element operations](ELEMENT-OPERATIONS.md)
+
+## Ownership
+
+The versioned graph includes 19 independently addressed node types. Each node has one owner;
+only the roaming network is a root. Owning collections use expanded objects in complete network
+JSON/CBOR. Group membership, tariff assignments and parking links use identifier strings.
+
+| Owner | Owned collection | Node type | Identity field |
+| --- | --- | --- | --- |
+| Network | `chargingStationOperators` | ChargingStationOperator | `@id` |
+| Network | `eMobilityProviders` | EMobilityProvider | `@id` |
+| Network | `chargingStationManufacturers` | ChargingStationManufacturer | `@id` |
+| Network | `gridOperators` | GridOperator | `id` |
+| Network | `parkingOperators` | ParkingOperator | `id` |
+| ChargingStationOperator | `chargingPools` | ChargingPool | `@id` |
+| ChargingStationOperator | `chargingTariffs` | ChargingTariff | `@id` |
+| ChargingStationOperator | `EVSEGroups` | EVSEGroup | `@id` |
+| ChargingStationOperator | `chargingStationGroups` | ChargingStationGroup | `@id` |
+| ChargingStationOperator | `chargingPoolGroups` | ChargingPoolGroup | `@id` |
+| ChargingStationOperator | `chargingTariffGroups` | ChargingTariffGroup | `@id` |
+| ChargingPool | `chargingStations` | ChargingStation | `@id` |
+| ChargingStation | `EVSEs` | EVSE | `@id` |
+| EVSE | `socketOutlets` | ChargingConnector | `@id`, scoped to its EVSE |
+| ParkingOperator | `parkingGarages` | ParkingGarage | `@id` |
+| ParkingOperator | `parkingSpaces` | ParkingSpace | `@id` |
+| ParkingOperator | `parkingSensors` | ParkingSensor | `@id` |
+| ParkingOperator | `parkingSpaceGroups` | ParkingSpaceGroup | `@id` |
+
+The root uses `@id`. All other graph identities are unique per node type within a network,
+except connectors. Domain comparison rules apply: group suffixes and parking child IDs are
+case-sensitive; manufacturer and parking operator IDs are case-insensitive. A group's embedded
+operator identity must match its owner. Different group types can have equal wire IDs.
+
+Import tariffs and infrastructure before groups, and charging infrastructure before parking
+operators. Network parsers perform this ordering themselves, regardless of JSON property order.
+Materialized groups refer to infrastructure objects in that same version. Public collection access
+does not expose registration or in-place static mutation APIs. Build a complete JSON document,
+use the available immutable constructors, or add nodes through ChangeSets.
+
+## References and deletion
+
+`RoamingNetworkDataSnapshot.References` is a persistent reverse index from target keys to consumer
+keys. `TariffReferences` exposes its tariff subset, including tariff groups and group tariff choices.
+Both whole-property and addressed element operations maintain the index incrementally.
+
+| Consumer | Reference | Required target scope |
+| --- | --- | --- |
+| EVSE/connector | `tariffIds` | Same charging station operator |
+| EVSEGroup | `EVSEIds` | Same charging station operator |
+| ChargingStationGroup | `chargingStationIds` | Same charging station operator |
+| ChargingPoolGroup | `chargingPoolIds` | Same charging station operator |
+| ChargingTariffGroup | `chargingTariffIds` | Same charging station operator |
+| EVSE/station/pool group | Optional `tariffId` | Same charging station operator |
+| Parking garage/space/sensor/space group | `chargingStationIds` | Existing station in the network |
+| Parking space/space group | `sensors` | Sensor owned by the same parking operator |
+| ParkingOperator | `localParkingSpaceIds`, `invalidParkingSpaceIds` | Space owned by that parking operator |
+
+Every indexed reference must resolve, and a reference array cannot repeat a domain identity.
+A target cannot be removed while surviving consumers reference it. Removing an owned subtree
+first removes references originating inside that subtree; references from outside still prevent
+deletion. Ordered batches must detach surviving references before removing their targets.
+
+For EVSE/station/pool groups, `allowedMemberIds` is an admission list, not active membership.
+It can contain future IDs from the same operator; these IDs do not require target nodes and do
+not protect deletion. Every active member must be allowed. Omitting the list defaults it to the
+active IDs; an explicitly empty list permits no active members. Parsers reject membership that
+would otherwise be silently filtered by constructor predicates. Executable inclusion predicates
+are application configuration and are not persisted.
+
+Parking space groups currently retain station/sensor references and geometry; the domain class
+has no parking-space membership property. Garages, spaces, sensors and space groups are direct
+children of the parking operator. Garage-to-space ownership and parking products are not modeled
+as additional graph relations by this package.
+
+## Create and edit a group
+
+This example requires an existing operator `DE*ABC` and EVSE `DE*ABC*E1`.
+
+```csharp
+using System.Text.Json;
+
+var opId = ChargingStationOperator_Id.Parse("DE*ABC");
+var groupId = EVSEGroup_Id.Parse(opId, "fast").ToString();
+var groupDocument = JsonSerializer.SerializeToElement(new Dictionary<String, Object> {
+    ["@id"] = groupId,
+    ["name"] = new { en = "Fast chargers" },
+    ["EVSEIds"] = new[] { "DE*ABC*E1" },
+    ["allowedMemberIds"] = new[] { "DE*ABC*E1" }
+});
+var addGroup = RoamingNetworkChange.Add(
+    "EVSEGroup", groupId, groupDocument, "ChargingStationOperator", opId.ToString());
+var batch = network.CreateChangeSet("group-1", DateTimeOffset.UtcNow, [addGroup]);
+var next = network.ApplyChangeSet(batch);
+
+var detachMember = RoamingNetworkChange.RemoveElement(
+    "EVSEGroup", groupId, [new("EVSEIds", "DE*ABC*E1")]);
+```
+
+Use graph `Add`, `Remove` and `UpdateProperty` for the new nodes. Use `AddElement`/`RemoveElement`
+for the identified reference arrays, including admission lists. Add an admission ID before adding
+active membership, and remove active membership before removing its admission ID. A selected
+reference string has no object properties to edit. Manufacturer `cryptoKeys` is a whole-property
+value; private keys are excluded from snapshot import and rejected in static ChangeSet payloads.
+
+## Editable fields
+
+The schema allowlist follows the persisted domain contract:
+
+| Node | Editable static fields |
+| --- | --- |
+| EVSE/station/pool group | `name`, `description`, member IDs, `allowedMemberIds`, `brand`, `priority`, `tariffId`, `dataLicenses` |
+| Tariff group | `description`, `chargingTariffIds` |
+| Manufacturer | `name`, `description`, `cryptoKeys` |
+| GridOperator | `name`, `description`, `dataSource`, `customData`, `logos`, `address`, `geoLocation`, `telephone`, `eMailAddress`, `homepage`, `hotline`, `priority`, `dataLicenses` |
+| ParkingOperator | `name`, `description`, `dataSource`, `customData`, `logos`, `address`, `geoLocation`, `telephone`, `eMailAddress`, `homepage`, `hotlinePhoneNumber`, `dataLicenses`, local/invalid parking space IDs |
+| Parking garage/space/sensor/space group | `name`, `description`, `osmWayId`, `geometry`, `chargingStationIds`; spaces/space groups additionally `sensors` |
+
+Identity, parent, managed timestamp and owned child fields cannot be edited as properties.
+Manufacturers have no managed node timestamps; their ancestors still receive the batch timestamp.
+Other added graph nodes receive deterministic missing timestamps from the batch's `CreatedAt`.
+
+## Content identifiers and runtime
+
+Network/operator ETags include the owned node documents. Group ETags include group configuration
+and member IDs, while each owned member's content is hashed through its infrastructure location.
+A change to a member can leave the group's ETag unchanged and still change the network ETags.
+Empty owned collections are part of the complete domain projection. This expanded projection
+changes content identifiers calculated before graph integration; recalculate state identifiers
+and prepare/sign new batches against the expanded profile.
+
+Grid connection points continue to embed an independent immutable GridOperator description,
+including its network ID. A network's `gridOperators` registry is separately owned. An equal
+operator ID does not create an alias, force equal configuration or synchronize runtime between
+these two slots. Unifying these descriptions into a single registry reference is a future contract
+decision; changing the registry alone does not update embedded connection-point descriptions.
+
+Groups, grid/parking operators and parking children retain mutable operational/admin statuses.
+Use `POIRuntimeTarget.Entity(type, id)` for them. Static derivation captures their histories and
+capacities into independent objects. Removing and reintroducing a node starts a new lifetime.
+Connectors and manufacturers have no status schedules and reject runtime targeting.
+
+`ToJSONSnapshot()` and `ToCBOR(IncludeRuntime: true)` can carry their current statuses;
+`DataSnapshot` stores none. Standalone group/parking parsers still need explicit membership
+context; complete network imports resolve that context automatically. Group validation resolves
+the owning operator's infrastructure, and parking validation resolves station context; their
+validation work can therefore exceed the cost of a scalar infrastructure-node update.

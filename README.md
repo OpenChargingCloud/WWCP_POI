@@ -1,11 +1,14 @@
 # WWCP Point-of-Interest
 
-WWCP POI models charging infrastructure and its current status as a versioned dataset.
+WWCP POI models static charging-infrastructure data as an immutable, versioned dataset.
+Current statuses, measurements and forecasts remain mutable runtime data within the entities.
 It is a spin-off from **WWCP-Core** and a .NET 10 library for applications that import,
 maintain, exchange and synchronize charging-infrastructure data.
 
 The starting point is a `RoamingNetwork`. Its operators own charging pools, stations,
-EVSEs, connectors and tariffs. E-mobility providers belong to the same network.
+EVSEs, connectors, tariffs and four kinds of groups. E-mobility providers, manufacturers,
+grid operators and parking operators belong to the same network. Parking operators own their
+parking garages, spaces, sensors and space groups.
 
 Instead of repeatedly transferring a complete dataset for every update, an application
 can describe changes as an ordered **ChangeSet**. Applying that batch returns a new network
@@ -19,6 +22,9 @@ version. The previous version remains available, and unchanged immutable data is
 | --- | --- |
 | [Architecture and implementation](docs/ARCHITECTURE.md) | Data model, immutable storage, copy-on-write, validation, concurrency and source organization |
 | [Using ChangeSets](docs/CHANGESETS.md) | Before/after ETags, operations, preconditions, revisions, errors and practical examples |
+| [Owned graph and references](docs/GRAPH.md) | Ownership collections, groups, manufacturers, parking, reference validation and deletion |
+| [Nested element operations](docs/ELEMENT-OPERATIONS.md) | IDs, structured owner paths, individual collection edits and merge behavior |
+| [Runtime updates](docs/RUNTIME.md) | Scoped status instructions, preconditions, history retention and static head publication |
 | [ETags and CBOR](docs/ETAGS-CBOR.md) | Immutability audit, canonical content identifiers, metrological CBOR and roundtrips |
 | [JSON contracts](docs/JSON.md) | Network snapshots, ChangeSet JSON, reference resolution, precision and explicit units |
 | [Greenfield model](docs/GREENFIELD.md) | Removed format variants, typed quantities and remaining dependency boundaries |
@@ -26,6 +32,7 @@ version. The previous version remains available, and unchanged immutable data is
 | [Signatures and trust](docs/SIGNATURES.md) | Signing/verification, equal peer signatures, commit descriptions/metadata and trust policy |
 | [Domain-specific ChangeSet details](WWCP_POI/ChangeSets/README.md) | Tariffs, transparency software, energy meters and storage APIs |
 | [Tests](WWCP_POI_Tests/README.md) | NUnit coverage, wire conventions and test commands |
+| [Development roadmap](docs/ROADMAP.md) | Completed corrections, type coverage and remaining steps towards distributed commit exchange |
 
 ## Charging-infrastructure hierarchy
 
@@ -33,6 +40,11 @@ version. The previous version remains available, and unchanged immutable data is
 flowchart TD
     RN[RoamingNetwork] --> CSO[ChargingStationOperator]
     RN --> EMP[EMobilityProvider]
+    RN --> Manufacturer[ChargingStationManufacturer]
+    RN --> RegisteredGO[GridOperator registry]
+    RN --> Parking[ParkingOperator]
+    Parking --> ParkNodes[ParkingGarage / Space / Sensor / SpaceGroup]
+    CSO --> Groups[EVSE / Station / Pool / Tariff groups]
     CSO --> Pool[ChargingPool]
     Pool -->|0..n| Meter[EnergyMeter]
     Pool -->|0..1| GCP[GridConnectionPoint]
@@ -48,6 +60,11 @@ flowchart TD
     CSO --> Tariff[ChargingTariff]
     EVSE -. tariffIds .-> Tariff
     Connector -. tariffIds .-> Tariff
+    Groups -. member IDs .-> EVSE
+    Groups -. member IDs .-> Station
+    Groups -. member IDs .-> Pool
+    Groups -. member IDs .-> Tariff
+    ParkNodes -. chargingStationIds .-> Station
 ```
 
 An EVSE represents the individually addressable charging unit. A connector describes a
@@ -63,6 +80,10 @@ A pool can additionally have one grid connection point. It always references a g
 and can own one meter, independently of the pool's direct meters. Optional connection data
 includes voltage level, agreed import/export powers and market/metering-location identifiers.
 
+The registry and the operator description embedded in a grid connection point are independent
+ownership slots. Equal IDs do not automatically share configuration or runtime; see
+[graph boundaries](docs/GRAPH.md#content-identifiers-and-runtime).
+
 ## What is implemented
 
 - JSON and CBOR parsing/serialization of the nested network hierarchy, providers, tariffs and support values.
@@ -71,10 +92,11 @@ includes voltage level, agreed import/export powers and market/metering-location
 - Sealed infrastructure, support and group types with immutable POI data and mutable runtime statuses.
 - Immutable entity storage with persistent dictionaries and sets.
 - Atomic, ordered `Add`, `Remove` and `UpdateProperty` ChangeSet operations.
+- Addressed nested Add/Remove/Replace/property edits with immutable owner paths and element IDs.
 - Mandatory before/after JSON and CBOR ETag checks, revision checks and optional expected-old-value checks.
 - ChangeSet preparation that computes both expected states before exchange or signing.
 - `TryMerge` previews compatible batches from a common source and prepares their merge only on explicit request.
-- Validation of entity IDs, ownership, editable fields and tariff references.
+- Validation of entity IDs, ownership, editable fields and indexed tariff/group/parking references.
 - Lazy domain hierarchies with independent runtime schedules for each network version.
 - Canonical ChangeSet signing/verification with Styx, equal peer signatures and a verifier per signature.
 - Immutable multilingual commit descriptions and arbitrary JSON metadata, covered by every signature.
@@ -163,8 +185,15 @@ been removed, which is a breaking API change.
 `Status`, `AdminStatus`, their histories, real-time measurements and forecasts still live inside
 the entities and remain mutable. Updating them directly does not change the POI revision or its
 creation/change timestamps. A derived network receives independent runtime schedules captured
-when `ApplyChangeSet()` runs. `DataSnapshot` remains a frozen baseline, including its captured
-status values; `ToJSONSnapshot()` overlays the current runtime statuses on the static version.
+when `ApplyChangeSet()` runs. `DataSnapshot` contains only static data; `ToJSONSnapshot()`
+overlays the current runtime statuses on that version. Static ChangeSets reject runtime fields,
+including statuses embedded in meter and connection-point replacements. Matching nested
+identities under the same owner retain independent copies of their current histories.
+
+Use `ApplyRuntimeUpdate()` for scoped status/admin-status instructions with an explicit timestamp,
+optional expected current status and optional static ETags. It updates the existing runtime
+schedule without changing the static snapshot, revision, timestamps or ETags. Direct domain status
+setters remain available. See [runtime updates](docs/RUNTIME.md) for targeting and publication rules.
 
 `ImmutableI18NString` and `ImmutableOpeningTimes` are local immutable replacements for mutable
 Illias values. Collections are detached on input; mutable nested dependency values are copied
@@ -177,8 +206,21 @@ certificate status follow the same static-data boundary. The local `ChargingStat
 fork stores immutable multilingual values and `ImmutableCryptoKeyInfo` documents. Parking children
 are immutable as well. EVSE, station, pool and tariff groups freeze membership; `WithMembers`,
 `WithMember` and `WithoutMember` return new groups. `ChargingPoolGroup` now groups actual pools.
-The ChangeSet graph still has the eight node types shown above; support values and standalone
-groups do not gain separate ChangeSet operations through this API conversion.
+The ChangeSet graph includes these groups, manufacturers, grid/parking operators and parking
+children as independently addressed nodes. JSON/CBOR network imports resolve group and parking
+references automatically. The persistent `References` index rejects dangling or out-of-scope links
+and prevents deletion of referenced members. See [graph ownership](docs/GRAPH.md).
+
+Nested owned values support `AddElement`, `RemoveElement`, `ReplaceElement` and
+`UpdateElementProperty`, with a typed `ElementPath`. Meters, brands, licenses, group membership
+and parking/tariff references can be changed individually. Optional singletons use their
+owner/property slot. See [element operations](docs/ELEMENT-OPERATIONS.md).
+
+Pool and station `MaxCurrent`, `MaxPower` and `MaxCapacity` use immutable Styx `Ampere`, `Watt`
+and `WattHour` quantities supplied through their constructors. They roundtrip as SI strings such
+as `"125 A"`, `"250 kW"` and `"20 kWh"`, participate in both ETags and support `UpdateProperty`.
+Null clears an optional limit; zero is retained; negative limits and numeric/unitless JSON are rejected.
+Their real-time values and forecasts use the same quantity types but remain mutable runtime data.
 
 ## Merge concurrent ChangeSets
 
@@ -207,17 +249,18 @@ else
 ```
 
 The check executes both batch orders on unpublished immutable maps, preserving the operations
-and their old-value checks. Both orders must be valid and yield the same complete stored data,
-including frozen runtime status values. Different properties of one entity can merge;
+and their old-value checks. Both orders must be valid and yield the same complete static data.
+Runtime updates are outside this merge. Different properties of one entity can merge;
 competing replacements, subtree deletion versus modification and failed reference/old-value
-checks are reported. Nested arrays/objects are whole-property replacements. The check is
+checks are reported. Explicit element operations can merge disjoint collection edits and distinct
+properties of a nested object. `UpdateProperty` still replaces its complete value. The check is
 conservative: it does not rewrite preconditions, deduplicate operations or choose a winning value.
 
 The merged batch contains the left operations followed by the right operations. Its timestamp
 defaults to the later input timestamp, or uses an explicitly supplied `createdAt`. That single
 timestamp drives changed ancestors and omitted metadata defaults. Original signatures are
 verified via `verifySignature` and are not copied; sign the new batch separately if required.
-`network.TryMerge(...)` delegates to its frozen `DataSnapshot`. Applying to the common source
+`network.TryMerge(...)` delegates to its static `DataSnapshot`. Applying to the common source
 produces one successor. Applications coordinate publication of their current head and retain
 branch successors as needed. See [merge details](docs/CHANGESETS.md#merging-concurrent-batches).
 
@@ -246,12 +289,16 @@ with an application key resolver. Signing accepts Bouncy Castle keys or Styx `CO
 Every supplied signature must pass the Apply/Merge callback. Applications resolve trusted keys
 and enforce their signer policy; unsigned batches remain accepted by the core applier.
 
-The versioned `wwcp-poi-changeset-json-v1` profile signs the header, operations, both ETag arrays,
+The versioned `wwcp-poi-changeset-json-v2` profile signs the header, operations and their full
+element ownership paths, both ETag arrays,
 descriptions and metadata using Styx canonical JSON. It also binds each peer's profile, algorithm,
 key ID and Base64 encoding. Signatures themselves are excluded so further peers can independently
 sign the same content. Descriptions and metadata do not change POI state ETags. Editing either
 returns an unsigned copy; existing signatures cannot be retained over changed content.
 See [the complete signing profile](docs/SIGNATURES.md).
+**Signing profile change:** v2 includes `ElementPath` on every signed operation. Built-in
+verification does not accept signatures from the previous profile; those batches need new
+signatures. The static JSON/CBOR ETag profiles are unchanged.
 
 ## Build and tests
 
@@ -300,8 +347,11 @@ static POI hierarchy, including static timestamps and owned children. Dynamic st
 revision metadata and derived ETags are excluded. Servers using the same profile can compare
 the corresponding identifiers to check content agreement.
 
-JSON writes each ETag as `["json", "sha256", "hex", "<64 lowercase hex digits>"]` or the corresponding
-`"cbor"` tuple. CBOR writes `["json", "sha256", h'<32 digest bytes>']`, using a native byte string.
+The first field identifies the **hashed representation**, independently of the transport format.
+JSON writes the JSON ETag as `["json", "sha256", "hex", "<64 lowercase hex digits>"]` and the CBOR
+ETag as `["cbor", "sha256", "hex", "<64 lowercase hex digits>"]`. CBOR transports both identifiers
+using native byte strings: `["json", "sha256", h'<32 JSON digest bytes>']` and
+`["cbor", "sha256", h'<32 CBOR digest bytes>']`, respectively.
 System.Text.Json and Newtonsoft.Json use the same structured JSON contract. Packed ETag strings
 are a display form; wire parsers require the tuple arrays.
 The explicit textual encoding supports `hex` (the default) and standard padded `base64`.
@@ -311,13 +361,20 @@ Both decode to the same immutable digest bytes and compare equally. Encoding is 
 choice, so neither ETag equality nor the canonical state hashes change. Native CBOR stays binary.
 
 ```csharp
-var bytes = network.ToCBOR();
-var restored = RoamingNetwork.ParseCBOR(bytes);
+// Preserve the static version's revision when transferring it to another replica.
+var bytes = network.ToCBOR(IncludeVersionMetadata: true);
+var replica = RoamingNetwork.ParseCBOR(bytes);
 
 var batch = network.CreateChangeSet("change-43", DateTimeOffset.UtcNow, [/* operations */]);
 // Transfer JsonSerializer.Serialize(batch) to a replica of this source version.
 var next = replica.ApplyChangeSet(batch);
 ```
+
+The default `ToCBOR()` exports static content without revision bookkeeping; parsing it starts
+an unversioned network at revision zero. Use the version-preserving form above to continue a
+ChangeSet chain. Add `IncludeRuntime: true` to export current statuses as well. The same independent
+flags exist on `ToJSONWithETags()`. A `DataSnapshot` has no runtime state and rejects
+`IncludeRuntime: true`; use a domain network for that export.
 
 `BeforeETags` and `AfterETags` are required `ImmutableArray<ETag>` values containing both identifiers.
 The applier checks the target, revision and source ETags, verifies every peer signature, applies all
@@ -330,8 +387,8 @@ The canonical signing profile binds both ETag arrays, operations, descriptions a
 **Breaking contract change:** constructing or deserializing a ChangeSet requires both typed arrays
 and their structured wire entries. Default/uninitialized ETags are rejected.
 Use `CreateChangeSet` for local preparation or pass trusted expected identifiers to its constructor.
-Direct runtime updates retain POI ETags; status ChangeSets can change them through managed
-`lastChange` timestamps. Empty batches advance revision and touch the root; unchanged content
+Runtime updates retain POI ETags; static ChangeSets reject operational status fields.
+Empty batches advance revision and touch the root; unchanged content
 can still have the same ETags when the timestamp is also unchanged.
 
 Hash verification traverses the complete canonical POI projection. Snapshot identifiers are

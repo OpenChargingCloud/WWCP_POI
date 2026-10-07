@@ -14,7 +14,7 @@ public partial class EVSEGroup
     {
         InfrastructureJson.Parent(json, "chargingStationOperator", op.Id.ToString());
         var members = POIReferenceJSON.Resolve(json, "EVSEIds", text => EVSE_Id.Parse(text), op.EVSEs, value => value.Id);
-        var allowed = InfrastructureJson.Array(json, "allowedMemberIds", token => EVSE_Id.Parse(POIReferenceJSON.Id(token)));
+        var allowed = POIReferenceJSON.Allowed(json, members.Select(value => value.Id), text => EVSE_Id.Parse(text));
         var result = new EVSEGroup(EVSEGroup_Id.Parse(POIValueJSON.Required(json, "@id")), op,
              POIValueJSON.Text(json, "name"), POIValueJSON.Text(json, "description"),
              InfrastructureJson.Object(json, "brand") is { } brand ? Brand.Parse(brand) : null,
@@ -40,7 +40,7 @@ public partial class ChargingStationGroup
     {
         InfrastructureJson.Parent(json, "chargingStationOperator", op.Id.ToString());
         var members = POIReferenceJSON.Resolve(json, "chargingStationIds", ChargingStation_Id.Parse, op.ChargingStations, value => value.Id);
-        var allowed = InfrastructureJson.Array(json, "allowedMemberIds", token => ChargingStation_Id.Parse(POIReferenceJSON.Id(token)));
+        var allowed = POIReferenceJSON.Allowed(json, members.Select(value => value.Id), ChargingStation_Id.Parse);
         var result = new ChargingStationGroup(ChargingStationGroup_Id.Parse(POIValueJSON.Required(json, "@id")), op,
              POIValueJSON.Text(json, "name"), POIValueJSON.Text(json, "description"),
              InfrastructureJson.Object(json, "brand") is { } brand ? Brand.Parse(brand) : null,
@@ -66,7 +66,7 @@ public partial class ChargingPoolGroup
     {
         InfrastructureJson.Parent(json, "chargingStationOperator", op.Id.ToString());
         var members = POIReferenceJSON.Resolve(json, "chargingPoolIds", ChargingPool_Id.Parse, op.ChargingPools, value => value.Id);
-        var allowed = InfrastructureJson.Array(json, "allowedMemberIds", token => ChargingPool_Id.Parse(POIReferenceJSON.Id(token)));
+        var allowed = POIReferenceJSON.Allowed(json, members.Select(value => value.Id), ChargingPool_Id.Parse);
         var result = new ChargingPoolGroup(ChargingPoolGroup_Id.Parse(POIValueJSON.Required(json, "@id")), op,
              POIValueJSON.Text(json, "name"), POIValueJSON.Text(json, "description"),
              InfrastructureJson.Object(json, "brand") is { } brand ? Brand.Parse(brand) : null,
@@ -232,10 +232,27 @@ internal static class POIReferenceJSON
                                                      IEnumerable<T> candidates, Func<T, TId> key) where TId : notnull
     {
         var ids = InfrastructureJson.Array(json, field, token => parse(Id(token)));
-        InfrastructureJson.Unique(ids, id => id, field);
+        var type = InfrastructureChangeSchema.Type(typeof(T).Name);
+        var seen = new HashSet<InfrastructureEntityKey>();
+        foreach (var id in ids)
+            if (!seen.Add(new(type, id.ToString()!)))
+                throw new ArgumentException($"{field}: duplicate identifier '{id}'.");
         var available = candidates.ToArray();
         return ids.Select(id => available.SingleOrDefault(value => EqualityComparer<TId>.Default.Equals(id, key(value))) ??
                 throw new ArgumentException($"{field}: unresolved identifier '{id}'.")).ToImmutableArray();
+    }
+
+    internal static ImmutableArray<TId> Allowed<TId>(JObject json, IEnumerable<TId> members, Func<String, TId> parse) where TId : notnull
+    {
+        var active = members.ToImmutableArray();
+        if (json["allowedMemberIds"] is null) return active;
+        var allowed = InfrastructureJson.Array(json, "allowedMemberIds", token => parse(Id(token))).ToImmutableArray();
+        for (var index = 0; index < allowed.Length; index++)
+            if (allowed.Take(index).Any(id => EqualityComparer<TId>.Default.Equals(id, allowed[index])))
+                throw new ArgumentException("allowedMemberIds: duplicate identifier.");
+        if (active.Any(id => !allowed.Any(candidate => EqualityComparer<TId>.Default.Equals(id, candidate))))
+            throw new ArgumentException("Every active group member must occur in allowedMemberIds.");
+        return allowed;
     }
 
     internal static Priority? Priority(JObject json)

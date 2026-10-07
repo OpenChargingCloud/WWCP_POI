@@ -47,13 +47,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    String?                  changeSetId   = null,
                                                    Int32?                   operationIndex = null,
                                                    InfrastructureEntityKey? entity        = null,
-                                                   String?                  propertyName  = null)
+                                                   String?                  propertyName  = null,
+                                                   ImmutableArray<POIElementPathSegment> elementPath = default)
         {
             Message        = message;
             ChangeSetId    = changeSetId;
             OperationIndex = operationIndex;
             Entity         = entity;
             PropertyName   = propertyName;
+            ElementPath    = elementPath.IsDefault ? [] : elementPath;
         }
 
         /// <summary>
@@ -77,9 +79,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public InfrastructureEntityKey? Entity { get; }
 
         /// <summary>
-        /// The affected top-level property, or null for a structural/batch failure.
+        /// The affected property, or null for a structural/batch failure; ElementPath gives its nested scope.
         /// </summary>
         public String? PropertyName { get; }
+
+        /// <summary>
+        /// The nested ownership path of an original failed element operation, otherwise empty.
+        /// </summary>
+        public ImmutableArray<POIElementPathSegment> ElementPath { get; }
 
     }
 

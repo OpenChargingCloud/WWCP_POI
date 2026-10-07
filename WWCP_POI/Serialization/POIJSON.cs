@@ -130,6 +130,9 @@ internal static class POIJSON
         // Membership is static. Runtime Removed statuses must not filter the content being hashed.
         json["chargingStationOperators"] = Children(entity.ChargingStationOperators);
         json["eMobilityProviders"] = Children(entity.EMobilityProviders);
+        json["gridOperators"] = Children(entity.GridOperators);
+        json["parkingOperators"] = Children(entity.ParkingOperators);
+        json["chargingStationManufacturers"] = Children(entity.ChargingStationManufacturers);
         return json;
     }
 
@@ -143,6 +146,10 @@ internal static class POIJSON
         json.Remove("chargingTariffIds");
         json["chargingPools"] = Children(entity.ChargingPools);
         json["chargingTariffs"] = Children(entity.ChargingTariffs);
+        json["EVSEGroups"] = Children(entity.EVSEGroups);
+        json["chargingStationGroups"] = Children(entity.ChargingStationGroups);
+        json["chargingPoolGroups"] = Children(entity.ChargingPoolGroups);
+        json["chargingTariffGroups"] = Children(entity.ChargingTariffGroups);
         return json;
     }
 
@@ -167,7 +174,7 @@ internal static class POIJSON
         return json;
     }
 
-    private static JArray Children<T>(IEnumerable<T> values) where T : IImmutablePOI
+    internal static JArray Children<T>(IEnumerable<T> values) where T : IImmutablePOI
         => new(values.Select(value => Document(value)).OrderBy(json => (json["@id"] ?? json["id"])?.Value<String>(), StringComparer.Ordinal));
 
     private static JObject Group<TId, TAdmin, TStatus>(AImmutableEMobilityEntity<TId, TAdmin, TStatus> entity,
@@ -206,6 +213,9 @@ internal static class POIJSON
     {
         var json = InfrastructureJson.SnapshotMetadata(entity.ToJSON(), entity);
         json["parkingGarages"] = Children(entity.ParkingGarages);
+        json["parkingSpaces"] = Children(entity.ParkingSpaces);
+        json["parkingSensors"] = Children(entity.ParkingSensors);
+        json["parkingSpaceGroups"] = Children(entity.ParkingSpaceGroups);
         json["invalidParkingSpaceIds"] = new JArray(entity.InvalidParkingSpaceIds.Select(id => id.ToString()).Order(StringComparer.Ordinal));
         json["localParkingSpaceIds"] = new JArray(entity.LocalParkingSpaceIds.Select(id => id.ToString()).Order(StringComparer.Ordinal));
         if (entity.Address is { } address) json["address"] = address.ToJSON(Embedded: true);

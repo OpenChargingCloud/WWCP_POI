@@ -4,6 +4,12 @@
 
 ## Immutability boundary
 
+The network's owned graph includes groups, manufacturers and grid/parking operators with parking
+children. Their static documents participate in their owners' ETags and use independent ChangeSet
+node addresses. Group IDs are references, so a member's content enters the network hash through
+its owned infrastructure location. See [graph content and runtime](GRAPH.md#content-identifiers-and-runtime).
+
+
 The domain contract freezes static POI data, ownership and membership. Operational/admin
 statuses, their schedules, real-time measurements, forecasts, aggregation delegates and
 application `InternalData` remain runtime state inside the domain objects.
@@ -65,6 +71,10 @@ identifies the representation; it needs no textual encoding label:
 ]
 ```
 
+The first entry identifies canonical JSON content, the second deterministic CBOR content.
+Their format labels describe what was hashed; both identifiers can be transported in either
+JSON or CBOR. CBOR transport does not turn a JSON-content identifier into a CBOR-content identifier.
+
 `ETag.ToString()` returns `json:sha256:hex:<hex>` or `cbor:sha256:hex:<hex>` for display/logging;
 `ETag.Parse(string)` parses that explicit human-readable form. JSON and CBOR parsers require
 the structured arrays and do not accept a packed string. JSON requires an explicit `hex` or
@@ -119,6 +129,10 @@ facilities and services; station images, features, model identifiers and configu
 EVSE photos and energy mixes; root CA/roaming partner information, certification/calibration
 references and provider priorities. These values participate in both identifiers.
 
+Pool and station `maxCurrent`, `maxPower` and `maxCapacity` also participate as typed static
+electrical limits, with SI strings in JSON and metrological values in CBOR. Their operational
+measurements and forecasts remain excluded.
+
 Operational/admin statuses and histories, real-time measurements, forecasts, internal data,
 revision bookkeeping and **all derived POI `ETags` arrays** are excluded. Exclusion follows
 the POI schema: a customer property named `status` or `ETags` inside `customData` still
@@ -128,8 +142,8 @@ Consequently direct runtime updates retain the identifiers. Static content chang
 membership and nested meter metadata changes, change the affected content identifiers.
 These are POI content validators. An export with current runtime statuses can change its
 transport bytes while retaining the same POI ETags. A ChangeSet that changes static
-`lastChange` metadata also changes the content identifiers, including when it records a
-new status baseline.
+`lastChange` metadata also changes the content identifiers. Operational status updates use the
+separate runtime API and never modify that metadata.
 
 ## API
 
@@ -145,9 +159,12 @@ var restored = RoamingNetwork.ParseCBOR(cbor);
 var canonicalJSONBytes = network.ToCanonicalJSON();
 var canonicalCBORBytes = network.ToCanonicalCBOR();
 
-// Include the current operational/admin statuses and revision metadata in transport.
+// Preserve revision bookkeeping without runtime data.
+var versionCBOR = network.ToCBOR(IncludeVersionMetadata: true);
+
+// Include current operational/admin statuses as an independent transport choice.
 // The identifiers still describe static POI content.
-var currentCBOR = network.ToCBOR(IncludeRuntime: true);
+var currentCBOR = network.ToCBOR(IncludeRuntime: true, IncludeVersionMetadata: true);
 
 // Child parsing uses the same explicit parent context as JSON.
 var restoredPool = ChargingPool.ParseCBOR(pool.ToCBOR(), chargingStationOperator);
@@ -175,7 +192,8 @@ compare format, algorithm and digest bytes. Unknown formats/algorithms, malforme
 wrong digest lengths and uninitialized values are rejected. Typed
 `TryParseCBOR` entry points and the shared `POIRepresentation.TryParseCBOR` return parse errors
 without throwing. Reference-only groups and parking objects require the referenced objects
-in the supplied operator or station collection.
+in the supplied operator or station collection. Complete network imports resolve these contexts
+automatically for owned groups and parking nodes; the schema visitor covers every [owned collection](GRAPH.md).
 
 Ordinary domain JSON parsers retain their existing view/resolver semantics; they do not treat
 received ETags as trusted state. Snapshot imports discard derived ETags before storage and
@@ -185,6 +203,10 @@ Signature verification still happens before import normalization.
 `DataSnapshot.ToJSON` and `WriteTo` include a root content-identifier array. Passing
 `IncludeETags: false` to `WriteTo` retains direct streaming without digest generation.
 CBOR transport of a data snapshot uses the same static domain projection as its network.
+`IncludeVersionMetadata: true` retains root `revision` and `appliedChangeSetId` independently
+of current-status transport on `ToCBOR()` and `ToJSONWithETags()`. Both flags default to false.
+`IncludeRuntime: true` alone does not retain revision metadata. A `DataSnapshot` has no runtime
+state and rejects that flag; export the domain network to include current statuses.
 
 ## CBOR metrology
 
@@ -232,8 +254,10 @@ preconditions, authorization, signatures and replay/history storage retain their
 See [ChangeSets](CHANGESETS.md) for required header fields, preparation and errors.
 
 `TryMerge` checks both input transitions against their common source and compares both combined
-operation orders using all frozen properties, including runtime values excluded from these
-identifiers. It returns only a notice by default. Explicit preparation produces a new unsigned
+operation orders using all stored static properties. Runtime updates are outside that merge.
+Explicit [element operations](ELEMENT-OPERATIONS.md) compare their addressed elements/properties
+and keep touched identity arrays in deterministic order, enabling disjoint collection edits.
+It returns only a notice by default. Explicit preparation produces a new unsigned
 ChangeSet with the source `BeforeETags` and freshly calculated merged `AfterETags`; it does not
 combine or reuse the two branch result hashes. The fixed merge timestamp participates in the
 combined result profile. See [merge semantics](CHANGESETS.md#merging-concurrent-batches).
@@ -243,7 +267,9 @@ combined result profile. See [merge semantics](CHANGESETS.md#merging-concurrent-
 Content identifiers and canonical POI bytes do not replace ChangeSet signature verification.
 They do not define which key is authorized to modify a network. The existing signature
 array and per-peer verification hook remain available. `Sign`/`TrySign` and `VerifySignature`/
-`VerifySignatures` implement the separate `wwcp-poi-changeset-json-v1` payload profile, covering
+`VerifySignatures` implement the separate `wwcp-poi-changeset-json-v2` payload profile, covering
 ordered operations, header, both state identifiers, descriptions/metadata and each peer's header.
 Every signature binds the same batch content; its peer signature array is excluded so signatures
 can be added independently. See [signatures](SIGNATURES.md).
+The v2 signing input also binds every operation's complete `ElementPath`. This changes ChangeSet
+signature bytes/profile, not the static POI ETag profiles.

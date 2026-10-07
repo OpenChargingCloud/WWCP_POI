@@ -19,6 +19,7 @@
 
 using System.Collections;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
@@ -1507,7 +1508,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data
 
-        private readonly ConcurrentDictionary<ChargingStationGroup_Id, ChargingStationGroup> chargingStationGroups;
+        private ImmutableDictionary<ChargingStationGroup_Id, ChargingStationGroup> chargingStationGroups = ImmutableDictionary<ChargingStationGroup_Id, ChargingStationGroup>.Empty;
 
         /// <summary>
         /// All charging station groups registered within this charging station operator.
@@ -2132,14 +2133,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data
 
-        private readonly EntityHashSet<ChargingStationOperator, EVSEGroup_Id, EVSEGroup> evseGroups;
+        private ImmutableDictionary<EVSEGroup_Id, EVSEGroup> evseGroups = ImmutableDictionary<EVSEGroup_Id, EVSEGroup>.Empty;
 
         /// <summary>
         /// All EVSE groups registered within this charging station operator.
         /// </summary>
         public IEnumerable<EVSEGroup> EVSEGroups
 
-            => ImmutablePOIValues.CopyItems(evseGroups);
+            => ImmutablePOIValues.CopyItems(evseGroups.Values);
 
         #endregion
 
@@ -2180,7 +2181,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetEVSEGroup(EVSEGroup_Id    Id,
                                        out EVSEGroup?  EVSEGroup)
 
-            => evseGroups.TryGet(Id, out EVSEGroup);
+            => evseGroups.TryGetValue(Id, out EVSEGroup);
 
         #endregion
 
@@ -2361,7 +2362,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ChargingTariffGroups
 
-        private readonly ConcurrentDictionary<ChargingTariffGroup_Id, ChargingTariffGroup> chargingTariffGroups;
+        private ImmutableDictionary<ChargingTariffGroup_Id, ChargingTariffGroup> chargingTariffGroups = ImmutableDictionary<ChargingTariffGroup_Id, ChargingTariffGroup>.Empty;
 
         /// <summary>
         /// All charging Tariff groups registered within this charging station operator.
@@ -2609,6 +2610,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    : null
 
                                );
+
+                json["EVSEGroups"] = POIJSON.Children(EVSEGroups);
+                json["chargingStationGroups"] = POIJSON.Children(ChargingStationGroups);
+                json["chargingPoolGroups"] = POIJSON.Children(ChargingPoolGroups);
+                json["chargingTariffGroups"] = POIJSON.Children(ChargingTariffGroups);
 
                 return POIRepresentation.AddETags(this, CustomChargingStationOperatorSerializer is not null
                            ? CustomChargingStationOperatorSerializer(this, json)

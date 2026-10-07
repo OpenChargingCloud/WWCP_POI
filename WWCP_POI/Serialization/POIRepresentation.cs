@@ -25,14 +25,17 @@ public static class POIRepresentation
 
     /// <summary>
     /// Serialize immutable POI content with its two content identifiers.
-    /// Select HEX or Base64 digest text and optionally include current statuses in the transport document.
+    /// Select HEX or Base64 digest text; independently include current statuses and revision metadata.
     /// </summary>
     public static JObject ToJSONWithETags(this IImmutablePOI value, Boolean IncludeRuntime = false,
-                                          ETagDigestEncoding DigestEncoding = ETagDigestEncoding.HEX)
+                                          ETagDigestEncoding DigestEncoding = ETagDigestEncoding.HEX,
+                                          Boolean IncludeVersionMetadata = false)
     {
+        if (IncludeRuntime && value is RoamingNetworkDataSnapshot)
+            throw new ArgumentException("A static DataSnapshot has no runtime state. Export a RoamingNetwork to include current statuses.", nameof(IncludeRuntime));
         var kind = Kind(value);
         var json = Document(value);
-        Prepare(json, kind, IncludeRuntime);
+        Prepare(json, kind, IncludeRuntime, IncludeVersionMetadata);
         Visit(json, kind, "", (document, type, path) =>
         {
             if (path.Length > 0 && !TaggedKinds.Contains(type)) return;
@@ -57,10 +60,11 @@ public static class POIRepresentation
 
     /// <summary>
     /// Serialize a POI document as deterministic CBOR, including its ETag array.
-    /// Measurements use Styx metrological tag 44252.
+    /// Measurements use Styx metrological tag 44252; runtime and revision metadata are independent options.
     /// </summary>
-    public static Byte[] ToCBOR(this IImmutablePOI value, Boolean IncludeRuntime = false)
-        => Encode(value.ToJSONWithETags(IncludeRuntime), Kind(value));
+    public static Byte[] ToCBOR(this IImmutablePOI value, Boolean IncludeRuntime = false,
+                                Boolean IncludeVersionMetadata = false)
+        => Encode(value.ToJSONWithETags(IncludeRuntime, IncludeVersionMetadata: IncludeVersionMetadata), Kind(value));
 
     /// <summary>
     /// Decode and reconstruct a POI value with the same parser and parent context as JSON.
@@ -220,19 +224,44 @@ public static class POIRepresentation
         nameof(PublicKey), nameof(ImmutableCryptoKeyInfo), nameof(RootCAInfo), nameof(EVRoamingPartnerInfo)
     }), StringComparer.Ordinal);
 
-    private static void Prepare(JObject json, String kind, Boolean includeRuntime)
+    private static readonly String[] RuntimeFields = [
+        "status", "adminStatus", "statusSchedule", "adminStatusSchedule", "lastStatusUpdate",
+        "maxVoltageRealTime", "maxCurrentRealTime", "maxPowerRealTime", "maxCapacityRealTime",
+        "maxVoltagePrognoses", "maxCurrentPrognoses", "maxPowerPrognoses", "maxCapacityPrognoses",
+        "energyMixRealTime", "energyMixPrognoses"
+    ];
+
+    internal static Boolean IsRuntimeProperty(String kind, String field)
+        => RuntimeEntityKinds.Contains(kind) && RuntimeFields.Contains(field, StringComparer.Ordinal);
+
+    internal static void RemoveRuntime(JObject json, String kind)
+        => Visit(json, kind, "", (document, type, _) =>
+        {
+            if (RuntimeEntityKinds.Contains(type))
+                foreach (var field in RuntimeFields) document.Remove(field);
+            if (type == nameof(ImmutableCryptoKeyInfo)) document.Remove("privateKey");
+        });
+
+    internal static void RequireStatic(JObject json, String kind)
+        => Visit(json, kind, "", (document, type, path) =>
+        {
+            foreach (var property in document.Properties())
+                if (IsRuntimeProperty(type, property.Name))
+                    throw new ArgumentException($"{path}/{property.Name}: runtime data is not allowed in a static ChangeSet. Use runtime updates instead.");
+                else if (type == nameof(ImmutableCryptoKeyInfo) && property.Name == "privateKey")
+                    throw new ArgumentException($"{path}/privateKey: private keys are not static POI content.");
+        });
+
+    private static void Prepare(JObject json, String kind, Boolean includeRuntime, Boolean includeVersionMetadata = false)
         => Visit(json, kind, "", (document, type, _) =>
         {
             document.Remove("ETags");
             if (!includeRuntime && RuntimeEntityKinds.Contains(type))
             {
-                foreach (var field in new[] { "status", "adminStatus", "statusSchedule", "adminStatusSchedule",
-                    "maxVoltageRealTime", "maxCurrentRealTime", "maxPowerRealTime", "maxCapacityRealTime",
-                    "maxVoltagePrognoses", "maxCurrentPrognoses", "maxPowerPrognoses", "maxCapacityPrognoses",
-                    "energyMixRealTime", "energyMixPrognoses" })
+                foreach (var field in RuntimeFields)
                     document.Remove(field);
             }
-            if (!includeRuntime && type == nameof(RoamingNetwork))
+            if (!includeVersionMetadata && type == nameof(RoamingNetwork))
             {
                 document.Remove("revision");
                 document.Remove("appliedChangeSetId");
@@ -243,6 +272,16 @@ public static class POIRepresentation
         => field switch
         {
             "chargingStationOperators" when kind == nameof(RoamingNetwork) => nameof(ChargingStationOperator),
+            "gridOperators" when kind == nameof(RoamingNetwork) => nameof(GridOperator),
+            "parkingOperators" when kind == nameof(RoamingNetwork) => nameof(ParkingOperator),
+            "chargingStationManufacturers" when kind == nameof(RoamingNetwork) => nameof(ChargingStationManufacturer),
+            "EVSEGroups" when kind == nameof(ChargingStationOperator) => nameof(EVSEGroup),
+            "chargingStationGroups" when kind == nameof(ChargingStationOperator) => nameof(ChargingStationGroup),
+            "chargingPoolGroups" when kind == nameof(ChargingStationOperator) => nameof(ChargingPoolGroup),
+            "chargingTariffGroups" when kind == nameof(ChargingStationOperator) => nameof(ChargingTariffGroup),
+            "parkingSpaces" when kind == nameof(ParkingOperator) => nameof(ParkingSpace),
+            "parkingSensors" when kind == nameof(ParkingOperator) => nameof(ParkingSensor),
+            "parkingSpaceGroups" when kind == nameof(ParkingOperator) => nameof(ParkingSpaceGroup),
             "eMobilityProviders" when kind == nameof(RoamingNetwork) => nameof(EMobilityProvider),
             "chargingPools" when kind is nameof(ChargingStationOperator) or nameof(ChargingPoolGroup) => nameof(ChargingPool),
             "chargingStations" when kind is nameof(ChargingPool) or nameof(ChargingStationGroup) => nameof(ChargingStation),

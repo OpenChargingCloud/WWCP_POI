@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
@@ -1312,10 +1313,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region GridOperators
 
-        private readonly ConcurrentDictionary<GridOperator_Id, GridOperator> gridOperators;
+        private readonly ConcurrentDictionary<GridOperator_Id, GridOperator> projectedGridOperators = [];
+
+        private ConcurrentDictionary<GridOperator_Id, GridOperator> gridOperators
+        {
+            get { EnsureSnapshotProjection(); return projectedGridOperators; }
+        }
 
         /// <summary>
-        /// Return all smart cities registered within this roaming network.
+        /// Return the standalone grid operators; the collection currently has no registration path.
         /// </summary>
         public IEnumerable<GridOperator> GridOperators
             => ImmutablePOIValues.CopyItems(gridOperators.Values);
@@ -1353,7 +1359,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Check if the given GridOperator is already present within the roaming network.
         /// </summary>
-        /// <param name="GridOperator">An Charging Station Operator.</param>
+        /// <param name="GridOperator">A grid operator.</param>
         public Boolean ContainsGridOperator(GridOperator GridOperator)
 
             => gridOperators.ContainsKey(GridOperator.Id);
@@ -1365,7 +1371,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Check if the given GridOperator identification is already present within the roaming network.
         /// </summary>
-        /// <param name="GridOperatorId">The unique identification of the Charging Station Operator.</param>
+        /// <param name="GridOperatorId">The unique identification of the grid operator.</param>
         public Boolean ContainsGridOperator(GridOperator_Id GridOperatorId)
 
             => gridOperators.ContainsKey(GridOperatorId);
@@ -1397,7 +1403,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ParkingOperators
 
-        private readonly ConcurrentDictionary<ParkingOperator_Id, ParkingOperator> parkingOperators;
+        private readonly ConcurrentDictionary<ParkingOperator_Id, ParkingOperator> projectedParkingOperators = [];
+
+        private ConcurrentDictionary<ParkingOperator_Id, ParkingOperator> parkingOperators
+        {
+            get { EnsureSnapshotProjection(); return projectedParkingOperators; }
+        }
 
         /// <summary>
         /// Return all parking operators registered within this roaming network.
@@ -1623,6 +1634,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              : null
 
                          );
+
+            JSON["gridOperators"] = POIJSON.Children(GridOperators);
+            JSON["parkingOperators"] = POIJSON.Children(ParkingOperators);
+            JSON["chargingStationManufacturers"] = POIJSON.Children(ChargingStationManufacturers);
 
             return POIRepresentation.AddETags(this, CustomRoamingNetworkSerializer is not null
                        ? CustomRoamingNetworkSerializer(this, JSON)

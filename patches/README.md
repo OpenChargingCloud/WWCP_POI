@@ -19,7 +19,10 @@ ChangeSets bind both source/result ETags; nested defaults
 derive from the fixed batch timestamp. See [ETags/CBOR](../docs/ETAGS-CBOR.md) and
 [ChangeSets](../docs/CHANGESETS.md) for the current dependency/API contract.
 
-## Applying the patch
+## Historical patch instructions
+
+These instructions document the original dependency change. They are not required to build or
+initialize the current immutable POI implementation.
 
 From this repository's root, inspect whether the method is already present:
 
@@ -37,6 +40,6 @@ git -C ../Styx apply ../WWCP_POI/patches/Styx.RestoreTimestamps.patch
 If the method is already present, do not apply the patch again. For a Styx version with different
 surrounding source, port this small method manually and review it against that version.
 
-The patch is kept here because the supplied sibling checkout's `.git` file points to missing
-submodule metadata, preventing a separate Styx commit. It is not an automatic build step and does
-not replace committing or adopting the API in the upstream Styx repository.
+The patch was recorded while the sibling Styx checkout's Git metadata was unavailable. That
+workspace problem has been resolved. The patch remains a historical record, not an automatic
+build step; the current POI implementation restores timestamps using its own immutable base.

@@ -24,7 +24,7 @@ using System.Text.Json;
 using Newtonsoft.Json.Linq;
 
 using EntityMap          = System.Collections.Immutable.ImmutableDictionary<cloud.charging.open.protocols.WWCP.POI.InfrastructureEntityKey, cloud.charging.open.protocols.WWCP.POI.InfrastructureEntitySnapshot>;
-using TariffReferenceMap = System.Collections.Immutable.ImmutableDictionary<cloud.charging.open.protocols.WWCP.POI.InfrastructureEntityKey, System.Collections.Immutable.ImmutableHashSet<cloud.charging.open.protocols.WWCP.POI.InfrastructureEntityKey>>;
+using ReferenceMap = System.Collections.Immutable.ImmutableDictionary<cloud.charging.open.protocols.WWCP.POI.InfrastructureEntityKey, System.Collections.Immutable.ImmutableHashSet<cloud.charging.open.protocols.WWCP.POI.InfrastructureEntityKey>>;
 
 #endregion
 
@@ -77,7 +77,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var map        = Entities;
-            var references = TariffReferences;
+            var references = References;
 
             for (var index = 0; index < changeSet.Changes.Length; index++)
             {
@@ -95,6 +95,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         RoamingNetworkChangeKind.Add            => AddEntity(change, key, parent, map, references, changeSet.CreatedAt),
                         RoamingNetworkChangeKind.Remove         => RemoveEntity(change, key, parent, map, references, changeSet.CreatedAt),
                         RoamingNetworkChangeKind.UpdateProperty => UpdateEntityProperty(change, key, parent, map, references, changeSet.CreatedAt),
+                        RoamingNetworkChangeKind.AddElement or RoamingNetworkChangeKind.RemoveElement or
+                        RoamingNetworkChangeKind.ReplaceElement or RoamingNetworkChangeKind.UpdateElementProperty
+                                                                => ApplyElementChange(change, key, parent, map, references, changeSet.CreatedAt),
                         _                                       => throw new ArgumentException("Unsupported change kind.")
                     };
                 }
@@ -195,11 +198,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Add, remove and update entities
 
-        private static (EntityMap Entities, TariffReferenceMap TariffReferences) AddEntity(RoamingNetworkChange      change,
+        private static (EntityMap Entities, ReferenceMap References) AddEntity(RoamingNetworkChange      change,
                                                                                            InfrastructureEntityKey   key,
                                                                                            InfrastructureEntityKey?  parent,
                                                                                            EntityMap                 map,
-                                                                                           TariffReferenceMap        references,
+                                                                                           ReferenceMap        references,
                                                                                            DateTimeOffset            timestamp)
         {
 
@@ -210,7 +213,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException($"Entity '{key}' already exists.");
 
             var document  = ReadJSON(change.NewValue!.Value.GetRawText());
-            var payloadId = InfrastructureJson.Text(document, "@id");
+            POIRepresentation.RequireStatic(document, key.Type.ToString());
+            var payloadId = InfrastructureJson.Text(document, InfrastructureChangeSchema.IdField(key.Type));
 
             if (payloadId is null || !InfrastructureChangeSchema.SameId(key.Type, payloadId, key.Id))
                 throw new ArgumentException("The payload identifier does not match EntityId.");
@@ -231,11 +235,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        private (EntityMap Entities, TariffReferenceMap TariffReferences) RemoveEntity(RoamingNetworkChange      change,
+        private (EntityMap Entities, ReferenceMap References) RemoveEntity(RoamingNetworkChange      change,
                                                                                        InfrastructureEntityKey   key,
                                                                                        InfrastructureEntityKey?  parent,
                                                                                        EntityMap                 map,
-                                                                                       TariffReferenceMap        references,
+                                                                                       ReferenceMap        references,
                                                                                        DateTimeOffset            timestamp)
         {
 
@@ -247,6 +251,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (change.OldValue is { } expected)
             {
                 var expectedJSON = ReadJSON(expected.GetRawText());
+                POIRepresentation.RequireStatic(expectedJSON, key.Type.ToString());
                 POIRepresentation.RemoveETags(expectedJSON, key.Type.ToString());
                 Expect(JsonDocumentValue(MetrologyJson.NormalizeHierarchy(expectedJSON, key.Type).
                                             ToString(Newtonsoft.Json.Formatting.None)),
@@ -258,10 +263,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var removedKey in removed)
                 references = RemoveReferences(map[removedKey], references);
 
-            foreach (var removedKey in removed.Where(item => item.Type == InfrastructureEntityType.ChargingTariff))
+            foreach (var removedKey in removed)
             {
                 if (references.TryGetValue(removedKey, out var consumers) && !consumers.IsEmpty)
-                    throw new ArgumentException($"Tariff '{removedKey.Id}' is still referenced by '{consumers.First()}'. Remove its assignments first.");
+                    throw new ArgumentException($"Entity '{removedKey}' is still referenced by '{consumers.First()}'. Remove its references first.");
             }
 
             map = Remove(entity.Key, map);
@@ -274,11 +279,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        private static (EntityMap Entities, TariffReferenceMap TariffReferences) UpdateEntityProperty(RoamingNetworkChange      change,
+        private static (EntityMap Entities, ReferenceMap References) UpdateEntityProperty(RoamingNetworkChange      change,
                                                                                                       InfrastructureEntityKey   key,
                                                                                                       InfrastructureEntityKey?  parent,
                                                                                                       EntityMap                 map,
-                                                                                                      TariffReferenceMap        references,
+                                                                                                      ReferenceMap        references,
                                                                                                       DateTimeOffset            timestamp)
         {
 
@@ -289,6 +294,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (change.OldValue is { } expected)
             {
+                var expectedDocument = new JObject(new JProperty(property, ReadToken(expected.GetRawText())));
+                POIRepresentation.RequireStatic(expectedDocument, key.Type.ToString());
+                POIRepresentation.RemoveETags(expectedDocument, key.Type.ToString());
+                expected = JsonDocumentValue(expectedDocument[property]!.ToString(Newtonsoft.Json.Formatting.None));
                 if (!entity.Properties.TryGetValue(property, out var actual))
                     throw new ArgumentException($"Property '{property}' is absent; it does not match the expected old value.");
 
@@ -296,6 +305,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             var replacement = new JObject(new JProperty(property, ReadToken(change.NewValue!.Value.GetRawText())));
+            POIRepresentation.RequireStatic(replacement, key.Type.ToString());
             POIRepresentation.RemoveETags(replacement, key.Type.ToString());
             POIRepresentation.InitializeNestedMetadata(replacement, key.Type.ToString(), timestamp);
             var properties = entity.Properties.SetItem(property, PropertyValue(key.Type, property,
@@ -305,11 +315,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Validate(key, map);
 
-            if (property == "tariffIds")
-            {
-                references = RemoveReferences(entity, references);
-                references = AddReferences(map[key], map, references);
-            }
+            references = RemoveReferences(entity, references);
+            references = AddReferences(map[key], map, references);
 
             return (Touch(key, map, timestamp), references);
 
@@ -406,7 +413,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 var entity = map[key];
 
-                if (key.Type != InfrastructureEntityType.ChargingConnector)
+                if (InfrastructureChangeSchema.HasMetadata(key.Type))
                     map = map.SetItem(key, entity.With(properties: entity.Properties.SetItem("lastChange", value)));
 
                 if (entity.Parent is not { } parent)
@@ -436,19 +443,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return JsonDocumentValue(MetrologyJson.NormalizeProperty(type, property, ReadToken(value.GetRawText())).
                                              ToString(Newtonsoft.Json.Formatting.None));
 
-            if (property is not ("status" or "adminStatus"))
-                return value;
-
-            if (value.ValueKind != JsonValueKind.Object)
-                throw new ArgumentException($"{property}: expected a timestamped status object.");
-
-            var document  = ReadJSON(value.GetRawText());
-            var timestamp = InfrastructureJson.Date(document, "timestamp") ??
-                            throw new ArgumentException($"{property}.timestamp: missing timestamp.");
-
-            document["timestamp"] = timestamp.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-
-            return JsonDocumentValue(document.ToString(Newtonsoft.Json.Formatting.None));
+            return value;
 
         }
 

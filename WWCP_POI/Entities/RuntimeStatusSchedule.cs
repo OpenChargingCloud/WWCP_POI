@@ -49,7 +49,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private IEnumerable<Timestamped<T>> Normalize(IEnumerable<Timestamped<T>> StatusList)
 
             => StatusList.
-                   GroupBy(status => status.Timestamp.ToISO8601()).
+                   GroupBy(status => status.Timestamp.UtcDateTime.Ticks).
                    Select (group  => group.Last()).
                    OrderByDescending(status => status.Timestamp).
                    Take(MaxStatusHistorySize);
@@ -301,7 +301,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     // Remove any old status having the same timestamp!
                     var newStatusSchedule  = statusSchedule.
-                                                 Where (status => status.Timestamp.ToISO8601() != Timestamp.ToISO8601()).
+                                                 Where (status => status.Timestamp != Timestamp).
                                                  ToList();
 
                     newStatusSchedule.Add(
@@ -479,25 +479,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region ApplyRuntimeUpdate(value, expected, mode)
+
+        /// <summary>
+        /// Check the current status and apply one runtime instruction under the mutation lock.
+        /// </summary>
+        internal void ApplyRuntimeUpdate(Timestamped<T> value, Timestamped<T>? expected, POIRuntimeUpdateMode mode)
+        {
+            lock (statusSchedule)
+            {
+                if (mode == POIRuntimeUpdateMode.ReplaceHistory && value.Timestamp > Timestamp.Now)
+                    throw new ArgumentException("Replacing a history requires a current or historical entry; insert future scheduled entries instead.");
+                var actual = CheckCurrentStatus();
+                if (expected is { } prior &&
+                    (actual.Timestamp != prior.Timestamp || !EqualityComparer<T>.Default.Equals(actual.Value, prior.Value)))
+                    throw new InvalidOperationException("Runtime status precondition failed.");
+                if (mode == POIRuntimeUpdateMode.ReplaceHistory)
+                    Replace([value]);
+                else
+                    Insert([value]);
+            }
+        }
+
+        #endregion
+
         #region IEnumerable<Timestamped<T>> Members
 
         /// <summary>
-        /// Return a status enumerator.
+        /// Return a detached status enumerator captured under the schedule's mutation lock.
         /// </summary>
         public IEnumerator<Timestamped<T>> GetEnumerator()
-
-            => statusSchedule.
-                   OrderByDescending(status => status.Timestamp).
-                   GetEnumerator();
+        {
+            Timestamped<T>[] snapshot;
+            lock (statusSchedule)
+                snapshot = statusSchedule.OrderByDescending(status => status.Timestamp).ToArray();
+            return ((IEnumerable<Timestamped<T>>) snapshot).GetEnumerator();
+        }
 
         /// <summary>
-        /// Return a status enumerator.
+        /// Return a detached status enumerator captured under the schedule's mutation lock.
         /// </summary>
         IEnumerator IEnumerable.GetEnumerator()
-
-            => statusSchedule.
-                   OrderByDescending(status => status.Timestamp).
-                   GetEnumerator();
+            => GetEnumerator();
 
         #endregion
 

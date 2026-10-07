@@ -1,4 +1,4 @@
-/*
+﻿/*
  * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  *
@@ -35,7 +35,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Parse/TryParse
 
         /// <summary>
-        /// Parse an operator and its tariffs and pools into the supplied network without registering it.
+        /// Parse an operator, its owned infrastructure, tariffs and groups into the supplied network.
         /// </summary>
         public static ChargingStationOperator Parse(JObject                                                JSON,
                                                     RoamingNetwork                                         RoamingNetwork,
@@ -107,6 +107,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var tariffIds = parsed.ParseOperatorTariffs(JSON, Context);
 
                 parsed.ParseOperatorPools(JSON, Context);
+                parsed.ParseOperatorGroups(JSON);
                 parsed.ValidateOperatorReferences(JSON, tariffIds);
 
                 InfrastructureJson.RestoreMetadata(JSON,

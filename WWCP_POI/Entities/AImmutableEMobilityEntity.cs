@@ -67,6 +67,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             statusSchedule.MaxStatusHistorySize = sizes.Status;
         }
 
+        internal void ApplyRuntimeStatus(Timestamped<TStatus> value, Timestamped<TStatus>? expected, POIRuntimeUpdateMode mode)
+            => statusSchedule.ApplyRuntimeUpdate(value, expected, mode);
+
+        internal void ApplyRuntimeAdminStatus(Timestamped<TAdminStatus> value, Timestamped<TAdminStatus>? expected, POIRuntimeUpdateMode mode)
+            => adminStatusSchedule.ApplyRuntimeUpdate(value, expected, mode);
+
         #region Data
 
         /// <summary>

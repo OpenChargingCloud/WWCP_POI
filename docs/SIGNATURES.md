@@ -1,4 +1,4 @@
-﻿# Signatures and trust
+# Signatures and trust
 
 [Repository overview](../README.md) · [Architecture](ARCHITECTURE.md) · [ChangeSets](CHANGESETS.md)
 
@@ -6,7 +6,7 @@
 
 `RoamingNetworkChangeSet.Sign` and `TrySign` generate real asymmetric signatures using Styx's
 `COSEAlgorithm` primitives. They accept Bouncy Castle asymmetric keys or Styx `COSEKey` objects.
-The built-in input profile is `wwcp-poi-changeset-json-v1`, with Styx canonical JSON UTF-8 bytes.
+The built-in input profile is `wwcp-poi-changeset-json-v2`, with Styx canonical JSON UTF-8 bytes.
 Styx supplies ECDSA, EdDSA and ML-DSA signing/verification for its supported algorithms and keys.
 ECDSA signing defaults to deterministic RFC 6979; `deterministic: false` selects randomized signing.
 
@@ -19,7 +19,7 @@ is designated primary. Each envelope contains five strings:
 | `Algorithm` | Canonical Styx COSE algorithm name, e.g. `Ed25519` or `ESP256` |
 | `KeyId` | Identifier used by an application to resolve a verification key |
 | `Value` | Signature bytes in canonical standard Base64 |
-| `Profile` | `wwcp-poi-changeset-json-v1` for the built-in profile |
+| `Profile` | `wwcp-poi-changeset-json-v2` for the built-in profile |
 | `Encoding` | `base64` for the built-in profile |
 
 Envelope construction rejects empty fields. Built-in verification additionally checks the profile,
@@ -137,16 +137,18 @@ tokens instead of rebuilding operations from the resulting domain objects.
 Static domain immutability does not freeze runtime statuses. `ToJSONSnapshot()` includes current
 runtime statuses and can therefore produce different bytes at the same POI revision. This profile
 signs the frozen operation payloads and before/after static state identifiers. Signing a ChangeSet
-does not authenticate later direct runtime updates.
+does not authenticate runtime updates, including `RoamingNetworkRuntimeUpdate` instructions.
+The [runtime API](RUNTIME.md) has no built-in signature envelope; its authentication belongs to
+the application's runtime channel.
 
-### `wwcp-poi-changeset-json-v1` input
+### `wwcp-poi-changeset-json-v2` input
 
 `GetSigningBytes(algorithm, keyId)` builds the following fixed schema, then serializes it using
 Styx `CanonicalJSON.ToUTF8Bytes(JsonDocument)`:
 
 ```json
 {
-  "Profile": "wwcp-poi-changeset-json-v1",
+  "Profile": "wwcp-poi-changeset-json-v2",
   "Algorithm": "Ed25519",
   "KeyId": "acme:alice",
   "Encoding": "base64",
@@ -177,8 +179,14 @@ The placeholders above describe array contents, not literal signing values. The 
 5. `Description` and `Metadata` are always objects, including `{}` when empty. Metadata JSON null
    remains a value. Old/new operation values are omitted when absent and emitted when explicitly
    JSON null. Optional property/parent fields are omitted when absent.
-6. Every operation includes kind/type/ID and its applicable property, parent scope, old/new values.
+6. Every operation includes kind/type/ID, `ElementPath` (always an array, empty for graph operations)
+   and its applicable property, parent scope and old/new values. Each path segment binds its exact
+   `PropertyName` and supplied `ElementId`; path array order is retained.
    Duplicate object member names anywhere in payloads/metadata and undefined values are rejected.
+
+The v2 profile binds the newly introduced element addressing contract. Built-in verification does
+not accept the previous profile; batches prepared under it need new signatures. Signature envelopes
+and equal-peer behavior are otherwise unchanged. See [element operations](ELEMENT-OPERATIONS.md).
 
 The repository also provides canonical POI JSON/CBOR bytes and SHA-256 content identifiers as
 specified in [ETags and CBOR](ETAGS-CBOR.md). Those exclude runtime state and revision bookkeeping;
@@ -229,7 +237,7 @@ still be reapplied to the same original snapshot to derive another successor.
 `TryMerge` validates each input against the common source, including both ETag pairs and every
 signature via the caller's `verifySignature(batch, signature)` callback. Default calls return a compatibility notice
 only. Explicit preparation creates a new unsigned ChangeSet after validating both combined
-execution orders, including the frozen runtime fields excluded from POI ETags.
+execution orders on strictly static storage. Runtime updates are outside the signed static merge.
 
 The combined header, operation sequence and result ETags constitute a new batch. Source signatures
 are not copied and do not authenticate it. Add the merge's own descriptions/metadata and sign it
@@ -240,7 +248,7 @@ See [merge semantics](CHANGESETS.md#merging-concurrent-batches).
 For a future distributed commit model, the remaining design work includes:
 
 - A commit identity binding ancestry, ordered operations and signatures beyond the existing before/after POI content identities.
-- Additional signing profiles/transports beyond the implemented canonical JSON v1 profile.
+- Additional signing profiles/transports beyond the implemented canonical JSON v2 profile.
 - Key resolution, trust policy, revocation and signer authorization.
 - Replay/history persistence and publication of the current head.
 - Automatic conflict resolution/rebasing beyond the explicit common-source merge, auditability and transport behavior.

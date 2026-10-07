@@ -26,6 +26,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ChargingStation,
         EVSE,
         ChargingConnector,
-        ChargingTariff
+        ChargingTariff,
+        EVSEGroup,
+        ChargingStationGroup,
+        ChargingPoolGroup,
+        ChargingTariffGroup,
+        ChargingStationManufacturer,
+        GridOperator,
+        ParkingOperator,
+        ParkingGarage,
+        ParkingSpace,
+        ParkingSensor,
+        ParkingSpaceGroup
     }
 }

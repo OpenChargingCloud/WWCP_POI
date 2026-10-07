@@ -81,12 +81,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              : null,
 
                          ParkingOperator.HotlinePhoneNumber.IsNotNullOrEmpty()
-                             ? new JProperty("hotline",             ParkingOperator.HotlinePhoneNumber)
+                             ? new JProperty("hotlinePhoneNumber",  ParkingOperator.HotlinePhoneNumber)
                              : null,
 
                          ParkingOperator.DataLicenses.Any()
                              ? new JProperty("dataLicenses",        new JArray(ParkingOperator.DataLicenses.Select(license => license.ToJSON())))
-                             : null
+                             : null,
+
+                         new JProperty("parkingGarages",          POIJSON.Children(ParkingOperator.ParkingGarages)),
+                         new JProperty("parkingSpaces",           POIJSON.Children(ParkingOperator.ParkingSpaces)),
+                         new JProperty("parkingSensors",          POIJSON.Children(ParkingOperator.ParkingSensors)),
+                         new JProperty("parkingSpaceGroups",      POIJSON.Children(ParkingOperator.ParkingSpaceGroups)),
+                         new JProperty("localParkingSpaceIds",    new JArray(ParkingOperator.LocalParkingSpaceIds.Select(id => id.ToString()).Order(StringComparer.Ordinal))),
+                         new JProperty("invalidParkingSpaceIds",  new JArray(ParkingOperator.InvalidParkingSpaceIds.Select(id => id.ToString()).Order(StringComparer.Ordinal)))
 
                          //new JProperty("chargingPools",         ExpandChargingPoolIds
                          //                                           ? new JArray(ParkingOperator.ChargingPools.     ToJSON(Embedded: true))
@@ -605,7 +612,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             String? HotlinePhoneNumber = null, IEnumerable<DataLicense>? DataLicenses = null,
                             IEnumerable<ParkingGarage>? ParkingGarages = null,
                             IEnumerable<ParkingSpace_Id>? InvalidParkingSpaceIds = null,
-                            IEnumerable<ParkingSpace_Id>? LocalParkingSpaceIds = null)
+                            IEnumerable<ParkingSpace_Id>? LocalParkingSpaceIds = null,
+                            IEnumerable<ParkingSpace>? ParkingSpaces = null,
+                            IEnumerable<ParkingSensor>? ParkingSensors = null,
+                            IEnumerable<ParkingSpaceGroup>? ParkingSpaceGroups = null)
 
             : base(Id,
                    Name,
@@ -632,6 +642,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this._DataLicenses = ImmutablePOIValues.CopyItems(DataLicenses);
             this.InvalidParkingSpaceIds = ImmutablePOIValues.CopyItems(InvalidParkingSpaceIds);
             this.LocalParkingSpaceIds = ImmutablePOIValues.CopyItems(LocalParkingSpaceIds);
+            this.ParkingSpaces = POIGraphJSON.Unique(ParkingSpaces ?? [], InfrastructureEntityType.ParkingSpace, value => value.Id.ToString());
+            this.ParkingSensors = POIGraphJSON.Unique(ParkingSensors ?? [], InfrastructureEntityType.ParkingSensor, value => value.Id.ToString());
+            this.ParkingSpaceGroups = POIGraphJSON.Unique(ParkingSpaceGroups ?? [], InfrastructureEntityType.ParkingSpaceGroup, value => value.Id.ToString());
+            POIGraphJSON.ValidateParkingReferences(this);
             this._ParkingGarages = new EntityHashSet<ParkingOperator, ParkingGarage_Id, ParkingGarage>(this);
             foreach (var garage in ParkingGarages ?? [])
                 if (_ParkingGarages.TryAdd(garage).Result != CommandResult.Success)

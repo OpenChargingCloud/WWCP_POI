@@ -107,7 +107,7 @@ with a supplied network checks that ID and binds the operator to the supplied ve
 
 Use pool `UpdateProperty` operations on `energyMeters` or `gridConnectionPoint`. Replace the whole
 array/object; `[]` clears direct meters and JSON null removes the optional connection point.
-Nested values remain pool properties in the existing eight-node ChangeSet graph. Domain validation
+Nested values remain pool properties in the versioned ChangeSet graph. Domain validation
 checks all supplied nested data before publishing a derived snapshot.
 
 Prepare these operations with `pool.Operator.RoamingNetwork.CreateChangeSet(...)` or the source
@@ -121,6 +121,20 @@ timestamps in introduced nested nodes are initialized from the fixed batch times
 See [ChangeSets](CHANGESETS.md#before-and-after-content-checks).
 
 `ToJSONSnapshot()` overlays current statuses of direct meters and connection-point operator/meter
-instances without changing POI revision or timestamps. `DataSnapshot.ToJSON()` exports the frozen
-baseline. Unrelated ChangeSets capture independent copies of current histories and their capacities;
-explicit replacement of a nested property keeps its supplied statuses.
+instances without changing POI revision or timestamps. `DataSnapshot.ToJSON()` exports only static
+data. ChangeSets preserve independent histories and their capacities for surviving children with
+matching owner and identity, including nested property replacements. Replacement payloads reject
+runtime fields. New child IDs or a changed connection point ID start a new runtime lifetime.
+See [runtime updates](RUNTIME.md) for scoped meter/operator status instructions.
+
+Static [element operations](ELEMENT-OPERATIONS.md) can edit connection-point ratings, operator
+properties and meter metadata through structured pool/connection-point/child paths. Direct
+meters and market/metering location identifiers support individual Add/Remove operations.
+These edits retain surviving child histories; explicit removal/reintroduction starts a new lifetime.
+
+## Network registry
+
+The network can also own standalone GridOperator nodes in `gridOperators`. Their static node
+operations and runtime targets are independent of the embedded connection-point descriptions.
+Equal IDs do not create shared objects or propagate edits between these slots. See
+[graph ownership](GRAPH.md#content-identifiers-and-runtime).

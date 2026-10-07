@@ -154,10 +154,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
             InfrastructureEntityKey? entity = null;
             String? property = null;
+            ImmutableArray<POIElementPathSegment> elementPath = [];
             if (index is >= 0 && index < source.Changes.Length)
             {
                 var operation = source.Changes[index.Value];
                 property = operation.PropertyName;
+                elementPath = operation.ElementPath;
                 // Invalid incoming type/ID text must still be reportable without throwing.
                 try
                 {
@@ -166,7 +168,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (Exception) { }
             }
-            return new(message, source.Id, index, entity, property);
+            return new(message, source.Id, index, entity, property, elementPath);
         }
 
         private static RoamingNetworkChangeSetMergeResult MergeFailure(RoamingNetworkChangeSetMergeStatus status,
@@ -177,7 +179,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  RoamingNetworkDataSnapshot reverse,
                                                  ImmutableArray<RoamingNetworkChangeSetMergeIssue>.Builder issues)
         {
-            // Compare the frozen runtime values as well: ETags intentionally exclude them.
+            // Immutable storage contains only static data; runtime updates are outside this merge.
             foreach (var key in forward.Entities.Keys.Union(reverse.Entities.Keys)
                                        .OrderBy(key => key.Type)
                                        .ThenBy(key => key.Id, StringComparer.Ordinal)

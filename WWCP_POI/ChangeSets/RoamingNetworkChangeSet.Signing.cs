@@ -20,7 +20,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Versioned, domain-separated Styx canonical JSON profile for complete ChangeSet signatures.
         /// </summary>
-        public const String SigningProfile = "wwcp-poi-changeset-json-v1";
+        public const String SigningProfile = "wwcp-poi-changeset-json-v2";
 
         /// <summary>
         /// Append a peer signature using Styx's asymmetric COSE algorithm primitives and return
@@ -258,6 +258,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         writer.WriteString("ParentEntityType", parentType);
                     if (operation.ParentEntityId is { } parentId)
                         writer.WriteString("ParentEntityId", parentId);
+                    writer.WritePropertyName("ElementPath");
+                    writer.WriteStartArray();
+                    foreach (var segment in operation.ElementPath)
+                    {
+                        writer.WriteStartObject();
+                        writer.WriteString("PropertyName", segment.PropertyName);
+                        if (segment.ElementId is { } elementId)
+                            writer.WriteString("ElementId", elementId);
+                        writer.WriteEndObject();
+                    }
+                    writer.WriteEndArray();
                     WriteSigningValue(writer, "OldValue", operation.OldValue);
                     WriteSigningValue(writer, "NewValue", operation.NewValue);
                     writer.WriteEndObject();

@@ -79,14 +79,33 @@ added or executed as part of these changes.
 
 `CopyOnWriteChangeSetTests` exercises immutable storage sharing, atomic multi-operation batches,
 old-value/revision conflicts, nested additions and cascading removal, local connector IDs,
-timestamped status updates, versioned JSON reloads, signature verification hooks and concurrent
+timestamped runtime status instructions, versioned JSON reloads, signature verification hooks and concurrent
 branches/projections. A 1,000-EVSE fixture checks that a single EVSE update replaces exactly five
 entries (the EVSE and its four ancestors), rather than copying all entries. Tests also ensure that
 editing detached dependency text copies does not edit the authoritative snapshot or another version.
 
-`ImmutableEntitiesTests` covers the eight sealed entity APIs, detached constructor inputs,
+`ImmutableEntitiesTests` covers the original eight sealed infrastructure entity APIs, detached constructor inputs,
 immutable multilingual text/opening hours, rejected dependency metadata mutation, direct runtime
 status updates without POI revision changes, and isolated runtime histories in derived versions.
+
+The subsequent correction gives pool/station limits, operational measurements and forecasts
+typed `Ampere`/`Watt`/`WattHour` dimensions; static limits support JSON/CBOR and ChangeSets.
+It also initializes standalone lookup collections and makes status-history enumeration return
+locked detached copies. No dedicated tests were added or executed for this correction; library
+compilation does not establish runtime or interoperability coverage. See the
+[roadmap](../docs/ROADMAP.md) for the remaining workflows and planned coverage.
+
+The runtime-separation package makes `DataSnapshot` strictly static and adds scoped immutable
+runtime status instructions with optional preconditions. The existing status fixture now uses
+`ApplyRuntimeUpdate()` and checks that runtime application leaves static storage/revision/ETags
+unchanged. It was adapted rather than adding test cases; no tests were executed for this package.
+The ChangeSet serialization fixture now uses a static `dataSource` update instead of a status operation.
+Compiling these fixtures does not establish runtime correctness or interoperability coverage.
+
+The subsequent nested-operation package adds immutable ownership paths, targeted collection/
+singleton edits, per-element preconditions, runtime lifetime handling and the v2 signing profile.
+Library and existing fixture compilation are build checks only. No tests were added or executed;
+dedicated element-operation, disjoint-collection merge and signed-path coverage remains pending.
 
 See the [ChangeSet guide](../docs/CHANGESETS.md) for the versioned API and operation rules, and
 the [domain details](../WWCP_POI/ChangeSets/README.md) for tariffs and transparency software.
@@ -102,3 +121,10 @@ certificate fields and UTC validity intervals with tick precision. Tests exercis
 complete ordering/equality/hash semantics, malformed nested data paths, energy meter metadata and
 full network snapshot reloads. Change-set tests replace an EVSE's `energyMeter` value, confirm
 sharing of unrelated EVSEs and verify atomic rollback on invalid software/status data.
+
+## Graph integration package
+
+The library and existing test project compile after integrating groups, manufacturers, grid/parking
+operators and parking children. No tests were added or executed for this package. Dedicated coverage
+for graph JSON/CBOR reloads, cross-owner reference rejection, protected subtree deletion, group
+admission edits and runtime lifetime retention is still pending. See [graph contracts](../docs/GRAPH.md).

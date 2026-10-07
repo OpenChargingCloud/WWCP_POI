@@ -59,6 +59,13 @@ internal static class MetrologyJson
         return units[index];
     }
 
+    internal static void WriteElectricalLimits(JObject json, Ampere? current, Watt? power, WattHour? capacity)
+    {
+        if (current is { } amperage) json["maxCurrent"] = Text(amperage);
+        if (power is { } watts) json["maxPower"] = Text(watts);
+        if (capacity is { } energy) json["maxCapacity"] = Text(energy);
+    }
+
     internal static T? Read<T>(JObject json, String field,
                                JsonValueParsing.ScalarParser<T> parse) where T : struct, IMetrology<T>
     {
@@ -138,7 +145,9 @@ internal static class MetrologyJson
             if (ReadAltitude(location, "alt") is { } altitude) location["alt"] = AltitudeText(altitude);
             return location;
         }
-        if (type == InfrastructureEntityType.EVSE && field is "maxVoltage" or "maxCurrent" or "maxPower" or "maxCapacity")
+        if ((type == InfrastructureEntityType.EVSE && field == "maxVoltage") ||
+            (type is InfrastructureEntityType.EVSE or InfrastructureEntityType.ChargingPool or InfrastructureEntityType.ChargingStation &&
+             field is "maxCurrent" or "maxPower" or "maxCapacity"))
         {
             var json = new JObject(new JProperty(field, value.DeepClone()));
             switch (field)
@@ -180,7 +189,8 @@ internal static class MetrologyJson
             InfrastructureEntityType.EVSE => field is "maxVoltage" or "maxCurrent" or "maxPower" or "maxCapacity" or "energyMix",
             InfrastructureEntityType.ChargingTariff => field is "elements" or "energyMix",
             InfrastructureEntityType.ChargingConnector => field == "cable",
-            InfrastructureEntityType.ChargingPool => field == "gridConnectionPoint",
+            InfrastructureEntityType.ChargingPool => field is "gridConnectionPoint" or "maxCurrent" or "maxPower" or "maxCapacity",
+            InfrastructureEntityType.ChargingStation => field is "maxCurrent" or "maxPower" or "maxCapacity",
             _ => false
         };
 

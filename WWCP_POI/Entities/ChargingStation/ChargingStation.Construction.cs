@@ -38,7 +38,7 @@ public sealed partial class ChargingStation
                                         MaxStatusScheduleSize: statusSchedule.MaxStatusHistorySize,
                                         DataSource: DataSource, Created: Created, LastChange: LastChangeDate,
                                         CustomData: CustomData, InternalData: InternalData, DataLicenses: DataLicenses,
-                                        EnergyMeters: EnergyMeters);
+                                        EnergyMeters: EnergyMeters, MaxCurrent: MaxCurrent, MaxPower: MaxPower, MaxCapacity: MaxCapacity);
         clone.openStreetMapNodeId = openStreetMapNodeId;
         clone.entranceAddress = ImmutablePOIValues.Copy(entranceAddress);
         clone.entranceLocation = entranceLocation;
@@ -48,9 +48,6 @@ public sealed partial class ChargingStation
         clone.immutableUIFeatures = immutableUIFeatures;
         clone.immutablePhotoURLs = immutablePhotoURLs;
         clone.gridConnection = gridConnection;
-        clone.maxCurrent = maxCurrent;
-        clone.maxPower = maxPower;
-        clone.maxCapacity = maxCapacity;
         clone.energyMix = ImmutablePOIValues.Copy(energyMix);
         clone.maxReservationDuration = maxReservationDuration;
         clone.isFreeOfCharge = isFreeOfCharge;

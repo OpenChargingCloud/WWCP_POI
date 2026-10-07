@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Globalization;
+using cloud.charging.open.protocols.WWCP.POI.CSM;
 
 using Newtonsoft.Json.Linq;
 
@@ -43,7 +44,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 [InfrastructureEntityType.ChargingPool]             = ("chargingPools",             InfrastructureEntityType.ChargingStationOperator),
                 [InfrastructureEntityType.ChargingStation]          = ("chargingStations",          InfrastructureEntityType.ChargingPool),
                 [InfrastructureEntityType.EVSE]                     = ("EVSEs",                     InfrastructureEntityType.ChargingStation),
-                [InfrastructureEntityType.ChargingConnector]        = ("socketOutlets",             InfrastructureEntityType.EVSE)
+                [InfrastructureEntityType.ChargingConnector]        = ("socketOutlets",             InfrastructureEntityType.EVSE),
+                [InfrastructureEntityType.EVSEGroup]                 = ("EVSEGroups",                InfrastructureEntityType.ChargingStationOperator),
+                [InfrastructureEntityType.ChargingStationGroup]     = ("chargingStationGroups",     InfrastructureEntityType.ChargingStationOperator),
+                [InfrastructureEntityType.ChargingPoolGroup]        = ("chargingPoolGroups",        InfrastructureEntityType.ChargingStationOperator),
+                [InfrastructureEntityType.ChargingTariffGroup]      = ("chargingTariffGroups",      InfrastructureEntityType.ChargingStationOperator),
+                [InfrastructureEntityType.ChargingStationManufacturer] = ("chargingStationManufacturers", InfrastructureEntityType.RoamingNetwork),
+                [InfrastructureEntityType.GridOperator]             = ("gridOperators",             InfrastructureEntityType.RoamingNetwork),
+                [InfrastructureEntityType.ParkingOperator]          = ("parkingOperators",          InfrastructureEntityType.RoamingNetwork),
+                [InfrastructureEntityType.ParkingGarage]            = ("parkingGarages",            InfrastructureEntityType.ParkingOperator),
+                [InfrastructureEntityType.ParkingSpace]             = ("parkingSpaces",             InfrastructureEntityType.ParkingOperator),
+                [InfrastructureEntityType.ParkingSensor]            = ("parkingSensors",            InfrastructureEntityType.ParkingOperator),
+                [InfrastructureEntityType.ParkingSpaceGroup]        = ("parkingSpaceGroups",        InfrastructureEntityType.ParkingOperator)
             };
 
         #endregion
@@ -71,6 +83,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 InfrastructureEntityType.EVSE                     => EVSE_Id.                    Parse(text).ToString(),
                 InfrastructureEntityType.ChargingConnector        => ChargingConnector_Id.       Parse(text).ToString(),
                 InfrastructureEntityType.ChargingTariff           => ChargingTariff_Id.          Parse(text).ToString(),
+                InfrastructureEntityType.EVSEGroup                 => EVSEGroup_Id.Parse(text).ToString(),
+                InfrastructureEntityType.ChargingStationGroup     => ChargingStationGroup_Id.Parse(text).ToString(),
+                InfrastructureEntityType.ChargingPoolGroup        => ChargingPoolGroup_Id.Parse(text).ToString(),
+                InfrastructureEntityType.ChargingTariffGroup      => ChargingTariffGroup_Id.Parse(text).ToString(),
+                InfrastructureEntityType.ChargingStationManufacturer => ChargingStationManufacturer_Id.Parse(text).ToString(),
+                InfrastructureEntityType.GridOperator             => GridOperator_Id.Parse(text).ToString(),
+                InfrastructureEntityType.ParkingOperator          => ParkingOperator_Id.Parse(text).ToString(),
+                InfrastructureEntityType.ParkingGarage            => ParkingGarage_Id.Parse(text).ToString(),
+                InfrastructureEntityType.ParkingSpace             => ParkingSpace_Id.Parse(text).ToString(),
+                InfrastructureEntityType.ParkingSensor            => ParkingSensor_Id.Parse(text).ToString(),
+                InfrastructureEntityType.ParkingSpaceGroup        => ParkingSpaceGroup_Id.Parse(text).ToString(),
                 _                                                => throw new ArgumentOutOfRangeException(nameof(type))
             };
 
@@ -93,12 +116,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 InfrastructureEntityType.EVSE                     => EVSEIdentity(EVSE_Id.Parse(text)),
                 InfrastructureEntityType.ChargingConnector        => ChargingConnector_Id.Parse(text).ToString(),
                 InfrastructureEntityType.ChargingTariff           => TariffIdentity(ChargingTariff_Id.Parse(text)),
+                InfrastructureEntityType.EVSEGroup                 => GroupIdentity(EVSEGroup_Id.Parse(text).OperatorId, EVSEGroup_Id.Parse(text).Suffix),
+                InfrastructureEntityType.ChargingStationGroup     => GroupIdentity(ChargingStationGroup_Id.Parse(text).OperatorId, ChargingStationGroup_Id.Parse(text).Suffix),
+                InfrastructureEntityType.ChargingPoolGroup        => GroupIdentity(ChargingPoolGroup_Id.Parse(text).OperatorId, ChargingPoolGroup_Id.Parse(text).Suffix),
+                InfrastructureEntityType.ChargingTariffGroup      => GroupIdentity(ChargingTariffGroup_Id.Parse(text).OperatorId, ChargingTariffGroup_Id.Parse(text).Suffix),
+                InfrastructureEntityType.ChargingStationManufacturer => Id(type, text).ToUpperInvariant(),
+                InfrastructureEntityType.GridOperator             => GridOperator_Id.Parse(text).CountryCode.Alpha2Code + ":" + GridOperator_Id.Parse(text).Suffix,
+                InfrastructureEntityType.ParkingOperator          => Id(type, text).ToUpperInvariant(),
+                InfrastructureEntityType.ParkingGarage or InfrastructureEntityType.ParkingSpace or
+                InfrastructureEntityType.ParkingSensor or InfrastructureEntityType.ParkingSpaceGroup => Id(type, text),
                 _                                                => throw new ArgumentOutOfRangeException(nameof(type))
             };
 
         private static String ProviderIdentity(EMobilityProvider_Id id)
 
             => id.CountryCode.Alpha2Code + ":" + id.Suffix;
+
+        private static String GroupIdentity(ChargingStationOperator_Id operatorId, String suffix)
+            => operatorId.ToString(OperatorIdFormats.ISO_STAR).ToUpperInvariant() + ":" + suffix;
+
+        internal static String IdField(InfrastructureEntityType type)
+            => type is InfrastructureEntityType.GridOperator or InfrastructureEntityType.ParkingOperator ? "id" : "@id";
+
+        internal static Boolean HasMetadata(InfrastructureEntityType type)
+            => type is not (InfrastructureEntityType.ChargingConnector or InfrastructureEntityType.ChargingStationManufacturer);
 
         private static String PoolIdentity(ChargingPool_Id id)
 
@@ -133,7 +174,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         private static readonly HashSet<String> Common =
         [
-            "name", "description", "dataSource", "customData", "status", "adminStatus"
+            "name", "description", "dataSource", "customData"
         ];
 
         private static readonly IReadOnlyDictionary<InfrastructureEntityType, HashSet<String>> Fields =
@@ -155,13 +196,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 [
                     "address", "geoLocation", "locationType", "accessibility", "authenticationModes",
                     "hotlinePhoneNumber", "openingTimes", "brands", "dataLicenses", "dataLicenseIds",
-                    "energyMeters", "gridConnectionPoint",
+                    "energyMeters", "gridConnectionPoint", "maxCurrent", "maxPower", "maxCapacity",
                     "timeZone", "chargingWhenClosed", "locationLanguages", "facilities", "services", "relatedLocations", "mobilityRootCAs", "evRoamingPartners"
                 ],
                 [InfrastructureEntityType.ChargingStation] =
                 [
                     "address", "geoLocation", "authenticationModes", "hotlinePhoneNumber", "openingTimes",
-                    "isFreeOfCharge", "brands", "dataLicenses", "dataLicenseIds", "energyMeters",
+                    "isFreeOfCharge", "brands", "dataLicenses", "dataLicenseIds", "energyMeters", "maxCurrent", "maxPower", "maxCapacity",
                     "chargingWhenClosed", "accessibility", "locationLanguage", "physicalReference", "paymentOptions", "features", "vehicleTypes", "images", "serviceIdentification", "modelCode", "published", "disabled", "mobilityRootCAs", "evRoamingPartners", "certificationInfo", "calibrationInfo"
                 ],
                 [InfrastructureEntityType.EVSE] =
@@ -178,15 +219,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 [InfrastructureEntityType.ChargingConnector] =
                 [
                     "type", "cable", "lockable", "tariffIds", "termsAndConditions"
-                ]
+                ],
+                [InfrastructureEntityType.EVSEGroup] = ["EVSEIds", "allowedMemberIds", "brand", "priority", "tariffId", "dataLicenses"],
+                [InfrastructureEntityType.ChargingStationGroup] = ["chargingStationIds", "allowedMemberIds", "brand", "priority", "tariffId", "dataLicenses"],
+                [InfrastructureEntityType.ChargingPoolGroup] = ["chargingPoolIds", "allowedMemberIds", "brand", "priority", "tariffId", "dataLicenses"],
+                [InfrastructureEntityType.ChargingTariffGroup] = ["description", "chargingTariffIds"],
+                [InfrastructureEntityType.ChargingStationManufacturer] = ["name", "description", "cryptoKeys"],
+                [InfrastructureEntityType.GridOperator] = ["logos", "address", "geoLocation", "telephone", "eMailAddress", "homepage", "hotline", "priority", "dataLicenses"],
+                [InfrastructureEntityType.ParkingOperator] = ["logos", "address", "geoLocation", "telephone", "eMailAddress", "homepage", "hotlinePhoneNumber", "dataLicenses", "invalidParkingSpaceIds", "localParkingSpaceIds"],
+                [InfrastructureEntityType.ParkingGarage] = ["osmWayId", "geometry", "chargingStationIds"],
+                [InfrastructureEntityType.ParkingSpace] = ["osmWayId", "geometry", "chargingStationIds", "sensors"],
+                [InfrastructureEntityType.ParkingSensor] = ["osmWayId", "geometry", "chargingStationIds"],
+                [InfrastructureEntityType.ParkingSpaceGroup] = ["osmWayId", "geometry", "chargingStationIds", "sensors"]
             };
 
         internal static void Property(InfrastructureEntityType  type,
                                       String                    name)
         {
 
+            var simple = type is InfrastructureEntityType.ChargingStationManufacturer or InfrastructureEntityType.ChargingTariffGroup or
+                                 InfrastructureEntityType.EVSEGroup or InfrastructureEntityType.ChargingStationGroup or
+                                 InfrastructureEntityType.ChargingPoolGroup or InfrastructureEntityType.ParkingGarage or
+                                 InfrastructureEntityType.ParkingSpace or InfrastructureEntityType.ParkingSensor or InfrastructureEntityType.ParkingSpaceGroup;
+
             if (!Fields[type].Contains(name) &&
-                (type == InfrastructureEntityType.ChargingConnector || !Common.Contains(name)))
+                (type == InfrastructureEntityType.ChargingConnector || type == InfrastructureEntityType.ChargingTariffGroup ||
+                 simple && name is not ("name" or "description") || !Common.Contains(name)))
             {
                 throw new ArgumentException($"Property '{name}' is not an editable JSON property of {type}. IDs, parents, children and revision metadata cannot be updated as properties.");
             }
@@ -199,7 +257,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var property in document.Properties())
             {
-                if (property.Name is "@id" or "@context" or "created" or "lastChange" or "ETags")
+                if (property.Name == IdField(type) || property.Name is "@context" or "ETags" ||
+                    HasMetadata(type) && property.Name is "created" or "lastChange")
                     continue;
 
                 if (type == InfrastructureEntityType.RoamingNetwork && property.Name is "revision" or "appliedChangeSetId")
@@ -222,31 +281,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 DateTimeOffset            timestamp)
         {
 
-            if (type == InfrastructureEntityType.ChargingConnector)
+            if (!HasMetadata(type))
                 return;
-
-            var time = timestamp.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-
-            var status = type switch
-            {
-                InfrastructureEntityType.ChargingTariff    => "Unspecified",
-                InfrastructureEntityType.EMobilityProvider => "Available",
-                _                                         => "available"
-            };
-
-            var adminStatus = type switch
-            {
-                InfrastructureEntityType.ChargingTariff    => "Unspecified",
-                InfrastructureEntityType.EMobilityProvider => "Operational",
-                _                                         => "operational"
-            };
 
             document["created"] = (InfrastructureJson.Date(document, "created") ?? timestamp).
                                       ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
             document["lastChange"] = (InfrastructureJson.Date(document, "lastChange") ?? timestamp).
                                          ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-            document["status"]      ??= new JObject(new JProperty("value", status),      new JProperty("timestamp", time));
-            document["adminStatus"] ??= new JObject(new JProperty("value", adminStatus), new JProperty("timestamp", time));
 
         }
 

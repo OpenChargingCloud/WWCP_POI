@@ -63,6 +63,16 @@ public sealed partial class RoamingNetwork
         }
 
         Capture(this, InfrastructureEntityType.RoamingNetwork);
+        foreach (var entity in GridOperators) Capture(entity, InfrastructureEntityType.GridOperator);
+        foreach (var entity in ParkingOperators) Capture(entity, InfrastructureEntityType.ParkingOperator);
+        foreach (var entity in EVSEGroups) Capture(entity, InfrastructureEntityType.EVSEGroup);
+        foreach (var entity in ChargingStationGroups) Capture(entity, InfrastructureEntityType.ChargingStationGroup);
+        foreach (var entity in ChargingPoolGroups) Capture(entity, InfrastructureEntityType.ChargingPoolGroup);
+        foreach (var entity in ChargingTariffGroups) Capture(entity, InfrastructureEntityType.ChargingTariffGroup);
+        foreach (var entity in ParkingGarages) Capture(entity, InfrastructureEntityType.ParkingGarage);
+        foreach (var entity in ParkingSpaces) Capture(entity, InfrastructureEntityType.ParkingSpace);
+        foreach (var entity in ParkingSensors) Capture(entity, InfrastructureEntityType.ParkingSensor);
+        foreach (var entity in ParkingSpaceGroups) Capture(entity, InfrastructureEntityType.ParkingSpaceGroup);
         foreach (var entity in ChargingStationOperators) Capture(entity, InfrastructureEntityType.ChargingStationOperator);
         foreach (var entity in EMobilityProviders) Capture(entity, InfrastructureEntityType.EMobilityProvider);
         foreach (var entity in ChargingPools)
@@ -92,12 +102,12 @@ public sealed partial class RoamingNetwork
 
         void Write(JObject json, InfrastructureEntityType type)
         {
-            if (states.TryGetValue(new(type, json["@id"]!.Value<String>()!), out var state))
+            if (states.TryGetValue(new(type, json[InfrastructureChangeSchema.IdField(type)]!.Value<String>()!), out var state))
             {
                 json["adminStatus"] = state.Admin;
                 json["status"] = state.Status;
             }
-            if (meters.TryGetValue(new(type, json["@id"]!.Value<String>()!), out var ownedMeters))
+            if (meters.TryGetValue(new(type, json[InfrastructureChangeSchema.IdField(type)]!.Value<String>()!), out var ownedMeters))
             {
                 void WriteMeter(JObject meter)
                 {
@@ -115,7 +125,7 @@ public sealed partial class RoamingNetwork
             }
             if (type == InfrastructureEntityType.ChargingPool && json["gridConnectionPoint"] is JObject point)
             {
-                var owner = new InfrastructureEntityKey(type, json["@id"]!.Value<String>()!);
+                var owner = new InfrastructureEntityKey(type, json[InfrastructureChangeSchema.IdField(type)]!.Value<String>()!);
                 if (point["gridOperator"] is JObject gridOperator && gridOperators.TryGetValue(owner, out var operatorState))
                 {
                     gridOperator["adminStatus"] = operatorState.Admin;
@@ -132,7 +142,7 @@ public sealed partial class RoamingNetwork
                 if (relation.Value.Parent != type || json[relation.Value.Field] is not JArray children) continue;
                 foreach (var child in children.OfType<JObject>())
                 {
-                    if (relation.Key != InfrastructureEntityType.ChargingConnector) Write(child, relation.Key);
+                    if (InfrastructureChangeSchema.HasMetadata(relation.Key)) Write(child, relation.Key);
                 }
             }
         }

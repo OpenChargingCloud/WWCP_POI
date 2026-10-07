@@ -446,20 +446,31 @@ namespace WWCP_POI_Tests
         }
 
         [Test]
-        public void Status_updates_keep_their_timestamp_and_do_not_edit_the_old_status()
+        public void Runtime_status_updates_keep_their_timestamp_without_editing_static_data()
         {
 
             var source = Network();
-            var oldStatus = source.DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["status"];
-            var changed = source.ApplyChangeSet(Set(source,
-                                                RoamingNetworkChange.UpdateProperty("EVSE", "DE*ABC*E1", "status", oldStatus,
-                                                    Json("{\"value\":\"charging\",\"timestamp\":\"2026-10-05T12:30:00+00:00\"}"))));
-            var evse = changed.EVSEs.Single(item => item.Id.ToString() == "DE*ABC*E1");
+            var data = source.DataSnapshot;
+            var eTags = source.ETags;
+            var evse = source.EVSEs.Single(item => item.Id.ToString() == "DE*ABC*E1");
+            var update = new RoamingNetworkRuntimeUpdate(
+                             source.Id.ToString(),
+                             POIRuntimeTarget.Entity(InfrastructureEntityType.EVSE, evse.Id.ToString()),
+                             POIRuntimeStatusKind.Status,
+                             new POIRuntimeStatusValue("charging", CommitTime.AddDays(-1)),
+                             POIRuntimeStatusValue.From(evse.Status),
+                             eTags,
+                             POIRuntimeUpdateMode.ReplaceHistory);
+
+            source.ApplyRuntimeUpdate(JsonSerializer.Deserialize<RoamingNetworkRuntimeUpdate>(JsonSerializer.Serialize(update))!);
 
             Assert.That(evse.Status.Value, Is.EqualTo(EVSEStatusType.Parse("charging")));
             Assert.That(evse.Status.Timestamp, Is.EqualTo(CommitTime.AddDays(-1)));
-            Assert.That(source.DataSnapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["status"].GetRawText(), Is.EqualTo(oldStatus.GetRawText()));
-            Assert.That(JToken.DeepEquals(RoamingNetwork.Parse(JObject.Parse(changed.ToJSONSnapshot().ToString())).ToJSONSnapshot(), changed.ToJSONSnapshot()), Is.True);
+            Assert.That(source.DataSnapshot, Is.SameAs(data));
+            Assert.That(data.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties.ContainsKey("status"), Is.False);
+            Assert.That(source.Revision, Is.Zero);
+            Assert.That(source.ETags, Is.EqualTo(eTags));
+            Assert.That(JToken.DeepEquals(RoamingNetwork.Parse(JObject.Parse(source.ToJSONSnapshot().ToString())).ToJSONSnapshot(), source.ToJSONSnapshot()), Is.True);
 
         }
 
