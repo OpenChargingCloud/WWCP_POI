@@ -268,6 +268,10 @@ Every successful batch creates exactly one new revision. Applying a batch agains
 fails before its operations are applied. A failed operation rejects the complete batch; the source
 snapshot and all previously published versions remain unchanged.
 
+Administrator-created [full snapshot links](SNAPSHOTS.md) also advance the history revision once,
+preserving the static ETags and last applied batch ID. Prepare a subsequent batch against that
+new head; matching older ETags alone does not satisfy the base-revision/publication checks.
+
 ```csharp
 if (network.TryApplyChangeSet(batch, out var result, out var error))
 {

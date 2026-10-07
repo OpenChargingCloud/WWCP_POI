@@ -22,6 +22,16 @@ public sealed partial class RoamingNetworkHistory
     public const String MergeMetadataProperty = "wwcpPOIMerge";
 
     /// <summary>
+    /// The original-operation lifetime evidence profile for optional merge audit records.
+    /// </summary>
+    public const String MergeLifetimeProfile = "wwcp-poi-operation-lifetime-v1";
+
+    /// <summary>
+    /// The explicit temporary reference-detachment and restoration audit profile.
+    /// </summary>
+    public const String MergeReferenceTransitionProfile = "wwcp-poi-reference-transition-v1";
+
+    /// <summary>
     /// Preview a static three-way integration of retained tips using their best common ancestor.
     /// Explicit preparation returns a new unsigned commit against the left tip; it never publishes it.
     /// </summary>
@@ -47,6 +57,23 @@ public sealed partial class RoamingNetworkHistory
             POIThreeWayMerge? planner = null;
             try
             {
+                if (!leftId.IsValid || !rightId.IsValid || commonAncestor is { IsValid: false })
+                    throw new ArgumentException("Requested commit identities must be valid.");
+                VerifyBoundary();
+                if (!HasCompleteAncestry)
+                {
+                    var requested = new[] { leftId, rightId }.AsEnumerable();
+                    if (commonAncestor is { } ancestor) requested = requested.Append(ancestor);
+                    var missing = requested.Where(id => !entries.ContainsKey(id)).Distinct()
+                        .OrderBy(id => id.ToString(), StringComparer.Ordinal).ToImmutableArray();
+                    if (!missing.IsEmpty)
+                    {
+                        result = new(RoamingNetworkMergeStatus.HistoryRequired,
+                            "Requested tips or ancestor are unavailable within this snapshot boundary; retrieve sufficient earlier history before merging.",
+                            leftId, rightId, missingCommits: missing);
+                        return false;
+                    }
+                }
                 if (!entries.TryGetValue(leftId, out var leftEntry) || !entries.TryGetValue(rightId, out var rightEntry))
                     throw new ArgumentException("Both tips must already be retained in this history.");
                 var leftAncestors = Ancestors(leftId);
@@ -84,8 +111,13 @@ public sealed partial class RoamingNetworkHistory
                     throw new ArgumentException("Preparation requires a fresh, nonempty mergedChangeSetId.");
                 if (metadata?.ContainsKey(MergeMetadataProperty) == true)
                     throw new ArgumentException($"Metadata key '{MergeMetadataProperty}' is reserved for the merge record.");
-                var timestamp = (createdAt ?? Later(leftEntry.Commit.ChangeSet?.CreatedAt, rightEntry.Commit.ChangeSet?.CreatedAt)).ToUniversalTime();
-                planner = new(entries[selectedBase.Value].Snapshot, leftEntry.Snapshot, rightEntry.Snapshot, resolveConflict, timestamp);
+                var timestamp = (createdAt ?? Later(leftEntry.Commit.CreatedAt, rightEntry.Commit.CreatedAt)).ToUniversalTime();
+                var lifetimes = new Dictionary<RoamingNetworkCommitId, POILifetimeState>();
+                var ancestorLifetime = Lifetime(selectedBase.Value, lifetimes);
+                var leftLifetime = Lifetime(leftId, lifetimes);
+                var rightLifetime = Lifetime(rightId, lifetimes);
+                planner = new(entries[selectedBase.Value].Snapshot, leftEntry.Snapshot, rightEntry.Snapshot, resolveConflict, timestamp,
+                              ancestorLifetime, leftLifetime, rightLifetime);
                 var target = planner.Merge();
                 var operations = target is null ? null : planner.Operations(target, timestamp);
                 if (operations is null)
@@ -102,7 +134,8 @@ public sealed partial class RoamingNetworkHistory
                 result = new(merge ? RoamingNetworkMergeStatus.Prepared : RoamingNetworkMergeStatus.MergeAvailable,
                     merge ? "An unsigned merge commit was prepared against the left tip; sign and publish it explicitly." :
                             "The tips can be integrated; explicitly request preparation to create a merge commit.",
-                    leftId, rightId, selectedBase, bases, Report(planner), batch.AfterETags);
+                        leftId, rightId, selectedBase, bases, Report(planner), batch.AfterETags,
+                        operations.Value, planner.ReferenceTransitions);
                 return true;
             }
             catch (Exception exception)
@@ -122,8 +155,31 @@ public sealed partial class RoamingNetworkHistory
         var pending = new Stack<RoamingNetworkCommitId>();
         pending.Push(tip);
         while (pending.TryPop(out var id))
-            if (result.Add(id)) foreach (var parent in entries[id].Commit.Parents) pending.Push(parent);
+            if (result.Add(id) && !IsAnchor(id)) foreach (var parent in entries[id].Commit.Parents) pending.Push(parent);
         return result;
+    }
+
+    private POILifetimeState Lifetime(RoamingNetworkCommitId tip, Dictionary<RoamingNetworkCommitId, POILifetimeState> cache)
+    {
+        var pending = new Stack<Entry>();
+        var current = tip;
+        while (!cache.ContainsKey(current))
+        {
+            var entry = entries[current];
+            if (IsAnchor(entry.Commit.Id))
+            {
+                cache[current] = POILifetimeState.Checkpoint(entry.Commit, entry.Snapshot);
+                break;
+            }
+            pending.Push(entry);
+            current = entry.Commit.Parents[0];
+        }
+        while (pending.TryPop(out var entry))
+        {
+            var parent = entry.Commit.Parents[0];
+            cache[entry.Commit.Id] = cache[parent].Apply(entry.Commit, entries[parent].Snapshot);
+        }
+        return cache[tip];
     }
 
     private static DateTimeOffset Later(DateTimeOffset? left, DateTimeOffset? right)
@@ -149,6 +205,9 @@ public sealed partial class RoamingNetworkHistory
             writer.WritePropertyName("Ancestor"); ancestor.Hash.WriteTo(writer);
             writer.WritePropertyName("Left"); left.Hash.WriteTo(writer);
             writer.WritePropertyName("Right"); right.Hash.WriteTo(writer);
+            if (planner.LifetimeSelections.Any() || planner.Conflicts.Any(conflict =>
+                    conflict.BaseLifetime != conflict.LeftLifetime || conflict.BaseLifetime != conflict.RightLifetime))
+                writer.WriteString("LifetimeProfile", MergeLifetimeProfile);
             writer.WritePropertyName("Resolutions");
             writer.WriteStartArray();
             var sequence = 0;
@@ -160,6 +219,12 @@ public sealed partial class RoamingNetworkHistory
                 writer.WriteString("Path", conflict.Path);
                 writer.WriteString("Kind", conflict.Kind.ToString());
                 writer.WriteString("Choice", resolution.Choice.ToString());
+                if (conflict.BaseLifetime != conflict.LeftLifetime || conflict.BaseLifetime != conflict.RightLifetime)
+                {
+                    WriteLifetime(writer, "BaseLifetime", conflict.BaseLifetime);
+                    WriteLifetime(writer, "LeftLifetime", conflict.LeftLifetime);
+                    WriteLifetime(writer, "RightLifetime", conflict.RightLifetime);
+                }
                 if (conflict.RelatedEntity is { } related)
                 {
                     writer.WritePropertyName("RelatedEntity"); writer.WriteStartObject();
@@ -171,9 +236,65 @@ public sealed partial class RoamingNetworkHistory
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();
+            if (planner.LifetimeSelections.Any())
+            {
+                writer.WritePropertyName("LifetimeSelections");
+                writer.WriteStartArray();
+                foreach (var selection in planner.LifetimeSelections)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteString("Path", selection.Key);
+                    WriteLifetime(writer, "Origin", selection.Value);
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+            }
+            if (!planner.ReferenceTransitions.IsEmpty)
+            {
+                writer.WriteString("ReferenceTransitionProfile", MergeReferenceTransitionProfile);
+                writer.WritePropertyName("ReferenceTransitions");
+                writer.WriteStartArray();
+                foreach (var transition in planner.ReferenceTransitions)
+                {
+                    writer.WriteStartObject();
+                    writer.WritePropertyName("Consumer"); WriteEntity(writer, transition.Consumer);
+                    writer.WriteString("PropertyName", transition.PropertyName);
+                    writer.WritePropertyName("Targets"); writer.WriteStartArray();
+                    foreach (var target in transition.Targets) WriteEntity(writer, target);
+                    writer.WriteEndArray();
+                    writer.WritePropertyName("BeforeValue"); transition.BeforeValue.WriteTo(writer);
+                    if (transition.DetachedValue is { } detached)
+                    { writer.WritePropertyName("DetachedValue"); detached.WriteTo(writer); }
+                    if (transition.AfterValue is { } after)
+                    { writer.WritePropertyName("AfterValue"); after.WriteTo(writer); }
+                    writer.WritePropertyName("DetachOperationIndices"); JsonSerializer.Serialize(writer, transition.DetachOperationIndices);
+                    writer.WritePropertyName("RestoreOperationIndices"); JsonSerializer.Serialize(writer, transition.RestoreOperationIndices);
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+            }
             writer.WriteEndObject();
         }
         using var document = JsonDocument.Parse(stream.ToArray());
         return document.RootElement.Clone();
+    }
+
+    private static void WriteLifetime(Utf8JsonWriter writer, String name, RoamingNetworkLifetimeOrigin? origin)
+    {
+        if (origin is null) return;
+        writer.WritePropertyName(name);
+        writer.WriteStartObject();
+        writer.WritePropertyName("CommitId"); origin.CommitId.Hash.WriteTo(writer);
+        writer.WriteNumber("OperationIndex", origin.OperationIndex);
+        writer.WriteEndObject();
+    }
+
+    private static void WriteEntity(Utf8JsonWriter writer, InfrastructureEntityKey entity)
+    {
+        writer.WriteStartObject();
+        writer.WriteString("EntityType", entity.Type.ToString());
+        writer.WriteString("EntityId", entity.Id);
+        if (entity.Scope is { } scope) writer.WriteString("Scope", scope);
+        writer.WriteEndObject();
     }
 }

@@ -19,17 +19,32 @@ public sealed partial class RoamingNetworkHistory
     public const String ArchiveProfile = "wwcp-poi-history-v1";
 
     /// <summary>
+    /// The complete-history archive profile permitting full snapshot links in the original chain.
+    /// </summary>
+    public const String SnapshotArchiveProfile = "wwcp-poi-history-v2";
+
+    private static String ArchiveProfileFor(ImmutableDictionary<RoamingNetworkCommitId, Entry> source)
+        => source.Values.Any(entry => entry.Commit.Kind == RoamingNetworkCommitKind.Snapshot) ? SnapshotArchiveProfile : ArchiveProfile;
+
+    private static void RequireArchiveProfile(String? profile, IEnumerable<RoamingNetworkCommit> commits)
+    {
+        var expected = commits.Any(commit => commit.Kind == RoamingNetworkCommitKind.Snapshot) ? SnapshotArchiveProfile : ArchiveProfile;
+        if (profile != expected) throw new ArgumentException("Unsupported or inconsistent history profile.");
+    }
+
+    /// <summary>
     /// Export static history and original peer envelopes as JSON; runtime data is excluded.
     /// </summary>
     public String ToJSON()
     {
         lock (gate)
         {
+            if (!HasCompleteAncestry) return BoundaryJSON(entries, anchorId, head.Id);
             using var stream = new MemoryStream();
             using (var writer = new Utf8JsonWriter(stream))
             {
                 writer.WriteStartObject();
-                writer.WriteString("Profile", ArchiveProfile);
+                writer.WriteString("Profile", ArchiveProfileFor(entries));
                 writer.WriteString("ContentProfile", POIContentProfile.Id);
                 writer.WritePropertyName("Checkpoint"); entries[checkpointId].Snapshot.WriteTo(writer);
                 writer.WritePropertyName("CheckpointCommit"); entries[checkpointId].Commit.WriteTo(writer);
@@ -54,8 +69,8 @@ public sealed partial class RoamingNetworkHistory
     }
 
     private Byte[] Archive(ImmutableDictionary<RoamingNetworkCommitId, Entry> source, RoamingNetworkCommitId headId)
-        => RoamingNetworkCommit.Map(
-            ("Profile", CBORValue.FromText(ArchiveProfile)),
+        => !HasCompleteAncestry ? BoundaryArchive(source, anchorId, headId) : RoamingNetworkCommit.Map(
+            ("Profile", CBORValue.FromText(ArchiveProfileFor(source))),
             ("ContentProfile", CBORValue.FromText(POIContentProfile.Id)),
             ("Checkpoint", CBORValue.Parse(source[checkpointId].Snapshot.ToCBOR(IncludeVersionMetadata: true))),
             ("CheckpointCommit", source[checkpointId].Commit.ToCBORValue()),
@@ -70,16 +85,22 @@ public sealed partial class RoamingNetworkHistory
     public static RoamingNetworkHistory Parse(String json,
         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature = null,
         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature = null,
-        Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null)
+        Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
+        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null)
     {
         using var document = JsonDocument.Parse(json);
         var value = document.RootElement;
+        if (value.GetProperty("Profile").GetString() is BoundaryArchiveProfile or RetentionArchiveProfile)
+            return ParseBoundaryJSON(value, verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary);
         RoamingNetworkCommit.RequireFields(value, "Profile", "ContentProfile", "Checkpoint", "CheckpointCommit", "Commits", "Head");
-        if (value.GetProperty("Profile").GetString() != ArchiveProfile) throw new ArgumentException("Unsupported history profile.");
+        if (value.GetProperty("Profile").GetString() is not (ArchiveProfile or SnapshotArchiveProfile))
+            throw new ArgumentException("Unsupported history profile.");
         POIContentProfile.Require(value.GetProperty("ContentProfile").GetString());
+        var commits = value.GetProperty("Commits").EnumerateArray().Select(RoamingNetworkCommit.Parse).ToImmutableArray();
+        RequireArchiveProfile(value.GetProperty("Profile").GetString(), commits);
         return Restore(RoamingNetworkDataSnapshot.Parse(value.GetProperty("Checkpoint").GetRawText()),
                        RoamingNetworkCommit.Parse(value.GetProperty("CheckpointCommit")),
-                       value.GetProperty("Commits").EnumerateArray().Select(RoamingNetworkCommit.Parse),
+                       commits,
                        JsonSerializer.Deserialize<RoamingNetworkCommitId>(value.GetProperty("Head")),
                        verifyBatchSignature, verifyCommitSignature, authorizeCommit);
     }
@@ -90,14 +111,21 @@ public sealed partial class RoamingNetworkHistory
     public static RoamingNetworkHistory ParseCBOR(ReadOnlySpan<Byte> bytes,
         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature = null,
         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature = null,
-        Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null)
+        Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
+        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null)
     {
-        var fields = RoamingNetworkCommit.Fields(CBORValue.Parse(bytes), "Profile", "ContentProfile", "Checkpoint", "CheckpointCommit", "Commits", "Head");
-        if (RoamingNetworkCommit.Text(fields["Profile"]) != ArchiveProfile) throw new ArgumentException("Unsupported history profile.");
+        var value = CBORValue.Parse(bytes);
+        if (RoamingNetworkCommit.Text(value.AsMap().Single(entry => RoamingNetworkCommit.Text(entry.Key) == "Profile").Value) is BoundaryArchiveProfile or RetentionArchiveProfile)
+            return ParseBoundaryCBOR(value, verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary);
+        var fields = RoamingNetworkCommit.Fields(value, "Profile", "ContentProfile", "Checkpoint", "CheckpointCommit", "Commits", "Head");
+        if (RoamingNetworkCommit.Text(fields["Profile"]) is not (ArchiveProfile or SnapshotArchiveProfile))
+            throw new ArgumentException("Unsupported history profile.");
         POIContentProfile.Require(RoamingNetworkCommit.Text(fields["ContentProfile"]));
+        var commits = fields["Commits"].AsArray().Select(RoamingNetworkCommit.ParseCBORValue).ToImmutableArray();
+        RequireArchiveProfile(RoamingNetworkCommit.Text(fields["Profile"]), commits);
         return Restore(RoamingNetworkDataSnapshot.ParseCBOR(fields["Checkpoint"].ToByteArray(CBORWriterOptions.Canonical)),
                        RoamingNetworkCommit.ParseCBORValue(fields["CheckpointCommit"]),
-                       fields["Commits"].AsArray().Select(RoamingNetworkCommit.ParseCBORValue),
+                       commits,
                        new(ETag.Parse(fields["Head"])), verifyBatchSignature, verifyCommitSignature, authorizeCommit);
     }
 
@@ -110,7 +138,7 @@ public sealed partial class RoamingNetworkHistory
         var history = new RoamingNetworkHistory(RoamingNetwork.Parse(snapshot.ToJSON()), verifyBatchSignature, verifyCommitSignature, authorizeCommit);
         try
         {
-            if (history.checkpointId != checkpoint.Id || checkpoint.ChangeSet is not null)
+            if (history.checkpointId != checkpoint.Id || checkpoint.Kind != RoamingNetworkCommitKind.Checkpoint)
                 throw new ArgumentException("Checkpoint commit does not match the archived static checkpoint.");
             if (!history.TryStoreCommit(checkpoint, out var rootResult)) throw new ArgumentException(rootResult.Error);
             var seen = new HashSet<RoamingNetworkCommitId> { checkpoint.Id };
@@ -152,13 +180,14 @@ public sealed partial class RoamingNetworkHistory
     public static RoamingNetworkHistory Open(String path,
         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature = null,
         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature = null,
-        Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null)
+        Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
+        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null)
     {
         var resolved = Path.GetFullPath(path);
         var lease = AcquireLease(resolved);
         try
         {
-            var history = ParseCBOR(File.ReadAllBytes(resolved), verifyBatchSignature, verifyCommitSignature, authorizeCommit);
+            var history = ParseCBOR(File.ReadAllBytes(resolved), verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary);
             history.archivePath = resolved;
             history.archiveLease = lease;
             return history;
@@ -180,7 +209,12 @@ public sealed partial class RoamingNetworkHistory
     private void Persist(ImmutableDictionary<RoamingNetworkCommitId, Entry> source, RoamingNetworkCommitId headId)
     {
         if (archivePath is null) return;
-        var bytes = Archive(source, headId);
+        Persist(Archive(source, headId));
+    }
+
+    private void Persist(Byte[] bytes)
+    {
+        if (archivePath is null) return;
         var temporary = archivePath + ".tmp-" + Guid.NewGuid().ToString("N");
         try
         {

@@ -24,6 +24,20 @@ namespace cloud.charging.open.protocols.WWCP.POI;
 
 public sealed partial class RoamingNetworkDataSnapshot
 {
+    internal ImmutableHashSet<InfrastructureEntityKey> MergeSubtree(InfrastructureEntityKey root)
+        => Entities.ContainsKey(root) ? Descendants(root, Entities).ToImmutableHashSet() : [];
+
+    internal IEnumerable<(InfrastructureEntityKey Consumer, String Field, InfrastructureEntityKey Target)>
+        MergeReferencesTo(IReadOnlySet<InfrastructureEntityKey> targets)
+    {
+        var consumers = targets.SelectMany(target => References.GetValueOrDefault(target) ?? []).Distinct().
+            OrderBy(key => key.Type).ThenBy(key => key.Id, StringComparer.Ordinal).ThenBy(key => key.Scope, StringComparer.Ordinal);
+        foreach (var consumer in consumers)
+            foreach (var reference in ReferenceTargets(Entities[consumer]).OrderBy(reference => reference.Field, StringComparer.Ordinal).
+                         ThenBy(reference => reference.Key.Type).ThenBy(reference => reference.Key.Id, StringComparer.Ordinal))
+                if (targets.Contains(reference.Key)) yield return (consumer, reference.Field, reference.Key);
+    }
+
     private static IEnumerable<(String Field, InfrastructureEntityType Type, Boolean Array)> ReferenceFields(InfrastructureEntityType type)
     {
         switch (type)

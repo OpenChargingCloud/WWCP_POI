@@ -73,6 +73,38 @@ public sealed class RoamingNetworkBootstrapManifest
     public const String Profile = "wwcp-poi-bootstrap-manifest-v1";
 
     /// <summary>
+    /// The bootstrap manifest profile for complete archives containing snapshot links.
+    /// </summary>
+    public const String SnapshotProfile = "wwcp-poi-bootstrap-manifest-v2";
+
+    /// <summary>
+    /// The manifest profile binding an original chain and a trusted snapshot replay boundary.
+    /// </summary>
+    public const String BoundaryProfile = "wwcp-poi-bootstrap-manifest-v3";
+
+    /// <summary>
+    /// The manifest profile binding a snapshot archive with its explicit pruning receipt catalog.
+    /// </summary>
+    public const String RetentionProfile = "wwcp-poi-bootstrap-manifest-v4";
+
+    /// <summary>
+    /// The replay root captured by this archive, distinct from Checkpoint for partial histories.
+    /// </summary>
+    public RoamingNetworkCommitId Anchor { get; }
+
+    /// <summary>
+    /// The exact history archive profile bound into this manifest identity.
+    /// </summary>
+    public String ArchiveProfile { get; }
+
+    /// <summary>
+    /// The manifest profile corresponding to its bound archive contract.
+    /// </summary>
+    public String WireProfile => ArchiveProfile == RoamingNetworkHistory.RetentionArchiveProfile ? RetentionProfile :
+        ArchiveProfile == RoamingNetworkHistory.BoundaryArchiveProfile ? BoundaryProfile :
+        ArchiveProfile == RoamingNetworkHistory.SnapshotArchiveProfile ? SnapshotProfile : Profile;
+
+    /// <summary>
     /// SHA-256 of canonical manifest JSON excluding this derived identity.
     /// </summary>
     public ETag Id { get; }
@@ -124,14 +156,21 @@ public sealed class RoamingNetworkBootstrapManifest
     /// </summary>
     public RoamingNetworkBootstrapManifest(RoamingNetworkCommitId checkpoint, RoamingNetworkCommitId head,
         Int32 commitCount, Int32 archiveBytes, Int32 chunkBytes, ETag archiveETag,
-        ImmutableArray<ImmutableArray<Byte>> chunkDigests)
+        ImmutableArray<ImmutableArray<Byte>> chunkDigests, String archiveProfile = RoamingNetworkHistory.ArchiveProfile,
+        RoamingNetworkCommitId? anchor = null)
     {
+        if (archiveProfile is not (RoamingNetworkHistory.ArchiveProfile or RoamingNetworkHistory.SnapshotArchiveProfile or RoamingNetworkHistory.BoundaryArchiveProfile or RoamingNetworkHistory.RetentionArchiveProfile))
+            throw new ArgumentException("Unsupported history archive profile.", nameof(archiveProfile));
+        Anchor = anchor ?? checkpoint;
+        if (!Anchor.IsValid || (archiveProfile is RoamingNetworkHistory.BoundaryArchiveProfile or RoamingNetworkHistory.RetentionArchiveProfile) != (Anchor != checkpoint))
+            throw new ArgumentException("The archive profile must match its explicit snapshot boundary.");
         if (!checkpoint.IsValid || !head.IsValid || commitCount < 1 || archiveBytes < 1 || chunkBytes < 1 ||
             !archiveETag.IsValid || archiveETag.Format != ETagFormat.CBOR || chunkDigests.IsDefaultOrEmpty ||
             chunkDigests.Length != ((Int64) archiveBytes + chunkBytes - 1) / chunkBytes ||
             chunkDigests.Any(digest => digest.IsDefault || digest.Length != 32))
             throw new ArgumentException("Invalid bootstrap identities, lengths, count or SHA-256 fragment digests.");
         Checkpoint = checkpoint; Head = head; CommitCount = commitCount;
+        ArchiveProfile = archiveProfile;
         ArchiveBytes = archiveBytes; ChunkBytes = chunkBytes; ArchiveETag = archiveETag; ChunkDigests = chunkDigests;
         using var document = JsonDocument.Parse(JSON(includeId: false));
         Id = ETag.Compute(ETagFormat.JSON, CanonicalJSON.ToUTF8Bytes(document));
@@ -163,9 +202,10 @@ public sealed class RoamingNetworkBootstrapManifest
         {
             writer.WriteStartObject();
             if (includeId) { writer.WritePropertyName("Id"); Id.WriteTo(writer); }
-            writer.WriteString("Profile", Profile); writer.WriteString("ContentProfile", POIContentProfile.Id);
-            writer.WriteString("ArchiveProfile", RoamingNetworkHistory.ArchiveProfile);
+            writer.WriteString("Profile", WireProfile); writer.WriteString("ContentProfile", POIContentProfile.Id);
+            writer.WriteString("ArchiveProfile", ArchiveProfile);
             writer.WritePropertyName("Checkpoint"); Checkpoint.Hash.WriteTo(writer);
+            if (WireProfile is BoundaryProfile or RetentionProfile) { writer.WritePropertyName("Anchor"); Anchor.Hash.WriteTo(writer); }
             writer.WritePropertyName("Head"); Head.Hash.WriteTo(writer);
             writer.WriteNumber("CommitCount", CommitCount); writer.WriteNumber("ArchiveBytes", ArchiveBytes);
             writer.WriteNumber("ChunkBytes", ChunkBytes);
@@ -187,8 +227,11 @@ public sealed class RoamingNetworkBootstrapManifest
         if (Encoding.UTF8.GetByteCount(json) > limits.MaxManifestBytes) throw new ArgumentException("Manifest exceeds MaxManifestBytes.");
         using var document = JsonDocument.Parse(json);
         var value = document.RootElement;
-        RoamingNetworkCommit.RequireFields(value, "Id", "Profile", "ContentProfile", "ArchiveProfile", "Checkpoint", "Head",
-            "CommitCount", "ArchiveBytes", "ChunkBytes", "ArchiveETag", "DigestAlgorithm", "ChunkDigestEncoding", "ChunkDigests");
+        var boundary = value.GetProperty("Profile").GetString() is BoundaryProfile or RetentionProfile;
+        var names = new List<String> { "Id", "Profile", "ContentProfile", "ArchiveProfile", "Checkpoint", "Head",
+            "CommitCount", "ArchiveBytes", "ChunkBytes", "ArchiveETag", "DigestAlgorithm", "ChunkDigestEncoding", "ChunkDigests" };
+        if (boundary) names.Add("Anchor");
+        RoamingNetworkCommit.RequireFields(value, names.ToArray());
         RequireProfiles(value.GetProperty("Profile").GetString(), value.GetProperty("ContentProfile").GetString(),
             value.GetProperty("ArchiveProfile").GetString(), value.GetProperty("DigestAlgorithm").GetString());
         if (value.GetProperty("ChunkDigestEncoding").GetString() != "base64" || value.GetProperty("ChunkDigests").GetArrayLength() > limits.MaxChunks)
@@ -197,7 +240,9 @@ public sealed class RoamingNetworkBootstrapManifest
             JsonSerializer.Deserialize<RoamingNetworkCommitId>(value.GetProperty("Head")), value.GetProperty("CommitCount").GetInt32(),
             value.GetProperty("ArchiveBytes").GetInt32(), value.GetProperty("ChunkBytes").GetInt32(),
             JsonSerializer.Deserialize<ETag>(value.GetProperty("ArchiveETag")), value.GetProperty("ChunkDigests").EnumerateArray()
-                .Select(item => ImmutableArray.CreateRange(DecodeBase64(item.GetString()!, 32))).ToImmutableArray());
+                .Select(item => ImmutableArray.CreateRange(DecodeBase64(item.GetString()!, 32))).ToImmutableArray(),
+            value.GetProperty("ArchiveProfile").GetString()!,
+            boundary ? JsonSerializer.Deserialize<RoamingNetworkCommitId>(value.GetProperty("Anchor")) : null);
         manifest.RequireLimits(limits);
         if (manifest.Id != JsonSerializer.Deserialize<ETag>(value.GetProperty("Id"))) throw new ArgumentException("Manifest identity mismatch.");
         return manifest;
@@ -206,12 +251,17 @@ public sealed class RoamingNetworkBootstrapManifest
     /// <summary>
     /// Encode native CBOR maps and binary digest strings.
     /// </summary>
-    public Byte[] ToCBOR() => RoamingNetworkCommit.Map(
-        ("Id", Id.ToCBOR()), ("Profile", CBORValue.FromText(Profile)), ("ContentProfile", CBORValue.FromText(POIContentProfile.Id)),
-        ("ArchiveProfile", CBORValue.FromText(RoamingNetworkHistory.ArchiveProfile)), ("Checkpoint", Checkpoint.ToCBOR()), ("Head", Head.ToCBOR()),
+    public Byte[] ToCBOR()
+    {
+        var fields = new List<(String Key, CBORValue Value)> {
+        ("Id", Id.ToCBOR()), ("Profile", CBORValue.FromText(WireProfile)), ("ContentProfile", CBORValue.FromText(POIContentProfile.Id)),
+        ("ArchiveProfile", CBORValue.FromText(ArchiveProfile)), ("Checkpoint", Checkpoint.ToCBOR()), ("Head", Head.ToCBOR()),
         ("CommitCount", CBORValue.FromInt64(CommitCount)), ("ArchiveBytes", CBORValue.FromInt64(ArchiveBytes)),
         ("ChunkBytes", CBORValue.FromInt64(ChunkBytes)), ("ArchiveETag", ArchiveETag.ToCBOR()), ("DigestAlgorithm", CBORValue.FromText("sha256")),
-        ("ChunkDigests", CBORValue.FromArray(ChunkDigests.Select(digest => CBORValue.FromBytes(digest.ToArray()))))).ToByteArray(CBORWriterOptions.Canonical);
+        ("ChunkDigests", CBORValue.FromArray(ChunkDigests.Select(digest => CBORValue.FromBytes(digest.ToArray())))) };
+        if (WireProfile is BoundaryProfile or RetentionProfile) fields.Add(("Anchor", Anchor.ToCBOR()));
+        return RoamingNetworkCommit.Map(fields.ToArray()).ToByteArray(CBORWriterOptions.Canonical);
+    }
 
     /// <summary>
     /// Decode a bounded exact CBOR manifest and recompute its shared identity.
@@ -220,8 +270,12 @@ public sealed class RoamingNetworkBootstrapManifest
     {
         limits ??= new();
         if (bytes.Length > limits.MaxManifestBytes) throw new ArgumentException("Manifest exceeds MaxManifestBytes.");
-        var fields = RoamingNetworkCommit.Fields(CBORValue.Parse(bytes), "Id", "Profile", "ContentProfile", "ArchiveProfile", "Checkpoint", "Head",
-            "CommitCount", "ArchiveBytes", "ChunkBytes", "ArchiveETag", "DigestAlgorithm", "ChunkDigests");
+        var value = CBORValue.Parse(bytes);
+        var boundary = RoamingNetworkCommit.Text(value.AsMap().Single(entry => RoamingNetworkCommit.Text(entry.Key) == "Profile").Value) is BoundaryProfile or RetentionProfile;
+        var names = new List<String> { "Id", "Profile", "ContentProfile", "ArchiveProfile", "Checkpoint", "Head",
+            "CommitCount", "ArchiveBytes", "ChunkBytes", "ArchiveETag", "DigestAlgorithm", "ChunkDigests" };
+        if (boundary) names.Add("Anchor");
+        var fields = RoamingNetworkCommit.Fields(value, names.ToArray());
         RequireProfiles(RoamingNetworkCommit.Text(fields["Profile"]), RoamingNetworkCommit.Text(fields["ContentProfile"]),
             RoamingNetworkCommit.Text(fields["ArchiveProfile"]), RoamingNetworkCommit.Text(fields["DigestAlgorithm"]));
         if (fields["ChunkDigests"].AsArray().Count > limits.MaxChunks) throw new ArgumentException("Manifest exceeds MaxChunks.");
@@ -230,7 +284,8 @@ public sealed class RoamingNetworkBootstrapManifest
             fields["ChunkDigests"].AsArray().Select(item => {
                 if (!item.TryGetBytes(out var digest) || digest.Length != 32) throw new ArgumentException("Expected a 32-byte fragment digest.");
                 return ImmutableArray.CreateRange(digest);
-            }).ToImmutableArray());
+            }).ToImmutableArray(), RoamingNetworkCommit.Text(fields["ArchiveProfile"]),
+            boundary ? new RoamingNetworkCommitId(ETag.Parse(fields["Anchor"])) : null);
         manifest.RequireLimits(limits);
         if (manifest.Id != ETag.Parse(fields["Id"])) throw new ArgumentException("Manifest identity mismatch.");
         return manifest;
@@ -252,7 +307,10 @@ public sealed class RoamingNetworkBootstrapManifest
 
     private static void RequireProfiles(String? profile, String? content, String? archive, String? algorithm)
     {
-        if (profile != Profile || archive != RoamingNetworkHistory.ArchiveProfile || algorithm != "sha256")
+        if (!((profile == Profile && archive == RoamingNetworkHistory.ArchiveProfile) ||
+              (profile == SnapshotProfile && archive == RoamingNetworkHistory.SnapshotArchiveProfile) ||
+              (profile == BoundaryProfile && archive == RoamingNetworkHistory.BoundaryArchiveProfile) ||
+              (profile == RetentionProfile && archive == RoamingNetworkHistory.RetentionArchiveProfile)) || algorithm != "sha256")
             throw new ArgumentException("Unsupported bootstrap profile, archive profile or digest algorithm.");
         POIContentProfile.Require(content);
     }

@@ -5,16 +5,26 @@
 `RoamingNetworkHistory` retains immutable commits and their static snapshots, including branches
 that have not been published. `Head` returns one coherent `RoamingNetworkHead` containing the
 commit envelope, typed commit ID, network and static snapshot. Network runtime data remains mutable.
+Commits have explicit `Checkpoint`, `ChangeSet` and `Snapshot` kinds. Administrators can insert
+[full snapshot links](SNAPSHOTS.md) into the same chain without changing static data or entity lifetimes.
+Separate replicas may also start at an [explicitly authorized snapshot boundary](SNAPSHOT-BOUNDARIES.md).
+`CheckpointId` remains the original chain claim; `AnchorId` identifies the local replay root and
+`HasCompleteAncestry` distinguishes full history from a trusted suffix. The one boundary root
+retains an external parent; every later commit still requires all parents locally.
+[Explicit archival/pruning](RETENTION.md) can move that root under a reviewed dependency-safe plan.
+It saves the entire preceding local archive before active replacement and preserves the exact live
+head/network/runtime. History-v4 includes immutable pruning receipts, permitting typed archived/unknown
+lookups and digest-checked retrieval into a separate history. Snapshot/export APIs never prune implicitly.
 
 ## State identity and commit identity
 
 | Identity | Input | Purpose |
 | --- | --- | --- |
 | Static JSON/CBOR ETags | Static stored POI properties and owned descendants | Compare data contents and validate a transition |
-| `RoamingNetworkCommitId` | Canonical JSON commit header, ordered parents and complete unsigned batch | Identify one version in its history |
+| `RoamingNetworkCommitId` | Canonical JSON header, ordered parents and unsigned batch or full snapshot payload | Identify one version in its history |
 | ChangeSet `Id` | Application-supplied identifier | Detect conflicting reuse within one retained history |
 
-The fixed commit identity profile is **`wwcp-poi-commit-json-v1`**. `GetIdentityBytes()` returns
+The checkpoint/ChangeSet identity profile is **`wwcp-poi-commit-json-v1`**. `GetIdentityBytes()` returns
 its Styx canonical UTF-8 JSON. SHA-256 over those bytes yields the typed readonly
 `RoamingNetworkCommitId`. The preimage contains exactly:
 
@@ -36,6 +46,13 @@ revision and last applied batch ID without inventing timestamps or earlier histo
 anchoring exactly the same snapshot produces the same checkpoint ID. Earlier commits are not
 reconstructed from the snapshot's last applied ID.
 
+Full snapshot links use **`wwcp-poi-snapshot-commit-json-v1`** with `Snapshot` replacing `ChangeSet`.
+The complete static state, creation time, multilingual descriptions and metadata are bound into
+their identity. They have exactly one parent, advance its revision once, preserve its state ETags
+and last applied batch ID, and introduce no synthetic batch. `PrepareSnapshot` prepares against
+the expected current head; sign then publish through the existing APIs. Details are in
+[snapshot state, identity and wire contracts](SNAPSHOTS.md).
+
 The ID uses the existing ETag digest tuple contract: JSON
 `["json", "sha256", "hex", "<64 lowercase digits>"]`; CBOR
 `["json", "sha256", h'<32 digest bytes>']`. Its **commit type and domain-separated profile**
@@ -45,8 +62,8 @@ the commit identity hashes canonical JSON. `StateETags` continue to carry both t
 
 ## Revision and ancestry
 
-Revision is a **first-parent chain coordinate**. A transition has the first parent's revision
-plus one and targets that parent's exact static ETags. An imported checkpoint can start above
+Revision is a **first-parent chain coordinate**. Each ChangeSet or snapshot link has the first parent's revision
+plus one. A ChangeSet targets its exact ETags; a full snapshot preserves those ETags. An imported checkpoint can start above
 zero. Parallel branches can legitimately have equal revisions and different commit IDs.
 
 ```mermaid
@@ -70,6 +87,13 @@ with structured conflicts and explicit resolutions. Its fresh commit has left/ri
 signed ancestor/resolution metadata. Preview/preparation never publish it. See
 [integrating retained branches](MERGING.md) for identity-based collection edits, best ancestor
 selection, validation and trust. Recursive virtual merge bases and rebase remain roadmap work.
+
+Merge derives addressed object lifetimes from original first-parent operation sequences, including
+intermediate removal/reintroduction with unchanged final IDs and creation metadata. Additional
+parents do not establish first-parent lifetime continuity. Selected recreations are represented
+by explicit operations and optional signed lifetime audit records. Origins are recomputed from
+retained history during planning, rather than restored from audit claims. See
+[object lifetime comparison](MERGING.md#object-lifetimes-from-original-operations).
 
 ## Preparing, retaining and publishing
 
@@ -133,15 +157,20 @@ Configure the constructor or archive loader with:
   signers, quorum or an unsigned-commit policy.
 
 Signed content requires its verifier. Unsigned content is allowed unless authorization rejects it.
+This ordinary commit policy does not weaken snapshot-boundary entry: its root must have accepted
+signatures and an explicit checkpoint/anchor authorization callback. The same requirement applies
+to boundary recovery and bootstrap preview/activation.
 Use the corresponding `VerifySignature` method and application-trusted public keys in each callback.
 Parsing a commit checks its declared ID/header; it does not establish trust or prove applicability.
-Storage/recovery validate parents and replay the batch against the retained static source.
+Storage/recovery validate parents and replay the batch or validate the full snapshot against its retained static source.
 
 Commit `Sign`/`TrySign` and `VerifySignature`/`VerifySignatures` use
 **`wwcp-poi-commit-signature-json-v1`** and Styx asymmetric algorithms/COSE keys. Its canonical JSON
 input contains `Profile`, `Algorithm`, `KeyId`, `Encoding: "base64"`, `CommitId` and `Commit`
 (the complete unsigned identity preimage). Both peer arrays remain excluded. The shared immutable
 `RoamingNetworkChangeSetSignature` envelope carries the profile selecting the signed content.
+Full snapshot commits use **`wwcp-poi-snapshot-commit-signature-json-v1`** instead, binding their
+complete payload and parent through the same methods. `SignatureProfile` selects the required profile.
 The v2 **batch** signature still authenticates the transition, descriptions and metadata; it does
 not authenticate the new commit's parents. Commit signatures add that ancestry binding.
 
@@ -150,11 +179,20 @@ it reentrantly. Keep verification local; fetch keys or missing parents before at
 
 ## Static archives and recovery
 
-`ToJSON()` and `ToCBOR()` export profile **`wwcp-poi-history-v1`**:
+`ToJSON()` and `ToCBOR()` export **`wwcp-poi-history-v1`** without snapshot links, or
+**`wwcp-poi-history-v2`** when a complete history retains any full snapshot. Both retain the original checkpoint and DAG.
+
+These version 1/2 contracts describe complete ancestry. Boundary replicas use
+**`wwcp-poi-history-v3`** with `CheckpointId`, complete `SnapshotCommit`, suffix `Commits`, `Head`
+and required profile headers. Recovery requires trusted anchor signature verification and explicit
+`authorizeSnapshotBoundary`; `Parse`, `ParseCBOR` and `Open` accept that callback. See
+[boundary archive and trust contracts](SNAPSHOT-BOUNDARIES.md).
+History-v4 additionally requires a nonempty `RetentionReceipts` array for [explicit pruning](RETENTION.md).
+Fresh recovery retains the catalog but does not treat its unsigned hashes as independent historical proof.
 
 | Field | Content |
 | --- | --- |
-| `Profile` | Archive profile name |
+| `Profile` | Complete-history archive profile name |
 | `ContentProfile` | Required static content profile (`wwcp-poi-static-v1`) |
 | `Checkpoint` | Static snapshot including revision, last batch ID and state ETags |
 | `CheckpointCommit` | Its complete immutable envelope and peer signatures |
@@ -201,8 +239,9 @@ metadata is not separately flushed. This is a local archive store, not a distrib
 The head reference is mutable archive bookkeeping, outside individual commit signatures. Validating
 an archive proves retained content and ancestry; preventing rollback to an older valid head requires
 an externally retained expected head or application policy. Archive rewriting and cached per-commit
-snapshots favor a simple recoverable implementation; incremental journals, pruning and performance
-measurements remain future extensions.
+snapshots favor a simple recoverable implementation; incremental journals and performance
+measurements remain future extensions. Explicit archive-before-pruning is implemented separately;
+its dedicated failure/recovery evidence remains pending.
 
 ## Runtime delivery
 
@@ -229,7 +268,8 @@ edges, including an incoming merge over its right parent. `GetReplicationState`,
 `TryCreateCommitPack` and `TryImportCommitPack` exchange missing ancestry in bounded JSON/CBOR
 pages, with atomic page retention and unchanged head/runtime on import. See [replication](REPLICATION.md).
 Dedicated exchange/adoption/persistence fixtures now contribute 61 passing cases; the full
-suite passes 509 tests. They cover boundaries, page rollback, signed second-parent selection,
+suite last passed 509 tests before the newer snapshot/boundary/retention changes. Those fixtures cover
+ordinary exchange boundaries, page rollback, signed second-parent selection,
 runtime lifetime resets, trust changes, head races, gated status delivery and disk recovery.
 See [replication evidence](REPLICATION.md#implementation-and-evidence). Exhaustive graph cases,
 power-loss simulation and performance evidence remain in the [roadmap](ROADMAP.md).
@@ -247,4 +287,7 @@ deletion/recreation/addition/owner conflicts, typed reference targets, scoped co
 and parking scopes, whole-subtree resolution with signed recovery, criss-cross ancestor selection
 and resolver reentry/exception rollback. Repeated invalid reference decisions terminate, and
 revalidation removes issues already repaired by a whole-subtree choice. A valid candidate with an
-unschedulable referenced replacement returns conflicts rather than bypassing operation validation.
+referenced replacement can now prepare an explicit temporary reference plan using normal operation
+validation. Its revised existing test expectation has not been rerun. Plans are exposed before
+explicit preparation/publication and recorded in signed merge metadata; remaining unschedulable
+dependencies still return conflicts.

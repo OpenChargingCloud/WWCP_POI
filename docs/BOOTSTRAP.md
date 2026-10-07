@@ -2,10 +2,13 @@
 
 [Repository overview](../README.md) · [History](HISTORY.md) · [Incremental replication](REPLICATION.md) · [Trust](SIGNATURES.md)
 
-Bootstrap supplies the checkpoint snapshot and complete retained commit DAG to a new replica.
+Ordinary bootstrap supplies the checkpoint snapshot and complete retained commit DAG to a new replica.
 It is the initial "clone" step before incremental exchange. An existing replica with a different
 checkpoint can use the same workflow to prepare a **separate** history for an explicit application
 switch. Staging and validation never replace its current history or runtime data.
+`CreateSnapshotBootstrap(snapshotId, targetTip, ...)` can instead freeze an original signed snapshot
+and a suffix whose every parent path terminates there. Activation requires explicit signature and
+checkpoint/anchor policies. See [authorized snapshot entry](SNAPSHOT-BOUNDARIES.md).
 
 ## Frozen source and local bounds
 
@@ -47,11 +50,12 @@ Manifest JSON has these exact fields:
 | Field | Meaning |
 | --- | --- |
 | `Id` | JSON SHA-256 ETag of canonical manifest JSON excluding this derived field |
-| `Profile` | `wwcp-poi-bootstrap-manifest-v1` |
+| `Profile` | Manifest version 1/2 for complete histories, version 3 for a snapshot boundary, version 4 when pruning receipts are included |
 | `ContentProfile` | `wwcp-poi-static-v1` |
-| `ArchiveProfile` | `wwcp-poi-history-v1` |
+| `ArchiveProfile` | `wwcp-poi-history-v1`/`v2` for complete history; `v3` for a boundary suffix; `v4` adds its pruning receipts |
 | `Checkpoint`, `Head` | Original typed checkpoint and published head IDs |
-| `CommitCount` | Retained commits including checkpoint and unpublished branches |
+| `Anchor` | Versions 3/4 only: original signed snapshot replay root |
+| `CommitCount` | Included commits plus the checkpoint or snapshot root |
 | `ArchiveBytes`, `ChunkBytes` | Complete byte length and fixed fragment size, except the final tail |
 | `ArchiveETag` | CBOR SHA-256 ETag of the complete deterministic CBOR archive |
 | `DigestAlgorithm` | `sha256`, for all raw fragment digests |
@@ -79,6 +83,22 @@ These identities have separate meanings:
 - The manifest ID additionally binds fragment layout, count and transfer profiles.
 
 Existing static, ChangeSet, commit, signature and archive profiles/reference bytes are unchanged.
+
+Full [snapshot links](SNAPSHOTS.md) select `wwcp-poi-history-v2` and
+`wwcp-poi-bootstrap-manifest-v2`. `Manifest.ArchiveProfile` and `WireProfile` expose this pair;
+decoding and final replay reject an inconsistent pairing. The archive still contains its original
+checkpoint and complete retained ancestry, including every snapshot branch. Snapshot-only links
+must reproduce their first parent's static state and advance revision while retaining its last batch ID.
+Fragment envelopes retain version 1 because they already bind arbitrary archive slices to a manifest.
+Activation continues to initialize fresh local runtime. Version 3 additionally supports a trusted
+snapshot with omitted earlier history and binds its explicit `Anchor`. `TryActivate` requires
+`authorizeSnapshotBoundary` and `verifyCommitSignature` for versions 3/4, including validation previews.
+The boundary policy must authorize the chain/anchor pair and rollback constraints independently.
+Version 4 binds history-v4 and also retains the [pruning receipt catalog](RETENTION.md). The complete
+archive digest covers these unsigned records, whose trust depends on archive/manifest provenance.
+`CommitCount` counts retained commits including the root, not recorded removed IDs. `MaxArchiveBytes`
+also bounds catalog input bytes. Creating a snapshot export does not record excluded branches as pruned.
+Snapshot, boundary and retention transfer tests remain pending.
 
 ## Staging and restart
 
@@ -197,6 +217,8 @@ still materialize a complete archive and all retained static states in memory. R
 snapshot memory are not bounded by fragment size. `MaxArchiveBytes` bounds input bytes rather than
 all allocations. Staging holds accepted bytes plus manifest and transient write files; orphan files
 from previous crashes need application cleanup. There is no streaming archive codec, durable sender
-session service, network/key negotiation, automatic old-history switch, pruning or power-loss proof.
+session service, network/key negotiation, automatic old-history switch or power-loss proof.
+Separate [explicit retention](RETENTION.md) now archives and prunes existing histories; bootstrap
+export itself continues to retain the source.
 The tests inject failures and model transfer interruption/reopen; they do not simulate power loss
 or arbitrary process exits during bootstrap writes. See the [roadmap](ROADMAP.md).

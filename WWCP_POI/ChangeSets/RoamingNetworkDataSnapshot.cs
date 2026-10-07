@@ -58,7 +58,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Int64 Revision { get; }
 
         /// <summary>
-        /// The change set that produced this version, if one has been applied.
+        /// The last applied change set identifier, retained unchanged by snapshot-only history links.
         /// </summary>
         public String? AppliedChangeSetId { get; }
 
@@ -94,6 +94,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         #endregion
+
+        /// <summary>
+        /// Advance history bookkeeping for a snapshot link while sharing all static entities and indexes.
+        /// </summary>
+        internal RoamingNetworkDataSnapshot AdvanceSnapshotRevision()
+            => new(Root, Entities, checked(Revision + 1), AppliedChangeSetId, References);
 
         #region Read entities and JSON
 

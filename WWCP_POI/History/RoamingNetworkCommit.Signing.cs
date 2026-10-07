@@ -19,6 +19,16 @@ public sealed partial class RoamingNetworkCommit
     public const String SigningProfile = "wwcp-poi-commit-signature-json-v1";
 
     /// <summary>
+    /// The domain-separated signing profile for complete snapshot links and their ancestry.
+    /// </summary>
+    public const String SnapshotSigningProfile = "wwcp-poi-snapshot-commit-signature-json-v1";
+
+    /// <summary>
+    /// The required signature profile for this payload kind.
+    /// </summary>
+    public String SignatureProfile => Snapshot is null ? SigningProfile : SnapshotSigningProfile;
+
+    /// <summary>
     /// Return the canonical signature input including algorithm, trusted key ID and full unsigned commit.
     /// </summary>
     public Byte[] GetSigningBytes(COSEAlgorithm algorithm, String keyId)
@@ -29,7 +39,7 @@ public sealed partial class RoamingNetworkCommit
         using (var writer = new Utf8JsonWriter(stream))
         {
             writer.WriteStartObject();
-            writer.WriteString("Profile", SigningProfile);
+            writer.WriteString("Profile", SignatureProfile);
             writer.WriteString("Algorithm", algorithm.Name);
             writer.WriteString("KeyId", keyId);
             writer.WriteString("Encoding", "base64");
@@ -50,7 +60,7 @@ public sealed partial class RoamingNetworkCommit
         ArgumentNullException.ThrowIfNull(privateKey);
         if (!privateKey.IsPrivate) throw new ArgumentException("Signing requires a private asymmetric key.", nameof(privateKey));
         var value = algorithm.Sign(GetSigningBytes(algorithm, keyId), privateKey, Deterministic: deterministic);
-        return WithSignature(new(algorithm.Name, keyId, Convert.ToBase64String(value), SigningProfile));
+        return WithSignature(new(algorithm.Name, keyId, Convert.ToBase64String(value), SignatureProfile));
     }
 
     /// <summary>
@@ -102,7 +112,7 @@ public sealed partial class RoamingNetworkCommit
             ArgumentNullException.ThrowIfNull(signature);
             if (publicKey.IsPrivate) throw new ArgumentException("Verification requires a public key.");
             if (!Signatures.Contains(signature)) throw new ArgumentException("The signature is not part of this commit.");
-            if (signature.Profile != SigningProfile || signature.Encoding != "base64")
+            if (signature.Profile != SignatureProfile || signature.Encoding != "base64")
                 throw new ArgumentException("Unsupported commit signature profile or encoding.");
             if (String.IsNullOrWhiteSpace(expectedKeyId) || signature.KeyId != expectedKeyId)
                 throw new ArgumentException("The signature key ID does not match the trusted key ID.");

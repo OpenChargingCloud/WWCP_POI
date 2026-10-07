@@ -55,6 +55,9 @@ profile relationships, cross-replica tests and the development-envelope change.
 
 These two identifiers describe static **state**. The separate typed `RoamingNetworkCommitId`
 hashes the canonical `wwcp-poi-commit-json-v1` header, ordered parents and unsigned batch content.
+Full [snapshot links](SNAPSHOTS.md) instead bind complete static state and administrator metadata
+under `wwcp-poi-snapshot-commit-json-v1`; their state ETags equal the parent's, while commit ID and
+history revision change. Static-v1 digest inputs are unchanged.
 It remains a JSON digest in CBOR transport; a transport encoding does not change its hash input.
 Both peer signature arrays are excluded. See [history identity](HISTORY.md#state-identity-and-commit-identity)
 for wire tuples, ancestry and archive recovery.

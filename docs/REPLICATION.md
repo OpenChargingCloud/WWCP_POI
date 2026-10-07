@@ -11,14 +11,16 @@ Current statuses, schedules, measurements and forecasts never enter these messag
 
 | Field | Meaning |
 | --- | --- |
-| `Profile` | `wwcp-poi-replication-state-v1` |
+| `Profile` | `wwcp-poi-replication-state-v1`, or version 2 for a trusted snapshot boundary |
 | `ContentProfile` | `wwcp-poi-static-v1` |
 | `Checkpoint` | Typed shared checkpoint commit ID |
+| `Anchor` | Version 2 only: the retained snapshot root, excluding its earlier ancestry |
 | `Head` | Typed published commit ID |
 | `KnownTips` | Deterministically ordered retained DAG frontier, including unpublished branches |
 
-Acknowledging a tip acknowledges its **complete ancestry through every parent**, rather than only
-its first-parent chain. An announcement produced by the history satisfies this rule. Applications
+Acknowledging a tip acknowledges every parent path **down to the declared replay root**, rather than only
+its first-parent chain. Version 1 reaches the original checkpoint; version 2 explicitly stops at its snapshot
+`Anchor` and does not acknowledge earlier parents. An announcement produced by the history satisfies this rule. Applications
 must not claim partially received or merely advertised IDs as retained tips. The sender ignores
 unknown tips, allowing replicas to announce local divergent branches the sender has not seen.
 
@@ -45,7 +47,7 @@ The checkpoint envelope does not count toward the transition-count limit.
 
 | Field | Meaning |
 | --- | --- |
-| `Profile` | `wwcp-poi-commit-pack-v1` |
+| `Profile` | `wwcp-poi-commit-pack-v1`, or `wwcp-poi-commit-pack-v2` when the page contains a full snapshot |
 | `ContentProfile` | `wwcp-poi-static-v1` |
 | `CheckpointCommit` | Shared checkpoint envelope with peer signatures, without a snapshot |
 | `Tip` | Fixed requested commit ID |
@@ -62,6 +64,22 @@ empty page is valid when the receiver already retains the tip. An incomplete pag
 at least one transition. Messages do not select their declared tip as the local head.
 
 ## Atomic import and trust
+
+Full [snapshot links](SNAPSHOTS.md) are original commit envelopes and count as one transition.
+Import requires their retained parent, exact unchanged static state, revision increment and unchanged
+last batch ID; snapshot links introduce no batch-ID entry. Their signatures/authorization are checked
+through the commit policies. `pack.WireProfile` selects the page profile; parsers reject inconsistent
+version/payload combinations. Complete-history snapshot-free pages retain version 1. A full snapshot
+among the new transitions is indivisible under the page limit; bounded archive bootstrap
+can transfer an oversized state in fragments. Snapshot publication/adoption preserves local runtime
+and original entity lifetimes. [Authorized snapshot entry](SNAPSHOT-BOUNDARIES.md) now also supports
+absent earlier parents. Version 3 pages have exact fields `Profile`, `ContentProfile`, `CheckpointId`,
+`AnchorId`, `AnchorSignatures`, `Tip`, `Complete` and `Commits`. They reference the already retained
+snapshot rather than retransmitting its state. `Parse`/`ParseCBOR` require `resolveAnchor: history.GetCommit`
+for such pages; import independently rechecks trust and the original chain ID. Missing boundary roots
+require explicit bootstrap/ancestry retrieval, never implicit activation. Complete-history version 1/2
+pages retain their original contract. The root is excluded from the transition count, while all root
+ID and peer envelopes count toward the byte limit.
 
 `TryImportCommitPack` validates a page in temporary immutable maps. It verifies incoming peers,
 unions retained peer envelopes and verifies the combined envelopes, reauthorizes consumed local
@@ -93,13 +111,21 @@ to a preconstructed pack. Applications should also cap network reads and concurr
 | `Imported` | All page content was accepted, with new transitions retained |
 | `AlreadyStored` | No new transition IDs; accepted peers may still have been added |
 | `CheckpointMismatch` | Explicit bootstrap is required; local history is untouched |
-| `UnknownTip` | Requested sender tip is unavailable |
+| `UnknownTip` | Requested sender tip is unknown, without a recorded pruning event |
 | `MissingParents` | Typed external dependencies or a declared complete tip are missing |
 | `CommitTooLarge` | A page/count/header/indivisible commit exceeds the chosen limits |
 | `ChangeSetIdConflict` | An existing batch ID denotes different content or ancestry |
 | `InvalidInput` | Contract, order, trust, replay or state validation failed |
 | `PersistenceFailure` | Candidate archive could not be installed |
 | `Unavailable` | History is disposed or mutation callbacks attempted reentry |
+| `SnapshotRequired` | A root is unavailable/unacknowledged or a requested tip has a pruning receipt; an optional signed proposal requires explicit authorization |
+| `HistoryRequired` | Required ancestry lies outside the selected boundary or an import needs recorded cold dependencies |
+
+[Explicit retention](RETENTION.md) supplies an optional `RetentionReceipt` for recorded archived IDs,
+including the exact source cold archive ETag. `LookupCommit` distinguishes retained, archived and unknown
+identities. A proposed boundary is chosen only when all head parent paths terminate there. Neither
+receipts nor proposals authorize replacing a receiver's head/root; locate cold history or explicitly
+authorize a compatible snapshot bootstrap. Receipt hashes are bookkeeping, not signed membership proofs.
 
 ## Explicit head adoption
 
@@ -209,7 +235,9 @@ reopen; the earlier crash fixture separately covers abrupt process exits around 
 The separate [bootstrap fixture](BOOTSTRAP.md#outcomes-and-evidence) adds 32 passing cases.
 The [structural merge fixture](MERGING.md#structural-merge-evidence) adds 34 passing cases for
 integration conflicts, typed references, scoped identities, explicit ancestor choices and resolver failures.
-HTTP transport, key negotiation, streaming archive replay, pruning, independent peer implementations
+HTTP transport, key negotiation, streaming archive replay, independent peer implementations
 and performance measurements remain application/future work. Export currently traverses retained
 history, and persistence rewrites the full archive; page bounds do not bound total history memory
 or replay/archive work. See the [roadmap](ROADMAP.md).
+Administrator-controlled [archival/pruning](RETENTION.md) is implemented separately; its new catalog
+and replication responses have a successful build but await dedicated executed verification.

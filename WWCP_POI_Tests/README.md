@@ -33,7 +33,7 @@ dotnet test WWCP_POI_Tests/WWCP_POI_Tests.csproj --no-restore --filter 'FullyQua
 | `HeadAdoptionTests` | Signed second-parent merge adoption, preview/idempotence/ancestry checks, independent runtime schedules/measurements/forecasts, recreated/new meter and EVSE lifetimes, connection-point children, revision decreases, revoked merge parents, reentrancy, competing heads and gated runtime delivery |
 | `ReplicationPersistenceTests` | One archive write per page, retention/head installation after replacement, injected failures before writing/after flushing, unchanged memory/disk/runtime, retry, original signed head recovery and continued publication |
 | `BootstrapTests` | 32 cases: frozen bounded JSON/CBOR transfer, verified receipts/restart/duplicates, exact raw/wire/count limits, disk/transport corruption, write failures and leases, complete digest/profile/checkpoint/head/identity/signature/replay checks, revoked unpublished branches, explicit activation, existing archives, reentry, fresh runtime and incremental continuation |
-| `StructuralMergeTests` | 34 cases: owner/descendant deletion in both branch orders, whole-subtree choices with signed recovery, meter/graph recreation and additions, all missing references and typed targets, active/admission groups, independent grid slots, owner/parking scope, connector IDs scoped to EVSE, criss-cross ancestor choices, invalid resolutions, resolver reentry/exceptions and unschedulable referenced replacements |
+| `StructuralMergeTests` | 34 cases: owner/descendant deletion in both branch orders, whole-subtree choices with signed recovery, meter/graph recreation and additions, all missing references and typed targets, active/admission groups, independent grid slots, owner/parking scope, connector IDs scoped to EVSE, criss-cross ancestor choices, invalid resolutions, resolver reentry/exceptions and referenced replacement with an explicit temporary reference plan (revised expectation not rerun) |
 
 The 1,000-EVSE sharing fixture counts replaced immutable entries; it is not a capacity/performance
 benchmark. The crash tests establish behavior for process interruption at two known stages;
@@ -97,8 +97,29 @@ policy and CBOR artifacts are marked binary in `.gitattributes`.
 
 ## Remaining coverage
 
-Exhaustive groups/parking/reference/ownership combinations, operation-history lifetime proofs for
-reused creation metadata, recursive virtual merge bases, power-loss simulation, broader size limits
+Full [snapshot commits](../docs/SNAPSHOTS.md) are implemented and the library builds. No dedicated
+snapshot tests have been added or run. Versioned JSON/CBOR/signature roundtrips and reference vectors,
+revision/last-batch bookkeeping, unchanged static timestamps/ETags, runtime and lifetime continuity,
+head races, atomic failure/recovery, bounded transfer and merges across snapshots remain to verify.
+The existing executed evidence and version 1 vectors predate the snapshot implementation.
+
+[Authorized snapshot boundaries](../docs/SNAPSHOT-BOUNDARIES.md) now have a library build, but no
+dedicated added/executed tests. Pending cases include mandatory fresh trust and rollback decisions,
+JSON/CBOR profiles/reference vectors, bounded partial bootstrap/restart/activation, large-anchor
+incremental limits, atomic failures/recovery, excluded ancestry acknowledgments, unknown roots,
+cross-boundary merge dependencies and retained-suffix runtime continuity. Existing executed
+complete-history evidence does not verify these new paths.
+
+[Explicit retention](../docs/RETENTION.md) now has a successful library build, without added or
+executed retention tests. Required cases include protected branches/bases and merge dependencies,
+released unpublished tips, stale head/inventory/peer additions, approval reentry/rejection, cold archive
+mismatch/leases, failure and retry before active replacement, repeated pruning/cold reads, catalog
+JSON/CBOR/bootstrap recovery, archived/unknown replication responses and exact live head/runtime identity.
+Snapshot/boundary/retention profiles still await frozen independent reference vectors.
+
+Operation-history lifetime handling and explicit temporary reference scheduling are implemented;
+their dedicated broader coverage and a fresh test run remain planned. Exhaustive groups/parking/
+reference/ownership combinations, recursive virtual merge bases, power-loss simulation, broader size limits
 and performance remain additional work. There is no independent remote implementation under test.
 The original archive-bootstrap workflow remains covered alongside bounded incremental
 exchange/adoption and [resumable bootstrap](../docs/BOOTSTRAP.md) workflows. Failure assertions compare the original head/network references,
@@ -108,7 +129,8 @@ including equal newly added meter IDs and reused identities. Broader owner/refer
 recursive merge bases, independent implementations and performance remain in the
 [roadmap](../docs/ROADMAP.md). See [replication evidence](../docs/REPLICATION.md#implementation-and-evidence).
 
-The [structural merge package](../docs/MERGING.md#structural-merge-evidence) has 34 passing cases:
+The [structural merge package](../docs/MERGING.md#structural-merge-evidence) had 34 passing cases in the
+last full run. That run predates the new lifetime rules and revised temporary-reference expectation:
 
 ```powershell
 dotnet test WWCP_POI_Tests/WWCP_POI_Tests.csproj --no-restore --filter 'FullyQualifiedName~StructuralMergeTests'

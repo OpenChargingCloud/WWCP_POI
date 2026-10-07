@@ -1,5 +1,15 @@
 # Runtime statuses and static POI versions
 
+Administrator-created [snapshot commits](SNAPSHOTS.md) advance history bookkeeping without editing
+static data or runtime. Gated publication and first-parent adoption capture current local runtime
+into independent schedules; snapshots do not reset entity lifetimes. Archive recovery and bootstrap
+still initialize fresh local runtime, which must be restored through runtime delivery separately.
+
+[Authorized snapshot entry](SNAPSHOT-BOUNDARIES.md) also initializes fresh runtime in a separate
+history. Retained suffix adoption uses its actual operations for local continuity; omitted earlier
+history supplies no birth/continuity proof. Equal static ETags do not authorize transferring runtime
+from another live history or replacing its head implicitly.
+
 [Repository overview](../README.md) · [ChangeSets](CHANGESETS.md) · [JSON](JSON.md) · [Roadmap](ROADMAP.md)
 
 ## Static boundary
@@ -196,6 +206,10 @@ starts fresh runtime schedules; see [history and atomic heads](HISTORY.md).
 The same rule applies to [bootstrap activation](BOOTSTRAP.md): transfer contains only static
 history, the returned replica starts fresh schedules/measurements/forecasts, and the application's
 existing history/runtime is untouched. Apply local runtime updates after explicitly selecting it.
+[Explicit retention](RETENTION.md) differs from recovery: pruning an existing history preserves the
+exact current head/network instances and every local runtime value. No runtime reconstruction occurs.
+Subsequent lifetime proofs stop at the new opaque snapshot baseline; omitted history cannot establish
+earlier births. Digest-checked cold reads return a separate history with fresh runtime.
 
 Runtime notifications follow the existing schedule events. A synchronous notification handler
 can throw after the schedule has been changed; runtime application does not provide the static

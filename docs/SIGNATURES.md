@@ -263,6 +263,22 @@ unsigned commit content, including ordered parents. It uses the same immutable e
 with the new `Profile`. All commit peers are equal; both signature arrays are excluded from
 commit identity and commit signing input. Adding peers preserves commit IDs and earlier signatures.
 
+Full snapshot links use `wwcp-poi-snapshot-commit-signature-json-v1` through the same methods.
+`commit.SignatureProfile` selects the required profile. The unsigned commit contains the complete
+static `Snapshot` payload, its creation timestamp, multilingual descriptions and detached metadata,
+and its single parent ID. No batch signature substitutes for this snapshot signature. The existing
+`authorizeCommit` callback can distinguish `commit.Kind == RoamingNetworkCommitKind.Snapshot`
+and require administrator keys or quorum. Default unsigned acceptance remains application policy.
+See [snapshot identities and trust](SNAPSHOTS.md).
+
+[Snapshot-boundary entry](SNAPSHOT-BOUNDARIES.md) additionally requires nonempty anchor signatures,
+trusted verification of every peer and explicit checkpoint/anchor authorization. The signed snapshot
+binds its immediate predecessor, but missing ancestry cannot independently establish its original
+checkpoint claim. Authorize that association and rollback policy independently. Boundary replicas
+recheck the policy for static mutations and recovery; partial bootstrap previews/activation take fresh
+policies each time. Incremental boundary pages resolve anchor ID and incoming peers against the local
+full signed payload, union accepted peers atomically, and never authorize another root implicitly.
+
 History has separate per-peer batch and commit verifiers, plus optional whole-commit authorization
 for required keys/quorum. Recovery verifies supplied trust and replays every branch before
 accepting the archived head. The archive's head reference remains mutable bookkeeping outside
@@ -295,3 +311,25 @@ Merge reference resolutions optionally add a typed `RelatedEntity` target/parent
 commit identity. Revalidating a whole-subtree choice drops obsolete unresolved issues without
 discarding accepted chronological decisions. Existing property-only merge vectors are unchanged;
 structural/reference resolution recovery is checked with the normal two-peer verifiers.
+
+Lifetime-dependent merge records additionally bind `LifetimeProfile`, typed original commit/
+operation origins in structural resolutions, and ordered `LifetimeSelections`. These are ordinary
+signed v2 batch metadata in both JSON and lossless CBOR. They describe selected source lifetimes;
+recovery applies the actual generated operations. Merge planning independently derives lifetime
+origins from retained first-parent operations and does not accept audit annotations as proof of
+continuity. Property-only merge metadata retains its existing shape. See
+[operation lifetime rules](MERGING.md#object-lifetimes-from-original-operations).
+
+Explicit reference-transition plans bind `ReferenceTransitionProfile: "wwcp-poi-reference-transition-v1"`
+and ordered `ReferenceTransitions` into `wwcpPOIMerge`. Records contain typed consumer/target identities,
+the property, actual before/detached/final values and zero-based positions in the signed operation
+sequence. Scalar property absence is omitted; explicit JSON null remains a value. The actual
+RemoveElement/RemoveProperty and restoration operations use the existing v2 batch/commit signing
+contracts and lossless JSON/CBOR codecs. These annotations document planning; storage/recovery still
+validate and replay the complete actual batch. See [temporary reference transitions](MERGING.md#explicit-temporary-reference-transitions).
+
+[Explicit archival/pruning](RETENTION.md) retains every original commit/snapshot signature in cold
+storage and rechecks the new signed root plus retained commit/batch peers before active installation.
+Boundary policy independently approves the checkpoint/anchor pair. Retention plans and receipts have
+derived hashes but are unsigned bookkeeping; root signatures do not cover their catalog. Independently
+trusted archive/manifest provenance and original signed cold replay govern historical verification.

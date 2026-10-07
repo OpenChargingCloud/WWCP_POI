@@ -15,6 +15,16 @@ compatible identical writes or removals are represented once.
 
 ## Ancestors and revision
 
+Full [snapshot links](SNAPSHOTS.md) participate in ordinary ancestry and merge-base selection.
+Their original parent remains retained. They advance revision but preserve static data and all
+operation-derived lifetime origins; a snapshot is not an entity removal/reintroduction. Merge
+preparation defaults its timestamp from both payload timestamps, including snapshot creation time.
+Dedicated merge-through-snapshot coverage is pending. [Authorized snapshot boundaries](SNAPSHOT-BOUNDARIES.md)
+now support known suffix merges while refusing unavailable requested tips or explicit bases with
+`HistoryRequired` and typed `MissingCommits`. They do not prove pre-boundary object lifetimes or
+replace missing historical bases with an invented comparison. Sufficient earlier history is required
+for parent paths crossing the boundary.
+
 Both tips and all their parents must already be retained. The search includes **all** parent
 edges. It finds best common ancestors: common ancestors with no later common descendant.
 One candidate is selected automatically. Multiple candidates produce `AmbiguousAncestor` and
@@ -66,7 +76,8 @@ network registry operators remain separate owned values.
 
 Managed graph/meter/operator `lastChange` fields do not create content conflicts. The prepared
 batch recomputes timestamps of modified objects/ancestors through normal application. Creation
-timestamps identify retained/recreated data and remain significant. Other dates, explicit null
+timestamps remain significant; original operations additionally distinguish recreated objects
+whose IDs and creation timestamps are reused. Other dates, explicit null
 versus absence, wire ID spelling and JSON number spelling remain significant. Runtime statuses,
 schedules, measurements and forecasts never participate in this comparison.
 
@@ -75,6 +86,50 @@ can be emitted as an explicit whole-property write; arrays with no defined ident
 ordinary complete-value ordering. New original branch objects retain supplied creation metadata;
 custom objects receive normal schema defaults at the merge timestamp. Custom SI values use the
 same quantity/unit normalization as ordinary static operations.
+
+### Object lifetimes from original operations
+
+Before comparing branch states, history merge derives owned-object lifetimes by replaying each
+tip's original first-parent operations from the checkpoint. It observes every intermediate state,
+including multiple operations in one batch. A graph subtree removal, an addressed element removal,
+or temporarily clearing an owned property followed by reintroduction starts a new lifetime even
+when the final payload, ID and `created` are unchanged. Changed ownership, nested identity or
+creation metadata also starts a new lifetime. Continuous same-identity property replacements
+preserve lifetimes; owner recreation propagates to all owned graph and nested descendants.
+
+Lifetimes cover graph entities and schema-addressed owned values, including meters, connection
+points, embedded operators, cables, brands and licenses. Reference strings are membership values;
+their removal/readdition does not recreate the referenced target. Collections without addressed
+identities retain whole-value comparison. Connector origins retain their EVSE scope and nested
+origins retain their complete schema ownership path.
+
+`RoamingNetworkLifetimeOrigin` exposes the original `CommitId` and zero-based `OperationIndex`.
+Index -1 identifies the checkpoint. Origins are interpreted together with the addressed object;
+several descendants can begin at the same subtree-add operation. Structural conflicts expose
+`BaseLifetime`, `LeftLifetime` and `RightLifetime`, so identical JSON values can still have
+different lifetimes. Deletion versus recreation reports `DeleteModify`; recreation versus edits
+or independent recreation reports `ReplaceModify`. Selecting Base/Left/Right chooses the complete
+owned state. Compatible identical additions at an identity absent from the ancestor retain the
+existing duplicate-add behavior.
+
+Independent moves to different owners retain the `Ownership` conflict and `$parent` values.
+Its Base/Left/Right parent choice also selects that branch's complete subtree and lifetime, so
+properties from independently reintroduced objects are not combined. Custom/removal owner choices
+remain invalid.
+
+An untouched branch can accept the other branch's recreation automatically. Preparation still
+requires explicit `merge: true`. When the selected lifetime differs from the left lifetime, the
+generated batch expresses Remove/Add even for identical static payloads. Required nested child
+recreation can require rebuilding its optional owner slot. Publication starts fresh local runtime
+for these rebuilt slots. Referenced graph recreation can additionally prepare explicit temporary
+detach/restore operations as described below.
+
+Additional parents remain ancestry claims: they do not transfer first-parent object lifetimes.
+Rebuilt objects in a published merge begin at that merge's actual operations. Later comparisons
+can therefore require an explicit lifetime choice even when additional-parent branch data agrees.
+Merge recomputes origins from retained operations and does not trust application-supplied audit
+annotations as lifetime evidence. Replay currently inventories owned slots per operation; caching
+and performance measurements remain planned. Dedicated coverage for these new rules remains planned.
 
 ## Preview and explicit preparation
 
@@ -122,7 +177,8 @@ Preparation requires a fresh batch ID, including against the imported checkpoint
 ## Structured conflicts and resolution
 
 `RoamingNetworkMergeResult` exposes `Status`, `Message`, `Left`, `Right`, selected `Ancestor`,
-`AncestorCandidates`, ordered `Conflicts` and the validated candidate's `AfterETags`. Tags are empty
+`AncestorCandidates`, ordered `Conflicts`, the validated candidate's `AfterETags`, complete
+`PlannedOperations` and `ReferenceTransitions`. Tags and plans are empty
 when no candidate can be validated. `MergeAvailable` and `Prepared` succeed; `AlreadyIntegrated`
 succeeds without a new commit. `Conflicts`, `AmbiguousAncestor`, `InvalidInput` and `Unavailable`
 return false.
@@ -209,18 +265,49 @@ ordinary metadata field preserves the surrounding meter/operator histories.
 The planner checks the combined graph, references and ownership, then schedules operations through
 the existing per-operation validator. It retries deferred operations when preceding accepted edits
 make dependencies available, for example adding a tariff before its reference or removing consumers
-before targets. If no valid ordering of the generated operations is found, it reports structured
-`InvalidResult` failures and creates no batch. It does not invent temporary states or weaken domain
-validation to force publication. After scheduling, selected static values are checked again and
-normal `CreateChangeSet` computes final timestamps and both result tags.
+before targets. If ordinary scheduling stalls on referenced removals, it can prepare explicit
+temporary reference changes. Every intermediate operation still passes the normal validator.
+Remaining schema/dependency failures return structured `InvalidResult` conflicts and no batch.
+After scheduling, selected static values are checked again and normal `CreateChangeSet` computes
+final timestamps and both result tags. Scheduling failures do not invoke the state conflict resolver.
 
-A valid final graph can still require an unschedulable transition. For example, recreating an EVSE
-with new creation metadata while an unchanged group keeps referencing it requires detaching the
-consumer before Remove/Add. State comparison does not preserve temporary detach/restore steps
-whose final value is unchanged. The planner reports `InvalidResult` when its generated delta cannot
-be legally applied, even if the original branch performed those temporary steps. Scheduling failures
-do not invoke the state conflict resolver. Explicitly detach/update consumers in a separate transition
-and retry, or prepare a deliberate ordered ChangeSet; no hidden temporary operations are generated.
+### Explicit temporary reference transitions
+
+Recreating an EVSE still referenced by an unchanged group can prepare this complete sequence:
+
+1. `RemoveElement` for the group's affected `EVSEIds` membership.
+2. Remove the original EVSE subtree.
+3. Add its selected replacement subtree.
+4. `AddElement` to restore the selected membership.
+
+The planner uses the shared reverse reference index and schema target identities. It detaches only
+references blocking remaining graph removals from outside each removed subtree. References internal
+to that subtree disappear with ordinary removal. Arrays use addressed member operations; optional
+scalar references use `RemoveProperty` and their selected final property value. Unaffected members
+are retained. Pending edits to a detached field are replaced with a delta against its actual
+detached value, so the original branch's final additions/removals are retained without stale
+preconditions. Final absent properties and explicit JSON null remain distinct.
+
+Restoration operations wait for the remaining removal operations observed at detachment; ordinary
+reference validation then requires their targets to exist. This prevents restoration to an old
+instance while another consumer still blocks its removal. If the consumer is rebuilt, its pending
+subtree Add imports the selected final references and is recorded as restoration. A permanently
+removed consumer needs no restoration. Temporary values that violate domain constraints are
+rejected; the planner does not disable scope, identity, membership or reference validation.
+
+Successful preview and preparation expose the complete `PlannedOperations`. Each immutable
+`RoamingNetworkMergeReferenceTransition` identifies `Consumer`, `PropertyName`, ordered `Targets`,
+actual `BeforeValue`, `DetachedValue`, normalized final `AfterValue`, and zero-based
+`DetachOperationIndices`/`RestoreOperationIndices` into that operation sequence. A missing value
+denotes absence. Failed plans expose no partial operation/transition arrays. These steps are part
+of the newly prepared ChangeSet, available for review and explicit signing/publication. Preview
+and preparation leave the head, retained commits, local runtime and persistent archive unchanged.
+
+Only schema-indexed graph references participate. Unsupported dependency cycles, invalid temporary
+domain states and cyclic full-subtree additions can still return `InvalidResult`. A caller can
+provide a deliberate ordered transition when additional domain-specific intermediate values are
+required. New reference-transition behavior has build evidence; broader regression coverage remains
+planned. The existing referenced-replacement fixture now expects a prepared plan and has not been rerun.
 
 Preview/preparation operate only on static snapshots. `TryPublish` later captures the current left
 head's live runtime values under its publication gate. Right-branch runtime values and operational
@@ -235,6 +322,18 @@ The reserved batch metadata key **`wwcpPOIMerge`** contains:
 - `Resolutions`: ordered explicit decisions with `Sequence`, `Path`, `Kind`, `Choice` and optional
   original custom `Value` (including explicit JSON null). Reference/invalid-parent decisions also
   include `RelatedEntity: { EntityType, EntityId, Scope? }` to identify their target/parent.
+- Lifetime-dependent records add `LifetimeProfile: "wwcp-poi-operation-lifetime-v1"`. Resolved
+  structural decisions can include `BaseLifetime`, `LeftLifetime` and `RightLifetime`, each carrying
+  typed `CommitId` and `OperationIndex`; absence omits that side's origin. `LifetimeSelections`
+  lists selected existing origins differing from the left, in ordinal `Path` order, as
+  `{ Path, Origin: { CommitId, OperationIndex } }`. These document selected source lifetimes;
+  any rebuilt result starts at the new merge's actual operations. Ordinary property-only merges
+  retain their existing metadata shape.
+- Reference-transition plans add `ReferenceTransitionProfile: "wwcp-poi-reference-transition-v1"`
+  and `ReferenceTransitions`, carrying typed consumer/target references, property name, actual
+  before/detached/final values and operation indices. Absent detached/final values are omitted;
+  explicit JSON null remains present. These ordered records and all temporary operations are bound
+  by the ordinary batch/commit signatures and lossless JSON/CBOR transports.
 
 Supply ordinary multilingual `description:` and application `metadata:` arguments as needed.
 They are detached by the batch constructor. The reserved key cannot be supplied by the caller.
@@ -275,14 +374,16 @@ New replicas can also receive the checkpoint and all original signed branches th
 bounded, restartable [bootstrap](BOOTSTRAP.md) workflow before continuing incremental exchange.
 ### Structural merge evidence
 
-[StructuralMergeTests](../WWCP_POI_Tests/Interoperability/StructuralMergeTests.cs) adds **34 passing
-cases**. Owner deletion versus descendant edits is tested for pools/stations/EVSEs in both branch
+[StructuralMergeTests](../WWCP_POI_Tests/Interoperability/StructuralMergeTests.cs) had **34 passing
+cases** in the last full run, before operation-history lifetimes and temporary reference plans.
+Owner deletion versus descendant edits is tested for pools/stations/EVSEs in both branch
 orders, with explicit complete-subtree choices and signed archive recovery. Further cases cover
 nested meter deletion/recreation, graph recreation, equal/different graph additions, connector
 scope, simultaneous deleted tariff references, active groups versus admission lists, independent
 grid-operator slots, owner moves and parking-scope violations. Invalid resolution shapes cannot
 bypass graph/identity/ownership constraints; reference decisions are revalidated without loops or
-stale errors. A valid but unschedulable referenced replacement is explicitly rejected.
+stale errors. The formerly rejected referenced-replacement case now expects explicit detachment,
+restoration and unchanged history during preparation; its revised expectation has not been rerun.
 
 Criss-cross history tests produce two best common ancestors, reject an arbitrary earlier base,
 require an explicit choice and bind that choice into deterministic unsigned merge identity.
@@ -290,6 +391,8 @@ Resolver tests reject reentrant retention/publication/nested merge/disposal, pre
 head/history/runtime on exceptions and successfully retry after failure. These cases add evidence
 without changing existing cryptographic reference profiles/bytes.
 
-Exhaustive deletion/recreation/reference/ownership combinations, operation-history lifetime proofs
-for reused creation metadata, recursive virtual bases, rebase APIs, multi-tip merges and performance evidence remain in the
+Operation-history lifetime handling now covers reused creation metadata as described above;
+dedicated regression coverage remains planned. Exhaustive deletion/recreation/reference/ownership
+combinations, broader reference-transition coverage, recursive virtual bases, rebase APIs,
+multi-tip merges and performance evidence remain in the
 [roadmap](ROADMAP.md).

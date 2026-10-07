@@ -12,7 +12,7 @@ using org.GraphDefined.Vanaheimr.Illias;
 namespace cloud.charging.open.protocols.WWCP.POI;
 
 /// <summary>
-/// An immutable checkpoint or transition binding state, ordered ancestry and unsigned batch content.
+/// An immutable checkpoint, ChangeSet or full snapshot binding state, ancestry and unsigned content.
 /// Batch and commit peer signatures are retained independently of the commit identity.
 /// </summary>
 public sealed partial class RoamingNetworkCommit
@@ -23,6 +23,11 @@ public sealed partial class RoamingNetworkCommit
     public const String IdentityProfile = "wwcp-poi-commit-json-v1";
 
     /// <summary>
+    /// The separate identity and wire profile for full snapshot links within an existing chain.
+    /// </summary>
+    public const String SnapshotIdentityProfile = "wwcp-poi-snapshot-commit-json-v1";
+
+    /// <summary>
     /// The deterministic identity of this commit's unsigned content.
     /// </summary>
     public RoamingNetworkCommitId Id { get; }
@@ -30,7 +35,13 @@ public sealed partial class RoamingNetworkCommit
     /// <summary>
     /// The identity profile carried by the wire document.
     /// </summary>
-    public String Profile => IdentityProfile;
+    public String Profile => Snapshot is null ? IdentityProfile : SnapshotIdentityProfile;
+
+    /// <summary>
+    /// The explicit in-memory payload kind; the wire profile distinguishes snapshot links.
+    /// </summary>
+    public RoamingNetworkCommitKind Kind => Parents.IsEmpty ? RoamingNetworkCommitKind.Checkpoint :
+        Snapshot is null ? RoamingNetworkCommitKind.ChangeSet : RoamingNetworkCommitKind.Snapshot;
 
     /// <summary>
     /// The static content profile bound by this commit identity and its ancestry signatures.
@@ -48,7 +59,7 @@ public sealed partial class RoamingNetworkCommit
     public Int64 Revision { get; }
 
     /// <summary>
-    /// Ordered predecessor identities; the first parent is the batch's source version.
+    /// Ordered predecessors; the first parent supplies the source version for this link.
     /// </summary>
     public ImmutableArray<RoamingNetworkCommitId> Parents { get; }
 
@@ -63,9 +74,19 @@ public sealed partial class RoamingNetworkCommit
     public String? AppliedChangeSetId { get; }
 
     /// <summary>
-    /// The original batch with all peer envelopes, absent for the checkpoint.
+    /// The original batch with all peer envelopes, absent for checkpoints and full snapshots.
     /// </summary>
     public RoamingNetworkChangeSet? ChangeSet { get; }
+
+    /// <summary>
+    /// The complete static payload and administrator metadata of a full snapshot link.
+    /// </summary>
+    public RoamingNetworkSnapshotContent? Snapshot { get; }
+
+    /// <summary>
+    /// The creation timestamp of the payload; imported checkpoints have no invented timestamp.
+    /// </summary>
+    public DateTimeOffset? CreatedAt => Snapshot?.CreatedAt ?? ChangeSet?.CreatedAt;
 
     /// <summary>
     /// Equal peer signatures authenticating the commit, including its ancestry.
@@ -76,14 +97,15 @@ public sealed partial class RoamingNetworkCommit
                                 ImmutableArray<RoamingNetworkCommitId> parents, ImmutableArray<ETag> stateETags,
                                 String? appliedChangeSetId, RoamingNetworkChangeSet? changeSet,
                                 ImmutableArray<RoamingNetworkChangeSetSignature> signatures,
-                                RoamingNetworkCommitId? declaredId = null)
+                                RoamingNetworkCommitId? declaredId = null,
+                                RoamingNetworkSnapshotContent? snapshot = null)
     {
         InfrastructureChangeSchema.Id(InfrastructureEntityType.RoamingNetwork, networkId);
         if (revision < 0) throw new ArgumentOutOfRangeException(nameof(revision));
         if (parents.IsDefault || parents.Any(id => !id.IsValid) || parents.Distinct().Count() != parents.Length)
             throw new ArgumentException("Parents must be initialized, valid and distinct.", nameof(parents));
-        if (parents.IsEmpty != (changeSet is null))
-            throw new ArgumentException("Only a checkpoint has no parents and no ChangeSet.");
+        if (snapshot is not null ? changeSet is not null || parents.Length != 1 || revision == 0 : parents.IsEmpty != (changeSet is null))
+            throw new ArgumentException("A checkpoint has no payload or parents; a snapshot has one parent and no batch.");
         if (appliedChangeSetId is not null && String.IsNullOrWhiteSpace(appliedChangeSetId))
             throw new ArgumentException("AppliedChangeSetId must be absent or nonempty.");
         RoamingNetworkId = networkId;
@@ -92,6 +114,7 @@ public sealed partial class RoamingNetworkCommit
         StateETags = ETag.ValidatePair(stateETags, nameof(stateETags));
         AppliedChangeSetId = appliedChangeSetId;
         ChangeSet = changeSet;
+        Snapshot = snapshot;
         Signatures = signatures.IsDefault ? [] : signatures;
         if (Signatures.Any(signature => signature is null))
             throw new ArgumentException("Signatures must not contain null entries.");
@@ -100,6 +123,10 @@ public sealed partial class RoamingNetworkCommit
              revision != checked(changeSet.BaseRevision + 1) || appliedChangeSetId != changeSet.Id ||
              !StateETags.SequenceEqual(changeSet.AfterETags)))
             throw new ArgumentException("The commit header must match its batch's target state and revision.");
+        if (snapshot is not null &&
+            (networkId != snapshot.State.Root.Id || revision != snapshot.State.Revision ||
+             appliedChangeSetId != snapshot.State.AppliedChangeSetId || !StateETags.SequenceEqual(snapshot.State.ETags)))
+            throw new ArgumentException("The snapshot payload must match the commit header.");
         Id = new(ETag.Compute(ETagFormat.JSON, GetIdentityBytes()));
         if (declaredId is { } expected && expected != Id)
             throw new ArgumentException("The declared commit identity does not match the content.");
@@ -131,6 +158,24 @@ public sealed partial class RoamingNetworkCommit
     }
 
     /// <summary>
+    /// Prepare a full snapshot of the exact parent state with a new history revision.
+    /// No static property, timestamp, entity lifetime or last applied batch identifier changes.
+    /// </summary>
+    public static RoamingNetworkCommit CreateSnapshot(RoamingNetworkCommit parent, RoamingNetworkDataSnapshot source,
+        DateTimeOffset createdAt, ImmutableDictionary<String, String>? description = null,
+        ImmutableDictionary<String, JsonElement>? metadata = null)
+    {
+        ArgumentNullException.ThrowIfNull(parent);
+        ArgumentNullException.ThrowIfNull(source);
+        if (source.Root.Id != parent.RoamingNetworkId || source.Revision != parent.Revision ||
+            source.AppliedChangeSetId != parent.AppliedChangeSetId || !source.ETags.SequenceEqual(parent.StateETags))
+            throw new ArgumentException("The snapshot source must match the exact parent state and bookkeeping.");
+        var content = new RoamingNetworkSnapshotContent(source.AdvanceSnapshotRevision(), createdAt, description, metadata);
+        return new(parent.RoamingNetworkId, content.State.Revision, [parent.Id], parent.StateETags,
+                   parent.AppliedChangeSetId, null, [], snapshot: content);
+    }
+
+    /// <summary>
     /// Return a copy with one more peer signature and the same commit identity.
     /// </summary>
     public RoamingNetworkCommit WithSignature(RoamingNetworkChangeSetSignature signature)
@@ -143,7 +188,7 @@ public sealed partial class RoamingNetworkCommit
     /// Replace the commit signature array without changing unsigned content.
     /// </summary>
     public RoamingNetworkCommit WithSignatures(ImmutableArray<RoamingNetworkChangeSetSignature> signatures)
-        => new(RoamingNetworkId, Revision, Parents, StateETags, AppliedChangeSetId, ChangeSet, signatures, Id);
+        => new(RoamingNetworkId, Revision, Parents, StateETags, AppliedChangeSetId, ChangeSet, signatures, Id, Snapshot);
 
     /// <summary>
     /// Replace only batch peer envelopes, rejecting any change to identity-bearing content.
@@ -151,7 +196,7 @@ public sealed partial class RoamingNetworkCommit
     public RoamingNetworkCommit WithChangeSet(RoamingNetworkChangeSet changeSet)
     {
         ArgumentNullException.ThrowIfNull(changeSet);
-        if (ChangeSet is null) throw new InvalidOperationException("A checkpoint has no batch.");
+        if (ChangeSet is null) throw new InvalidOperationException("This commit has no batch.");
         return new(RoamingNetworkId, Revision, Parents, StateETags, AppliedChangeSetId, changeSet, Signatures, Id);
     }
 
@@ -169,7 +214,7 @@ public sealed partial class RoamingNetworkCommit
     private void WriteIdentity(Utf8JsonWriter writer)
     {
         writer.WriteStartObject();
-        writer.WriteString("Profile", IdentityProfile);
+        writer.WriteString("Profile", Profile);
         writer.WriteString("ContentProfile", ContentProfile);
         writer.WriteString("RoamingNetworkId", RoamingNetworkId);
         writer.WriteNumber("Revision", Revision);
@@ -182,9 +227,16 @@ public sealed partial class RoamingNetworkCommit
         foreach (var tag in StateETags) tag.WriteTo(writer);
         writer.WriteEndArray();
         writer.WriteString("AppliedChangeSetId", AppliedChangeSetId);
-        writer.WritePropertyName("ChangeSet");
-        if (ChangeSet is null) writer.WriteNullValue();
-        else ChangeSet.WriteUnsignedContent(writer);
+        if (Snapshot is { } snapshot)
+        {
+            writer.WritePropertyName("Snapshot"); snapshot.WriteTo(writer);
+        }
+        else
+        {
+            writer.WritePropertyName("ChangeSet");
+            if (ChangeSet is null) writer.WriteNullValue();
+            else ChangeSet.WriteUnsignedContent(writer);
+        }
         writer.WriteEndObject();
     }
 
@@ -204,7 +256,7 @@ public sealed partial class RoamingNetworkCommit
     public void WriteTo(Utf8JsonWriter writer)
     {
         writer.WriteStartObject();
-        writer.WriteString("Profile", IdentityProfile);
+        writer.WriteString("Profile", Profile);
         writer.WriteString("ContentProfile", ContentProfile);
         writer.WritePropertyName("Id"); Id.Hash.WriteTo(writer);
         writer.WriteString("RoamingNetworkId", RoamingNetworkId);
@@ -212,7 +264,11 @@ public sealed partial class RoamingNetworkCommit
         writer.WritePropertyName("Parents"); JsonSerializer.Serialize(writer, Parents);
         writer.WritePropertyName("StateETags"); JsonSerializer.Serialize(writer, StateETags);
         writer.WriteString("AppliedChangeSetId", AppliedChangeSetId);
-        writer.WritePropertyName("ChangeSet"); JsonSerializer.Serialize(writer, ChangeSet);
+        if (Snapshot is { } snapshot)
+        {
+            writer.WritePropertyName("Snapshot"); snapshot.WriteTo(writer);
+        }
+        else { writer.WritePropertyName("ChangeSet"); JsonSerializer.Serialize(writer, ChangeSet); }
         writer.WritePropertyName("Signatures"); JsonSerializer.Serialize(writer, Signatures);
         writer.WriteEndObject();
     }
@@ -228,22 +284,25 @@ public sealed partial class RoamingNetworkCommit
 
     internal static RoamingNetworkCommit Parse(JsonElement json)
     {
+        var profile = json.GetProperty("Profile").GetString();
+        var isSnapshot = profile == SnapshotIdentityProfile;
         RequireFields(json, "Profile", "ContentProfile", "Id", "RoamingNetworkId", "Revision", "Parents", "StateETags",
-                      "AppliedChangeSetId", "ChangeSet", "Signatures");
-        if (json.GetProperty("Profile").GetString() != IdentityProfile)
+                      "AppliedChangeSetId", isSnapshot ? "Snapshot" : "ChangeSet", "Signatures");
+        if (profile != IdentityProfile && !isSnapshot)
             throw new ArgumentException("Unsupported commit identity profile.");
         POIContentProfile.Require(json.GetProperty("ContentProfile").GetString());
         foreach (var field in new[] { "Parents", "StateETags", "Signatures" })
             if (json.GetProperty(field).ValueKind != JsonValueKind.Array)
                 throw new ArgumentException($"{field} must be an array.");
-        var changeSet = json.GetProperty("ChangeSet");
+        var changeSet = isSnapshot ? default : json.GetProperty("ChangeSet");
         return new(json.GetProperty("RoamingNetworkId").GetString()!, json.GetProperty("Revision").GetInt64(),
                    JsonSerializer.Deserialize<ImmutableArray<RoamingNetworkCommitId>>(json.GetProperty("Parents")),
                    JsonSerializer.Deserialize<ImmutableArray<ETag>>(json.GetProperty("StateETags")),
                    json.GetProperty("AppliedChangeSetId").GetString(),
-                   changeSet.ValueKind == JsonValueKind.Null ? null : JsonSerializer.Deserialize<RoamingNetworkChangeSet>(changeSet),
+                   isSnapshot || changeSet.ValueKind == JsonValueKind.Null ? null : JsonSerializer.Deserialize<RoamingNetworkChangeSet>(changeSet),
                    JsonSerializer.Deserialize<ImmutableArray<RoamingNetworkChangeSetSignature>>(json.GetProperty("Signatures")),
-                   JsonSerializer.Deserialize<RoamingNetworkCommitId>(json.GetProperty("Id")));
+                   JsonSerializer.Deserialize<RoamingNetworkCommitId>(json.GetProperty("Id")),
+                   isSnapshot ? RoamingNetworkSnapshotContent.Parse(json.GetProperty("Snapshot")) : null);
     }
 
     /// <summary>
@@ -257,7 +316,8 @@ public sealed partial class RoamingNetworkCommit
                ("Parents", CBORValue.FromArray(Parents.Select(id => id.ToCBOR()))),
                ("StateETags", CBORValue.FromArray(StateETags.Select(tag => tag.ToCBOR()))),
                ("AppliedChangeSetId", AppliedChangeSetId is null ? CBORValue.Null : CBORValue.FromText(AppliedChangeSetId)),
-               ("ChangeSet", ChangeSet is null ? CBORValue.Null : CBORValue.Parse(ChangeSet.ToCBOR())),
+               Snapshot is { } snapshot ? ("Snapshot", snapshot.ToCBOR()) :
+                   ("ChangeSet", ChangeSet is null ? CBORValue.Null : CBORValue.Parse(ChangeSet.ToCBOR())),
                ("Signatures", CBORValue.FromArray(Signatures.Select(signature => Map(
                    ("Profile", CBORValue.FromText(signature.Profile)), ("Algorithm", CBORValue.FromText(signature.Algorithm)),
                    ("KeyId", CBORValue.FromText(signature.KeyId)), ("Encoding", CBORValue.FromText(signature.Encoding)),
@@ -270,9 +330,11 @@ public sealed partial class RoamingNetworkCommit
 
     internal static RoamingNetworkCommit ParseCBORValue(CBORValue value)
     {
+        var profile = Text(value.AsMap().Single(entry => Text(entry.Key) == "Profile").Value);
+        var isSnapshot = profile == SnapshotIdentityProfile;
         var fields = Fields(value, "Profile", "ContentProfile", "Id", "RoamingNetworkId", "Revision", "Parents", "StateETags",
-                            "AppliedChangeSetId", "ChangeSet", "Signatures");
-        if (Text(fields["Profile"]) != IdentityProfile) throw new ArgumentException("Unsupported commit identity profile.");
+                            "AppliedChangeSetId", isSnapshot ? "Snapshot" : "ChangeSet", "Signatures");
+        if (profile != IdentityProfile && !isSnapshot) throw new ArgumentException("Unsupported commit identity profile.");
         POIContentProfile.Require(Text(fields["ContentProfile"]));
         if (!fields["Revision"].TryGetInt64(out var revision)) throw new ArgumentException("Revision must be an Int64.");
         var signatures = fields["Signatures"].AsArray().Select(item => {
@@ -284,9 +346,10 @@ public sealed partial class RoamingNetworkCommit
                    fields["Parents"].AsArray().Select(item => new RoamingNetworkCommitId(ETag.Parse(item))).ToImmutableArray(),
                    fields["StateETags"].AsArray().Select(ETag.Parse).ToImmutableArray(),
                    fields["AppliedChangeSetId"].Kind == CBORValueKind.Null ? null : Text(fields["AppliedChangeSetId"]),
-                   fields["ChangeSet"].Kind == CBORValueKind.Null ? null :
+                   isSnapshot || fields["ChangeSet"].Kind == CBORValueKind.Null ? null :
                        RoamingNetworkChangeSet.ParseCBOR(fields["ChangeSet"].ToByteArray(CBORWriterOptions.Canonical)),
-                   signatures, new(ETag.Parse(fields["Id"])));
+                   signatures, new(ETag.Parse(fields["Id"])),
+                   isSnapshot ? RoamingNetworkSnapshotContent.ParseCBOR(fields["Snapshot"]) : null);
     }
 
     internal static void RequireFields(JsonElement value, params String[] expected)

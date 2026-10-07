@@ -1,5 +1,20 @@
 # JSON contracts
 
+Full history snapshot links use the separate `wwcp-poi-snapshot-commit-json-v1` envelope with a
+`Snapshot` payload (`CreatedAt`, `Description`, `Metadata`, `State`) instead of `ChangeSet`.
+`State` is a complete static network with resulting revision, last batch ID, static-v1 declaration
+and ETags. It excludes mutable runtime values. The static data must equal the retained parent;
+only history revision advances. See [exact snapshot contracts](SNAPSHOTS.md).
+
+[Partial history archives](SNAPSHOT-BOUNDARIES.md) use history-v3 with original `CheckpointId`,
+signed full `SnapshotCommit`, suffix `Commits` and `Head`. Boundary incremental pages instead
+reference `AnchorId` and `AnchorSignatures`; their parsers require an exact local anchor resolver.
+The boundary association requires explicit application authorization and signature verification.
+History-v4 adds required nonempty `RetentionReceipts` for explicit archival/pruning. Each receipt uses
+`wwcp-poi-retention-receipt-v1`, structured commit/digest arrays and a canonical JSON identity excluding
+`Id`. Native CBOR carries digest bytes. The catalog is unsigned bookkeeping; original cold replay
+provides historical evidence. Review plans use `wwcp-poi-retention-plan-v1`. See [retention](RETENTION.md).
+
 [Repository overview](../README.md) · [Architecture](ARCHITECTURE.md) · [ChangeSets](CHANGESETS.md)
 
 ## 1. Two JSON layers

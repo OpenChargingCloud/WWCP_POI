@@ -50,6 +50,26 @@ must be prepared again from their static snapshots and signed; no missing-header
 | History archive | `wwcp-poi-history-v1` | Requires static-v1 checkpoint and commit content |
 | Three-way merge audit | `wwcp-poi-three-way-merge-v1` | Explicit preparation decisions in signed batch metadata |
 
+Full snapshot links additionally use `wwcp-poi-snapshot-commit-json-v1` and
+`wwcp-poi-snapshot-commit-signature-json-v1`. Archives/pages containing them select
+`wwcp-poi-history-v2`/`wwcp-poi-commit-pack-v2`; bootstrap manifests bind history-v2 through
+`wwcp-poi-bootstrap-manifest-v2`. Ordinary version 1 bytes and static-v1 hashes are unchanged.
+These new profiles have a library build but await dedicated roundtrip/signature/reference-vector
+verification; they are not covered by the existing frozen reference suite. See [snapshots](SNAPSHOTS.md).
+
+[Snapshot boundaries](SNAPSHOT-BOUNDARIES.md) add history-v3, manifest-v3, replication-state-v2
+and commit-pack-v3 without changing original commit/snapshot identity/signature preimages. Manifest
+identity binds the original checkpoint claim and anchor; boundary authorization is mandatory because
+omitted ancestry cannot independently prove chain association. Pages resolve root ID/peers against
+local retained content. Dedicated boundary reference vectors and executed workflow evidence are pending.
+
+[Explicit retention](RETENTION.md) additionally introduces `wwcp-poi-retention-plan-v1`,
+`wwcp-poi-retention-receipt-v1`, history-v4 and manifest-v4. Plans bind the complete source archive;
+native JSON/CBOR receipts retain removed IDs and the digest of that archived source. The receipt
+identity uses canonical JSON excluding `Id`; it is unsigned bookkeeping. Root signatures do not
+authenticate the catalog. Existing identity/signature/page/chunk contracts are unchanged without
+these catalogs. Retention reference vectors and failure/recovery evidence remain pending.
+
 ## Static projection
 
 Both hashes read the same authoritative immutable property document. They do not rebuild
@@ -169,16 +189,22 @@ The existing reference workflow still exercises separate full archive bootstrap 
 runtime delivery. New dedicated [replication/adoption fixtures](REPLICATION.md#implementation-and-evidence)
 add 61 passing cases for bounded JSON/CBOR pages, atomic failure, original signed merge adoption,
 local runtime lifetimes, changed trust, head races and file persistence/recovery. The full suite
-on 2026-10-07 passes 509 tests, with one separately executed crash worker skipped. Bootstrap adds
+on 2026-10-07 passed 509 tests, with one separately executed crash worker skipped. That run predates
+operation-history lifetimes and explicit temporary reference plans. Bootstrap adds
 32 passing cases for both wire formats, receipt failures, corruption, replay/trust rejection,
 explicit activation, fresh runtime and continued incremental exchange.
 The [structural merge fixture](MERGING.md#structural-merge-evidence) adds 34 passing cases for
 deletion/recreation/ownership, complete typed reference diagnostics, group/parking/connector scopes,
 signed subtree choices, criss-cross ancestor selection, resolver reentry/exception rollback and
-unschedulable referenced replacements. Reference decisions optionally bind `RelatedEntity` in merge
+the formerly rejected referenced replacement, whose revised expectation now prepares explicit
+detachment/restoration and has not been rerun. Reference decisions optionally bind `RelatedEntity` in merge
 audit metadata; unchanged scenarios retain their existing identity/signature/reference bytes.
 Streaming archive replay, independent implementations, transport authentication and key
 negotiation remain additional work. Existing fixed reference bytes/profiles are unchanged.
+
+Temporary reference plans add an optional `wwcp-poi-reference-transition-v1` audit section through
+the existing lossless batch metadata codecs. New transition vectors and broader coverage remain
+planned; ordinary merges without temporary steps retain their existing metadata shape.
 
 ## Running and updating references
 

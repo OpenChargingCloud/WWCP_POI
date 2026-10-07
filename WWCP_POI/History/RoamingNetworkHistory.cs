@@ -97,6 +97,7 @@ public sealed partial class RoamingNetworkHistory : IDisposable
         this.authorizeCommit = authorizeCommit;
         var checkpoint = RoamingNetworkCommit.CreateCheckpoint(network.DataSnapshot);
         checkpointId = checkpoint.Id;
+        anchorId = checkpoint.Id;
         entries = ImmutableDictionary<RoamingNetworkCommitId, Entry>.Empty.Add(checkpoint.Id, new(checkpoint, network.DataSnapshot));
         batchIds = ImmutableDictionary.Create<String, RoamingNetworkCommitId>(StringComparer.Ordinal);
         if (checkpoint.AppliedChangeSetId is { } batchId) batchIds = batchIds.Add(batchId, checkpoint.Id);
@@ -125,6 +126,14 @@ public sealed partial class RoamingNetworkHistory : IDisposable
     }
 
     /// <summary>
+    /// Retrieve a retained original commit envelope, including a snapshot page's local anchor.
+    /// </summary>
+    public RoamingNetworkCommit GetCommit(RoamingNetworkCommitId id)
+    {
+        lock (gate) return entries.TryGetValue(id, out var entry) ? entry.Commit : throw new KeyNotFoundException("Unknown commit.");
+    }
+
+    /// <summary>
     /// Prepare and validate a commit against any retained source, without retaining or publishing it.
     /// </summary>
     public RoamingNetworkCommit PrepareCommit(RoamingNetworkCommitId parentId, RoamingNetworkChangeSet changeSet,
@@ -135,6 +144,7 @@ public sealed partial class RoamingNetworkHistory : IDisposable
             BeginMutation();
             try
             {
+                VerifyBoundary();
                 if (!entries.TryGetValue(parentId, out var parent)) throw new KeyNotFoundException("Unknown first parent.");
                 var commit = RoamingNetworkCommit.Create(parent.Commit, changeSet, additionalParents);
                 ValidateParents(commit);
@@ -173,6 +183,7 @@ public sealed partial class RoamingNetworkHistory : IDisposable
             try
             {
                 ArgumentNullException.ThrowIfNull(commit);
+                VerifyBoundary();
                 VerifyCommit(commit);
                 if (commit.ChangeSet is { } batch && batchIds.TryGetValue(batch.Id, out var priorId) && priorId != commit.Id)
                 {
@@ -200,11 +211,11 @@ public sealed partial class RoamingNetworkHistory : IDisposable
                 if (publish && !alreadyPublished)
                 {
                     // Capture the latest delivered runtime state while holding the publication gate.
-                    network = head.Network.ApplyChangeSet(commit.ChangeSet!, verifyBatchSignature);
+                    network = ApplyCommit(head.Network, commit);
                     snapshot = network.DataSnapshot;
                 }
                 else if (known) snapshot = oldEntry!.Snapshot;
-                else snapshot = entries[commit.Parents[0]].Snapshot.ApplyChangeSet(commit.ChangeSet!, verifyBatchSignature);
+                else snapshot = ApplyCommit(entries[commit.Parents[0]].Snapshot, commit);
                 MatchState(commit, snapshot);
                 var updatedEntries = entries.SetItem(commit.Id, new(commit, snapshot));
                 var updatedBatches = commit.ChangeSet is { } storedBatch ? batchIds.SetItem(storedBatch.Id, commit.Id) : batchIds;
@@ -255,10 +266,15 @@ public sealed partial class RoamingNetworkHistory : IDisposable
     private void ValidateParents(RoamingNetworkCommit commit)
         => ValidateParents(commit, entries);
 
-    private static void ValidateParents(RoamingNetworkCommit commit, ImmutableDictionary<RoamingNetworkCommitId, Entry> sourceEntries)
+    private void ValidateParents(RoamingNetworkCommit commit, ImmutableDictionary<RoamingNetworkCommitId, Entry> sourceEntries)
     {
-        if (commit.ChangeSet is null || commit.Parents.IsEmpty)
-            throw new ArgumentException("A history has exactly one checkpoint; new commits require a batch and known parents.");
+        if (IsAnchor(commit.Id))
+        {
+            MatchState(commit, sourceEntries[anchorId].Snapshot);
+            return;
+        }
+        if (commit.Parents.IsEmpty)
+            throw new ArgumentException("A history has exactly one checkpoint; new commits require a payload and known parents.");
         foreach (var id in commit.Parents)
         {
             if (!sourceEntries.TryGetValue(id, out var parent)) throw new ArgumentException($"Missing parent: {id}.");
@@ -266,7 +282,12 @@ public sealed partial class RoamingNetworkHistory : IDisposable
                 throw new ArgumentException("All parents must belong to the same checkpoint network.");
         }
         var source = sourceEntries[commit.Parents[0]];
-        if (source.Commit.Revision != commit.ChangeSet.BaseRevision ||
+        if (commit.Snapshot is not null)
+        {
+            ValidateSnapshotParent(commit, source);
+            return;
+        }
+        if (source.Commit.Revision != commit.ChangeSet!.BaseRevision ||
             !source.Commit.StateETags.SequenceEqual(commit.ChangeSet.BeforeETags))
             throw new ArgumentException("The batch must start at the first parent's revision and state.");
     }
@@ -278,6 +299,10 @@ public sealed partial class RoamingNetworkHistory : IDisposable
                 throw new ArgumentException($"Commit signature '{signature.KeyId}' was not accepted.");
         if (authorizeCommit is not null && !authorizeCommit(commit))
             throw new ArgumentException("The application did not authorize this commit.");
+        if (!HasCompleteAncestry && IsAnchor(commit.Id) &&
+            (commit.Signatures.IsEmpty || authorizeSnapshotBoundary is null ||
+             !authorizeSnapshotBoundary(new(checkpointId, commit))))
+            throw new ArgumentException("The application did not authorize the original chain and signed snapshot boundary.");
     }
 
     private void VerifyBatch(RoamingNetworkCommit commit)
@@ -311,16 +336,18 @@ public sealed partial class RoamingNetworkHistory : IDisposable
         {
             if (current == id) return true;
             var parents = entries[current].Commit.Parents;
-            if (parents.IsEmpty) return false;
+            if (IsAnchor(current)) return false;
             current = parents[0];
         }
     }
 
-    private static IEnumerable<Entry> OrderedEntries(ImmutableDictionary<RoamingNetworkCommitId, Entry> source)
+    private IEnumerable<Entry> OrderedEntries(ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
+                                              RoamingNetworkCommitId? replayRoot = null)
     {
-        var remaining = source.ToDictionary(entry => entry.Key, entry => entry.Value.Commit.Parents.Length);
+        var root = replayRoot ?? anchorId;
+        var remaining = source.ToDictionary(entry => entry.Key, entry => entry.Key == root ? 0 : entry.Value.Commit.Parents.Length);
         var children = source.Keys.ToDictionary(id => id, _ => new List<RoamingNetworkCommitId>());
-        foreach (var entry in source.Values)
+        foreach (var entry in source.Values.Where(entry => entry.Commit.Id != root))
             foreach (var parent in entry.Commit.Parents) children[parent].Add(entry.Commit.Id);
         var ready = new SortedSet<(String Text, RoamingNetworkCommitId Id)>(
             Comparer<(String Text, RoamingNetworkCommitId Id)>.Create((left, right) => StringComparer.Ordinal.Compare(left.Text, right.Text)));

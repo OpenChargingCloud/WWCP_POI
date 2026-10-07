@@ -123,7 +123,8 @@ public sealed class RoamingNetworkBootstrapSource
     public RoamingNetworkBootstrapManifest Manifest { get; }
 
     internal RoamingNetworkBootstrapSource(Byte[] archive, RoamingNetworkCommitId checkpoint, RoamingNetworkCommitId head,
-        Int32 commits, Int32 chunkBytes, RoamingNetworkBootstrapLimits limits)
+        Int32 commits, Int32 chunkBytes, RoamingNetworkBootstrapLimits limits, String archiveProfile = RoamingNetworkHistory.ArchiveProfile,
+        RoamingNetworkCommitId? anchor = null)
     {
         if (chunkBytes < 1 || chunkBytes > limits.MaxChunkBytes || archive.Length > limits.MaxArchiveBytes ||
             ((Int64) archive.Length + chunkBytes - 1) / chunkBytes > limits.MaxChunks || commits > limits.MaxCommits)
@@ -136,7 +137,7 @@ public sealed class RoamingNetworkBootstrapSource
             digests.Add(ImmutableArray.CreateRange(System.Security.Cryptography.SHA256.HashData(archive.AsSpan(offset, length))));
             offset += length;
         }
-        Manifest = new(checkpoint, head, commits, archive.Length, chunkBytes, ETag.Compute(ETagFormat.CBOR, archive), digests.ToImmutable());
+        Manifest = new(checkpoint, head, commits, archive.Length, chunkBytes, ETag.Compute(ETagFormat.CBOR, archive), digests.ToImmutable(), archiveProfile, anchor);
         Manifest.RequireLimits(limits);
         // The last full fragment has the widest position encoding; also check the short tail.
         CreateChunk(Math.Max(0, Manifest.ChunkCount - 2));

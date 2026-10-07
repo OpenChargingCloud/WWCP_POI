@@ -13,15 +13,15 @@ namespace cloud.charging.open.protocols.WWCP.POI;
 public sealed partial class RoamingNetworkHistory
 {
     /// <summary>
-    /// Announce the shared checkpoint, published head and all retained branch tips.
-    /// Each acknowledged tip includes its complete ancestry through every parent.
+    /// Announce the original checkpoint, local replay root, published head and retained branch tips.
+    /// Acknowledgment includes every retained parent path down to the declared root.
     /// </summary>
     public RoamingNetworkReplicationState GetReplicationState()
     {
         lock (gate)
         {
             var parents = entries.Values.SelectMany(entry => entry.Commit.Parents).ToHashSet();
-            return new(checkpointId, head.Id, entries.Keys.Where(id => !parents.Contains(id)).ToImmutableArray());
+            return new(checkpointId, head.Id, entries.Keys.Where(id => !parents.Contains(id)).ToImmutableArray(), anchorId);
         }
     }
 
@@ -54,28 +54,59 @@ public sealed partial class RoamingNetworkHistory
                 }
                 if (!targetTip.IsValid || !entries.ContainsKey(targetTip))
                 {
+                    if (targetTip.IsValid && archivedCommits.TryGetValue(targetTip, out var receipt))
+                    {
+                        result = new(RoamingNetworkReplicationOutcome.SnapshotRequired, head,
+                            MissingCommits: [targetTip], ProposedBoundary: AvailableBoundary(), RetentionReceipt: receipt,
+                            Error: "The requested tip was archived by explicit retention; retrieve its cold archive or explicitly authorize a current snapshot bootstrap.");
+                        return false;
+                    }
                     result = new(RoamingNetworkReplicationOutcome.UnknownTip, head, Error: "The requested tip is not retained.");
                     return false;
                 }
-                var known = new HashSet<RoamingNetworkCommitId> { checkpointId };
+                var wireRoot = receiver.HasCompleteAncestry && !HasCompleteAncestry ? anchorId : receiver.Anchor;
+                if (receiver.HasCompleteAncestry && !HasCompleteAncestry &&
+                    !receiver.KnownTips.Any(tip => entries.ContainsKey(tip) && Ancestors(tip).Contains(anchorId)))
+                {
+                    result = new(RoamingNetworkReplicationOutcome.SnapshotRequired, head,
+                        MissingCommits: [anchorId], ProposedBoundary: AvailableBoundary(),
+                        Error: "The receiver has not acknowledged this replica's snapshot anchor; explicitly bootstrap or retrieve its original ancestry.");
+                    return false;
+                }
+                if (!entries.TryGetValue(wireRoot, out var rootEntry) ||
+                    (wireRoot != checkpointId && rootEntry.Commit.Kind != RoamingNetworkCommitKind.Snapshot))
+                {
+                    result = new(RoamingNetworkReplicationOutcome.SnapshotRequired, head,
+                        MissingCommits: [wireRoot], ProposedBoundary: AvailableBoundary(),
+                        RetentionReceipt: archivedCommits.GetValueOrDefault(wireRoot),
+                        Error: "The receiver's replay boundary is unavailable here; explicitly authorize a compatible snapshot or retrieve full history.");
+                    return false;
+                }
+                if (!TryAncestorsWithin(targetTip, wireRoot, out var missing, out var external))
+                {
+                    result = new(RoamingNetworkReplicationOutcome.HistoryRequired, head,
+                        MissingCommits: external, ProposedBoundary: AvailableBoundary(),
+                        Error: "The requested tip needs ancestry outside the selected snapshot boundary; retrieve an earlier boundary or complete history.");
+                    return false;
+                }
+                var known = new HashSet<RoamingNetworkCommitId> { wireRoot };
                 foreach (var tip in receiver.KnownTips)
-                    if (entries.ContainsKey(tip)) known.UnionWith(Ancestors(tip));
-                var missing = Ancestors(targetTip);
+                    if (entries.ContainsKey(tip) && TryAncestorsWithin(tip, wireRoot, out var acknowledged, out _)) known.UnionWith(acknowledged);
                 missing.ExceptWith(known);
                 var selected = ImmutableArray<RoamingNetworkCommit>.Empty;
-                var anchor = entries[checkpointId].Commit;
-                var candidate = new RoamingNetworkCommitPack(anchor, targetTip, true, selected);
+                var anchor = rootEntry.Commit;
+                var candidate = new RoamingNetworkCommitPack(anchor, targetTip, true, selected, checkpointId);
                 if (PackSize(candidate) > maxBytes)
                 {
                     result = new(RoamingNetworkReplicationOutcome.CommitTooLarge, head,
-                        Error: "The checkpoint envelope and page header exceed maxBytes.");
+                        Error: "The replay-root envelope and page header exceed maxBytes.");
                     return false;
                 }
                 foreach (var entry in OrderedEntries(entries).Where(entry => missing.Contains(entry.Commit.Id)))
                 {
                     if (selected.Length == maxCommits) break;
                     var next = selected.Add(entry.Commit);
-                    candidate = new(anchor, targetTip, next.Length == missing.Count, next);
+                    candidate = new(anchor, targetTip, next.Length == missing.Count, next, checkpointId);
                     if (PackSize(candidate) > maxBytes)
                     {
                         if (selected.IsEmpty)
@@ -88,7 +119,7 @@ public sealed partial class RoamingNetworkHistory
                     }
                     selected = next;
                 }
-                pack = new(anchor, targetTip, selected.Length == missing.Count, selected);
+                pack = new(anchor, targetTip, selected.Length == missing.Count, selected, checkpointId);
                 result = new(RoamingNetworkReplicationOutcome.PackAvailable, head);
                 return true;
             }
@@ -122,8 +153,9 @@ public sealed partial class RoamingNetworkHistory
             try
             {
                 ArgumentNullException.ThrowIfNull(pack);
+                VerifyBoundary();
                 if (maxCommits < 1 || maxBytes < 1) throw new ArgumentOutOfRangeException(nameof(maxCommits), "Page limits must be positive.");
-                if (pack.CheckpointCommit.Id != checkpointId)
+                if (pack.Checkpoint != checkpointId)
                 {
                     result = new(RoamingNetworkReplicationOutcome.CheckpointMismatch, head,
                         Error: "The checkpoint differs; incremental import cannot replace the local history.");
@@ -134,29 +166,41 @@ public sealed partial class RoamingNetworkHistory
                     result = new(RoamingNetworkReplicationOutcome.CommitTooLarge, head, Error: "The incoming page exceeds the configured limits.");
                     return false;
                 }
+                if (!entries.TryGetValue(pack.AnchorCommit.Id, out var rootEntry))
+                {
+                    result = new(HasCompleteAncestry ? RoamingNetworkReplicationOutcome.MissingParents : RoamingNetworkReplicationOutcome.SnapshotRequired,
+                        head, MissingCommits: [pack.AnchorCommit.Id],
+                        RetentionReceipt: archivedCommits.GetValueOrDefault(pack.AnchorCommit.Id),
+                        ProposedBoundary: pack.HasSnapshotAnchor && !pack.AnchorCommit.Signatures.IsEmpty ? new(checkpointId, pack.AnchorCommit) : AvailableBoundary(),
+                        Error: "The page root is not retained. Import its original ancestry or explicitly bootstrap a separate authorized snapshot replica.");
+                    return false;
+                }
                 var incomingIds = pack.Commits.Select(commit => commit.Id).ToHashSet();
                 var missing = pack.Commits.SelectMany(commit => commit.Parents)
                     .Where(id => !entries.ContainsKey(id) && !incomingIds.Contains(id)).ToHashSet();
                 if (pack.Complete && !entries.ContainsKey(pack.Tip) && !incomingIds.Contains(pack.Tip)) missing.Add(pack.Tip);
                 if (missing.Count > 0)
                 {
-                    result = new(RoamingNetworkReplicationOutcome.MissingParents, head,
-                        MissingCommits: missing.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToImmutableArray(),
-                        Error: "Fetch these missing commits and their ancestry before retrying the unchanged page.");
+                    var ordered = RoamingNetworkRetentionPlan.Sort(missing);
+                    var receipt = ordered.Select(id => archivedCommits.GetValueOrDefault(id)).FirstOrDefault(value => value is not null);
+                    result = new(receipt is null ? RoamingNetworkReplicationOutcome.MissingParents : RoamingNetworkReplicationOutcome.HistoryRequired, head,
+                        MissingCommits: ordered, RetentionReceipt: receipt, ProposedBoundary: receipt is null ? null : AvailableBoundary(),
+                        Error: receipt is null ? "Fetch these missing commits and their ancestry before retrying the unchanged page." :
+                            "Required commits were archived; retrieve cold history or explicitly bootstrap a compatible snapshot before retrying.");
                     return false;
                 }
-                VerifyCommit(pack.CheckpointCommit);
-                var checkpoint = MergeEnvelopes(entries[checkpointId].Commit, pack.CheckpointCommit);
-                VerifyCommit(checkpoint);
-                MatchState(checkpoint, entries[checkpointId].Snapshot);
-                var updatedEntries = entries.SetItem(checkpointId, new(checkpoint, entries[checkpointId].Snapshot));
+                if (!pack.HasSnapshotAnchor) VerifyCommit(pack.AnchorCommit);
+                var root = MergeEnvelopes(rootEntry.Commit, pack.AnchorCommit);
+                VerifyCommit(root);
+                MatchState(root, rootEntry.Snapshot);
+                var updatedEntries = entries.SetItem(root.Id, new(root, rootEntry.Snapshot));
                 var updatedBatches = batchIds;
 
                 // Stored ancestry is reauthorized using the receiver's current trust policy.
                 var consumed = new HashSet<RoamingNetworkCommitId>();
                 foreach (var parent in pack.Commits.SelectMany(commit => commit.Parents).Append(pack.Tip))
                     if (entries.ContainsKey(parent)) consumed.UnionWith(Ancestors(parent));
-                foreach (var id in consumed.Where(id => id != checkpointId && !incomingIds.Contains(id)))
+                foreach (var id in consumed.Where(id => id != root.Id && !incomingIds.Contains(id)))
                 {
                     VerifyCommit(entries[id].Commit);
                     VerifyBatch(entries[id].Commit);
@@ -170,8 +214,8 @@ public sealed partial class RoamingNetworkHistory
                     if (incoming.Parents.Any(id => incomingIds.Contains(id) && !preceding.Contains(id)))
                         throw new ArgumentException("Parents included in a page must precede their children.");
                     VerifyCommit(incoming);
-                    var batch = incoming.ChangeSet!;
-                    if (updatedBatches.TryGetValue(batch.Id, out var priorId) && priorId != incoming.Id)
+                    var batch = incoming.ChangeSet;
+                    if (batch is not null && updatedBatches.TryGetValue(batch.Id, out var priorId) && priorId != incoming.Id)
                     {
                         result = new(RoamingNetworkReplicationOutcome.ChangeSetIdConflict, head,
                             Error: "A batch ID already identifies different commit content or ancestry.");
@@ -183,10 +227,10 @@ public sealed partial class RoamingNetworkHistory
                     VerifyCommit(commit);
                     VerifyBatch(commit);
                     var snapshot = known ? retained!.Snapshot :
-                        updatedEntries[commit.Parents[0]].Snapshot.ApplyChangeSet(commit.ChangeSet!, verifyBatchSignature);
+                        ApplyCommit(updatedEntries[commit.Parents[0]].Snapshot, commit);
                     MatchState(commit, snapshot);
                     updatedEntries = updatedEntries.SetItem(commit.Id, new(commit, snapshot));
-                    updatedBatches = updatedBatches.SetItem(batch.Id, commit.Id);
+                    if (batch is not null) updatedBatches = updatedBatches.SetItem(batch.Id, commit.Id);
                     preceding.Add(commit.Id);
                     if (known) duplicates++; else stored++;
                 }

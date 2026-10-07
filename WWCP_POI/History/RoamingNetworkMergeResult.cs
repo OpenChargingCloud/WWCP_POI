@@ -20,7 +20,8 @@ public enum RoamingNetworkMergeStatus
     Conflicts,
     AmbiguousAncestor,
     InvalidInput,
-    Unavailable
+    Unavailable,
+    HistoryRequired
 }
 
 /// <summary>
@@ -110,7 +111,9 @@ public sealed class RoamingNetworkMergeConflict
         InfrastructureEntityKey? entity = null, String? propertyName = null,
         ImmutableArray<POIElementPathSegment> elementPath = default,
         JsonElement? baseValue = null, JsonElement? leftValue = null, JsonElement? rightValue = null,
-        RoamingNetworkMergeResolution? resolution = null, InfrastructureEntityKey? relatedEntity = null)
+        RoamingNetworkMergeResolution? resolution = null, InfrastructureEntityKey? relatedEntity = null,
+        RoamingNetworkLifetimeOrigin? baseLifetime = null, RoamingNetworkLifetimeOrigin? leftLifetime = null,
+        RoamingNetworkLifetimeOrigin? rightLifetime = null)
     {
         Kind = kind;
         Path = path;
@@ -123,6 +126,9 @@ public sealed class RoamingNetworkMergeConflict
         RightValue = rightValue?.Clone();
         Resolution = resolution;
         RelatedEntity = relatedEntity;
+        BaseLifetime = baseLifetime;
+        LeftLifetime = leftLifetime;
+        RightLifetime = rightLifetime;
     }
 
     /// <summary>
@@ -177,12 +183,28 @@ public sealed class RoamingNetworkMergeConflict
     public JsonElement? RightValue { get; }
 
     /// <summary>
+    /// The ancestor's original object lifetime, when this conflict addresses an owned object.
+    /// </summary>
+    public RoamingNetworkLifetimeOrigin? BaseLifetime { get; }
+
+    /// <summary>
+    /// The left branch's original object lifetime, even when its static payload equals the ancestor.
+    /// </summary>
+    public RoamingNetworkLifetimeOrigin? LeftLifetime { get; }
+
+    /// <summary>
+    /// The right branch's original object lifetime, even when its identifier and creation metadata are reused.
+    /// </summary>
+    public RoamingNetworkLifetimeOrigin? RightLifetime { get; }
+
+    /// <summary>
     /// An explicit accepted resolution; null means the conflict remains unresolved.
     /// </summary>
     public RoamingNetworkMergeResolution? Resolution { get; }
 
     internal RoamingNetworkMergeConflict WithResolution(RoamingNetworkMergeResolution resolution)
-        => new(Kind, Path, Message, Entity, PropertyName, ElementPath, BaseValue, LeftValue, RightValue, resolution, RelatedEntity);
+        => new(Kind, Path, Message, Entity, PropertyName, ElementPath, BaseValue, LeftValue, RightValue, resolution, RelatedEntity,
+               BaseLifetime, LeftLifetime, RightLifetime);
 }
 
 /// <summary>
@@ -193,7 +215,10 @@ public sealed class RoamingNetworkMergeResult
     internal RoamingNetworkMergeResult(RoamingNetworkMergeStatus status, String message,
         RoamingNetworkCommitId left, RoamingNetworkCommitId right, RoamingNetworkCommitId? ancestor = null,
         ImmutableArray<RoamingNetworkCommitId> ancestors = default,
-        ImmutableArray<RoamingNetworkMergeConflict> conflicts = default, ImmutableArray<ETag> afterETags = default)
+        ImmutableArray<RoamingNetworkMergeConflict> conflicts = default, ImmutableArray<ETag> afterETags = default,
+        ImmutableArray<RoamingNetworkChange> plannedOperations = default,
+        ImmutableArray<RoamingNetworkMergeReferenceTransition> referenceTransitions = default,
+        ImmutableArray<RoamingNetworkCommitId> missingCommits = default)
     {
         Status = status;
         Message = message;
@@ -203,6 +228,9 @@ public sealed class RoamingNetworkMergeResult
         AncestorCandidates = ancestors.IsDefault ? [] : ancestors;
         Conflicts = conflicts.IsDefault ? [] : conflicts;
         AfterETags = afterETags.IsDefault ? [] : afterETags;
+        PlannedOperations = plannedOperations.IsDefault ? [] : plannedOperations;
+        ReferenceTransitions = referenceTransitions.IsDefault ? [] : referenceTransitions;
+        MissingCommits = missingCommits.IsDefault ? [] : missingCommits;
     }
 
     /// <summary>
@@ -255,4 +283,20 @@ public sealed class RoamingNetworkMergeResult
     /// The validated candidate's JSON/CBOR state tags; empty when no candidate could be validated.
     /// </summary>
     public ImmutableArray<ETag> AfterETags { get; }
+
+    /// <summary>
+    /// The complete validated operation sequence for a successful preview or explicit preparation.
+    /// </summary>
+    public ImmutableArray<RoamingNetworkChange> PlannedOperations { get; }
+
+    /// <summary>
+    /// Explicit temporary reference changes, with positions in PlannedOperations for review.
+    /// </summary>
+    public ImmutableArray<RoamingNetworkMergeReferenceTransition> ReferenceTransitions { get; }
+
+    /// <summary>
+    /// Requested tips or an explicit ancestor unavailable within this replica's snapshot boundary.
+    /// Missing IDs do not prove that the requested data was once retained or compacted.
+    /// </summary>
+    public ImmutableArray<RoamingNetworkCommitId> MissingCommits { get; }
 }

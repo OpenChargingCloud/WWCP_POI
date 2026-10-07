@@ -24,6 +24,15 @@ exchange missing ancestry atomically. A separate preview/explicit adoption API s
 descendants, including merges reached through a second parent, while carrying local runtime lifetimes.
 New replicas can bootstrap a frozen checkpoint and complete history through bounded, resumable
 JSON/CBOR fragments. Validation previews precede explicit activation into a separate history.
+Administrators can also publish full static snapshot links inside the same chain. Each preserves
+the parent's data ETags and local runtime, advances the history revision and carries its own
+descriptions, metadata, deterministic identity and equal peer signatures.
+New replicas can start at an explicitly authorized signed snapshot, retain the original chain ID
+and replay later commits. Their announcements distinguish a trusted snapshot boundary from
+complete ancestry, and incremental pages reference the locally retained anchor without repeating its full state.
+Administrators can review an explicit retention plan, archive the complete preceding history and
+prune active replay at a signed snapshot. Branch/merge dependencies are protected, the original
+chain and local runtime head stay unchanged, and receipts distinguish archived from unknown IDs.
 
 ## Documentation
 
@@ -38,6 +47,9 @@ JSON/CBOR fragments. Validation previews precede explicit activation into a sepa
 | [ETags and CBOR](docs/ETAGS-CBOR.md) | Immutability audit, canonical content identifiers, metrological CBOR and roundtrips |
 | [ChangeSet CBOR](docs/CHANGESET-CBOR.md) | Complete binary exchange preserving signed values, paths and all peer signatures |
 | [Commit history and atomic heads](docs/HISTORY.md) | Typed commit IDs, ancestry, publication, duplicate delivery, signatures and archive recovery |
+| [Full snapshot links](docs/SNAPSHOTS.md) | Admin-controlled full states, unchanged static data, revision rules, signatures and versioned exchange |
+| [Authorized snapshot boundaries](docs/SNAPSHOT-BOUNDARIES.md) | Fresh replicas without older ancestry, explicit trust, partial archives, bounded bootstrap and suffix replication |
+| [History archival and pruning](docs/RETENTION.md) | Review plans, protected branches/bases, cold archives, atomic installation, unchanged runtime and pruning receipts |
 | [Incremental replication](docs/REPLICATION.md) | Retained-tip announcements, bounded commit pages, atomic import and explicit head adoption |
 | [Bootstrap new replicas](docs/BOOTSTRAP.md) | Frozen archive fragments, local limits, disk staging, restart and explicit validated activation |
 | [Integrating retained branches](docs/MERGING.md) | Three-way comparison, best common ancestors, structured conflicts and explicit merge commits |
@@ -142,6 +154,14 @@ bases, rebase, a streaming archive codec and an HTTP synchronization service rem
 The transport-independent incremental exchange/adoption contract has dedicated JSON/CBOR,
 atomic failure, runtime lifetime, concurrency and persistence/recovery coverage. Peer signatures
 remain separate from commit identity.
+
+[Snapshot commits](docs/SNAPSHOTS.md) now add administrator-selected full static states within the
+existing chain, followed by ordinary ChangeSets. JSON/CBOR archives, incremental pages and resumable
+full-history bootstrap include them through explicit versioned profiles. [Authorized snapshot boundaries](docs/SNAPSHOT-BOUNDARIES.md)
+now support separate replicas without earlier ancestry, with mandatory signature/boundary policies
+and versioned partial archives/transfer. [Explicit archival/pruning](docs/RETENTION.md) now adds reviewed
+plans, dependency blockers, durable cold archives, unchanged heads and persisted receipt catalogs;
+creating a snapshot or exporting a partial history retains all source commits.
 
 ## Quick start
 
@@ -364,10 +384,17 @@ It rechecks ownership/references and uses addressed element edits for supported 
 Missing or out-of-scope references return `Reference` conflicts with the consumer in `Entity`,
 the affected `PropertyName` and typed target in `RelatedEntity`. All currently affected consumers
 and targets are reported. Whole-subtree choices are revalidated immediately, so repaired issues
-drop out and repeated invalid choices terminate. Creation/owner changes remain structural choices;
-connectors retain their EVSE scope. Criss-cross histories require an explicit best-ancestor choice.
-Recreating a referenced target can require an explicit consumer detach transition when the generated
-merge delta has no legal operation order; no temporary detach/restore operations are inferred.
+drop out and repeated invalid choices terminate. History merge replays original first-parent operations
+to distinguish removed/reintroduced graph and nested objects even when their IDs, `created` and final
+payloads are reused. Structural conflicts expose typed `BaseLifetime`, `LeftLifetime` and `RightLifetime`
+origins. Selecting a different lifetime generates Remove/Add and records the selected origins in signed
+merge metadata. Creation/owner changes remain structural choices; connectors retain their EVSE scope.
+Criss-cross histories require an explicit best-ancestor choice.
+Recreating a referenced target can prepare explicit temporary detachment/restoration through the
+normal operation validator. Preview reports expose complete `PlannedOperations` and typed
+`ReferenceTransitions`, including actual field values and operation indices. These steps are part
+of the signed merge batch and require explicit preparation/publication. Remaining domain/dependency
+failures still return conflicts without a partial plan.
 See [three-way integration](docs/MERGING.md) for preparation, signing and boundaries.
 
 ## Exchange missing commits and adopt a retained head
@@ -524,7 +551,9 @@ The **32 bootstrap cases** cover bounded JSON/CBOR fragments, restart, corruptio
 full trust/replay validation, preview/activation, fresh runtime and incremental continuation.
 The **34 structural merge cases** cover deletion/recreation/addition/owner conflicts, precise
 reference diagnostics and choices, connector scopes, signed resolution recovery, criss-cross
-ancestor selection, resolver reentry/exceptions and unschedulable referenced replacements.
+ancestor selection and resolver reentry/exceptions. The referenced-replacement case now expects a
+prepared temporary reference plan; this revised expectation and operation-history lifetime handling
+have not been covered by a new test run.
 See the [profile and reference vectors](docs/INTEROPERABILITY.md) and [test coverage](WWCP_POI_Tests/README.md).
 
 ## License

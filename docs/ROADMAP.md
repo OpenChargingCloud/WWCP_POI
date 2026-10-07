@@ -44,6 +44,15 @@ planned are not guarantees of the current API.
   maintenance enable disjoint nested edits. Built-in signing uses v2 and binds every path.
 - Runtime capture detects explicit removal/reintroduction and temporary identity/slot replacement
   within a batch, so reused final IDs do not silently inherit an earlier runtime lifetime.
+- History merge additionally derives graph/nested owned-object lifetimes from original first-parent
+  operations, including intermediate states with reused IDs/creation metadata. Structural conflicts
+  expose typed checkpoint/commit/operation origins; selecting another lifetime generates Remove/Add
+  and optional signed audit evidence. Dedicated regression coverage remains planned.
+- Referenced graph recreation can prepare explicit temporary reference detachment/restoration
+  through ordinary validators. Preview exposes complete operations and immutable transition records;
+  operation indices and actual field values enter signed audit metadata. Restoration waits for pending
+  removals, including consumer subtree rebuilds. The existing replacement expectation is updated;
+  broader regression coverage and a fresh test run remain planned.
 - Incremental JSON/CBOR exchange announces retained DAG tips and bounds commit pages by count/bytes.
   Atomic import validates ancestry, trust and replay before retention, without selecting a head.
   Preview/explicit expected-head adoption accepts descendants through any parent and conservatively
@@ -57,14 +66,16 @@ planned are not guarantees of the current API.
   fields and targets. Accepted whole-subtree choices are revalidated before processing stale issues;
   repeated invalid choices terminate. Its 34 passing cases cover owner/descendant deletion,
   recreation/addition/ownership, connector scope, reference/group/parking constraints, explicit
-  ancestor choices in criss-cross histories, resolver reentry/exceptions and unschedulable replacement.
+  ancestor choices in criss-cross histories and resolver reentry/exceptions. The formerly rejected
+  referenced-replacement case now expects a temporary reference plan and has not been rerun.
 - The README distinguishes static versioning from live runtime values and explains CBOR
   revision transport. The historical Styx patch no longer claims a current Git metadata failure.
 
 The interoperable static profile is now **`wwcp-poi-static-v1`**, declared in tagged transports and
 bound into commit IDs/signatures. Fixed JSON/CBOR/state/commit/signature/merge/archive references
 are published. The full NUnit run on 2026-10-07 passed **509 tests**, with one skipped child
-worker that is executed separately by the process-crash tests. See [interoperability](INTEROPERABILITY.md).
+worker that is executed separately by the process-crash tests. That run predates original-operation
+lifetimes and temporary reference plans; their expanded coverage remains planned. See [interoperability](INTEROPERABILITY.md).
 
 ## Current type coverage
 
@@ -179,8 +190,9 @@ cycles or operation dependencies that cannot be scheduled are reported rather th
 domain constraints. Fixed disjoint/resolved merge references and workflow tests are published.
 The 34 [structural merge cases](MERGING.md#structural-merge-evidence) now exercise deletion/recreation,
 ownership, missing and out-of-scope references, scoped connectors, criss-cross ambiguity, explicit
-ancestor choices and resolver reentry/exception rollback. Operation-history lifetime proofs for
-reused creation metadata and exhaustive graph/reference combinations remain additional work.
+ancestor choices and resolver reentry/exception rollback. Operation-history lifetime handling for
+reused creation metadata is now implemented; dedicated coverage, exhaustive graph/reference
+combinations and broader temporary reference-transition coverage remain additional work.
 
 ## 5. Freeze interoperable profiles and exchange behavior — partly implemented
 
@@ -216,7 +228,89 @@ cover interrupted transfer/reopen, exact limits, corruption, complete trust/repl
 explicit activation, fresh runtime and continued incremental exchange. See also
 [replication fixture details](REPLICATION.md#implementation-and-evidence).
 
-Broader nested/graph/ownership combinations, operation-history lifetime proofs, recursive merge bases
+Broader nested/graph/ownership combinations, dedicated operation-history lifetime coverage, recursive merge bases
 and performance remain additional work. There is no power-loss simulation or independently
 implemented remote peer yet. Measure full static hashing, import/materialization, archive rewrite/replay
 and runtime capture before adding caches or a Merkle profile.
+
+## 7. Admin-controlled snapshot commits and history retention
+
+Full-state snapshot links now exist inside the original chain. Administrators explicitly prepare,
+sign and publish them; ordinary ChangeSet commits follow at the new revision. Operation-history
+lifetime handling and temporary reference scheduling remain integrated. Snapshot creation keeps
+all original ancestry. See [snapshot contracts and usage](SNAPSHOTS.md). Automatic time/change-count
+policies remain application work. Explicit trusted snapshot entry, suffix exchange and independently
+approved archival/pruning are now implemented as described below.
+
+### Implemented snapshot links and complete-history exchange
+
+- Explicit snapshot commit kind with the current head as its single parent, a complete static
+  snapshot, both state ETags, content profile, creation timestamp, descriptions and metadata.
+  Existing commit IDs and signatures are preserved; subsequent commits build on the snapshot.
+- Separate deterministic identity and signing profiles bind parent, full state and administrator
+  metadata. Equal-peer signatures use the existing commit verification and authorization callbacks.
+- Snapshot-only commits advance revision once, preserve the last applied batch ID and reproduce
+  exact parent static content and both ETags. POI timestamps and entity lifetimes do not change.
+- Publication uses the expected-head gate and atomic persistence. Derived local runtime remains
+  independent and preserves statuses, schedules, measurements and forecasts.
+- JSON/CBOR full-history archives, resumable bootstrap and incremental pages have explicit profiles
+  for snapshot envelopes. Complete first-parent replay and every original merge parent remain required.
+
+This implementation has a successful library build, but no snapshot-specific tests or reference
+vectors have been executed. Verify roundtrips/signatures, bookkeeping, runtime continuity,
+publication races, atomic failure/recovery, transfer bounds and merges crossing snapshot links
+before freezing the new profiles.
+
+### Implemented authorized snapshot boundaries
+
+- `FromSnapshot` and `CreatePersistentFromSnapshot` start a separate fresh-runtime replica at an
+  original signed snapshot, preserving its ID, external parent and original chain checkpoint claim.
+- Signature verification and explicit checkpoint/anchor authorization are mandatory. Boundary
+  policy must independently authorize chain association and rollback constraints; omitted ancestry
+  cannot prove the original checkpoint claim. Static mutations and recovery recheck current trust.
+- Partial history-v3 archives and manifest-v3 bootstrap include the full root once. The selected
+  tip's suffix must include all parent paths. The source archive remains intact.
+- Replication-state-v2 explicitly acknowledges only ancestry down to its anchor. Commit-pack-v3
+  references the local root by ID and peer envelopes, keeping incremental pages independent of its
+  full payload size. Existing complete-history identities/profiles remain unchanged.
+- `SnapshotRequired` and `HistoryRequired` report boundary/dependency failures with typed IDs.
+  Proposals require fresh approval; unknown IDs are not described as proven compacted history.
+- Known suffix branches can merge and preserve local runtime through retained operation evidence.
+  Missing requested bases return `HistoryRequired`. Snapshot entry starts fresh runtime and cannot
+  prove pre-boundary object lifetimes. Full-history replay remains independently available.
+
+See [boundary contracts and examples](SNAPSHOT-BOUNDARIES.md). The library builds, but dedicated
+boundary tests, vectors, fresh-policy/rollback cases, bootstrap recovery, large-root incremental
+bounds, atomic failures, runtime continuity and cross-boundary merge evidence remain pending.
+
+### Implemented explicit retention and pruning
+
+- `GetRetentionSnapshots` binds administrator time policy to a retained first-parent cutoff.
+  Immutable plans protect head, all unpublished frontier tips, explicit bases and every merge parent.
+  Cross-boundary dependencies block pruning; only named frontier tips can be released to cold storage.
+- Review identities bind the full source archive, including peers and earlier receipts. Execution
+  rejects changed heads or inventories and requires explicit pruning plus boundary authorization.
+- A complete preceding local CBOR archive is flushed, published without overwrite and digest-checked
+  before active replacement. In-memory histories require this durable backup as well.
+- Exact live head/network/runtime remain unchanged. Root, retained maps, batch inventory and receipts
+  install together after persistence. Existing original commit identities/signatures remain intact.
+- History-v4/manifest-v4 persist native JSON/CBOR pruning receipts. Known archived IDs return
+  structured lookup/replication outcomes and cold archive digests; arbitrary unknown IDs stay distinct.
+  `ReadColdArchive` verifies an independently located archive into a separate fresh-runtime history.
+
+See [retention contracts and examples](RETENTION.md). No dedicated retention tests have been added or
+executed. The catalog is unsigned bookkeeping; original signed cold replay supplies historical evidence.
+
+### Next package: snapshot and retention verification
+
+- Add/execute snapshot identity/signature and JSON/CBOR reference cases, revision/last-batch rules,
+  runtime/lifetime preservation, root authorization changes and partial bootstrap continuation.
+- Verify protected old branches/bases, crossing merge parents, explicitly released unpublished work,
+  inventory changes through peer-only additions, repeated pruning/catalog recovery and cold retrieval.
+- Verify failure/retry before active replacement, existing cold destination mismatch, writer leases,
+  head races, callback reentry, exact disk/memory/runtime invariants and boundary replication responses.
+- Freeze new profiles only after this evidence. Streaming replay, compact catalog indexes, archive
+  discovery, automatic schedules, multiple anchors and performance measurements remain later work.
+
+Announced chain/epoch transitions remain a possible later extension. The implemented retention workflow
+uses snapshot boundaries within the existing chain and independently configured archive availability.

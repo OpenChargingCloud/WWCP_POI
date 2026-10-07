@@ -154,7 +154,8 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature = null,
         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature = null,
         Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
-        Func<RoamingNetworkBootstrapManifest, Boolean>? authorizeBootstrap = null)
+        Func<RoamingNetworkBootstrapManifest, Boolean>? authorizeBootstrap = null,
+        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null)
     {
         lock (gate)
         {
@@ -177,7 +178,7 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
                 }
                 if (ETag.Compute(ETagFormat.CBOR, bytes) != Manifest.ArchiveETag)
                     throw new ArgumentException("Complete archive digest differs from the manifest.");
-                validated = RoamingNetworkHistory.RestoreBootstrap(bytes, Manifest, verifyBatchSignature, verifyCommitSignature, authorizeCommit);
+                validated = RoamingNetworkHistory.RestoreBootstrap(bytes, Manifest, verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary);
                 if (!activate)
                 {
                     result = Result(RoamingNetworkBootstrapOutcome.ActivationAvailable); return true;

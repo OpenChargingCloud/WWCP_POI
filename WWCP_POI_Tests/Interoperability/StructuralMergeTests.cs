@@ -368,7 +368,7 @@ public sealed class StructuralMergeTests
     }
 
     [Test]
-    public void A_valid_combined_graph_is_rejected_when_replacement_cannot_be_scheduled_without_detaching_consumers()
+    public void A_referenced_replacement_prepares_explicit_detachment_and_restoration_without_publication()
     {
         var network = Network(); var id = EVSEGroup_Id.Parse(ChargingStationOperator_Id.Parse("DE*ABC"), "active").ToString();
         var group = Value(JsonSerializer.Serialize(new Dictionary<String, Object> {
@@ -384,10 +384,10 @@ public sealed class StructuralMergeTests
             RoamingNetworkChange.Add("EVSE", Evse, Document(replacement), "ChargingStation", Station),
             RoamingNetworkChange.AddElement("EVSEGroup", id, [new("EVSEIds", Evse)], Value(JsonSerializer.Serialize(Evse))));
         Publish(history, left); Store(history, right); var before = new Observation(history);
-        Assert.That(history.TryMerge(left.Id, right.Id, out var absent, out var report, merge: true, mergedChangeSetId: "cannot-schedule"), Is.False);
-        Assert.That(absent, Is.Null); Assert.That(report.Status, Is.EqualTo(RoamingNetworkMergeStatus.Conflicts));
-        Assert.That(report.Conflicts.Any(conflict => conflict.Kind == RoamingNetworkMergeConflictKind.InvalidResult && conflict.Message.Contains("reference", StringComparison.OrdinalIgnoreCase)), Is.True);
-        Assert.That(report.AfterETags, Is.Empty); before.AssertUnchanged(history);
+        Assert.That(history.TryMerge(left.Id, right.Id, out var prepared, out var report, merge: true, mergedChangeSetId: "reference-plan"), Is.True, report.Message);
+        Assert.That(prepared, Is.Not.Null); Assert.That(report.Status, Is.EqualTo(RoamingNetworkMergeStatus.Prepared));
+        Assert.That(report.ReferenceTransitions.Single().Consumer, Is.EqualTo(new InfrastructureEntityKey(InfrastructureEntityType.EVSEGroup, id)));
+        Assert.That(report.AfterETags, Is.Not.Empty); before.AssertUnchanged(history);
     }
 
     [TestCase("Return")]

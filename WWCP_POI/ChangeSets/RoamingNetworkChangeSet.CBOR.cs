@@ -229,4 +229,21 @@ public sealed partial record RoamingNetworkChangeSet
     }
 
     private static String Pointer(String value) => value.Replace("~", "~0").Replace("/", "~1");
+
+    internal static CBORValue EncodeApplicationJSON(JsonElement value)
+    {
+        ValidateSigningJSON(value);
+        return EncodeTransportJSON(value, "", []);
+    }
+
+    internal static JsonElement DecodeApplicationJSON(CBORValue value)
+    {
+        using var stream = new MemoryStream();
+        var readings = new HashSet<String>(StringComparer.Ordinal);
+        using (var writer = new Utf8JsonWriter(stream)) WriteTransportJSON(writer, value, "", readings);
+        if (readings.Count != 0) throw new ArgumentException("Application metadata cannot contain schema-defined measurement tags.");
+        using var document = JsonDocument.Parse(stream.ToArray());
+        ValidateSigningJSON(document.RootElement);
+        return document.RootElement.Clone();
+    }
 }

@@ -496,6 +496,25 @@ it is not a performance benchmark.
 
 ## Canonical content representations
 
+Administrator-controlled [snapshot commits](SNAPSHOTS.md) retain a full static state inside the
+original history chain. The static map and reference index are shared while the history revision
+advances; static ETags, last applied batch ID, POI timestamps and entity lifetimes remain unchanged.
+Publication and adoption derive independent local runtime using the existing capture mechanism.
+Archive recovery and bootstrap initialize fresh runtime. Snapshot envelopes have separate identity,
+signature and exchange profiles, without changing ordinary commit preimages.
+
+[Boundary histories](SNAPSHOT-BOUNDARIES.md) retain the original checkpoint claim separately from
+their signed local snapshot root. Only that root may have an external parent; all suffix commits
+require complete local parents. Traversal, ordering, first-parent replay and lifetime baselines stop
+at the root explicitly. Fresh signature/boundary policies govern entry and recovery. Partial archives
+include the full root once, while incremental pages resolve its ID and peer envelopes locally.
+
+[Explicit retention](RETENTION.md) previews the full protected DAG closure and binds archive content
+including peers. Cold backup publication and digest verification precede active archive replacement.
+Retained maps, batch IDs, root policy and receipt catalog install under the gate without replacing
+the live head/network. History-v4 and manifest-v4 carry unsigned receipt bookkeeping; removed IDs
+use a hash-only lookup index, while cold archive replay supplies original historical evidence.
+
 The immutability audit and `IImmutablePOI` contract also cover the remaining support values
 and parking-space groups. Derived ETags are generated from the complete static domain projection;
 runtime Removed statuses never filter its owned membership. ETags are not editable snapshot

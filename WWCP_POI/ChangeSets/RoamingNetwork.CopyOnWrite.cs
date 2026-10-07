@@ -69,7 +69,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => DataSnapshot.Revision;
 
         /// <summary>
-        /// The change set that produced this snapshot, if one has been applied.
+        /// The last applied change set identifier, retained unchanged by snapshot-only history links.
         /// </summary>
         public String? AppliedChangeSetId
             => DataSnapshot.AppliedChangeSetId;

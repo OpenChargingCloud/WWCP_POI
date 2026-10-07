@@ -67,9 +67,11 @@ History merge can combine independently valid branches into an invalid reference
 one deletes a target while another adds a consumer. It now reports `Reference` with consumer `Entity`,
 `PropertyName` and typed `RelatedEntity`, collecting all current missing/out-of-scope targets before
 domain projection. Whole-consumer subtree choices are validated again; keeping an invalid reference
-does not resurrect the target or waive operator scope. Temporary detach/restore instructions whose
-final state is unchanged are not inferred from branch state comparison. See [structural merge and
-reference conflicts](MERGING.md#reference-conflicts).
+does not resurrect the target or waive operator scope. When target recreation blocks scheduling,
+the planner can explicitly detach indexed references and restore their selected final values.
+The complete proposed steps and their operation indices are visible in the merge report and signed
+audit metadata. Every intermediate operation retains normal validation. See [reference conflicts](MERGING.md#reference-conflicts)
+and [temporary reference transitions](MERGING.md#explicit-temporary-reference-transitions).
 
 For EVSE/station/pool groups, `allowedMemberIds` is an admission list, not active membership.
 It can contain future IDs from the same operator; these IDs do not require target nodes and do

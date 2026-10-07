@@ -11,13 +11,17 @@ using Newtonsoft.Json.Linq;
 namespace cloud.charging.open.protocols.WWCP.POI;
 
 // Merge stored static values first; then synthesize addressed operations against the left state.
-internal sealed class POIThreeWayMerge
+internal sealed partial class POIThreeWayMerge
 {
     private readonly RoamingNetworkDataSnapshot ancestor;
     private readonly RoamingNetworkDataSnapshot left;
     private readonly RoamingNetworkDataSnapshot right;
     private readonly Func<RoamingNetworkMergeConflict, RoamingNetworkMergeResolution?>? resolve;
     private readonly DateTimeOffset timestamp;
+    private readonly POILifetimeState ancestorLifetime;
+    private readonly POILifetimeState leftLifetime;
+    private readonly POILifetimeState rightLifetime;
+    private readonly Dictionary<String, RoamingNetworkLifetimeOrigin> desiredLifetimes;
     private readonly Dictionary<InfrastructureEntityKey, InfrastructureEntitySnapshot> desired = [];
     private readonly HashSet<InfrastructureEntityKey> handled = [];
     internal List<RoamingNetworkMergeConflict> Conflicts { get; } = [];
@@ -25,13 +29,18 @@ internal sealed class POIThreeWayMerge
     internal POIThreeWayMerge(RoamingNetworkDataSnapshot ancestor, RoamingNetworkDataSnapshot left,
                               RoamingNetworkDataSnapshot right,
                               Func<RoamingNetworkMergeConflict, RoamingNetworkMergeResolution?>? resolve,
-                              DateTimeOffset timestamp)
+                              DateTimeOffset timestamp, POILifetimeState ancestorLifetime,
+                              POILifetimeState leftLifetime, POILifetimeState rightLifetime)
     {
         this.ancestor = ancestor;
         this.left = left;
         this.right = right;
         this.resolve = resolve;
         this.timestamp = timestamp;
+        this.ancestorLifetime = ancestorLifetime;
+        this.leftLifetime = leftLifetime;
+        this.rightLifetime = rightLifetime;
+        desiredLifetimes = leftLifetime.Origins.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
     }
 
     internal RoamingNetworkDataSnapshot? Merge()
@@ -48,10 +57,14 @@ internal sealed class POIThreeWayMerge
             {
                 if (l is not null && r is not null)
                 {
-                    if (WholeSame(left, right, key)) ChooseSubtree(key, left);
+                    if (WholeSame(left, right, key, compareLifetimes: false)) ChooseSubtree(key, left);
                     else WholeConflict(key, RoamingNetworkMergeConflictKind.AddAdd, "Both branches added different data at the same graph identity.");
                 }
-                else desired[key] = l ?? r!;
+                else
+                {
+                    desired[key] = l ?? r!;
+                    SelectOrigins(Path(key, []), l is null ? right : left);
+                }
                 continue;
             }
             if (l is null || r is null)
@@ -61,12 +74,17 @@ internal sealed class POIThreeWayMerge
                     WholeConflict(key, RoamingNetworkMergeConflictKind.DeleteModify, "One branch deleted the subtree while the other modified it.");
                 continue;
             }
-            if (!Equal(Property(b, "created"), Property(l, "created")) || !Equal(Property(b, "created"), Property(r, "created")))
+            if (ancestorLifetime.At(Path(key, [])) != leftLifetime.At(Path(key, [])) ||
+                ancestorLifetime.At(Path(key, [])) != rightLifetime.At(Path(key, [])) ||
+                !Equal(Property(b, "created"), Property(l, "created")) || !Equal(Property(b, "created"), Property(r, "created")))
             {
                 if (WholeSame(left, right, key)) ChooseSubtree(key, left);
                 else if (WholeSame(ancestor, left, key)) ChooseSubtree(key, right);
                 else if (WholeSame(ancestor, right, key)) ChooseSubtree(key, left);
-                else WholeConflict(key, RoamingNetworkMergeConflictKind.ReplaceModify, "A recreated entity conflicts with another branch's state.");
+                else if (b.Parent != l.Parent && b.Parent != r.Parent && l.Parent != r.Parent)
+                    OwnershipConflict(key, b.Parent, l.Parent, r.Parent);
+                else WholeConflict(key, RoamingNetworkMergeConflictKind.ReplaceModify,
+                                   "Original operations establish different entity lifetimes; select a complete branch state.");
                 continue;
             }
             var parent = Atom(Parent(b.Parent), Parent(l.Parent), Parent(r.Parent), null, key, [], "$parent",
@@ -119,7 +137,9 @@ internal sealed class POIThreeWayMerge
     private void WholeConflict(InfrastructureEntityKey key, RoamingNetworkMergeConflictKind kind, String message)
     {
         var conflict = new RoamingNetworkMergeConflict(kind, Path(key, []), message, key,
-            baseValue: GraphValue(ancestor, key), leftValue: GraphValue(left, key), rightValue: GraphValue(right, key));
+            baseValue: GraphValue(ancestor, key), leftValue: GraphValue(left, key), rightValue: GraphValue(right, key),
+            baseLifetime: ancestorLifetime.At(Path(key, [])), leftLifetime: leftLifetime.At(Path(key, [])),
+            rightLifetime: rightLifetime.At(Path(key, [])));
         var resolution = Resolve(conflict);
         if (resolution?.Choice == RoamingNetworkMergeChoice.Custom)
             throw new ArgumentException("Graph structural conflicts require Base, Left, Right or Remove; custom values are for properties/elements.");
@@ -130,6 +150,24 @@ internal sealed class POIThreeWayMerge
             _ => left
         };
         ChooseSubtree(key, selected);
+    }
+
+    private void OwnershipConflict(InfrastructureEntityKey key, InfrastructureEntityKey? b,
+                                   InfrastructureEntityKey? l, InfrastructureEntityKey? r)
+    {
+        var address = Path(key, []);
+        var conflict = new RoamingNetworkMergeConflict(RoamingNetworkMergeConflictKind.Ownership, Path(key, [], "$parent"),
+            "Both branches moved the entity to different owners; select the complete branch lifetime.", key, "$parent",
+            baseValue: Parent(b), leftValue: Parent(l), rightValue: Parent(r), baseLifetime: ancestorLifetime.At(address),
+            leftLifetime: leftLifetime.At(address), rightLifetime: rightLifetime.At(address));
+        var resolution = Resolve(conflict);
+        if (resolution?.Choice is RoamingNetworkMergeChoice.Custom or RoamingNetworkMergeChoice.Remove)
+            throw new ArgumentException("Ownership conflicts require a Base, Left or Right parent choice.");
+        ChooseSubtree(key, resolution?.Choice switch {
+            RoamingNetworkMergeChoice.Base => ancestor,
+            RoamingNetworkMergeChoice.Right => right,
+            _ => left
+        });
     }
 
     private void ChooseSubtree(InfrastructureEntityKey root, RoamingNetworkDataSnapshot? selected)
@@ -151,8 +189,32 @@ internal sealed class POIThreeWayMerge
             handled.Add(key);
             if (selected is not null && selected.Entities.TryGetValue(key, out var node)) desired[key] = node;
             else desired.Remove(key);
+            SelectOrigins(Path(key, []), selected);
         }
     }
+
+    private POILifetimeState Lifetimes(RoamingNetworkDataSnapshot snapshot)
+        => ReferenceEquals(snapshot, left) ? leftLifetime : ReferenceEquals(snapshot, right) ? rightLifetime : ancestorLifetime;
+
+    private void SelectOrigins(String path, RoamingNetworkDataSnapshot? selected)
+    {
+        foreach (var key in desiredLifetimes.Keys.Where(key => POILifetimeState.Within(key, path)).ToArray())
+            desiredLifetimes.Remove(key);
+        if (selected is null) return;
+        foreach (var entry in Lifetimes(selected).Origins.Where(entry => POILifetimeState.Within(entry.Key, path)))
+            desiredLifetimes[entry.Key] = entry.Value;
+    }
+
+    private Boolean LifetimeChanged(String path)
+        => leftLifetime.At(path) != desiredLifetimes.GetValueOrDefault(path);
+
+    private Boolean NestedLifetimeChanged(String path)
+        => leftLifetime.Origins.Any(entry => POILifetimeState.Within(entry.Key, path) &&
+                                            desiredLifetimes.GetValueOrDefault(entry.Key) != entry.Value);
+
+    internal IEnumerable<KeyValuePair<String, RoamingNetworkLifetimeOrigin>> LifetimeSelections
+        => desiredLifetimes.Where(entry => leftLifetime.At(entry.Key) is { } old && old != entry.Value).
+               OrderBy(entry => entry.Key, StringComparer.Ordinal);
 
     private JsonElement Object(String kind, JsonElement? b, JsonElement l, JsonElement r,
                                 InfrastructureEntityKey key, ImmutableArray<POIElementPathSegment> path)
@@ -200,23 +262,40 @@ internal sealed class POIThreeWayMerge
         }
         if (!relation.IsArray && (ObjectValue(b) || ObjectValue(l) || ObjectValue(r)))
             return Element(relation, b, l, r, key, path.Add(new(name)));
-        return Atom(b, l, r, relation.Kind, key, path, name,
-                    !Present(l) || !Present(r) ? RoamingNetworkMergeConflictKind.DeleteModify :
-                                                RoamingNetworkMergeConflictKind.DifferentValues);
+        var address = Path(key, path, name);
+        if (Equivalent(l, r, relation.Kind) && leftLifetime.SameUnder(rightLifetime, address))
+        { SelectOrigins(address, left); return l; }
+        if (Equivalent(b, l, relation.Kind) && ancestorLifetime.SameUnder(leftLifetime, address))
+        { SelectOrigins(address, right); return r; }
+        if (Equivalent(b, r, relation.Kind) && ancestorLifetime.SameUnder(rightLifetime, address))
+        { SelectOrigins(address, left); return l; }
+        var selectedValue = Conflict(!Present(l) || !Present(r) ? RoamingNetworkMergeConflictKind.DeleteModify :
+                                                       RoamingNetworkMergeConflictKind.DifferentValues,
+                             "The relation value or its owned-object lifetimes changed incompatibly.", b, l, r, key, path, name);
+        SelectResolutionOrigins(address, Conflicts[^1].Resolution, freshCustomLifetime: false);
+        return selectedValue;
     }
 
     private JsonElement? Element(POIElementSchema.Relation relation, JsonElement? b, JsonElement? l, JsonElement? r,
                                  InfrastructureEntityKey key, ImmutableArray<POIElementPathSegment> path)
     {
-        if (Equivalent(l, r, relation.Kind)) return l;
-        if (Equivalent(b, l, relation.Kind)) return r;
-        if (Equivalent(b, r, relation.Kind)) return l;
+        var address = Path(key, path);
+        Boolean Same(JsonElement? x, JsonElement? y, POILifetimeState xs, POILifetimeState ys)
+            => Equivalent(x, y, relation.Kind) && (relation.IsReference || xs.SameUnder(ys, address));
+        if (Equivalent(l, r, relation.Kind) && (!Present(b) || relation.IsReference || leftLifetime.SameUnder(rightLifetime, address)))
+        { SelectOrigins(address, left); return l; }
+        if (Same(b, l, ancestorLifetime, leftLifetime))
+        { SelectOrigins(address, right); return r; }
+        if (Same(b, r, ancestorLifetime, rightLifetime))
+        { SelectOrigins(address, left); return l; }
         var kind = !Present(b) ? RoamingNetworkMergeConflictKind.AddAdd :
                    !Present(l) || !Present(r) ? RoamingNetworkMergeConflictKind.DeleteModify :
                    RoamingNetworkMergeConflictKind.ReplaceModify;
         var sameIdentity = relation.Identity is null || SameIdentity(b, l, relation) && SameIdentity(b, r, relation);
         var sameCreation = Equal(Field(b, "created"), Field(l, "created")) && Equal(Field(b, "created"), Field(r, "created"));
-        if (ObjectValue(b) && ObjectValue(l) && ObjectValue(r) && sameIdentity && sameCreation)
+        var sameLifetime = ancestorLifetime.At(address) == leftLifetime.At(address) &&
+                           ancestorLifetime.At(address) == rightLifetime.At(address);
+        if (ObjectValue(b) && ObjectValue(l) && ObjectValue(r) && sameIdentity && sameCreation && sameLifetime)
             return Object(relation.Kind, b, l!.Value, r!.Value, key, path);
         return Conflict(kind, "Incompatible addition, deletion or replacement of the addressed element.", b, l, r, key, path, null);
     }
@@ -236,10 +315,16 @@ internal sealed class POIThreeWayMerge
                                   JsonElement? l, JsonElement? r, InfrastructureEntityKey key,
                                   ImmutableArray<POIElementPathSegment> path, String? name)
     {
-        var conflict = new RoamingNetworkMergeConflict(kind, Path(key, path, name), message, key, name, path, b, l, r);
+        var address = Path(key, path);
+        var conflict = new RoamingNetworkMergeConflict(kind, Path(key, path, name), message, key, name, path, b, l, r,
+            baseLifetime: name is null ? ancestorLifetime.At(address) : null,
+            leftLifetime: name is null ? leftLifetime.At(address) : null,
+            rightLifetime: name is null ? rightLifetime.At(address) : null);
         var resolution = Resolve(conflict);
         if (name == "$parent" && resolution?.Choice is RoamingNetworkMergeChoice.Custom or RoamingNetworkMergeChoice.Remove)
             throw new ArgumentException("Ownership conflicts require a Base, Left or Right parent choice.");
+        if (name is null)
+            SelectResolutionOrigins(address, resolution);
         return resolution?.Choice switch {
             RoamingNetworkMergeChoice.Base => b,
             RoamingNetworkMergeChoice.Right => r,
@@ -248,6 +333,16 @@ internal sealed class POIThreeWayMerge
             _ => l
         };
     }
+
+    private void SelectResolutionOrigins(String address, RoamingNetworkMergeResolution? resolution,
+                                         Boolean freshCustomLifetime = true)
+        => SelectOrigins(address, resolution?.Choice switch {
+            RoamingNetworkMergeChoice.Base => ancestor,
+            RoamingNetworkMergeChoice.Right => right,
+            RoamingNetworkMergeChoice.Remove => null,
+            RoamingNetworkMergeChoice.Custom => freshCustomLifetime ? null : left,
+            _ => left
+        });
 
     private RoamingNetworkMergeResolution? Resolve(RoamingNetworkMergeConflict conflict)
     {
@@ -303,7 +398,7 @@ internal sealed class POIThreeWayMerge
         {
             var source = left.Entities[key];
             var destination = target.Entities[key];
-            if (source.Parent != destination.Parent || source.Properties.Keys.Union(destination.Properties.Keys).Any(name =>
+            if (LifetimeChanged(Path(key, [])) || source.Parent != destination.Parent || source.Properties.Keys.Union(destination.Properties.Keys).Any(name =>
                     name != "lastChange" && !Editable(key.Type, name) && !Equal(Property(source, name), Property(destination, name))))
             { removals.Add(key); additions.Add(key); }
         }
@@ -341,6 +436,8 @@ internal sealed class POIThreeWayMerge
             var progress = false;
             foreach (var operation in pending.ToArray())
             {
+                if (AwaitingReferenceRemoval(operation, pending))
+                { failures.Add((operation, "Reference restoration awaits the remaining removal operations.")); continue; }
                 if (!working.TryMergeOperation(operation, timestamp, out var next, out var error))
                 { failures.Add((operation, error)); continue; }
                 working = next!;
@@ -349,6 +446,7 @@ internal sealed class POIThreeWayMerge
                 progress = true;
             }
             if (progress) continue;
+            if (TryDetachReferences(ref working, target, pending, ordered, timestamp)) continue;
             foreach (var failure in failures)
             {
                 var operation = failure.Operation;
@@ -362,10 +460,11 @@ internal sealed class POIThreeWayMerge
         }
         if (!SameState(working, target))
             throw new ArgumentException("The generated operations do not preserve the selected merged static values.");
+        CompleteReferenceTransitions(ordered, working);
         return ordered.ToImmutable();
     }
 
-    private static void DiffObject(String kind, JsonElement source, JsonElement target, InfrastructureEntitySnapshot node,
+    private void DiffObject(String kind, JsonElement source, JsonElement target, InfrastructureEntitySnapshot node,
                                     ImmutableArray<POIElementPathSegment> path, List<RoamingNetworkChange> operations)
     {
         foreach (var name in Names(source).Union(Names(target)).Order(StringComparer.Ordinal))
@@ -373,8 +472,8 @@ internal sealed class POIThreeWayMerge
             if (name == "lastChange" && Managed(kind)) continue;
             var old = Field(source, name);
             var value = Field(target, name);
-            if (Equal(old, value)) continue;
             var relation = POIElementSchema.TryChild(kind, name);
+            if (Equal(old, value) && (relation is null || !NestedLifetimeChanged(Path(node.Key, path, name)))) continue;
             if (relation is { IsArray: true } && Array(value) && (!old.HasValue || old.Value.ValueKind is JsonValueKind.Array or JsonValueKind.Null))
             {
                 var before = operations.Count;
@@ -397,18 +496,18 @@ internal sealed class POIThreeWayMerge
         }
     }
 
-    private static void DiffElement(POIElementSchema.Relation relation, JsonElement? old, JsonElement? value,
+    private void DiffElement(POIElementSchema.Relation relation, JsonElement? old, JsonElement? value,
                                      InfrastructureEntitySnapshot node, ImmutableArray<POIElementPathSegment> path,
                                      List<RoamingNetworkChange> operations)
     {
-        if (Equal(old, value)) return;
+        if (Equal(old, value) && !NestedLifetimeChanged(Path(node.Key, path))) return;
         if (!old.HasValue)
         { operations.Add(RoamingNetworkChange.AddElement(node.Key.Type.ToString(), node.Key.Id, path, value!.Value, node.Parent?.Type.ToString(), node.Parent?.Id)); return; }
         if (!value.HasValue)
         { operations.Add(RoamingNetworkChange.RemoveElement(node.Key.Type.ToString(), node.Key.Id, path, old, node.Parent?.Type.ToString(), node.Parent?.Id)); return; }
         var identityChanged = !SameIdentity(old, value, relation);
-        var recreate = identityChanged || !Equal(Field(old, "created"), Field(value, "created")) ||
-                       ObjectValue(old) && ObjectValue(value) && RequiredChildRecreated(relation.Kind, old.Value, value.Value);
+        var recreate = LifetimeChanged(Path(node.Key, path)) || identityChanged || !Equal(Field(old, "created"), Field(value, "created")) ||
+                       ObjectValue(old) && ObjectValue(value) && RequiredChildRecreated(relation.Kind, old.Value, value.Value, node.Key, path);
         if (recreate)
         {
             if (!relation.IsArray && !relation.Optional && identityChanged)
@@ -471,12 +570,14 @@ internal sealed class POIThreeWayMerge
     { try { InfrastructureChangeSchema.Property(kind, name); return true; } catch (ArgumentException) { return false; } }
     private static Boolean ElementEditable(String kind, String name)
     { try { POIElementSchema.Property(kind, name); return true; } catch (ArgumentException) { return false; } }
-    private static Boolean RequiredChildRecreated(String kind, JsonElement source, JsonElement target)
+    private Boolean RequiredChildRecreated(String kind, JsonElement source, JsonElement target,
+                                          InfrastructureEntityKey key, ImmutableArray<POIElementPathSegment> path)
         => Names(source).Union(Names(target)).Any(name =>
             POIElementSchema.TryChild(kind, name) is { IsArray: false, Optional: false } relation &&
             ObjectValue(Field(source, name)) && ObjectValue(Field(target, name)) &&
             SameIdentity(Field(source, name), Field(target, name), relation) &&
-            !Equal(Field(Field(source, name), "created"), Field(Field(target, name), "created")));
+            (!Equal(Field(Field(source, name), "created"), Field(Field(target, name), "created")) ||
+             LifetimeChanged(Path(key, path.Add(new(name))))));
     private static Boolean Managed(String? kind) => kind is not null && (POIElementSchema.HasManagedMetadata(kind) ||
         Enum.TryParse<InfrastructureEntityType>(kind, out var type) && InfrastructureChangeSchema.HasMetadata(type));
     private static IEnumerable<InfrastructureEntityKey> Order(IEnumerable<InfrastructureEntityKey> keys)
@@ -488,8 +589,20 @@ internal sealed class POIThreeWayMerge
         => value.EnumerateObject().ToImmutableDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal);
     private static JsonElement? Full(RoamingNetworkDataSnapshot snapshot, InfrastructureEntityKey key)
         => snapshot.Entities.ContainsKey(key) ? snapshot.MergeEntityValue(key) : null;
-    private static Boolean WholeSame(RoamingNetworkDataSnapshot a, RoamingNetworkDataSnapshot b, InfrastructureEntityKey key)
-        => a.Entities[key].Parent == b.Entities[key].Parent && Equivalent(Full(a, key), Full(b, key), key.Type.ToString());
+    private Boolean WholeSame(RoamingNetworkDataSnapshot a, RoamingNetworkDataSnapshot b, InfrastructureEntityKey key,
+                              Boolean compareLifetimes = true)
+    {
+        if (a.Entities[key].Parent != b.Entities[key].Parent || !Equivalent(Full(a, key), Full(b, key), key.Type.ToString())) return false;
+        if (!compareLifetimes) return true;
+        var pending = new Stack<InfrastructureEntityKey>();
+        pending.Push(key);
+        while (pending.TryPop(out var child))
+        {
+            if (!Lifetimes(a).SameUnder(Lifetimes(b), Path(child, []))) return false;
+            foreach (var descendant in a.Entities[child].Children) pending.Push(descendant);
+        }
+        return true;
+    }
     private static JsonElement? GraphValue(RoamingNetworkDataSnapshot snapshot, InfrastructureEntityKey key)
         => snapshot.Entities.TryGetValue(key, out var node) ? JsonSerializer.SerializeToElement(new {
             Parent = Parent(node.Parent), Document = snapshot.MergeEntityValue(key)

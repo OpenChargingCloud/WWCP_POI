@@ -64,6 +64,7 @@ public sealed partial class RoamingNetworkHistory
             mutating = true;
             try
             {
+                VerifyBoundary();
                 if (!targetTip.IsValid || !entries.TryGetValue(targetTip, out var target))
                 {
                     result = new(RoamingNetworkHeadAdoptionOutcome.UnknownTip, head, targetTip, Error: "Import the target's complete ancestry first.");
@@ -112,7 +113,7 @@ public sealed partial class RoamingNetworkHistory
                 {
                     network = head.Network;
                     for (var i = index - 1; i >= 0; i--)
-                        network = network.ApplyChangeSet(targetLine[i].Commit.ChangeSet!, verifyBatchSignature);
+                        network = ApplyCommit(network, targetLine[i].Commit);
                 }
                 else
                 {
@@ -122,6 +123,7 @@ public sealed partial class RoamingNetworkHistory
                     var lifetimeHistory = localLine.TakeWhile(entry => entry.Commit.Id != common)
                         .Concat(targetLine.TakeWhile(entry => entry.Commit.Id != common))
                         .DistinctBy(entry => entry.Commit.Id)
+                        .Where(entry => entry.Commit.ChangeSet is not null)
                         .Select(entry => (entry.Commit.ChangeSet!, entries[entry.Commit.Parents[0]].Snapshot)).ToImmutableArray();
                     // A secondary parent records ancestry, not an applicable batch against the local head.
                     // Transfer independently captured local runtime only across proved first-parent lifetimes.
@@ -155,7 +157,7 @@ public sealed partial class RoamingNetworkHistory
         {
             var entry = entries[tip];
             result.Add(entry);
-            if (entry.Commit.Parents.IsEmpty) return result;
+            if (IsAnchor(entry.Commit.Id)) return result;
             tip = entry.Commit.Parents[0];
         }
     }
