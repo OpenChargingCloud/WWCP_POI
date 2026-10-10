@@ -207,6 +207,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
+            #region Link events
+
+            this.adminStatusSchedule.OnStatusChanged += async (timestamp, eventTrackingId, statusSchedule, newStatus, oldStatus, dataSource) => {
+                var onAdminStatusChanged = OnAdminStatusChanged;
+                if (onAdminStatusChanged is not null)
+                    await onAdminStatusChanged(timestamp, eventTrackingId, this, newStatus, oldStatus, dataSource);
+            };
+
+            this.statusSchedule.     OnStatusChanged += async (timestamp, eventTrackingId, statusSchedule, newStatus, oldStatus, dataSource) => {
+                var onStatusChanged = OnStatusChanged;
+                if (onStatusChanged is not null)
+                    await onStatusChanged(timestamp, eventTrackingId, this, newStatus, oldStatus, dataSource);
+            };
+
+            #endregion
 
         }
 

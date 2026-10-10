@@ -128,8 +128,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             set
             {
-                if (!adminStatusSchedule.CurrentValue.Equals(value.Value))
-                    adminStatusSchedule.Insert(value);
+                adminStatusSchedule.Insert(value);
             }
 
         }
@@ -186,8 +185,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             set
             {
-                if (!statusSchedule.CurrentValue.Equals(value.Value))
-                    statusSchedule.Insert(value);
+                statusSchedule.Insert(value);
             }
 
         }

@@ -138,7 +138,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var evse in children)
             {
-                if (evses.TryAdd(evse).Result != CommandResult.Success)
+                if (evses.TryAdd(evse, Connect).Result != CommandResult.Success)
                     throw new ArgumentException($"EVSEs: failed to attach '{evse.Id}'.");
             }
 

@@ -265,14 +265,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static Boolean operator == (EVSEGroup_Id EVSEGroupId1, EVSEGroup_Id EVSEGroupId2)
         {
 
-            // If both are null, or both are same instance, return true.
-            if (ReferenceEquals(EVSEGroupId1, EVSEGroupId2))
-                return true;
-
-            // If one is null, but not both, return false.
-            if (((Object) EVSEGroupId1 is null) || ((Object) EVSEGroupId2 is null))
-                return false;
-
             return EVSEGroupId1.Equals(EVSEGroupId2);
 
         }
@@ -452,7 +444,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
 
             return OperatorId.Equals(EVSEGroupId.OperatorId) &&
-                   Suffix.    Equals(EVSEGroupId.Suffix);
+                   String.Equals(Suffix, EVSEGroupId.Suffix);
 
         }
 
@@ -468,7 +460,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public override Int32 GetHashCode()
 
             => OperatorId.GetHashCode() ^
-               Suffix.    GetHashCode();
+              (Suffix?.GetHashCode() ?? 0);
 
         #endregion
 

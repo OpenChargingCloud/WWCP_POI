@@ -108,7 +108,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Identifier equality
 
         // Preserve wire spelling while comparing identifiers according to their domain semantics.
-        // Some dependency ID hash implementations do not agree with their case-insensitive equality.
         internal static String Identity(InfrastructureEntityType  type,
                                         String                    text)
 
@@ -196,11 +195,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ],
                 [InfrastructureEntityType.ChargingStationOperator] =
                 [
-                    "address", "logos", "homepage", "hotline", "brands", "dataLicenses", "dataLicenseIds"
+                    "address", "geoLocation", "telephone", "eMailAddress", "logos", "homepage", "hotline", "termsAndConditions",
+                    "brands", "dataLicenses", "dataLicenseIds"
                 ],
                 [InfrastructureEntityType.EMobilityProvider] =
                 [
-                    "address", "logos", "homepage", "hotline", "dataLicenses", "dataLicenseIds", "priority"
+                    "address", "geoLocation", "telephone", "eMailAddress", "logos", "homepage", "hotline",
+                    "dataLicenses", "dataLicenseIds", "priority"
                 ],
                 [InfrastructureEntityType.ChargingPool] =
                 [

@@ -217,6 +217,12 @@ ChangeSet engine's rollback guarantee. Async notification completion is not awai
 should isolate failing subscribers and must not treat a notification exception as proof that
 no runtime write occurred.
 
+Status, admin status and data events of an EVSE, station or pool also reach the station, pool and
+operator above it (`OnEVSEStatusChanged`, `OnChargingStationStatusChanged`, `OnChargingPoolStatusChanged`
+and their admin status/data counterparts). Operators and the network raise `OnStatusChanged` and
+`OnAdminStatusChanged` for their own schedules. Subscriptions belong to the objects of one network
+version: a version derived through a ChangeSet has its own objects, so subscribe there again.
+
 ### Subsequent exact root/head snapshot reuse
 
 [Root/head reconstruction](SNAPSHOT-RECONSTRUCTION.md) now conditionally retains an immutable

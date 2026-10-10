@@ -448,8 +448,8 @@ The following fields are additional; connectors use only their listed fields.
 | Entity | Additional editable JSON properties |
 | --- | --- |
 | RoamingNetwork | `dataLicenses`, `dataLicenseIds` |
-| ChargingStationOperator | `address`, `logos`, `homepage`, `hotline`, `brands`, `dataLicenses`, `dataLicenseIds` |
-| EMobilityProvider | `address`, `logos`, `homepage`, `hotline`, `priority`, `dataLicenses`, `dataLicenseIds` |
+| ChargingStationOperator | `address`, `geoLocation`, `telephone`, `eMailAddress`, `logos`, `homepage`, `hotline`, `termsAndConditions`, `brands`, `dataLicenses`, `dataLicenseIds` |
+| EMobilityProvider | `address`, `geoLocation`, `telephone`, `eMailAddress`, `logos`, `homepage`, `hotline`, `priority`, `dataLicenses`, `dataLicenseIds` |
 | ChargingPool | `address`, `geoLocation`, `locationType`, `accessibility`, `authenticationModes`, `hotlinePhoneNumber`, `openingTimes`, `timeZone`, `chargingWhenClosed`, `locationLanguages`, `facilities`, `services`, `relatedLocations`, `mobilityRootCAs`, `evRoamingPartners`, `brands`, `dataLicenses`, `dataLicenseIds`, `energyMeters`, `gridConnectionPoint`, `maxCurrent`, `maxPower`, `maxCapacity` |
 | ChargingStation | `address`, `geoLocation`, `authenticationModes`, `hotlinePhoneNumber`, `openingTimes`, `isFreeOfCharge`, `chargingWhenClosed`, `accessibility`, `locationLanguage`, `physicalReference`, `paymentOptions`, `features`, `vehicleTypes`, `images`, `serviceIdentification`, `modelCode`, `published`, `disabled`, `mobilityRootCAs`, `evRoamingPartners`, `certificationInfo`, `calibrationInfo`, `brands`, `dataLicenses`, `dataLicenseIds`, `energyMeters`, `maxCurrent`, `maxPower`, `maxCapacity` |
 | EVSE | `physicalReference`, `geoLocation`, `brand`, `isFreeOfCharge`, `chargingModes`, `currentType`, `maxVoltage`, `maxCurrent`, `maxPower`, `maxCapacity`, `energyMeter`, `photoURLs`, `mobilityRootCAs`, `energyMix`, `calibrationInfo`, `dataLicenses`, `dataLicenseIds`, `tariffIds` |

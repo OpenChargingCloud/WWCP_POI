@@ -117,6 +117,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                     ))
                              : null,
 
+                         eMobilityProvider.GeoLocation.HasValue
+                             ? new JProperty("geoLocation",         InfrastructureJson.LocationJSON(eMobilityProvider.GeoLocation.Value, true))
+                             : null,
+
+                         eMobilityProvider.Telephone.HasValue
+                             ? new JProperty("telephone",           eMobilityProvider.Telephone.ToString())
+                             : null,
+
+                         eMobilityProvider.EMailAddress.HasValue
+                             ? new JProperty("eMailAddress",        eMobilityProvider.EMailAddress.ToString())
+                             : null,
+
                          eMobilityProvider.Homepage.HasValue
                              ? new JProperty("homepage",            eMobilityProvider.Homepage.ToString())
                              : null,
@@ -359,13 +371,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region GeoLocation
 
-        private GeoCoordinate _GeoLocation;
+        private GeoCoordinate? _GeoLocation;
 
         /// <summary>
         /// The geographical location of this operator.
         /// </summary>
         [Optional]
-        public GeoCoordinate GeoLocation
+        public GeoCoordinate? GeoLocation
         {
 
             get

@@ -386,7 +386,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An event fired whenever the admin status changed.
         /// </summary>
-        public event OnAdminStatus2ChangedDelegate OnAdminStatusChanged;
+        public event OnAdminStatus2ChangedDelegate? OnAdminStatusChanged;
 
         #endregion
 
@@ -617,12 +617,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               Context?                                 DataSource   = null)
         {
 
-            await OnAdminStatusChanged?.Invoke(Timestamp,
-                                               EventTrackingId,
-                                               this,
-                                               NewStatus,
-                                               OldStatus,
-                                               DataSource);
+            var onAdminStatusChanged = OnAdminStatusChanged;
+            if (onAdminStatusChanged is not null)
+                await onAdminStatusChanged(Timestamp,
+                                           EventTrackingId,
+                                           this,
+                                           NewStatus,
+                                           OldStatus,
+                                           DataSource);
 
         }
 

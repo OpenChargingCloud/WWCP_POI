@@ -21,7 +21,7 @@ public sealed class SnapshotMapPreparationTests
         var owner = document["chargingStationOperators"]![0]!;
         foreach (var (field, memberField, member, id) in new[] {
             ("EVSEGroups", "EVSEIds", "DE*ABC*E1", "DE*ABC*GE1"), ("chargingStationGroups", "chargingStationIds", "DE*ABC*S1", "DE*ABC*GS1"),
-            ("chargingPoolGroups", "chargingPoolIds", "DE*ABC*P1", "DE*ABC*GS1"), ("chargingTariffGroups", "chargingTariffIds", "DE*ABC*T1", "DE*ABC*TG1") })
+            ("chargingPoolGroups", "chargingPoolIds", "DE*ABC*P1", "DE*ABC*GP1"), ("chargingTariffGroups", "chargingTariffIds", "DE*ABC*T1", "DE*ABC*TG1") })
         {
             var group = new JObject { ["@id"] = id, [memberField] = new JArray(member),
                 ["created"] = "2026-01-01T00:00:00Z", ["lastChange"] = "2026-01-01T00:00:00Z" };

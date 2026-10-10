@@ -23,6 +23,7 @@ using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+using org.GraphDefined.Vanaheimr.Hermod.Mail;
 
 #endregion
 
@@ -93,9 +94,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                          DataSource:  InfrastructureJson.Text(JSON, "dataSource"),
                                                          CustomData:  InfrastructureJson.CustomData(JSON))
                 {
-                    address            = InfrastructureJson.Address(JSON),
-                    homepage           = InfrastructureJson.Scalar<URL>(JSON, "homepage", URL.TryParse),
-                    hotlinePhoneNumber = InfrastructureJson.Scalar<PhoneNumber>(JSON, "hotline", PhoneNumber.TryParse)
+                    address               = InfrastructureJson.Address(JSON),
+                    geoLocation           = InfrastructureJson.Location(JSON),
+                    telephone             = InfrastructureJson.Scalar<PhoneNumber>       (JSON, "telephone",          PhoneNumber.TryParse),
+                    eMailAddress          = InfrastructureJson.Scalar<SimpleEMailAddress>(JSON, "eMailAddress",       SimpleEMailAddress.TryParse),
+                    homepage              = InfrastructureJson.Scalar<URL>               (JSON, "homepage",           URL.TryParse),
+                    hotlinePhoneNumber    = InfrastructureJson.Scalar<PhoneNumber>       (JSON, "hotline",            PhoneNumber.TryParse),
+                    termsAndConditionsURL = InfrastructureJson.Scalar<URL>               (JSON, "termsAndConditions", URL.TryParse)
                 };
 
                 parsed.ParseOperatorLogo(JSON);
@@ -201,7 +206,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var pool in pools)
             {
-                if (chargingPools.TryAdd(pool).Result != CommandResult.Success)
+                if (chargingPools.TryAdd(pool, Connect).Result != CommandResult.Success)
                     throw new ArgumentException($"chargingPools: failed to attach '{pool.Id}'.");
 
                 foreach (var station in pool.ChargingStations)

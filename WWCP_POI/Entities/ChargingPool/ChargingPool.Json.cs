@@ -148,7 +148,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var station in stations)
             {
-                if (chargingStations.TryAdd(station).Result != CommandResult.Success)
+                if (chargingStations.TryAdd(station, Connect).Result != CommandResult.Success)
                     throw new ArgumentException($"chargingStations: failed to attach '{station.Id}'.");
             }
 

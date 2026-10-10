@@ -501,6 +501,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.RoamingNetwork = RoamingNetwork;
             this.chargingPools = new EntityHashSet<ChargingStationOperator, ChargingPool_Id, ChargingPool>(this);
 
+            #region Link events
+
+            this.adminStatusSchedule.OnStatusChanged += (timestamp, eventTrackingId, statusSchedule, newStatus, oldStatus, dataSource)
+                                                          => UpdateAdminStatus(timestamp, eventTrackingId, oldStatus, newStatus);
+
+            this.statusSchedule.     OnStatusChanged += (timestamp, eventTrackingId, statusSchedule, newStatus, oldStatus, dataSource)
+                                                          => UpdateStatus     (timestamp, eventTrackingId, oldStatus, newStatus);
+
+            #endregion
+
         }
 
         #endregion
@@ -2511,12 +2521,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                           ))
                                    : null,
 
+                               GeoLocation.HasValue
+                                   ? new JProperty("geoLocation",         InfrastructureJson.LocationJSON(GeoLocation.Value, true))
+                                   : null,
+
+                               Telephone.HasValue
+                                   ? new JProperty("telephone",           Telephone.ToString())
+                                   : null,
+
+                               EMailAddress.HasValue
+                                   ? new JProperty("eMailAddress",        EMailAddress.ToString())
+                                   : null,
+
                                Homepage.HasValue
                                    ? new JProperty("homepage",            Homepage.ToString())
                                    : null,
 
                                HotlinePhoneNumber.HasValue
                                    ? new JProperty("hotline",             HotlinePhoneNumber.ToString())
+                                   : null,
+
+                               TermsAndConditionsURL.HasValue
+                                   ? new JProperty("termsAndConditions",  TermsAndConditionsURL.ToString())
                                    : null,
 
 

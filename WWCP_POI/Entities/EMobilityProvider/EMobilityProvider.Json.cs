@@ -23,6 +23,7 @@ using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+using org.GraphDefined.Vanaheimr.Hermod.Mail;
 
 #endregion
 
@@ -89,8 +90,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    DataSource:  InfrastructureJson.Text(JSON, "dataSource"),
                                                    CustomData:  InfrastructureJson.CustomData(JSON))
                 {
-                    _Homepage           = InfrastructureJson.Scalar<URL>(JSON, "homepage", URL.TryParse),
-                    _HotlinePhoneNumber = InfrastructureJson.Scalar<PhoneNumber>(JSON, "hotline", PhoneNumber.TryParse)
+                    _GeoLocation        = InfrastructureJson.Location(JSON),
+                    _Telephone          = InfrastructureJson.Scalar<PhoneNumber>       (JSON, "telephone",    PhoneNumber.TryParse),
+                    _EMailAddress       = InfrastructureJson.Scalar<SimpleEMailAddress>(JSON, "eMailAddress", SimpleEMailAddress.TryParse),
+                    _Homepage           = InfrastructureJson.Scalar<URL>               (JSON, "homepage",     URL.TryParse),
+                    _HotlinePhoneNumber = InfrastructureJson.Scalar<PhoneNumber>       (JSON, "hotline",      PhoneNumber.TryParse)
                 };
 
                 if (InfrastructureJson.Address(JSON) is { } address)
