@@ -12,7 +12,7 @@ Current statuses, schedules, measurements and forecasts never enter these messag
 | Field | Meaning |
 | --- | --- |
 | `Profile` | `wwcp-poi-replication-state-v1`, or version 2 for a trusted snapshot boundary |
-| `ContentProfile` | `wwcp-poi-static-v1` |
+| `ContentProfile` | `wwcp-poi-static-v2` |
 | `Checkpoint` | Typed shared checkpoint commit ID |
 | `Anchor` | Version 2 only: the retained snapshot root, excluding its earlier ancestry |
 | `Head` | Typed published commit ID |
@@ -48,7 +48,7 @@ The checkpoint envelope does not count toward the transition-count limit.
 | Field | Meaning |
 | --- | --- |
 | `Profile` | `wwcp-poi-commit-pack-v1`, or `wwcp-poi-commit-pack-v2` when the page contains a full snapshot |
-| `ContentProfile` | `wwcp-poi-static-v1` |
+| `ContentProfile` | `wwcp-poi-static-v2` |
 | `CheckpointCommit` | Shared checkpoint envelope with peer signatures, without a snapshot |
 | `Tip` | Fixed requested commit ID |
 | `Complete` | Sender has included all missing ancestry relative to this announcement |
@@ -219,9 +219,10 @@ Sources: [replication](../WWCP_POI/History/RoamingNetworkHistory.Replication.cs)
 [adoption](../WWCP_POI/History/RoamingNetworkHistory.Adoption.cs) and
 [runtime capture](../WWCP_POI/ChangeSets/RoamingNetwork.RuntimeState.cs).
 
-The dedicated package has **61 passing cases**; the full suite on 2026-10-07 passed **509 tests**,
+The dedicated package has **61 passing cases**; the full suite on 2026-10-08 passed **952 tests**,
 with one separately executed crash worker skipped in the parent process. Existing fixed reference
-files are unchanged. The fixtures provide the following evidence:
+files were unchanged by that package. These executed cases predate static-v2; current files
+were subsequently regenerated. The fixtures provide the following baseline evidence:
 
 | Fixture | Cases and assertions |
 | --- | --- |
@@ -233,11 +234,16 @@ These are targeted cases, rather than exhaustive proofs for every graph/ownershi
 combination. The new persistence cases inject pre-replacement exceptions and exercise clean
 reopen; the earlier crash fixture separately covers abrupt process exits around archive replacement.
 The separate [bootstrap fixture](BOOTSTRAP.md#outcomes-and-evidence) adds 32 passing cases.
+The [bootstrap crash fixture](BOOTSTRAP-CRASH-RECOVERY.md) adds 89 cases for receipt/activation exits,
+exact destination recovery after acknowledgement loss and fresh trust/runtime before continuation.
 The [structural merge fixture](MERGING.md#structural-merge-evidence) adds 34 passing cases for
 integration conflicts, typed references, scoped identities, explicit ancestor choices and resolver failures.
 HTTP transport, key negotiation, streaming archive replay, independent peer implementations
-and performance measurements remain application/future work. Export currently traverses retained
+and larger production measurements remain application/future work. Separate [scaling evidence](SCALING.md)
+covers retained archives/bootstrap/cold replay, rather than page transport or remote throughput. Export currently traverses retained
 history, and persistence rewrites the full archive; page bounds do not bound total history memory
 or replay/archive work. See the [roadmap](ROADMAP.md).
 Administrator-controlled [archival/pruning](RETENTION.md) is implemented separately; its new catalog
-and replication responses have a successful build but await dedicated executed verification.
+and replication responses are verified in the [76-case snapshot/retention package](VERIFICATION-SNAPSHOTS-RETENTION.md).
+The existing recreated-EVSE adoption test now asserts ReplaceModify and requires an explicit subtree
+choice before verifying runtime reset and unrelated runtime preservation.

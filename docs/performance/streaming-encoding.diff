@@ -1,0 +1,789 @@
+diff --git a/WWCP_POI/History/POIArchiveCBORValues.cs b/WWCP_POI/History/POIArchiveCBORValues.cs
+new file mode 100644
+--- /dev/null
++++ b/WWCP_POI/History/POIArchiveCBORValues.cs
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Globalization;
++using System.Text.Json;
++using org.GraphDefined.Vanaheimr.Illias;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++// The archive adapter emits existing wire fields directly. Standalone/pack codecs and identity
++// preimages retain their own representations, including lossless application number spelling.
++internal static class POIArchiveCBORValues
++{
++    internal static void WriteArchiveCBOR(this RoamingNetworkCommit commit, POIArchiveCBORWriter writer)
++        => writer.Map(
++            ("Profile", value => value.Text(commit.Profile)),
++            ("ContentProfile", value => value.Text(commit.ContentProfile)),
++            ("Id", value => value.Value(commit.Id.ToCBOR())),
++            ("RoamingNetworkId", value => value.Text(commit.RoamingNetworkId)),
++            ("Revision", value => value.Value(CBORValue.FromInt64(commit.Revision))),
++            ("Parents", value => value.Array(commit.Parents.Length, commit.Parents, (output, id) => output.Value(id.ToCBOR()))),
++            ("StateETags", value => value.Array(commit.StateETags.Length, commit.StateETags, (output, tag) => output.Value(tag.ToCBOR()))),
++            ("AppliedChangeSetId", value => value.Value(commit.AppliedChangeSetId is { } id ? CBORValue.FromText(id) : CBORValue.Null)),
++            commit.Snapshot is { } snapshot ? ("Snapshot", value => WriteSnapshot(snapshot, value)) :
++                ("ChangeSet", value => { if (commit.ChangeSet is { } batch) value.Encoded(batch.ToCBOR()); else value.Value(CBORValue.Null); }),
++            ("Signatures", value => value.Array(commit.Signatures.Length, commit.Signatures, (output, signature) => output.Map(
++                ("Profile", field => field.Text(signature.Profile)), ("Algorithm", field => field.Text(signature.Algorithm)),
++                ("KeyId", field => field.Text(signature.KeyId)), ("Encoding", field => field.Text(signature.Encoding)),
++                ("Value", field => field.Text(signature.Value))))));
++
++    private static void WriteSnapshot(RoamingNetworkSnapshotContent snapshot, POIArchiveCBORWriter writer)
++        => writer.Map(
++            ("CreatedAt", value => value.Text(snapshot.CreatedAt.ToString("O", CultureInfo.InvariantCulture))),
++            ("Description", value => value.Value(RoamingNetworkChangeSet.EncodeApplicationJSON(JsonSerializer.SerializeToElement(snapshot.Description)))),
++            ("Metadata", value => value.Value(RoamingNetworkChangeSet.EncodeApplicationJSON(JsonSerializer.SerializeToElement(snapshot.Metadata)))),
++            ("State", value => value.Encoded(snapshot.State.ToCBOR(IncludeVersionMetadata: true))));
++
++    internal static void WriteArchiveCBOR(this RoamingNetworkRetentionReceipt receipt, POIArchiveCBORWriter writer)
++        => writer.Map(
++            ("Id", value => value.Value(receipt.Id.ToCBOR())),
++            ("Profile", value => value.Text(RoamingNetworkRetentionReceipt.Profile)),
++            ("PlanId", value => value.Value(receipt.PlanId.ToCBOR())),
++            ("CheckpointId", value => value.Value(receipt.Checkpoint.ToCBOR())),
++            ("BeforeAnchor", value => value.Value(receipt.BeforeAnchor.ToCBOR())),
++            ("AfterAnchor", value => value.Value(receipt.AfterAnchor.ToCBOR())),
++            ("Head", value => value.Value(receipt.Head.ToCBOR())),
++            ("CreatedAt", value => value.Text(receipt.CreatedAt.ToString("O", CultureInfo.InvariantCulture))),
++            ("SourceArchiveETag", value => value.Value(receipt.SourceArchiveETag.ToCBOR())),
++            ("PrunedCommits", value => value.Array(receipt.PrunedCommits.Length, receipt.PrunedCommits, (output, id) => output.Value(id.ToCBOR()))),
++            ("ArchiveOnlyTips", value => value.Array(receipt.ArchiveOnlyTips.Length, receipt.ArchiveOnlyTips, (output, id) => output.Value(id.ToCBOR()))));
++}
+diff --git a/WWCP_POI/History/POIArchiveHashStream.cs b/WWCP_POI/History/POIArchiveHashStream.cs
+new file mode 100644
+--- /dev/null
++++ b/WWCP_POI/History/POIArchiveHashStream.cs
+@@ -0,0 +1,45 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Security.Cryptography;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++// Hash/count an archive without retaining its bytes; optionally forward them to a borrowed file.
++internal sealed class POIArchiveHashStream(Stream? destination = null) : Stream
++{
++    private readonly IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
++    private Int64 length;
++    private Boolean complete;
++
++    internal ETag Complete()
++    {
++        if (complete) throw new InvalidOperationException("The archive digest has already been finalized.");
++        complete = true;
++        return new(ETagFormat.CBOR, ETagHashAlgorithm.SHA256, hash.GetHashAndReset());
++    }
++
++    public override void Write(ReadOnlySpan<Byte> buffer)
++    {
++        if (complete) throw new InvalidOperationException("The archive digest has already been finalized.");
++        var next = checked(length + buffer.Length);
++        destination?.Write(buffer);
++        hash.AppendData(buffer);
++        length = next;
++    }
++
++    public override void Write(Byte[] buffer, Int32 offset, Int32 count) => Write(buffer.AsSpan(offset, count));
++    public override Boolean CanRead => false;
++    public override Boolean CanSeek => false;
++    public override Boolean CanWrite => !complete;
++    public override Int64 Length => length;
++    public override Int64 Position { get => length; set => throw new NotSupportedException(); }
++    public override void Flush() { }
++    public override Int32 Read(Byte[] buffer, Int32 offset, Int32 count) => throw new NotSupportedException();
++    public override Int64 Seek(Int64 offset, SeekOrigin origin) => throw new NotSupportedException();
++    public override void SetLength(Int64 value) => throw new NotSupportedException();
++    protected override void Dispose(Boolean disposing) { if (disposing) { hash.Dispose(); complete = true; } base.Dispose(disposing); }
++}
+diff --git a/WWCP_POI/History/POIBootstrapArchiveCapture.cs b/WWCP_POI/History/POIBootstrapArchiveCapture.cs
+new file mode 100644
+--- /dev/null
++++ b/WWCP_POI/History/POIBootstrapArchiveCapture.cs
+@@ -0,0 +1,71 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Collections.Immutable;
++using System.Security.Cryptography;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++// Own fixed-size fragments and hash them as they are emitted. No complete contiguous archive
++// is allocated. All arrays remain private to the completed immutable bootstrap source.
++internal sealed class POIBootstrapArchiveCapture(Int32 chunkBytes, Int32 maxArchiveBytes, Int32 maxChunks) : Stream
++{
++    private readonly IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
++    private readonly List<Byte[]> chunks = [];
++    private readonly List<ImmutableArray<Byte>> digests = [];
++    private Byte[]? current;
++    private Int32 used;
++    private Int32 length;
++    private Boolean complete;
++
++    public override void Write(ReadOnlySpan<Byte> buffer)
++    {
++        if (complete) throw new InvalidOperationException("The frozen archive has already been finalized.");
++        if ((Int64)length + buffer.Length > Math.Min((Int64)maxArchiveBytes, (Int64)chunkBytes * maxChunks))
++            throw new ArgumentException("Frozen archive exceeds local bootstrap limits.");
++        hash.AppendData(buffer);
++        length += buffer.Length;
++        while (!buffer.IsEmpty)
++        {
++            current ??= new Byte[Math.Min(chunkBytes, maxArchiveBytes - (length - buffer.Length))];
++            var count = Math.Min(buffer.Length, current.Length - used);
++            buffer[..count].CopyTo(current.AsSpan(used));
++            used += count;
++            buffer = buffer[count..];
++            if (used == current.Length) FinishChunk();
++        }
++    }
++
++    private void FinishChunk()
++    {
++        if (current is null || used == 0) return;
++        if (used != current.Length) System.Array.Resize(ref current, used);
++        chunks.Add(current);
++        digests.Add(ImmutableArray.CreateRange(SHA256.HashData(current)));
++        current = null;
++        used = 0;
++    }
++
++    internal (ImmutableArray<Byte[]> Chunks, ImmutableArray<ImmutableArray<Byte>> ChunkDigests, Int32 Length, ETag Digest) Complete()
++    {
++        if (complete) throw new InvalidOperationException("The frozen archive has already been finalized.");
++        FinishChunk();
++        complete = true;
++        return ([.. chunks], [.. digests], length, new(ETagFormat.CBOR, ETagHashAlgorithm.SHA256, hash.GetHashAndReset()));
++    }
++
++    public override void Write(Byte[] buffer, Int32 offset, Int32 count) => Write(buffer.AsSpan(offset, count));
++    public override Boolean CanRead => false;
++    public override Boolean CanSeek => false;
++    public override Boolean CanWrite => !complete;
++    public override Int64 Length => length;
++    public override Int64 Position { get => length; set => throw new NotSupportedException(); }
++    public override void Flush() { }
++    public override Int32 Read(Byte[] buffer, Int32 offset, Int32 count) => throw new NotSupportedException();
++    public override Int64 Seek(Int64 offset, SeekOrigin origin) => throw new NotSupportedException();
++    public override void SetLength(Int64 value) => throw new NotSupportedException();
++    protected override void Dispose(Boolean disposing) { if (disposing) { hash.Dispose(); complete = true; } base.Dispose(disposing); }
++}
+diff --git a/WWCP_POI/History/RoamingNetworkBootstrapChunk.cs b/WWCP_POI/History/RoamingNetworkBootstrapChunk.cs
+--- a/WWCP_POI/History/RoamingNetworkBootstrapChunk.cs
++++ b/WWCP_POI/History/RoamingNetworkBootstrapChunk.cs
+@@ -114,7 +114,7 @@
+ /// </summary>
+ public sealed class RoamingNetworkBootstrapSource
+ {
+-    private readonly Byte[] archive;
++    private readonly ImmutableArray<Byte[]> archiveChunks;
+     private readonly RoamingNetworkBootstrapLimits limits;
+ 
+     /// <summary>
+@@ -122,26 +122,34 @@
+     /// </summary>
+     public RoamingNetworkBootstrapManifest Manifest { get; }
+ 
+-    internal RoamingNetworkBootstrapSource(Byte[] archive, RoamingNetworkCommitId checkpoint, RoamingNetworkCommitId head,
++    internal RoamingNetworkBootstrapSource(Action<Stream> writeArchive, RoamingNetworkCommitId checkpoint, RoamingNetworkCommitId head,
+         Int32 commits, Int32 chunkBytes, RoamingNetworkBootstrapLimits limits, String archiveProfile = RoamingNetworkHistory.ArchiveProfile,
+         RoamingNetworkCommitId? anchor = null)
+     {
+-        if (chunkBytes < 1 || chunkBytes > limits.MaxChunkBytes || archive.Length > limits.MaxArchiveBytes ||
+-            ((Int64) archive.Length + chunkBytes - 1) / chunkBytes > limits.MaxChunks || commits > limits.MaxCommits)
++        if (chunkBytes < 1 || chunkBytes > limits.MaxChunkBytes || commits > limits.MaxCommits)
+             throw new ArgumentException("Frozen archive exceeds local bootstrap limits.");
+-        this.archive = archive; this.limits = limits;
+-        var digests = ImmutableArray.CreateBuilder<ImmutableArray<Byte>>();
+-        for (var offset = 0; offset < archive.Length; )
+-        {
+-            var length = Math.Min(chunkBytes, archive.Length - offset);
+-            digests.Add(ImmutableArray.CreateRange(System.Security.Cryptography.SHA256.HashData(archive.AsSpan(offset, length))));
+-            offset += length;
+-        }
+-        Manifest = new(checkpoint, head, commits, archive.Length, chunkBytes, ETag.Compute(ETagFormat.CBOR, archive), digests.ToImmutable(), archiveProfile, anchor);
++        this.limits = limits;
++        using var capture = new POIBootstrapArchiveCapture(chunkBytes, limits.MaxArchiveBytes, limits.MaxChunks);
++        writeArchive(capture);
++        var frozen = capture.Complete();
++        archiveChunks = frozen.Chunks;
++        Manifest = new(checkpoint, head, commits, frozen.Length, chunkBytes, frozen.Digest, frozen.ChunkDigests, archiveProfile, anchor);
+         Manifest.RequireLimits(limits);
+         // The last full fragment has the widest position encoding; also check the short tail.
+         CreateChunk(Math.Max(0, Manifest.ChunkCount - 2));
+         if (Manifest.ChunkCount > 1) CreateChunk(Manifest.ChunkCount - 1);
++    }
++
++    /// <summary>
++    /// Write the frozen original CBOR archive without closing or flushing the writable destination.
++    /// Later history changes cannot alter this source; a write failure may leave partial output.
++    /// </summary>
++    public void WriteArchive(Stream destination)
++    {
++        ArgumentNullException.ThrowIfNull(destination);
++        if (!destination.CanWrite) throw new ArgumentException("An archive destination must be writable.", nameof(destination));
++        for (var index = 0; index < archiveChunks.Length; index++)
++            destination.Write(archiveChunks[index].AsSpan(0, Manifest.Length(index)));
+     }
+ 
+     /// <summary>
+@@ -150,7 +158,7 @@
+     public RoamingNetworkBootstrapChunk CreateChunk(Int32 index)
+     {
+         var length = Manifest.Length(index);
+-        var chunk = new RoamingNetworkBootstrapChunk(Manifest.Id, index, archive.AsSpan(index * Manifest.ChunkBytes, length));
++        var chunk = new RoamingNetworkBootstrapChunk(Manifest.Id, index, archiveChunks[index].AsSpan(0, length));
+         chunk.RequireLimits(limits);
+         return chunk;
+     }
+diff --git a/WWCP_POI/History/RoamingNetworkHistory.Archive.cs b/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
+--- a/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
+@@ -39,25 +39,54 @@
+     {
+         lock (gate)
+         {
+-            if (!HasCompleteAncestry) return BoundaryJSON(entries, anchorId, head.Id);
+             using var stream = new MemoryStream();
+-            using (var writer = new Utf8JsonWriter(stream))
+-            {
+-                writer.WriteStartObject();
+-                writer.WriteString("Profile", ArchiveProfileFor(entries));
+-                writer.WriteString("ContentProfile", POIContentProfile.Id);
+-                writer.WritePropertyName("Checkpoint"); entries[checkpointId].Snapshot.WriteTo(writer);
+-                writer.WritePropertyName("CheckpointCommit"); entries[checkpointId].Commit.WriteTo(writer);
+-                writer.WritePropertyName("Commits");
+-                writer.WriteStartArray();
+-                foreach (var entry in OrderedEntries(entries))
+-                    if (entry.Commit.Id != checkpointId) entry.Commit.WriteTo(writer);
+-                writer.WriteEndArray();
+-                writer.WritePropertyName("Head"); head.Id.Hash.WriteTo(writer);
+-                writer.WriteEndObject();
+-            }
+-            return Encoding.UTF8.GetString(stream.ToArray());
+-        }
++            WriteArchiveJSON(stream, entries, head.Id);
++            return Encoding.UTF8.GetString(stream.GetBuffer().AsSpan(0, checked((Int32)stream.Length)));
++        }
++    }
++
++    /// <summary>
++    /// Write the exact JSON archive to a writable stream without closing or flushing it.
++    /// The export holds the history gate; reentrant mutation is rejected. A stream failure may
++    /// leave partial output, while retained history, the published head and runtime remain unchanged.
++    /// </summary>
++    public void WriteJSON(Stream destination)
++    {
++        RequireArchiveStream(destination);
++        lock (gate)
++        {
++            if (disposed || mutating) throw new InvalidOperationException("History is disposed or a mutation callback is reentrant.");
++            mutating = true;
++            try { WriteArchiveJSON(destination, entries, head.Id); }
++            finally { mutating = false; }
++        }
++    }
++
++    private void WriteArchiveJSON(Stream destination, ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
++                                   RoamingNetworkCommitId headId)
++    {
++        using var output = new POIArchiveStreamBuffer(destination);
++        using var writer = new Utf8JsonWriter(output);
++        WriteArchiveJSON(writer, source, headId);
++        writer.Flush();
++        output.Flush();
++    }
++
++    private void WriteArchiveJSON(Utf8JsonWriter writer, ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
++                                   RoamingNetworkCommitId headId)
++    {
++        if (!HasCompleteAncestry) { WriteBoundaryJSON(writer, source, anchorId, headId); return; }
++        writer.WriteStartObject();
++        writer.WriteString("Profile", ArchiveProfileFor(source));
++        writer.WriteString("ContentProfile", POIContentProfile.Id);
++        writer.WritePropertyName("Checkpoint"); source[checkpointId].Snapshot.WriteTo(writer);
++        writer.WritePropertyName("CheckpointCommit"); source[checkpointId].Commit.WriteTo(writer);
++        writer.WritePropertyName("Commits"); writer.WriteStartArray();
++        foreach (var entry in OrderedEntries(source))
++            if (entry.Commit.Id != checkpointId) entry.Commit.WriteTo(writer);
++        writer.WriteEndArray();
++        writer.WritePropertyName("Head"); headId.Hash.WriteTo(writer);
++        writer.WriteEndObject();
+     }
+ 
+     /// <summary>
+@@ -68,15 +97,59 @@
+         lock (gate) return Archive(entries, head.Id);
+     }
+ 
++    /// <summary>
++    /// Write the exact deterministic CBOR archive to a writable stream, leaving it open and unflushed.
++    /// Outer maps, commits and receipt catalogs are emitted in order; individual POI snapshots and
++    /// ChangeSets still use their existing per-value encoders. Failed output does not change history.
++    /// </summary>
++    public void WriteCBOR(Stream destination)
++    {
++        RequireArchiveStream(destination);
++        lock (gate)
++        {
++            if (disposed || mutating) throw new InvalidOperationException("History is disposed or a mutation callback is reentrant.");
++            mutating = true;
++            try { WriteArchiveCBOR(destination, entries, head.Id); }
++            finally { mutating = false; }
++        }
++    }
++
++    private static void RequireArchiveStream(Stream destination)
++    {
++        ArgumentNullException.ThrowIfNull(destination);
++        if (!destination.CanWrite) throw new ArgumentException("An archive destination must be writable.", nameof(destination));
++    }
++
+     private Byte[] Archive(ImmutableDictionary<RoamingNetworkCommitId, Entry> source, RoamingNetworkCommitId headId)
+-        => !HasCompleteAncestry ? BoundaryArchive(source, anchorId, headId) : RoamingNetworkCommit.Map(
+-            ("Profile", CBORValue.FromText(ArchiveProfileFor(source))),
+-            ("ContentProfile", CBORValue.FromText(POIContentProfile.Id)),
+-            ("Checkpoint", CBORValue.Parse(source[checkpointId].Snapshot.ToCBOR(IncludeVersionMetadata: true))),
+-            ("CheckpointCommit", source[checkpointId].Commit.ToCBORValue()),
+-            ("Commits", CBORValue.FromArray(OrderedEntries(source).Where(entry => entry.Commit.Id != checkpointId)
+-                                                   .Select(entry => entry.Commit.ToCBORValue()))),
+-            ("Head", headId.ToCBOR())).ToByteArray(CBORWriterOptions.Canonical);
++    {
++        using var stream = new MemoryStream();
++        WriteArchiveCBOR(stream, source, headId);
++        return stream.ToArray();
++    }
++
++    private void WriteArchiveCBOR(Stream destination, ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
++                                   RoamingNetworkCommitId headId)
++    {
++        if (!HasCompleteAncestry) { WriteBoundaryArchive(destination, source, anchorId, headId); return; }
++        using var writer = new POIArchiveCBORWriter(destination);
++        writer.Map(
++            ("Profile", value => value.Text(ArchiveProfileFor(source))),
++            ("ContentProfile", value => value.Text(POIContentProfile.Id)),
++            ("Checkpoint", value => value.Encoded(source[checkpointId].Snapshot.ToCBOR(IncludeVersionMetadata: true))),
++            ("CheckpointCommit", value => source[checkpointId].Commit.WriteArchiveCBOR(value)),
++            ("Commits", value => value.Array(source.Count - 1, OrderedEntries(source).Where(entry => entry.Commit.Id != checkpointId),
++                (output, entry) => entry.Commit.WriteArchiveCBOR(output))),
++            ("Head", value => value.Value(headId.ToCBOR())));
++        writer.Complete();
++    }
++
++    private (ETag Digest, Int64 Length) ArchiveDigest(ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
++                                                      RoamingNetworkCommitId headId)
++    {
++        using var stream = new POIArchiveHashStream();
++        WriteArchiveCBOR(stream, source, headId);
++        return (stream.Complete(), stream.Length);
++    }
+ 
+     /// <summary>
+     /// Recover an in-memory archive by validating the checkpoint and replaying every retained branch.
+@@ -218,10 +291,10 @@
+     private void Persist(ImmutableDictionary<RoamingNetworkCommitId, Entry> source, RoamingNetworkCommitId headId)
+     {
+         if (archivePath is null) return;
+-        Persist(Archive(source, headId));
+-    }
+-
+-    private void Persist(Byte[] bytes)
++        Persist(stream => WriteArchiveCBOR(stream, source, headId));
++    }
++
++    private void Persist(Action<Stream> writeArchive)
+     {
+         if (archivePath is null) return;
+         var temporary = archivePath + ".tmp-" + Guid.NewGuid().ToString("N");
+@@ -230,7 +303,7 @@
+             ArchiveWriteObserver?.Invoke(ArchiveWriteStage.BeforeTemporaryWrite);
+             using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+             {
+-                file.Write(bytes);
++                writeArchive(file);
+                 file.Flush(flushToDisk: true);
+             }
+             ArchiveWriteObserver?.Invoke(ArchiveWriteStage.TemporaryFileFlushed);
+diff --git a/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs b/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs
+--- a/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs
+@@ -14,7 +14,7 @@
+     /// <summary>
+     /// Freeze the complete static archive under the history gate for bounded bootstrap transfer.
+     /// Original checkpoint, head, all retained branches and peer signatures are preserved.
+-    /// Export and final replay currently materialize a complete archive in memory.
++    /// Export encodes directly into bounded frozen fragments; final replay still materializes the archive.
+     /// </summary>
+     public RoamingNetworkBootstrapSource CreateBootstrap(Int32 chunkBytes = 64 * 1024, RoamingNetworkBootstrapLimits? limits = null)
+     {
+@@ -25,7 +25,7 @@
+             if (chunkBytes < 1 || chunkBytes > limits.MaxChunkBytes) throw new ArgumentException("Invalid chunk size.");
+             limits.HistoryLimits.Require(RoamingNetworkHistoryLimitKind.RetainedCommits, entries.Count);
+             if (!HasCompleteAncestry) RequireCatalogLimits(limits.HistoryLimits);
+-            return new(Archive(entries, head.Id), checkpointId, head.Id, entries.Count, chunkBytes, limits,
++            return new(stream => WriteArchiveCBOR(stream, entries, head.Id), checkpointId, head.Id, entries.Count, chunkBytes, limits,
+                 HasCompleteAncestry ? ArchiveProfileFor(entries) : CurrentBoundaryArchiveProfile, anchorId);
+         }
+     }
+@@ -52,7 +52,7 @@
+             limits.HistoryLimits.Require(RoamingNetworkHistoryLimitKind.RetainedCommits, ancestry.Count);
+             RequireCatalogLimits(limits.HistoryLimits);
+             var selected = entries.Where(entry => ancestry.Contains(entry.Key)).ToImmutableDictionary();
+-            return new(BoundaryArchive(selected, snapshotId, tip), checkpointId, tip, selected.Count, chunkBytes, limits,
++            return new(stream => WriteBoundaryArchive(stream, selected, snapshotId, tip), checkpointId, tip, selected.Count, chunkBytes, limits,
+                 CurrentBoundaryArchiveProfile, snapshotId);
+         }
+     }
+diff --git a/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs b/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs
+--- a/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs
+@@ -5,7 +5,6 @@
+  */
+ 
+ using System.Collections.Immutable;
+-using System.Text;
+ using System.Text.Json;
+ using org.GraphDefined.Vanaheimr.Illias;
+ 
+@@ -26,48 +25,46 @@
+ 
+     private String CurrentBoundaryArchiveProfile => retentionReceipts.IsEmpty ? BoundaryArchiveProfile : RetentionArchiveProfile;
+ 
+-    private String BoundaryJSON(ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
+-                                RoamingNetworkCommitId root, RoamingNetworkCommitId headId)
++    private void WriteBoundaryJSON(Utf8JsonWriter writer, ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
++                                     RoamingNetworkCommitId root, RoamingNetworkCommitId headId)
+     {
+-        using var stream = new MemoryStream();
+-        using (var writer = new Utf8JsonWriter(stream))
++        writer.WriteStartObject();
++        writer.WriteString("Profile", CurrentBoundaryArchiveProfile);
++        writer.WriteString("ContentProfile", POIContentProfile.Id);
++        writer.WritePropertyName("CheckpointId"); checkpointId.Hash.WriteTo(writer);
++        writer.WritePropertyName("SnapshotCommit"); source[root].Commit.WriteTo(writer);
++        writer.WritePropertyName("Commits"); writer.WriteStartArray();
++        foreach (var entry in OrderedEntries(source, root))
++            if (entry.Commit.Id != root) entry.Commit.WriteTo(writer);
++        writer.WriteEndArray();
++        writer.WritePropertyName("Head"); headId.Hash.WriteTo(writer);
++        if (!retentionReceipts.IsEmpty)
+         {
+-            writer.WriteStartObject();
+-            writer.WriteString("Profile", CurrentBoundaryArchiveProfile);
+-            writer.WriteString("ContentProfile", POIContentProfile.Id);
+-            writer.WritePropertyName("CheckpointId"); checkpointId.Hash.WriteTo(writer);
+-            writer.WritePropertyName("SnapshotCommit"); source[root].Commit.WriteTo(writer);
+-            writer.WritePropertyName("Commits"); writer.WriteStartArray();
+-            foreach (var entry in OrderedEntries(source, root))
+-                if (entry.Commit.Id != root) entry.Commit.WriteTo(writer);
++            writer.WritePropertyName("RetentionReceipts"); writer.WriteStartArray();
++            foreach (var receipt in retentionReceipts) receipt.WriteTo(writer);
+             writer.WriteEndArray();
+-            writer.WritePropertyName("Head"); headId.Hash.WriteTo(writer);
+-            if (!retentionReceipts.IsEmpty)
+-            {
+-                writer.WritePropertyName("RetentionReceipts"); writer.WriteStartArray();
+-                foreach (var receipt in retentionReceipts) receipt.WriteTo(writer);
+-                writer.WriteEndArray();
+-            }
+-            writer.WriteEndObject();
+         }
+-        return Encoding.UTF8.GetString(stream.ToArray());
++        writer.WriteEndObject();
+     }
+ 
+-    private Byte[] BoundaryArchive(ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
+-                                    RoamingNetworkCommitId root, RoamingNetworkCommitId headId,
+-                                    ImmutableArray<RoamingNetworkRetentionReceipt>? receipts = null)
++    private void WriteBoundaryArchive(Stream destination, ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
++                                       RoamingNetworkCommitId root, RoamingNetworkCommitId headId,
++                                       ImmutableArray<RoamingNetworkRetentionReceipt>? receipts = null)
+     {
+         var catalog = receipts ?? retentionReceipts;
+-        var fields = new List<(String Key, CBORValue Value)> {
+-            ("Profile", CBORValue.FromText(catalog.IsEmpty ? BoundaryArchiveProfile : RetentionArchiveProfile)),
+-            ("ContentProfile", CBORValue.FromText(POIContentProfile.Id)),
+-            ("CheckpointId", checkpointId.ToCBOR()),
+-            ("SnapshotCommit", source[root].Commit.ToCBORValue()),
+-            ("Commits", CBORValue.FromArray(OrderedEntries(source, root).Where(entry => entry.Commit.Id != root)
+-                .Select(entry => entry.Commit.ToCBORValue()))),
+-            ("Head", headId.ToCBOR()) };
+-        if (!catalog.IsEmpty) fields.Add(("RetentionReceipts", CBORValue.FromArray(catalog.Select(receipt => receipt.ToCBORValue()))));
+-        return RoamingNetworkCommit.Map(fields.ToArray()).ToByteArray(CBORWriterOptions.Canonical);
++        var fields = new List<(String Name, Action<POIArchiveCBORWriter> Write)> {
++            ("Profile", value => value.Text(catalog.IsEmpty ? BoundaryArchiveProfile : RetentionArchiveProfile)),
++            ("ContentProfile", value => value.Text(POIContentProfile.Id)),
++            ("CheckpointId", value => value.Value(checkpointId.ToCBOR())),
++            ("SnapshotCommit", value => source[root].Commit.WriteArchiveCBOR(value)),
++            ("Commits", value => value.Array(source.Count - 1, OrderedEntries(source, root).Where(entry => entry.Commit.Id != root),
++                (output, entry) => entry.Commit.WriteArchiveCBOR(output))),
++            ("Head", value => value.Value(headId.ToCBOR())) };
++        if (!catalog.IsEmpty) fields.Add(("RetentionReceipts", value => value.Array(catalog.Length, catalog,
++            (output, receipt) => receipt.WriteArchiveCBOR(output))));
++        using var writer = new POIArchiveCBORWriter(destination);
++        writer.Map(fields.ToArray());
++        writer.Complete();
+     }
+ 
+     private static String[] BoundaryFields(Boolean hasReceipts)
+diff --git a/WWCP_POI/History/RoamingNetworkHistory.Retention.cs b/WWCP_POI/History/RoamingNetworkHistory.Retention.cs
+--- a/WWCP_POI/History/RoamingNetworkHistory.Retention.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Retention.cs
+@@ -153,7 +153,7 @@
+             result = new(RoamingNetworkRetentionOutcome.NothingToPrune, head, "The selected boundary and protected tips retain all current entries.");
+             return false;
+         }
+-        plan = new(boundary, anchorId, head.Id, cutoff, createdAt, ETag.Compute(ETagFormat.CBOR, Archive(entries, head.Id)),
++        plan = new(boundary, anchorId, head.Id, cutoff, createdAt, ArchiveDigest(entries, head.Id).Digest,
+             keep, pruned, released, protectedSet);
+         result = new(RoamingNetworkRetentionOutcome.Planned, head);
+         return true;
+@@ -185,9 +185,9 @@
+                     result = new(RoamingNetworkRetentionOutcome.HeadConflict, head, "The published head changed after planning.");
+                     return false;
+                 }
+-                var oldArchive = Archive(entries, head.Id);
++                var oldArchive = ArchiveDigest(entries, head.Id);
+                 if (checkpointId != plan.Boundary.Checkpoint || anchorId != plan.BeforeAnchor ||
+-                    ETag.Compute(ETagFormat.CBOR, oldArchive) != plan.SourceArchiveETag)
++                    oldArchive.Digest != plan.SourceArchiveETag)
+                 {
+                     result = new(RoamingNetworkRetentionOutcome.InventoryChanged, head, "Branches, envelopes, receipts or the replay boundary changed after planning.");
+                     return false;
+@@ -221,14 +221,14 @@
+                     batches = batches.Add(lastBatch, current.Boundary.Anchor);
+                 foreach (var entry in updated.Values)
+                     if (entry.Commit.ChangeSet is { } batch) batches = batches.Add(batch.Id, entry.Commit.Id);
+-                var activeBytes = BoundaryArchive(updated, current.Boundary.Anchor, head.Id, receipts);
+                 String resolved;
+                 try
+                 {
+                     resolved = ResolveColdArchivePath(coldArchivePath);
+                     using var coldLease = AcquireLease(resolved);
+-                    using var coldFile = PublishColdArchive(resolved, oldArchive, plan.SourceArchiveETag);
+-                    Persist(activeBytes);
++                    using var coldFile = PublishColdArchive(resolved, stream => WriteArchiveCBOR(stream, entries, head.Id),
++                        oldArchive.Length, plan.SourceArchiveETag);
++                    Persist(stream => WriteBoundaryArchive(stream, updated, current.Boundary.Anchor, head.Id, receipts));
+                 }
+                 catch (Exception exception)
+                 {
+@@ -295,7 +295,7 @@
+         return Path.Combine(DirectoryPath(new DirectoryInfo(Path.GetDirectoryName(path)!)), Path.GetFileName(path));
+     }
+ 
+-    private FileStream PublishColdArchive(String path, Byte[] bytes, ETag expected)
++    private FileStream PublishColdArchive(String path, Action<Stream> writeArchive, Int64 length, ETag expected)
+     {
+         if (!File.Exists(path))
+         {
+@@ -305,7 +305,11 @@
+                 RetentionWriteObserver?.Invoke(RetentionWriteStage.BeforeColdTemporaryWrite);
+                 using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                 {
+-                    file.Write(bytes); file.Flush(flushToDisk: true);
++                    using var hashing = new POIArchiveHashStream(file);
++                    writeArchive(hashing);
++                    if (hashing.Length != length || hashing.Complete() != expected)
++                        throw new IOException("The streamed cold archive differs from the complete reviewed source archive.");
++                    file.Flush(flushToDisk: true);
+                     RetentionWriteObserver?.Invoke(RetentionWriteStage.ColdTemporaryFileFlushed);
+                 }
+                 File.Move(temporary, path, overwrite: false);
+@@ -323,7 +327,7 @@
+         var retained = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+         try
+         {
+-            if (retained.Length != bytes.Length || !SHA256.HashData(retained).AsSpan().SequenceEqual(expected.Digest.AsSpan()))
++            if (retained.Length != length || !SHA256.HashData(retained).AsSpan().SequenceEqual(expected.Digest.AsSpan()))
+                 throw new IOException("An existing cold archive does not match the complete reviewed source archive.");
+             retained.Flush(flushToDisk: true);
+             RetentionWriteObserver?.Invoke(RetentionWriteStage.ColdArchiveVerified);
+diff --git a/WWCP_POI/Serialization/POIArchiveCBORWriter.cs b/WWCP_POI/Serialization/POIArchiveCBORWriter.cs
+new file mode 100644
+--- /dev/null
++++ b/WWCP_POI/Serialization/POIArchiveCBORWriter.cs
+@@ -0,0 +1,97 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Buffers.Binary;
++using org.GraphDefined.Vanaheimr.Illias;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++// Archive containers have known counts and text keys. Sort their encoded keys before emitting
++// values, so Styx does not need a scratch buffer containing the complete outer archive map.
++// Leaf values keep Styx's canonical encoding; pre-encoded POI/batch payloads keep their codecs.
++internal sealed class POIArchiveCBORWriter(Stream destination) : IDisposable
++{
++    private readonly POIArchiveStreamBuffer output = new(destination);
++    private Int32 depth;
++
++    internal void Map(params (String Name, Action<POIArchiveCBORWriter> Write)[] fields)
++    {
++        var sorted = fields.Select(field => (Key: CBORValue.FromText(field.Name).ToByteArray(CBORWriterOptions.Canonical), field.Write)).ToArray();
++        System.Array.Sort(sorted, (left, right) => left.Key.AsSpan().SequenceCompareTo(right.Key));
++        for (var index = 1; index < sorted.Length; index++)
++            if (sorted[index - 1].Key.AsSpan().SequenceEqual(sorted[index].Key))
++                throw new ArgumentException("Duplicate CBOR archive map key.");
++        Enter();
++        try
++        {
++            Head(5, sorted.Length);
++            foreach (var field in sorted)
++            {
++                output.WriteParts(field.Key);
++                field.Write(this);
++            }
++        }
++        finally { depth--; }
++    }
++
++    internal void Array<T>(Int32 count, IEnumerable<T> values, Action<POIArchiveCBORWriter, T> write)
++    {
++        Enter();
++        try
++        {
++            Head(4, count);
++            var written = 0;
++            foreach (var value in values)
++            {
++                if (written == count) throw new ArgumentException("CBOR archive array exceeds its declared count.");
++                write(this, value);
++                written++;
++            }
++            if (written != count) throw new ArgumentException("CBOR archive array differs from its declared count.");
++        }
++        finally { depth--; }
++    }
++
++    internal void Value(CBORValue value)
++    {
++        var writer = new CBORWriter(output, new CBORWriterOptions { Deterministic = true, MaxDepth = 64 - depth });
++        value.WriteTo(writer);
++        if (!writer.IsComplete) throw new InvalidOperationException("Incomplete CBOR archive value.");
++    }
++
++    internal void Text(String value) => Value(CBORValue.FromText(value));
++
++    internal void Encoded(ReadOnlySpan<Byte> canonicalValue)
++    {
++        var reader = new CBORReader(canonicalValue, new CBORReaderOptions { MaxDepth = 64 - depth });
++        reader.SkipValue();
++        if (reader.BytesRemaining != 0) throw new ArgumentException("Expected one encoded CBOR archive value.");
++        output.WriteParts(canonicalValue);
++    }
++
++    private void Enter()
++    {
++        if (depth == 64) throw new CBORException("The maximum CBOR nesting depth of 64 was exceeded.");
++        depth++;
++    }
++
++    // Only definite-length array/map heads are emitted here. Scalar/tag/float rules stay in Styx.
++    private void Head(Byte major, Int32 count)
++    {
++        ArgumentOutOfRangeException.ThrowIfNegative(count);
++        var span = output.GetSpan(5);
++        var prefix = (Byte)(major << 5);
++        if (count < 24) { span[0] = (Byte)(prefix | count); output.Advance(1); }
++        else if (count <= Byte.MaxValue) { span[0] = (Byte)(prefix | 24); span[1] = (Byte)count; output.Advance(2); }
++        else if (count <= UInt16.MaxValue) { span[0] = (Byte)(prefix | 25); BinaryPrimitives.WriteUInt16BigEndian(span[1..], (UInt16)count); output.Advance(3); }
++        else { span[0] = (Byte)(prefix | 26); BinaryPrimitives.WriteUInt32BigEndian(span[1..], (UInt32)count); output.Advance(5); }
++    }
++
++    internal void Complete() => output.Flush();
++
++    public void Dispose() => output.Dispose();
++
++}
+diff --git a/WWCP_POI/Serialization/POIArchiveStreamBuffer.cs b/WWCP_POI/Serialization/POIArchiveStreamBuffer.cs
+new file mode 100644
+--- /dev/null
++++ b/WWCP_POI/Serialization/POIArchiveStreamBuffer.cs
+@@ -0,0 +1,66 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Buffers;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++// A borrowed stream adapter for JSON and CBOR writers. Flush only the encoder buffer;
++// destination lifetime and durable flushing belong to the caller. Large values can grow it.
++internal sealed class POIArchiveStreamBuffer(Stream stream) : IBufferWriter<Byte>, IDisposable
++{
++    private Byte[] buffer = ArrayPool<Byte>.Shared.Rent(16 * 1024);
++    private Int32 written;
++
++    public Memory<Byte> GetMemory(Int32 sizeHint = 0) { Ensure(sizeHint); return buffer.AsMemory(written); }
++    public Span<Byte> GetSpan(Int32 sizeHint = 0) { Ensure(sizeHint); return buffer.AsSpan(written); }
++
++    public void Advance(Int32 count)
++    {
++        if (count < 0 || count > buffer.Length - written) throw new ArgumentOutOfRangeException(nameof(count));
++        written += count;
++    }
++
++    private void Ensure(Int32 sizeHint)
++    {
++        ObjectDisposedException.ThrowIf(buffer.Length == 0, this);
++        ArgumentOutOfRangeException.ThrowIfNegative(sizeHint);
++        sizeHint = Math.Max(1, sizeHint);
++        if (sizeHint <= buffer.Length - written) return;
++        Flush();
++        if (sizeHint <= buffer.Length) return;
++        var replacement = ArrayPool<Byte>.Shared.Rent(sizeHint);
++        ArrayPool<Byte>.Shared.Return(buffer);
++        buffer = replacement;
++    }
++
++    internal void WriteParts(ReadOnlySpan<Byte> bytes)
++    {
++        if (bytes.Length > buffer.Length)
++        {
++            Flush();
++            stream.Write(bytes);
++            return;
++        }
++        bytes.CopyTo(GetSpan(bytes.Length));
++        Advance(bytes.Length);
++    }
++
++    internal void Flush()
++    {
++        if (written == 0) return;
++        stream.Write(buffer.AsSpan(0, written));
++        written = 0;
++    }
++
++    public void Dispose()
++    {
++        // Flush only after successful encoding. Never close or flush the caller's stream.
++        if (buffer.Length == 0) return;
++        ArrayPool<Byte>.Shared.Return(buffer);
++        buffer = [];
++    }
++}

@@ -34,62 +34,95 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Project(key, map);
 
+        private static void Validate(IEnumerable<InfrastructureEntityKey> keys, EntityMap map)
+        {
+            var projection = new ValidationProjection(map);
+            foreach (var key in keys) projection.Project(key);
+        }
+
         /// <summary>
         /// Reconstruct the entity and its ancestors for domain validation.
         /// Groups additionally resolve the owning operator's infrastructure; parking resolves station references.
         /// </summary>
-        private static Object Project(InfrastructureEntityKey  key,
-                                      EntityMap                map)
+        private static Object Project(InfrastructureEntityKey key, EntityMap map)
+            => new ValidationProjection(map).Project(key);
+
+        // One fixed immutable map per pass. No model escapes this validation traversal;
+        // successful ancestors/station views can be reused without sharing runtime with a history.
+        private sealed class ValidationProjection
         {
+            private readonly EntityMap map;
+            private readonly Dictionary<InfrastructureEntityKey, Object> projected = new();
+            private ChargingStation[]? stations;
 
-            var entity   = map[key];
-            var document = OwnJSON(entity);
-            var parent   = entity.Parent is { } parentKey
-                               ? Project(parentKey, map)
-                               : null;
+            internal ValidationProjection(EntityMap map) => this.map = map;
 
-            if (key.Type is InfrastructureEntityType.EVSEGroup or InfrastructureEntityType.ChargingStationGroup or
-                            InfrastructureEntityType.ChargingPoolGroup or InfrastructureEntityType.ChargingTariffGroup)
+            internal Object Project(InfrastructureEntityKey key)
             {
-                var owner = map[entity.Parent!.Value];
-                var ownerDocument = OwnJSON(owner);
-                foreach (var type in new[] { InfrastructureEntityType.ChargingPool, InfrastructureEntityType.ChargingTariff })
-                    ownerDocument[InfrastructureChangeSchema.Relations[type].Field] = new Newtonsoft.Json.Linq.JArray(
-                        owner.Children.Where(child => child.Type == type).Select(child => ValidationDocument(child, map)));
-                var op = ChargingStationOperator.Parse(ownerDocument, ((ChargingStationOperator) parent!).RoamingNetwork);
-                return key.Type switch
-                {
-                    InfrastructureEntityType.EVSEGroup => EVSEGroup.Parse(document, op),
-                    InfrastructureEntityType.ChargingStationGroup => ChargingStationGroup.Parse(document, op),
-                    InfrastructureEntityType.ChargingPoolGroup => ChargingPoolGroup.Parse(document, op),
-                    _ => ChargingTariffGroup.Parse(document, op)
-                };
+                if (projected.TryGetValue(key, out var value)) return value;
+                value = Create(key);
+                projected.Add(key, value); // Failed projections remain uncached and retain ordinary diagnostics.
+                return value;
             }
 
-            ChargingStation[] Stations()
-                => map.Keys.Where(item => item.Type == InfrastructureEntityType.ChargingStation).
-                       Select(item => (ChargingStation) Project(item, map)).ToArray();
-
-            return key.Type switch
+            private Object Create(InfrastructureEntityKey key)
             {
-                InfrastructureEntityType.RoamingNetwork           => RoamingNetwork.Parse(document),
-                InfrastructureEntityType.ChargingStationOperator => ChargingStationOperator.Parse(document, (RoamingNetwork) parent!),
-                InfrastructureEntityType.EMobilityProvider        => EMobilityProvider.Parse(document, (RoamingNetwork) parent!),
-                InfrastructureEntityType.ChargingPool             => ChargingPool.Parse(document, (ChargingStationOperator) parent!),
-                InfrastructureEntityType.ChargingStation          => ChargingStation.Parse(document, (ChargingPool) parent!),
-                InfrastructureEntityType.EVSE                     => EVSE.Parse(document, (ChargingStation) parent!),
-                InfrastructureEntityType.ChargingConnector        => ChargingConnector.Parse(document),
-                InfrastructureEntityType.ChargingTariff           => ChargingTariff.Parse(document, (ChargingStationOperator) parent!),
-                InfrastructureEntityType.ChargingStationManufacturer => ChargingStationManufacturer.Parse(document),
-                InfrastructureEntityType.GridOperator             => GridOperator.Parse(document, (RoamingNetwork) parent!),
-                InfrastructureEntityType.ParkingOperator          => ParkingOperator.Parse(ValidationDocument(key, map), (RoamingNetwork) parent!, Stations()),
-                InfrastructureEntityType.ParkingGarage            => ParkingGarage.Parse(document, Stations()),
-                InfrastructureEntityType.ParkingSpace             => ParkingSpace.Parse(document, Stations()),
-                InfrastructureEntityType.ParkingSensor            => ParkingSensor.Parse(document, Stations()),
-                InfrastructureEntityType.ParkingSpaceGroup        => ParkingSpaceGroup.Parse(document, Stations()),
-                _                                                => throw new ArgumentOutOfRangeException(nameof(key))
-            };
+                var entity   = map[key];
+                var document = OwnJSON(entity);
+                if (key.Type == InfrastructureEntityType.RoamingNetwork)
+                    foreach (var type in new[] { InfrastructureEntityType.GridOperator, InfrastructureEntityType.ChargingStationManufacturer,
+                                                InfrastructureEntityType.TransparencySoftware, InfrastructureEntityType.TransparencySoftwareCertificate })
+                        document[InfrastructureChangeSchema.Relations[type].Field] = new Newtonsoft.Json.Linq.JArray(
+                            entity.Children.Where(child => child.Type == type).Select(child => ValidationDocument(child, map)));
+                var parent   = entity.Parent is { } parentKey
+                                   ? Project(parentKey)
+                                   : null;
 
+                if (key.Type is InfrastructureEntityType.EVSEGroup or InfrastructureEntityType.ChargingStationGroup or
+                                InfrastructureEntityType.ChargingPoolGroup or InfrastructureEntityType.ChargingTariffGroup)
+                {
+                    var owner = map[entity.Parent!.Value];
+                    var ownerDocument = OwnJSON(owner);
+                    foreach (var type in new[] { InfrastructureEntityType.ChargingPool, InfrastructureEntityType.ChargingTariff })
+                        ownerDocument[InfrastructureChangeSchema.Relations[type].Field] = new Newtonsoft.Json.Linq.JArray(
+                            owner.Children.Where(child => child.Type == type).Select(child => ValidationDocument(child, map)));
+                    var op = ChargingStationOperator.Parse(ownerDocument, ((ChargingStationOperator) parent!).RoamingNetwork);
+                    return key.Type switch
+                    {
+                        InfrastructureEntityType.EVSEGroup => EVSEGroup.Parse(document, op),
+                        InfrastructureEntityType.ChargingStationGroup => ChargingStationGroup.Parse(document, op),
+                        InfrastructureEntityType.ChargingPoolGroup => ChargingPoolGroup.Parse(document, op),
+                        _ => ChargingTariffGroup.Parse(document, op)
+                    };
+                }
+
+                ChargingStation[] Stations()
+                    => stations ??= map.Keys.Where(item => item.Type == InfrastructureEntityType.ChargingStation).
+                           Select(item => (ChargingStation) Project(item)).ToArray();
+
+                return key.Type switch
+                {
+                    InfrastructureEntityType.RoamingNetwork           => RoamingNetwork.Parse(document),
+                    InfrastructureEntityType.ChargingStationOperator => ChargingStationOperator.Parse(document, (RoamingNetwork) parent!),
+                    InfrastructureEntityType.EMobilityProvider        => EMobilityProvider.Parse(document, (RoamingNetwork) parent!),
+                    InfrastructureEntityType.ChargingPool             => ChargingPool.Parse(document, (ChargingStationOperator) parent!),
+                    InfrastructureEntityType.ChargingStation          => ChargingStation.Parse(document, (ChargingPool) parent!),
+                    InfrastructureEntityType.EVSE                     => EVSE.Parse(document, (ChargingStation) parent!),
+                    InfrastructureEntityType.ChargingConnector        => ChargingConnector.Parse(document),
+                    InfrastructureEntityType.ChargingTariff           => ChargingTariff.Parse(document, (ChargingStationOperator) parent!),
+                    InfrastructureEntityType.ChargingStationManufacturer => ChargingStationManufacturer.Parse(document),
+                    InfrastructureEntityType.GridOperator             => GridOperator.Parse(document, (RoamingNetwork) parent!),
+                    InfrastructureEntityType.ParkingOperator          => ParkingOperator.Parse(ValidationDocument(key, map), (RoamingNetwork) parent!, Stations()),
+                    InfrastructureEntityType.TransparencySoftware     => TransparencySoftware.Parse(document),
+                    InfrastructureEntityType.TransparencySoftwareCertificate => TransparencySoftwareCertificate.Parse(document, (RoamingNetwork) parent!),
+                    InfrastructureEntityType.ParkingProduct           => ParkingProduct.Parse(document),
+                    InfrastructureEntityType.ParkingGarage            => ParkingGarage.Parse(document, Stations()),
+                    InfrastructureEntityType.ParkingSpace             => ParkingSpace.Parse(document, Stations()),
+                    InfrastructureEntityType.ParkingSensor            => ParkingSensor.Parse(document, Stations()),
+                    InfrastructureEntityType.ParkingSpaceGroup        => ParkingSpaceGroup.Parse(document, Stations()),
+                    _                                                => throw new ArgumentOutOfRangeException(nameof(key))
+                };
+            }
         }
 
         private static Newtonsoft.Json.Linq.JObject ValidationDocument(InfrastructureEntityKey key, EntityMap map)

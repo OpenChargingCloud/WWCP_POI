@@ -1,0 +1,113 @@
+{
+  "date": "2026-10-09",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "aa1e89df9d1563f3772e06d5f60126b77a9d0b8c0b03355625b291bf7b7f27ef",
+  "productionAssemblySHA256": "dfac3f3fc09a404c91074f353025ac564f69d93d93f691f4b1e088a038afae7c",
+  "testSourceSHA256": "38e9266a6388cd24b55054ad1172d3d52b90feba1d109af81ae64a9d193863f8",
+  "testAssemblySHA256": "14117a6340ea8180db5e60b4dfba81f3381de61aaf060b1060780bb4b76184a8",
+  "benchmarkSourceSHA256": "182e777394626fb881b1298f50797dc58f3cfc8ca029fc97a37fdfd4f1b772bb",
+  "reportScriptSHA256": "85ae2c2ba058284ce5509cfabd47c4f259fe934716cebc0e49db366787b88826",
+  "reconstructedBeforeProductionSourceSHA256": "a08c6cd8c0a43be0462d1451e7031c0f27ea36d46f7e8657f6e35eafaca43f84",
+  "beforeProductionAssemblySHA256": "9403157c696d8ba9a7334ef20ee6529f72c26b5ff769bb896974c871fc935f19",
+  "scopedPatchSHA256": "78a74f1fea33a674a28927eec1041c8ba04238785b6af36697315db41c211861",
+  "newTestCases": 55,
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/direct-changeset-cbor/direct-changeset-cbor-focused.trx",
+      "sha256": "18a6d66ff297d65afca5cbe991306759cd3f14d8d86f49954f5ecbd6386040f0",
+      "times": {
+        "creation": "2026-10-09T02:01:32.1264837+02:00",
+        "queuing": "2026-10-09T02:01:32.1264841+02:00",
+        "start": "2026-10-09T02:01:30.8617574+02:00",
+        "finish": "2026-10-09T02:02:22.5444180+02:00"
+      },
+      "passed": 283,
+      "failed": 0,
+      "skipped": 0,
+      "excludedExplicitGenerators": [],
+      "counters": {
+        "total": 283,
+        "executed": 283,
+        "passed": 283,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/direct-changeset-cbor/direct-changeset-cbor-full.trx",
+      "sha256": "2c4c3343c7aee8bc31d24b4b7f559522411c2c44231d13b09b13e1458ee2803c",
+      "times": {
+        "creation": "2026-10-09T02:03:42.2058965+02:00",
+        "queuing": "2026-10-09T02:03:42.2058970+02:00",
+        "start": "2026-10-09T02:03:40.6169855+02:00",
+        "finish": "2026-10-09T02:07:52.2656788+02:00"
+      },
+      "passed": 1308,
+      "failed": 0,
+      "skipped": 1,
+      "excludedExplicitGenerators": [
+        "GenerateReferenceVectors",
+        "GenerateSnapshotRetentionVectors"
+      ],
+      "counters": {
+        "total": 1311,
+        "executed": 1308,
+        "passed": 1308,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  ],
+  "reports": [
+    {
+      "file": "docs/performance/direct-changeset-cbor-before.json",
+      "sha256": "a6ad4cfb77e439a85882cc9e044bc8ede3754b9245fcc9d25e2cf0b3a2649c12",
+      "workers": 32,
+      "measuredSamples": 160
+    },
+    {
+      "file": "docs/performance/direct-changeset-cbor-after.json",
+      "sha256": "eb5216c7b46ebbffa4470dcdb6bd18cf929188abfb9a5d31cc859165a22aeb98",
+      "workers": 32,
+      "measuredSamples": 160
+    }
+  ],
+  "limits": {
+    "completeChangeSetCBORTree": false,
+    "completeJSONBufferAndIndex": true,
+    "completeCBOROutputBuffer": true,
+    "applicationMetadataAndDecoderTreesRemain": true,
+    "maxCachedEncodedKeys": 128,
+    "maxCachedEncodedKeyBytes": 16384,
+    "maxDepth": 64,
+    "signingProfileUnchanged": true
+  },
+  "setupCorrections": [
+    "Benchmark application requires an explicit signature verifier.",
+    "Raw dictionary JSON varies across processes; the control now emits canonical JSON. The failed incomplete report was moved to task temp files.",
+    "Graph-owned connectors are addressed as scoped entities, cable as an element. Large fractional property payloads use transport-only tests; static domain Decimal limits remain unchanged."
+  ]
+}

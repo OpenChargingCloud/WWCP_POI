@@ -14,7 +14,7 @@ public sealed partial class RoamingNetworkHistory
     /// <summary>
     /// Freeze the complete static archive under the history gate for bounded bootstrap transfer.
     /// Original checkpoint, head, all retained branches and peer signatures are preserved.
-    /// Export and final replay currently materialize a complete archive in memory.
+    /// Export encodes directly into bounded frozen fragments; final replay retains decoded models and states.
     /// </summary>
     public RoamingNetworkBootstrapSource CreateBootstrap(Int32 chunkBytes = 64 * 1024, RoamingNetworkBootstrapLimits? limits = null)
     {
@@ -22,9 +22,10 @@ public sealed partial class RoamingNetworkHistory
         {
             if (disposed || mutating) throw new InvalidOperationException("History is disposed or a mutation callback is reentrant.");
             limits ??= new();
-            if (chunkBytes < 1 || chunkBytes > limits.MaxChunkBytes || entries.Count > limits.MaxCommits)
-                throw new ArgumentException("Invalid chunk size or excessive retained commit count.");
-            return new(Archive(entries, head.Id), checkpointId, head.Id, entries.Count, chunkBytes, limits,
+            if (chunkBytes < 1 || chunkBytes > limits.MaxChunkBytes) throw new ArgumentException("Invalid chunk size.");
+            limits.HistoryLimits.Require(RoamingNetworkHistoryLimitKind.RetainedCommits, entries.Count);
+            if (!HasCompleteAncestry) RequireCatalogLimits(limits.HistoryLimits);
+            return new(stream => WriteArchiveCBOR(stream, entries, head.Id), checkpointId, head.Id, entries.Count, chunkBytes, limits,
                 HasCompleteAncestry ? ArchiveProfileFor(entries) : CurrentBoundaryArchiveProfile, anchorId);
         }
     }
@@ -47,10 +48,11 @@ public sealed partial class RoamingNetworkHistory
             if (!entries.ContainsKey(tip)) throw new KeyNotFoundException("Unknown target tip.");
             if (!TryAncestorsWithin(tip, snapshotId, out var ancestry, out var missing))
                 throw new ArgumentException("The selected snapshot does not cover all target parent paths; retrieve earlier history: " + String.Join(", ", missing));
-            if (chunkBytes < 1 || chunkBytes > limits.MaxChunkBytes || ancestry.Count > limits.MaxCommits)
-                throw new ArgumentException("Invalid chunk size or excessive retained commit count.");
+            if (chunkBytes < 1 || chunkBytes > limits.MaxChunkBytes) throw new ArgumentException("Invalid chunk size.");
+            limits.HistoryLimits.Require(RoamingNetworkHistoryLimitKind.RetainedCommits, ancestry.Count);
+            RequireCatalogLimits(limits.HistoryLimits);
             var selected = entries.Where(entry => ancestry.Contains(entry.Key)).ToImmutableDictionary();
-            return new(BoundaryArchive(selected, snapshotId, tip), checkpointId, tip, selected.Count, chunkBytes, limits,
+            return new(stream => WriteBoundaryArchive(stream, selected, snapshotId, tip), checkpointId, tip, selected.Count, chunkBytes, limits,
                 CurrentBoundaryArchiveProfile, snapshotId);
         }
     }
@@ -59,48 +61,82 @@ public sealed partial class RoamingNetworkHistory
         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature,
         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
         Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
-        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary)
+        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary,
+        RoamingNetworkHistoryLimits limits, POIArchiveReadProgress progress = default)
     {
-        var value = CBORValue.Parse(bytes);
-        if (!value.ToByteArray(CBORWriterOptions.Canonical).AsSpan().SequenceEqual(bytes))
-            throw new ArgumentException("Bootstrap requires the deterministic CBOR archive representation.");
+        CheckCBORArchiveCore(bytes, limits, progress);
+        var index = POIArchiveCBORIndex.Read(bytes, progress);
+        POIArchiveCBORIndex.RequireCanonical(bytes, progress);
+        using var preparation = POICanonicalPreparation.Enter();
         if (manifest.ArchiveProfile is BoundaryArchiveProfile or RetentionArchiveProfile)
         {
             var hasReceipts = manifest.ArchiveProfile == RetentionArchiveProfile;
-            var partial = RoamingNetworkCommit.Fields(value, BoundaryFields(hasReceipts));
-            if (RoamingNetworkCommit.Text(partial["Profile"]) != manifest.ArchiveProfile ||
-                (Int64) partial["Commits"].AsArray().Count + 1 != manifest.CommitCount ||
-                new RoamingNetworkCommitId(ETag.Parse(partial["CheckpointId"])) != manifest.Checkpoint ||
-                new RoamingNetworkCommitId(ETag.Parse(partial["Head"])) != manifest.Head)
+            index.RequireFields(BoundaryFields(hasReceipts));
+            if (RoamingNetworkCommit.Text(index.Value(bytes, "Profile")) != manifest.ArchiveProfile ||
+                (Int64) index.Commits.Length + 1 != manifest.CommitCount ||
+                new RoamingNetworkCommitId(ETag.Parse(index.Value(bytes, "CheckpointId"))) != manifest.Checkpoint ||
+                new RoamingNetworkCommitId(ETag.Parse(index.Value(bytes, "Head"))) != manifest.Head)
                 throw new ArgumentException("Boundary archive contract, chain, head or count differs from the manifest.");
-            POIContentProfile.Require(RoamingNetworkCommit.Text(partial["ContentProfile"]));
-            var snapshot = RoamingNetworkCommit.ParseCBORValue(partial["SnapshotCommit"]);
+            POIContentProfile.Require(RoamingNetworkCommit.Text(index.Value(bytes, "ContentProfile")));
+            var snapshot = ReadIndexedRoot(bytes, index, "SnapshotCommit", progress);
             if (snapshot.Id != manifest.Anchor) throw new ArgumentException("Snapshot anchor differs from the manifest.");
-            var receipts = hasReceipts ? partial["RetentionReceipts"].AsArray().Select(RoamingNetworkRetentionReceipt.ParseCBORValue).ToImmutableArray() : [];
-            if (hasReceipts && receipts.IsEmpty) throw new ArgumentException("A retention archive requires a nonempty receipt catalog.");
-            return RestoreBoundary(manifest.Checkpoint, snapshot, partial["Commits"].AsArray().Select(RoamingNetworkCommit.ParseCBORValue),
-                manifest.Head, verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, receipts);
+            var receipts = hasReceipts ? ReadIndexedReceipts(bytes, index, progress) : [];
+            return RestoreIndexedBoundary(bytes, index, manifest.Checkpoint, snapshot, manifest.Head,
+                verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, receipts, progress);
         }
-        var fields = RoamingNetworkCommit.Fields(value, "Profile", "ContentProfile", "Checkpoint", "CheckpointCommit", "Commits", "Head");
-        if (RoamingNetworkCommit.Text(fields["Profile"]) != manifest.ArchiveProfile) throw new ArgumentException("Archive profile differs from the manifest.");
-        POIContentProfile.Require(RoamingNetworkCommit.Text(fields["ContentProfile"]));
-        if ((Int64) fields["Commits"].AsArray().Count + 1 != manifest.CommitCount)
+        index.RequireFields(CompleteArchiveFields);
+        if (RoamingNetworkCommit.Text(index.Value(bytes, "Profile")) != manifest.ArchiveProfile)
+            throw new ArgumentException("Archive profile differs from the manifest.");
+        POIContentProfile.Require(RoamingNetworkCommit.Text(index.Value(bytes, "ContentProfile")));
+        if ((Int64) index.Commits.Length + 1 != manifest.CommitCount)
             throw new ArgumentException("Archive commit count differs from the manifest.");
-        var checkpoint = RoamingNetworkCommit.ParseCBORValue(fields["CheckpointCommit"]);
-        var headId = new RoamingNetworkCommitId(ETag.Parse(fields["Head"]));
+        var checkpoint = ReadIndexedRoot(bytes, index, "CheckpointCommit", progress);
+        var headId = new RoamingNetworkCommitId(ETag.Parse(index.Value(bytes, "Head")));
         if (checkpoint.Id != manifest.Checkpoint || headId != manifest.Head)
             throw new ArgumentException("Archive checkpoint or head differs from the manifest.");
-        var commits = fields["Commits"].AsArray().Select(RoamingNetworkCommit.ParseCBORValue).ToImmutableArray();
+        var commits = ReadIndexedCommits(bytes, index, progress);
         RequireArchiveProfile(manifest.ArchiveProfile, commits);
-        return Restore(RoamingNetworkDataSnapshot.ParseCBOR(fields["Checkpoint"].ToByteArray(CBORWriterOptions.Canonical)),
-            checkpoint, commits, headId,
-            verifyBatchSignature, verifyCommitSignature, authorizeCommit);
+        return RestoreCore(ReadIndexedState(bytes, index, progress),
+            checkpoint, commits, headId, verifyBatchSignature, verifyCommitSignature, authorizeCommit, progress);
     }
 
-    internal void PersistBootstrap(String path)
+    internal void PersistBootstrap(String path, Action<ArchiveWriteStage>? observer = null)
     {
-        AcquireArchive(path);
-        if (File.Exists(archivePath)) throw new IOException("Bootstrap activation requires a new archive path; an existing archive cannot be replaced.");
-        Persist(entries, head.Id);
+        ArchiveWriteObserver = observer;
+        try
+        {
+            AcquireArchive(path);
+            if (File.Exists(archivePath)) throw new IOException("Bootstrap activation requires a new archive path; an existing archive cannot be replaced.");
+            Persist(entries, head.Id);
+        }
+        finally { ArchiveWriteObserver = null; }
+    }
+
+    internal static RoamingNetworkHistory RecoverBootstrapArchive(String path, ReadOnlySpan<Byte> expectedBytes,
+        RoamingNetworkBootstrapManifest manifest,
+        Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature,
+        Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+        Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
+        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary,
+        RoamingNetworkHistoryLimits limits, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var resolved = Path.GetFullPath(path);
+        var lease = AcquireLease(resolved);
+        RoamingNetworkHistory? history = null;
+        try
+        {
+            using (var stored = new POIArchiveMappedFile(resolved, limits))
+            {
+                if (!stored.Bytes.SequenceEqual(expectedBytes))
+                    throw new ArgumentException("The existing activation archive differs from the exact manifest-bound archive.");
+                history = RestoreCapturedInput(stored.Bytes, limits, verifyBatchSignature, verifyCommitSignature,
+                    authorizeCommit, authorizeSnapshotBoundary, cancellationToken, manifest);
+            }
+            cancellationToken.ThrowIfCancellationRequested();
+            history.archivePath = resolved; history.archiveLease = lease;
+            return history;
+        }
+        catch { history?.Dispose(); lease.Dispose(); throw; }
     }
 }

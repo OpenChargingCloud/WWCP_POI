@@ -14,7 +14,7 @@ public static class POIContentProfile
     /// <summary>
     /// Identifies stored static properties, Styx canonical JSON and deterministic metrological CBOR.
     /// </summary>
-    public const String Id = "wwcp-poi-static-v1";
+    public const String Id = "wwcp-poi-static-v2";
 
     /// <summary>
     /// The schema-owned transport declaration, excluded from the static digest inputs.

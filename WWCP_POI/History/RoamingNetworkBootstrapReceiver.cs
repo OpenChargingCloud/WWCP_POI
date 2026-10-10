@@ -22,14 +22,18 @@ public enum RoamingNetworkBootstrapOutcome
     ManifestMismatch,
     InvalidData,
     PersistenceFailure,
-    Unavailable
+    Unavailable,
+    LimitExceeded,
+    ActivationRecovered,
+    Cancelled
 }
 
 /// <summary>
 /// The fixed manifest and next required fragment; failure never returns an activated history.
 /// </summary>
 public sealed record RoamingNetworkBootstrapResult(RoamingNetworkBootstrapOutcome Outcome,
-    RoamingNetworkBootstrapManifest Manifest, Int32 NextChunk, String? Error = null);
+    RoamingNetworkBootstrapManifest Manifest, Int32 NextChunk, String? Error = null,
+    RoamingNetworkHistoryLimitViolation? LimitViolation = null);
 
 /// <summary>
 /// Disk staging with an exclusive writer lease, atomic fragment receipts and restartable progress.
@@ -68,6 +72,11 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
     /// </summary>
     public static RoamingNetworkBootstrapReceiver Create(String directory, RoamingNetworkBootstrapManifest manifest,
         RoamingNetworkBootstrapLimits? limits = null)
+        => CreateObserved(directory, manifest, limits, null);
+
+    // Inject a process-exit observer before the first manifest write, without a public test hook.
+    internal static RoamingNetworkBootstrapReceiver CreateObserved(String directory, RoamingNetworkBootstrapManifest manifest,
+        RoamingNetworkBootstrapLimits? limits, Action<BootstrapWriteStage>? observer)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         limits ??= new(); manifest.RequireLimits(limits);
@@ -79,7 +88,9 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
             if (Directory.EnumerateFileSystemEntries(resolved).Any(path => Path.GetFileName(path) != "bootstrap.lock"))
                 throw new IOException("Bootstrap staging requires a dedicated empty directory; open an existing transfer to resume.");
             var receiver = new RoamingNetworkBootstrapReceiver(resolved, lease, manifest, limits);
+            receiver.WriteObserver = observer;
             receiver.WriteAtomic(Path.Combine(resolved, "manifest.cbor"), manifest.ToCBOR());
+            receiver.WriteObserver = null;
             return receiver;
         }
         catch { lease.Dispose(); throw; }
@@ -148,6 +159,11 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
     /// authorization, every branch and state transition. The default is a validation preview.
     /// activate=true returns a new history, optionally persisted to a new archive path.
     /// Every call obtains current trust policy afresh; no validated preview is cached as authority.
+    /// Actual archive container counts are bounded before materialization and replay, independent of manifest claims.
+    /// Explicit recoverExistingArchive permits reopening only the exact manifest-bound persisted archive,
+    /// with a writer lease and freshly supplied verification/authorization; no existing bytes are replaced.
+    /// Bounded capture releases its mapped input before durable installation. Cancellation is checked
+    /// between chunks/commits/callbacks and before installation; atomic publication completes once started.
     /// </summary>
     public Boolean TryActivate(ETag expectedManifest, out RoamingNetworkHistory? history,
         out RoamingNetworkBootstrapResult result, Boolean activate = false, String? archivePath = null,
@@ -155,7 +171,9 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature = null,
         Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
         Func<RoamingNetworkBootstrapManifest, Boolean>? authorizeBootstrap = null,
-        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null)
+        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null,
+        Boolean recoverExistingArchive = false, RoamingNetworkArchiveReadOptions? readOptions = null,
+        CancellationToken cancellationToken = default)
     {
         lock (gate)
         {
@@ -164,28 +182,62 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
             RoamingNetworkHistory? validated = null;
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (recoverExistingArchive && (!activate || archivePath is null))
+                    return Fail(RoamingNetworkBootstrapOutcome.InvalidData, "Archive recovery requires explicit activation and an archive path.", out result);
                 if (expectedManifest != Manifest.Id) return Fail(RoamingNetworkBootstrapOutcome.ManifestMismatch, "Activation requires the expected manifest identity.", out result);
-                if (authorizeBootstrap is not null && !authorizeBootstrap(Manifest))
+                var authorized = authorizeBootstrap?.Invoke(Manifest) ?? true;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!authorized)
                     return Fail(RoamingNetworkBootstrapOutcome.InvalidData, "The bootstrap manifest was not authorized.", out result);
-                Scan();
+                Scan(cancellationToken);
                 if (nextChunk != Manifest.ChunkCount) return Fail(RoamingNetworkBootstrapOutcome.Incomplete, "Transfer is incomplete; request NextChunk to resume.", out result);
-                var bytes = new Byte[Manifest.ArchiveBytes];
-                for (var index = 0; index < Manifest.ChunkCount; index++)
+                var recovered = false;
+                using (var spool = new POIArchiveInputSpool(readOptions ?? new(), limits.HistoryLimits, false, InputObserver))
                 {
-                    var data = ReadBounded(ChunkPath(index), Manifest.Length(index));
-                    Validate(index, data);
-                    data.CopyTo(bytes, index * Manifest.ChunkBytes);
+                    for (var index = 0; index < Manifest.ChunkCount; index++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var data = ReadBounded(ChunkPath(index), Manifest.Length(index));
+                        Validate(index, data);
+                        cancellationToken.ThrowIfCancellationRequested();
+                        spool.Append(data);
+                    }
+                    validated = spool.Read(bytes =>
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (ETag.Compute(ETagFormat.CBOR, bytes) != Manifest.ArchiveETag)
+                            throw new ArgumentException("Complete archive digest differs from the manifest.");
+                        var restored = RoamingNetworkHistory.RestoreCapturedInput(bytes, limits.HistoryLimits,
+                            verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, cancellationToken, Manifest);
+                        if (activate && archivePath is not null && recoverExistingArchive && File.Exists(archivePath))
+                        {
+                            restored.Dispose();
+                            restored = RoamingNetworkHistory.RecoverBootstrapArchive(archivePath, bytes, Manifest,
+                                verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, limits.HistoryLimits, cancellationToken);
+                            recovered = true;
+                        }
+                        return restored;
+                    });
                 }
-                if (ETag.Compute(ETagFormat.CBOR, bytes) != Manifest.ArchiveETag)
-                    throw new ArgumentException("Complete archive digest differs from the manifest.");
-                validated = RoamingNetworkHistory.RestoreBootstrap(bytes, Manifest, verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary);
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!activate)
                 {
                     result = Result(RoamingNetworkBootstrapOutcome.ActivationAvailable); return true;
                 }
-                if (archivePath is not null) validated.PersistBootstrap(archivePath);
+                // Input views and temporary reader leases are closed before durable installation.
+                // Once installation starts, its existing atomic publication contract determines the result.
+                if (archivePath is not null && !recovered) validated.PersistBootstrap(archivePath, ActivationWriteObserver);
                 history = validated; validated = null;
-                result = Result(RoamingNetworkBootstrapOutcome.Activated); return true;
+                result = Result(recovered ? RoamingNetworkBootstrapOutcome.ActivationRecovered : RoamingNetworkBootstrapOutcome.Activated); return true;
+            }
+            catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
+            { return Fail(RoamingNetworkBootstrapOutcome.Cancelled, exception.Message, out result); }
+            catch (RoamingNetworkHistoryLimitException exception)
+            {
+                result = new(RoamingNetworkBootstrapOutcome.LimitExceeded, Manifest, nextChunk,
+                    exception.Message, exception.Violation);
+                return false;
             }
             catch (IOException exception) { return Fail(RoamingNetworkBootstrapOutcome.PersistenceFailure, exception.Message, out result); }
             catch (UnauthorizedAccessException exception) { return Fail(RoamingNetworkBootstrapOutcome.PersistenceFailure, exception.Message, out result); }
@@ -194,16 +246,18 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
         }
     }
 
-    private void Scan()
+    private void Scan(CancellationToken cancellationToken = default)
     {
         var prefix = 0;
         for (var index = 0; index < Manifest.ChunkCount; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!File.Exists(ChunkPath(index))) continue;
             if (index != prefix) throw new ArgumentException("Stored fragments contain a gap; staging is not a valid ordered prefix.");
             Validate(index, ReadBounded(ChunkPath(index), Manifest.Length(index)));
             prefix++;
         }
+        cancellationToken.ThrowIfCancellationRequested();
         nextChunk = prefix;
     }
 
@@ -235,6 +289,7 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
             WriteObserver?.Invoke(BootstrapWriteStage.TemporaryFileFlushed);
             File.Move(temporary, path, overwrite: false);
             // Receipt exists durably before in-memory progress advances.
+            WriteObserver?.Invoke(BootstrapWriteStage.ReceiptInstalled);
         }
         finally
         {
@@ -274,7 +329,9 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
         }
     }
 
-    // A test observer may fail before a receipt is installed, never after it becomes acknowledged.
-    internal enum BootstrapWriteStage { BeforeTemporaryWrite, TemporaryFileFlushed }
+    // ReceiptInstalled may terminate the process, but must not throw after receipt publication.
+    internal enum BootstrapWriteStage { BeforeTemporaryWrite, TemporaryFileFlushed, ReceiptInstalled }
     internal Action<BootstrapWriteStage>? WriteObserver { get; set; }
+    internal Action<ArchiveWriteStage>? ActivationWriteObserver { get; set; }
+    internal Action<POIArchiveInputStage, String>? InputObserver { get; set; }
 }

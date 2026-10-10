@@ -28,22 +28,25 @@ public sealed partial class RoamingNetworkHistory
     /// Read an independently stored cold archive into a separate in-memory history after checking its exact digest.
     /// Recovery rechecks caller-supplied trust and initializes fresh runtime; the cold file is never opened for mutation.
     /// A cold archive from an earlier pruning event may itself require snapshot-boundary authorization.
+    /// Local limits bound known file bytes before mapping and container counts before decoding/replay.
+    /// The input mapping is held through digest/trust checks and released before return.
     /// </summary>
     public static RoamingNetworkHistory ReadColdArchive(String path, ETag expectedArchiveETag,
         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature = null,
         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature = null,
         Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
-        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null)
+        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null,
+        RoamingNetworkHistoryLimits? limits = null, CancellationToken cancellationToken = default)
     {
         if (!expectedArchiveETag.IsValid || expectedArchiveETag.Format != ETagFormat.CBOR)
             throw new ArgumentException("A valid CBOR archive digest is required.", nameof(expectedArchiveETag));
-        using var file = new FileStream(Path.GetFullPath(path), FileMode.Open, FileAccess.Read, FileShare.Read);
-        using var stream = new MemoryStream();
-        file.CopyTo(stream);
-        var bytes = stream.ToArray();
-        if (ETag.Compute(ETagFormat.CBOR, bytes) != expectedArchiveETag)
+        limits ??= new();
+        cancellationToken.ThrowIfCancellationRequested();
+        using var input = new POIArchiveMappedFile(path, limits);
+        if (ETag.Compute(ETagFormat.CBOR, input.Bytes) != expectedArchiveETag)
             throw new ArgumentException("Cold archive digest mismatch.");
-        return ParseCBOR(bytes, verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary);
+        return RestoreCapturedInput(input.Bytes, limits, verifyBatchSignature, verifyCommitSignature,
+            authorizeCommit, authorizeSnapshotBoundary, cancellationToken);
     }
 
     /// <summary>
@@ -153,7 +156,7 @@ public sealed partial class RoamingNetworkHistory
             result = new(RoamingNetworkRetentionOutcome.NothingToPrune, head, "The selected boundary and protected tips retain all current entries.");
             return false;
         }
-        plan = new(boundary, anchorId, head.Id, cutoff, createdAt, ETag.Compute(ETagFormat.CBOR, Archive(entries, head.Id)),
+        plan = new(boundary, anchorId, head.Id, cutoff, createdAt, ArchiveDigest(entries, head.Id).Digest,
             keep, pruned, released, protectedSet);
         result = new(RoamingNetworkRetentionOutcome.Planned, head);
         return true;
@@ -185,9 +188,9 @@ public sealed partial class RoamingNetworkHistory
                     result = new(RoamingNetworkRetentionOutcome.HeadConflict, head, "The published head changed after planning.");
                     return false;
                 }
-                var oldArchive = Archive(entries, head.Id);
+                var oldArchive = ArchiveDigest(entries, head.Id);
                 if (checkpointId != plan.Boundary.Checkpoint || anchorId != plan.BeforeAnchor ||
-                    ETag.Compute(ETagFormat.CBOR, oldArchive) != plan.SourceArchiveETag)
+                    oldArchive.Digest != plan.SourceArchiveETag)
                 {
                     result = new(RoamingNetworkRetentionOutcome.InventoryChanged, head, "Branches, envelopes, receipts or the replay boundary changed after planning.");
                     return false;
@@ -221,14 +224,14 @@ public sealed partial class RoamingNetworkHistory
                     batches = batches.Add(lastBatch, current.Boundary.Anchor);
                 foreach (var entry in updated.Values)
                     if (entry.Commit.ChangeSet is { } batch) batches = batches.Add(batch.Id, entry.Commit.Id);
-                var activeBytes = BoundaryArchive(updated, current.Boundary.Anchor, head.Id, receipts);
                 String resolved;
                 try
                 {
                     resolved = ResolveColdArchivePath(coldArchivePath);
                     using var coldLease = AcquireLease(resolved);
-                    using var coldFile = PublishColdArchive(resolved, oldArchive, plan.SourceArchiveETag);
-                    Persist(activeBytes);
+                    using var coldFile = PublishColdArchive(resolved, stream => WriteArchiveCBOR(stream, entries, head.Id),
+                        oldArchive.Length, plan.SourceArchiveETag);
+                    Persist(stream => WriteBoundaryArchive(stream, updated, current.Boundary.Anchor, head.Id, receipts));
                 }
                 catch (Exception exception)
                 {
@@ -295,18 +298,25 @@ public sealed partial class RoamingNetworkHistory
         return Path.Combine(DirectoryPath(new DirectoryInfo(Path.GetDirectoryName(path)!)), Path.GetFileName(path));
     }
 
-    private static FileStream PublishColdArchive(String path, Byte[] bytes, ETag expected)
+    private FileStream PublishColdArchive(String path, Action<Stream> writeArchive, Int64 length, ETag expected)
     {
         if (!File.Exists(path))
         {
             var temporary = path + ".tmp-" + Guid.NewGuid().ToString("N");
             try
             {
+                RetentionWriteObserver?.Invoke(RetentionWriteStage.BeforeColdTemporaryWrite);
                 using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 {
-                    file.Write(bytes); file.Flush(flushToDisk: true);
+                    using var hashing = new POIArchiveHashStream(file);
+                    writeArchive(hashing);
+                    if (hashing.Length != length || hashing.Complete() != expected)
+                        throw new IOException("The streamed cold archive differs from the complete reviewed source archive.");
+                    file.Flush(flushToDisk: true);
+                    RetentionWriteObserver?.Invoke(RetentionWriteStage.ColdTemporaryFileFlushed);
                 }
                 File.Move(temporary, path, overwrite: false);
+                RetentionWriteObserver?.Invoke(RetentionWriteStage.ColdArchivePublished);
             }
             finally
             {
@@ -320,9 +330,10 @@ public sealed partial class RoamingNetworkHistory
         var retained = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
         try
         {
-            if (retained.Length != bytes.Length || !SHA256.HashData(retained).AsSpan().SequenceEqual(expected.Digest.AsSpan()))
+            if (retained.Length != length || !SHA256.HashData(retained).AsSpan().SequenceEqual(expected.Digest.AsSpan()))
                 throw new IOException("An existing cold archive does not match the complete reviewed source archive.");
             retained.Flush(flushToDisk: true);
+            RetentionWriteObserver?.Invoke(RetentionWriteStage.ColdArchiveVerified);
             return retained;
         }
         catch { retained.Dispose(); throw; }

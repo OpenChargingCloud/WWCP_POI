@@ -13,9 +13,21 @@ internal enum ArchiveWriteStage
     ArchiveReplaced
 }
 
+internal enum RetentionWriteStage
+{
+    BeforeColdTemporaryWrite,
+    ColdTemporaryFileFlushed,
+    ColdArchivePublished,
+    ColdArchiveVerified
+}
+
 public sealed partial class RoamingNetworkHistory
 {
     // Internal process-crash seam. A test can terminate the process after replacement;
     // observers must not throw after the archive has been replaced.
     internal Action<ArchiveWriteStage>? ArchiveWriteObserver { get; set; }
+
+    // Every cold stage precedes active replacement. Tests may inject an exception or
+    // terminate the process here; no observer is installed in ordinary application use.
+    internal Action<RetentionWriteStage>? RetentionWriteObserver { get; set; }
 }

@@ -98,7 +98,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               MaxPower:           MetrologyJson.Read<Watt>(JSON, "maxPower", Watt.TryParse),
                                               MaxCapacity:        MetrologyJson.Read<WattHour>(JSON, "maxCapacity", WattHour.TryParse),
                                               EnergyMeters:       InfrastructureJson.Array(JSON, "energyMeters",
-                                                                                          token => EnergyMeter.Parse(InfrastructureJson.Entry(token))),
+                                                                                          token => EnergyMeter.Parse(InfrastructureJson.Entry(token), Network: Operator.RoamingNetwork)),
                                               GridConnectionPoint: InfrastructureJson.Object(JSON, "gridConnectionPoint") is { } point
                                                                        ? InfrastructureJson.At("gridConnectionPoint", () => POI.GridConnectionPoint.Parse(point, Operator.RoamingNetwork))
                                                                        : null);

@@ -60,10 +60,22 @@ public sealed partial class RoamingNetworkDataSnapshot
                 yield return ("localParkingSpaceIds", InfrastructureEntityType.ParkingSpace, true);
                 yield return ("invalidParkingSpaceIds", InfrastructureEntityType.ParkingSpace, true); break;
             case InfrastructureEntityType.ParkingSpace:
+                yield return ("parkingGarageId", InfrastructureEntityType.ParkingGarage, false);
+                yield return ("parkingProductIds", InfrastructureEntityType.ParkingProduct, true);
+                yield return ("sensors", InfrastructureEntityType.ParkingSensor, true);
+                yield return ("chargingStationIds", InfrastructureEntityType.ChargingStation, true); break;
             case InfrastructureEntityType.ParkingSpaceGroup:
+                yield return ("parkingSpaceIds", InfrastructureEntityType.ParkingSpace, true);
+                yield return ("parkingProductIds", InfrastructureEntityType.ParkingProduct, true);
                 yield return ("sensors", InfrastructureEntityType.ParkingSensor, true);
                 yield return ("chargingStationIds", InfrastructureEntityType.ChargingStation, true); break;
             case InfrastructureEntityType.ParkingGarage:
+                yield return ("parkingProductIds", InfrastructureEntityType.ParkingProduct, true);
+                yield return ("chargingStationIds", InfrastructureEntityType.ChargingStation, true); break;
+            case InfrastructureEntityType.TransparencySoftwareCertificate:
+                yield return ("verifiedTransparencySoftwareIds", InfrastructureEntityType.TransparencySoftware, true);
+                yield return ("compatibleTransparencySoftwareIds", InfrastructureEntityType.TransparencySoftware, true);
+                yield return ("chargingStationManufacturerId", InfrastructureEntityType.ChargingStationManufacturer, false); break;
             case InfrastructureEntityType.ParkingSensor:
                 yield return ("chargingStationIds", InfrastructureEntityType.ChargingStation, true); break;
         }
@@ -74,6 +86,7 @@ public sealed partial class RoamingNetworkDataSnapshot
 
     private static IEnumerable<(String Field, InfrastructureEntityKey Key)> ReferenceTargets(InfrastructureEntitySnapshot entity)
     {
+        foreach (var reference in NestedReferenceTargets(entity).Distinct()) yield return reference;
         foreach (var relation in ReferenceFields(entity.Key.Type))
         {
             if (!entity.Properties.TryGetValue(relation.Field, out var values) || values.ValueKind == JsonValueKind.Null)
@@ -90,6 +103,51 @@ public sealed partial class RoamingNetworkDataSnapshot
                     throw new ArgumentException($"{relation.Field}: duplicate reference '{key.Id}'.");
                 yield return (relation.Field, key);
             }
+        }
+    }
+
+    // Nested consumers are indexed by their independently addressed owner and whole property.
+    // The property can be detached/restored atomically by the normal merge planner.
+    private static IEnumerable<(String Field, InfrastructureEntityKey Key)> NestedReferenceTargets(InfrastructureEntitySnapshot entity)
+    {
+        IEnumerable<(String Field, InfrastructureEntityKey Key)> Meter(JsonElement meter, String field)
+        {
+            if (meter.ValueKind == JsonValueKind.Null) yield break;
+            if (meter.ValueKind != JsonValueKind.Object) throw new ArgumentException($"{field}: expected a meter object.");
+            if (!meter.TryGetProperty("transparencySoftware", out var assignments) || assignments.ValueKind == JsonValueKind.Null) yield break;
+            if (assignments.ValueKind != JsonValueKind.Array) throw new ArgumentException($"{field}.transparencySoftware: expected an array.");
+            var seen = new HashSet<InfrastructureEntityKey>();
+            foreach (var assignment in assignments.EnumerateArray())
+            {
+                if (assignment.ValueKind != JsonValueKind.Object || !assignment.TryGetProperty("transparencySoftwareId", out var id) ||
+                    id.ValueKind != JsonValueKind.String) throw new ArgumentException($"{field}.transparencySoftwareId: expected a reference.");
+                var key = Key(InfrastructureEntityType.TransparencySoftware, id.GetString()!);
+                if (!seen.Add(key)) throw new ArgumentException($"{field}: duplicate software assignment '{key.Id}'.");
+                yield return (field, key);
+                if (assignment.TryGetProperty("certificateId", out var certificate) && certificate.ValueKind != JsonValueKind.Null)
+                {
+                    if (certificate.ValueKind != JsonValueKind.String) throw new ArgumentException("certificateId: expected an identifier string.");
+                    yield return (field, Key(InfrastructureEntityType.TransparencySoftwareCertificate, certificate.GetString()!));
+                }
+            }
+        }
+        if (entity.Key.Type is InfrastructureEntityType.ChargingPool or InfrastructureEntityType.ChargingStation &&
+            entity.Properties.TryGetValue("energyMeters", out var meters) && meters.ValueKind != JsonValueKind.Null)
+        {
+            if (meters.ValueKind != JsonValueKind.Array) throw new ArgumentException("energyMeters: expected an array.");
+            foreach (var meter in meters.EnumerateArray())
+                foreach (var reference in Meter(meter, "energyMeters")) yield return reference;
+        }
+        if (entity.Key.Type == InfrastructureEntityType.EVSE && entity.Properties.TryGetValue("energyMeter", out var evseMeter))
+            foreach (var reference in Meter(evseMeter, "energyMeter")) yield return reference;
+        if (entity.Key.Type == InfrastructureEntityType.ChargingPool && entity.Properties.TryGetValue("gridConnectionPoint", out var point) &&
+            point.ValueKind != JsonValueKind.Null)
+        {
+            if (point.ValueKind != JsonValueKind.Object || !point.TryGetProperty("gridOperatorId", out var operatorId) ||
+                operatorId.ValueKind != JsonValueKind.String) throw new ArgumentException("gridConnectionPoint.gridOperatorId: expected a reference.");
+            yield return ("gridConnectionPoint", Key(InfrastructureEntityType.GridOperator, operatorId.GetString()!));
+            if (point.TryGetProperty("energyMeter", out var meter))
+                foreach (var reference in Meter(meter, "gridConnectionPoint")) yield return reference;
         }
     }
 
@@ -117,15 +175,18 @@ public sealed partial class RoamingNetworkDataSnapshot
     {
         if (!map.TryGetValue(reference, out var target))
             return $"Reference from '{entity.Key}' to '{reference}' cannot be resolved.";
-        if (entity.Key.Type is InfrastructureEntityType.EVSE or InfrastructureEntityType.ChargingConnector or
-            InfrastructureEntityType.EVSEGroup or InfrastructureEntityType.ChargingStationGroup or
-            InfrastructureEntityType.ChargingPoolGroup or InfrastructureEntityType.ChargingTariffGroup)
+        if (reference.Type is (InfrastructureEntityType.EVSE or InfrastructureEntityType.ChargingStation or
+                               InfrastructureEntityType.ChargingPool or InfrastructureEntityType.ChargingTariff) &&
+            entity.Key.Type is (InfrastructureEntityType.EVSE or InfrastructureEntityType.ChargingConnector or
+                                InfrastructureEntityType.EVSEGroup or InfrastructureEntityType.ChargingStationGroup or
+                                InfrastructureEntityType.ChargingPoolGroup or InfrastructureEntityType.ChargingTariffGroup))
         {
             if (Ancestor(entity, InfrastructureEntityType.ChargingStationOperator, map) !=
                 Ancestor(target, InfrastructureEntityType.ChargingStationOperator, map))
                 return $"Reference '{reference}' belongs to a different charging station operator.";
         }
-        else if (reference.Type is InfrastructureEntityType.ParkingSpace or InfrastructureEntityType.ParkingSensor)
+        else if (reference.Type is InfrastructureEntityType.ParkingSpace or InfrastructureEntityType.ParkingSensor or
+                                   InfrastructureEntityType.ParkingGarage or InfrastructureEntityType.ParkingProduct)
         {
             if (Ancestor(entity, InfrastructureEntityType.ParkingOperator, map) != target.Parent)
                 return $"Reference '{reference}' belongs to a different parking operator.";

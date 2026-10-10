@@ -70,15 +70,15 @@ with identical static ETags.
 | `POIRuntimeTarget.Entity(type, id)` | Any status-bearing graph node, including groups, grid/parking operators and parking children |
 | `POIRuntimeTarget.Meter(ownerType, ownerId, meterId)` | Direct pool/station meter, or the EVSE's meter |
 | `POIRuntimeTarget.ConnectionMeter(poolId, meterId)` | Meter in the pool's grid connection point |
-| `POIRuntimeTarget.ConnectionGridOperator(poolId, operatorId)` | Grid operator in the pool's grid connection point |
+| `POIRuntimeTarget.GridOperator(operatorId)` | Network registry grid operator shared by all referencing points |
 
 Nested targets require both the static owner ID and the child ID in the specified ownership
 slot. Meter IDs use the existing meter identity; their POI JSON spelling is `id`. A direct pool
 meter and a connection-point meter are distinct targets even when their meter IDs are equal.
-Connectors and manufacturers have no status schedule and are rejected. Network groups,
-grid/parking operators and parking children have independent entity targets. A registered
-GridOperator and a connection-point GridOperator with the same ID are distinct runtime targets;
-their schedules are independent.
+Connectors, manufacturers, software, certificates and parking products have no status schedule
+and are rejected. Network groups, grid/parking operators and parking children have entity targets.
+Every point referencing an operator in one network version observes that same registry schedule;
+separate network versions own independent schedules.
 
 Connection-point targets resolve the pool's current connection point. They do not carry a
 separate connection-point ID. If an owner/child ID is reused for a new static lifetime, bind
@@ -216,3 +216,14 @@ can throw after the schedule has been changed; runtime application does not prov
 ChangeSet engine's rollback guarantee. Async notification completion is not awaited. Applications
 should isolate failing subscribers and must not treat a notification exception as proof that
 no runtime write occurred.
+
+### Subsequent exact root/head snapshot reuse
+
+[Root/head reconstruction](SNAPSHOT-RECONSTRUCTION.md) now conditionally retains an immutable
+snapshot after the complete domain parser, references, metadata and representation completion.
+Every stored property byte, child and version must match; different spellings/defaults use the
+existing capture path. Separate histories keep independent runtime objects; a private root-only
+head can keep its freshly validated root model. Every peer/current policy, eager/lazy error timing,
+cancellation and atomic publication remain intact. No persistent model or trust cache is added.
+The package adds 86 cases and matched model/signature/restore/full-recovery measurements with
+unchanged prepared inputs, outputs, C# harness and dependencies. Earlier results remain historical.

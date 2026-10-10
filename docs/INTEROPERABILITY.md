@@ -4,17 +4,30 @@
 
 ## Profile declarations
 
-The static content contract is **`wwcp-poi-static-v1`**, exposed as `POIContentProfile.Id`.
+The static content contract is **`wwcp-poi-static-v2`**, exposed as `POIContentProfile.Id`.
 It fixes the stored-property projection, normalization, canonical JSON and metrological CBOR
 used by both state identifiers. Changes that alter these bytes require a new profile identifier
 and reference vectors; dependency updates must pass the existing vectors first.
+
+Static-v2 adds network software/certificate registries and operator-owned parking products,
+replaces point operator documents with ID references and introduces parking membership/garage/
+product references. Tagged static-v1 documents and archives are rejected, including their batches
+and signatures. Current vector files were regenerated successfully. Dedicated shared-model tests
+pass **73 cases**. The full static-v2 run passes **1,025 tests**, with zero failures and one
+ordinary worker skipped; see [model verification](VERIFICATION-DOMAIN-MODEL.md). That execution
+predates the streaming archive changes. Their [measured byte/identity preservation](STREAMING-ARCHIVES.md)
+uses matching static-v2 workloads. The later [streaming verification](VERIFICATION-STREAMING.md)
+checks all four profiles and fixed references, then reruns the full suite with 1,174 passed,
+zero failures and one skipped worker.
+See [domain model](DOMAIN-MODEL.md) and
+[the historical snapshot execution record](VERIFICATION-SNAPSHOTS-RETENTION.md).
 
 Complete tagged POI documents declare the profile in a schema-owned `contentProfile` property:
 
 ```json
 {
   "@id": "interop-network",
-  "contentProfile": "wwcp-poi-static-v1",
+  "contentProfile": "wwcp-poi-static-v2",
   "ETags": [
     ["json", "sha256", "hex", "<64 lowercase digits>"],
     ["cbor", "sha256", "hex", "<64 lowercase digits>"]
@@ -43,32 +56,34 @@ must be prepared again from their static snapshots and signed; no missing-header
 
 | Contract | Profile | Fixed relationship |
 | --- | --- | --- |
-| Static POI projection and encodings | `wwcp-poi-static-v1` | State JSON/CBOR ETags |
-| ChangeSet signing | `wwcp-poi-changeset-json-v2` | Applies to the current static-v1 transition contract |
+| Static POI projection and encodings | `wwcp-poi-static-v2` | State JSON/CBOR ETags |
+| ChangeSet signing | `wwcp-poi-changeset-json-v2` | Applies to the current static-v2 transition contract |
 | Commit identity | `wwcp-poi-commit-json-v1` | Includes `ContentProfile`, ordered parents and unsigned v2 batch |
 | Commit signing | `wwcp-poi-commit-signature-json-v1` | Binds identity and complete unsigned commit |
-| History archive | `wwcp-poi-history-v1` | Requires static-v1 checkpoint and commit content |
+| History archive | `wwcp-poi-history-v1` | Requires static-v2 checkpoint and commit content |
 | Three-way merge audit | `wwcp-poi-three-way-merge-v1` | Explicit preparation decisions in signed batch metadata |
 
 Full snapshot links additionally use `wwcp-poi-snapshot-commit-json-v1` and
 `wwcp-poi-snapshot-commit-signature-json-v1`. Archives/pages containing them select
 `wwcp-poi-history-v2`/`wwcp-poi-commit-pack-v2`; bootstrap manifests bind history-v2 through
-`wwcp-poi-bootstrap-manifest-v2`. Ordinary version 1 bytes and static-v1 hashes are unchanged.
-These new profiles have a library build but await dedicated roundtrip/signature/reference-vector
-verification; they are not covered by the existing frozen reference suite. See [snapshots](SNAPSHOTS.md).
+`wwcp-poi-bootstrap-manifest-v2`. The container/profile names remain unchanged; their `ContentProfile` header now binds static-v2.
+The current [snapshot regression references](interoperability/snapshot-retention.vectors.json)
+have been regenerated along with the ordinary references. See [snapshots](SNAPSHOTS.md).
 
 [Snapshot boundaries](SNAPSHOT-BOUNDARIES.md) add history-v3, manifest-v3, replication-state-v2
 and commit-pack-v3 without changing original commit/snapshot identity/signature preimages. Manifest
 identity binds the original checkpoint claim and anchor; boundary authorization is mandatory because
 omitted ancestry cannot independently prove chain association. Pages resolve root ID/peers against
-local retained content. Dedicated boundary reference vectors and executed workflow evidence are pending.
+local retained content. Fixed boundary/page references and executed workflow cases are described in
+[snapshot/retention verification](VERIFICATION-SNAPSHOTS-RETENTION.md).
 
 [Explicit retention](RETENTION.md) additionally introduces `wwcp-poi-retention-plan-v1`,
 `wwcp-poi-retention-receipt-v1`, history-v4 and manifest-v4. Plans bind the complete source archive;
 native JSON/CBOR receipts retain removed IDs and the digest of that archived source. The receipt
 identity uses canonical JSON excluding `Id`; it is unsigned bookkeeping. Root signatures do not
 authenticate the catalog. Existing identity/signature/page/chunk contracts are unchanged without
-these catalogs. Retention reference vectors and failure/recovery evidence remain pending.
+these catalogs. Fixed retention/archive/manifest references and failure/recovery cases now pass.
+The references are local regression evidence; independent peer interoperability remains open.
 
 ## Static projection
 
@@ -168,8 +183,14 @@ The new [interoperability tests](../WWCP_POI_Tests/Interoperability) execute:
 
 The crash tests terminate a child process without unwinding its archive/disposal blocks. They
 provide process-interruption evidence; they do not simulate power loss or filesystem damage.
-Performance, exhaustive graph/merge combinations and independent implementation interoperability
-remain additional work.
+[Signed snapshot and retention exits](CRASH-RECOVERY.md) add 26 passing cases across complete and
+previously pruned histories, including cold publication/flush, exact active root/catalog recovery,
+original peers and digest-checked older archives. Missing acknowledgements are handled by exact
+candidate/plan identity: snapshot re-delivery is idempotent, and a completed pruning receipt prevents
+blind replay of a stale plan. Both recovery paths continue signed exchange with fresh runtime.
+Exhaustive graph/merge combinations and independent implementation interoperability remain additional
+work. Separate [scaling measurements](SCALING.md) preserve state/archive/operation identities and
+byte counts while measuring digest reuse and local archive/runtime/cold paths.
 
 ## Receiving a merge at a different head
 
@@ -188,25 +209,37 @@ alone does not select authorized keys, distinct signers or quorum; configure app
 The existing reference workflow still exercises separate full archive bootstrap and receiver
 runtime delivery. New dedicated [replication/adoption fixtures](REPLICATION.md#implementation-and-evidence)
 add 61 passing cases for bounded JSON/CBOR pages, atomic failure, original signed merge adoption,
-local runtime lifetimes, changed trust, head races and file persistence/recovery. The full suite
-on 2026-10-07 passed 509 tests, with one separately executed crash worker skipped. That run predates
-operation-history lifetimes and explicit temporary reference plans. Bootstrap adds
+local runtime lifetimes, changed trust, head races and file persistence/recovery. The current
+[static-v2 full-suite run](VERIFICATION-DOMAIN-MODEL.md) also reruns operation-history lifetimes,
+explicit temporary reference plans and all fixed vector assertions. Bootstrap adds
 32 passing cases for both wire formats, receipt failures, corruption, replay/trust rejection,
 explicit activation, fresh runtime and continued incremental exchange.
+[Bootstrap crash recovery](BOOTSTRAP-CRASH-RECOVERY.md) adds 89 cases, including 36 real exits across
+all archive profiles and explicit exact-destination recovery with fresh trust under its writer lease.
+Those packages retained existing wire profiles and identities at the then-current static-v1 baseline.
+The current static-v2 model change regenerates the fixed state/commit/signature artifacts.
+[Cold archive retrieval](COLD-ARCHIVES.md) adds 98 cases for moved local files, immutable location
+catalogs, exact source digests, current authority/replay, receipt membership and older receipt chains.
+It adds no wire profile and preserves source bytes, active history/runtime and receipt identities.
 The [structural merge fixture](MERGING.md#structural-merge-evidence) adds 34 passing cases for
 deletion/recreation/ownership, complete typed reference diagnostics, group/parking/connector scopes,
 signed subtree choices, criss-cross ancestor selection, resolver reentry/exception rollback and
 the formerly rejected referenced replacement, whose revised expectation now prepares explicit
-detachment/restoration and has not been rerun. Reference decisions optionally bind `RelatedEntity` in merge
+detachment/restoration and now passes. Reference decisions optionally bind `RelatedEntity` in merge
 audit metadata; unchanged scenarios retain their existing identity/signature/reference bytes.
 Streaming archive replay, independent implementations, transport authentication and key
-negotiation remain additional work. Existing fixed reference bytes/profiles are unchanged.
+negotiation remain additional work. Current fixed references use static-v2.
 
 Temporary reference plans add an optional `wwcp-poi-reference-transition-v1` audit section through
 the existing lossless batch metadata codecs. New transition vectors and broader coverage remain
 planned; ordinary merges without temporary steps retain their existing metadata shape.
 
 ## Running and updating references
+
+The [archive-limit package](ARCHIVE-LIMITS.md) adds 60 passing cases for complete/boundary/pruned
+recovery through JSON/CBOR, direct/cold files and bootstrap. Local budgets cover encoded bytes,
+retained roots/commits, receipts and aggregate catalog-ID entries before materialization/replay;
+structured rejection keeps active state unchanged. Archive limits do not introduce a content profile.
 
 Ordinary tests compare committed expectations and never rewrite them:
 

@@ -1083,7 +1083,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             //};
 
-            this.EnergyMeters = ImmutablePOIValues.CopyEnergyMeters(EnergyMeters);
+            this.EnergyMeters = ImmutablePOIValues.CopyEnergyMeters(EnergyMeters, RoamingNetwork);
             if (GridConnectionPoint is not null && RoamingNetwork is { } network &&
                 GridConnectionPoint.GridOperator.RoamingNetwork.Id != network.Id)
                 throw new ArgumentException("gridConnectionPoint: grid operator belongs to a different roaming network.", nameof(GridConnectionPoint));

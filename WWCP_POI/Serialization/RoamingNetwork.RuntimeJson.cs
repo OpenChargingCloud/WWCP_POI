@@ -30,7 +30,6 @@ public sealed partial class RoamingNetwork
         var states = new Dictionary<InfrastructureEntityKey, (JObject Admin, JObject Status)>();
         var meters = new Dictionary<InfrastructureEntityKey, Dictionary<String, (JObject Admin, JObject Status)>>();
         var connectionMeters = new Dictionary<InfrastructureEntityKey, (JObject Admin, JObject Status)>();
-        var gridOperators = new Dictionary<InfrastructureEntityKey, (JObject Admin, JObject Status)>();
 
         (JObject Admin, JObject Status) ReadStatuses<TId, TAdmin, TStatus>(AImmutableEMobilityEntity<TId, TAdmin, TStatus> entity)
             where TId : IId
@@ -82,7 +81,6 @@ public sealed partial class RoamingNetwork
             foreach (var meter in entity.EnergyMeters) CaptureMeter(owner, meter);
             if (entity.GridConnectionPoint is { } point)
             {
-                gridOperators.Add(owner, ReadStatuses(point.GridOperator));
                 if (point.EnergyMeter is { } meter) connectionMeters.Add(owner, ReadStatuses(meter));
             }
         }
@@ -126,11 +124,6 @@ public sealed partial class RoamingNetwork
             if (type == InfrastructureEntityType.ChargingPool && json["gridConnectionPoint"] is JObject point)
             {
                 var owner = new InfrastructureEntityKey(type, json[InfrastructureChangeSchema.IdField(type)]!.Value<String>()!);
-                if (point["gridOperator"] is JObject gridOperator && gridOperators.TryGetValue(owner, out var operatorState))
-                {
-                    gridOperator["adminStatus"] = operatorState.Admin;
-                    gridOperator["status"] = operatorState.Status;
-                }
                 if (point["energyMeter"] is JObject meter && connectionMeters.TryGetValue(owner, out var meterState))
                 {
                     meter["adminStatus"] = meterState.Admin;

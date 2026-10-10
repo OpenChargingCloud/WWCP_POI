@@ -1,0 +1,309 @@
+--- a/WWCP_POI/WWCP_POI.csproj
++++ b/WWCP_POI/WWCP_POI.csproj
+@@ -4,6 +4,7 @@
+     <TargetFramework>net10.0</TargetFramework>
+     <ImplicitUsings>enable</ImplicitUsings>
+     <Nullable>enable</Nullable>
++    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+   </PropertyGroup>
+ 
+   <ItemGroup>
+--- /dev/null
++++ b/WWCP_POI/History/RoamingNetworkArchiveReadOptions.cs
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++/// <summary>
++/// Local capture policy for borrowed CBOR input streams, independent of signed archive content.
++/// </summary>
++public sealed class RoamingNetworkArchiveReadOptions
++{
++    /// <summary>
++    /// Maximum private managed capture capacity before switching to an owned temporary file.
++    /// Zero forces file capture; the archive byte budget also bounds memory and file bytes.
++    /// </summary>
++    public Int32 MemoryThresholdBytes { get; }
++
++    /// <summary>
++    /// Absolute existing directory for owned temporary files, resolved when options are created.
++    /// It is inspected only when spilling; linked directory ancestors are rejected.
++    /// </summary>
++    public String TemporaryDirectory { get; }
++
++    /// <summary>
++    /// Local temporary archive namespace, accepted by TryInspectArchive for explicit orphan maintenance.
++    /// Readers hold shared read leases; its coordination lock is retained after capture.
++    /// </summary>
++    public String TemporaryArchivePath { get; }
++
++    /// <summary>
++    /// Construct a capture policy. A null directory selects the operating system temporary directory.
++    /// The caller administers this directory; recovery never creates or deletes directories.
++    /// </summary>
++    public RoamingNetworkArchiveReadOptions(Int32 memoryThresholdBytes = 1024 * 1024, String? temporaryDirectory = null)
++    {
++        ArgumentOutOfRangeException.ThrowIfNegative(memoryThresholdBytes);
++        if (temporaryDirectory is not null) ArgumentException.ThrowIfNullOrWhiteSpace(temporaryDirectory);
++        MemoryThresholdBytes = memoryThresholdBytes;
++        TemporaryDirectory = Path.GetFullPath(temporaryDirectory ?? Path.GetTempPath());
++        TemporaryArchivePath = Path.Combine(TemporaryDirectory, "wwcp-poi-input.cbor");
++    }
++}
+--- /dev/null
++++ b/WWCP_POI/History/POIArchiveInputSpool.cs
+@@ -0,0 +1,123 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.IO.MemoryMappedFiles;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++internal enum POIArchiveInputStage { FileCreated, BeforeWrite, BeforeMap }
++
++/// <summary>
++/// Private bounded input capture. File handles own deletion; mapped spans live only during synchronous replay.
++/// </summary>
++internal sealed class POIArchiveInputSpool : IDisposable, IAsyncDisposable
++{
++    internal delegate RoamingNetworkHistory Restore(ReadOnlySpan<Byte> bytes);
++    internal const Int32 BufferBytes = 64 * 1024;
++    private readonly RoamingNetworkArchiveReadOptions options;
++    private readonly RoamingNetworkHistoryLimits limits;
++    private readonly Int32 memoryLimit;
++    private readonly Boolean asynchronous;
++    private readonly Action<POIArchiveInputStage, String>? observer;
++    private MemoryStream? memory = new();
++    private FileStream? file;
++    private FileStream? lease;
++    private String? path;
++    internal Int32 Length { get; private set; }
++    internal Int32 MemoryCapacity => memory?.Capacity ?? 0;
++
++    internal POIArchiveInputSpool(RoamingNetworkArchiveReadOptions options, RoamingNetworkHistoryLimits limits,
++        Boolean asynchronous, Action<POIArchiveInputStage, String>? observer = null)
++    {
++        this.options = options; this.limits = limits; memoryLimit = Math.Min(options.MemoryThresholdBytes, limits.MaxArchiveBytes);
++        this.asynchronous = asynchronous; this.observer = observer;
++    }
++
++    private void CreateFile()
++    {
++        if (!Directory.Exists(options.TemporaryDirectory)) throw new DirectoryNotFoundException("The input spool directory must exist.");
++        for (var directory = new DirectoryInfo(options.TemporaryDirectory); directory is not null; directory = directory.Parent)
++            if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
++                throw new IOException("Input spooling does not accept linked directory ancestors.");
++        var lockPath = options.TemporaryArchivePath + ".lock";
++        try
++        {
++            if ((File.GetAttributes(lockPath) & (FileAttributes.Directory | FileAttributes.ReparsePoint | FileAttributes.Device)) != 0)
++                throw new IOException("The input spool lease must be a regular file.");
++        }
++        catch (FileNotFoundException) { }
++        // Shared reader leases permit simultaneous captures and exclude the maintenance writer lease.
++        lease = new(lockPath, FileMode.OpenOrCreate, FileAccess.Read, FileShare.Read);
++        path = options.TemporaryArchivePath + ".tmp-" + Guid.NewGuid().ToString("N");
++        file = new(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, BufferBytes,
++            FileOptions.DeleteOnClose | FileOptions.SequentialScan | (asynchronous ? FileOptions.Asynchronous : FileOptions.None));
++        observer?.Invoke(POIArchiveInputStage.FileCreated, path);
++    }
++
++    private void Reserve(Int32 count)
++    {
++        var required = checked(Length + count);
++        if (memory!.Capacity < required)
++            memory.Capacity = (Int32) Math.Min(memoryLimit, Math.Max(required, Math.Max(256L, 2L * memory.Capacity)));
++    }
++
++    internal void Append(ReadOnlySpan<Byte> bytes)
++    {
++        limits.Require(RoamingNetworkHistoryLimitKind.ArchiveBytes, (Int64) Length + bytes.Length);
++        if (file is null && (Int64) Length + bytes.Length > memoryLimit)
++        {
++            CreateFile();
++            file!.Write(memory!.GetBuffer().AsSpan(0, Length));
++            memory.Dispose(); memory = null;
++        }
++        if (file is null) { Reserve(bytes.Length); memory!.Write(bytes); }
++        else { observer?.Invoke(POIArchiveInputStage.BeforeWrite, path!); file.Write(bytes); }
++        Length = checked(Length + bytes.Length);
++    }
++
++    internal async ValueTask AppendAsync(ReadOnlyMemory<Byte> bytes, CancellationToken cancellationToken)
++    {
++        cancellationToken.ThrowIfCancellationRequested();
++        limits.Require(RoamingNetworkHistoryLimitKind.ArchiveBytes, (Int64) Length + bytes.Length);
++        if (file is null && (Int64) Length + bytes.Length > memoryLimit)
++        {
++            CreateFile();
++            await file!.WriteAsync(memory!.GetBuffer().AsMemory(0, Length), cancellationToken).ConfigureAwait(false);
++            memory.Dispose(); memory = null;
++        }
++        if (file is null) { Reserve(bytes.Length); memory!.Write(bytes.Span); }
++        else
++        {
++            observer?.Invoke(POIArchiveInputStage.BeforeWrite, path!);
++            await file.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
++        }
++        Length = checked(Length + bytes.Length);
++    }
++
++    internal ValueTask FlushAsync(CancellationToken cancellationToken)
++        => file is null ? ValueTask.CompletedTask : new(file.FlushAsync(cancellationToken));
++
++    internal unsafe RoamingNetworkHistory Read(Restore restore)
++    {
++        if (file is null) return restore(memory!.GetBuffer().AsSpan(0, Length));
++        file.Flush();
++        observer?.Invoke(POIArchiveInputStage.BeforeMap, path!);
++        using var mapping = MemoryMappedFile.CreateFromFile(file, null, Length, MemoryMappedFileAccess.Read,
++            HandleInheritability.None, leaveOpen: true);
++        using var view = mapping.CreateViewAccessor(0, Length, MemoryMappedFileAccess.Read);
++        Byte* pointer = null;
++        view.SafeMemoryMappedViewHandle.AcquirePointer(ref pointer);
++        try { return restore(new ReadOnlySpan<Byte>(pointer + view.PointerOffset, Length)); }
++        finally { view.SafeMemoryMappedViewHandle.ReleasePointer(); }
++    }
++
++    public void Dispose() { try { file?.Dispose(); } finally { try { lease?.Dispose(); } finally { memory?.Dispose(); } } }
++    public async ValueTask DisposeAsync()
++    {
++        try { if (file is not null) await file.DisposeAsync().ConfigureAwait(false); }
++        finally { try { lease?.Dispose(); } finally { memory?.Dispose(); } }
++    }
++}
+--- /dev/null
++++ b/WWCP_POI/History/RoamingNetworkHistory.InputStreams.cs
+@@ -0,0 +1,123 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++public sealed partial class RoamingNetworkHistory
++{
++    /// <summary>
++    /// Capture and recover a borrowed readable CBOR stream, leaving it open and never seeking it.
++    /// Byte limits reject at the first excess byte; full syntax validation still precedes trust.
++    /// Cancellation is observed between reads, commits and callbacks; a blocking Read is not interrupted.
++    /// </summary>
++    public static RoamingNetworkHistory ParseCBOR(Stream source,
++        Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature = null,
++        Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature = null,
++        Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
++        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null,
++        RoamingNetworkHistoryLimits? limits = null, RoamingNetworkArchiveReadOptions? readOptions = null,
++        CancellationToken cancellationToken = default)
++    {
++        RequireInput(source); limits ??= new(); readOptions ??= new();
++        cancellationToken.ThrowIfCancellationRequested();
++        using var spool = new POIArchiveInputSpool(readOptions, limits, false);
++        var buffer = new Byte[(Int32) Math.Min(POIArchiveInputSpool.BufferBytes, (Int64) limits.MaxArchiveBytes + 1)];
++        while (true)
++        {
++            cancellationToken.ThrowIfCancellationRequested();
++            var count = source.Read(buffer, 0, InputRequest(spool.Length, buffer.Length, limits));
++            cancellationToken.ThrowIfCancellationRequested();
++            RequireInputCount(count, InputRequest(spool.Length, buffer.Length, limits));
++            if (count == 0) break;
++            limits.Require(RoamingNetworkHistoryLimitKind.ArchiveBytes, (Int64) spool.Length + count);
++            spool.Append(buffer.AsSpan(0, count));
++        }
++        return spool.Read(bytes => RestoreCapturedInput(bytes, limits, verifyBatchSignature, verifyCommitSignature,
++            authorizeCommit, authorizeSnapshotBoundary, cancellationToken));
++    }
++
++    /// <summary>
++    /// Asynchronously capture a borrowed CBOR stream and recover its static history with fresh local runtime.
++    /// The source owns its lifetime; temporary files, buffers and mapped views belong to this call.
++    /// Replay is synchronous and observes cancellation at commit/callback boundaries, not inside scalar/model parsing.
++    /// </summary>
++    public static async Task<RoamingNetworkHistory> ParseCBORAsync(Stream source,
++        Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature = null,
++        Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature = null,
++        Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
++        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null,
++        RoamingNetworkHistoryLimits? limits = null, RoamingNetworkArchiveReadOptions? readOptions = null,
++        CancellationToken cancellationToken = default)
++    {
++        RequireInput(source); limits ??= new(); readOptions ??= new();
++        cancellationToken.ThrowIfCancellationRequested();
++        await using var spool = new POIArchiveInputSpool(readOptions, limits, true);
++        var buffer = new Byte[(Int32) Math.Min(POIArchiveInputSpool.BufferBytes, (Int64) limits.MaxArchiveBytes + 1)];
++        while (true)
++        {
++            cancellationToken.ThrowIfCancellationRequested();
++            var request = InputRequest(spool.Length, buffer.Length, limits);
++            var count = await source.ReadAsync(buffer.AsMemory(0, request), cancellationToken).ConfigureAwait(false);
++            cancellationToken.ThrowIfCancellationRequested();
++            RequireInputCount(count, request);
++            if (count == 0) break;
++            limits.Require(RoamingNetworkHistoryLimitKind.ArchiveBytes, (Int64) spool.Length + count);
++            await spool.AppendAsync(buffer.AsMemory(0, count), cancellationToken).ConfigureAwait(false);
++        }
++        await spool.FlushAsync(cancellationToken).ConfigureAwait(false);
++        return spool.Read(bytes => RestoreCapturedInput(bytes, limits, verifyBatchSignature, verifyCommitSignature,
++            authorizeCommit, authorizeSnapshotBoundary, cancellationToken));
++    }
++
++    private static void RequireInput(Stream source)
++    {
++        ArgumentNullException.ThrowIfNull(source);
++        if (!source.CanRead) throw new ArgumentException("The archive input stream must be readable.", nameof(source));
++    }
++
++    private static Int32 InputRequest(Int32 length, Int32 bufferLength, RoamingNetworkHistoryLimits limits)
++        => (Int32) Math.Min(bufferLength, (Int64) limits.MaxArchiveBytes - length + 1);
++
++    private static void RequireInputCount(Int32 count, Int32 requested)
++    {
++        if (count < 0 || count > requested) throw new IOException("The input stream returned an invalid read count.");
++    }
++
++    private static RoamingNetworkHistory RestoreCapturedInput(ReadOnlySpan<Byte> bytes, RoamingNetworkHistoryLimits limits,
++        Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature,
++        Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
++        Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
++        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary, CancellationToken token)
++    {
++        Boolean BatchTrust(RoamingNetworkChangeSet batch, RoamingNetworkChangeSetSignature peer)
++        { token.ThrowIfCancellationRequested(); var valid = verifyBatchSignature!(batch, peer); token.ThrowIfCancellationRequested(); return valid; }
++        Boolean CommitTrust(RoamingNetworkCommit commit, RoamingNetworkChangeSetSignature peer)
++        { token.ThrowIfCancellationRequested(); var valid = verifyCommitSignature!(commit, peer); token.ThrowIfCancellationRequested(); return valid; }
++        Boolean CommitAuthority(RoamingNetworkCommit commit)
++        { token.ThrowIfCancellationRequested(); var valid = authorizeCommit?.Invoke(commit) ?? true; token.ThrowIfCancellationRequested(); return valid; }
++        Boolean BoundaryAuthority(RoamingNetworkSnapshotBoundary boundary)
++        { token.ThrowIfCancellationRequested(); var valid = authorizeSnapshotBoundary!(boundary); token.ThrowIfCancellationRequested(); return valid; }
++        RoamingNetworkHistory? history = null;
++        try
++        {
++            token.ThrowIfCancellationRequested();
++            history = ParseCBOR(bytes,
++                verifyBatchSignature is null ? null : BatchTrust,
++                verifyCommitSignature is null ? null : CommitTrust,
++                CommitAuthority, authorizeSnapshotBoundary is null ? null : BoundaryAuthority, limits);
++            token.ThrowIfCancellationRequested();
++            var result = history; history = null; return result;
++        }
++        catch (Exception) when (token.IsCancellationRequested) { throw new OperationCanceledException(token); }
++        finally
++        {
++            // The recovered history retains its trust delegates. Cancellation belongs only to this read.
++            // Clear the captured token before returning so later commits keep the caller's original policy.
++            token = default;
++            history?.Dispose();
++        }
++    }
++}

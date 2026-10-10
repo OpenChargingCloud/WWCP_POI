@@ -4,7 +4,9 @@
 
 ## API and exchange
 
-`RoamingNetworkChangeSet.ToCBOR()` writes a deterministic CBOR map. `ParseCBOR()` and
+`RoamingNetworkChangeSet.ToCBOR()` writes a deterministic CBOR map using
+[direct emission with the existing signed scalar codec](DIRECT-CHANGESET-CBOR.md), avoiding
+complete CBOR/native-ETag conversion trees. `ParseCBOR()` and
 `TryParseCBOR()` reconstruct the immutable batch, including all equal peer signatures.
 The map uses the same case-sensitive property names and required fields as System.Text.Json.
 It retains operation and signature order, complete element paths, descriptions, arbitrary JSON
@@ -91,3 +93,16 @@ and executes two-peer cryptographic verification after transport, SI/number-spel
 optional payload presence, header ETag byte tuples, duplicate-key/trailing-item rejection and
 continued signed transitions after recovery. Further malformed-tag/size-limit and exhaustive
 schema-path cases remain additional coverage work.
+
+The subsequent [direct-encoding verification](DIRECT-CHANGESET-CBOR.md) adds 55 cases and passes
+283 focused / 1,308 full Release cases against the unchanged signing/byte references. It includes
+exact numeric/SI spellings, scoped elements, all operation shapes and persistent tag-depth failures.
+Matched long-batch/multiple-peer measurements are separate from the earlier one-operation fixture.
+The decoder and static domain ranges remain unchanged.
+
+## Direct archive payload output
+
+The [direct archive ChangeSet package](DIRECT-ARCHIVE-CHANGESET.md) emits the same bytes inside
+all archive profiles after complete signing/schema/scalar/depth preflight, without a complete
+per-batch CBOR output buffer. Native root ETags, exact signed scalar tokens and every peer remain.
+Public standalone `ToCBOR()` is unchanged; prepared JSON/index/schema paths and decoder trees remain.

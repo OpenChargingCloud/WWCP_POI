@@ -180,6 +180,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ArgumentNullException.ThrowIfNull(resolvePublicKey);
                 if (Signatures.IsEmpty)
                     throw new InvalidOperationException("The ChangeSet is unsigned.");
+                using var preparation = POICanonicalPreparation.Enter();
                 for (var index = 0; index < Signatures.Length; index++)
                 {
                     var signature = Signatures[index];
@@ -214,6 +215,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("The algorithm is not supported for asymmetric signing.", nameof(algorithm));
             Required(keyId, nameof(keyId));
 
+            return POICanonicalPreparation.SigningBytes(this, WriteUnsignedContent, writer =>
+            {
+                writer.WriteStartObject();
+                writer.WriteString("Profile", SigningProfile);
+                writer.WriteString("Algorithm", algorithm.Name);
+                writer.WriteString("KeyId", keyId);
+                writer.WriteString("Encoding", "base64");
+                writer.WriteNull("ChangeSet");
+                writer.WriteEndObject();
+            }, "ChangeSet", () => GetOriginalSigningBytes(algorithm, keyId));
+        }
+
+        private Byte[] GetOriginalSigningBytes(COSEAlgorithm algorithm, String keyId)
+        {
             using var stream = new MemoryStream();
             using (var writer = new Utf8JsonWriter(stream))
             {

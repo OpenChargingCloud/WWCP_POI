@@ -1,0 +1,118 @@
+--- a/WWCP_POI/Serialization/POIRepresentation.cs
++++ b/WWCP_POI/Serialization/POIRepresentation.cs
+@@ -39,6 +39,14 @@
+         Visit(json, kind, "", (document, type, path) =>
+         {
+             if (path.Length > 0 && !TaggedKinds.Contains(type)) return;
++            // A network's authoritative static snapshot already owns these two immutable digests.
++            // Revision metadata and runtime overlays never enter their content identity.
++            if (path.Length == 0 && (value is RoamingNetwork or RoamingNetworkDataSnapshot))
++            {
++                document[POIContentProfile.PropertyName] = POIContentProfile.Id;
++                document["ETags"] = TagsJSON(value.ETags, DigestEncoding);
++                return;
++            }
+             var staticContent = (JObject) document.DeepClone();
+             Prepare(staticContent, type, false);
+             document[POIContentProfile.PropertyName] = POIContentProfile.Id;
+@@ -149,13 +157,16 @@
+     }
+ 
+     private static ImmutableArray<ETag> Tags(JObject json, String kind)
+-        => [ETag.Compute(ETagFormat.JSON, CanonicalJSON.ToUTF8Bytes(json)),
+-            ETag.Compute(ETagFormat.CBOR, Encode(json, kind))];
++    {
++        var canonicalJSON = CanonicalJSON.ToUTF8Bytes(json);
++        return [ETag.Compute(ETagFormat.JSON, canonicalJSON),
++                ETag.Compute(ETagFormat.CBOR, Encode(json, kind, canonicalJSON))];
++    }
+ 
+     private static JArray TagsJSON(IEnumerable<ETag> tags, ETagDigestEncoding encoding = ETagDigestEncoding.HEX)
+         => new(tags.Select(tag => tag.ToJSON(encoding)));
+ 
+-    private static Byte[] Encode(JObject json, String kind)
++    private static Byte[] Encode(JObject json, String kind, Byte[]? canonicalJSON = null)
+     {
+         var paths = new HashSet<String>(StringComparer.Ordinal);
+         var hasETags = false;
+@@ -170,7 +181,7 @@
+                     paths.Add(path + "/" + Escape(property.Name));
+                 }
+         });
+-        var cbor = CBORJSON.ToCBOR(CanonicalJSON.ToUTF8Bytes(json), new CBORJSONOptions {
++        var cbor = CBORJSON.ToCBOR(canonicalJSON ?? CanonicalJSON.ToUTF8Bytes(json), new CBORJSONOptions {
+             DetectMetrologicalValues = (path, _) => paths.Contains(path)
+         });
+         return (hasETags ? ConvertETagCBOR(cbor, kind, true) : cbor).ToByteArray(CBORWriterOptions.Canonical);
+--- a/WWCP_POI/Entities/AImmutableEMobilityEntity.cs
++++ b/WWCP_POI/Entities/AImmutableEMobilityEntity.cs
+@@ -49,8 +49,10 @@
+ 
+         /// <summary>
+         /// Content identifiers of the immutable POI data; runtime states are excluded.
+-        /// </summary>
+-        public System.Collections.Immutable.ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
++        /// Networks reuse their authoritative snapshot's lazy digest pair.
++        /// </summary>
++        public System.Collections.Immutable.ImmutableArray<ETag> ETags
++            => this is RoamingNetwork network ? network.DataSnapshot.ETags : POIRepresentation.GetETags(this);
+ 
+         /// <summary>
+         /// Restore persisted timestamps on a newly parsed entity without recording a change.
+--- a/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.cs
++++ b/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.cs
+@@ -81,7 +81,8 @@
+                                            EntityMap                entities,
+                                            Int64                    revision,
+                                            String?                  appliedChangeSetId,
+-                                           ReferenceMap?           references = null)
++                                           ReferenceMap?           references = null,
++                                           Lazy<ImmutableArray<ETag>>? sharedContentETags = null)
+         {
+ 
+             Root               = root;
+@@ -89,17 +90,17 @@
+             Revision           = revision;
+             AppliedChangeSetId = appliedChangeSetId;
+             References         = references ?? ReferenceMap.Empty;
+-            contentETags       = new(() => POIRepresentation.GetETags(this));
++            contentETags       = sharedContentETags ?? new(() => POIRepresentation.GetETags(this));
+ 
+         }
+ 
+         #endregion
+ 
+         /// <summary>
+-        /// Advance history bookkeeping for a snapshot link while sharing all static entities and indexes.
++        /// Advance history bookkeeping while sharing unchanged static entities, indexes and content digests.
+         /// </summary>
+         internal RoamingNetworkDataSnapshot AdvanceSnapshotRevision()
+-            => new(Root, Entities, checked(Revision + 1), AppliedChangeSetId, References);
++            => new(Root, Entities, checked(Revision + 1), AppliedChangeSetId, References, contentETags);
+ 
+         #region Read entities and JSON
+ 
+--- a/WWCP_POI/History/RoamingNetworkColdArchiveCatalog.cs
++++ b/WWCP_POI/History/RoamingNetworkColdArchiveCatalog.cs
+@@ -65,14 +65,19 @@
+         MaxLocations = maxLocations;
+         var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+         var paths = new Dictionary<ETag, List<String>>();
++        var registered = new Dictionary<ETag, HashSet<String>>();
+         var unique = ImmutableArray.CreateBuilder<RoamingNetworkColdArchiveLocation>();
+         Int64 count = 0;
+         foreach (var location in locations)
+         {
+             if (++count > maxLocations) throw new ArgumentException("Cold archive catalog exceeds its local location budget.", nameof(locations));
+             ArgumentNullException.ThrowIfNull(location);
+-            if (!paths.TryGetValue(location.ArchiveETag, out var values)) paths.Add(location.ArchiveETag, values = []);
+-            if (values.Contains(location.Path, comparer)) continue;
++            if (!paths.TryGetValue(location.ArchiveETag, out var values))
++            {
++                paths.Add(location.ArchiveETag, values = []);
++                registered.Add(location.ArchiveETag, new(comparer));
++            }
++            if (!registered[location.ArchiveETag].Add(location.Path)) continue;
+             values.Add(location.Path); unique.Add(location);
+         }
+         Locations = unique.ToImmutable();

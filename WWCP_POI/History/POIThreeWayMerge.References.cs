@@ -6,6 +6,7 @@
 
 using System.Collections.Immutable;
 using System.Text.Json;
+using Newtonsoft.Json.Linq;
 
 namespace cloud.charging.open.protocols.WWCP.POI;
 
@@ -56,6 +57,8 @@ internal sealed partial class POIThreeWayMerge
             else if (before.ValueKind == JsonValueKind.String)
                 detach.Add(RoamingNetworkChange.RemoveProperty(consumer.Type.ToString(), consumer.Id, field, before,
                                                                node.Parent?.Type.ToString(), node.Parent?.Id));
+            else if (TryDetachNestedReferences(consumer.Type, field, before, targets, out var nested))
+                PropertyOperation(node, [], field, before, nested, detach);
             else continue;
             if (detach.Count == 0) continue;
             var detached = working;
@@ -101,8 +104,41 @@ internal sealed partial class POIThreeWayMerge
     private static Boolean ReferenceFieldOperation(RoamingNetworkChange operation, InfrastructureEntityKey consumer, String field)
         => ChangeKey(operation) == consumer &&
            ((operation.Kind is RoamingNetworkChangeKind.UpdateProperty or RoamingNetworkChangeKind.RemoveProperty) && operation.PropertyName == field ||
-            (operation.Kind is RoamingNetworkChangeKind.AddElement or RoamingNetworkChangeKind.RemoveElement or RoamingNetworkChangeKind.ReplaceElement) &&
-            operation.ElementPath.Length == 1 && operation.ElementPath[0].PropertyName == field);
+            (operation.Kind is RoamingNetworkChangeKind.AddElement or RoamingNetworkChangeKind.RemoveElement or RoamingNetworkChangeKind.ReplaceElement or
+                               RoamingNetworkChangeKind.UpdateElementProperty or RoamingNetworkChangeKind.RemoveElementProperty) &&
+            !operation.ElementPath.IsEmpty && operation.ElementPath[0].PropertyName == field);
+
+    // Only traverse schema-owned meter/point fields. Customer objects with similar keys remain content.
+    private static Boolean TryDetachNestedReferences(InfrastructureEntityType consumerType, String field, JsonElement before,
+        ImmutableArray<InfrastructureEntityKey> targets, out JsonElement? detached)
+    {
+        detached = null;
+        var metersField = field == "energyMeters" && consumerType is InfrastructureEntityType.ChargingPool or InfrastructureEntityType.ChargingStation;
+        var meterField = field == "energyMeter" && consumerType == InfrastructureEntityType.EVSE;
+        var pointField = field == "gridConnectionPoint" && consumerType == InfrastructureEntityType.ChargingPool;
+        if (!metersField && !meterField && !pointField) return false;
+        var value = InfrastructureJson.ReadToken(before.GetRawText());
+        Boolean Matches(InfrastructureEntityType type, JToken? id)
+            => id?.Type == JTokenType.String && targets.Contains(new InfrastructureEntityKey(type, id.Value<String>()!));
+        // The operator reference is required within a point; clearing its optional owner slot is explicit.
+        if (pointField && Matches(InfrastructureEntityType.GridOperator, value["gridOperatorId"])) return true;
+        IEnumerable<JToken> meters = metersField ? value.Children() :
+            pointField ? value["energyMeter"] is { } pointMeter ? [pointMeter] : [] : [value];
+        var changed = false;
+        foreach (var meter in meters)
+            if (meter["transparencySoftware"] is JArray assignments)
+                foreach (var assignment in assignments.OfType<JObject>().ToArray())
+                {
+                    if (Matches(InfrastructureEntityType.TransparencySoftware, assignment["transparencySoftwareId"]))
+                    { assignment.Remove(); changed = true; }
+                    else if (Matches(InfrastructureEntityType.TransparencySoftwareCertificate, assignment["certificateId"]))
+                    { assignment.Remove("certificateId"); changed = true; }
+                }
+        if (!changed) return false;
+        using var document = JsonDocument.Parse(value.ToString(Newtonsoft.Json.Formatting.None));
+        detached = document.RootElement.Clone();
+        return true;
+    }
 
     private static JsonElement ReferenceField(String field, JsonElement? value)
         => JsonSerializer.SerializeToElement(value is { } present ? new Dictionary<String, JsonElement> { [field] = present } : []);

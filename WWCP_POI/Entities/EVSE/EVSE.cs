@@ -927,7 +927,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.energyMixRealTime                  = EnergyMixRealTime;
             this.energyMixPrognoses                 = EnergyMixPrognoses;
 
-            this.energyMeter                        = ImmutablePOIValues.Copy(EnergyMeter);
+            this.energyMeter                        = EnergyMeter?.Clone(ChargingStation?.RoamingNetwork);
 
             this.isFreeOfCharge                     = IsFreeOfCharge ?? false;
 

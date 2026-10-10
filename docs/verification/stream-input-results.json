@@ -1,0 +1,349 @@
+{
+  "date": "2026-10-09",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "5bf93be538d900ea7bcb239ea49d7543005ad60bdbcea8eb6cbc569218861dd5",
+  "productionAssemblySHA256": "0a5520bd476df844ca5512dd904076a2180e43b5a5ec8f005d5de914b6acaab5",
+  "beforeProductionSourceSHA256": "219cc984724a6ae5d0ef108f71a34380e3e66971567d5f6cd5924154eee4db26",
+  "beforeProductionAssemblySHA256": "d3c7d87cc107e7e9400be34f4dc7ce22d618e4f23ee208c293d0a31d7e2aad8a",
+  "beforeEvidence": "docs/verification/indexed-archive-results.json",
+  "productionPatch": {
+    "file": "docs/performance/stream-input-reader.diff",
+    "sha256": "24470d15d5f029006264993b1441dda61768deeb28473d99d0c0f328f54ef66f",
+    "modifiedFiles": [
+      "WWCP_POI/WWCP_POI.csproj"
+    ],
+    "addedFiles": [
+      "WWCP_POI/History/RoamingNetworkArchiveReadOptions.cs",
+      "WWCP_POI/History/POIArchiveInputSpool.cs",
+      "WWCP_POI/History/RoamingNetworkHistory.InputStreams.cs"
+    ],
+    "reverseCheckPassed": true,
+    "reverseAppliedInPrivateCopyRestoresExactBeforeBytes": true
+  },
+  "testSourceSHA256": "b100482287c74efd12915e0ea02e4646a28a028a7c558b3fad719c70357ee105",
+  "testAssemblySHA256": "0e7e24fbe937cab1d70907227804a33d72133a45b814b9f4942d69c1e51e6244",
+  "existingTestSourcesUnchanged": true,
+  "benchmarkSourceSHA256": "5755be9edc9100693d479dac1ac76358b0cfb5a8440b7d4902e67c0f179b57a5",
+  "benchmarkAssemblySHA256": "d0880d71fa2afb464904a72a1ae729a34ef497996c5477d58a53640a9487de55",
+  "beforeBenchmarkSourceSHA256": "225f9ce61c7829b0ac33a083ebe325a28fca22e9ce052306669fb36d4f53296a",
+  "benchmarkChangedFiles": [
+    "ArchiveRecoveryProbe.cs",
+    "Program.cs"
+  ],
+  "historicalSevenStageDefaultPreserved": true,
+  "reportScriptSHA256": "1a46f24008dadc1044b363b71b07158052805c356939dd4d63934e8a3a7a972a",
+  "sharedDependencies": [
+    {
+      "name": "Styx.dll",
+      "sha256": "1655174175e2abb259ead391c8e58aa71c089e71142c04a88581d31f3b7956ac",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "WWCP_CoreData.dll",
+      "sha256": "4630250928e031ad4fc7c531c6786d3cca3e952f851f3f184903b3d3d19c0cba",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "org.GraphDefined.Vanaheimr.Hermod.dll",
+      "sha256": "7355657890caf64a8e922e3d11bb14e835c398b6dd76f013d3987e035535a43c",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "Newtonsoft.Json.dll",
+      "sha256": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "BouncyCastle.Cryptography.dll",
+      "sha256": "ef92fc661e8d7ba8ec4d39a7cdfcdba41f14cb327f0d24fe79d0b5bb428899b5",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    }
+  ],
+  "newTestCases": 160,
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/stream-input/stream-input-focused-definitive.trx",
+      "sha256": "57367c62e06e36edc8cc591771239c24418477da3c7db46798b96eea5867dba5",
+      "times": {
+        "creation": "2026-10-09T15:11:45.1378095+02:00",
+        "queuing": "2026-10-09T15:11:45.1378100+02:00",
+        "start": "2026-10-09T15:11:42.0929210+02:00",
+        "finish": "2026-10-09T15:12:33.0176522+02:00"
+      },
+      "passed": 511,
+      "failed": 0,
+      "skipped": 1,
+      "newInputCasesPassed": 160,
+      "excludedExplicitGenerators": [],
+      "counters": {
+        "total": 512,
+        "executed": 511,
+        "passed": 511,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/stream-input/stream-input-full-definitive.trx",
+      "sha256": "1ca84b793fd024a439e95db8cf5600c11aaa29ad4cd0a444911b94d786c1a328",
+      "times": {
+        "creation": "2026-10-09T15:14:53.1147686+02:00",
+        "queuing": "2026-10-09T15:14:53.1147694+02:00",
+        "start": "2026-10-09T15:14:50.5594156+02:00",
+        "finish": "2026-10-09T15:20:29.4834873+02:00"
+      },
+      "passed": 2029,
+      "failed": 0,
+      "skipped": 1,
+      "newInputCasesPassed": 160,
+      "excludedExplicitGenerators": [
+        "GenerateReferenceVectors",
+        "GenerateSnapshotRetentionVectors"
+      ],
+      "counters": {
+        "total": 2032,
+        "executed": 2029,
+        "passed": 2029,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  ],
+  "setupCorrections": [
+    "The initial added test build exposed an internal enum on a public NUnit method; the fixture now uses an Int32 seam parameter.",
+    "The first expanded focused run passed 414 and failed one pending-read timeout: the test source incremented Reads only via a nullable observer. Counting now happens independently; final focused/full runs pass.",
+    "A build attempted while preceding own tests were running hit Windows testhost DLL locks. Obsolete own test processes were stopped; the final build succeeded before the definitive focused/full runs. Interrupted earlier runs are excluded."
+  ],
+  "buildResult": {
+    "errors": 0,
+    "existingWarnings": "Earlier complete compile showed existing nullable/analyzer warnings; definitive incremental build has zero errors/warnings."
+  },
+  "reports": [
+    {
+      "file": "docs/performance/stream-input-recovery.json",
+      "sha256": "02a8dc4be630263d6b5d94c7b05f2497a13da95a59fbd1a62402c92679cb1d9b",
+      "workers": 42,
+      "measuredSamples": 210,
+      "origin": "Fresh same-build span/memory/file controls"
+    }
+  ],
+  "inputControl": {
+    "file": "docs/performance/indexed-archive-after.json",
+    "sha256": "63594df8cb8f5faf1a7d900e338ce4676cdaa7223cee9159077a336dceec71aa",
+    "exactInputsInventoriesHeadsAndResults": true,
+    "usedForBeforeAfterSpeedup": false
+  },
+  "generatedReports": [
+    {
+      "file": "docs/performance/stream-input-summary.md",
+      "sha256": "48310dc20210640038765c8e86ba377e53602bf6e35e95ca7b06f889e26f8493"
+    }
+  ],
+  "fixedReferences": [
+    {
+      "file": "docs/interoperability/changeset.cbor",
+      "sha256": "2e9ca50bf982c5797fa5301beadd7399c38967031325d305909fd1a9ddaff2e3"
+    },
+    {
+      "file": "docs/interoperability/changeset.json",
+      "sha256": "5149f33a4d0f04cca1b077c5bb5888da6f7670fb970c08ed9b8d2be01d58e461"
+    },
+    {
+      "file": "docs/interoperability/commit.cbor",
+      "sha256": "dd808c2f667ed99ac1f319fbbe480b7bfa7a1cd0c2fffb9d0c72a4dd49441f64"
+    },
+    {
+      "file": "docs/interoperability/commit.json",
+      "sha256": "16e1c0b8e5e26b741a915882f6445df61985a74813da4e0bde8df96b0dcdc9e2"
+    },
+    {
+      "file": "docs/interoperability/history.cbor",
+      "sha256": "4ad8c59d47e8738c9005a303a150552077ba4dc0ab990e2a62c42b66d889ed53"
+    },
+    {
+      "file": "docs/interoperability/history.json",
+      "sha256": "173f11f152a749ee7d25a8f629351eec9c0da8366ddf7881353c1bafbc8e16e3"
+    },
+    {
+      "file": "docs/interoperability/merge.cbor",
+      "sha256": "c94096478440e4e714cc1d73ff39d73da0181faf485fd16b0d6ff9369fa9c966"
+    },
+    {
+      "file": "docs/interoperability/merge.json",
+      "sha256": "6e3f4a476d1da2678528ab3a7abcba770258b5d7c229e71aa280fbb294cb6a9c"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.cbor",
+      "sha256": "c8ec4ad4ed107ea6a7b801f8ad5fad78b93a42f12905148824f78a2b1b1dec49"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.json",
+      "sha256": "abeea6cdfea5e449c56a771cd0caa14ed45a874962336d353e5c0fe7a1436dfc"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.cbor",
+      "sha256": "408ce78ba3c28befe90b6b159f9e12146046146717e698d31f1789e74804e3ac"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.json",
+      "sha256": "fad7ba55d04bffc11312ca01112da1c0920adbd0221123981460630ebe42a34a"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.cbor",
+      "sha256": "903a0f7e5de856c92d893476fb081633da45a4cdc2587f5b18a3bec9f0810e9b"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.json",
+      "sha256": "52c32069a8f96baa7826998fdc5180e7781d8e875bb04618d93ff51e0589160c"
+    },
+    {
+      "file": "docs/interoperability/retention-plan.json",
+      "sha256": "53d6e4f920b2801e72acd3c9ddcd9916d24e0f365883829c7fe12faeaa4e3c73"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.cbor",
+      "sha256": "18865a3f1ee8e9319a9dc63fb9c47c55d86ce6c95ac19e425f9144c0d31d5f29"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.json",
+      "sha256": "f486190cd0fa2de10bd39cabfe3d582a27814dc27a41ac8e4529cc727041894b"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.cbor",
+      "sha256": "0a5b8a2389bb4d603cbb17e6c6f75a24736a82bdfb49c56b4e206d6120e9ade7"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.json",
+      "sha256": "7c5363c00863993d47c1b1cc9e723486521f640294fbce71207ef018fe061af5"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.cbor",
+      "sha256": "1d6593f6cfbef65f4b310cb173a81cadea5010e96f6f3cd2454e29701450bb47"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.json",
+      "sha256": "c1cbf4389ded04c16a78f45980ff5b68f440e012a5e936929418cc3db368a18c"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.cbor",
+      "sha256": "608218579b163fbf3eb71b7932fe4a9483bf089953e448793d02d27114074531"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.json",
+      "sha256": "4bc9b76e36a992d73df3632b5f18d678d29aa33a0be42fcb311710818e1820e4"
+    },
+    {
+      "file": "docs/interoperability/snapshot-retention.vectors.json",
+      "sha256": "b773e90f3ba2f9c1ae110163bddc48a5da76eadad04e522cfa852d16dbb412c9"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.cbor",
+      "sha256": "ca17c05ea79af48847fe95268b3743b5eea2901fad1a14a7369a98867e70d1b8"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.json",
+      "sha256": "9b1d6039d962c1060732539670204869e4db55f67bcc04a109adf226515ef415"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.cbor",
+      "sha256": "b813800ae3bddbc98e216a7cd47f92075843c19a43c71fda82e971dc4b29f0e5"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.json",
+      "sha256": "f278409b12987017f2270170c57f2f732b36068a5b606a958ea7da028c1dc36d"
+    },
+    {
+      "file": "docs/interoperability/snapshot.cbor",
+      "sha256": "dbf002f25a428e1588f150fd6a69f352da6bda8d420b06c3dc2f8c1633eec89f"
+    },
+    {
+      "file": "docs/interoperability/snapshot.input.json",
+      "sha256": "10c250ec20ff14a8d1e330262ec8ba53b0a70a3a380b80da4fb6fbf113bbe7b1"
+    },
+    {
+      "file": "docs/interoperability/snapshot.json",
+      "sha256": "70a684f485bcf208440455656c69463e4d1058d330de91504ffdae31171f81bd"
+    },
+    {
+      "file": "docs/interoperability/vectors.json",
+      "sha256": "7684f6096567f7cb40f9316a30c6d8601b80b329c2727be5a53b51cc37143201"
+    }
+  ],
+  "measurementMethod": {
+    "suite": "recovery",
+    "workloadShapes": 7,
+    "operations": 3,
+    "processesPerOperation": 2,
+    "warmupsPerProcess": 5,
+    "samplesPerProcess": 5,
+    "taskBuildTestOverlap": false,
+    "dedicatedHost": false,
+    "allocationCounter": "GC.GetAllocatedBytesForCurrentThread on the operation thread",
+    "source": "Borrowed non-seekable wrapper over identical prepared bytes, at most 16 KiB per Read; wrapper created inside measurement.",
+    "memoryCapture": "Threshold Int32.MaxValue, bounded by archive byte policy.",
+    "fileCapture": "Threshold zero, actual file/reader lease/I/O/flush/mapping/cleanup included.",
+    "outputVerification": "Outside measurement: exact CBOR peers, every branch state, head/checkpoint/anchor/receipts and fresh local runtime.",
+    "sameBuildOperationComparison": true,
+    "beforeAfterPerformanceComparison": false,
+    "originalInputHeldInAllOperations": true
+  },
+  "limits": {
+    "productionProfilesChanged": false,
+    "publicInputAPIsAdded": [
+      "ParseCBOR(Stream)",
+      "ParseCBORAsync(Stream)"
+    ],
+    "streamBorrowedAndNonSeekable": true,
+    "privateMemoryThresholdDefaultBytes": 1048576,
+    "inputReadBufferMaximumBytes": 65536,
+    "streamByteRejectionObservation": "Maximum + 1; no draining",
+    "spanKnownLengthDiagnosticsUnchanged": true,
+    "ownedDeleteOnCloseSpool": true,
+    "sharedReaderMaintenanceLease": true,
+    "coordinationLockRetained": true,
+    "existingOrphansRequireExplicitReview": true,
+    "fullManagedFileInputCopy": false,
+    "readOnlyMappedInput": true,
+    "unsafeMappedPointerScopedToSynchronousRestore": true,
+    "wholeArchiveCBORTree": false,
+    "fullSyntaxBeforeTrust": true,
+    "eagerCompleteLazyBoundaryModelsPreserved": true,
+    "cancellationScopeEndsWithRead": true,
+    "scalarModelStateApplicationIndividuallyPreemptible": false,
+    "totalRecoveryMemoryBound": false,
+    "mappedPagesAndPartKeyScalarTrees": true,
+    "privateBoundaryPendingBytes": true,
+    "retainedBranchStates": true,
+    "maxCBORDepth": 64,
+    "exactPeakMemoryMeasurement": false,
+    "persistentColdBootstrapCaptureIntegration": "Next package preserving existing byte/digest/manifest/lease/activation contracts"
+  }
+}

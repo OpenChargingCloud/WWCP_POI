@@ -70,7 +70,7 @@ internal static class POIElementSchema
             (nameof(ChargingPool) or nameof(ChargingStation), "energyMeters") => Meter(true),
             (nameof(EVSE) or nameof(GridConnectionPoint), "energyMeter") => Meter(false),
             (nameof(ChargingPool), "gridConnectionPoint") => new(nameof(GridConnectionPoint), false, "id", Identifier),
-            (nameof(GridConnectionPoint), "gridOperator") => new(nameof(GridOperator), false, "id", GridOperatorIdentity, Optional: false),
+            (nameof(GridConnectionPoint), "gridOperatorId") => Reference(InfrastructureEntityType.GridOperator, false, false),
             (nameof(ChargingConnector), "cable") => new(nameof(ChargingCable), false),
             (nameof(ChargingStationOperator) or nameof(ChargingPool) or nameof(ChargingStation), "brands") => Brand(true),
             (nameof(EVSE), "brand") => Brand(true),
@@ -81,6 +81,11 @@ internal static class POIElementSchema
             (nameof(ChargingTariffGroup), "chargingTariffIds") => Reference(InfrastructureEntityType.ChargingTariff),
             (nameof(ParkingGarage) or nameof(ParkingSpace) or nameof(ParkingSensor) or nameof(ParkingSpaceGroup), "chargingStationIds") => Reference(InfrastructureEntityType.ChargingStation),
             (nameof(ParkingSpace) or nameof(ParkingSpaceGroup), "sensors") => Reference(InfrastructureEntityType.ParkingSensor),
+            (nameof(ParkingSpaceGroup), "parkingSpaceIds") => Reference(InfrastructureEntityType.ParkingSpace),
+            (nameof(ParkingSpace), "parkingGarageId") => Reference(InfrastructureEntityType.ParkingGarage, false),
+            (nameof(ParkingGarage) or nameof(ParkingSpace) or nameof(ParkingSpaceGroup), "parkingProductIds") => Reference(InfrastructureEntityType.ParkingProduct),
+            (nameof(TransparencySoftwareCertificate), "verifiedTransparencySoftwareIds" or "compatibleTransparencySoftwareIds") => Reference(InfrastructureEntityType.TransparencySoftware),
+            (nameof(TransparencySoftwareCertificate), "chargingStationManufacturerId") => Reference(InfrastructureEntityType.ChargingStationManufacturer, false),
             (nameof(ParkingOperator), "localParkingSpaceIds" or "invalidParkingSpaceIds") => Reference(InfrastructureEntityType.ParkingSpace),
             (nameof(RoamingNetwork) or nameof(ChargingStationOperator) or nameof(EMobilityProvider) or
              nameof(ChargingPool) or nameof(ChargingStation) or nameof(EVSE) or nameof(Brand) or nameof(GridOperator) or nameof(ParkingOperator) or
@@ -96,8 +101,8 @@ internal static class POIElementSchema
             _ => null
         };
 
-    private static Relation Reference(InfrastructureEntityType type)
-        => new(type + "Reference", true, Identity: id => InfrastructureChangeSchema.Identity(type, id), IsReference: true);
+    private static Relation Reference(InfrastructureEntityType type, Boolean array = true, Boolean optional = true)
+        => new(type + "Reference", array, Optional: optional, Identity: id => InfrastructureChangeSchema.Identity(type, id), IsReference: true);
 
     private static Relation Meter(Boolean array)
         => new(nameof(EnergyMeter), array, "id", id => EnergyMeter_Id.Parse(id).ToString().ToUpperInvariant());
@@ -108,12 +113,6 @@ internal static class POIElementSchema
     private static String LicenseIdentity(String id)
         => DataLicense_Id.Parse(id).ToString().ToUpperInvariant();
 
-    private static String GridOperatorIdentity(String text)
-    {
-        var id = GridOperator_Id.Parse(text);
-        return id.CountryCode.Alpha2Code + ":" + id.Suffix;
-    }
-
     private static String Identifier(String id)
         => !String.IsNullOrWhiteSpace(id) ? id.Trim() : throw new ArgumentException("An identifier must not be empty.");
 
@@ -123,13 +122,10 @@ internal static class POIElementSchema
             [nameof(EnergyMeter)] = ["id", "@context", "name", "description", "role", "manufacturer", "manufacturerURL",
                                     "model", "modelURL", "serialNumber", "hardwareVersion", "firmwareVersion", "publicKeys",
                                     "publicKeyCertificateChain", "transparencySoftware", "dataSource", "customData", "created", "lastChange"],
-            [nameof(GridConnectionPoint)] = ["id", "@context", "name", "description", "gridOperator", "energyMeter", "address", "geoLocation",
+            [nameof(GridConnectionPoint)] = ["id", "@context", "name", "description", "gridOperatorId", "energyMeter", "address", "geoLocation",
                                              "voltageLevel", "connectionType", "nominalVoltage", "nominalFrequency", "contractedImportPower",
                                              "contractedExportPower", "contractedImportApparentPower", "contractedExportApparentPower",
                                              "connectionAgreementId", "networkLocationId", "marketLocationIds", "meteringLocationIds"],
-            [nameof(GridOperator)] = ["id", "@context", "roamingNetworkId", "name", "description", "logos", "address", "geoLocation",
-                                     "telephone", "eMailAddress", "homepage", "hotline", "priority", "dataLicenses", "dataSource",
-                                     "customData", "created", "lastChange"],
             [nameof(ChargingCable)] = ["@context", "length", "resistance", "lossCompensationName", "lossCompensationIdentification"],
             [nameof(Brand)] = ["id", "@context", "name", "description", "logo", "homepage", "dataLicenses"],
             ["DataLicense"] = ["@id", "@context", "description", "URLs"]
@@ -163,7 +159,7 @@ internal static class POIElementSchema
     }
 
     internal static Boolean HasManagedMetadata(String kind)
-        => kind is nameof(EnergyMeter) or nameof(GridOperator);
+        => kind == nameof(EnergyMeter);
 
     internal static JToken Normalize(String kind, JToken value)
     {

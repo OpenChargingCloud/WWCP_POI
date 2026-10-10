@@ -1,0 +1,635 @@
+{
+  "Environment": {
+    "TimestampUTC": "2026-10-08T11:06:50.1354932+00:00",
+    "Label": "optimized",
+    "Suite": "catalog",
+    "SamplesPerProcess": 3,
+    "ProcessesPerOperation": 2,
+    "WarmupsPerProcess": 1,
+    "Runtime": ".NET 10.0.12",
+    "OS": "Microsoft Windows 10.0.26300",
+    "Architecture": "X64",
+    "LogicalProcessors": 16,
+    "ServerGC": false,
+    "GCLatency": "Interactive",
+    "Cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+    "BuildConfiguration": "Release",
+    "SourceRevision": "f77799922828dcd43ca9b5e593314bb4dc02d7fe",
+    "SourceStatus": " M README.md\n M WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.cs\n M WWCP_POI/Entities/AImmutableEMobilityEntity.cs\n M WWCP_POI/History/RoamingNetworkBootstrapManifest.cs\n M WWCP_POI/History/RoamingNetworkBootstrapReceiver.cs\n M WWCP_POI/History/RoamingNetworkHistory.Archive.cs\n M WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs\n M WWCP_POI/History/RoamingNetworkHistory.PersistenceDiagnostics.cs\n M WWCP_POI/History/RoamingNetworkHistory.Retention.cs\n M WWCP_POI/Serialization/POIRepresentation.cs\n M WWCP_POI_Tests/Interoperability/BootstrapTests.cs\n M WWCP_POI_Tests/Interoperability/HeadAdoptionTests.cs\n M WWCP_POI_Tests/Interoperability/PersistenceTests.cs\n M WWCP_POI_Tests/README.md\n M docs/ARCHITECTURE.md\n M docs/BOOTSTRAP.md\n M docs/ETAGS-CBOR.md\n M docs/HISTORY.md\n M docs/INTEROPERABILITY.md\n M docs/MERGING.md\n M docs/REPLICATION.md\n M docs/RETENTION.md\n M docs/ROADMAP.md\n M docs/SNAPSHOT-BOUNDARIES.md\n M docs/SNAPSHOTS.md\n M docs/interoperability/README.md\n?? WWCP_POI/History/RoamingNetworkArchiveCleanupPlan.cs\n?? WWCP_POI/History/RoamingNetworkArchiveMaintenance.cs\n?? WWCP_POI/History/RoamingNetworkColdArchiveCatalog.cs\n?? WWCP_POI/History/RoamingNetworkColdArchiveResult.cs\n?? WWCP_POI/History/RoamingNetworkHistory.ArchiveLimits.cs\n?? WWCP_POI/History/RoamingNetworkHistory.ColdArchives.cs\n?? WWCP_POI/History/RoamingNetworkHistoryLimits.cs\n?? WWCP_POI_Benchmarks/\n?? WWCP_POI_Tests/Interoperability/ArchiveCrashTestSupport.cs\n?? WWCP_POI_Tests/Interoperability/ArchiveLimitsTests.cs\n?? WWCP_POI_Tests/Interoperability/ArchiveMaintenanceTests.cs\n?? WWCP_POI_Tests/Interoperability/BootstrapCrashTests.cs\n?? WWCP_POI_Tests/Interoperability/ColdArchiveTests.cs\n?? WWCP_POI_Tests/Interoperability/RetentionTests.cs\n?? WWCP_POI_Tests/Interoperability/SnapshotBoundaryTests.cs\n?? WWCP_POI_Tests/Interoperability/SnapshotHistoryTests.cs\n?? WWCP_POI_Tests/Interoperability/SnapshotRetentionCrashTests.cs\n?? WWCP_POI_Tests/Interoperability/SnapshotRetentionReferenceTests.cs\n?? WWCP_POI_Tests/Interoperability/SnapshotTestSupport.cs\n?? docs/ARCHIVE-LIMITS.md\n?? docs/ARCHIVE-MAINTENANCE.md\n?? docs/BOOTSTRAP-CRASH-RECOVERY.md\n?? docs/COLD-ARCHIVES.md\n?? docs/CRASH-RECOVERY.md\n?? docs/SCALING.md\n?? docs/VERIFICATION-SNAPSHOTS-RETENTION.md\n?? docs/interoperability/pruned-bootstrap-manifest.cbor\n?? docs/interoperability/pruned-bootstrap-manifest.json\n?? docs/interoperability/pruned-history.cbor\n?? docs/interoperability/pruned-history.json\n?? docs/interoperability/retention-plan.json\n?? docs/interoperability/retention-receipt.cbor\n?? docs/interoperability/retention-receipt.json\n?? docs/interoperability/snapshot-boundary-history.cbor\n?? docs/interoperability/snapshot-boundary-history.json\n?? docs/interoperability/snapshot-commit.cbor\n?? docs/interoperability/snapshot-commit.json\n?? docs/interoperability/snapshot-complete-history.cbor\n?? docs/interoperability/snapshot-complete-history.json\n?? docs/interoperability/snapshot-retention.vectors.json\n?? docs/interoperability/snapshot-suffix-page.cbor\n?? docs/interoperability/snapshot-suffix-page.json\n?? docs/performance/",
+    "ProductionSourceSHA256": "4ac629a268068e3ab87e95a58d7c4f4936dc170c53fa3f4036e59feb417b4367",
+    "BenchmarkSourceSHA256": "93d0ea5ef478d3a217089fdc4e66b61f03cd52cdb46b608acbc122fa5fb4ce46",
+    "ProductionAssemblySHA256": "0fdd893ca23ef71bd1c756898926576351aaba7abb897f7316ca0810f6a6ccb1",
+    "Dependencies": [
+      {
+        "Name": "Styx",
+        "Revision": "ff3b0879a9454f7f222ca391d3a51d614696714d",
+        "Status": ""
+      },
+      {
+        "Name": "Hermod",
+        "Revision": "bbbf88b6e5e411708ca870f3998676b3efd1698c",
+        "Status": ""
+      },
+      {
+        "Name": "WWCP_Core",
+        "Revision": "a64ed144ccff62a8dc8e96993afc6e54a937a0a0",
+        "Status": ""
+      }
+    ]
+  },
+  "Complete": true,
+  "Runs": [
+    {
+      "Shape": {
+        "Name": "catalog-16",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 0,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 16
+      },
+      "Operation": "catalog-create",
+      "Entities": 6,
+      "RetainedCommits": 1,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:70ad2f98549b1003eb58a057ee62fa320b28cd82a3b4103f76f80ce000266c27|cbor:sha256:hex:cc04b916bd9607536c518ecb8ddbfecc0a61a947f8aadf3af2b7a17050369770",
+      "ArchiveIdentity": "cbor:sha256:hex:76df57254d17cb1081cc699c2e569946037d508553e6c4a56e68f26074437c79",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.1432,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 8664,
+          "ManagedBeforeBytes": 797640,
+          "SampledManagedPeakBytes": 813920,
+          "WorkingSetBeforeBytes": 57999360,
+          "SampledWorkingSetPeakBytes": 58044416,
+          "ProcessLifetimePeakWorkingSetBytes": 58044416,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.0903,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 8664,
+          "ManagedBeforeBytes": 766376,
+          "SampledManagedPeakBytes": 782560,
+          "WorkingSetBeforeBytes": 58781696,
+          "SampledWorkingSetPeakBytes": 58785792,
+          "ProcessLifetimePeakWorkingSetBytes": 58785792,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.0891,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 8664,
+          "ManagedBeforeBytes": 766176,
+          "SampledManagedPeakBytes": 782360,
+          "WorkingSetBeforeBytes": 58785792,
+          "SampledWorkingSetPeakBytes": 58785792,
+          "ProcessLifetimePeakWorkingSetBytes": 58802176,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16"
+          }
+        }
+      ]
+    },
+    {
+      "Shape": {
+        "Name": "catalog-16",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 0,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 16
+      },
+      "Operation": "catalog-create",
+      "Entities": 6,
+      "RetainedCommits": 1,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:70ad2f98549b1003eb58a057ee62fa320b28cd82a3b4103f76f80ce000266c27|cbor:sha256:hex:cc04b916bd9607536c518ecb8ddbfecc0a61a947f8aadf3af2b7a17050369770",
+      "ArchiveIdentity": "cbor:sha256:hex:76df57254d17cb1081cc699c2e569946037d508553e6c4a56e68f26074437c79",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.158,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 8664,
+          "ManagedBeforeBytes": 798784,
+          "SampledManagedPeakBytes": 815064,
+          "WorkingSetBeforeBytes": 58159104,
+          "SampledWorkingSetPeakBytes": 58200064,
+          "ProcessLifetimePeakWorkingSetBytes": 58200064,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.0866,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 8664,
+          "ManagedBeforeBytes": 767520,
+          "SampledManagedPeakBytes": 783704,
+          "WorkingSetBeforeBytes": 58908672,
+          "SampledWorkingSetPeakBytes": 58912768,
+          "ProcessLifetimePeakWorkingSetBytes": 58929152,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.0845,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 8664,
+          "ManagedBeforeBytes": 767320,
+          "SampledManagedPeakBytes": 783504,
+          "WorkingSetBeforeBytes": 58916864,
+          "SampledWorkingSetPeakBytes": 58916864,
+          "ProcessLifetimePeakWorkingSetBytes": 58933248,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16"
+          }
+        }
+      ]
+    },
+    {
+      "Shape": {
+        "Name": "catalog-256",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 0,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "catalog-create",
+      "Entities": 6,
+      "RetainedCommits": 1,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:70ad2f98549b1003eb58a057ee62fa320b28cd82a3b4103f76f80ce000266c27|cbor:sha256:hex:cc04b916bd9607536c518ecb8ddbfecc0a61a947f8aadf3af2b7a17050369770",
+      "ArchiveIdentity": "cbor:sha256:hex:76df57254d17cb1081cc699c2e569946037d508553e6c4a56e68f26074437c79",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.5592,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 120144,
+          "ManagedBeforeBytes": 798792,
+          "SampledManagedPeakBytes": 930208,
+          "WorkingSetBeforeBytes": 58220544,
+          "SampledWorkingSetPeakBytes": 58269696,
+          "ProcessLifetimePeakWorkingSetBytes": 58269696,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:256"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.4277,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 120144,
+          "ManagedBeforeBytes": 767528,
+          "SampledManagedPeakBytes": 898848,
+          "WorkingSetBeforeBytes": 58998784,
+          "SampledWorkingSetPeakBytes": 59002880,
+          "ProcessLifetimePeakWorkingSetBytes": 59019264,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:256"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.4313,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 120144,
+          "ManagedBeforeBytes": 767328,
+          "SampledManagedPeakBytes": 898648,
+          "WorkingSetBeforeBytes": 59006976,
+          "SampledWorkingSetPeakBytes": 59006976,
+          "ProcessLifetimePeakWorkingSetBytes": 59023360,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:256"
+          }
+        }
+      ]
+    },
+    {
+      "Shape": {
+        "Name": "catalog-256",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 0,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "catalog-create",
+      "Entities": 6,
+      "RetainedCommits": 1,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:70ad2f98549b1003eb58a057ee62fa320b28cd82a3b4103f76f80ce000266c27|cbor:sha256:hex:cc04b916bd9607536c518ecb8ddbfecc0a61a947f8aadf3af2b7a17050369770",
+      "ArchiveIdentity": "cbor:sha256:hex:76df57254d17cb1081cc699c2e569946037d508553e6c4a56e68f26074437c79",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.5031,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 120144,
+          "ManagedBeforeBytes": 798792,
+          "SampledManagedPeakBytes": 930208,
+          "WorkingSetBeforeBytes": 58011648,
+          "SampledWorkingSetPeakBytes": 58056704,
+          "ProcessLifetimePeakWorkingSetBytes": 58056704,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:256"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.4094,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 120144,
+          "ManagedBeforeBytes": 767528,
+          "SampledManagedPeakBytes": 898848,
+          "WorkingSetBeforeBytes": 58777600,
+          "SampledWorkingSetPeakBytes": 58781696,
+          "ProcessLifetimePeakWorkingSetBytes": 58798080,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:256"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.3866,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 120144,
+          "ManagedBeforeBytes": 767328,
+          "SampledManagedPeakBytes": 898648,
+          "WorkingSetBeforeBytes": 58785792,
+          "SampledWorkingSetPeakBytes": 58785792,
+          "ProcessLifetimePeakWorkingSetBytes": 58802176,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:256"
+          }
+        }
+      ]
+    },
+    {
+      "Shape": {
+        "Name": "catalog-4096",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 0,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 4096
+      },
+      "Operation": "catalog-create",
+      "Entities": 6,
+      "RetainedCommits": 1,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:70ad2f98549b1003eb58a057ee62fa320b28cd82a3b4103f76f80ce000266c27|cbor:sha256:hex:cc04b916bd9607536c518ecb8ddbfecc0a61a947f8aadf3af2b7a17050369770",
+      "ArchiveIdentity": "cbor:sha256:hex:76df57254d17cb1081cc699c2e569946037d508553e6c4a56e68f26074437c79",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 5.5018,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 1962912,
+          "ManagedBeforeBytes": 797656,
+          "SampledManagedPeakBytes": 2770096,
+          "WorkingSetBeforeBytes": 59834368,
+          "SampledWorkingSetPeakBytes": 59904000,
+          "ProcessLifetimePeakWorkingSetBytes": 59904000,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:4096"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 17.0664,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 1962936,
+          "ManagedBeforeBytes": 766400,
+          "SampledManagedPeakBytes": 2738744,
+          "WorkingSetBeforeBytes": 60108800,
+          "SampledWorkingSetPeakBytes": 61014016,
+          "ProcessLifetimePeakWorkingSetBytes": 61014016,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:4096"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 4.9658,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 1962912,
+          "ManagedBeforeBytes": 766232,
+          "SampledManagedPeakBytes": 2738576,
+          "WorkingSetBeforeBytes": 61014016,
+          "SampledWorkingSetPeakBytes": 61014016,
+          "ProcessLifetimePeakWorkingSetBytes": 61030400,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:4096"
+          }
+        }
+      ]
+    },
+    {
+      "Shape": {
+        "Name": "catalog-4096",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 0,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 4096
+      },
+      "Operation": "catalog-create",
+      "Entities": 6,
+      "RetainedCommits": 1,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:70ad2f98549b1003eb58a057ee62fa320b28cd82a3b4103f76f80ce000266c27|cbor:sha256:hex:cc04b916bd9607536c518ecb8ddbfecc0a61a947f8aadf3af2b7a17050369770",
+      "ArchiveIdentity": "cbor:sha256:hex:76df57254d17cb1081cc699c2e569946037d508553e6c4a56e68f26074437c79",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 5.5103,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 1962912,
+          "ManagedBeforeBytes": 798800,
+          "SampledManagedPeakBytes": 2771240,
+          "WorkingSetBeforeBytes": 60010496,
+          "SampledWorkingSetPeakBytes": 60063744,
+          "ProcessLifetimePeakWorkingSetBytes": 60063744,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:4096"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 17.2154,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 1962936,
+          "ManagedBeforeBytes": 767544,
+          "SampledManagedPeakBytes": 2739888,
+          "WorkingSetBeforeBytes": 60264448,
+          "SampledWorkingSetPeakBytes": 61157376,
+          "ProcessLifetimePeakWorkingSetBytes": 61157376,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:4096"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 5.0793,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 1962912,
+          "ManagedBeforeBytes": 767376,
+          "SampledManagedPeakBytes": 2739720,
+          "WorkingSetBeforeBytes": 61128704,
+          "SampledWorkingSetPeakBytes": 61128704,
+          "ProcessLifetimePeakWorkingSetBytes": 61157376,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:4096"
+          }
+        }
+      ]
+    },
+    {
+      "Shape": {
+        "Name": "catalog-16384",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 0,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 16384
+      },
+      "Operation": "catalog-create",
+      "Entities": 6,
+      "RetainedCommits": 1,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:70ad2f98549b1003eb58a057ee62fa320b28cd82a3b4103f76f80ce000266c27|cbor:sha256:hex:cc04b916bd9607536c518ecb8ddbfecc0a61a947f8aadf3af2b7a17050369770",
+      "ArchiveIdentity": "cbor:sha256:hex:76df57254d17cb1081cc699c2e569946037d508553e6c4a56e68f26074437c79",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 19.6006,
+          "CpuMilliseconds": 46.875,
+          "AllocatedBytes": 7228640,
+          "ManagedBeforeBytes": 767072,
+          "SampledManagedPeakBytes": 8021736,
+          "WorkingSetBeforeBytes": 68784128,
+          "SampledWorkingSetPeakBytes": 69615616,
+          "ProcessLifetimePeakWorkingSetBytes": 69615616,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16384"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 19.3417,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 7228640,
+          "ManagedBeforeBytes": 767168,
+          "SampledManagedPeakBytes": 8021568,
+          "WorkingSetBeforeBytes": 68833280,
+          "SampledWorkingSetPeakBytes": 69644288,
+          "ProcessLifetimePeakWorkingSetBytes": 69644288,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16384"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 19.1902,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 7228640,
+          "ManagedBeforeBytes": 767384,
+          "SampledManagedPeakBytes": 8021784,
+          "WorkingSetBeforeBytes": 68837376,
+          "SampledWorkingSetPeakBytes": 69644288,
+          "ProcessLifetimePeakWorkingSetBytes": 69644288,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16384"
+          }
+        }
+      ]
+    },
+    {
+      "Shape": {
+        "Name": "catalog-16384",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 0,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 16384
+      },
+      "Operation": "catalog-create",
+      "Entities": 6,
+      "RetainedCommits": 1,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:70ad2f98549b1003eb58a057ee62fa320b28cd82a3b4103f76f80ce000266c27|cbor:sha256:hex:cc04b916bd9607536c518ecb8ddbfecc0a61a947f8aadf3af2b7a17050369770",
+      "ArchiveIdentity": "cbor:sha256:hex:76df57254d17cb1081cc699c2e569946037d508553e6c4a56e68f26074437c79",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 19.8077,
+          "CpuMilliseconds": 31.25,
+          "AllocatedBytes": 7228640,
+          "ManagedBeforeBytes": 767072,
+          "SampledManagedPeakBytes": 8021736,
+          "WorkingSetBeforeBytes": 68825088,
+          "SampledWorkingSetPeakBytes": 69668864,
+          "ProcessLifetimePeakWorkingSetBytes": 69668864,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16384"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 18.8409,
+          "CpuMilliseconds": 46.875,
+          "AllocatedBytes": 7228640,
+          "ManagedBeforeBytes": 767168,
+          "SampledManagedPeakBytes": 8021568,
+          "WorkingSetBeforeBytes": 68890624,
+          "SampledWorkingSetPeakBytes": 69701632,
+          "ProcessLifetimePeakWorkingSetBytes": 69701632,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16384"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 18.9096,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 7228640,
+          "ManagedBeforeBytes": 767384,
+          "SampledManagedPeakBytes": 8021784,
+          "WorkingSetBeforeBytes": 68898816,
+          "SampledWorkingSetPeakBytes": 69701632,
+          "ProcessLifetimePeakWorkingSetBytes": 69701632,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 0,
+            "WrittenBytes": 0,
+            "Identity": "ordered-locations:16384"
+          }
+        }
+      ]
+    }
+  ]
+}

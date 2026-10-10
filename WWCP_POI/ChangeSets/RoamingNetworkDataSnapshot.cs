@@ -38,6 +38,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
     {
 
         private readonly Lazy<ImmutableArray<ETag>> contentETags;
+        // The context binds the complete entity map, root and fixed content profile.
+        // Share it only with snapshot-only revisions, never with a changed entity map.
+        private readonly Lazy<POIChildETagCache> childETags;
+        internal POIChildETagCache ChildETags => childETags.Value;
         private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ReferenceMap, ReferenceMap> tariffIndexes = new();
 
         #region Properties
@@ -81,7 +85,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            EntityMap                entities,
                                            Int64                    revision,
                                            String?                  appliedChangeSetId,
-                                           ReferenceMap?           references = null)
+                                           ReferenceMap?           references = null,
+                                           Lazy<ImmutableArray<ETag>>? sharedContentETags = null,
+                                           Lazy<POIChildETagCache>? sharedChildETags = null)
         {
 
             Root               = root;
@@ -89,17 +95,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Revision           = revision;
             AppliedChangeSetId = appliedChangeSetId;
             References         = references ?? ReferenceMap.Empty;
-            contentETags       = new(() => POIRepresentation.GetETags(this));
+            contentETags       = sharedContentETags ?? new(() => POIRepresentation.GetETags(this));
+            childETags         = sharedChildETags ?? new(() => new POIChildETagCache());
 
         }
 
         #endregion
 
         /// <summary>
-        /// Advance history bookkeeping for a snapshot link while sharing all static entities and indexes.
+        /// Advance history bookkeeping while sharing unchanged static entities, indexes and content digests.
         /// </summary>
         internal RoamingNetworkDataSnapshot AdvanceSnapshotRevision()
-            => new(Root, Entities, checked(Revision + 1), AppliedChangeSetId, References);
+            => new(Root, Entities, checked(Revision + 1), AppliedChangeSetId, References, contentETags, childETags);
 
         #region Read entities and JSON
 
@@ -146,17 +153,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         internal static RoamingNetworkDataSnapshot Capture(JObject  document,
                                                            Int64    revision,
-                                                           String?  changeSetId = null)
+                                                           String?  changeSetId = null,
+                                                           RoamingNetworkDataSnapshot? reuse = null)
         {
 
-            var map        = EntityMap.Empty;
-            var root       = Import(document, InfrastructureEntityType.RoamingNetwork, null, ref map, null);
-            var references = ReferenceMap.Empty;
+            var map        = reuse?.Entities ?? EntityMap.Empty;
+            var visited    = reuse is null ? null : new HashSet<InfrastructureEntityKey>();
+            var root       = Import(document, InfrastructureEntityType.RoamingNetwork, null, ref map, null, reuse: reuse, visited: visited);
+            if (visited is not null)
+                map = map.RemoveRange(map.Keys.Where(key => !visited.Contains(key)));
 
+            // Domain-equal aliases can have different visible ID/scope spellings.
+            // SetItem retains an existing equal dictionary key; ordinary capture is
+            // required when that retained key differs from the newly imported record.
+            if (reuse is not null && map.Any(entry => entry.Key.Id != entry.Value.Key.Id || entry.Key.Scope != entry.Value.Key.Scope ||
+                reuse.Entities.TryGetValue(entry.Key, out var previous) &&
+                (previous.Key.Id != entry.Value.Key.Id || previous.Key.Scope != entry.Value.Key.Scope)))
+                return Capture(document, revision, changeSetId);
+
+            var references = reuse?.References ?? ReferenceMap.Empty;
+            if (reuse is not null)
+                foreach (var (key, previous) in reuse.Entities)
+                    if (!map.TryGetValue(key, out var current) || !ReferenceEquals(previous, current))
+                        references = RemoveReferences(previous, references);
+
+            // Every current entity still passes the ordinary reference and scope checks.
             foreach (var entity in map.Values)
                 references = AddReferences(entity, map, references);
 
-            return new RoamingNetworkDataSnapshot(root, map, revision, changeSetId, references);
+            if (reuse is not null && references.Count == reuse.References.Count &&
+                references.All(entry => reuse.References.TryGetValue(entry.Key, out var existing) && existing.SetEquals(entry.Value)))
+                references = reuse.References;
+
+            var sameMap = reuse is not null && ReferenceEquals(map, reuse.Entities) && root == reuse.Root;
+            return new RoamingNetworkDataSnapshot(root, map, revision, changeSetId, references,
+                                                 sameMap ? reuse!.contentETags : null,
+                                                 sameMap ? reuse!.childETags : null);
 
         }
 

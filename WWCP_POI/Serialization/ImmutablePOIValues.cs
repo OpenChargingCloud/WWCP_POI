@@ -59,7 +59,7 @@ internal static class ImmutablePOIValues
     internal static ImmutableArray<T> CopyItems<T>(IEnumerable<T>? values)
         => values is null ? [] : values.Select(Copy).ToImmutableArray();
 
-    internal static ImmutableArray<EnergyMeter> CopyEnergyMeters(IEnumerable<EnergyMeter>? values)
+    internal static ImmutableArray<EnergyMeter> CopyEnergyMeters(IEnumerable<EnergyMeter>? values, RoamingNetwork? network = null)
     {
         var meters = values?.ToArray() ?? [];
         var ids = new HashSet<String>(StringComparer.OrdinalIgnoreCase);
@@ -70,7 +70,7 @@ internal static class ImmutablePOIValues
             if (!ids.Add(meter.Id.ToString()))
                 throw new ArgumentException($"energyMeters: duplicate identifier '{meter.Id}'.", nameof(values));
         }
-        return CopyItems(meters);
+        return meters.Select(meter => meter.Clone(network)).ToImmutableArray();
     }
 
 }

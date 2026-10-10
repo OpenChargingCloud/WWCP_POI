@@ -22,8 +22,24 @@ public sealed partial record RoamingNetworkChangeSet
         using var document = JsonDocument.Parse(json);
         ValidateSigningJSON(document.RootElement);
         var paths = MeasurementPaths();
-        var cbor = EncodeTransportJSON(document.RootElement, "", paths);
-        return ConvertTransportETags(cbor, true).ToByteArray(CBORWriterOptions.Canonical);
+        var output = new System.Buffers.ArrayBufferWriter<Byte>();
+        new POICBORWriter(output).WriteChangeSet(document.RootElement, paths);
+        return output.WrittenSpan.ToArray();
+    }
+
+    /// <summary>
+    /// Emit this complete signed batch into an archive after standalone and remaining-depth preflight.
+    /// Exact scalar spelling and every peer envelope retain the standalone transport representation.
+    /// </summary>
+    internal void WriteArchiveCBOR(System.Buffers.IBufferWriter<Byte> output, Int32 remainingDepth)
+    {
+        var json = JsonSerializer.SerializeToUtf8Bytes(this);
+        using var document = JsonDocument.Parse(json);
+        ValidateSigningJSON(document.RootElement);
+        var paths = MeasurementPaths();
+        var scalars = new POIChangeSetScalarCache();
+        new POICBORPreflight(remainingDepth).ValidateChangeSet(document.RootElement, paths, scalars);
+        new POICBORWriter(output).WriteChangeSet(document.RootElement, paths, scalars);
     }
 
     /// <summary>
@@ -141,6 +157,17 @@ public sealed partial record RoamingNetworkChangeSet
             return CBORValue.Tagged(EmbeddedJSON, CBORValue.FromBytes(Encoding.UTF8.GetBytes("{\"Number\":" + text + "}")));
         }
         return CBORJSON.ToCBOR(value.GetRawText());
+    }
+
+    /// <summary>
+    /// Encode one signed scalar with the existing lossless transport rules.
+    /// Containers are forbidden here so direct output cannot construct a complete CBOR tree.
+    /// </summary>
+    internal static CBORValue EncodeTransportScalar(JsonElement value, String path, HashSet<String> readings)
+    {
+        if (value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
+            throw new ArgumentException("The ChangeSet scalar codec does not accept containers.");
+        return EncodeTransportJSON(value, path, readings);
     }
 
     private static CBORValue ConvertTransportETags(CBORValue value, Boolean toBinary)

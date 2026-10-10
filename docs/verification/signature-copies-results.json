@@ -1,0 +1,539 @@
+{
+  "productionSourceSHA256": "e34e03190e19cbef2356050e17fbbdfad4c8a8927bb73d0707b57fadfcc7992a",
+  "benchmarkSourceSHA256": "5870c6337691a34295578b6f01285a6ddf9b068d59b1b2ac9d6736c1c08738d6",
+  "productionAssemblySHA256": "7c2765701c9ec18d96348f33793512a77538f8d30bed1f74b5920d8d3bbe8bf0",
+  "benchmarkAssemblySHA256": "27edc7e1ebab7b921e7c5d8806082b52c9b3d802f27a7402c3428a0773226b48",
+  "sharedDependencies": [
+    {
+      "name": "Azure.Core.dll",
+      "sha256": "1d6df436afdc73c30d476be938f6513c90ef8fc884a7bae280091a9bed0a5490"
+    },
+    {
+      "name": "Azure.Identity.dll",
+      "sha256": "31574a3d35ffeb0e25a00ebb317937222fe5283b91af608613f2e3bf0f26c50a"
+    },
+    {
+      "name": "BouncyCastle.Cryptography.dll",
+      "sha256": "ef92fc661e8d7ba8ec4d39a7cdfcdba41f14cb327f0d24fe79d0b5bb428899b5"
+    },
+    {
+      "name": "Microsoft.Bcl.AsyncInterfaces.dll",
+      "sha256": "f1e1d6e1a2990071b450bdf6c9618408ac0e3f24a3c7a3bef1f50508ba732ca5"
+    },
+    {
+      "name": "Microsoft.Diagnostics.NETCore.Client.dll",
+      "sha256": "e2cc9e1f6c97b3c4ee45ebabaa92408eb9b2fc81cb08ceeb342fe48bf79db15f"
+    },
+    {
+      "name": "Microsoft.Diagnostics.Runtime.dll",
+      "sha256": "52d5f113180bb0f70b1a9b10608aef93b187364ac689885d2d3c734102d850a2"
+    },
+    {
+      "name": "Microsoft.Extensions.Configuration.Abstractions.dll",
+      "sha256": "da2203cd85e701598210999e6714e4cc83d20b833b4afa923e3b84196d6f72aa"
+    },
+    {
+      "name": "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
+      "sha256": "da04edc338d5aa0f38a1f5fa5ff3ee7e36affe9c961daf3ea724a428bd746bc6"
+    },
+    {
+      "name": "Microsoft.Extensions.DependencyInjection.dll",
+      "sha256": "2d0e268bf76b4ce36a55ebb2767354db956c6660de65d6cccfc35c957fb12cfc"
+    },
+    {
+      "name": "Microsoft.Extensions.Diagnostics.Abstractions.dll",
+      "sha256": "4d20c015406a7bf1a6478f1b6af567d972fa2ba4727de6134ff2c641f90ab36c"
+    },
+    {
+      "name": "Microsoft.Extensions.FileProviders.Abstractions.dll",
+      "sha256": "39e7fcd41d10abeffcf2b224237bed64ae98f99d94e329bd19f447451eda3abc"
+    },
+    {
+      "name": "Microsoft.Extensions.Hosting.Abstractions.dll",
+      "sha256": "fb21feb2c6aafe2607a8b1d500c2b86535cd1b48b67ef878139dc7818c70ce4d"
+    },
+    {
+      "name": "Microsoft.Extensions.Logging.Abstractions.dll",
+      "sha256": "7c242f8ca612fa1acc61f78efd5f8c89e01bd0bd47dc4ecc65e0e6e24f1a1668"
+    },
+    {
+      "name": "Microsoft.Extensions.Logging.dll",
+      "sha256": "05b76234f2a5eb945b268ced706cb4d81446778ea6bd6910298b5e9111170b4a"
+    },
+    {
+      "name": "Microsoft.Extensions.Options.dll",
+      "sha256": "b4ff561da6a7b11b68341f9fd32cab3f8b23cdd8b40332b9fd8bed73a9ee7de3"
+    },
+    {
+      "name": "Microsoft.Extensions.Primitives.dll",
+      "sha256": "67642533eb87e8dadeb9026de59ff4b66cc9bf35c0cfbedfef7b79bc6d8b30bc"
+    },
+    {
+      "name": "Microsoft.Identity.Client.dll",
+      "sha256": "5795027e9ae95eececb310a4fed3c502bb368039d186ab0884f64b7792b84717"
+    },
+    {
+      "name": "Microsoft.Identity.Client.Extensions.Msal.dll",
+      "sha256": "07109a2f30df782300077a567ade47cbd0a0502c75cd7c8a62192f7d64bb004e"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Abstractions.dll",
+      "sha256": "24e97b54b6b5c234a124a336757e3116617ac6c30b655cdae74517dc2ecb5746"
+    },
+    {
+      "name": "Newtonsoft.Json.dll",
+      "sha256": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b"
+    },
+    {
+      "name": "org.GraphDefined.Vanaheimr.Hermod.dll",
+      "sha256": "7355657890caf64a8e922e3d11bb14e835c398b6dd76f013d3987e035535a43c"
+    },
+    {
+      "name": "Styx.dll",
+      "sha256": "1655174175e2abb259ead391c8e58aa71c089e71142c04a88581d31f3b7956ac"
+    },
+    {
+      "name": "System.ClientModel.dll",
+      "sha256": "dec5e22b71a1685c5e6e97cd28b629f0aa6703fb87b6950df28e79fc1804290c"
+    },
+    {
+      "name": "System.Configuration.ConfigurationManager.dll",
+      "sha256": "f6f445777420df03447d74f63671dfe97f8b833836ceb4643af76fa2e0c66a1b"
+    },
+    {
+      "name": "System.Diagnostics.EventLog.dll",
+      "sha256": "77aae5ac102caa9c8bdd8473bc55ed7de246b3e06171c6393bad7f959c1a7bf5"
+    },
+    {
+      "name": "System.Diagnostics.PerformanceCounter.dll",
+      "sha256": "fcc74baee4e7184dc70f9e28d758d75eb124a4fcebe3b368b890182906b1f698"
+    },
+    {
+      "name": "System.IO.Ports.dll",
+      "sha256": "e751931b4bf7ff27953c053b015fa1c299a0034c3c8777e4f49009e1e4176872"
+    },
+    {
+      "name": "System.Memory.Data.dll",
+      "sha256": "2c1035b0106dbb2de7913d151e06071ed617bb58bbb3d6cd46a2dd0f6a03617b"
+    },
+    {
+      "name": "System.Security.Cryptography.ProtectedData.dll",
+      "sha256": "b61a1445b99a1486a5d9abbd45d766497f136270f5b04862defee1fc054ded14"
+    },
+    {
+      "name": "WWCP_CoreData.dll",
+      "sha256": "4630250928e031ad4fc7c531c6786d3cca3e952f851f3f184903b3d3d19c0cba"
+    }
+  ],
+  "productionPatch": {
+    "file": "docs/performance/signature-copies.diff",
+    "sha256": "a67c52c797c88a08ef627b447f951b0849125298b2bd322351a47d00105d7c60",
+    "reverseCheckPassed": true,
+    "privateReverseRestoresExactBeforeBytes": true,
+    "modifiedFiles": [
+      "WWCP_POI/History/RoamingNetworkCommit.cs",
+      "WWCP_POI/Serialization/POICanonicalPreparation.cs"
+    ]
+  },
+  "beforeBindingSHA256": "7c587e1b5b7f52ce4b0b8aade259155c28a3cc2a523d8b19f203c97318139ebf",
+  "date": "2026-10-09",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "beforeProductionSourceSHA256": "54f70da9ca5bb6ad171e697ea3dba3eef6f6de319da2a7aa933ad9b34bc94609",
+  "beforeProductionAssemblySHA256": "3bb6f6a79404c526af189c8c7baee2ef76dafac817f852d6efd20449860348db",
+  "beforeEvidence": "docs/verification/snapshot-reconstruction-results.json",
+  "beforeEvidenceSHA256": "f17f494c3caea4ec3857c7d93c872c25ca2c1f7c3b1bc5adb06a9a76212fc15a",
+  "precedingBenchmarkSourceSHA256": "d389ff298008f62c33535621d24b04508bfb82d0af5f0e1af3552740fd867186",
+  "testSourceSHA256": "dbe503fe47e37c779c4ddf9a3377d2a2b3fbbf539ba324bf9a3eae45327e990d",
+  "testAssemblySHA256": "fc599bac036447fa45108285cde929d87d6da748a11635b4685eda21743c0aec",
+  "newTestCases": 103,
+  "testChangedFiles": [
+    "Interoperability/SignatureCopyTests.cs"
+  ],
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/signature-copies/signature-copies-fixture-definitive.trx",
+      "sha256": "93a999f9f15d34ea81e38c0e61aed86486c0f0fa9078f5d19d4bf7e1c96c9740",
+      "counters": {
+        "total": 103,
+        "executed": 103,
+        "passed": 103,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "newFixturePassed": 103,
+      "times": {
+        "creation": "2026-10-09T21:23:08.9588772+02:00",
+        "queuing": "2026-10-09T21:23:08.9588780+02:00",
+        "start": "2026-10-09T21:23:06.9672379+02:00",
+        "finish": "2026-10-09T21:23:17.8033747+02:00"
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/signature-copies/signature-copies-focused.trx",
+      "sha256": "406d9245ea602f80707c4a0b3c43b5be02fcecdba02908b18830bdd1042f7048",
+      "counters": {
+        "total": 2238,
+        "executed": 2237,
+        "passed": 2237,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "newFixturePassed": 103,
+      "times": {
+        "creation": "2026-10-09T21:23:42.8767465+02:00",
+        "queuing": "2026-10-09T21:23:42.8767469+02:00",
+        "start": "2026-10-09T21:23:37.9024191+02:00",
+        "finish": "2026-10-09T21:31:30.2926549+02:00"
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/signature-copies/signature-copies-full.trx",
+      "sha256": "6e01ca7cbbf6c6302401a7ebaf9ab12b1676bd100c2a4216067492e88ffc1411",
+      "counters": {
+        "total": 2570,
+        "executed": 2569,
+        "passed": 2569,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "newFixturePassed": 103,
+      "times": {
+        "creation": "2026-10-09T21:31:35.3734140+02:00",
+        "queuing": "2026-10-09T21:31:35.3734144+02:00",
+        "start": "2026-10-09T21:31:32.8135152+02:00",
+        "finish": "2026-10-09T21:37:18.7725166+02:00"
+      }
+    }
+  ],
+  "excludedExplicitGenerators": [
+    "GenerateReferenceVectors",
+    "GenerateSnapshotRetentionVectors"
+  ],
+  "referenceFiles": [
+    {
+      "file": "docs/interoperability/changeset.cbor",
+      "sha256": "2e9ca50bf982c5797fa5301beadd7399c38967031325d305909fd1a9ddaff2e3"
+    },
+    {
+      "file": "docs/interoperability/changeset.json",
+      "sha256": "5149f33a4d0f04cca1b077c5bb5888da6f7670fb970c08ed9b8d2be01d58e461"
+    },
+    {
+      "file": "docs/interoperability/commit.cbor",
+      "sha256": "dd808c2f667ed99ac1f319fbbe480b7bfa7a1cd0c2fffb9d0c72a4dd49441f64"
+    },
+    {
+      "file": "docs/interoperability/commit.json",
+      "sha256": "16e1c0b8e5e26b741a915882f6445df61985a74813da4e0bde8df96b0dcdc9e2"
+    },
+    {
+      "file": "docs/interoperability/history.cbor",
+      "sha256": "4ad8c59d47e8738c9005a303a150552077ba4dc0ab990e2a62c42b66d889ed53"
+    },
+    {
+      "file": "docs/interoperability/history.json",
+      "sha256": "173f11f152a749ee7d25a8f629351eec9c0da8366ddf7881353c1bafbc8e16e3"
+    },
+    {
+      "file": "docs/interoperability/merge.cbor",
+      "sha256": "c94096478440e4e714cc1d73ff39d73da0181faf485fd16b0d6ff9369fa9c966"
+    },
+    {
+      "file": "docs/interoperability/merge.json",
+      "sha256": "6e3f4a476d1da2678528ab3a7abcba770258b5d7c229e71aa280fbb294cb6a9c"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.cbor",
+      "sha256": "c8ec4ad4ed107ea6a7b801f8ad5fad78b93a42f12905148824f78a2b1b1dec49"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.json",
+      "sha256": "abeea6cdfea5e449c56a771cd0caa14ed45a874962336d353e5c0fe7a1436dfc"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.cbor",
+      "sha256": "408ce78ba3c28befe90b6b159f9e12146046146717e698d31f1789e74804e3ac"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.json",
+      "sha256": "fad7ba55d04bffc11312ca01112da1c0920adbd0221123981460630ebe42a34a"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.cbor",
+      "sha256": "903a0f7e5de856c92d893476fb081633da45a4cdc2587f5b18a3bec9f0810e9b"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.json",
+      "sha256": "52c32069a8f96baa7826998fdc5180e7781d8e875bb04618d93ff51e0589160c"
+    },
+    {
+      "file": "docs/interoperability/retention-plan.json",
+      "sha256": "53d6e4f920b2801e72acd3c9ddcd9916d24e0f365883829c7fe12faeaa4e3c73"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.cbor",
+      "sha256": "18865a3f1ee8e9319a9dc63fb9c47c55d86ce6c95ac19e425f9144c0d31d5f29"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.json",
+      "sha256": "f486190cd0fa2de10bd39cabfe3d582a27814dc27a41ac8e4529cc727041894b"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.cbor",
+      "sha256": "0a5b8a2389bb4d603cbb17e6c6f75a24736a82bdfb49c56b4e206d6120e9ade7"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.json",
+      "sha256": "7c5363c00863993d47c1b1cc9e723486521f640294fbce71207ef018fe061af5"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.cbor",
+      "sha256": "1d6593f6cfbef65f4b310cb173a81cadea5010e96f6f3cd2454e29701450bb47"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.json",
+      "sha256": "c1cbf4389ded04c16a78f45980ff5b68f440e012a5e936929418cc3db368a18c"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.cbor",
+      "sha256": "608218579b163fbf3eb71b7932fe4a9483bf089953e448793d02d27114074531"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.json",
+      "sha256": "4bc9b76e36a992d73df3632b5f18d678d29aa33a0be42fcb311710818e1820e4"
+    },
+    {
+      "file": "docs/interoperability/snapshot-retention.vectors.json",
+      "sha256": "b773e90f3ba2f9c1ae110163bddc48a5da76eadad04e522cfa852d16dbb412c9"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.cbor",
+      "sha256": "ca17c05ea79af48847fe95268b3743b5eea2901fad1a14a7369a98867e70d1b8"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.json",
+      "sha256": "9b1d6039d962c1060732539670204869e4db55f67bcc04a109adf226515ef415"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.cbor",
+      "sha256": "b813800ae3bddbc98e216a7cd47f92075843c19a43c71fda82e971dc4b29f0e5"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.json",
+      "sha256": "f278409b12987017f2270170c57f2f732b36068a5b606a958ea7da028c1dc36d"
+    },
+    {
+      "file": "docs/interoperability/snapshot.cbor",
+      "sha256": "dbf002f25a428e1588f150fd6a69f352da6bda8d420b06c3dc2f8c1633eec89f"
+    },
+    {
+      "file": "docs/interoperability/snapshot.input.json",
+      "sha256": "10c250ec20ff14a8d1e330262ec8ba53b0a70a3a380b80da4fb6fbf113bbe7b1"
+    },
+    {
+      "file": "docs/interoperability/snapshot.json",
+      "sha256": "70a684f485bcf208440455656c69463e4d1058d330de91504ffdae31171f81bd"
+    },
+    {
+      "file": "docs/interoperability/vectors.json",
+      "sha256": "7684f6096567f7cb40f9316a30c6d8601b80b329c2727be5a53b51cc37143201"
+    }
+  ],
+  "referenceFilesUnchanged": true,
+  "preservedNewHarnessBinaryUsedOnBothSides": true,
+  "benchmarkSourceUnchangedAcrossComparedBuilds": true,
+  "benchmarkAddedFiles": [
+    "WWCP_POI_Benchmarks/SignatureCopyProbe.cs"
+  ],
+  "benchmarkModifiedFiles": [
+    "WWCP_POI_Benchmarks/Program.cs"
+  ],
+  "sourceBindings": [
+    {
+      "file": "docs/verification/signature-copies-before-binding.json",
+      "sha256": "7c587e1b5b7f52ce4b0b8aade259155c28a3cc2a523d8b19f203c97318139ebf"
+    },
+    {
+      "file": "docs/verification/signature-copies-after-binding.json",
+      "sha256": "3bbbafae47388d23b3083c4ab2b72a589be8d612f4a29c291253ee007817151e"
+    }
+  ],
+  "measurementReports": [
+    {
+      "file": "docs/performance/signature-copies-before.json",
+      "sha256": "3358b5ab1a31fa3442a12c7817f49d3960645f2b794adb8633979e963cd70bbf",
+      "startedUTC": "2026-10-09T19:16:40.523456+00:00",
+      "finishedUTC": "2026-10-09T19:20:00.989090+00:00",
+      "workers": 40,
+      "samples": 120
+    },
+    {
+      "file": "docs/performance/signature-copies-after.json",
+      "sha256": "9551723b44bd1758565b30bedcb84d71b9ead138ae07e747ae60649c6f1ca5b3",
+      "startedUTC": "2026-10-09T19:37:40.503989+00:00",
+      "finishedUTC": "2026-10-09T19:40:22.713780+00:00",
+      "workers": 40,
+      "samples": 120
+    }
+  ],
+  "measurementSummary": {
+    "file": "docs/performance/signature-copies-summary.md",
+    "sha256": "bcf2891912efefd43bf85f55565a65a53cefff799aa8225fcea60f9625462d81"
+  },
+  "taskBuildsTestsDoNotOverlapFormalSeries": true,
+  "buildLogs": [
+    {
+      "name": "build-before.log",
+      "sha256": "f7e5dcc8b8067d28eca2da3a85fb565b5506605082c87afa3343d61ee0ca1d10"
+    },
+    {
+      "name": "build-tests.log",
+      "sha256": "a15e422a8a06d7b66ad770d83742153de2a652d00ca286f88ad4dae5892d2d64"
+    },
+    {
+      "name": "build-tests-definitive.log",
+      "sha256": "3cf9635150715cf4e4f70c2f1bffc1f60669543e05b8664f485caf0ba4b399a4"
+    },
+    {
+      "name": "build-tests-final.log",
+      "sha256": "7dc683d6ac5402758934ee90878cc5ce4ac69090f6d11fc132022459196a33f6"
+    }
+  ],
+  "initialCorrections": [
+    "Resolve Time namespace collision, typed null peer array and captured integer/discard ambiguity in new test code.",
+    "Twenty initial fixture failures required an invalid insertion-order guarantee after CBOR. Compare preceding/current transports; retain canonical/preimage and exact direct-copy checks."
+  ],
+  "scope": {
+    "commitCopies": "Only signature-array copies of a validated immutable source; Id/payload retained.",
+    "batchProof": "Exact header/timestamp, shared immutable operations/ETags, ordinal descriptions and exact metadata raw JSON.",
+    "fallback": "Full preceding constructor for independent arrays, different spelling or changed unsigned content.",
+    "canonicalSharing": "Existing private immutable content only, within same synchronous scope; no absent-source preparation.",
+    "bounds": "64 entries, 1 MiB/value, 4 MiB total; aliases counted at full length conservatively.",
+    "publicBytesDetached": true,
+    "persistentPayloadCacheAdded": false,
+    "keysCached": false,
+    "trustCached": false,
+    "allCurrentPeersAuthoritiesChecked": true,
+    "recordEqualityUnchanged": true,
+    "runtimeSharedAcrossHistories": false,
+    "exactWireIdentitySigningBytesPreserved": true,
+    "atomicPublicationPreserved": true
+  },
+  "oracle": {
+    "copy": "Unchanged full nine-parameter constructor with original declared ID.",
+    "canonical": "Frozen preceding CanonicalPreparationOracle factories/writers; unchanged Styx and snapshot helpers."
+  },
+  "measuredScope": "16 copies/signings per call, no canonical scope; setup/transport/full-oracle/trust/replacement-batch metadata clones excluded.",
+  "endToEndRecoveryImprovementMeasured": false,
+  "scripts": [
+    {
+      "file": "WWCP_POI_Benchmarks/signature_copies_measure.py",
+      "sha256": "ba14c4227df8d9ae49a44c50f970c2204e55eb618c4bfa699af44f4474917cdf"
+    },
+    {
+      "file": "WWCP_POI_Benchmarks/signature_copies_report.py",
+      "sha256": "c02eabb0024607c010e0c33b3ede3fb7639cd03611c6d5a77b8a7c6c8d87780d"
+    }
+  ],
+  "documentationFiles": [
+    {
+      "file": "README.md",
+      "sha256": "ccfad3c13d9fba20c288b9998a3c849486f4421c0da67f0c9279c761460c3624"
+    },
+    {
+      "file": "WWCP_POI_Tests/README.md",
+      "sha256": "5ed78fa74a5878fe5541fc128abfd963331642ae4d354e3319bac0e609e53fa1"
+    },
+    {
+      "file": "WWCP_POI_Benchmarks/README.md",
+      "sha256": "5162eacd19633129a0a50d349ca2d77c5dc09cc45aa7a8607f54911da9d6251e"
+    },
+    {
+      "file": "docs/SIGNATURE-COPIES.md",
+      "sha256": "15b1eb69e3c54bad29a7f50939a820b84ca9fa792aad09fe4457eee6aef17e3b"
+    },
+    {
+      "file": "docs/ROADMAP.md",
+      "sha256": "c6971e4fe0255b802aaf8403d386bc5ce672b336bae881222d846d5076374d97"
+    },
+    {
+      "file": "docs/ARCHITECTURE.md",
+      "sha256": "15d837114227e02a926c47f35349e900a20e1baf955808deca29f80ff16b37a4"
+    },
+    {
+      "file": "docs/HISTORY.md",
+      "sha256": "55709cecd816b8617cba6201bcd2288b58f84c08e40fe3373ff68d050c1d6a3c"
+    },
+    {
+      "file": "docs/SCALING.md",
+      "sha256": "41f788c996f5ddd7fa97354608a33305a310d63f09ac4497751e707ba1426aea"
+    },
+    {
+      "file": "docs/VERIFICATION-STREAMING.md",
+      "sha256": "9270fe615b6cd0b63176fc9d009ffacda9e5bc1190d8e4a7071169fb912455ef"
+    },
+    {
+      "file": "docs/CANONICAL-PREPARATION.md",
+      "sha256": "680dcffcf8318fb06b8be5ce65ef266f3f3cb0484e26ea585e1e94367c5e19b3"
+    },
+    {
+      "file": "docs/SNAPSHOT-RECONSTRUCTION.md",
+      "sha256": "dec46b51c5e2210c602bcd10f93b834793e148b9470a7cb7e63e6bbfc5398c00"
+    }
+  ],
+  "benchmarkReportValidation": {
+    "reproducedSummary": true,
+    "rejectedVariants": [
+      "incomplete",
+      "missing-worker",
+      "changed-shape",
+      "changed-peer-output",
+      "changed-input",
+      "changed-harness",
+      "changed-method"
+    ]
+  },
+  "finalChecks": {
+    "completedUTC": "2026-10-09T19:42:53.032831+00:00",
+    "sourcesAssembliesReferencesRechecked": true,
+    "scopedWhitespaceCheckPassed": true,
+    "terminalNewlinesAndTrailingWhitespaceChecked": true,
+    "productionPatchReverseCheckRepeated": true,
+    "markdownLinks": "Local Markdown links: 1096 Missing: []",
+    "precedingReferenceEvidence": "32 original fixed file hashes from the exact preceding snapshot-reconstruction evidence, retained before edits and compared after the full runs. Before measurement source binding is separate from fixed-reference evidence."
+  }
+}

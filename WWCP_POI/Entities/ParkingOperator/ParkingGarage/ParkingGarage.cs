@@ -44,6 +44,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        /// <summary>
+        /// Available products owned by the same parking operator; assignments do not imply price combination.
+        /// </summary>
+        public System.Collections.Immutable.ImmutableArray<ParkingProduct_Id> ParkingProductIds { get; }
+
+
 
         #region OSM_WayId
 
@@ -140,9 +146,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Id">The unique identification of the parking sensor.</param>
         public ParkingGarage(ParkingGarage_Id Id, I18NString? Name = null, I18NString? Description = null,
                               String? OSM_WayId = null, IEnumerable<GeoCoordinate>? Geometry = null,
-                              IEnumerable<ChargingStation>? ChargingStations = null)
+                              IEnumerable<ChargingStation>? ChargingStations = null,
+                              IEnumerable<ParkingProduct_Id>? ParkingProductIds = null)
             : base(Id, Name ?? I18NString.Create(Id.ToString()), Description)
         {
+            this.ParkingProductIds = POIGraphJSON.ReferenceIds(ParkingProductIds ?? [], InfrastructureEntityType.ParkingProduct);
             this._OSM_WayId = OSM_WayId;
             this._Geometry = ImmutablePOIValues.CopyItems(Geometry);
             this._ChargingStations = ImmutablePOIValues.CopyItems(ChargingStations);

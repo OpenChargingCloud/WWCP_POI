@@ -50,6 +50,11 @@ public sealed partial class RoamingNetwork
     /// </summary>
     public ImmutableArray<ParkingSpaceGroup> ParkingSpaceGroups => ParkingOperators.SelectMany(op => op.ParkingSpaceGroups).ToImmutableArray();
 
+    /// <summary>
+    /// Products owned by this network's parking operators.
+    /// </summary>
+    public ImmutableArray<ParkingProduct> ParkingProducts => ParkingOperators.SelectMany(op => op.ParkingProducts).ToImmutableArray();
+
     private Object? FindGraphRuntimeEntity(InfrastructureEntityType type, String id)
     {
         T? Find<T>(IEnumerable<T> values, Func<T, String> key) where T : class

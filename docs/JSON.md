@@ -2,7 +2,7 @@
 
 Full history snapshot links use the separate `wwcp-poi-snapshot-commit-json-v1` envelope with a
 `Snapshot` payload (`CreatedAt`, `Description`, `Metadata`, `State`) instead of `ChangeSet`.
-`State` is a complete static network with resulting revision, last batch ID, static-v1 declaration
+`State` is a complete static network with resulting revision, last batch ID, static-v2 declaration
 and ETags. It excludes mutable runtime values. The static data must equal the retained parent;
 only history revision advances. See [exact snapshot contracts](SNAPSHOTS.md).
 
@@ -34,7 +34,7 @@ without renaming the document's properties.
 
 ## Profile declarations
 
-Tagged POI documents declare `contentProfile: "wwcp-poi-static-v1"`; complete tagged parsers require
+Tagged POI documents declare `contentProfile: "wwcp-poi-static-v2"`; complete tagged parsers require
 it when ETags are present. Fresh untagged input may omit it. The declaration is transport metadata,
 excluded from immutable storage/digest inputs. Same-named customer fields remain content.
 Commit/archive headers require `ContentProfile` with the same value; commit IDs/signatures bind it.
@@ -46,11 +46,12 @@ complete snapshot/transport tests validate the exact ETags and canonical bytes.
 
 ## 2. Network snapshots
 
-Complete documents include network-owned manufacturers/grid/parking operators and operator-owned
-EVSE/station/pool/tariff groups. Parking operators own `parkingGarages`, `parkingSpaces`,
-`parkingSensors` and `parkingSpaceGroups`. These arrays contain expanded objects; group members
+Complete documents include network-owned manufacturers/grid/parking operators, `transparencySoftware`
+and `transparencySoftwareCertificates`, and operator-owned EVSE/station/pool/tariff groups. Parking
+operators own `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups` and
+`parkingProducts`. These arrays contain expanded objects; group members
 and parking links are ID strings. Grid/parking operator identities use `id`, other graph nodes
-use `@id`. Import resolves infrastructure before groups and parking; see [graph contract](GRAPH.md).
+use `@id`. Import resolves catalogs before infrastructure, then groups and parking; see [graph contract](GRAPH.md).
 
 
 `RoamingNetwork.ToJSONSnapshot()` writes the nested hierarchy, current timestamped operational
@@ -80,7 +81,7 @@ persisted merely because it exists in C#.
 `ToJSON()` retains expansion controls and custom callbacks. Use `ToJSONSnapshot()` for the
 authoritative static version with current runtime statuses, including the operational/admin
 statuses of directly owned pool/station energy meters, EVSE meters and grid-connection-point
-meters, plus embedded and registered grid operators, groups and parking entities. They remain in their instances and their current values
+meters, plus registered grid operators, groups and parking entities. They remain in their instances and their current values
 are overlaid by `ToJSONSnapshot()`. Direct runtime changes do not increase `revision` or change
 entity timestamps. Entities whose runtime status is `Removed` remain in
 the snapshot; removing POI nodes requires a ChangeSet Remove operation.
@@ -149,22 +150,35 @@ For individual membership/metadata changes use addressed [element operations](EL
 
 ### Grid connection points
 
-`ChargingPool.gridConnectionPoint` is an optional object (zero or one). Its `gridOperator` is
-a required embedded operator document with an `id`; `energyMeter` is optional. The embedded
-operator carries a `roamingNetworkId`, its static data and timestamped current statuses.
-Parsing into a supplied pool/network validates that network reference; standalone parsing
-reconstructs a network reference from that ID. The operator is not automatically registered
-as an independent graph node. An absent or null connection point means no grid connection point.
+`ChargingPool.gridConnectionPoint` is an optional object (zero or one). Its required `gridOperatorId`
+resolves the operator owned in network `gridOperators`; `energyMeter` is optional. Embedded
+`gridOperator` input is rejected. Parsing requires network context, and an unknown registry ID
+fails. An absent or null connection point means no grid connection point.
 
-Replace the complete `gridConnectionPoint` property to edit it; JSON null removes it. Static
-replacement payloads reject runtime fields. Operator/meter histories are independently preserved
-when owner, connection-point identity and child ID match. Electrical properties use Styx `Volt`, `Hertz`, `Watt` and
-`VoltAmpere` value types. JSON writes invariant unit-bearing strings such as `"400 V"`,
-`"50 Hz"`, `"250 kW"` and `"300 kVA"`. Numbers and unitless strings are rejected.
-See [Grid connections](GRIDCONNECTIONS.md)
-for fields and units.
-Connection-point and child properties can also be edited via structured element paths; whole
-property replacement remains available.
+Replace the complete property or edit its fields through structured element paths. JSON null
+removes it. Static payloads reject runtime fields. Owned meter histories survive when owner,
+point identity and meter ID match; registry operator history is independent of point lifetime.
+Electrical properties use Styx `Volt`, `Hertz`, `Watt` and `VoltAmpere` value types. JSON writes
+invariant unit-bearing strings such as `"400 V"`, `"50 Hz"`, `"250 kW"` and `"300 kVA"`.
+Numbers and unitless strings are rejected. See [Grid connections](GRIDCONNECTIONS.md).
+
+### Shared software and certificate documents
+
+Software JSON uses `@id` plus its name, release version, license, vendor and links. Certificate
+JSON uses its own `@id`, issuer, station model/version and verified/compatible software ID arrays.
+Validity, document number/URL and a manufacturer ID are optional. The meter's assignment is
+`{ "transparencySoftwareId": "verifier-2", "legalStatus": "verified", "certificateId": "approval-1" }`.
+`certificateId` can be omitted; both referenced catalog entries must otherwise exist in the
+network, and the document must cover the selected software release. No description is embedded
+in the assignment. See [full model and example](DOMAIN-MODEL.md#transparency-software-and-certificates).
+
+### Parking references
+
+A space can reference `parkingGarageId`; a group lists `parkingSpaceIds`. Garages, spaces and
+groups list `parkingProductIds`. All targets must belong to the same parking operator. Groups
+may overlap. The operator owns expanded `parkingProducts` documents once. These offers have
+IDs and optional SI duration fields; tariff elements/components/restrictions retain value semantics.
+See [parking contract](DOMAIN-MODEL.md#parking).
 
 ## 3. ChangeSet JSON
 
@@ -437,3 +451,14 @@ Fragments may split any CBOR token; they are verified/staged before the complete
 is decoded. Exact parsers impose local byte/count bounds and recompute the manifest identity.
 These messages contain no runtime and do not select an existing head. Complete field tables,
 canonical identity, resume and preview/activation rules are in [bootstrap](BOOTSTRAP.md).
+
+### Subsequent exact root/head snapshot reuse
+
+[Root/head reconstruction](SNAPSHOT-RECONSTRUCTION.md) now conditionally retains an immutable
+snapshot after the complete domain parser, references, metadata and representation completion.
+Every stored property byte, child and version must match; different spellings/defaults use the
+existing capture path. Separate histories keep independent runtime objects; a private root-only
+head can keep its freshly validated root model. Every peer/current policy, eager/lazy error timing,
+cancellation and atomic publication remain intact. No persistent model or trust cache is added.
+The package adds 86 cases and matched model/signature/restore/full-recovery measurements with
+unchanged prepared inputs, outputs, C# harness and dependencies. Earlier results remain historical.

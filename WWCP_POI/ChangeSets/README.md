@@ -182,59 +182,56 @@ without converting them to binary floating point first. When supplying a JObject
 `JsonTextReader.FloatParseHandling = FloatParseHandling.Decimal`. Precision already lost in a
 JObject created with the default double reader cannot be recovered by a parser.
 
-## Transparency software and certificate status
+## Transparency software, certificate documents and meters
 
-`TransparencySoftware` and `TransparencySoftwareStatus` are nested values under
-`EVSE.energyMeter.transparencySoftware`. They have no independent entity IDs. Change them by
-replacing the owning EVSE's `energyMeter` property with an optional `OldValue` precondition:
+The network owns identified `TransparencySoftware` releases and identified
+`TransparencySoftwareCertificate` approval/compatibility documents. Add, remove and edit these
+with graph operations. A document describes a station model/version, its issuer and software IDs
+classified as verified or compatible. Optional validity belongs to the document. IDs protect
+referenced entries from deletion; changing a document revalidates its consuming assignments.
+See [domain contract](../../docs/DOMAIN-MODEL.md#transparency-software-and-certificates).
+
+`TransparencySoftwareStatus` is a nested immutable assignment in a meter's `transparencySoftware`
+array. It contains `transparencySoftwareId`, `legalStatus` and optional `certificateId`. The array
+has one assignment per software ID. Assignments resolve the shared network entries rather than
+embedding descriptions. Change the array on an addressed meter, or replace the owning meter
+property with an optional old-value precondition. The following requires an existing document
+`certificate-2` covering the selected software:
 
 ```csharp
 var oldMeter = roamingNetwork.DataSnapshot
     .GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["energyMeter"];
 var meter = System.Text.Json.Nodes.JsonNode.Parse(oldMeter.GetRawText())!;
 meter["transparencySoftware"]![0]!["legalStatus"] = "verified";
-meter["transparencySoftware"]![0]!["certificate"] = "certificate-2";
+meter["transparencySoftware"]![0]!["certificateId"] = "certificate-2";
 
 var change = RoamingNetworkChange.UpdateProperty(
     "EVSE", "DE*ABC*E1", "energyMeter", oldMeter,
     JsonSerializer.SerializeToElement(meter));
 ```
 
-Pools and stations can additionally own zero or more meters under `energyMeters`.
-Each meter can specify an optional `role` such as `grid`, `pv` or `battery`. Replace the owner's
-complete `energyMeters` array to change membership, roles or transparency information; use `[]`
-to clear it. IDs must be unique within the owner. Direct pool/station meters retain independent
-mutable operational/admin status schedules, which are captured when deriving a network version
-and overlaid by `ToJSONSnapshot()`. Static array replacements preserve histories by owner and
-meter ID, and reject runtime fields in supplied documents.
-Use `AddElement`/`RemoveElement` for individual meters and `UpdateElementProperty` for their
-static fields. Clearing/removing and reintroducing a child starts a new runtime lifetime even
-when its final ID equals its old ID.
+Pools and stations directly own zero or more `energyMeters`; an EVSE or point owns an optional
+single `energyMeter`. Meter roles such as `grid`, `pv` and `battery` are immutable. Use element
+Add/Remove/property operations for meters, or whole-property replacement (`[]` clears an array).
+Static edits preserve independent runtime by owner/meter identity. Removal/reintroduction starts
+a new runtime lifetime even if the final ID is reused; runtime fields are rejected in static payloads.
 
-`ChargingPool.gridConnectionPoint` optionally describes the public-grid connection. It has a
-mandatory `gridOperator` reference/document and an optional `energyMeter`. Replace this complete
-property to change its connection data; JSON null removes it. Operator and meter runtime histories
-are independently preserved across static replacements when ownership, connection-point ID
-and child ID match. New identities start with runtime defaults.
+A pool's optional `gridConnectionPoint` has a required `gridOperatorId` resolving the network
+registry and an optional owned meter. Edit its properties or replace it; JSON null removes it.
+Changing its identity resets the point meter, while the shared operator retains its schedule.
 See [Grid connections](../../docs/GRIDCONNECTIONS.md).
 
-The replacement is validated through the energy meter and software/status parsers before commit.
-Invalid software, non-string certificate fields and reversed validity intervals abort the batch. Other
-EVSEs and their data are shared unchanged. The meter's own `lastChange` is supplied in the property
-document; the change set updates the owning EVSE and its ancestor timestamps automatically.
+Software JSON requires an `openSourceLicense` object (`@id`, `description`, `URLs`), never a
+string license. Software links, license URLs and document URLs must be absolute. Certificate
+`NotBefore`/`NotAfter` are nullable UTC-normalized `DateTimeOffset` values with tick precision;
+JSON timestamps require `Z` or an explicit offset. Reversed intervals, duplicate/disjoint-list
+violations and dangling references fail validation. At least one verified or compatible software
+ID is required. Legal labels remain extensible. The document is domain evidence, with authenticity
+and station deployment matching left to the application; see [signatures](../../docs/SIGNATURES.md).
 
-Software JSON requires `openSourceLicense` as a license object (`@id`, `description`, `URLs`).
-String licenses and alternative property names are rejected.
-
-`TransparencySoftwareStatus.NotBefore`/`NotAfter` and their constructor parameters are now nullable
-`DateTimeOffset` values normalized to UTC. JSON retains all seven fractional second digits.
-Timestamp strings require an explicit offset or `Z`. Legal status values remain extensible; parsing
-checks their representation, not certificate authenticity or legal approval. Software links and
-license URLs must be absolute. Software/status comparisons cover all serialized fields, and nested
-license metadata and the meter's software collection are copied defensively.
-
-Energy meter JSON now retains creation/change timestamps, current timestamped statuses,
-data source and custom data in both regular output and network snapshots.
+Energy meter JSON retains creation/change timestamps, current timestamped statuses, data source
+and custom data. Runtime status stays outside static hashes. Tariff elements, price components
+and restrictions remain value substructures without IDs.
 
 ## Source organization
 
@@ -261,6 +258,6 @@ not introduce extra copies of entities or JSON trees.
 
 ## Interoperability evidence
 
-The fixed [static-v1 profile](../../docs/INTEROPERABILITY.md) supplies exact JSON/CBOR/digest/signature
+The fixed [static-v2 profile](../../docs/INTEROPERABILITY.md) supplies exact JSON/CBOR/digest/signature
 references and executed replica, resolution, expected-head race and archive-recovery workflows.
 Commit IDs/signatures bind the profile explicitly; static ETag inputs exclude its transport declaration.

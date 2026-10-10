@@ -1,0 +1,84 @@
+{
+  "date": "2026-10-08",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "fc9d619c60f309b129f048251eee8f7b629d0d77ec8c7bc0201902156bde0ed0",
+  "productionAssemblySHA256": "58c252259eaea5d7e5c1ddcc1adf9d9017e3d63f582567da5bb13ec1dc61188f",
+  "testSourceSHA256": "469fb273f771ad94017ba234e87ba8d18181ad51851d7f4f0f6b154035c1cfc4",
+  "testAssemblySHA256": "923b625da6e8e9d588e8d3395525067599749e403f1b853ab04d604e870fd53e",
+  "benchmarkSourceSHA256": "1f7d11023960393b23e38f759795b72c5c7ce27b56f278c39a20c7b070b99e2c",
+  "reconstructedBeforeProductionSourceSHA256": "882ef87016d841bbdf1f2e2684beba75d500e305b437d5083a0fe56811f66c3e",
+  "scopedPatchSHA256": "69096065b1fadeaaa5dbc558deaf7574f75436ff2dade303580aaeaeb9de5b18",
+  "newTestCases": 0,
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/tagged-document/tagged-document-focused.trx",
+      "sha256": "d302a530dfedd28ad95c623d38bd878de58fd0acaf97d9844be025919cd5cd8d",
+      "times": {
+        "creation": "2026-10-08T22:41:43.1808884+02:00",
+        "queuing": "2026-10-08T22:41:43.1808888+02:00",
+        "start": "2026-10-08T22:41:42.1218716+02:00",
+        "finish": "2026-10-08T22:42:16.9926448+02:00"
+      },
+      "passed": 149,
+      "failed": 0,
+      "skipped": 0,
+      "excludedExplicitGenerators": [],
+      "rawNotExecuted": 0,
+      "counters": {
+        "total": 149,
+        "executed": 149,
+        "passed": 149,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/tagged-document/tagged-document-full.trx",
+      "sha256": "3aa4182248c5bb6f49222651fb6dbbeb5d6f08b07ee4429717e602d968228e1b",
+      "times": {
+        "creation": "2026-10-08T22:43:24.6673175+02:00",
+        "queuing": "2026-10-08T22:43:24.6673179+02:00",
+        "start": "2026-10-08T22:43:23.1932870+02:00",
+        "finish": "2026-10-08T22:46:48.5037713+02:00"
+      },
+      "passed": 1174,
+      "failed": 0,
+      "skipped": 1,
+      "excludedExplicitGenerators": [
+        "GenerateReferenceVectors",
+        "GenerateSnapshotRetentionVectors"
+      ],
+      "rawNotExecuted": 3,
+      "counters": {
+        "total": 1177,
+        "executed": 1174,
+        "passed": 1174,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  ]
+}

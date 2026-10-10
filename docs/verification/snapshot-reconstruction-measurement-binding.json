@@ -1,0 +1,340 @@
+{
+  "date": "2026-10-09",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "54f70da9ca5bb6ad171e697ea3dba3eef6f6de319da2a7aa933ad9b34bc94609",
+  "productionAssemblySHA256": "3bb6f6a79404c526af189c8c7baee2ef76dafac817f852d6efd20449860348db",
+  "beforeProductionSourceSHA256": "953efa1c396d0f547d65aa89ea72935e75ff87856a829ee6db8804fe59f14034",
+  "beforeProductionAssemblySHA256": "3d731f99b926a64b892915f1e6fe15317a6fd3ce2f50ea0d252a4b4e0f7047b7",
+  "beforeEvidence": "docs/verification/canonical-preparation-results.json",
+  "productionPatch": {
+    "file": "docs/performance/snapshot-reconstruction.diff",
+    "sha256": "37e513e4d9269d3cfd85c741071412846aa9ea2a1714e5fc32348213e4bf2d72",
+    "modifiedFiles": [
+      "WWCP_POI/Entities/RoamingNetwork/RoamingNetwork.Json.cs",
+      "WWCP_POI/ChangeSets/RoamingNetwork.CopyOnWrite.cs",
+      "WWCP_POI/History/RoamingNetworkHistory.Archive.cs",
+      "WWCP_POI/History/RoamingNetworkHistory.Boundary.cs",
+      "WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs"
+    ],
+    "addedFiles": [
+      "WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Reconstruction.cs"
+    ],
+    "reverseCheckPassed": true,
+    "reverseAppliedInPrivateCopyRestoresExactBeforeBytes": true,
+    "privateCheckoutEOL": "Original per-file LF/CRLF rules in private .gitattributes."
+  },
+  "testSourceSHA256": "b4304a8e0dae3a61285f6811a29fc70e36aae83c3fe979cf5536acd4cfc4bb1b",
+  "testAssemblySHA256": "c8283b13ee8bb776c18300c9b692e5ff5e3c03c01e8b799b0414489fc5d4d008",
+  "newTestCases": 86,
+  "testChangedFiles": [
+    "Interoperability/SnapshotReconstructionTests.cs"
+  ],
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/snapshot-reconstruction/reconstruction-fixture-definitive.trx",
+      "sha256": "ecca1511bd7f3d9a7b7b7eede262f49464d86a8bd62c3459dfb43c72aa4e4016",
+      "counters": {
+        "total": 86,
+        "executed": 86,
+        "passed": 86,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "newFixturePassed": 86,
+      "times": {
+        "creation": "2026-10-09T20:38:31.8479601+02:00",
+        "queuing": "2026-10-09T20:38:31.8479610+02:00",
+        "start": "2026-10-09T20:38:29.9265193+02:00",
+        "finish": "2026-10-09T20:38:37.6147627+02:00"
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/snapshot-reconstruction/reconstruction-focused.trx",
+      "sha256": "1aee8d93f5d4357aebb7b300b7a3d7684a77e8e7a118d41348c443cb6ca49cd4",
+      "counters": {
+        "total": 2135,
+        "executed": 2134,
+        "passed": 2134,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "newFixturePassed": 86,
+      "times": {
+        "creation": "2026-10-09T20:39:04.3856969+02:00",
+        "queuing": "2026-10-09T20:39:04.3856974+02:00",
+        "start": "2026-10-09T20:38:59.9723470+02:00",
+        "finish": "2026-10-09T20:44:57.5576765+02:00"
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/snapshot-reconstruction/reconstruction-full.trx",
+      "sha256": "36036efd442877941919bafab71e8fd2d386f0e1ea21853ad01397799755433e",
+      "counters": {
+        "total": 2467,
+        "executed": 2466,
+        "passed": 2466,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "newFixturePassed": 86,
+      "times": {
+        "creation": "2026-10-09T20:39:02.0890457+02:00",
+        "queuing": "2026-10-09T20:39:02.0890462+02:00",
+        "start": "2026-10-09T20:39:00.2179389+02:00",
+        "finish": "2026-10-09T20:44:58.9890166+02:00"
+      }
+    }
+  ],
+  "excludedExplicitGenerators": [
+    "GenerateReferenceVectors",
+    "GenerateSnapshotRetentionVectors"
+  ],
+  "referenceFiles": [
+    {
+      "file": "docs/interoperability/changeset.cbor",
+      "sha256": "2e9ca50bf982c5797fa5301beadd7399c38967031325d305909fd1a9ddaff2e3"
+    },
+    {
+      "file": "docs/interoperability/changeset.json",
+      "sha256": "5149f33a4d0f04cca1b077c5bb5888da6f7670fb970c08ed9b8d2be01d58e461"
+    },
+    {
+      "file": "docs/interoperability/commit.cbor",
+      "sha256": "dd808c2f667ed99ac1f319fbbe480b7bfa7a1cd0c2fffb9d0c72a4dd49441f64"
+    },
+    {
+      "file": "docs/interoperability/commit.json",
+      "sha256": "16e1c0b8e5e26b741a915882f6445df61985a74813da4e0bde8df96b0dcdc9e2"
+    },
+    {
+      "file": "docs/interoperability/history.cbor",
+      "sha256": "4ad8c59d47e8738c9005a303a150552077ba4dc0ab990e2a62c42b66d889ed53"
+    },
+    {
+      "file": "docs/interoperability/history.json",
+      "sha256": "173f11f152a749ee7d25a8f629351eec9c0da8366ddf7881353c1bafbc8e16e3"
+    },
+    {
+      "file": "docs/interoperability/merge.cbor",
+      "sha256": "c94096478440e4e714cc1d73ff39d73da0181faf485fd16b0d6ff9369fa9c966"
+    },
+    {
+      "file": "docs/interoperability/merge.json",
+      "sha256": "6e3f4a476d1da2678528ab3a7abcba770258b5d7c229e71aa280fbb294cb6a9c"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.cbor",
+      "sha256": "c8ec4ad4ed107ea6a7b801f8ad5fad78b93a42f12905148824f78a2b1b1dec49"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.json",
+      "sha256": "abeea6cdfea5e449c56a771cd0caa14ed45a874962336d353e5c0fe7a1436dfc"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.cbor",
+      "sha256": "408ce78ba3c28befe90b6b159f9e12146046146717e698d31f1789e74804e3ac"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.json",
+      "sha256": "fad7ba55d04bffc11312ca01112da1c0920adbd0221123981460630ebe42a34a"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.cbor",
+      "sha256": "903a0f7e5de856c92d893476fb081633da45a4cdc2587f5b18a3bec9f0810e9b"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.json",
+      "sha256": "52c32069a8f96baa7826998fdc5180e7781d8e875bb04618d93ff51e0589160c"
+    },
+    {
+      "file": "docs/interoperability/retention-plan.json",
+      "sha256": "53d6e4f920b2801e72acd3c9ddcd9916d24e0f365883829c7fe12faeaa4e3c73"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.cbor",
+      "sha256": "18865a3f1ee8e9319a9dc63fb9c47c55d86ce6c95ac19e425f9144c0d31d5f29"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.json",
+      "sha256": "f486190cd0fa2de10bd39cabfe3d582a27814dc27a41ac8e4529cc727041894b"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.cbor",
+      "sha256": "0a5b8a2389bb4d603cbb17e6c6f75a24736a82bdfb49c56b4e206d6120e9ade7"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.json",
+      "sha256": "7c5363c00863993d47c1b1cc9e723486521f640294fbce71207ef018fe061af5"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.cbor",
+      "sha256": "1d6593f6cfbef65f4b310cb173a81cadea5010e96f6f3cd2454e29701450bb47"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.json",
+      "sha256": "c1cbf4389ded04c16a78f45980ff5b68f440e012a5e936929418cc3db368a18c"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.cbor",
+      "sha256": "608218579b163fbf3eb71b7932fe4a9483bf089953e448793d02d27114074531"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.json",
+      "sha256": "4bc9b76e36a992d73df3632b5f18d678d29aa33a0be42fcb311710818e1820e4"
+    },
+    {
+      "file": "docs/interoperability/snapshot-retention.vectors.json",
+      "sha256": "b773e90f3ba2f9c1ae110163bddc48a5da76eadad04e522cfa852d16dbb412c9"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.cbor",
+      "sha256": "ca17c05ea79af48847fe95268b3743b5eea2901fad1a14a7369a98867e70d1b8"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.json",
+      "sha256": "9b1d6039d962c1060732539670204869e4db55f67bcc04a109adf226515ef415"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.cbor",
+      "sha256": "b813800ae3bddbc98e216a7cd47f92075843c19a43c71fda82e971dc4b29f0e5"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.json",
+      "sha256": "f278409b12987017f2270170c57f2f732b36068a5b606a958ea7da028c1dc36d"
+    },
+    {
+      "file": "docs/interoperability/snapshot.cbor",
+      "sha256": "dbf002f25a428e1588f150fd6a69f352da6bda8d420b06c3dc2f8c1633eec89f"
+    },
+    {
+      "file": "docs/interoperability/snapshot.input.json",
+      "sha256": "10c250ec20ff14a8d1e330262ec8ba53b0a70a3a380b80da4fb6fbf113bbe7b1"
+    },
+    {
+      "file": "docs/interoperability/snapshot.json",
+      "sha256": "70a684f485bcf208440455656c69463e4d1058d330de91504ffdae31171f81bd"
+    },
+    {
+      "file": "docs/interoperability/vectors.json",
+      "sha256": "7684f6096567f7cb40f9316a30c6d8601b80b329c2727be5a53b51cc37143201"
+    }
+  ],
+  "referenceFilesUnchanged": true,
+  "benchmarkSourceSHA256": "d389ff298008f62c33535621d24b04508bfb82d0af5f0e1af3552740fd867186",
+  "rebuiltBenchmarkAssemblySHA256": "a5d482e595dd5b63416d48e6a15a1020bfd4e1265c0b1a4ba36ae47966238cb5",
+  "measurementBenchmarkAssemblySHA256": "c82ca65658b52849124f3bb7897f97ce6bff5b710283eb87a4d7800b73a7b2ba",
+  "benchmarkCSharpSourceUnchanged": true,
+  "preservedHarnessBinaryUsedOnBothSides": true,
+  "sharedDependencies": [
+    {
+      "name": "Styx.dll",
+      "sha256": "1655174175e2abb259ead391c8e58aa71c089e71142c04a88581d31f3b7956ac",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "WWCP_CoreData.dll",
+      "sha256": "4630250928e031ad4fc7c531c6786d3cca3e952f851f3f184903b3d3d19c0cba",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "org.GraphDefined.Vanaheimr.Hermod.dll",
+      "sha256": "7355657890caf64a8e922e3d11bb14e835c398b6dd76f013d3987e035535a43c",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "Newtonsoft.Json.dll",
+      "sha256": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "BouncyCastle.Cryptography.dll",
+      "sha256": "ef92fc661e8d7ba8ec4d39a7cdfcdba41f14cb327f0d24fe79d0b5bb428899b5",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    }
+  ],
+  "scope": {
+    "reuse": "Only the retained immutable snapshot following fresh full domain/model validation and exact raw-property/owned-child/version equality.",
+    "rootOnlyHead": "One private newly validated root model can supply an identical-snapshot head.",
+    "runtimeObjectsSharedAcrossHistories": false,
+    "mutableJSONRetained": false,
+    "persistentModelCacheAdded": false,
+    "trustCached": false,
+    "allCurrentPeersAuthoritiesChecked": true,
+    "eagerCompleteAndLazyBoundaryModelsPreserved": true,
+    "exactExportAndValidationErrorsPreserved": true,
+    "publicSignaturesChanged": false,
+    "mismatch": "Preceding capture/normalization path.",
+    "temporaryComparison": "Visited set proportional to supplied immutable entities, released on return; no additional global retention."
+  },
+  "oracle": {
+    "route": "Unchanged ordinary RoamingNetwork.Parse(snapshot.ToJSON()), which supplies no prepared snapshot to the factored parser.",
+    "sharedHelpers": "Existing domain parsers, completion/capture/binding and Styx; exact prior source changes are bound by the scoped reverse patch.",
+    "propertyComparison": "Exact stored raw property JSON; owned child ordering is irrelevant to immutable set capture."
+  },
+  "buildLogs": [
+    {
+      "name": "build-tests-definitive.log",
+      "sha256": "8584822893b77b90009380126ab95e18acda9b1aa4f55364fe7036df4ca4ad29"
+    },
+    {
+      "name": "build-benchmark.log",
+      "sha256": "c7bdab42bbd1d73acf453cf113706d97b6cc2a4938462fc5d1bd7953f58f520d"
+    }
+  ],
+  "initialCorrections": [
+    "Invalid identity input must disable optional reuse; catch its ArgumentException in the comparison.",
+    "Count repeated root peer verification in the preceding recovery paths.",
+    "Whole head snapshot identity is conditional; normalized escape/whitespace spellings must preserve capture fallback.",
+    "Remove equal JValue before changing numeric scale because the Newtonsoft setter can retain an equal value.",
+    "Construct a matching checkpoint before constructing a deliberately invalid-domain snapshot envelope."
+  ],
+  "measurementScripts": [
+    {
+      "file": "WWCP_POI_Benchmarks/snapshot_reconstruction_measure.py",
+      "sha256": "fdc38491dd2683b7b4757044286d83ea3c670553d75b4d7f4a8cd635a6eda40e"
+    },
+    {
+      "file": "WWCP_POI_Benchmarks/snapshot_reconstruction_report.py",
+      "sha256": "ddb13e221c3d3c1cbdea2d4414d0c16f58acb20a3931a3e28c5c11378fdab0cc"
+    }
+  ]
+}

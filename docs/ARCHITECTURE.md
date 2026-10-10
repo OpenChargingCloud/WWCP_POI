@@ -16,7 +16,7 @@ service implemented by this repository.
 
 ## 2. Entity nodes and nested values
 
-The immutable graph has 19 node types; see [ownership and references](GRAPH.md):
+The immutable graph has 22 node types; see [ownership and references](GRAPH.md):
 
 | Node type | Parent | Child JSON field |
 | --- | --- | --- |
@@ -35,6 +35,9 @@ The immutable graph has 19 node types; see [ownership and references](GRAPH.md):
 | `ChargingStationManufacturer` | `RoamingNetwork` | `chargingStationManufacturers` |
 | `GridOperator` | `RoamingNetwork` | `gridOperators` |
 | `ParkingOperator` | `RoamingNetwork` | `parkingOperators` |
+| `TransparencySoftware` | `RoamingNetwork` | `transparencySoftware` |
+| `TransparencySoftwareCertificate` | `RoamingNetwork` | `transparencySoftwareCertificates` |
+| `ParkingProduct` | `ParkingOperator` | `parkingProducts` |
 | `ParkingGarage`, `ParkingSpace`, `ParkingSensor`, `ParkingSpaceGroup` | `ParkingOperator` | `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups` |
 
 Each `InfrastructureEntitySnapshot` contains:
@@ -61,8 +64,9 @@ A `RoamingNetworkDataSnapshot` contains the root key, the entity map, a revision
 applied ChangeSet ID and the persistent reverse entity-reference index. TariffReferences exposes its tariff subset.
 
 Brands, licenses, addresses, coordinates, energy mixes, price components, tariff restrictions,
-cables, energy meters, grid connection points and transparency software/status are nested property values. They are not
-independent graph node types. Supported nested relations use addressed element operations or explicit whole-property replacement.
+cables, energy meters, grid connection points and meter transparency assignments are nested
+property values. Software releases and certificate documents have independent network-owned
+graph identities; tariff substructures remain values without IDs. Supported nested relations use addressed element operations or explicit whole-property replacement.
 
 ### Identity
 
@@ -132,8 +136,9 @@ static version and revision metadata. Operational statuses and measurements neve
 ### Support types and immutable groups
 
 The immutable API also covers `ChargingCable`, `EnergyMeter`, `GridOperator`, `ParkingOperator`,
-`TransparencySoftware` and `TransparencySoftwareStatus`. The latter describes a persisted legal
-certificate value; its name does not make it a mutable operational schedule. Parking garages,
+`TransparencySoftware`, `TransparencySoftwareCertificate` and `TransparencySoftwareStatus`.
+The latter is an immutable legal-status assignment linking the catalog release to an optional
+model/version-specific certificate document; it has no mutable operational schedule. Parking garages,
 spaces and sensors also have immutable static fields and collections. Grid/parking operator
 contact values and data licenses are supplied through their constructors.
 
@@ -147,17 +152,24 @@ captured independently when deriving a network version, including replacements r
 owner and meter ID. Runtime fields are rejected in static replacement payloads.
 An EVSE's optional meter remains separate from the station's direct meters.
 
-`ChargingPool.EnergyMeters` now uses the same detached immutable array and JSON/ChangeSet
-contract as station meters. A pool also owns zero or one `GridConnectionPoint`, an immutable
-description with a mandatory `GridOperator` reference and zero or one meter. Its operator and
-meter are cloned with independent runtime histories when copying a pool; the operator's network
-reference points to the owning network version. A different network ID is rejected.
-Snapshots include the referenced operator's complete supported data, allowing reconstruction
-without an external lookup. The connection point remains a nested owner property in the versioned
-graph. It carries optional electrical ratings and location/contract identifiers, documented in
-[Grid connections](GRIDCONNECTIONS.md). Static replacements of `gridConnectionPoint` or
-`energyMeters` preserve current runtime histories when ownership and child identity match.
-Changing the connection point's ID starts a new runtime lifetime for its children.
+`ChargingPool.EnergyMeters` uses the same detached immutable array and JSON/ChangeSet contract
+as station meters. A pool also owns zero or one immutable `GridConnectionPoint` with a mandatory
+`gridOperatorId` and zero or one meter. The operator must exist in the network registry. Every
+point resolves the canonical operator instance in that version, so its description and runtime
+are shared across points. A derived network owns a fresh registry instance and independent
+operator schedules; its points resolve that instance. Point meters are cloned independently.
+
+Complete snapshots own the operator document once in `gridOperators`. Standalone point parsing
+requires network context to resolve the ID. The point remains a nested pool property with
+optional electrical ratings and location/contract identifiers; see [Grid connections](GRIDCONNECTIONS.md).
+Static property replacement preserves point-meter runtime when ownership and identity match.
+Changing the point ID resets its meter lifetime; it does not reset the referenced operator.
+
+Network software and certificate catalogs are parsed before meters. Assignments retain shared
+immutable descriptions, and indexed IDs protect referenced nodes from deletion. Certificate
+updates also revalidate the software coverage of consuming assignments. Parking products belong
+to the parking operator; space-to-garage links and group membership are references within that
+operator. Product offers are a union without inferred pricing rules. See [domain decisions](DOMAIN-MODEL.md).
 
 `ChargingStationManufacturer` is a local fork of the WWCP-Core type. Its texts use
 `ImmutableI18NString`; its keys are detached `ImmutableCryptoKeyInfo` documents rather than a
@@ -181,17 +193,16 @@ construction/import and remain immutable at the public boundary; static registra
 `Add`. Network parsing resolves infrastructure before groups and parking references. See
 [graph integration](GRAPH.md) for fields, scopes and supported reference operations.
 
-Meters, cables and transparency information remain owner properties. Nested supported relations
+Meters, cables and legal-status assignments remain owner properties. Nested supported relations
 have addressed element operations with structured paths and per-element/property preconditions.
-Value collections without stable identities retain explicit whole-property replacement.
-
-The GridOperator embedded in a connection point remains an independent description. Its ID does
-not alias a registered network GridOperator; updates and runtime in those two slots are independent.
+Tariff value arrays and meter assignment arrays retain explicit whole-property replacement.
+Software releases/certificates use graph operations; their identified reference arrays support
+element operations. Grid operator descriptions use graph operations on the registry entry.
 
 The local `RuntimeStatusSchedule` fork retains the existing mutable schedule behavior and lets
 derivation restore the original history capacities without replacing schedules or losing their
 event subscriptions. Captured versions own independent schedules, including pool/station/EVSE
-meters and the operators/meters referenced by grid connection points.
+meters, connection-point meters and the network registry of grid operators.
 
 Status schedule enumeration copies the entries while holding the schedule's mutation lock,
 then enumerates that detached copy. Concurrent inserts cannot invalidate an active enumerator.
@@ -315,8 +326,8 @@ Errors from collection parsers retain paths such as `chargingStations[0].EVSEs[1
 Operation failures are wrapped in `RoamingNetworkChangeSetException`, with the batch ID and a
 zero-based operation index. Batch-level failures have no operation index.
 
-Validation has a defined scope. A well-formed certificate string is not proof of certificate
-authenticity; an extensible legal-status label is not a legal approval; a parsed ID is not evidence
+Validation has a defined scope. A well-formed approval/compatibility document is not proof of
+its authenticity; an extensible legal-status label is not a legal approval; a parsed ID is not evidence
 that the sender owns that entity. See [signatures and trust](SIGNATURES.md).
 
 ## 7. Timestamps and status
@@ -387,6 +398,21 @@ for large-data processing.
 Retaining previous snapshots retains shared data and any older values that are still reachable.
 Applications decide how many versions to retain. There are no measured throughput, memory-budget
 or million-entity capacity guarantees supplied by these tests.
+Separate [Release measurements](SCALING.md) now cover 16/128/512-EVSE synthetic workloads,
+retained branches/snapshots, repeated pruning and larger local location catalogs. They record
+elapsed/CPU/allocation, approximate memory peaks and archive/transfer bytes; they supply local
+before/after evidence rather than general capacity guarantees. Root exports reuse the immutable
+snapshot's digest pair, snapshot-only revisions share it, and one pair computation reuses canonical
+JSON bytes for CBOR conversion. Full encoded archives are not cached per retained version.
+The [individual encoder baseline](ENCODING-COSTS.md) now isolates tagged snapshot/ChangeSet
+stages and borrowed versus buffered archive outputs over 680 samples. Tagged document construction
+was the largest isolated snapshot allocation stage in that historical baseline.
+[The subsequent optimization](TAGGED-DOCUMENT-OPTIMIZATION.md)
+now hashes prepared static subtrees before attaching declarations, removing redundant copies/passes
+while preserving bytes and the runtime projection. The [direct POI CBOR encoder](DIRECT-POI-CBOR.md)
+then removes complete CBOR/native-ETag trees. It sorts encoded keys before Styx emission, retaining
+canonical JSON bytes, a compact JSON index and complete value output buffers. Archive value
+validation at the remaining outer depth and full replay/materialization retain their contracts.
 
 Immutable snapshots can be read and used to derive independent versions concurrently. Capture and
 domain hierarchy materialization use a per-network lock. Concurrent runtime updates across
@@ -414,7 +440,14 @@ Content-equivalent versions share static identifiers even if their histories dif
 `wwcp-poi-commit-json-v1` identity binds ordered ancestry, state tags, revision and unsigned batch
 content. Equal batch/commit peer signatures are retained outside this identity. Static JSON/CBOR
 history archives preserve a checkpoint, original commits and head; recovery replays every branch.
-File-backed publication flushes/replaces the archive before changing the in-memory head. Global
+File-backed publication streams into a sibling temporary file and flushes/replaces the archive
+before changing the in-memory head. `WriteJSON(Stream)` / `WriteCBOR(Stream)` borrow a writable
+destination and hold the gate; reentrant gated mutations reject and caller-owned failed output
+can be partial. A pooled buffer emits existing JSON field order; CBOR maps sort encoded text keys
+and emit definite counts with Styx leaf codecs. POI payloads preflight standalone/remaining
+depth rules and emit directly; [ChangeSets](DIRECT-ARCHIVE-CHANGESET.md) do the same with exact
+signed scalar preflight/reuse. Retention hashes/counts output incrementally.
+See [direct POI archive payloads](DIRECT-ARCHIVE-PAYLOAD.md). See [streaming archives](STREAMING-ARCHIVES.md). Global
 replica coordination and archive rollback policy remain application work.
 See [commit history](HISTORY.md) for identity, signatures, leases and durability boundaries.
 
@@ -446,7 +479,9 @@ complete digest and ordered fragment digests. Bounded JSON/CBOR fragments are in
 disk receipts under a staging writer lease; reopening verifies the ordered prefix. Complete profile,
 hash, trust and all-branch replay checks precede preview/explicit activation into a new history.
 No current head is switched by staging. Runtime is initialized locally; original signed envelopes
-are retained. Transfer bounds do not make archive construction/replay streaming. See [bootstrap](BOOTSTRAP.md).
+are retained. Source encoding now freezes bounded fragments as they are emitted; their total
+payload remains retained. POI and ChangeSet archive payloads emit directly after preflight;
+prepared JSON/index/schema paths and final decoding/replay still materialize complete values. Transfer bounds do not bound total memory or replay work. See [bootstrap](BOOTSTRAP.md).
 
 ## 10. Source organization and extending the model
 
@@ -475,7 +510,7 @@ are retained. Transfer bounds do not make archive construction/replay streaming.
 | [Import](../WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Import.cs) | Hierarchy import and timestamp normalization |
 | [Validation](../WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Validation.cs) | Small domain projections for validation |
 | [Entity references](../WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.References.cs) | Reverse graph reference index |
-| [Static content profile](../WWCP_POI/Serialization/POIContentProfile.cs) | Fixed static-v1 declaration and unsupported-profile rejection |
+| [Static content profile](../WWCP_POI/Serialization/POIContentProfile.cs) | Fixed static-v2 declaration and unsupported-profile rejection |
 | [JSON export](../WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Json.cs) | Property JSON and direct nested writing |
 | [RoamingNetwork integration](../WWCP_POI/ChangeSets/RoamingNetwork.CopyOnWrite.cs) | Public API and lazy domain projection |
 | [Runtime retention](../WWCP_POI/ChangeSets/RoamingNetwork.RuntimeState.cs) | Independent schedules/measurements and preservation by owner/identity |
@@ -520,9 +555,167 @@ and parking-space groups. Derived ETags are generated from the complete static d
 runtime Removed statuses never filter its owned membership. ETags are not editable snapshot
 properties. JSON and CBOR share their domain validation and metrological schema.
 See [ETags and CBOR](ETAGS-CBOR.md) for the audited types and encoding profile, and
-[interoperability](INTEROPERABILITY.md) for static-v1 rules, fixed bytes and executed workflow tests.
+[interoperability](INTEROPERABILITY.md) for static-v2 rules, fixed bytes and executed workflow tests.
 The profile declaration is transport metadata; commits bind it explicitly into their identity.
 Unchanged reference sets preserve the reverse-index root. The cached tariff subset shares identity
 when that root is shared, rather than rebuilding the subset on every access.
 An internal archive write observer, exposed only to the friend test assembly, provides reproducible
 failure/process-exit stages around persistence. It is not an application extension API.
+
+The later [bounded child ETag cache](CHILD-ETAG-CACHE.md) reuses immutable child digest pairs within
+a complete static snapshot context. Pure snapshot revisions share it; changed maps start fresh.
+Explicit entry/key/payload limits preserve the admitted traversal prefix. Runtime and transport
+views stay fresh; managed overhead and total retained-version memory are reported separately.
+Cold/warm and exact-output verification preserve static-v2 bytes and identities.
+
+The subsequent [direct ChangeSet CBOR encoder](DIRECT-CHANGESET-CBOR.md) removes complete
+batch/native-header-ETag trees while retaining the exact v2 scalar/signing rules and decoder.
+Matched long batches/multiple-peer results and 55 new cases accompany 283 focused / 1,308 full
+Release passes. Complete per-value JSON/output buffers and archive depth validation remain costs.
+
+The later [direct POI archive payload package](DIRECT-ARCHIVE-PAYLOAD.md) removes complete
+checkpoint/snapshot CBOR output buffers after preflight preserving standalone/remaining reader
+depth rules. That build retained canonical JSON/index, ChangeSet buffers, full archive rewriting
+and decoding/replay costs. Its 140 new cases, 423 focused and 1,448 full Release cases pass; earlier evidence
+above remains historical, and the new paired reports bind their own source/assembly fingerprints.
+
+## Later bounded POI archive preflight reuse
+
+[The preflight reuse package](PREFLIGHT-ALLOCATION.md) retains all pre-payload semantic/depth and
+atomicity contracts while decoding names once, pooling cleared bounded name sets, proving validated
+native ETag tuple shape and reusing bounded successful SI scalar trees within one payload call.
+All 494 focused / 1,519 full Release cases pass, including 71 new budget/depth/context/retry cases.
+Matching 80-worker/400-sample reports preserve every output and inventory; streamed 512-EVSE
+allocation changes 74.87 -> 66.03 MiB (-11.8%). Earlier measurements/counts remain historical.
+That build retained complete JSON/index and batch buffers, graph preparation and decoding/replay costs.
+
+## Later direct ChangeSet archive emission
+
+[The ChangeSet archive package](DIRECT-ARCHIVE-CHANGESET.md) removes complete per-batch CBOR
+output buffers after preflight preserving original exact signed scalars, native root ETags,
+both depth rules, equal peers and atomic failure/retry contracts. A bounded per-call scalar
+context reuses successful codec results while rechecking every occurrence's ownership/depth.
+All 708 focused / 1,733 full Release cases pass, including 214 new cases. Two matched series
+each contain 48 workers/240 samples per side and retain all output counts/digests/inventories.
+At 2,048 operations/four peers streamed signed-archive allocation changes
+32.27 -> 31.90 MiB (-1.1%). Earlier costs/counts remain historical; complete batch CBOR
+output buffers are now absent from borrowed archive output. Prepared POI/ChangeSet JSON/index,
+schema paths, metadata trees, public buffered results, fragment totals and replay remain costs.
+
+### Subsequent archive reader measurements
+
+The [recovery baseline](ARCHIVE-RECOVERY-COSTS.md) separates seven reader stages across all four
+profiles, with 98 workers / 490 calls and exact recovered heads, branch states, peers and runtime.
+It adds 58 contract cases; all 179 focused / 1,791 full Release cases pass without production or
+reference changes. Full-input syntax/duplicate/EOF checks precede trust; v3/v4 suffix models
+retain their existing lazy callback timing. That build preceded the subsequent indexed reader. Prepared models and retained branch states still consume memory;
+stage medians and collected process-heap deltas establish no total-memory or throughput bound.
+
+### Indexed CBOR archive recovery
+
+The [indexed reader](INDEXED-ARCHIVES.md) validates the complete resident input before trust,
+then reads envelope/model slices without constructing a complete archive CBOR tree. Boundary
+suffix bytes are privately frozen before callbacks; eager v1/v2 and lazy v3/v4 model timing,
+all equal peers, deterministic bootstrap and fresh runtime remain unchanged. The package adds
+78 cases; 257 focused / 1,869 full cases pass. Matched complete-CBOR, JSON and prepared-model
+restore reports use the exact 210-sample baseline subset and 210 fresh after samples with the
+unchanged C# harness. Resident input, private suffix bytes, individual trees and retained states
+remain. The subsequent [input-stream package](ARCHIVE-INPUT-STREAMS.md) implements borrowed
+sync/async non-seekable capture with bounded memory/file bytes, mapped recovery and cancellation.
+Shared reader leases permit concurrency and exclude explicit orphan maintenance. Earlier
+measurements remain historical; the new package compares fresh same-build span/memory/file inputs.
+
+The subsequent [mapped recovery package](MAPPED-ARCHIVE-RECOVERY.md) applies scoped file input
+to persistent opening and both cold APIs, and bounded capture to bootstrap preview/activation.
+Input views close before new installation and persistent return. Exact digest/manifest bytes,
+current trust, atomic retry, known-length diagnostics and recovery cancellation are covered;
+model/replay costs, mapped pages and retained states remain. Earlier results are historical.
+
+### Subsequent private model/replay preparation
+
+The [model preparation package](MODEL-PREPARATION.md) removes recursive deep copies of descendants
+already owned by a private import/completion/binding traversal. Entry-point and projected-value
+copies remain; all normalization/validation order, exact bytes/peers, current trust, eager/lazy
+recovery and fresh runtime are preserved. No persistent cache is added. Frozen prior algorithms
+and atomic failures/retries are covered by 88 new cases; all 1,942 interoperability / 2,274 full
+Release cases pass. Matched preparation/restore/full-CBOR reports bind the unchanged harness binary,
+dependencies, exact inputs and results. Earlier measurements remain historical. Canonicalization,
+cryptography, individual trees, root/head reconstruction and retained branch states remain costs.
+
+### Subsequent bounded canonical identity/signature preparation
+
+The [canonical preparation package](CANONICAL-PREPARATION.md) reuses successful immutable unsigned
+bytes within synchronous recovery/peer verification, with 64-entry/1-MiB-value/4-MiB-byte admission
+bounds. Every outer scope releases its entries. Original numeric/SI/identity/signature bytes,
+public array ownership, eager/lazy errors, all current peer/policy checks, runtime and atomic
+publication remain exact. It adds 106 cases; all 2,048 interoperability / 2,380 full Release cases
+pass with unchanged fixed artifacts. Four-stage matched reports bind the unchanged harness,
+dependencies, inputs and results across 112 workers / 336 samples. Individual signature-only
+calls retain the preceding pipeline as a control; actual recovery joins scoped preparation.
+Earlier measurements remain historical. Root/head reconstruction, cryptography, individual
+model trees, retained versions and wider production/concurrency measurements remain work.
+
+### Subsequent exact root/head snapshot reuse
+
+[Root/head reconstruction](SNAPSHOT-RECONSTRUCTION.md) now conditionally retains an immutable
+snapshot after the complete domain parser, references, metadata and representation completion.
+Every stored property byte, child and version must match; different spellings/defaults use the
+existing capture path. Separate histories keep independent runtime objects; a private root-only
+head can keep its freshly validated root model. Every peer/current policy, eager/lazy error timing,
+cancellation and atomic publication remain intact. No persistent model or trust cache is added.
+The package adds 86 cases and matched model/signature/restore/full-recovery measurements with
+unchanged prepared inputs, outputs, C# harness and dependencies. Earlier results remain historical.
+
+### Subsequent immutable signature-envelope copies
+
+[Signature copies](SIGNATURE-COPIES.md) retain the already validated commit identity when only
+peer arrays change. Embedded batch replacements need exact unsigned-content proof; changed
+content and independent parses retain the complete constructor. Existing scoped canonical bytes
+can be shared within the same conservative bounds, with detached public arrays and full release.
+Every current peer policy, atomic duplicate/pack union and independent runtime remains intact.
+The package adds 103 cases and direct matched copy/signing measurements; recovery measurements
+above remain historical and establish no copy-package end-to-end speedup.
+
+### Subsequent cooperative parser cancellation
+
+[Parser cancellation](PARSER-CANCELLATION.md) passes the existing recovery token explicitly through
+owned syntax/budget/canonical loops and around each commit/receipt/model/root/replay/head step.
+There is no ambient token or retained parser context. Exact preceding diagnostics, eager/lazy
+trust timing, input ownership, scope release, late token clearing and atomic installation remain.
+Individual Styx/model/crypto calls and copies remain synchronous; no cancellation latency bound
+is claimed. It adds 270 cases; all 2,507 interoperability / 2,839 full Release tests pass with
+unchanged fixed references. Matched default/active-token successful reads use 72 workers/216 samples,
+the same new harness/dependencies and exact prepared inputs/results. Earlier measurements remain
+historical. Broader shared-reference/tariff/parking workloads are measured in the subsequent package below.
+
+### Subsequent domain recovery baseline
+
+[Shared-reference, tariff and parking workloads](DOMAIN-RECOVERY-WORKLOADS.md) add eight
+deterministic 16/64-EVSE shapes with all four profiles, shared catalogs, meters, nested values,
+targeted membership edits and one signed two-parent merge. Model/restore/full CBOR/JSON stages
+use 64 fresh workers/192 samples with exact input/head/branch/peer and independent-runtime checks.
+Production/dependency/reference bytes remain unchanged; six old simple-workload controls still
+match. The new baseline measures richer data and is separate from historical performance reports.
+81 new cases and all 2,588 interoperability / 2,920 full Release tests pass, including current
+bootstrap trust rejection/retry and atomic invalid reference/value/additional-peer edits.
+
+### Subsequent temporary validation projection reuse
+
+[Validation projections](VALIDATION-PROJECTION.md) reuse successful ancestors and one station
+view per fixed immutable map. Every ordinary parser/reference/trust check and failure order
+remains; failed values are uncached and runtime stays private to the pass. The separate tariff
+group text/length/empty-flag correction preserves ordering across equivalent operator formats.
+71 new cases and all 2,659 interoperability / 2,991 full Release cases pass with unchanged
+fixed references. The exact rich baseline/harness/dependencies support matched recovery
+measurements; earlier performance reports remain historical. Normalized immutable map
+preparation is completed below; larger catalogs and production concurrency remain work.
+
+### Subsequent normalized immutable map preparation
+
+[Normalized snapshot maps](SNAPSHOT-MAP-PREPARATION.md) reuse exactly equal properties, child sets,
+entity/map branches and root catalogs after the full ordinary parser and normalization. Binding
+reads stable typed IDs directly; all reference/current peer checks, exact errors, independent
+runtime, canonical content and atomic publication remain. Removed identities/consumers are handled.
+53 new cases and all 2,712 interoperability / 3,044 full Release cases pass with unchanged references.
+Matched rich recovery measurements keep the exact archives, branches, peers and C# harness/dependencies.
+Earlier reports remain historical. Larger group/catalog/history and concurrency workloads are next.

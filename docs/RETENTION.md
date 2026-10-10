@@ -159,7 +159,9 @@ if (lookup.Receipt is { } receipt)
         verifyBatchSignature: VerifyBatchPeer,
         verifyCommitSignature: VerifyCommitPeer,
         authorizeCommit: AcceptCommit,
-        authorizeSnapshotBoundary: AcceptApprovedChainAndAnchor);
+        authorizeSnapshotBoundary: AcceptApprovedChainAndAnchor,
+        limits: new RoamingNetworkHistoryLimits(maxArchiveBytes: 64 * 1024 * 1024,
+            maxCommits: 10000, maxRetentionReceipts: 128, maxCatalogCommitIds: 100000));
     var oldState = oldHistory.GetSnapshot(oldCommitId);
 }
 ```
@@ -170,6 +172,20 @@ archive can itself start at a previous snapshot and contain receipts pointing to
 These archives must remain retrievable; this package does not delete them or automatically hydrate
 older ancestry into an active boundary history.
 
+[Local archive limits](ARCHIVE-LIMITS.md) check the opened file's known byte length before read-only mapping,
+then retained commits, receipt count and the aggregate of both receipt ID arrays before document
+materialization/replay. Direct `Parse`/`ParseCBOR`/`Open` and bootstrap final validation apply the same
+budgets. Repeated IDs across arrays/events consume the catalog budget again. A rejected cold read
+never creates a writer lease or changes the active graph; structured exceptions identify the budget.
+
+For moved files or multiple local copies, [cold archive discovery](COLD-ARCHIVES.md) supplies an
+immutable `RoamingNetworkColdArchiveCatalog` keyed by the receipt's `SourceArchiveETag`.
+`TryReadColdArchive(receipt, catalog, out history, out result, ...)` diagnoses candidates in registration
+order and returns a separate verified history only after current trust, replay and receipt/source
+membership checks. Optional `requestedCommit` rejects unknown or still archived IDs; the latter can
+return an earlier receipt for an explicit further lookup. No paths are added to historical receipts,
+no candidate files are changed and active ancestry remains unchanged.
+
 ## Wire profiles and evidence
 
 `wwcp-poi-history-v4` adds a required nonempty `RetentionReceipts` array to the snapshot-boundary
@@ -179,13 +195,44 @@ a snapshot bootstrap does not create pruning receipts: the source still retains 
 history-v1/v2/v3, commit identities, snapshot signing inputs, page contracts and chunk-v1 bytes
 remain unchanged when the new catalog is absent.
 
-The library builds. No retention-specific tests have been added or run. Required follow-up evidence
-includes protected unpublished branches/bases, crossing merge parents, stale peers with unchanged
-head, repeated pruning and cold retrieval, catalog roundtrips/bootstraps, callback rejection/reentry,
-existing destination mismatch, writer leases, failure/retry before active replacement and exact
-head/runtime continuity. New profiles are not frozen interoperability vectors.
+[RetentionTests](../WWCP_POI_Tests/Interoperability/RetentionTests.cs) now has 38 passing cases for
+protected branches/bases and merge parents, stale inventories/peers, explicit releases, cold archives,
+callback rejection/reentry, pre-replacement failure/retry, destination/lease guards, repeated catalog
+recovery, bootstrap exclusions and v4 transfer, cold reads, archived/unknown lookups, missing cold
+dependencies, reimport and concurrent execution/runtime delivery. Fixed plan/receipt/archive/manifest
+regression references passed at that baseline. Before static-v2, the full run had 952 passing tests;
+current artifacts were subsequently regenerated. See [verification and limits](VERIFICATION-SNAPSHOTS-RETENTION.md).
+Independent implementation interoperability and process-crash/power-loss proof for every retention
+stage remain broader work; the named write boundaries now have actual process-crash coverage below.
+These local regression files do not authenticate unsigned catalog bookkeeping.
 
-Planning/export/persistence materialize complete archives and retained graph closures. The catalog
+[SnapshotRetentionCrashTests](CRASH-RECOVERY.md) adds sixteen pruning process exits around four
+cold and three active archive points, including previously pruned history and matching existing
+cold destinations. Recovery rechecks original signatures, exact roots/catalogs/source bytes and
+cold digests; repeated cases retrieve the still older archive through its earlier receipt. Four
+additional cold-stage exceptions assert unchanged live state, own-temp cleanup, released handles,
+reentry rejection and successful retry. The six signed snapshot exits in the same fixture bring
+this package to 26 passing cases.
+
+After a missing acknowledgement, reopen using independently approved chain/root policies. An old
+active inventory can retry the same reviewed plan against a verified matching cold destination.
+A new active root with the expected receipt `PlanId` identifies a completed operation; the stale
+plan returns `InventoryChanged` without adding a second receipt. Retry preserves the recovered
+live head/runtime, and both paths accept further signed publication. These tests establish named
+process-interruption points; power loss and interruption inside individual writes/renames remain open.
+
+[Explicit archive maintenance](ARCHIVE-MAINTENANCE.md) can review and remove orphan temporary
+siblings of active or cold archives under their respective writer leases. Installed cold data and
+active files are protected; stale inventory and partial deletions are reported. A real cold-flush
+process exit now exercises cleanup and retry of the original reviewed retention operation.
+
+Planning hashes/counts the reviewed CBOR archive incrementally. Cold publication and active
+replacement stream directly into temporary files before durable flush/rename; the cold write
+checks the reviewed length/digest before publication and retains the verified handle through active
+replacement. POI payloads [preflight and emit directly](DIRECT-ARCHIVE-PAYLOAD.md), as do
+[ChangeSets](DIRECT-ARCHIVE-CHANGESET.md); prepared JSON/index/schema paths and retained graph
+closures remain in memory. See [streaming contracts and evidence](STREAMING-ARCHIVES.md). The catalog
 uses space proportional to recorded removed IDs, with repeated events retaining their own receipts.
 Hash-only catalogs still grow; compressed indexes, streaming replay, automatic archive discovery,
-independent implementations and performance measurements remain future work.
+independent implementations and larger production measurements remain future work. Separate
+[scaling evidence](SCALING.md) covers repeated pruning catalogs and retained archive/replay costs.

@@ -1,0 +1,257 @@
+--- a/WWCP_POI/Serialization/POIRepresentation.cs
++++ b/WWCP_POI/Serialization/POIRepresentation.cs
+@@ -182,19 +182,40 @@
+ 
+     private static Byte[] Encode(JObject json, String kind, Byte[]? canonicalJSON = null)
+     {
+-        // Preserve validation order before canonical JSON rejects unsupported customer values.
+-        Visit(json, kind, "", (document, type, path) =>
+-        {
+-            foreach (var property in document.Properties())
+-                if (property.Value.Type == JTokenType.String && IsMeasurement(type, property.Name) &&
+-                    !MetrologicalValue.TryParse(property.Value.Value<String>()!, out _, out var error))
+-                    throw new ArgumentException($"{path}/{property.Name}: cannot encode a Styx metrological value: {error}");
+-        });
++        ValidateMeasurements(json, kind);
+         var bytes = canonicalJSON ?? CanonicalJSON.ToUTF8Bytes(json);
+         using var document = System.Text.Json.JsonDocument.Parse(bytes, new System.Text.Json.JsonDocumentOptions { MaxDepth = 64 });
+         var output = new System.Buffers.ArrayBufferWriter<Byte>();
+         new POICBORWriter(output).Write(document.RootElement, kind);
+         return output.WrittenSpan.ToArray();
++    }
++
++    /// <summary>
++    /// Emit a prepared static snapshot into an archive without a complete POI CBOR buffer.
++    /// All semantic codec and remaining reader-depth checks precede its first output byte.
++    /// </summary>
++    internal static void WriteArchiveCBOR(IImmutablePOI value, System.Buffers.IBufferWriter<Byte> output,
++                                         Int32 remainingDepth)
++    {
++        var kind = Kind(value);
++        var json = value.ToJSONWithETags(IncludeVersionMetadata: true);
++        ValidateMeasurements(json, kind);
++        var bytes = CanonicalJSON.ToUTF8Bytes(json);
++        using var document = System.Text.Json.JsonDocument.Parse(bytes, new System.Text.Json.JsonDocumentOptions { MaxDepth = 64 });
++        new POICBORPreflight(remainingDepth).Validate(document.RootElement, kind);
++        new POICBORWriter(output).Write(document.RootElement, kind);
++    }
++
++    private static void ValidateMeasurements(JObject json, String kind)
++    {
++        // Preserve validation order before canonical JSON rejects unsupported customer values.
++        Visit(json, kind, "", (document, type, path) =>
++        {
++            foreach (var property in document.Properties())
++                if (property.Value.Type == JTokenType.String && IsMeasurement(type, property.Name) &&
++                    !MetrologicalValue.TryParse(property.Value.Value<String>()!, out _, out var error))
++                    throw new ArgumentException($"{path}/{property.Name}: cannot encode a Styx metrological value: {error}");
++        });
+     }
+ 
+     // Convert only schema-owned ETag arrays. Customer fields with the same name stay untouched.
+--- a/WWCP_POI/Serialization/POICBORWriter.cs
++++ b/WWCP_POI/Serialization/POICBORWriter.cs
+@@ -132,7 +132,7 @@
+         writer.WriteEndArray();
+     }
+ 
+-    private static ETag ReadETag(JsonElement value)
++    internal static ETag ReadETag(JsonElement value)
+     {
+         if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() != 4 ||
+             value.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String))
+--- a/WWCP_POI/Serialization/POIArchiveCBORWriter.cs
++++ b/WWCP_POI/Serialization/POIArchiveCBORWriter.cs
+@@ -11,7 +11,7 @@
+ 
+ // Archive containers have known counts and text keys. Sort their encoded keys before emitting
+ // values, so Styx does not need a scratch buffer containing the complete outer archive map.
+-// Leaf values keep Styx's canonical encoding; pre-encoded POI/batch payloads keep their codecs.
++// Leaf values keep Styx's canonical encoding; POI payloads preflight before direct emission.
+ internal sealed class POIArchiveCBORWriter(Stream destination) : IDisposable
+ {
+     private readonly POIArchiveStreamBuffer output = new(destination);
+@@ -72,6 +72,13 @@
+         output.WriteParts(canonicalValue);
+     }
+ 
++    /// <summary>
++    /// Preflight a complete static POI snapshot before writing it directly into this archive.
++    /// The caller keeps ownership of the output stream and its durable installation.
++    /// </summary>
++    internal void POI(IImmutablePOI value)
++        => POIRepresentation.WriteArchiveCBOR(value, output, 64 - depth);
++
+     private void Enter()
+     {
+         if (depth == 64) throw new CBORException("The maximum CBOR nesting depth of 64 was exceeded.");
+--- a/WWCP_POI/History/POIArchiveCBORValues.cs
++++ b/WWCP_POI/History/POIArchiveCBORValues.cs
+@@ -36,7 +36,7 @@
+             ("CreatedAt", value => value.Text(snapshot.CreatedAt.ToString("O", CultureInfo.InvariantCulture))),
+             ("Description", value => value.Value(RoamingNetworkChangeSet.EncodeApplicationJSON(JsonSerializer.SerializeToElement(snapshot.Description)))),
+             ("Metadata", value => value.Value(RoamingNetworkChangeSet.EncodeApplicationJSON(JsonSerializer.SerializeToElement(snapshot.Metadata)))),
+-            ("State", value => value.Encoded(snapshot.State.ToCBOR(IncludeVersionMetadata: true))));
++            ("State", value => value.POI(snapshot.State)));
+ 
+     internal static void WriteArchiveCBOR(this RoamingNetworkRetentionReceipt receipt, POIArchiveCBORWriter writer)
+         => writer.Map(
+--- a/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
+@@ -99,8 +99,8 @@
+ 
+     /// <summary>
+     /// Write the exact deterministic CBOR archive to a writable stream, leaving it open and unflushed.
+-    /// Outer maps, commits and receipt catalogs are emitted in order; individual POI snapshots and
+-    /// ChangeSets still use their existing per-value encoders. Failed output does not change history.
++    /// Outer maps, commits, receipts and preflight-validated POI snapshots are emitted directly.
++    /// ChangeSets retain their per-value buffers. Failed output does not change history.
+     /// </summary>
+     public void WriteCBOR(Stream destination)
+     {
+@@ -135,7 +135,7 @@
+         writer.Map(
+             ("Profile", value => value.Text(ArchiveProfileFor(source))),
+             ("ContentProfile", value => value.Text(POIContentProfile.Id)),
+-            ("Checkpoint", value => value.Encoded(source[checkpointId].Snapshot.ToCBOR(IncludeVersionMetadata: true))),
++            ("Checkpoint", value => value.POI(source[checkpointId].Snapshot)),
+             ("CheckpointCommit", value => source[checkpointId].Commit.WriteArchiveCBOR(value)),
+             ("Commits", value => value.Array(source.Count - 1, OrderedEntries(source).Where(entry => entry.Commit.Id != checkpointId),
+                 (output, entry) => entry.Commit.WriteArchiveCBOR(output))),
+--- /dev/null
++++ b/WWCP_POI/Serialization/POICBORPreflight.cs
+@@ -0,0 +1,134 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Collections.Immutable;
++using System.Globalization;
++using System.Text.Json;
++using org.GraphDefined.Vanaheimr.Illias;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++/// <summary>
++/// Validate prepared POI JSON before emitting a borrowed archive payload.
++/// Preserve standalone writer limits and the archive reader's remaining-depth rules.
++/// </summary>
++internal sealed class POICBORPreflight(Int32 remainingDepth)
++{
++    private CBORException? readerFailure;
++
++    internal void Validate(JsonElement value, String kind)
++    {
++        Visit(value, kind, 0, "");
++        // Standalone codec failures precede the old Encoded/SkipValue validation.
++        if (readerFailure is not null) throw readerFailure;
++    }
++
++    private void Visit(JsonElement value, String? kind, Int32 depth, String path)
++    {
++        switch (value.ValueKind)
++        {
++            case JsonValueKind.Object:
++                Enter(depth, value.EnumerateObject().Any());
++                var names = new HashSet<String>(StringComparer.Ordinal);
++                foreach (var field in value.EnumerateObject())
++                {
++                    if (!names.Add(field.Name)) throw new CBORException("Duplicate CBOR POI map key.");
++                    if (kind is not null && field.Name == "ETags")
++                    {
++                        if (field.Value.ValueKind != JsonValueKind.Array || field.Value.GetArrayLength() != 2)
++                            throw new ArgumentException("ETags: expected the JSON and CBOR identifier arrays.");
++                        var tags = ETag.ValidatePair(ImmutableArray.Create(POICBORWriter.ReadETag(field.Value[0]),
++                                                                          POICBORWriter.ReadETag(field.Value[1])), "ETags");
++                        Leaf(CBORValue.FromArray(tags.Select(tag => tag.ToCBOR())), depth + 1);
++                    }
++                    else if (kind is not null && field.Value.ValueKind == JsonValueKind.String &&
++                             POIRepresentation.IsMeasurement(kind, field.Name))
++                    {
++                        if (!MetrologicalValue.TryParse(field.Value.GetString()!, out var reading, out var error))
++                            throw new ArgumentException($"{path}/{Escape(field.Name)}: cannot encode a Styx metrological value: {error}");
++                        Leaf(reading.ToCBOR(), depth + 1);
++                    }
++                    else
++                    {
++                        var child = kind is null ? null : POIRepresentation.ChildKind(kind, field.Name);
++                        Visit(field.Value, child, depth + 1, child is null ? "" : path + "/" + Escape(field.Name));
++                    }
++                }
++                break;
++            case JsonValueKind.Array:
++                Enter(depth, value.GetArrayLength() > 0);
++                var index = 0;
++                foreach (var item in value.EnumerateArray())
++                {
++                    var child = item.ValueKind == JsonValueKind.Object ? kind : null;
++                    Visit(item, child, depth + 1, child is null ? "" : path + "/" + index.ToString(CultureInfo.InvariantCulture));
++                    index++;
++                }
++                break;
++            case JsonValueKind.Number:
++                if (!value.TryGetInt64(out _) && !value.TryGetUInt64(out _))
++                    Leaf(CBORJSON.ToCBOR(value.GetRawText()), depth);
++                break;
++            case JsonValueKind.String:
++                _ = value.GetString();
++                break;
++            case JsonValueKind.True:
++            case JsonValueKind.False:
++            case JsonValueKind.Null:
++                break;
++            default:
++                throw new CBORException($"Unsupported POI JSON kind '{value.ValueKind}'.");
++        }
++    }
++
++    private void Enter(Int32 depth, Boolean hasItems)
++    {
++        if (depth >= 64) throw new CBORException("The maximum CBOR nesting depth of 64 was exceeded!");
++        // SkipValue does not push definite empty containers. Tags live only inside scalar
++        // leaves in POI JSON, where the actual Styx reader supplies tag-run accounting.
++        if (hasItems && depth >= remainingDepth)
++            readerFailure ??= new CBORException($"The maximum CBOR nesting depth of {remainingDepth} was exceeded!");
++    }
++
++    private void Leaf(CBORValue value, Int32 depth)
++    {
++        // Counting all ancestor tags and even empty containers bounds both Styx algorithms.
++        // Generated scalar trees have valid keys/types; only depth can reject their encoding.
++        // Away from the boundary no temporary leaf encoding is needed. Near it, use Styx.
++        var bound = DepthBound(value);
++        if (bound <= 64 - depth && (readerFailure is not null || bound <= remainingDepth - depth)) return;
++        // Only this scalar's number/unit/digest structure is buffered. A complete POI value
++        // is never encoded here. Writer and SkipValue intentionally have different budgets.
++        var bytes = value.ToByteArray(new CBORWriterOptions { Deterministic = true, PreferredFloatEncoding = true, MaxDepth = 64 - depth });
++        if (readerFailure is not null) return;
++        try
++        {
++            var reader = new CBORReader(bytes, new CBORReaderOptions { MaxDepth = remainingDepth - depth });
++            reader.SkipValue();
++        }
++        catch (CBORException error) { readerFailure = error; }
++    }
++
++    private static Int32 DepthBound(CBORValue value)
++    {
++        if (value.Kind == CBORValueKind.Tagged) return 1 + DepthBound(value.UntaggedValue);
++        var children = 0;
++        if (value.Kind == CBORValueKind.Array)
++        {
++            foreach (var child in value.AsArray()) children = Math.Max(children, DepthBound(child));
++            return 1 + children;
++        }
++        if (value.Kind == CBORValueKind.Map)
++        {
++            foreach (var field in value.AsMap())
++                children = Math.Max(children, Math.Max(DepthBound(field.Key), DepthBound(field.Value)));
++            return 1 + children;
++        }
++        return 0;
++    }
++
++    private static String Escape(String value) => value.Replace("~", "~0").Replace("/", "~1");
++}

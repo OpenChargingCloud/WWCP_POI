@@ -1321,7 +1321,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// Return the standalone grid operators; the collection currently has no registration path.
+        /// Return the network-owned grid operators shared by all referencing connection points.
         /// </summary>
         public IEnumerable<GridOperator> GridOperators
             => ImmutablePOIValues.CopyItems(gridOperators.Values);
@@ -1332,7 +1332,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region GridOperatorsAdminStatus
 
         /// <summary>
-        /// Return the admin status of all smart cities registered within this roaming network.
+        /// Return the admin status of all grid operators registered within this roaming network.
         /// </summary>
         public IEnumerable<KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorAdminStatusTypes>>>> GridOperatorsAdminStatus
 
@@ -1344,7 +1344,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region GridOperatorsStatus
 
         /// <summary>
-        /// Return the status of all smart cities registered within this roaming network.
+        /// Return the status of all grid operators registered within this roaming network.
         /// </summary>
         public IEnumerable<KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorStatusTypes>>>> GridOperatorsStatus
 
@@ -1362,7 +1362,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="GridOperator">A grid operator.</param>
         public Boolean ContainsGridOperator(GridOperator GridOperator)
 
-            => gridOperators.ContainsKey(GridOperator.Id);
+            => GetGridOperator(GridOperator.Id) is not null;
 
         #endregion
 
@@ -1374,7 +1374,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="GridOperatorId">The unique identification of the grid operator.</param>
         public Boolean ContainsGridOperator(GridOperator_Id GridOperatorId)
 
-            => gridOperators.ContainsKey(GridOperatorId);
+            => GetGridOperator(GridOperatorId) is not null;
 
         #endregion
 
@@ -1382,7 +1382,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         public GridOperator? GetGridOperator(GridOperator_Id GridOperatorId)
 
-            => gridOperators.GetValueOrDefault(GridOperatorId);
+            { EnsureSnapshotProjection(); return projectedGridOperatorReferences.GetValueOrDefault(new(InfrastructureEntityType.GridOperator, GridOperatorId.ToString())); }
 
         #endregion
 
@@ -1391,7 +1391,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetGridOperatorById(GridOperator_Id                        GridOperatorId,
                                               [NotNullWhen(true)] out GridOperator?  GridOperator)
 
-            => gridOperators.TryGetValue(GridOperatorId, out GridOperator);
+            { EnsureSnapshotProjection(); return projectedGridOperatorReferences.TryGetValue(new(InfrastructureEntityType.GridOperator, GridOperatorId.ToString()), out GridOperator); }
 
         #endregion
 
@@ -1636,6 +1636,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          );
 
             JSON["gridOperators"] = POIJSON.Children(GridOperators);
+            JSON["transparencySoftware"] = POIJSON.Children(TransparencySoftware);
+            JSON["transparencySoftwareCertificates"] = POIJSON.Children(TransparencySoftwareCertificates);
             JSON["parkingOperators"] = POIJSON.Children(ParkingOperators);
             JSON["chargingStationManufacturers"] = POIJSON.Children(ChargingStationManufacturers);
 

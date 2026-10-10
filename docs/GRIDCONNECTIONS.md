@@ -20,10 +20,11 @@ the stored meter instances retain mutable operational/admin statuses. `EnergyMet
 identify connections such as `grid`, `pv` or `battery`.
 
 `GridConnectionPoint` is a sealed immutable description. It always references a `GridOperator`
-with a valid ID. When attached to a pool, its operator must belong to the same roaming network
-if the pool has one. The pool captures an independent copy of the connection point, its operator
-and its meter. `ChargingPool.Clone()` and network derivation preserve independent runtime histories.
-Standalone operator references are not automatically added to the network's operator registry.
+with a valid ID. When attached to a network pool, its operator must exist in that network's
+`gridOperators` registry and is resolved to the registry instance. Many points can share it.
+Point construction does not implicitly register an operator. Pool copies detach point/meter
+values, while network derivation creates independent operator runtime once in the new registry.
+A changed point identity resets only its owned meter; the referenced operator keeps its lifetime.
 
 ## Optional connection data
 
@@ -73,9 +74,15 @@ these value types without conversion.
 ## Construction
 
 ```csharp
-var network = new RoamingNetwork(RoamingNetwork_Id.Parse("network-a"));
-var cpo = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*ABC"), network);
-var gridOperator = new GridOperator(GridOperator_Id.Parse("DE*NET"), network);
+var network = RoamingNetwork.Parse("""
+{
+  "@id": "network-a",
+  "gridOperators": [{ "id": "DE*NET" }],
+  "chargingStationOperators": [{ "@id": "DE*ABC" }]
+}
+""");
+var cpo = network.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*ABC"))!;
+var gridOperator = network.GetGridOperator(GridOperator_Id.Parse("DE*NET"))!;
 
 var point = new GridConnectionPoint(
     gridOperator,
@@ -99,11 +106,10 @@ var restored = ChargingPool.Parse(pool.ToJSON(), cpo);
 ## JSON, ChangeSets and runtime state
 
 The pool serializes `energyMeters` as embedded meter objects and `gridConnectionPoint` as one
-embedded object. The latter contains a required `gridOperator` document, including its `id`,
-network reference, static data, metadata and current statuses; its `energyMeter` is optional.
-`GridConnectionPoint.Parse/TryParse` and `GridOperator.Parse/TryParse` restore these documents.
-Standalone parsing recreates the operator's network reference from `roamingNetworkId`; parsing
-with a supplied network checks that ID and binds the operator to the supplied version.
+embedded object. The latter contains a required `gridOperatorId` string; `energyMeter` is optional.
+The expanded operator is owned once under network `gridOperators`. `GridConnectionPoint.Parse`
+requires the network context for resolution and rejects embedded `gridOperator` descriptions.
+An unknown ID fails validation. Complete network parsing supplies this context automatically.
 
 Use pool `UpdateProperty` operations on `energyMeters` or `gridConnectionPoint`. Replace the whole
 array/object; `[]` clears direct meters and JSON null removes the optional connection point.
@@ -120,21 +126,25 @@ encodings decode to the same bytes. Mutable operational/admin statuses are exclu
 timestamps in introduced nested nodes are initialized from the fixed batch timestamp.
 See [ChangeSets](CHANGESETS.md#before-and-after-content-checks).
 
-`ToJSONSnapshot()` overlays current statuses of direct meters and connection-point operator/meter
-instances without changing POI revision or timestamps. `DataSnapshot.ToJSON()` exports only static
+`ToJSONSnapshot()` overlays current statuses of direct/point meters and registered grid operators
+without changing POI revision or timestamps. Operator status is emitted once in the registry. `DataSnapshot.ToJSON()` exports only static
 data. ChangeSets preserve independent histories and their capacities for surviving children with
 matching owner and identity, including nested property replacements. Replacement payloads reject
-runtime fields. New child IDs or a changed connection point ID start a new runtime lifetime.
+runtime fields. New meter IDs or a changed connection point ID start a new meter lifetime.
+A point reassignment never duplicates or resets the referenced operator schedule.
 See [runtime updates](RUNTIME.md) for scoped meter/operator status instructions.
 
-Static [element operations](ELEMENT-OPERATIONS.md) can edit connection-point ratings, operator
-properties and meter metadata through structured pool/connection-point/child paths. Direct
+Static [element operations](ELEMENT-OPERATIONS.md) can edit connection-point ratings, its operator
+ID and meter metadata through structured pool/connection-point/child paths. Edit operator
+properties with graph operations on `GridOperator`. Direct
 meters and market/metering location identifiers support individual Add/Remove operations.
 These edits retain surviving child histories; explicit removal/reintroduction starts a new lifetime.
 
 ## Network registry
 
-The network can also own standalone GridOperator nodes in `gridOperators`. Their static node
-operations and runtime targets are independent of the embedded connection-point descriptions.
-Equal IDs do not create shared objects or propagate edits between these slots. See
-[graph ownership](GRAPH.md#content-identifiers-and-runtime).
+The network owns every GridOperator description in `gridOperators`. Connection points contain
+references, and `GetGridOperator(id)` resolves the shared instance using domain ID equality.
+Deleting an operator with surviving points is rejected by the reverse reference index. Use
+`POIRuntimeTarget.GridOperator(id)` for operational delivery to this one registry schedule.
+Point ETags hash the reference; network ETags also hash the referenced description.
+See [graph ownership](GRAPH.md#content-identifiers-and-runtime).

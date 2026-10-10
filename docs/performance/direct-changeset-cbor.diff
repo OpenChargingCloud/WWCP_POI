@@ -1,0 +1,116 @@
+--- a/WWCP_POI/ChangeSets/RoamingNetworkChangeSet.CBOR.cs
++++ b/WWCP_POI/ChangeSets/RoamingNetworkChangeSet.CBOR.cs
+@@ -22,8 +22,9 @@
+         using var document = JsonDocument.Parse(json);
+         ValidateSigningJSON(document.RootElement);
+         var paths = MeasurementPaths();
+-        var cbor = EncodeTransportJSON(document.RootElement, "", paths);
+-        return ConvertTransportETags(cbor, true).ToByteArray(CBORWriterOptions.Canonical);
++        var output = new System.Buffers.ArrayBufferWriter<Byte>();
++        new POICBORWriter(output).WriteChangeSet(document.RootElement, paths);
++        return output.WrittenSpan.ToArray();
+     }
+ 
+     /// <summary>
+@@ -141,6 +142,17 @@
+             return CBORValue.Tagged(EmbeddedJSON, CBORValue.FromBytes(Encoding.UTF8.GetBytes("{\"Number\":" + text + "}")));
+         }
+         return CBORJSON.ToCBOR(value.GetRawText());
++    }
++
++    /// <summary>
++    /// Encode one signed scalar with the existing lossless transport rules.
++    /// Containers are forbidden here so direct output cannot construct a complete CBOR tree.
++    /// </summary>
++    internal static CBORValue EncodeTransportScalar(JsonElement value, String path, HashSet<String> readings)
++    {
++        if (value.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
++            throw new ArgumentException("The ChangeSet scalar codec does not accept containers.");
++        return EncodeTransportJSON(value, path, readings);
+     }
+ 
+     private static CBORValue ConvertTransportETags(CBORValue value, Boolean toBinary)
+--- a/WWCP_POI/Serialization/POICBORWriter.cs
++++ b/WWCP_POI/Serialization/POICBORWriter.cs
+@@ -13,7 +13,7 @@
+ namespace cloud.charging.open.protocols.WWCP.POI;
+ 
+ /// <summary>
+-/// Write canonical POI CBOR from canonical JSON without constructing complete CBOR value trees.
++/// Write deterministic POI and ChangeSet CBOR from prepared JSON without complete CBOR value trees.
+ /// Map order and uniqueness are checked here; scalar/tag/depth rules belong to Styx.
+ /// </summary>
+ internal sealed class POICBORWriter
+@@ -21,6 +21,7 @@
+     private readonly CBORWriter writer;
+     private readonly Dictionary<String, Byte[]> keys = new(StringComparer.Ordinal);
+     private Int32 keyBytes;
++    private HashSet<String>? changeSetReadings;
+     private const Int32 MaxCachedKeys = 128;
+     private const Int32 MaxCachedKeyBytes = 16384;
+ 
+@@ -35,6 +36,17 @@
+     {
+         WriteValue(value, kind, "");
+         if (!writer.IsComplete) throw new CBORException("Incomplete POI CBOR value.");
++    }
++
++    /// <summary>
++    /// Emit a validated ChangeSet document using its exact signed scalar codec and reading paths.
++    /// Only the two root header ETag pairs become native byte tuples.
++    /// </summary>
++    internal void WriteChangeSet(JsonElement value, HashSet<String> readings)
++    {
++        changeSetReadings = readings;
++        WriteValue(value, null, "");
++        if (!writer.IsComplete) throw new CBORException("Incomplete ChangeSet CBOR value.");
+     }
+ 
+     private void WriteValue(JsonElement value, String? kind, String path)
+@@ -52,7 +64,9 @@
+                 foreach (var field in fields)
+                 {
+                     writer.WriteTextString(field.Name);
+-                    if (kind is not null && field.Name == "ETags") WriteETags(field.Value);
++                    if ((kind is not null && field.Name == "ETags") ||
++                        (changeSetReadings is not null && path.Length == 0 && field.Name is "BeforeETags" or "AfterETags"))
++                        WriteETags(field.Value);
+                     else if (kind is not null && field.Value.ValueKind == JsonValueKind.String &&
+                              POIRepresentation.IsMeasurement(kind, field.Name))
+                     {
+@@ -64,7 +78,7 @@
+                     else
+                     {
+                         var child = kind is null ? null : POIRepresentation.ChildKind(kind, field.Name);
+-                        WriteValue(field.Value, child, child is null ? "" : path + "/" + Escape(field.Name));
++                        WriteValue(field.Value, child, changeSetReadings is not null || child is not null ? path + "/" + Escape(field.Name) : "");
+                     }
+                 }
+                 writer.WriteEndMap();
+@@ -76,17 +90,23 @@
+                 {
+                     // The schema visitor binds immediate object elements only, not nested arrays.
+                     var child = item.ValueKind == JsonValueKind.Object ? kind : null;
+-                    WriteValue(item, child, child is null ? "" : path + "/" + index.ToString(CultureInfo.InvariantCulture));
++                    WriteValue(item, child, changeSetReadings is not null || child is not null ? path + "/" + index.ToString(CultureInfo.InvariantCulture) : "");
+                     index++;
+                 }
+                 writer.WriteEndArray();
+                 break;
+-            case JsonValueKind.String: writer.WriteTextString(value.GetString()!); break;
++            case JsonValueKind.String:
++                if (changeSetReadings is not null && changeSetReadings.Contains(path))
++                    WriteLeaf(RoamingNetworkChangeSet.EncodeTransportScalar(value, path, changeSetReadings));
++                else writer.WriteTextString(value.GetString()!);
++                break;
+             case JsonValueKind.True: writer.WriteBoolean(true); break;
+             case JsonValueKind.False: writer.WriteBoolean(false); break;
+             case JsonValueKind.Null: writer.WriteNull(); break;
+             case JsonValueKind.Number:
+-                if (value.TryGetInt64(out var signed)) writer.WriteInt64(signed);
++                if (changeSetReadings is not null)
++                    WriteLeaf(RoamingNetworkChangeSet.EncodeTransportScalar(value, path, changeSetReadings));
++                else if (value.TryGetInt64(out var signed)) writer.WriteInt64(signed);
+                 else if (value.TryGetUInt64(out var unsigned)) writer.WriteUInt64(unsigned);
+                 // Styx preserves exact decimal scales, exponents and bignums; never use binary floats.
+                 else WriteLeaf(CBORJSON.ToCBOR(value.GetRawText()));

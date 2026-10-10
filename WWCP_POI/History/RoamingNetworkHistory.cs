@@ -294,6 +294,7 @@ public sealed partial class RoamingNetworkHistory : IDisposable
 
     private void VerifyCommit(RoamingNetworkCommit commit)
     {
+        using var preparation = POICanonicalPreparation.Enter();
         foreach (var signature in commit.Signatures)
             if (verifyCommitSignature is null || !verifyCommitSignature(commit, signature))
                 throw new ArgumentException($"Commit signature '{signature.KeyId}' was not accepted.");
@@ -308,6 +309,7 @@ public sealed partial class RoamingNetworkHistory : IDisposable
     private void VerifyBatch(RoamingNetworkCommit commit)
     {
         if (commit.ChangeSet is not { } batch) return;
+        using var preparation = POICanonicalPreparation.Enter();
         foreach (var signature in batch.Signatures)
             if (verifyBatchSignature is null || !verifyBatchSignature(batch, signature))
                 throw new ArgumentException($"Batch signature '{signature.KeyId}' was not accepted.");

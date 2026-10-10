@@ -211,8 +211,10 @@ The library supplies cryptographic verification helpers, the per-signature hook 
 signer-to-operator permission model. Applications can enforce trust and authorization before
 application or within their verification boundary.
 
-Transparency-software certificate fields are domain metadata. Parsing those strings and validity
-intervals does not validate a certificate chain or authenticate a ChangeSet signature.
+TransparencySoftwareCertificate describes an approval/compatibility document for a station
+model/version and software releases. Its ID, issuer and validity are domain metadata. It is
+separate from cryptographic key certificates and ChangeSet signatures. Parsing establishes
+references and software coverage, not authenticity or deployment matching. See [domain model](DOMAIN-MODEL.md).
 
 ## Revisions, replay and branches
 
@@ -309,7 +311,8 @@ separate history with fresh local runtime and optionally persists only to a new 
 Merge reference resolutions optionally add a typed `RelatedEntity` target/parent to the ordered
 `wwcpPOIMerge.Resolutions` audit entries. This remains part of the signed batch and deterministic
 commit identity. Revalidating a whole-subtree choice drops obsolete unresolved issues without
-discarding accepted chronological decisions. Existing property-only merge vectors are unchanged;
+discarding accepted chronological decisions. That package kept its then-current property-only merge vectors unchanged; current references
+were subsequently regenerated for static-v2;
 structural/reference resolution recovery is checked with the normal two-peer verifiers.
 
 Lifetime-dependent merge records additionally bind `LifetimeProfile`, typed original commit/
@@ -333,3 +336,9 @@ storage and rechecks the new signed root plus retained commit/batch peers before
 Boundary policy independently approves the checkpoint/anchor pair. Retention plans and receipts have
 derived hashes but are unsigned bookkeeping; root signatures do not cover their catalog. Independently
 trusted archive/manifest provenance and original signed cold replay govern historical verification.
+
+[Scoped canonical preparation](CANONICAL-PREPARATION.md) now reuses unsigned bytes during
+synchronous recovery/peer loops with bounded admission and complete release at return/failure.
+Original identity/signature profiles and every key/verifier/authority callback remain exact;
+no trust result or key is cached. Direct individual signing-byte calls use their preceding
+pipeline. Public arrays stay detached, and runtime remains separate from signed static content.

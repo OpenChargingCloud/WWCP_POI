@@ -123,7 +123,21 @@ public sealed class HeadAdoptionTests
         var right = Prepare(history, root, "right", operations); Publish(history, right);
         Status(history, EvseTarget, "charging"); Status(history, PoolMeter, "error"); Status(history, StationMeter, "reserved");
         if (kind == "NewMeter") Status(history, POIRuntimeTarget.Meter(InfrastructureEntityType.ChargingPool, "DE*ABC*P1", "new-meter"), "error");
-        var merge = Merge(history, left, right); Store(history, merge);
+        RoamingNetworkCommit merge;
+        if (kind == "RecreatedEVSE")
+        {
+            // Replacement and a property edit on the prior lifetime now require an explicit choice.
+            var unchanged = new Observation(history);
+            Assert.That(history.TryMerge(left.Id, right.Id, out _, out var conflict), Is.False);
+            Assert.That(conflict.Conflicts.Any(item => item.Kind == RoamingNetworkMergeConflictKind.ReplaceModify), Is.True);
+            unchanged.AssertUnchanged(history);
+            Assert.That(history.TryMerge(left.Id, right.Id, out var prepared, out var resolved, merge: true,
+                mergedChangeSetId: "merge", createdAt: InteropFixture.Time.AddDays(1),
+                resolveConflict: _ => RoamingNetworkMergeResolution.UseRight), Is.True, resolved.Message);
+            merge = Sign(prepared!.WithChangeSet(Sign(prepared.ChangeSet!)));
+        }
+        else merge = Merge(history, left, right);
+        Store(history, merge);
         var old = history.Head.Network;
         Assert.That(history.TryAdoptHead(right.Id, merge.Id, out var result, adopt: true), Is.True, result.Error);
         var current = history.Head.Network;
@@ -180,14 +194,14 @@ public sealed class HeadAdoptionTests
             RoamingNetworkChange.UpdateElementProperty("ChargingPool", "DE*ABC*P1", [new("gridConnectionPoint", "point-a")], "nominalVoltage", null, Value("\"450 V\""));
         var right = Prepare(history, root, "right", edit); Publish(history, right);
         Status(history, POIRuntimeTarget.ConnectionMeter("DE*ABC*P1", "connection-meter"), "error");
-        Status(history, POIRuntimeTarget.ConnectionGridOperator("DE*ABC*P1", "DE*GRD"), "Offline");
+        Status(history, POIRuntimeTarget.GridOperator("DE*GRD"), "Offline");
         Status(history, PoolMeter, "reserved");
         var merge = Merge(history, left, right); Store(history, merge);
         Assert.That(history.TryAdoptHead(right.Id, merge.Id, out var result, adopt: true), Is.True, result.Error);
         var current = history.Head.Network.ChargingPools.Single();
         Assert.That(current.EnergyMeters.Single().Status.Value.ToString(), Is.EqualTo("reserved"));
         Assert.That(current.GridConnectionPoint!.EnergyMeter!.Status.Value.ToString() == "error", Is.EqualTo(!replaceIdentity));
-        Assert.That(current.GridConnectionPoint.GridOperator.Status.Value == GridOperatorStatusTypes.Offline, Is.EqualTo(!replaceIdentity));
+        Assert.That(current.GridConnectionPoint.GridOperator.Status.Value, Is.EqualTo(GridOperatorStatusTypes.Offline));
     }
 
     [Test]

@@ -1,0 +1,91 @@
+--- a/WWCP_POI_Benchmarks/ArchiveRecoveryProbe.cs
++++ b/WWCP_POI_Benchmarks/ArchiveRecoveryProbe.cs
+@@ -23,7 +23,8 @@
+     internal static readonly String[] Operations = ["read-cbor-limits", "read-cbor-tree", "read-cbor-model",
+         "read-signatures", "read-restore", "read-cbor", "read-json"];
+     internal static readonly String[] StreamOperations = ["read-cbor-input-memory", "read-cbor-input-spool"];
+-    internal static readonly String[] AllOperations = [.. Operations, .. StreamOperations];
++    internal static readonly String[] FileOperations = ["read-cbor-file-array", "read-cbor-file-mapped"];
++    internal static readonly String[] AllOperations = [.. Operations, .. StreamOperations, .. FileOperations];
+ 
+     private sealed class Input(Byte[] bytes) : Stream
+     {
+@@ -94,6 +95,9 @@
+     private Model? latestModel;
+     private RoamingNetworkHistory? latestHistory;
+     private Int32 latestSignatures;
++    private String? inputDirectory;
++    private String? inputPath;
++    private FileStream? inputLease;
+ 
+     internal ArchiveRecoveryProbe(Shape shape, String operation)
+     {
+@@ -135,8 +139,14 @@
+             using var cbor = RoamingNetworkHistory.ParseCBOR(bytes, batchTrust, commitTrust, authorizeSnapshotBoundary: Boundary); VerifyRecovered(cbor, true);
+             using var text = RoamingNetworkHistory.Parse(json, batchTrust, commitTrust, authorizeSnapshotBoundary: Boundary); VerifyRecovered(text, true);
+             VerifySignatures(model);
+-        }
+-        catch { boundarySource?.Dispose(); owner.Dispose(); throw; }
++            if (FileOperations.Contains(operation))
++            {
++                inputDirectory = Path.Combine(Path.GetTempPath(), "wwcp-poi-mapped-probe-" + Guid.NewGuid().ToString("N"));
++                Directory.CreateDirectory(inputDirectory);
++                inputPath = Path.Combine(inputDirectory, "history.cbor"); File.WriteAllBytes(inputPath, bytes);
++            }
++        }
++        catch { Dispose(); throw; }
+     }
+ 
+     private Boolean Boundary(RoamingNetworkSnapshotBoundary value) => value.Checkpoint == source.CheckpointId;
+@@ -223,10 +233,26 @@
+                     latestHistory = RoamingNetworkHistory.ParseCBOR(input, batchTrust, commitTrust, authorizeSnapshotBoundary: Boundary,
+                         limits: limits, readOptions: operation == "read-cbor-input-memory" ? memoryInput : fileInput);
+                 break;
++            case "read-cbor-file-array":
++                // Previous Open input algorithm as a same-build control. Hold the writer lease until
++                // post-measurement verification/disposal, just like the mapped persistent history.
++                inputLease = new FileStream(inputPath + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
++                Byte[] captured;
++                using (var file = new FileStream(inputPath!, FileMode.Open, FileAccess.Read, FileShare.Read))
++                {
++                    if (file.Length > limits.MaxArchiveBytes) throw new InvalidOperationException("Benchmark fixture exceeds its archive budget.");
++                    captured = new Byte[checked((Int32) file.Length)]; file.ReadExactly(captured);
++                    if (file.ReadByte() != -1) throw new IOException("Archive length changed while reading.");
++                }
++                latestHistory = RoamingNetworkHistory.ParseCBOR(captured, batchTrust, commitTrust, authorizeSnapshotBoundary: Boundary, limits: limits);
++                break;
++            case "read-cbor-file-mapped":
++                latestHistory = RoamingNetworkHistory.Open(inputPath!, batchTrust, commitTrust, authorizeSnapshotBoundary: Boundary, limits: limits);
++                break;
+             case "read-json": latestHistory = RoamingNetworkHistory.Parse(json, batchTrust, commitTrust, authorizeSnapshotBoundary: Boundary); break;
+             default: throw new ArgumentException("Unknown recovery operation.");
+         }
+-        return new(operation == "read-cbor" || StreamOperations.Contains(operation) ? bytes.Length : operation == "read-json" ? inventory.InputJSONBytes : 0, 0, latestHistory.Head.Id.ToString());
++        return new(operation == "read-cbor" || StreamOperations.Contains(operation) || FileOperations.Contains(operation) ? bytes.Length : operation == "read-json" ? inventory.InputJSONBytes : 0, 0, latestHistory.Head.Id.ToString());
+     }
+ 
+     private void Verify()
+@@ -238,7 +264,7 @@
+             if (operation == "read-signatures" && latestSignatures != inventory.CommitPeers + inventory.BatchPeers) throw new InvalidOperationException("Peer count changed.");
+             if (latestHistory is { } history) VerifyRecovered(history, true);
+         }
+-        finally { latestHistory?.Dispose(); latestHistory = null; latestTree = null; latestModel = null; }
++        finally { latestHistory?.Dispose(); inputLease?.Dispose(); inputLease = null; latestHistory = null; latestTree = null; latestModel = null; }
+     }
+ 
+     private ReplayRetention Retention()
+@@ -271,5 +297,13 @@
+     private static T Bind<T>(Type owner, String name) where T : Delegate
+         => (owner.GetMethod(name, BindingFlags.Static | BindingFlags.NonPublic) ?? throw new MissingMethodException(owner.FullName, name)).CreateDelegate<T>();
+ 
+-    public void Dispose() { latestHistory?.Dispose(); boundarySource?.Dispose(); owner.Dispose(); }
++    public void Dispose()
++    {
++        try { latestHistory?.Dispose(); inputLease?.Dispose(); boundarySource?.Dispose(); owner.Dispose(); }
++        finally
++        {
++            if (inputPath is not null) { File.Delete(inputPath); File.Delete(inputPath + ".lock"); }
++            if (inputDirectory is not null) Directory.Delete(inputDirectory);
++        }
++    }
+ }

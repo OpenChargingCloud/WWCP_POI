@@ -15,8 +15,7 @@ public enum POIRuntimeTargetKind
 {
     Entity,
     EnergyMeter,
-    GridConnectionPointEnergyMeter,
-    GridConnectionPointGridOperator
+    GridConnectionPointEnergyMeter
 }
 
 /// <summary>
@@ -33,7 +32,8 @@ public sealed record POIRuntimeTarget
                             String ownerEntityId, String? childId = null)
     {
         if (!Enum.IsDefined(kind) || !Enum.IsDefined(ownerEntityType) ||
-            ownerEntityType is InfrastructureEntityType.ChargingConnector or InfrastructureEntityType.ChargingStationManufacturer)
+            ownerEntityType is InfrastructureEntityType.ChargingConnector or InfrastructureEntityType.ChargingStationManufacturer or
+                               InfrastructureEntityType.ParkingProduct or InfrastructureEntityType.TransparencySoftware or InfrastructureEntityType.TransparencySoftwareCertificate)
             throw new ArgumentException("Invalid runtime target kind or owner type.");
         OwnerEntityId = new InfrastructureEntityKey(ownerEntityType, ownerEntityId).Id;
         if (kind == POIRuntimeTargetKind.Entity && childId is not null)
@@ -43,12 +43,10 @@ public sealed record POIRuntimeTarget
         if (kind == POIRuntimeTargetKind.EnergyMeter &&
             ownerEntityType is not (InfrastructureEntityType.ChargingPool or InfrastructureEntityType.ChargingStation or InfrastructureEntityType.EVSE))
             throw new ArgumentException("A direct meter requires a pool, station or EVSE owner.");
-        if (kind is POIRuntimeTargetKind.GridConnectionPointEnergyMeter or POIRuntimeTargetKind.GridConnectionPointGridOperator &&
+        if (kind == POIRuntimeTargetKind.GridConnectionPointEnergyMeter &&
             ownerEntityType != InfrastructureEntityType.ChargingPool)
             throw new ArgumentException("A grid connection point requires a pool owner.");
-        if (kind == POIRuntimeTargetKind.GridConnectionPointGridOperator)
-            _ = GridOperator_Id.Parse(childId!);
-        else if (kind != POIRuntimeTargetKind.Entity)
+        if (kind != POIRuntimeTargetKind.Entity)
             _ = EnergyMeter_Id.Parse(childId!);
         Kind = kind;
         OwnerEntityType = ownerEntityType;
@@ -74,7 +72,7 @@ public sealed record POIRuntimeTarget
     public String OwnerEntityId { get; private init; }
 
     /// <summary>
-    /// The meter or grid operator identifier, required for nested targets.
+    /// The meter identifier, required for nested targets.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public String? ChildId { get; }
@@ -98,10 +96,10 @@ public sealed record POIRuntimeTarget
         => new(POIRuntimeTargetKind.GridConnectionPointEnergyMeter, InfrastructureEntityType.ChargingPool, poolId, meterId);
 
     /// <summary>
-    /// Address the grid operator within a pool's grid connection point.
+    /// Address a shared grid operator in the network registry.
     /// </summary>
-    public static POIRuntimeTarget ConnectionGridOperator(String poolId, String gridOperatorId)
-        => new(POIRuntimeTargetKind.GridConnectionPointGridOperator, InfrastructureEntityType.ChargingPool, poolId, gridOperatorId);
+    public static POIRuntimeTarget GridOperator(String gridOperatorId)
+        => Entity(InfrastructureEntityType.GridOperator, gridOperatorId);
 }
 
 internal sealed class POIRuntimeEnumConverter<T> : JsonStringEnumConverter<T> where T : struct, Enum

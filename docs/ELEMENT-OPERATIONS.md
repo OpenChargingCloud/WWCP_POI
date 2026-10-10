@@ -68,7 +68,9 @@ is updated for targeted assignment changes just as for whole-property `tariffIds
 
 Group member arrays (`EVSEIds`, `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`)
 and the first three groups' `allowedMemberIds` support addressed Add/Remove/Replace operations.
-Parking nodes' `chargingStationIds`/`sensors`, and parking operators' local/invalid space IDs do too.
+Parking nodes' station/sensor/space/product reference arrays, certificate software reference arrays
+and parking operators' local/invalid space IDs do too. Optional scalar garage/manufacturer
+references and required point `gridOperatorId` are edited as properties.
 Active group members must exist under their operator and be admitted. Parking sensors/spaces
 must belong to the same parking operator; station references can cross charging operators within
 the network. Deletion protection is maintained by `DataSnapshot.References`; see [scopes](GRAPH.md).
@@ -80,7 +82,7 @@ the network. Deletion protection is maintained by `DataSnapshot.References`; see
 | Pool/station `energyMeters` | Array of meters | Meter `id`, with domain ID equality |
 | EVSE/connection-point `energyMeter` | Optional singleton meter | Owner/property; optional meter ID assertion |
 | Pool `gridConnectionPoint` | Optional singleton | Owner/property; optional connection-point `id` assertion |
-| Connection-point `gridOperator` | Required singleton | Owner/property; optional operator ID assertion |
+| Connection-point `gridOperatorId` | Required scalar reference | Update the point property; registry description uses graph operations |
 | Connector `cable` | Optional singleton value | Owner/property; no element ID |
 | Operator/pool/station `brands`, EVSE `brand` | Array of expanded brands | Brand `id` |
 | Tariff/EVSE-group/station-group/pool-group `brand` | Optional singleton brand | Owner/property; optional brand ID assertion |
@@ -89,7 +91,8 @@ the network. Deletion protection is maintained by `DataSnapshot.References`; see
 | Network/operator/provider/pool/station/EVSE `dataLicenseIds` | Array of references | License ID string |
 | EVSE/connector `tariffIds` | Array of references | Tariff ID string |
 | Group active member IDs and admission IDs | Array of reference strings | Referenced domain ID |
-| Parking station/sensor/space IDs | Array of reference strings | Referenced domain ID |
+| Parking station/sensor/space/product IDs | Array of reference strings | Referenced domain ID |
+| Certificate verified/compatible software IDs | Array of reference strings | TransparencySoftware ID |
 | Group/parking-operator `dataLicenses` | Expanded licenses | License `@id` |
 | Connection-point `marketLocationIds`, `meteringLocationIds` | Array of references | Existing location identifier string |
 
@@ -114,12 +117,12 @@ not traversal roots. Graph child collections such as `EVSEs` still use graph ope
 object elements must contain their correct identity and supported fields. Duplicate identities,
 wrong scopes, malformed elements and unknown element fields are rejected before publication.
 
-Tariff elements/price components/restrictions and transparency software/certificate values have
-no independent IDs in the current model. Their arrays remain explicit whole-property values.
-For example, `UpdateElementProperty` can update a selected meter's `transparencySoftware` array
-while preserving its other fields. Groups, manufacturers and network grid/parking operators,
-including parking children, have independent graph addresses. Their owned child arrays use graph
-operations; identified membership/reference arrays use element operations.
+Tariff elements, price components and restrictions deliberately remain values without IDs;
+their arrays use whole-property replacement. A meter's `transparencySoftware` array holds legal
+assignments referencing identified software/certificate graph nodes. That assignment array also
+uses whole-property replacement, for example via `UpdateElementProperty` on a selected meter.
+The software/certificate descriptions and parking products have independent graph addresses.
+Owned child arrays use graph operations; identified membership/reference arrays use element operations.
 
 ## Validation, metadata and runtime
 
@@ -132,9 +135,9 @@ Property edits cannot change element IDs, parent/network references, contexts, c
 timestamps or derived ETags. Array replacements must retain the addressed element identity.
 An unqualified singleton slot can explicitly replace its child with a different identity.
 
-Meter/grid-operator `lastChange` and those of their affected nested ancestors use the fixed batch
-timestamp. Graph owner/ancestor timestamps are updated normally. `ReplaceElement` of the same
-identified meter/operator preserves its creation timestamp and rejects a supplied different one.
+Meter `lastChange` and those of its affected nested ancestors use the fixed batch timestamp.
+Graph owner/ancestor timestamps are updated normally. `ReplaceElement` of the same identified
+meter preserves its creation timestamp and rejects a supplied different one.
 Missing introduced metadata uses deterministic batch defaults. Quantities use explicit SI strings;
 equivalent units are normalized for old-value checks and storage. Zero/null constraints remain
 those of the domain parser.

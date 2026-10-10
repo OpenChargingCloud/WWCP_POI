@@ -1,0 +1,357 @@
+{
+  "date": "2026-10-09",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "219cc984724a6ae5d0ef108f71a34380e3e66971567d5f6cd5924154eee4db26",
+  "productionAssemblySHA256": "d3c7d87cc107e7e9400be34f4dc7ce22d618e4f23ee208c293d0a31d7e2aad8a",
+  "beforeProductionSourceSHA256": "4a580ff39348bf76092fe2b6d57f932f3602684f049c8cb86e380a289b7e99db",
+  "beforeProductionAssemblySHA256": "c16496874a6535ef405bc3218eeca095b6117b8b1761186c639ef67bce6a665d",
+  "beforeEvidence": "docs/verification/archive-recovery-results.json",
+  "productionPatch": {
+    "file": "docs/performance/indexed-archive-reader.diff",
+    "sha256": "92ed00ed536cf302353ee233ddba573b2098b16cfe6fa1cf87932cb2007cfa06",
+    "modifiedFiles": [
+      "WWCP_POI/History/RoamingNetworkHistory.Archive.cs",
+      "WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs",
+      "WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs",
+      "WWCP_POI/History/RoamingNetworkBootstrapManifest.cs"
+    ],
+    "addedFiles": [
+      "WWCP_POI/History/POIArchiveCBORIndex.cs",
+      "WWCP_POI/History/RoamingNetworkHistory.IndexedArchive.cs"
+    ],
+    "reverseCheckPassed": true,
+    "reverseAppliedInPrivateCopyRestoresExactBeforeBytes": true,
+    "reconstructedBeforeFingerprintMatchesBaseline": true
+  },
+  "testSourceSHA256": "51fad9139d9cc378d06e4614fff793f49b448be3a72f9694006231c7e89d9498",
+  "testAssemblySHA256": "cdace64e7de451f0b79124dd7b539ccb9a6088e5066e6e36b3aec0bb588b9f99",
+  "existingTestSourcesUnchanged": true,
+  "benchmarkSourceSHA256": "225f9ce61c7829b0ac33a083ebe325a28fca22e9ce052306669fb36d4f53296a",
+  "benchmarkAssemblySHA256": "2031684326c101e607f3b47e0432d36c605fcf18df085bcc491562c4a01b9e51",
+  "beforeBenchmarkAssemblySHA256": "294f762d80423105ee5cf3a86f8a497360cae75b82ff4814bc0ca8184c251208",
+  "benchmarkSourcesUnchanged": true,
+  "benchmarkBinaryNote": "The after harness was rebuilt. Its unchanged C# source fingerprint and both distinct assembly hashes are recorded separately.",
+  "evidenceGenerationCorrections": [
+    "The proof helper initially also required equal rebuilt benchmark assembly hashes. That assertion was corrected: harness source is unchanged, rebuilt binary artifacts are bound separately. No production, test or measured report changed."
+  ],
+  "reportScriptSHA256": "4d51b569cf7c94619a1df33d872b8ca8f1c2ad7440c5a8b5424e415b3546b0a8",
+  "sharedDependencies": [
+    {
+      "name": "Styx.dll",
+      "sha256": "1655174175e2abb259ead391c8e58aa71c089e71142c04a88581d31f3b7956ac",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "WWCP_CoreData.dll",
+      "sha256": "4630250928e031ad4fc7c531c6786d3cca3e952f851f3f184903b3d3d19c0cba",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "org.GraphDefined.Vanaheimr.Hermod.dll",
+      "sha256": "7355657890caf64a8e922e3d11bb14e835c398b6dd76f013d3987e035535a43c",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "Newtonsoft.Json.dll",
+      "sha256": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "BouncyCastle.Cryptography.dll",
+      "sha256": "ef92fc661e8d7ba8ec4d39a7cdfcdba41f14cb327f0d24fe79d0b5bb428899b5",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    }
+  ],
+  "newTestCases": 78,
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/indexed-archive/indexed-archive-focused.trx",
+      "sha256": "df4086fd3d45b6e7fc7478a59baa1613a5329cbc2a2bf374cf6a088465788449",
+      "times": {
+        "creation": "2026-10-09T14:18:36.3078073+02:00",
+        "queuing": "2026-10-09T14:18:36.3078076+02:00",
+        "start": "2026-10-09T14:18:34.4053798+02:00",
+        "finish": "2026-10-09T14:19:00.8110702+02:00"
+      },
+      "passed": 257,
+      "failed": 0,
+      "skipped": 1,
+      "newIndexedCasesPassed": 78,
+      "excludedExplicitGenerators": [],
+      "counters": {
+        "total": 258,
+        "executed": 257,
+        "passed": 257,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/indexed-archive/indexed-archive-full.trx",
+      "sha256": "0dce71db10b2843f7d1effc968356788b3958c046299bc3800d8f2b0d6a98c4c",
+      "times": {
+        "creation": "2026-10-09T14:20:00.6054140+02:00",
+        "queuing": "2026-10-09T14:20:00.6054144+02:00",
+        "start": "2026-10-09T14:19:59.0171860+02:00",
+        "finish": "2026-10-09T14:24:30.1577198+02:00"
+      },
+      "passed": 1869,
+      "failed": 0,
+      "skipped": 1,
+      "newIndexedCasesPassed": 78,
+      "excludedExplicitGenerators": [
+        "GenerateSnapshotRetentionVectors",
+        "GenerateReferenceVectors"
+      ],
+      "counters": {
+        "total": 1872,
+        "executed": 1869,
+        "passed": 1869,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  ],
+  "initialSetupCorrections": [],
+  "buildResult": {
+    "errors": 0,
+    "existingWarnings": "Existing nullable/analyzer warnings remain; no new index-file diagnostics."
+  },
+  "reports": [
+    {
+      "file": "docs/performance/indexed-archive-before.json",
+      "sha256": "ddd3cc8c4c4e24424ac94073b3f44849e57acaf37ef68d2937fd1442ced9f57f",
+      "workers": 42,
+      "measuredSamples": 210,
+      "origin": "Exact selected records from the preceding decoder baseline, not new before executions"
+    },
+    {
+      "file": "docs/performance/indexed-archive-after.json",
+      "sha256": "63594df8cb8f5faf1a7d900e338ce4676cdaa7223cee9159077a336dceec71aa",
+      "workers": 42,
+      "measuredSamples": 210,
+      "origin": "Fresh after workers"
+    }
+  ],
+  "baselineDerivation": {
+    "file": "docs/performance/archive-recovery-baseline.json",
+    "sha256": "b479c97dad0a6c309fe6fca5ba8d91a688b2bff314714ffd7354eed718f6c470",
+    "originalWorkers": 98,
+    "originalMeasuredSamples": 490,
+    "selectedOperations": [
+      "read-cbor",
+      "read-json",
+      "read-restore"
+    ],
+    "exactRecordsUnchanged": true,
+    "derivedFrom": {
+      "file": "docs/performance/archive-recovery-baseline.json",
+      "sha256": "b479c97dad0a6c309fe6fca5ba8d91a688b2bff314714ffd7354eed718f6c470",
+      "method": "Exact selected original worker/sample records; no new before measurements."
+    }
+  },
+  "generatedReports": [
+    {
+      "file": "docs/performance/indexed-archive-summary.md",
+      "sha256": "4716c954e681427a541bb35596ed6a83c739051bfeffd70ad4b1cd9dac41362c"
+    },
+    {
+      "file": "docs/performance/indexed-archive-comparison.md",
+      "sha256": "8a1ec4b3f7855fc60e9ed705274766f559a0eaa2855f8acc3b70fbc8aa029fb2"
+    }
+  ],
+  "fixedReferences": [
+    {
+      "file": "docs/interoperability/changeset.cbor",
+      "sha256": "2e9ca50bf982c5797fa5301beadd7399c38967031325d305909fd1a9ddaff2e3"
+    },
+    {
+      "file": "docs/interoperability/changeset.json",
+      "sha256": "5149f33a4d0f04cca1b077c5bb5888da6f7670fb970c08ed9b8d2be01d58e461"
+    },
+    {
+      "file": "docs/interoperability/commit.cbor",
+      "sha256": "dd808c2f667ed99ac1f319fbbe480b7bfa7a1cd0c2fffb9d0c72a4dd49441f64"
+    },
+    {
+      "file": "docs/interoperability/commit.json",
+      "sha256": "16e1c0b8e5e26b741a915882f6445df61985a74813da4e0bde8df96b0dcdc9e2"
+    },
+    {
+      "file": "docs/interoperability/history.cbor",
+      "sha256": "4ad8c59d47e8738c9005a303a150552077ba4dc0ab990e2a62c42b66d889ed53"
+    },
+    {
+      "file": "docs/interoperability/history.json",
+      "sha256": "173f11f152a749ee7d25a8f629351eec9c0da8366ddf7881353c1bafbc8e16e3"
+    },
+    {
+      "file": "docs/interoperability/merge.cbor",
+      "sha256": "c94096478440e4e714cc1d73ff39d73da0181faf485fd16b0d6ff9369fa9c966"
+    },
+    {
+      "file": "docs/interoperability/merge.json",
+      "sha256": "6e3f4a476d1da2678528ab3a7abcba770258b5d7c229e71aa280fbb294cb6a9c"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.cbor",
+      "sha256": "c8ec4ad4ed107ea6a7b801f8ad5fad78b93a42f12905148824f78a2b1b1dec49"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.json",
+      "sha256": "abeea6cdfea5e449c56a771cd0caa14ed45a874962336d353e5c0fe7a1436dfc"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.cbor",
+      "sha256": "408ce78ba3c28befe90b6b159f9e12146046146717e698d31f1789e74804e3ac"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.json",
+      "sha256": "fad7ba55d04bffc11312ca01112da1c0920adbd0221123981460630ebe42a34a"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.cbor",
+      "sha256": "903a0f7e5de856c92d893476fb081633da45a4cdc2587f5b18a3bec9f0810e9b"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.json",
+      "sha256": "52c32069a8f96baa7826998fdc5180e7781d8e875bb04618d93ff51e0589160c"
+    },
+    {
+      "file": "docs/interoperability/retention-plan.json",
+      "sha256": "53d6e4f920b2801e72acd3c9ddcd9916d24e0f365883829c7fe12faeaa4e3c73"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.cbor",
+      "sha256": "18865a3f1ee8e9319a9dc63fb9c47c55d86ce6c95ac19e425f9144c0d31d5f29"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.json",
+      "sha256": "f486190cd0fa2de10bd39cabfe3d582a27814dc27a41ac8e4529cc727041894b"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.cbor",
+      "sha256": "0a5b8a2389bb4d603cbb17e6c6f75a24736a82bdfb49c56b4e206d6120e9ade7"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.json",
+      "sha256": "7c5363c00863993d47c1b1cc9e723486521f640294fbce71207ef018fe061af5"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.cbor",
+      "sha256": "1d6593f6cfbef65f4b310cb173a81cadea5010e96f6f3cd2454e29701450bb47"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.json",
+      "sha256": "c1cbf4389ded04c16a78f45980ff5b68f440e012a5e936929418cc3db368a18c"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.cbor",
+      "sha256": "608218579b163fbf3eb71b7932fe4a9483bf089953e448793d02d27114074531"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.json",
+      "sha256": "4bc9b76e36a992d73df3632b5f18d678d29aa33a0be42fcb311710818e1820e4"
+    },
+    {
+      "file": "docs/interoperability/snapshot-retention.vectors.json",
+      "sha256": "b773e90f3ba2f9c1ae110163bddc48a5da76eadad04e522cfa852d16dbb412c9"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.cbor",
+      "sha256": "ca17c05ea79af48847fe95268b3743b5eea2901fad1a14a7369a98867e70d1b8"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.json",
+      "sha256": "9b1d6039d962c1060732539670204869e4db55f67bcc04a109adf226515ef415"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.cbor",
+      "sha256": "b813800ae3bddbc98e216a7cd47f92075843c19a43c71fda82e971dc4b29f0e5"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.json",
+      "sha256": "f278409b12987017f2270170c57f2f732b36068a5b606a958ea7da028c1dc36d"
+    },
+    {
+      "file": "docs/interoperability/snapshot.cbor",
+      "sha256": "dbf002f25a428e1588f150fd6a69f352da6bda8d420b06c3dc2f8c1633eec89f"
+    },
+    {
+      "file": "docs/interoperability/snapshot.input.json",
+      "sha256": "10c250ec20ff14a8d1e330262ec8ba53b0a70a3a380b80da4fb6fbf113bbe7b1"
+    },
+    {
+      "file": "docs/interoperability/snapshot.json",
+      "sha256": "70a684f485bcf208440455656c69463e4d1058d330de91504ffdae31171f81bd"
+    },
+    {
+      "file": "docs/interoperability/vectors.json",
+      "sha256": "7684f6096567f7cb40f9316a30c6d8601b80b329c2727be5a53b51cc37143201"
+    }
+  ],
+  "measurementMethod": {
+    "suite": "recovery",
+    "workloadShapes": 7,
+    "operations": 3,
+    "processesPerOperation": 2,
+    "warmupsPerProcess": 5,
+    "samplesPerProcess": 5,
+    "taskBuildTestOverlap": false,
+    "dedicatedHost": false,
+    "baselineRerun": false,
+    "allocationCounter": "GC.GetAllocatedBytesForCurrentThread on the operation thread",
+    "controls": "Complete JSON and actual prepared-model restore; common boundary cursor changed, no C# harness change.",
+    "outputVerification": "Outside measurement: exact CBOR bytes/peers, every branch state, head/checkpoint/anchor/receipts and fresh local runtime.",
+    "postMeasurementRetentionProbesPerReport": 14,
+    "retentionUnit": "Approximate additional managed process heap holding one recovered history, source/input kept alive on both sides.",
+    "stagesAdditive": false,
+    "exactBeforeAfterInputsAndResults": true
+  },
+  "limits": {
+    "productionProfilesChanged": false,
+    "publicAPIsChanged": false,
+    "wholeArchiveInput": true,
+    "wholeArchiveCBORTree": false,
+    "validatedRangeIndexes": true,
+    "privateBoundaryPendingBytes": true,
+    "partKeyScalarTrees": true,
+    "retainedBranchStates": true,
+    "maxCBORDepth": 64,
+    "newStreamDecoder": false,
+    "fullSyntaxBeforeTrust": true,
+    "eagerCompleteLazyBoundaryModelsPreserved": true,
+    "bootstrapCanonicalAcceptanceMatchesActualWriterOracle": true,
+    "totalRecoveryMemoryBound": false,
+    "exactPeakMemoryMeasurement": false,
+    "nonSeekableStreamSpool": "Next package with borrowed source, owned cleanup/limits/cancellation/I/O/retry contracts"
+  }
+}

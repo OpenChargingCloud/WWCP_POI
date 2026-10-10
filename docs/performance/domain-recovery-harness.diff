@@ -1,0 +1,593 @@
+diff --git a/WWCP_POI_Benchmarks/ArchiveRecoveryProbe.cs b/WWCP_POI_Benchmarks/ArchiveRecoveryProbe.cs
+index c879077..9800011 100644
+--- a/WWCP_POI_Benchmarks/ArchiveRecoveryProbe.cs
++++ b/WWCP_POI_Benchmarks/ArchiveRecoveryProbe.cs
+@@ -92,6 +92,7 @@ internal sealed class ArchiveRecoveryProbe : IDisposable
+     private readonly Model? inputModel;
+     private readonly String modelIdentity;
+     private readonly RecoveryInventory inventory;
++    private readonly DomainRecoveryFixture? domain;
+     private CBORValue? latestTree;
+     private Model? latestModel;
+     private RoamingNetworkHistory? latestHistory;
+@@ -100,10 +101,15 @@ internal sealed class ArchiveRecoveryProbe : IDisposable
+     private String? inputPath;
+     private FileStream? inputLease;
+ 
+-    internal ArchiveRecoveryProbe(Shape shape, String operation)
++    internal ArchiveRecoveryProbe(Shape shape, String operation, DomainRecoveryFixture? domain = null)
+     {
+-        this.shape = shape; this.operation = operation;
+-        if (shape.Name.StartsWith("recover-batch-", StringComparison.Ordinal))
++        this.shape = shape; this.operation = operation; this.domain = domain;
++        if (domain is not null)
++        {
++            owner = domain; source = domain.History;
++            batchTrust = DomainRecoveryFixture.VerifyBatch; commitTrust = DomainRecoveryFixture.VerifyCommit;
++        }
++        else if (shape.Name.StartsWith("recover-batch-", StringComparison.Ordinal))
+         {
+             var batch = new ArchiveBatchProbe(shape); owner = batch; source = batch.History;
+             batchTrust = ArchiveBatchProbe.VerifyBatch; commitTrust = ArchiveBatchProbe.VerifyCommit;
+@@ -216,6 +222,7 @@ internal sealed class ArchiveRecoveryProbe : IDisposable
+             source.Head.Network.EVSEs.Single(item => item.Id.ToString() == "DE*ABC*E1").Status.Value.ToString() != "charging")
+             throw new InvalidOperationException("Local runtime leaked into recovery or source changed.");
+         if (export && !value.ToCBOR().AsSpan().SequenceEqual(bytes)) throw new InvalidOperationException("Recovery changed exact archive bytes/peers.");
++        domain?.CheckRecovered(value);
+     }
+ 
+     private OperationResult Action()
+@@ -293,7 +300,8 @@ internal sealed class ArchiveRecoveryProbe : IDisposable
+         }).ToArray();
+         return new(shape, operation, source.Head.Snapshot.Entities.Count, source.Commits.Length, source.RetentionReceipts.Length,
+             source.RetentionReceipts.Sum(value => value.PrunedCommits.Length + value.ArchiveOnlyTips.Length), staticIdentity, archiveIdentity, measured,
+-            RecoveryInventory: inventory, ReplayRetention: operation == "read-cbor" ? Retention() : null);
++            RecoveryInventory: inventory, ReplayRetention: operation == "read-cbor" ? Retention() : null,
++            DomainInventory: domain?.Inventory);
+     }
+ 
+     private static T Bind<T>(Type owner, String name) where T : Delegate
+diff --git a/WWCP_POI_Benchmarks/DomainRecoveryFixture.cs b/WWCP_POI_Benchmarks/DomainRecoveryFixture.cs
+new file mode 100644
+index 0000000..00a4c35
+--- /dev/null
++++ b/WWCP_POI_Benchmarks/DomainRecoveryFixture.cs
+@@ -0,0 +1,283 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Globalization;
++using System.Security.Cryptography;
++using System.Text;
++using System.Text.Json;
++using cloud.charging.open.protocols.WWCP.POI;
++using Newtonsoft.Json.Linq;
++using Org.BouncyCastle.Crypto.Parameters;
++using org.GraphDefined.Vanaheimr.Illias;
++
++namespace WWCP_POI_Benchmarks;
++
++internal sealed record DomainInventory(Int32 Pools, Int32 Stations, Int32 EVSEs, Int32 GridOperators,
++    Int32 SoftwareReleases, Int32 Certificates, Int32 MeterSlots, Int32 SoftwareAssignments,
++    Int32 Tariffs, Int32 TariffElements, Int32 PriceComponents, Int32 Restrictions,
++    Int32 ParkingOperators, Int32 ParkingGarages, Int32 ParkingSpaces, Int32 ParkingGroups, Int32 ParkingProducts,
++    Int32 ReferenceEdges, Int32 MergeCommits, Int32 ElementOperations, String BranchStateIdentity);
++
++/// <summary>
++/// Deterministic shared-reference, tariff and parking data with signed edits and an explicit merge.
++/// This source is compiled into the benchmark and the contract tests; it uses only production APIs.
++/// </summary>
++internal sealed class DomainRecoveryFixture : IDisposable
++{
++    internal static readonly DateTimeOffset Epoch = DateTimeOffset.Parse("2026-01-01T00:00:00Z", CultureInfo.InvariantCulture);
++    // Published, reproducible seeds. Neither key establishes production authority.
++    private static readonly Ed25519PrivateKeyParameters[] Keys = [
++        new(Convert.FromHexString("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), 0),
++        new(Convert.FromHexString("1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100"), 0)];
++    private static readonly Ed25519PublicKeyParameters[] PublicKeys = Keys.Select(key => key.GeneratePublicKey()).ToArray();
++    private readonly String directory = Path.Combine(Path.GetTempPath(), "wwcp-poi-domain-" + Guid.NewGuid().ToString("N"));
++    private Int32 ordinal;
++    internal RoamingNetworkHistory History { get; private set; } = null!;
++    internal RoamingNetworkCommitId Checkpoint { get; }
++    internal DomainInventory Inventory { get; }
++    internal Int32 Profile { get; }
++
++    internal static Boolean VerifyBatch(RoamingNetworkChangeSet batch, RoamingNetworkChangeSetSignature peer)
++        => KeyIndex(peer.KeyId) is var index && index >= 0 && batch.VerifySignature(peer, PublicKeys[index], peer.KeyId, out _);
++    internal static Boolean VerifyCommit(RoamingNetworkCommit commit, RoamingNetworkChangeSetSignature peer)
++        => KeyIndex(peer.KeyId) is var index && index >= 0 && commit.VerifySignature(peer, PublicKeys[index], peer.KeyId, out _);
++    private static Int32 KeyIndex(String id) => id == "domain-a" ? 0 : id == "domain-b" ? 1 : -1;
++    internal static RoamingNetworkChangeSet Sign(RoamingNetworkChangeSet value)
++        => value.Sign(Keys[0], "domain-a", COSEAlgorithm.Ed25519).Sign(Keys[1], "domain-b", COSEAlgorithm.Ed25519);
++    internal static RoamingNetworkCommit Sign(RoamingNetworkCommit value)
++        => value.Sign(Keys[0], "domain-a", COSEAlgorithm.Ed25519).Sign(Keys[1], "domain-b", COSEAlgorithm.Ed25519);
++    internal Boolean Boundary(RoamingNetworkSnapshotBoundary value) => value.Checkpoint == Checkpoint;
++    private DateTimeOffset At() => Epoch.AddSeconds(++ordinal);
++
++    internal DomainRecoveryFixture(Int32 evses, Int32 profile)
++    {
++        if (evses < 8 || evses % 8 != 0) throw new ArgumentOutOfRangeException(nameof(evses));
++        if (profile is < 1 or > 4) throw new ArgumentOutOfRangeException(nameof(profile));
++        Profile = profile; Directory.CreateDirectory(directory);
++        try
++        {
++            History = new(CreateNetwork(evses), VerifyBatch, VerifyCommit); Checkpoint = History.CheckpointId;
++            Require(History.TryStoreCommit(Sign(History.Head.Commit), out var stored), stored.Error);
++            ApplyEdits();
++            if (profile is 2 or 3) PublishSnapshot();
++            if (profile == 3)
++            {
++                var complete = History;
++                History = RoamingNetworkHistory.FromSnapshot(Checkpoint, complete.Head.Commit, Boundary, VerifyCommit, VerifyBatch);
++                complete.Dispose();
++            }
++            if (profile == 4)
++            {
++                for (var round = 0; round < 2; round++)
++                {
++                    var anchor = PublishSnapshot();
++                    Publish(Edit("TransparencySoftwareCertificate", "approval-1", "documentNumber", Text("prefix-" + round)));
++                    Require(History.TryPlanRetention(anchor.Id, At(), out var plan, out var review, cutoffCommit: anchor.Id), review.Error);
++                    Require(History.TryExecuteRetention(plan!, Path.Combine(directory, $"cold-{round}.cbor"), Boundary,
++                        out var retained, prune: true), retained.Error);
++                }
++            }
++            if (profile != 1) ApplyEdits();
++            var parent = History.Head.Id;
++            var left = Prepare(parent, Edit("TransparencySoftware", "verifier-1", "vendor", Text("Merged vendor")));
++            var right = Prepare(parent, Edit("ParkingProduct", "short-stay", "minDuration", Text("900 s")));
++            Require(History.TryPublish(parent, left, out var published), published.Error);
++            Require(History.TryStoreCommit(right, out stored), stored.Error);
++            Require(History.TryMerge(left.Id, right.Id, out _, out var preview), preview.Message);
++            Require(preview.Status == RoamingNetworkMergeStatus.MergeAvailable, "Expected a disjoint merge preview.");
++            Require(History.TryMerge(left.Id, right.Id, out var merge, out var merged, merge: true,
++                mergedChangeSetId: "domain-merge", createdAt: At()), merged.Message);
++            var signed = Sign(merge!.WithChangeSet(Sign(merge.ChangeSet!)));
++            Require(History.TryPublish(left.Id, signed, out published), published.Error);
++            CheckGraph(History.Head.Network);
++            Inventory = Describe(History);
++            // Operational changes are local and must disappear from static recovery.
++            Runtime(POIRuntimeTarget.Entity(InfrastructureEntityType.EVSE, "DE*ABC*E1"), "charging");
++            Runtime(POIRuntimeTarget.GridOperator("DE*GRD"), "Offline");
++            Runtime(POIRuntimeTarget.Entity(InfrastructureEntityType.ParkingOperator, "parking-op"), "Offline");
++            Runtime(POIRuntimeTarget.Meter(InfrastructureEntityType.ChargingPool, "DE*ABC*P1", "pool-grid-1"), "error");
++        }
++        catch { Dispose(); throw; }
++    }
++
++    internal RoamingNetworkCommit Prepare(RoamingNetworkCommitId parent, params RoamingNetworkChange[] changes)
++    {
++        var timestamp = At(); var batch = Sign(History.GetSnapshot(parent).CreateChangeSet("domain-" + ordinal, timestamp, [.. changes]));
++        return Sign(History.PrepareCommit(parent, batch));
++    }
++    private void Publish(params RoamingNetworkChange[] changes)
++    {
++        var parent = History.Head.Id; var commit = Prepare(parent, changes);
++        Require(History.TryPublish(parent, commit, out var result), result.Error);
++    }
++    private RoamingNetworkCommit PublishSnapshot()
++    {
++        var parent = History.Head.Id; var snapshot = Sign(History.PrepareSnapshot(parent, At()));
++        Require(History.TryPublish(parent, snapshot, out var result), result.Error); return snapshot;
++    }
++    private void Runtime(POIRuntimeTarget target, String value)
++        => History.ApplyRuntimeUpdate(new("benchmark-network", target, POIRuntimeStatusKind.Status,
++            new(value, Epoch.AddMonths(5)), mode: POIRuntimeUpdateMode.ReplaceHistory));
++
++    private void ApplyEdits()
++    {
++        Publish(Edit("GridOperator", "DE*GRD", "name", Json(new JObject { ["en"] = "Grid " + ordinal, ["de"] = "Netz" })));
++        Publish(Edit("TransparencySoftware", "verifier-1", "vendor", Text("Vendor " + ordinal)));
++        Publish(Edit("TransparencySoftwareCertificate", "approval-1", "documentNumber", Text("Document " + ordinal)));
++        var point = JToken.Parse(History.Head.Snapshot.GetEntity(InfrastructureEntityType.ChargingPool, "DE*ABC*P1")
++            .Properties["gridConnectionPoint"].GetRawText());
++        point["gridOperatorId"] = point["gridOperatorId"]!.Value<String>() == "DE*GRD" ? "DE*ALT" : "DE*GRD";
++        Publish(Edit("ChargingPool", "DE*ABC*P1", "gridConnectionPoint", Json(point)));
++        var tariff = History.Head.Snapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["tariffIds"]
++            .EnumerateArray().First(value => value.GetString() is "DE*ABC*T1" or "DE*ABC*T3").GetString()!;
++        var next = tariff == "DE*ABC*T1" ? "DE*ABC*T3" : "DE*ABC*T1";
++        Publish(RoamingNetworkChange.RemoveElement("EVSE", "DE*ABC*E1", [new("tariffIds", tariff)]),
++            RoamingNetworkChange.AddElement("EVSE", "DE*ABC*E1", [new("tariffIds", next)], Text(next)));
++        Publish(Edit("ChargingTariff", "DE*ABC*T1", "elements", Json(TariffElements(ordinal))));
++        var hasThirdSpace = History.Head.Snapshot.GetEntity(InfrastructureEntityType.ParkingSpaceGroup, "group-1")
++            .Properties["parkingSpaceIds"].EnumerateArray().Any(value => value.GetString() == "space-3");
++        var add = hasThirdSpace ? "space-1" : "space-3"; var remove = hasThirdSpace ? "space-3" : "space-1";
++        Publish(RoamingNetworkChange.AddElement("ParkingSpaceGroup", "group-1", [new("parkingSpaceIds", add)], Text(add)),
++            RoamingNetworkChange.RemoveElement("ParkingSpaceGroup", "group-1", [new("parkingSpaceIds", remove)]));
++    }
++
++    internal static JsonElement Text(String text) => JsonSerializer.SerializeToElement(text);
++    internal static JsonElement Json(JToken value) => JsonSerializer.Deserialize<JsonElement>(value.ToString(Newtonsoft.Json.Formatting.None));
++    internal static RoamingNetworkChange Edit(String type, String id, String property, JsonElement value)
++        => RoamingNetworkChange.UpdateProperty(type, id, property, null, value);
++    private static JObject Node(String id) => new() { ["@id"] = id, ["name"] = new JObject { ["en"] = "Domain benchmark", ["de"] = "Messnetz" },
++        ["created"] = "2026-01-01T00:00:00Z", ["lastChange"] = "2026-01-01T00:00:00Z" };
++    private static JObject Meter(String id, String role, Int32 certificate)
++        => new() { ["id"] = id, ["role"] = role, ["created"] = "2026-01-01T00:00:00Z", ["lastChange"] = "2026-01-01T00:00:00Z",
++            ["transparencySoftware"] = new JArray(Enumerable.Range(certificate * 2 - 1, 2).Select(release => new JObject {
++                ["transparencySoftwareId"] = "verifier-" + release, ["legalStatus"] = release % 2 == 1 ? "verified" : "compatible",
++                ["certificateId"] = "approval-" + certificate })) };
++
++    internal static JArray TariffElements(Int32 ordinal)
++        => new(Enumerable.Range(0, 2).Select(index => new JObject {
++            ["priceComponents"] = new JArray(
++                new JObject { ["type"] = "ENERGY", ["price"] = 0.456789123456789m + ordinal / 10000m, ["stepSize"] = "1 Wh" },
++                new JObject { ["type"] = "TIME", ["price"] = 1.234500m, ["stepSize"] = "300 s" },
++                new JObject { ["type"] = "FLAT", ["price"] = 2.50m }),
++            ["restrictions"] = new JArray(new JObject { ["startTime"] = index == 0 ? "08:00" : "20:00",
++                ["endTime"] = index == 0 ? "18:00" : "23:00", ["minEnergy"] = "0.1234567 kWh", ["maxEnergy"] = "42.9876543 kWh",
++                ["minPower"] = "0 W", ["maxPower"] = "350.123 kW", ["minDuration"] = "0.0000001 s", ["maxDuration"] = "3600.25 s",
++                ["daysOfWeek"] = new JArray("MONDAY", "FRIDAY") },
++                new JObject { ["startDate"] = "2026-01-01T00:00:00Z", ["endDate"] = "2027-01-01T00:00:00Z", ["maxEnergy"] = "100 kWh" }) }));
++
++    internal static RoamingNetwork CreateNetwork(Int32 evses) => RoamingNetwork.Parse(CreateDocument(evses));
++    internal static JObject CreateDocument(Int32 evses)
++    {
++        var root = Node("benchmark-network");
++        root["gridOperators"] = new JArray(new[] { "DE*GRD", "DE*ALT" }.Select(id => { var item = Node(id); item["id"] = id; item.Remove("@id"); return item; }));
++        root["transparencySoftware"] = new JArray(Enumerable.Range(1, 4).Select(index => new JObject {
++            ["@id"] = "verifier-" + index, ["name"] = "Meter verifier", ["version"] = index + ".0", ["vendor"] = "Domain vendor",
++            ["openSourceLicense"] = new JObject { ["@id"] = "MIT", ["description"] = new JObject { ["en"] = "MIT License" } } }));
++        root["transparencySoftwareCertificates"] = new JArray(Enumerable.Range(1, 2).Select(index => new JObject {
++            ["@id"] = "approval-" + index, ["issuer"] = "Example inspection organization", ["chargingStationModel"] = "Station X",
++            ["chargingStationModelVersion"] = "3.1", ["verifiedTransparencySoftwareIds"] = new JArray("verifier-" + (index * 2 - 1)),
++            ["compatibleTransparencySoftwareIds"] = new JArray("verifier-" + index * 2), ["documentNumber"] = "42/2026",
++            ["notBefore"] = "2026-01-01T00:00:00.1234567Z", ["notAfter"] = "2030-01-01T00:00:00Z" }));
++        var pools = new JArray();
++        for (var offset = 0; offset < evses; offset += 8)
++        {
++            var number = offset / 8 + 1; var pool = Node("DE*ABC*P" + number);
++            pool["energyMeters"] = new JArray(Meter("pool-grid-" + number, "grid", 1), Meter("pool-pv-" + number, "pv", 2));
++            pool["gridConnectionPoint"] = new JObject { ["gridOperatorId"] = "DE*GRD", ["nominalVoltage"] = "400 V",
++                ["nominalFrequency"] = "50 Hz", ["contractedImportPower"] = "250 kW", ["contractedImportApparentPower"] = "300 kVA",
++                ["energyMeter"] = Meter("point-" + number, "grid", 1) };
++            var stations = new JArray();
++            for (var start = offset; start < offset + 8; start += 4)
++            {
++                var station = Node("DE*ABC*S" + (start / 4 + 1));
++                station["energyMeters"] = new JArray(Meter("station-grid-" + start, "grid", 1), Meter("station-pv-" + start, "pv", 2));
++                station["EVSEs"] = new JArray(Enumerable.Range(start + 1, 4).Select(index => {
++                    var evse = Node("DE*ABC*E" + index); evse["currentType"] = new JArray("DC"); evse["maxPower"] = "100 kW";
++                    evse["tariffIds"] = new JArray("DE*ABC*T1", "DE*ABC*T2"); evse["energyMeter"] = Meter("evse-" + index, "grid", 1);
++                    evse["socketOutlets"] = new JArray(new JObject { ["@id"] = "1", ["type"] = "CCS", ["lockable"] = false,
++                        ["tariffIds"] = new JArray("DE*ABC*T2", "DE*ABC*T4") }); return evse;
++                })); stations.Add(station);
++            }
++            pool["chargingStations"] = stations; pools.Add(pool);
++        }
++        var owner = Node("DE*ABC"); owner["chargingPools"] = pools;
++        owner["chargingTariffs"] = new JArray(Enumerable.Range(1, 4).Select(index => { var tariff = Node("DE*ABC*T" + index);
++            tariff["currency"] = "EUR"; tariff["elements"] = TariffElements(index); return tariff; }));
++        root["chargingStationOperators"] = new JArray(owner);
++        var parking = Node("parking-op"); parking["id"] = "parking-op"; parking.Remove("@id");
++        parking["parkingProducts"] = new JArray(new JObject { ["@id"] = "short-stay", ["minDuration"] = "300 s", ["stopParkingAfterTime"] = "7200 s" },
++            new JObject { ["@id"] = "long-stay", ["minDuration"] = "600 s", ["stopParkingAfterTime"] = "28800 s" });
++        parking["parkingGarages"] = new JArray(Enumerable.Range(1, evses / 8).Select(index => {
++            var garage = Node("garage-" + index); garage["parkingProductIds"] = new JArray("short-stay");
++            garage["chargingStationIds"] = new JArray("DE*ABC*S" + (index * 2 - 1)); return garage; }));
++        parking["parkingSpaces"] = new JArray(Enumerable.Range(1, evses).Select(index => {
++            var space = Node("space-" + index); space["parkingGarageId"] = "garage-" + ((index - 1) / 8 + 1);
++            space["parkingProductIds"] = new JArray("long-stay"); space["chargingStationIds"] = new JArray("DE*ABC*S" + ((index - 1) / 4 + 1)); return space; }));
++        parking["parkingSpaceGroups"] = new JArray(Enumerable.Range(1, 2).Select(index => {
++            var group = Node("group-" + index); group["parkingSpaceIds"] = new JArray("space-1", "space-2");
++            group["parkingProductIds"] = new JArray(index == 1 ? "short-stay" : "long-stay"); return group; }));
++        root["parkingOperators"] = new JArray(parking); return root;
++    }
++
++    internal static IEnumerable<EnergyMeter> Meters(RoamingNetwork value)
++        => value.ChargingPools.SelectMany(pool => pool.EnergyMeters).Concat(value.ChargingStations.SelectMany(station => station.EnergyMeters))
++            .Concat(value.EVSEs.Select(evse => evse.EnergyMeter!)).Concat(value.ChargingPools.Select(pool => pool.GridConnectionPoint!.EnergyMeter!));
++    internal static void CheckGraph(RoamingNetwork value)
++    {
++        foreach (var pool in value.ChargingPools)
++            Require(ReferenceEquals(pool.GridConnectionPoint!.GridOperator, value.GridOperators.Single(grid => grid.Id == pool.GridConnectionPoint.GridOperator.Id)), "Grid registry instance duplicated.");
++        foreach (var assignment in Meters(value).SelectMany(meter => meter.TransparencySoftware))
++        {
++            Require(ReferenceEquals(assignment.TransparencySoftware, value.GetTransparencySoftwareById(assignment.TransparencySoftwareId)), "Software registry instance duplicated.");
++            Require(ReferenceEquals(assignment.Certificate, value.GetTransparencySoftwareCertificateById(assignment.CertificateId!.Value)), "Certificate registry instance duplicated.");
++        }
++        foreach (var parking in value.ParkingOperators)
++        foreach (var space in parking.ParkingSpaces)
++            Require(space.ChargingStations.All(station => ReferenceEquals(station, value.ChargingStations.Single(other => other.Id == station.Id))), "Parking station reference duplicated.");
++        Require(value.ParkingOperators.Single().GetAvailableParkingProducts(ParkingSpace_Id.Parse("space-2")).Select(product => product.Id.ToString())
++            .SequenceEqual(new[] { "long-stay", "short-stay" }), "Parking product union changed.");
++    }
++    internal void CheckRecovered(RoamingNetworkHistory restored)
++    {
++        CheckGraph(restored.Head.Network);
++        Require(Describe(restored) == Inventory, "Domain or branch inventory changed.");
++        Require(restored.Head.Network.GridOperators.Single(value => value.Id.ToString() == "DE*GRD").Status.Value != GridOperatorStatusTypes.Offline,
++            "Local grid status leaked into recovery.");
++        Require(restored.Head.Network.ParkingOperators.Single().Status.Value != ParkingOperatorStatusTypes.Offline, "Local parking status leaked into recovery.");
++        Require(restored.Head.Network.ChargingPools.First(pool => pool.Id.ToString() == "DE*ABC*P1").EnergyMeters[0].Status.Value.ToString() != "error", "Local meter status leaked into recovery.");
++        Require(!ReferenceEquals(restored.Head.Network.GridOperators.First(), History.Head.Network.GridOperators.First()), "Independent runtime shared a grid object.");
++    }
++    internal static DomainInventory Describe(RoamingNetworkHistory history)
++    {
++        var network = history.Head.Network; var tariffs = network.ChargingStationOperators.SelectMany(value => value.ChargingTariffs).ToArray();
++        var elements = tariffs.SelectMany(tariff => tariff.TariffElements).ToArray(); var meters = Meters(network).ToArray();
++        return new(network.ChargingPools.Count(), network.ChargingStations.Count(), network.EVSEs.Count(), network.GridOperators.Count(),
++            network.TransparencySoftware.Length, network.TransparencySoftwareCertificates.Length, meters.Length, meters.Sum(meter => meter.TransparencySoftware.Count()),
++            tariffs.Length, elements.Length, elements.Sum(element => element.ChargingPriceComponents.Count()), elements.Sum(element => element.ChargingTariffRestrictions.Count()),
++            network.ParkingOperators.Count(), network.ParkingGarages.Length, network.ParkingSpaces.Length, network.ParkingSpaceGroups.Length, network.ParkingProducts.Length,
++            history.Head.Snapshot.References.Sum(pair => pair.Value.Count), history.Commits.Count(commit => commit.Parents.Length > 1),
++            history.Commits.Sum(commit => commit.ChangeSet?.Changes.Count(change => change.Kind is RoamingNetworkChangeKind.AddElement or RoamingNetworkChangeKind.RemoveElement) ?? 0),
++            BranchIdentity(history));
++    }
++    internal static String BranchIdentity(RoamingNetworkHistory history)
++    {
++        using var stream = new MemoryStream(); using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
++        foreach (var commit in history.Commits.OrderBy(commit => commit.Id.ToString(), StringComparer.Ordinal))
++        {
++            writer.Write(commit.Id.ToString());
++            foreach (var etag in history.GetSnapshot(commit.Id).ETags) writer.Write(etag.ToString());
++        }
++        writer.Flush(); return "branches:sha256:hex:" + Convert.ToHexStringLower(SHA256.HashData(stream.GetBuffer().AsSpan(0, (Int32)stream.Length)));
++    }
++    private static void Require(Boolean condition, String? message)
++    { if (!condition) throw new InvalidOperationException(message ?? "Domain fixture contract failed."); }
++    public void Dispose()
++    {
++        History?.Dispose();
++        foreach (var file in Directory.EnumerateFiles(directory)) File.Delete(file);
++        Directory.Delete(directory);
++    }
++}
+diff --git a/WWCP_POI_Benchmarks/Program.cs b/WWCP_POI_Benchmarks/Program.cs
+index 4c31b73..9dd2940 100644
+--- a/WWCP_POI_Benchmarks/Program.cs
++++ b/WWCP_POI_Benchmarks/Program.cs
+@@ -19,7 +19,8 @@ namespace WWCP_POI_Benchmarks;
+ internal sealed record RunResult(Shape Shape, String Operation, Int32 Entities, Int32 RetainedCommits,
+     Int32 Receipts, Int32 CatalogIds, String StaticIdentity, String ArchiveIdentity, Sample[] Samples,
+     ChildETagRetention? ChildETagRetention = null, ChildETagState? ChildETagState = null,
+-    RecoveryInventory? RecoveryInventory = null, ReplayRetention? ReplayRetention = null);
++    RecoveryInventory? RecoveryInventory = null, ReplayRetention? ReplayRetention = null,
++    DomainInventory? DomainInventory = null);
+ 
+ internal static class Program
+ {
+@@ -38,7 +39,7 @@ internal static class Program
+             if (options.ContainsKey("help"))
+             {
+                 Console.WriteLine("WWCP POI scaling measurements (Release build).\n" +
+-                    "--suite smoke|scaling|catalog|changesets|batcharchives|recovery --samples 3 --processes 3 --warmups 1 --label NAME --output FILE\n" +
++                    "--suite smoke|scaling|catalog|changesets|batcharchives|recovery|domainrecovery --samples 3 --processes 3 --warmups 1 --label NAME --output FILE\n" +
+                     "--operations " + String.Join(",", Operations) + "\n" +
+                     "Custom shape: --evses N --changes N --branches N --snapshot-every N --retentions N --locations N\n" +
+                     "Compare: --compare-before FILE --compare-after FILE --summary FILE\n" +
+@@ -68,7 +69,9 @@ internal static class Program
+                 }
+                 if (ArchiveRecoveryProbe.AllOperations.Contains(operation))
+                 {
+-                    using var recovery = new ArchiveRecoveryProbe(shape, operation);
++                    var domain = shape.Name.StartsWith("domain-v", StringComparison.Ordinal)
++                        ? new DomainRecoveryFixture(shape.EVSEs, Int32.Parse(shape.Name.AsSpan(8, 1), CultureInfo.InvariantCulture)) : null;
++                    using var recovery = new ArchiveRecoveryProbe(shape, operation, domain);
+                     Console.WriteLine(JsonSerializer.Serialize(recovery.Run(warmups, samples)));
+                     return 0;
+                 }
+@@ -123,6 +126,8 @@ internal static class Program
+                                    new("recover-history-64", 16, 64, 8, 16, 0, 256), new("recover-pruned-4", 16, 32, 4, 8, 4, 256),
+                                    new("recover-boundary-16", 16, 8, 2, 4, 0, 256),
+                                    new("recover-batch-1-peers-1", 1, 1, 1, 0, 0, 0), new("recover-batch-2048-peers-4", 512, 2048, 4, 0, 0, 0)],
++                    "domainrecovery" => [.. new[] { 16, 64 }.SelectMany(evses => Enumerable.Range(1, 4).Select(profile =>
++                        new Shape($"domain-v{profile}-evses-{evses}", evses, 7, 2, profile == 1 ? 0 : 7, profile == 4 ? 2 : 0, 0)))],
+                     "batcharchives" => [.. new[] { 1, 64, 512, 2048 }.SelectMany(count => new[] { 1, 4 }.Select(peers =>
+                         new Shape($"archive-batch-{count}-peers-{peers}", Math.Min(count, 512), count, peers, 0, 0, 0)))],
+                     "catalog" => [new("catalog-16", 1, 1, 0, 0, 0, 16), new("catalog-256", 1, 1, 0, 0, 0, 256),
+@@ -130,6 +135,9 @@ internal static class Program
+                     _ => throw new ArgumentException("Unknown suite.")
+                 };
+             if (suite == "catalog") selected = ["catalog-create"];
++            if (suite == "domainrecovery" && !options.ContainsKey("operations")) selected = ["read-cbor-model", "read-restore", "read-cbor", "read-json"];
++            if (suite == "domainrecovery" && selected.Any(value => !ArchiveRecoveryProbe.AllOperations.Contains(value)))
++                throw new ArgumentException("The domainrecovery suite supports only archive read stages.");
+             if (suite == "recovery" && !options.ContainsKey("operations")) selected = ArchiveRecoveryProbe.Operations;
+             if (suite == "recovery" && selected.Any(value => !ArchiveRecoveryProbe.AllOperations.Contains(value)))
+                 throw new ArgumentException("The recovery suite supports only archive read stages.");
+diff --git a/WWCP_POI_Tests/Interoperability/DomainRecoveryWorkloadTests.cs b/WWCP_POI_Tests/Interoperability/DomainRecoveryWorkloadTests.cs
+new file mode 100644
+index 0000000..2b605db
+--- /dev/null
++++ b/WWCP_POI_Tests/Interoperability/DomainRecoveryWorkloadTests.cs
+@@ -0,0 +1,184 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Globalization;
++using cloud.charging.open.protocols.WWCP.POI;
++using Newtonsoft.Json.Linq;
++using NUnit.Framework;
++using WWCP_POI_Benchmarks;
++using static WWCP_POI_Benchmarks.DomainRecoveryFixture;
++
++namespace WWCP_POI_Tests.Interoperability;
++
++[TestFixture]
++public sealed class DomainRecoveryWorkloadTests
++{
++    private sealed class DirectoryLease : IDisposable
++    {
++        internal String PathName { get; } = Path.Combine(Path.GetTempPath(), "wwcp-poi-domain-test-" + Guid.NewGuid().ToString("N"));
++        internal DirectoryLease() => Directory.CreateDirectory(PathName);
++        public void Dispose()
++        {
++            foreach (var file in Directory.EnumerateFiles(PathName)) File.Delete(file);
++            Directory.Delete(PathName);
++        }
++    }
++
++    [Test, Combinatorial]
++    public void Prepared_workloads_have_exact_reproducible_bytes_peers_branches_and_real_inventories(
++        [Values(16, 64)] Int32 evses, [Values(1, 2, 3, 4)] Int32 profile)
++    {
++        using var first = new DomainRecoveryFixture(evses, profile); using var second = new DomainRecoveryFixture(evses, profile);
++        Assert.That(second.History.ToCBOR(), Is.EqualTo(first.History.ToCBOR())); Assert.That(second.History.ToJSON(), Is.EqualTo(first.History.ToJSON()));
++        Assert.That(second.Inventory, Is.EqualTo(first.Inventory)); Assert.That(first.Inventory.EVSEs, Is.EqualTo(evses));
++        Assert.That(first.Inventory.Pools, Is.EqualTo(evses / 8)); Assert.That(first.Inventory.Stations, Is.EqualTo(evses / 4));
++        Assert.That(first.Inventory.MeterSlots, Is.EqualTo(evses / 8 * 3 + evses / 4 * 2 + evses));
++        Assert.That(first.Inventory.SoftwareAssignments, Is.EqualTo(first.Inventory.MeterSlots * 2));
++        Assert.That(first.Inventory.ReferenceEdges, Is.GreaterThan(evses * 8));
++        Assert.That(first.Inventory.TariffElements, Is.EqualTo(8)); Assert.That(first.Inventory.PriceComponents, Is.EqualTo(24));
++        Assert.That(first.Inventory.Restrictions, Is.EqualTo(16)); Assert.That(first.Inventory.MergeCommits, Is.EqualTo(1));
++        Assert.That(first.Inventory.ElementOperations, Is.GreaterThanOrEqualTo(4));
++        Assert.That(first.History.RetentionReceipts.Length, Is.EqualTo(profile == 4 ? 2 : 0));
++        Assert.That(first.History.HasCompleteAncestry, Is.EqualTo(profile <= 2));
++        foreach (var commit in first.History.Commits)
++        {
++            Assert.That(commit.Signatures.Select(peer => peer.KeyId), Is.EquivalentTo(new[] { "domain-a", "domain-b" }));
++            Assert.That(commit.Signatures.All(peer => VerifyCommit(commit, peer)), Is.True);
++            if (commit.ChangeSet is { } batch) Assert.That(batch.Signatures.All(peer => VerifyBatch(batch, peer)), Is.True);
++        }
++    }
++
++    [Test, Combinatorial]
++    public void All_profiles_recover_full_domain_data_and_independent_runtime_through_public_inputs(
++        [Values(1, 2, 3, 4)] Int32 profile, [Values("json", "cbor", "memory", "spool")] String input)
++    {
++        using var fixture = new DomainRecoveryFixture(16, profile); using var work = new DirectoryLease();
++        var bytes = fixture.History.ToCBOR(); var etags = fixture.History.Head.Snapshot.ETags;
++        using var source = new MemoryStream(bytes, writable: false);
++        using var token = new CancellationTokenSource();
++        using var restored = input switch {
++            "json" => RoamingNetworkHistory.Parse(fixture.History.ToJSON(), VerifyBatch, VerifyCommit, authorizeSnapshotBoundary: fixture.Boundary),
++            "cbor" => RoamingNetworkHistory.ParseCBOR(bytes, VerifyBatch, VerifyCommit, authorizeSnapshotBoundary: fixture.Boundary),
++            _ => RoamingNetworkHistory.ParseCBOR(source, VerifyBatch, VerifyCommit, authorizeSnapshotBoundary: fixture.Boundary,
++                readOptions: new(input == "spool" ? 0 : Int32.MaxValue, work.PathName), cancellationToken: token.Token)
++        };
++        fixture.CheckRecovered(restored); Assert.That(restored.ToCBOR(), Is.EqualTo(bytes));
++        Assert.That(source.CanRead, Is.True); Assert.That(Directory.GetFiles(work.PathName, "*.tmp-*"), Is.Empty);
++        Assert.That(restored.Head.Snapshot.ETags, Is.EqualTo(etags));
++        token.Cancel(); var parent = restored.Head.Id;
++        var batch = Sign(restored.Head.Snapshot.CreateChangeSet("late-token", Epoch.AddDays(2),
++            [Edit("TransparencySoftwareCertificate", "approval-1", "documentNumber", Text("Later publication"))]));
++        var commit = Sign(restored.PrepareCommit(parent, batch));
++        Assert.That(restored.TryPublish(parent, commit, out var result), Is.True, result.Error);
++        Assert.That(fixture.History.ToCBOR(), Is.EqualTo(bytes)); CheckGraph(restored.Head.Network);
++    }
++
++    [Test, Combinatorial]
++    public void Bootstrap_domain_activation_rejects_fresh_trust_atomically_and_retries(
++        [Values(1, 2, 3, 4)] Int32 profile, [Values(false, true)] Boolean file, [Values(false, true)] Boolean deny)
++    {
++        using var fixture = new DomainRecoveryFixture(16, profile); using var work = new DirectoryLease(); using var capture = new DirectoryLease();
++        var source = fixture.History.CreateBootstrap(4096); var path = Path.Combine(work.PathName, "active.cbor"); var calls = 0;
++        using var receiver = RoamingNetworkBootstrapReceiver.Create(work.PathName, source.Manifest);
++        for (var index = 0; index < source.Manifest.ChunkCount; index++)
++            Assert.That(receiver.TryAcceptChunk(source.CreateChunk(index), out var accepted), Is.True, accepted.Error);
++        var options = new RoamingNetworkArchiveReadOptions(file ? 0 : Int32.MaxValue, capture.PathName);
++        Boolean CommitTrust(RoamingNetworkCommit commit, RoamingNetworkChangeSetSignature peer)
++        { calls++; return !deny && VerifyCommit(commit, peer); }
++        var activated = receiver.TryActivate(source.Manifest.Id, out var history, out var result, activate: true,
++            archivePath: path, verifyBatchSignature: VerifyBatch, verifyCommitSignature: CommitTrust,
++            authorizeSnapshotBoundary: fixture.Boundary, readOptions: options);
++        if (deny)
++        {
++            Assert.That(activated, Is.False); Assert.That(history, Is.Null); Assert.That(File.Exists(path), Is.False);
++            Assert.That(receiver.NextChunk, Is.EqualTo(source.Manifest.ChunkCount)); Assert.That(calls, Is.GreaterThan(0));
++            deny = false;
++            Assert.That(receiver.TryActivate(source.Manifest.Id, out history, out result, activate: true,
++                archivePath: path, verifyBatchSignature: VerifyBatch, verifyCommitSignature: CommitTrust,
++                authorizeSnapshotBoundary: fixture.Boundary, readOptions: options), Is.True, result.Error);
++        }
++        else Assert.That(activated, Is.True, result.Error);
++        using (history!) { fixture.CheckRecovered(history!); Assert.That(history!.ToCBOR(), Is.EqualTo(fixture.History.ToCBOR())); }
++        Assert.That(File.ReadAllBytes(path), Is.EqualTo(fixture.History.ToCBOR()));
++        Assert.That(Directory.GetFiles(capture.PathName, "*.tmp-*"), Is.Empty);
++        using var lease = new FileStream(path + ".lock", FileMode.Open, FileAccess.ReadWrite, FileShare.None);
++    }
++
++    [TestCase(16)] [TestCase(64)]
++    public void Nested_values_and_shared_catalogs_are_detached_from_the_supplied_document(Int32 evses)
++    {
++        var document = CreateDocument(evses); var network = RoamingNetwork.Parse(document); var before = network.ToCanonicalCBOR();
++        document["transparencySoftware"]![0]!["vendor"] = "Caller mutation";
++        document["transparencySoftwareCertificates"]![0]!["issuer"] = "Caller issuer";
++        document["chargingStationOperators"]![0]!["chargingTariffs"]![0]!["elements"]![0]!["priceComponents"]![0]!["price"] = 999m;
++        document["parkingOperators"]![0]!["parkingSpaces"]![0]!["chargingStationIds"] = new JArray();
++        Assert.That(network.ToCanonicalCBOR(), Is.EqualTo(before)); CheckGraph(network);
++        var prices = network.ChargingStationOperators.Single().ChargingTariffs.First().ToJSON();
++        prices["elements"]![0]!["restrictions"]![0]!["maxPower"] = "1 W";
++        Assert.That(network.ToCanonicalCBOR(), Is.EqualTo(before));
++    }
++
++    [Test, Combinatorial]
++    public void Invalid_reference_and_tariff_edits_leave_all_history_and_runtime_unchanged(
++        [Values(1, 2, 3, 4)] Int32 profile, [Values("grid", "software", "certificate", "tariff", "parking", "restriction")] String kind)
++    {
++        using var fixture = new DomainRecoveryFixture(16, profile); var history = fixture.History;
++        var before = history.ToCBOR(); var head = history.Head; var runtime = head.Network.ToJSONSnapshot().ToString();
++        var change = kind switch {
++            "grid" => RoamingNetworkChange.Remove("GridOperator", "DE*GRD"),
++            "software" => RoamingNetworkChange.Remove("TransparencySoftware", "verifier-1"),
++            "certificate" => RoamingNetworkChange.Remove("TransparencySoftwareCertificate", "approval-1"),
++            "tariff" => RoamingNetworkChange.Remove("ChargingTariff", "DE*ABC*T2"),
++            "parking" => RoamingNetworkChange.Remove("ParkingProduct", "long-stay"),
++            _ => Edit("ChargingTariff", "DE*ABC*T1", "elements", DomainRecoveryFixture.Json(JArray.Parse("""[{"priceComponents":[{"type":"ENERGY","price":1,"stepSize":"0 Wh"}]}]""")))
++        };
++        Assert.Throws<RoamingNetworkChangeSetException>(() => fixture.Prepare(head.Id, change));
++        Assert.That(history.Head, Is.SameAs(head)); Assert.That(history.ToCBOR(), Is.EqualTo(before));
++        Assert.That(history.Head.Network.ToJSONSnapshot().ToString(), Is.EqualTo(runtime)); Assert.That(Describe(history), Is.EqualTo(fixture.Inventory));
++    }
++
++    [Test, Combinatorial]
++    public void Invalid_extra_signature_peer_rejects_publication_atomically_before_valid_retry(
++        [Values(1, 2, 3, 4)] Int32 profile, [Values(false, true)] Boolean batchPeer)
++    {
++        using var fixture = new DomainRecoveryFixture(16, profile); var history = fixture.History; var head = history.Head;
++        var bytes = history.ToCBOR(); var good = fixture.Prepare(head.Id, Edit("TransparencySoftwareCertificate", "approval-1", "documentNumber", Text("Retry")));
++        var peer = new RoamingNetworkChangeSetSignature("Ed25519", "unknown-peer", Convert.ToBase64String(new Byte[64]),
++            batchPeer ? RoamingNetworkChangeSet.SigningProfile : RoamingNetworkCommit.SigningProfile);
++        var bad = batchPeer ? good.WithChangeSet(good.ChangeSet!.WithSignature(peer)) : good.WithSignature(peer);
++        Assert.That(history.TryPublish(head.Id, bad, out var result), Is.False);
++        Assert.That(history.Head, Is.SameAs(head)); Assert.That(history.ToCBOR(), Is.EqualTo(bytes));
++        Assert.That(history.TryPublish(head.Id, good, out result), Is.True, result.Error); CheckGraph(history.Head.Network);
++        Assert.That(history.Head.Network.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.EqualTo(GridOperatorStatusTypes.Offline));
++        using var restored = RoamingNetworkHistory.ParseCBOR(history.ToCBOR(), VerifyBatch, VerifyCommit, authorizeSnapshotBoundary: fixture.Boundary);
++        CheckGraph(restored.Head.Network); Assert.That(restored.Head.Id, Is.EqualTo(good.Id));
++    }
++
++    [TestCase(1)] [TestCase(2)] [TestCase(3)] [TestCase(4)]
++    public void Prepared_merge_retains_both_branches_and_catalog_and_parking_results(Int32 profile)
++    {
++        using var fixture = new DomainRecoveryFixture(16, profile); var history = fixture.History;
++        Assert.That(history.Head.Commit.Parents, Has.Length.EqualTo(2));
++        Assert.That(history.Head.Network.GetTransparencySoftwareById(TransparencySoftware_Id.Parse("verifier-1"))!.Vendor, Is.EqualTo("Merged vendor"));
++        Assert.That(history.Head.Network.ParkingProducts.Single(product => product.Id.ToString() == "short-stay").MinDuration, Is.EqualTo(TimeSpan.FromMinutes(15)));
++        Assert.That(history.GetSnapshot(history.Head.Commit.Parents[0]).ETags, Is.Not.EqualTo(history.GetSnapshot(history.Head.Commit.Parents[1]).ETags));
++        using var recovered = RoamingNetworkHistory.ParseCBOR(history.ToCBOR(), VerifyBatch, VerifyCommit, authorizeSnapshotBoundary: fixture.Boundary);
++        fixture.CheckRecovered(recovered);
++    }
++
++    [TestCase("en-US")] [TestCase("de-DE")] [TestCase("ar-EG")]
++    public void Domain_values_and_identities_are_culture_independent(String culture)
++    {
++        var previous = CultureInfo.CurrentCulture;
++        try
++        {
++            CultureInfo.CurrentCulture = CultureInfo.InvariantCulture; using var baseline = new DomainRecoveryFixture(16, 2);
++            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture); using var actual = new DomainRecoveryFixture(16, 2);
++            Assert.That(actual.History.ToCBOR(), Is.EqualTo(baseline.History.ToCBOR())); Assert.That(actual.Inventory, Is.EqualTo(baseline.Inventory));
++        }
++        finally { CultureInfo.CurrentCulture = previous; }
++    }
++}
+diff --git a/WWCP_POI_Tests/WWCP_POI_Tests.csproj b/WWCP_POI_Tests/WWCP_POI_Tests.csproj
+index 652f18c..8271045 100644
+--- a/WWCP_POI_Tests/WWCP_POI_Tests.csproj
++++ b/WWCP_POI_Tests/WWCP_POI_Tests.csproj
+@@ -20,6 +20,7 @@
+ 
+   <ItemGroup>
+     <Content Include="..\docs\interoperability\*.json;..\docs\interoperability\*.cbor" Link="InteropVectors\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
++    <Compile Include="..\WWCP_POI_Benchmarks\DomainRecoveryFixture.cs" Link="Interoperability\DomainRecoveryFixture.cs" />
+   </ItemGroup>
+ 
+ </Project>

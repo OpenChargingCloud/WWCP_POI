@@ -135,3 +135,7 @@ WWCP_WebAPI/HTTPRoot/css/debugLog
 # machine compiles with the same version and a build does not depend on what
 # somebody once ran "npm install -g" for.
 node_modules/
+
+# Python report script caches
+__pycache__/
+*.py[cod]

@@ -35,6 +35,21 @@ public sealed partial class RoamingNetworkCommit
     {
         if (!algorithm.IsSupportedForSigning) throw new ArgumentException("Unsupported signing algorithm.", nameof(algorithm));
         if (String.IsNullOrWhiteSpace(keyId)) throw new ArgumentException("KeyId must not be empty.", nameof(keyId));
+        return POICanonicalPreparation.SigningBytes(this, WriteIdentity, writer =>
+        {
+            writer.WriteStartObject();
+            writer.WriteString("Profile", SignatureProfile);
+            writer.WriteString("Algorithm", algorithm.Name);
+            writer.WriteString("KeyId", keyId);
+            writer.WriteString("Encoding", "base64");
+            writer.WritePropertyName("CommitId"); Id.Hash.WriteTo(writer);
+            writer.WriteNull("Commit");
+            writer.WriteEndObject();
+        }, "Commit", () => GetOriginalSigningBytes(algorithm, keyId));
+    }
+
+    private Byte[] GetOriginalSigningBytes(COSEAlgorithm algorithm, String keyId)
+    {
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {
@@ -156,6 +171,7 @@ public sealed partial class RoamingNetworkCommit
         {
             ArgumentNullException.ThrowIfNull(resolvePublicKey);
             if (Signatures.IsEmpty) throw new InvalidOperationException("The commit is unsigned.");
+            using var preparation = POICanonicalPreparation.Enter();
             for (var index = 0; index < Signatures.Length; index++)
             {
                 var signature = Signatures[index];

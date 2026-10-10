@@ -65,12 +65,13 @@ public sealed partial class RoamingNetworkDataSnapshot
         if (issues.Count > 0) throw new POIMergePlanningException([.. issues]);
         var references = System.Collections.Immutable.ImmutableDictionary<InfrastructureEntityKey,
             ImmutableHashSet<InfrastructureEntityKey>>.Empty;
+        var projection = new ValidationProjection(map);
         foreach (var node in map.Values.OrderBy(node => node.Key.Type).ThenBy(node => node.Key.Id, StringComparer.Ordinal).
                                        ThenBy(node => node.Key.Scope, StringComparer.Ordinal))
         {
             try
             {
-                Validate(node.Key, map);
+                projection.Project(node.Key);
                 references = AddReferences(node, map, references);
             }
             catch (Exception exception) { issues.Add(new(node.Key, exception.Message)); }

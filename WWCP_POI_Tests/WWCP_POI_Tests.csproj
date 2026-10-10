@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <Content Include="..\docs\interoperability\*.json;..\docs\interoperability\*.cbor" Link="InteropVectors\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="..\WWCP_POI_Benchmarks\DomainRecoveryFixture.cs" Link="Interoperability\DomainRecoveryFixture.cs" />
   </ItemGroup>
 
 </Project>

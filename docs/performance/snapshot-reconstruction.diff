@@ -1,0 +1,180 @@
+--- a/WWCP_POI/ChangeSets/RoamingNetwork.CopyOnWrite.cs
++++ b/WWCP_POI/ChangeSets/RoamingNetwork.CopyOnWrite.cs
+@@ -238,7 +238,7 @@
+ 
+         #region Restore revision metadata
+ 
+-        internal void RestoreVersionedSnapshot(JObject json)
++        internal void RestoreVersionedSnapshot(JObject json, RoamingNetworkDataSnapshot? preparedSnapshot = null)
+         {
+ 
+             var revision = json["revision"];
+@@ -252,7 +252,9 @@
+                 throw new ArgumentException("appliedChangeSetId requires revision metadata.");
+             var projection = POIRepresentation.WithoutETags(() => POIJSON.Document(this));
+             var content = POISnapshotRepresentation.CompleteImport(json, projection, nameof(RoamingNetwork), ownedGraph: true);
+-            dataSnapshot = RoamingNetworkDataSnapshot.Capture(content, number, changeSetId);
++            dataSnapshot = preparedSnapshot is not null && preparedSnapshot.MatchesCompletedDocument(content, number, changeSetId)
++                               ? preparedSnapshot
++                               : RoamingNetworkDataSnapshot.Capture(content, number, changeSetId);
+             POISnapshotRepresentation.Bind(this, dataSnapshot.GetDocument());
+ 
+         }
+--- a/WWCP_POI/Entities/RoamingNetwork/RoamingNetwork.Json.cs
++++ b/WWCP_POI/Entities/RoamingNetwork/RoamingNetwork.Json.cs
+@@ -125,6 +125,14 @@
+                                        [NotNullWhen(false)] out String?              error,
+                                        CustomJObjectParserDelegate<RoamingNetwork>?  CustomRoamingNetworkParser,
+                                        InfrastructureJsonParsingContext?             Context                    = null)
++            => TryParseCore(JSON, out network, out error, CustomRoamingNetworkParser, Context, null);
++
++        private static Boolean TryParseCore(JObject JSON,
++            [NotNullWhen(true)] out RoamingNetwork? network,
++            [NotNullWhen(false)] out String? error,
++            CustomJObjectParserDelegate<RoamingNetwork>? CustomRoamingNetworkParser,
++            InfrastructureJsonParsingContext? Context,
++            RoamingNetworkDataSnapshot? snapshot)
+         {
+ 
+             network = null;
+@@ -148,7 +156,7 @@
+                                                    RoamingNetworkAdminStatusType.TryParse,
+                                                    RoamingNetworkStatusType.TryParse);
+ 
+-                parsed.RestoreVersionedSnapshot(JSON);
++                parsed.RestoreVersionedSnapshot(JSON, snapshot);
+ 
+                 network = CustomRoamingNetworkParser is null
+                               ? parsed
+@@ -167,6 +175,19 @@
+         }
+ 
+         #endregion
++
++        /// <summary>
++        /// Reconstruct fresh model/runtime objects while retaining an exactly matching immutable snapshot.
++        /// All domain parsing and representation completion run before snapshot reuse is considered.
++        /// </summary>
++        internal static RoamingNetwork ParseSnapshot(RoamingNetworkDataSnapshot snapshot)
++        {
++            var document = snapshot.GetDocument();
++            _ = snapshot.ETags;
++            if (TryParseCore(document, out var network, out var error, null, null, snapshot))
++                return network;
++            throw new ArgumentException($"Invalid roaming network JSON: {error}", "JSON");
++        }
+ 
+         #region Parse network properties
+ 
+--- a/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
+@@ -206,7 +206,7 @@
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit)
+     {
+         using var preparation = POICanonicalPreparation.Enter();
+-        var history = new RoamingNetworkHistory(RoamingNetwork.Parse(snapshot.ToJSON()), verifyBatchSignature, verifyCommitSignature, authorizeCommit);
++        var history = new RoamingNetworkHistory(RoamingNetwork.ParseSnapshot(snapshot), verifyBatchSignature, verifyCommitSignature, authorizeCommit);
+         try
+         {
+             if (history.checkpointId != checkpoint.Id || checkpoint.Kind != RoamingNetworkCommitKind.Checkpoint)
+@@ -219,7 +219,8 @@
+                 if (!history.TryStoreCommit(commit, out var result)) throw new ArgumentException(result.Error);
+             }
+             if (!history.entries.TryGetValue(headId, out var headEntry)) throw new ArgumentException("Archive head is not retained.");
+-            history.head = new(headEntry.Commit, RoamingNetwork.Parse(headEntry.Snapshot.ToJSON()));
++            history.head = new(headEntry.Commit, ReferenceEquals(history.head.Snapshot, headEntry.Snapshot)
++                ? history.head.Network : RoamingNetwork.ParseSnapshot(headEntry.Snapshot));
+             return history;
+         }
+         catch { history.Dispose(); throw; }
+--- a/WWCP_POI/History/RoamingNetworkHistory.Boundary.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Boundary.cs
+@@ -41,7 +41,7 @@
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean> verifyCommit,
+         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatch,
+         Func<RoamingNetworkCommit, Boolean>? authorize)
+-        : this(RoamingNetwork.Parse(boundary.SnapshotCommit.Snapshot!.State.ToJSON()), verifyBatch, verifyCommit, authorize)
++        : this(RoamingNetwork.ParseSnapshot(boundary.SnapshotCommit.Snapshot!.State), verifyBatch, verifyCommit, authorize)
+     {
+         checkpointId = boundary.Checkpoint;
+         anchorId = boundary.Anchor;
+--- a/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs
+@@ -107,7 +107,8 @@
+                 if (!history.TryStoreCommit(commit, out var result)) throw new ArgumentException(result.Error);
+             }
+             if (!history.entries.TryGetValue(headId, out var entry)) throw new ArgumentException("Archive head is not retained.");
+-            history.head = new(entry.Commit, RoamingNetwork.Parse(entry.Snapshot.ToJSON()));
++            history.head = new(entry.Commit, ReferenceEquals(history.head.Snapshot, entry.Snapshot)
++                ? history.head.Network : RoamingNetwork.ParseSnapshot(entry.Snapshot));
+             history.retentionReceipts = receipts.IsDefault ? [] : receipts;
+             history.archivedCommits = IndexReceipts(history.retentionReceipts, checkpoint);
+             return history;
+--- /dev/null
++++ b/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Reconstruction.cs
+@@ -0,0 +1,65 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using Newtonsoft.Json;
++using Newtonsoft.Json.Linq;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++public sealed partial class RoamingNetworkDataSnapshot
++{
++    /// <summary>
++    /// Check completed model input against every immutable property and owned child before reuse.
++    /// Lexical property equality preserves numbers, nested arrays and metadata without normalization.
++    /// </summary>
++    internal Boolean MatchesCompletedDocument(JObject document, Int64 revision, String? changeSetId)
++    {
++        if (Revision != revision || AppliedChangeSetId != changeSetId) return false;
++        var visited = new HashSet<InfrastructureEntityKey>();
++        return Match(Root, document) && visited.Count == Entities.Count;
++
++        Boolean Match(InfrastructureEntityKey key, JObject node)
++        {
++            if (!visited.Add(key) || !Entities.TryGetValue(key, out var entity)) return false;
++            var fields = 0;
++            foreach (var property in node.Properties())
++            {
++                if (entity.Properties.TryGetValue(property.Name, out var expected))
++                {
++                    if (property.Value.ToString(Formatting.None) != expected.GetRawText()) return false;
++                    fields++;
++                    continue;
++                }
++                if (key == Root && property.Name is "revision" or "appliedChangeSetId") continue;
++                if (property.Name == POIContentProfile.PropertyName)
++                {
++                    if (property.Value.Type != JTokenType.String || property.Value.Value<String>() != POIContentProfile.Id)
++                        return false;
++                    continue;
++                }
++                if (InfrastructureChangeSchema.Relations.Any(relation => relation.Value.Parent == key.Type &&
++                                                                        relation.Value.Field == property.Name)) continue;
++                return false;
++            }
++            if (fields != entity.Properties.Count) return false;
++            foreach (var relation in InfrastructureChangeSchema.Relations.Where(relation => relation.Value.Parent == key.Type))
++            {
++                if (node[relation.Value.Field] is not JArray children ||
++                    children.Count != entity.Children.Count(child => child.Type == relation.Key)) return false;
++                foreach (var child in children)
++                {
++                    if (child is not JObject value || value[InfrastructureChangeSchema.IdField(relation.Key)] is not
++                        JValue { Type: JTokenType.String } id) return false;
++                    InfrastructureEntityKey childKey;
++                    try { childKey = Key(relation.Key, id.Value<String>()!, key.Id); }
++                    catch (ArgumentException) { return false; }
++                    if (!entity.Children.Contains(childKey) || !Match(childKey, value)) return false;
++                }
++            }
++            return true;
++        }
++    }
++}

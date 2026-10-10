@@ -1,0 +1,703 @@
+{
+  "productionSourceSHA256": "246e21026511b46cb2353e746049c148c2057afed6d092a143865fd29c5c3f97",
+  "productionAssemblySHA256": "c8c34819880f4577114a304ec6828d7a3b89c708a0c86b9506a4746cc48629c9",
+  "benchmarkSourceSHA256": "484b65712d8c13d96b50711e61c4595642291fbeaadde6892cdb3132405fd2e0",
+  "benchmarkAssemblySHA256": "0db144fc81474c9097626053210cd5ad1d04602d039df6052829d27af388ed20",
+  "testSourceSHA256": "c465d11f713e62a8ebfb15ed18f93138788d6bdfb0cbe0909b49e99c10d23b69",
+  "testAssemblySHA256": "84ed7a2ed2c1e006633609f7da9db74f2df1f96c5307fc762005fe1867f97c99",
+  "linkedFixture": {
+    "file": "WWCP_POI_Benchmarks/DomainRecoveryFixture.cs",
+    "sha256": "7433b2efe017dd938c9e621660748f8bacfc4be6b2f10d5e6617397c0bca11a1",
+    "compiledBy": [
+      "WWCP_POI_Benchmarks",
+      "WWCP_POI_Tests"
+    ]
+  },
+  "runtimeConfigSHA256": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097",
+  "dependencyManifestSHA256": "a308c3ee663bc6b319a3ce950947ed000473a532756b268af768cc23d7c3c433",
+  "sharedDependencies": [
+    {
+      "name": "Azure.Core.dll",
+      "sha256": "1d6df436afdc73c30d476be938f6513c90ef8fc884a7bae280091a9bed0a5490"
+    },
+    {
+      "name": "Azure.Identity.dll",
+      "sha256": "31574a3d35ffeb0e25a00ebb317937222fe5283b91af608613f2e3bf0f26c50a"
+    },
+    {
+      "name": "BouncyCastle.Cryptography.dll",
+      "sha256": "ef92fc661e8d7ba8ec4d39a7cdfcdba41f14cb327f0d24fe79d0b5bb428899b5"
+    },
+    {
+      "name": "Microsoft.Bcl.AsyncInterfaces.dll",
+      "sha256": "f1e1d6e1a2990071b450bdf6c9618408ac0e3f24a3c7a3bef1f50508ba732ca5"
+    },
+    {
+      "name": "Microsoft.Diagnostics.NETCore.Client.dll",
+      "sha256": "e2cc9e1f6c97b3c4ee45ebabaa92408eb9b2fc81cb08ceeb342fe48bf79db15f"
+    },
+    {
+      "name": "Microsoft.Diagnostics.Runtime.dll",
+      "sha256": "52d5f113180bb0f70b1a9b10608aef93b187364ac689885d2d3c734102d850a2"
+    },
+    {
+      "name": "Microsoft.Extensions.Configuration.Abstractions.dll",
+      "sha256": "da2203cd85e701598210999e6714e4cc83d20b833b4afa923e3b84196d6f72aa"
+    },
+    {
+      "name": "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
+      "sha256": "da04edc338d5aa0f38a1f5fa5ff3ee7e36affe9c961daf3ea724a428bd746bc6"
+    },
+    {
+      "name": "Microsoft.Extensions.DependencyInjection.dll",
+      "sha256": "2d0e268bf76b4ce36a55ebb2767354db956c6660de65d6cccfc35c957fb12cfc"
+    },
+    {
+      "name": "Microsoft.Extensions.Diagnostics.Abstractions.dll",
+      "sha256": "4d20c015406a7bf1a6478f1b6af567d972fa2ba4727de6134ff2c641f90ab36c"
+    },
+    {
+      "name": "Microsoft.Extensions.FileProviders.Abstractions.dll",
+      "sha256": "39e7fcd41d10abeffcf2b224237bed64ae98f99d94e329bd19f447451eda3abc"
+    },
+    {
+      "name": "Microsoft.Extensions.Hosting.Abstractions.dll",
+      "sha256": "fb21feb2c6aafe2607a8b1d500c2b86535cd1b48b67ef878139dc7818c70ce4d"
+    },
+    {
+      "name": "Microsoft.Extensions.Logging.Abstractions.dll",
+      "sha256": "7c242f8ca612fa1acc61f78efd5f8c89e01bd0bd47dc4ecc65e0e6e24f1a1668"
+    },
+    {
+      "name": "Microsoft.Extensions.Logging.dll",
+      "sha256": "05b76234f2a5eb945b268ced706cb4d81446778ea6bd6910298b5e9111170b4a"
+    },
+    {
+      "name": "Microsoft.Extensions.Options.dll",
+      "sha256": "b4ff561da6a7b11b68341f9fd32cab3f8b23cdd8b40332b9fd8bed73a9ee7de3"
+    },
+    {
+      "name": "Microsoft.Extensions.Primitives.dll",
+      "sha256": "67642533eb87e8dadeb9026de59ff4b66cc9bf35c0cfbedfef7b79bc6d8b30bc"
+    },
+    {
+      "name": "Microsoft.Identity.Client.dll",
+      "sha256": "5795027e9ae95eececb310a4fed3c502bb368039d186ab0884f64b7792b84717"
+    },
+    {
+      "name": "Microsoft.Identity.Client.Extensions.Msal.dll",
+      "sha256": "07109a2f30df782300077a567ade47cbd0a0502c75cd7c8a62192f7d64bb004e"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Abstractions.dll",
+      "sha256": "24e97b54b6b5c234a124a336757e3116617ac6c30b655cdae74517dc2ecb5746"
+    },
+    {
+      "name": "Newtonsoft.Json.dll",
+      "sha256": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b"
+    },
+    {
+      "name": "org.GraphDefined.Vanaheimr.Hermod.dll",
+      "sha256": "7355657890caf64a8e922e3d11bb14e835c398b6dd76f013d3987e035535a43c"
+    },
+    {
+      "name": "Styx.dll",
+      "sha256": "1655174175e2abb259ead391c8e58aa71c089e71142c04a88581d31f3b7956ac"
+    },
+    {
+      "name": "System.ClientModel.dll",
+      "sha256": "dec5e22b71a1685c5e6e97cd28b629f0aa6703fb87b6950df28e79fc1804290c"
+    },
+    {
+      "name": "System.Configuration.ConfigurationManager.dll",
+      "sha256": "f6f445777420df03447d74f63671dfe97f8b833836ceb4643af76fa2e0c66a1b"
+    },
+    {
+      "name": "System.Diagnostics.EventLog.dll",
+      "sha256": "77aae5ac102caa9c8bdd8473bc55ed7de246b3e06171c6393bad7f959c1a7bf5"
+    },
+    {
+      "name": "System.Diagnostics.PerformanceCounter.dll",
+      "sha256": "fcc74baee4e7184dc70f9e28d758d75eb124a4fcebe3b368b890182906b1f698"
+    },
+    {
+      "name": "System.IO.Ports.dll",
+      "sha256": "e751931b4bf7ff27953c053b015fa1c299a0034c3c8777e4f49009e1e4176872"
+    },
+    {
+      "name": "System.Memory.Data.dll",
+      "sha256": "2c1035b0106dbb2de7913d151e06071ed617bb58bbb3d6cd46a2dd0f6a03617b"
+    },
+    {
+      "name": "System.Security.Cryptography.ProtectedData.dll",
+      "sha256": "b61a1445b99a1486a5d9abbd45d766497f136270f5b04862defee1fc054ded14"
+    },
+    {
+      "name": "WWCP_CoreData.dll",
+      "sha256": "4630250928e031ad4fc7c531c6786d3cca3e952f851f3f184903b3d3d19c0cba"
+    }
+  ],
+  "referenceFiles": [
+    {
+      "file": "docs/interoperability/changeset.cbor",
+      "sha256": "2e9ca50bf982c5797fa5301beadd7399c38967031325d305909fd1a9ddaff2e3"
+    },
+    {
+      "file": "docs/interoperability/changeset.json",
+      "sha256": "5149f33a4d0f04cca1b077c5bb5888da6f7670fb970c08ed9b8d2be01d58e461"
+    },
+    {
+      "file": "docs/interoperability/commit.cbor",
+      "sha256": "dd808c2f667ed99ac1f319fbbe480b7bfa7a1cd0c2fffb9d0c72a4dd49441f64"
+    },
+    {
+      "file": "docs/interoperability/commit.json",
+      "sha256": "16e1c0b8e5e26b741a915882f6445df61985a74813da4e0bde8df96b0dcdc9e2"
+    },
+    {
+      "file": "docs/interoperability/history.cbor",
+      "sha256": "4ad8c59d47e8738c9005a303a150552077ba4dc0ab990e2a62c42b66d889ed53"
+    },
+    {
+      "file": "docs/interoperability/history.json",
+      "sha256": "173f11f152a749ee7d25a8f629351eec9c0da8366ddf7881353c1bafbc8e16e3"
+    },
+    {
+      "file": "docs/interoperability/merge.cbor",
+      "sha256": "c94096478440e4e714cc1d73ff39d73da0181faf485fd16b0d6ff9369fa9c966"
+    },
+    {
+      "file": "docs/interoperability/merge.json",
+      "sha256": "6e3f4a476d1da2678528ab3a7abcba770258b5d7c229e71aa280fbb294cb6a9c"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.cbor",
+      "sha256": "c8ec4ad4ed107ea6a7b801f8ad5fad78b93a42f12905148824f78a2b1b1dec49"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.json",
+      "sha256": "abeea6cdfea5e449c56a771cd0caa14ed45a874962336d353e5c0fe7a1436dfc"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.cbor",
+      "sha256": "408ce78ba3c28befe90b6b159f9e12146046146717e698d31f1789e74804e3ac"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.json",
+      "sha256": "fad7ba55d04bffc11312ca01112da1c0920adbd0221123981460630ebe42a34a"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.cbor",
+      "sha256": "903a0f7e5de856c92d893476fb081633da45a4cdc2587f5b18a3bec9f0810e9b"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.json",
+      "sha256": "52c32069a8f96baa7826998fdc5180e7781d8e875bb04618d93ff51e0589160c"
+    },
+    {
+      "file": "docs/interoperability/retention-plan.json",
+      "sha256": "53d6e4f920b2801e72acd3c9ddcd9916d24e0f365883829c7fe12faeaa4e3c73"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.cbor",
+      "sha256": "18865a3f1ee8e9319a9dc63fb9c47c55d86ce6c95ac19e425f9144c0d31d5f29"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.json",
+      "sha256": "f486190cd0fa2de10bd39cabfe3d582a27814dc27a41ac8e4529cc727041894b"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.cbor",
+      "sha256": "0a5b8a2389bb4d603cbb17e6c6f75a24736a82bdfb49c56b4e206d6120e9ade7"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.json",
+      "sha256": "7c5363c00863993d47c1b1cc9e723486521f640294fbce71207ef018fe061af5"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.cbor",
+      "sha256": "1d6593f6cfbef65f4b310cb173a81cadea5010e96f6f3cd2454e29701450bb47"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.json",
+      "sha256": "c1cbf4389ded04c16a78f45980ff5b68f440e012a5e936929418cc3db368a18c"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.cbor",
+      "sha256": "608218579b163fbf3eb71b7932fe4a9483bf089953e448793d02d27114074531"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.json",
+      "sha256": "4bc9b76e36a992d73df3632b5f18d678d29aa33a0be42fcb311710818e1820e4"
+    },
+    {
+      "file": "docs/interoperability/snapshot-retention.vectors.json",
+      "sha256": "b773e90f3ba2f9c1ae110163bddc48a5da76eadad04e522cfa852d16dbb412c9"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.cbor",
+      "sha256": "ca17c05ea79af48847fe95268b3743b5eea2901fad1a14a7369a98867e70d1b8"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.json",
+      "sha256": "9b1d6039d962c1060732539670204869e4db55f67bcc04a109adf226515ef415"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.cbor",
+      "sha256": "b813800ae3bddbc98e216a7cd47f92075843c19a43c71fda82e971dc4b29f0e5"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.json",
+      "sha256": "f278409b12987017f2270170c57f2f732b36068a5b606a958ea7da028c1dc36d"
+    },
+    {
+      "file": "docs/interoperability/snapshot.cbor",
+      "sha256": "dbf002f25a428e1588f150fd6a69f352da6bda8d420b06c3dc2f8c1633eec89f"
+    },
+    {
+      "file": "docs/interoperability/snapshot.input.json",
+      "sha256": "10c250ec20ff14a8d1e330262ec8ba53b0a70a3a380b80da4fb6fbf113bbe7b1"
+    },
+    {
+      "file": "docs/interoperability/snapshot.json",
+      "sha256": "70a684f485bcf208440455656c69463e4d1058d330de91504ffdae31171f81bd"
+    },
+    {
+      "file": "docs/interoperability/vectors.json",
+      "sha256": "7684f6096567f7cb40f9316a30c6d8601b80b329c2727be5a53b51cc37143201"
+    }
+  ],
+  "precedingBinding": {
+    "file": "docs/verification/validation-projection-after-binding.json",
+    "sha256": "1dbce86e66bea5e55492e235476090d85b6daffe9d1f77726394d32708a44fab"
+  },
+  "precedingEvidence": {
+    "file": "docs/verification/validation-projection-results.json",
+    "sha256": "80dae9ac07cc674c3fae7a6332506f2111f65082d76e63039e8b0928a20dbd70"
+  },
+  "precedingBaseline": {
+    "file": "docs/performance/validation-projection-after.json",
+    "sha256": "ff2d4403cdca46f87b0924e82875583222f4cb8f875eca6185028635c7c019ad"
+  },
+  "scopedPatch": {
+    "file": "docs/performance/snapshot-map-preparation.diff",
+    "sha256": "6a29dc8eead1fd500e1997d5f295d7dd81d4b77b6159efffa1e6056c65c41252",
+    "modifiedFiles": [
+      "WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Import.cs",
+      "WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.cs",
+      "WWCP_POI/ChangeSets/RoamingNetwork.CopyOnWrite.cs",
+      "WWCP_POI/Serialization/POISnapshotRepresentation.cs"
+    ],
+    "addedFiles": [
+      "WWCP_POI_Tests/Interoperability/SnapshotMapPreparationTests.cs"
+    ],
+    "reverseCheckPassed": true,
+    "privateReverseRestoresExactBeforeBytes": true
+  },
+  "precedingProductionAndTestSourceReconstructedExactly": true,
+  "ordinaryImportBodyRetainedExactly": true,
+  "measurementHarnessAndDependenciesUnchanged": true,
+  "date": "2026-10-10 UTC",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "sourceBinding": {
+    "file": "docs/verification/snapshot-map-preparation-binding.json",
+    "sha256": "4c487aa402d2afee204f856d04f935ff0c66ddd2aed791d132345fe222115998"
+  },
+  "referenceFilesUnchanged": true,
+  "newTestCases": 53,
+  "runs": [
+    {
+      "file": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi-map-preparation-20261010\\map-preparation-full-final.trx",
+      "sha256": "26d7769951cce7a30e87dc25f10cdde63532a7a2694179549b9d1e6a29ea28cf",
+      "counters": {
+        "total": 3045,
+        "executed": 3044,
+        "passed": 3044,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "newFixturePassed": 53,
+      "interoperabilityPassed": 2712,
+      "times": {
+        "creation": "2026-10-10T04:12:35.7640716+02:00",
+        "queuing": "2026-10-10T04:12:35.7640721+02:00",
+        "start": "2026-10-10T04:12:33.3331503+02:00",
+        "finish": "2026-10-10T04:21:21.2682088+02:00"
+      }
+    }
+  ],
+  "interoperabilityCasesIncludedInFullRun": 2712,
+  "excludedExplicitGenerators": [
+    "GenerateReferenceVectors",
+    "GenerateSnapshotRetentionVectors"
+  ],
+  "buildLogs": [
+    {
+      "file": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi-map-preparation-20261010\\build-final-guards.log",
+      "sha256": "cdfa5134810666b5f7ff7157e747382754455ace00a5f7cdd9299c00a1c9bfa7"
+    }
+  ],
+  "intermediateTests": {
+    "logs": [
+      {
+        "file": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi-map-preparation-20261010\\initial-tests.log",
+        "sha256": "b459003e88777e9f428f4deedad23662b639a3ffaeff2091d709c388479bcf74"
+      },
+      {
+        "file": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi-map-preparation-20261010\\focused-tests.log",
+        "sha256": "39b56b347709fc24e867cd1d06b4a19a2a8ec5166f10413937ca5d7a03d9991a"
+      },
+      {
+        "file": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi-map-preparation-20261010\\fixture-tests.log",
+        "sha256": "4607907d68c2449223f79911b9ca0e336e161dcf97fc591e14f282af7d58988a"
+      },
+      {
+        "file": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi-map-preparation-20261010\\full-tests.log",
+        "sha256": "a32bb83b76280d15e68d544b859d70c764f86d0f442476c42b3f677c577dd518"
+      },
+      {
+        "file": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi-map-preparation-20261010\\kinds-complete.log",
+        "sha256": "ead5dda2ce4be3b2f4a1e56f904aa3e168d493fee286c6374d479e56aa203779"
+      },
+      {
+        "file": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi-map-preparation-20261010\\fixture-complete.log",
+        "sha256": "43186885823fefdf990062cca4f0025a65661ca3608ed5297578390002a7a592"
+      },
+      {
+        "file": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi-map-preparation-20261010\\fixture-final.log",
+        "sha256": "22d70bbecf939a4f538cc37520488da61ac3ae1add4648629ed7240cd87fe78f"
+      },
+      {
+        "file": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi-map-preparation-20261010\\full-complete.log",
+        "sha256": "1cd443b6ebb99c38cebab265e08f9df5ac9131bba8d9283e7455d721c8c32764"
+      }
+    ],
+    "corrections": "The added fixture initially selected customData on entity kinds whose schema excludes it; allowed editable fields were selected instead. Moving an EVSE preserves an equal reverse index. A second interim full run was stopped before extending the identity-spelling guard; only that identified task test process tree was terminated. Connector selection now includes the EVSE scope and toggles the actual parsed value. The first full run was stopped after the known fixture-scope failure; only its identified test process tree was terminated. Initial existing 157 cases passed; corrected final source passes all 22 kind cases and all 53 new cases, then the complete final regression run."
+  },
+  "reports": [
+    {
+      "file": "docs/performance/validation-projection-after.json",
+      "sha256": "ff2d4403cdca46f87b0924e82875583222f4cb8f875eca6185028635c7c019ad",
+      "workers": 64,
+      "samples": 192,
+      "startedUTC": "2026-10-09T23:29:16.718956+00:00",
+      "finishedUTC": "2026-10-09T23:42:14.342462+00:00"
+    },
+    {
+      "file": "docs/performance/snapshot-map-preparation-after.json",
+      "sha256": "4dd6d4416f9f5c78bb650669f93d344a53e873ad3f217cf882b6229707afd27b",
+      "workers": 64,
+      "samples": 192,
+      "startedUTC": "2026-10-10T02:22:49.942619+00:00",
+      "finishedUTC": "2026-10-10T02:34:29.866696+00:00"
+    }
+  ],
+  "summary": {
+    "file": "docs/performance/snapshot-map-preparation-summary.md",
+    "sha256": "543b82e71919a142363f4f51fac3853eaf0d5d315c56082c7555767c52add4d1"
+  },
+  "taskBuildsAndTestsFinishBeforeAfterFormalSeries": true,
+  "noTaskProfilingDuringAfterFormalSeries": true,
+  "precedingFormalBaselinePreserved": true,
+  "reportChecks": {
+    "summaryReproducesExactBytes": true,
+    "summarySHA256": "543b82e71919a142363f4f51fac3853eaf0d5d315c56082c7555767c52add4d1",
+    "rejectedReportVariants": [
+      {
+        "case": "incomplete",
+        "error": "A complete Release domainrecovery report is required"
+      },
+      {
+        "case": "missing-worker",
+        "error": "Missing fresh process"
+      },
+      {
+        "case": "missing-stage",
+        "error": "Missing or unexpected workload groups"
+      },
+      {
+        "case": "shape",
+        "error": "Unexpected shape parameters"
+      },
+      {
+        "case": "samples",
+        "error": "Repeated inventory or sample count changed"
+      },
+      {
+        "case": "negative-allocation",
+        "error": "Invalid measurement: AllocatedBytes"
+      },
+      {
+        "case": "nonfinite-time",
+        "error": "Invalid measurement: ElapsedMilliseconds"
+      },
+      {
+        "case": "repeated-result",
+        "error": "Output changed within a group"
+      },
+      {
+        "case": "input-bytes",
+        "error": "Repeated inventory or sample count changed"
+      },
+      {
+        "case": "branch-state",
+        "error": "Repeated inventory or sample count changed"
+      },
+      {
+        "case": "domain-count",
+        "error": "Repeated inventory or sample count changed"
+      },
+      {
+        "case": "binding",
+        "error": "Source binding bytes changed"
+      },
+      {
+        "case": "production",
+        "error": "Source or assembly changed: productionAssemblySHA256"
+      },
+      {
+        "case": "harness",
+        "error": "Source or assembly changed: benchmarkAssemblySHA256"
+      },
+      {
+        "case": "method",
+        "error": "Unexpected worker/warmup/sample method"
+      },
+      {
+        "case": "runtime",
+        "error": "Runtime configuration or dependency manifest changed"
+      },
+      {
+        "case": "manifest",
+        "error": "Runtime configuration or dependency manifest changed"
+      },
+      {
+        "case": "dependency",
+        "error": "Shared dependency changed"
+      },
+      {
+        "case": "retention",
+        "error": "Collected retention inventory changed"
+      },
+      {
+        "case": "commit-peers",
+        "error": "Original commit peers changed"
+      },
+      {
+        "case": "batch-peers",
+        "error": "Original batch peers changed"
+      },
+      {
+        "case": "all-stage-domain-count",
+        "error": "Missing shared-reference/tariff/parking inventory"
+      },
+      {
+        "case": "all-stage-element-ops",
+        "error": "Missing element operations or exact branch-state identity"
+      },
+      {
+        "case": "all-stage-branch-format",
+        "error": "Missing element operations or exact branch-state identity"
+      },
+      {
+        "case": "all-sample-json-length",
+        "error": "Unexpected input/output bytes"
+      },
+      {
+        "case": "comparison-method",
+        "error": "Comparison method/harness/dependency changed: Method"
+      },
+      {
+        "case": "comparison-sdk",
+        "error": "Comparison method/harness/dependency changed: DotnetSDK"
+      },
+      {
+        "case": "comparison-runtime-tuning",
+        "error": "Comparison method/harness/dependency changed: RuntimeTuning"
+      },
+      {
+        "case": "comparison-times",
+        "error": "Invalid formal series times"
+      },
+      {
+        "case": "nonfinite-retained-heap",
+        "error": "Nonfinite collected heap delta"
+      },
+      {
+        "case": "coherent-static-etag",
+        "error": "Prepared input/domain/branch identity changed: StaticIdentity"
+      },
+      {
+        "case": "coherent-archive-etag",
+        "error": "Prepared input/domain/branch identity changed: ArchiveIdentity"
+      },
+      {
+        "case": "coherent-branch-state",
+        "error": "Prepared input/domain/branch identity changed: DomainInventory"
+      },
+      {
+        "case": "coherent-reference-count",
+        "error": "Prepared input/domain/branch identity changed: DomainInventory"
+      },
+      {
+        "case": "coherent-byte-inventory",
+        "error": "Prepared input/domain/branch identity changed: RecoveryInventory"
+      },
+      {
+        "case": "coherent-model-peer-result",
+        "error": "Complete model/peer/head result changed"
+      },
+      {
+        "case": "coherent-head-result",
+        "error": "Complete model/peer/head result changed"
+      }
+    ],
+    "rejectedBinaryVariants": [
+      {
+        "file": "WWCP_POI.dll",
+        "error": "Binary bytes differ from the explicit source/binary binding"
+      },
+      {
+        "file": "WWCP_POI_Benchmarks.dll",
+        "error": "Binary bytes differ from the explicit source/binary binding"
+      },
+      {
+        "file": "Azure.Core.dll",
+        "error": "Shared dependency changed: Azure.Core.dll"
+      },
+      {
+        "file": "WWCP_POI_Benchmarks.runtimeconfig.json",
+        "error": "Runtime configuration changed"
+      },
+      {
+        "file": "WWCP_POI_Benchmarks.deps.json",
+        "error": "Dependency manifest changed"
+      }
+    ],
+    "restoredBindingAccepted": true
+  },
+  "scripts": [
+    {
+      "file": "WWCP_POI_Benchmarks/domain_recovery_measure.py",
+      "sha256": "2571d9bcb9ef531a90fbd930c2b5b641299fec3938ad5604beebc879450f0b01"
+    },
+    {
+      "file": "WWCP_POI_Benchmarks/domain_recovery_report.py",
+      "sha256": "fb8153cb6b05995857daad6ad81af4498fc460e0590a5a374dc4379808717255"
+    },
+    {
+      "file": "WWCP_POI_Benchmarks/validation_projection_report.py",
+      "sha256": "0bb4c69a8f7a674dd7653fef21bcd570d70e281ab2e2f9aac71ddd2636dfc86b"
+    },
+    {
+      "file": "WWCP_POI_Benchmarks/snapshot_map_preparation_report.py",
+      "sha256": "4f5bbb31aabbb8343e5b090c8db1ab1cb8d77e7604ed97793bfb36fb2685102b"
+    }
+  ],
+  "scope": {
+    "normalizedPropertyAndChildMapReuse": true,
+    "all22OwnedKindsCovered": true,
+    "rootCatalogsAndMapBranchesReused": true,
+    "equivalentVisibleIdentitySpellingChangesUseOrdinaryCapture": true,
+    "removedPropertiesPreserveOtherSharedValues": true,
+    "exactNormalizedRawPropertyEqualityRequired": true,
+    "ordinaryImportBodyRetainedExactly": true,
+    "duplicateIdentityAndRemovedDescendantChecksRetained": true,
+    "everyCurrentReferenceChecked": true,
+    "equalReverseIndexAndTariffSubsetShared": true,
+    "revisionBookkeepingIndependent": true,
+    "contentAndChildETagContextsSharedOnlyForIdenticalMapAndRoot": true,
+    "typedBindingIDsMatchPrecedingFullProjection": true,
+    "idlessNestedValuesRetainPositionalBinding": true,
+    "unknownBindingTypesRetainFullProjectionFallback": true,
+    "callerDataReadOnly": true,
+    "publicExportsDetached": true,
+    "publicAPIChange": false,
+    "mutableJSONOrModelOrRuntimeOrTrustCache": false,
+    "localRuntimeIndependent": true,
+    "currentPeerVerificationUnchanged": true,
+    "allPreparedArchivesAndBranchResultsMatch": true,
+    "wireLayoutAndSigningProfileUnchanged": true,
+    "eagerLazyCancellationAndAtomicPublicationContractsRetained": true,
+    "productionCapacityOrLatencyOrConstantMemoryBound": false
+  },
+  "documentationFiles": [
+    {
+      "file": "README.md",
+      "sha256": "5bd4e60fa96a3111a9443c01b982948fb7aaf231d95a5c5a436906d34465a93f"
+    },
+    {
+      "file": "WWCP_POI_Tests/README.md",
+      "sha256": "7f186694fd6cfe19ae7f3f262b1537ec0fdd2005a55a96250ecd47ee299303ab"
+    },
+    {
+      "file": "WWCP_POI_Benchmarks/README.md",
+      "sha256": "1f1e3b33f77de67f3f468fd13834450ef2751d03c54571c71bb2509d9f6bb982"
+    },
+    {
+      "file": "docs/VALIDATION-PROJECTION.md",
+      "sha256": "6278b6699c0f3bc2f8755818b8cf365697c2f3ccda6ccebc77fff06c0744582b"
+    },
+    {
+      "file": "docs/SNAPSHOT-MAP-PREPARATION.md",
+      "sha256": "b8dc46420ad876acfcc5d3ff0d41cd85d7ece326d15341ca29904eed8e07a630"
+    },
+    {
+      "file": "docs/PARSER-CANCELLATION.md",
+      "sha256": "034e36e6c4637cff5603d740a72b5d5314a7e31b3bd4d099502f882e9af8718c"
+    },
+    {
+      "file": "docs/ROADMAP.md",
+      "sha256": "0b783241e1e4645a897c0a80de7a4cc65ad979546bd7f445723b241a8f1115e4"
+    },
+    {
+      "file": "docs/DOMAIN-RECOVERY-WORKLOADS.md",
+      "sha256": "b1622ca5545bd5618fa067bca7ce79f51560addf58aa8d838946503af748d670"
+    },
+    {
+      "file": "docs/ARCHITECTURE.md",
+      "sha256": "4808fab649522df545ffd0d4232a74f2c062b91122f57148a527b5fe62148fa7"
+    },
+    {
+      "file": "docs/HISTORY.md",
+      "sha256": "70a18b7475d2ad91893e57d175d7642280bbb92714fa2d7b24152c954e404d16"
+    },
+    {
+      "file": "docs/SCALING.md",
+      "sha256": "48366257b9a20804abfb69b3e92d8583db1218e0a06ca8dc5d16e49b89d0bf18"
+    },
+    {
+      "file": "docs/MODEL-PREPARATION.md",
+      "sha256": "14cc5d5760105abf3462d620eb11805e79461c403214c6733373eac241be13be"
+    },
+    {
+      "file": "docs/DOMAIN-MODEL.md",
+      "sha256": "d1b950e4d97439a1c1294447d0ce0c1103d2e2d3032f5bcaa216e4cdf92283d5"
+    },
+    {
+      "file": "docs/SNAPSHOT-RECONSTRUCTION.md",
+      "sha256": "83b83f4dad89267dbb51d0b76fedece473888a139e877838755f5a280943c194"
+    }
+  ],
+  "finalChecks": {
+    "completedUTC": "2026-10-10T02:36:55.367155+00:00",
+    "sourcesAssembliesReferencesScriptsAndReportsRechecked": true,
+    "scopedPatchReverseCheckRepeated": true,
+    "scopedWhitespaceAndTerminalNewlinesPassed": true,
+    "markdownLinks": "Local Markdown links: 1210 Missing: []",
+    "noRepositoryCommitOrPush": true,
+    "preexistingWorkingChangesPreserved": true
+  }
+}

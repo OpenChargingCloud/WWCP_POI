@@ -1,4 +1,4 @@
-﻿/*
+﻿﻿/*
  * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
  * Licensed under the Affero GPL license, Version 3.0.
@@ -100,7 +100,7 @@ public sealed partial class GridConnectionPoint
             throw new ArgumentOutOfRangeException(nameof(ConnectionType));
 
         this.GridOperator = GridOperator;
-        this.EnergyMeter = ImmutablePOIValues.Copy(EnergyMeter);
+        this.EnergyMeter = EnergyMeter?.Clone(GridOperator.RoamingNetwork);
         this.Id = Identifier(Id, "id");
         this.Name = new(Name ?? I18NString.Empty);
         this.Description = new(Description ?? I18NString.Empty);
@@ -130,18 +130,19 @@ public sealed partial class GridConnectionPoint
     /// Create a detached copy, optionally binding the grid operator to another network version.
     /// </summary>
     public GridConnectionPoint Clone(RoamingNetwork? RoamingNetwork = null)
-        => new(GridOperator.CloneToNetwork(RoamingNetwork ?? GridOperator.RoamingNetwork), EnergyMeter,
+        => new((RoamingNetwork is null ? GridOperator :
+               RoamingNetwork.GetGridOperator(GridOperatorId) ?? throw new ArgumentException("The target network has no referenced grid operator.")), EnergyMeter,
                Id, Name, Description, address, GeoLocation, VoltageLevel, ConnectionType,
                NominalVoltage, NominalFrequency, ContractedImportPower, ContractedExportPower,
                ContractedImportApparentPower, ContractedExportApparentPower, ConnectionAgreementId,
                NetworkLocationId, MarketLocationIds, MeteringLocationIds);
 
     /// <summary>
-    /// Export a complete nested document, including the referenced operator's static data.
+    /// Export the operator's registry reference and this connection point's owned static values.
     /// </summary>
     public JObject ToJSON(Boolean Embedded = false)
     {
-        var json = new JObject(new JProperty("gridOperator", GridOperator.ToJSON()));
+        var json = new JObject(new JProperty("gridOperatorId", GridOperatorId.ToString()));
         if (!Embedded) json["@context"] = JSONLDContext;
         if (Id is not null) json["id"] = Id;
         if (Name.IsNotNullOrEmpty()) json["name"] = Name.ToJSON();
@@ -180,12 +181,14 @@ public sealed partial class GridConnectionPoint
         try
         {
             InfrastructureJson.Validate(JSON, JSONLDContext);
-            var operatorJSON = InfrastructureJson.Object(JSON, "gridOperator") ??
-                               throw new ArgumentException("gridOperator: a grid operator is required.");
+            if (JSON["gridOperator"] is not null) throw new ArgumentException("Use gridOperatorId and the network registry.");
+            var operatorId = GridOperator_Id.Parse(TransparencyJson.RequiredText(JSON, "gridOperatorId"));
+            var gridOperator = RoamingNetwork?.GetGridOperator(operatorId) ??
+                               throw new ArgumentException($"gridOperatorId: unresolved operator '{operatorId}'.");
             Point = new GridConnectionPoint(
-                InfrastructureJson.At("gridOperator", () => POI.GridOperator.Parse(operatorJSON, RoamingNetwork)),
+                gridOperator,
                 EnergyMeter: InfrastructureJson.Object(JSON, "energyMeter") is { } meter
-                                 ? InfrastructureJson.At("energyMeter", () => POI.EnergyMeter.Parse(meter)) : null,
+                                 ? InfrastructureJson.At("energyMeter", () => POI.EnergyMeter.Parse(meter, Network: RoamingNetwork)) : null,
                 Id: InfrastructureJson.Text(JSON, "id"),
                 Name: InfrastructureJson.Name(JSON, "name"),
                 Description: InfrastructureJson.Name(JSON, "description"),

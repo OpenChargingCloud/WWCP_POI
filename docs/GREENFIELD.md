@@ -23,6 +23,9 @@ infer physical units from property names, or maintain alternate input representa
 | Enum flags | Flat arrays of declared names; nested arrays and alternate current-type names rejected |
 | Prices | Decimal JSON numbers; string prices rejected |
 | Timestamps | Explicit offset or `Z`; no inference of UTC for timezone-free text |
+| Shared catalogs | Network-owned grid operators, identified software releases and certificate documents; points/meters contain ID references |
+| Parking relationships | Operator-owned products, optional space-to-garage reference, overlapping groups and deduplicated offer union |
+| Tariff substructures | Elements, price components and restrictions remain values without IDs |
 | Software licenses | Object at `openSourceLicense`, with `@id`; no string licenses, ID alias or alternative license key |
 | Data licenses | Local parser for the emitted `@id` contract; no rewrites to satisfy a different dependency parser |
 | Authentication | Removed obsolete `DirectPayment` subclass; typed modes use `number`/`stationCode` |

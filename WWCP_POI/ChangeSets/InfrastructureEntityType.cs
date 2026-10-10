@@ -37,6 +37,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ParkingGarage,
         ParkingSpace,
         ParkingSensor,
-        ParkingSpaceGroup
+        ParkingSpaceGroup,
+        ParkingProduct,
+        TransparencySoftware,
+        TransparencySoftwareCertificate
     }
 }

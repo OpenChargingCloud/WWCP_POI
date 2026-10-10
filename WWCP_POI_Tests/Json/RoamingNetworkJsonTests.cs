@@ -67,7 +67,7 @@ namespace WWCP_POI_Tests.Json
         {
 
             var json = JObject.Parse("{\"@id\":\"network-a\",\"name\":{},\"dataLicenseIds\":[\"license-a\"]}");
-            foreach (var field in new[] { "gridOperators", "parkingOperators", "chargingStationManufacturers" }) json[field] = new JArray();
+            foreach (var field in new[] { "gridOperators", "parkingOperators", "chargingStationManufacturers", "transparencySoftware", "transparencySoftwareCertificates" }) json[field] = new JArray();
             var parsed = RoamingNetwork.Parse(json);
 
             Assert.That(parsed.DataLicenses.Single().Id.ToString(), Is.EqualTo("license-a"));

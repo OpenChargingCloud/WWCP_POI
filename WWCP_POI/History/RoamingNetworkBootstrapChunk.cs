@@ -114,7 +114,7 @@ public sealed class RoamingNetworkBootstrapChunk
 /// </summary>
 public sealed class RoamingNetworkBootstrapSource
 {
-    private readonly Byte[] archive;
+    private readonly ImmutableArray<Byte[]> archiveChunks;
     private readonly RoamingNetworkBootstrapLimits limits;
 
     /// <summary>
@@ -122,26 +122,34 @@ public sealed class RoamingNetworkBootstrapSource
     /// </summary>
     public RoamingNetworkBootstrapManifest Manifest { get; }
 
-    internal RoamingNetworkBootstrapSource(Byte[] archive, RoamingNetworkCommitId checkpoint, RoamingNetworkCommitId head,
+    internal RoamingNetworkBootstrapSource(Action<Stream> writeArchive, RoamingNetworkCommitId checkpoint, RoamingNetworkCommitId head,
         Int32 commits, Int32 chunkBytes, RoamingNetworkBootstrapLimits limits, String archiveProfile = RoamingNetworkHistory.ArchiveProfile,
         RoamingNetworkCommitId? anchor = null)
     {
-        if (chunkBytes < 1 || chunkBytes > limits.MaxChunkBytes || archive.Length > limits.MaxArchiveBytes ||
-            ((Int64) archive.Length + chunkBytes - 1) / chunkBytes > limits.MaxChunks || commits > limits.MaxCommits)
+        if (chunkBytes < 1 || chunkBytes > limits.MaxChunkBytes || commits > limits.MaxCommits)
             throw new ArgumentException("Frozen archive exceeds local bootstrap limits.");
-        this.archive = archive; this.limits = limits;
-        var digests = ImmutableArray.CreateBuilder<ImmutableArray<Byte>>();
-        for (var offset = 0; offset < archive.Length; )
-        {
-            var length = Math.Min(chunkBytes, archive.Length - offset);
-            digests.Add(ImmutableArray.CreateRange(System.Security.Cryptography.SHA256.HashData(archive.AsSpan(offset, length))));
-            offset += length;
-        }
-        Manifest = new(checkpoint, head, commits, archive.Length, chunkBytes, ETag.Compute(ETagFormat.CBOR, archive), digests.ToImmutable(), archiveProfile, anchor);
+        this.limits = limits;
+        using var capture = new POIBootstrapArchiveCapture(chunkBytes, limits.MaxArchiveBytes, limits.MaxChunks);
+        writeArchive(capture);
+        var frozen = capture.Complete();
+        archiveChunks = frozen.Chunks;
+        Manifest = new(checkpoint, head, commits, frozen.Length, chunkBytes, frozen.Digest, frozen.ChunkDigests, archiveProfile, anchor);
         Manifest.RequireLimits(limits);
         // The last full fragment has the widest position encoding; also check the short tail.
         CreateChunk(Math.Max(0, Manifest.ChunkCount - 2));
         if (Manifest.ChunkCount > 1) CreateChunk(Manifest.ChunkCount - 1);
+    }
+
+    /// <summary>
+    /// Write the frozen original CBOR archive without closing or flushing the writable destination.
+    /// Later history changes cannot alter this source; a write failure may leave partial output.
+    /// </summary>
+    public void WriteArchive(Stream destination)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        if (!destination.CanWrite) throw new ArgumentException("An archive destination must be writable.", nameof(destination));
+        for (var index = 0; index < archiveChunks.Length; index++)
+            destination.Write(archiveChunks[index].AsSpan(0, Manifest.Length(index)));
     }
 
     /// <summary>
@@ -150,7 +158,7 @@ public sealed class RoamingNetworkBootstrapSource
     public RoamingNetworkBootstrapChunk CreateChunk(Int32 index)
     {
         var length = Manifest.Length(index);
-        var chunk = new RoamingNetworkBootstrapChunk(Manifest.Id, index, archive.AsSpan(index * Manifest.ChunkBytes, length));
+        var chunk = new RoamingNetworkBootstrapChunk(Manifest.Id, index, archiveChunks[index].AsSpan(0, length));
         chunk.RequireLimits(limits);
         return chunk;
     }

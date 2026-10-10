@@ -4,7 +4,6 @@
  * Licensed under the Affero GPL license, Version 3.0.
  */
 
-using System.Diagnostics;
 using cloud.charging.open.protocols.WWCP.POI;
 using NUnit.Framework;
 using static WWCP_POI_Tests.Interoperability.InteropFixture;
@@ -80,19 +79,7 @@ public sealed class PersistenceTests
             root = initial.Head.Id;
             expected = initial.PrepareCommit(root, Batch(initial.Head.Snapshot, "crash-change", Power("150 kW")));
         }
-        var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-        foreach (var argument in new[] {"test", typeof(PersistenceTests).Assembly.Location, "--nologo", "--filter", "FullyQualifiedName~ArchiveCrashWorker"}) start.ArgumentList.Add(argument);
-        start.Environment["WWCP_INTEROP_CRASH_PATH"] = directory.ArchivePath;
-        start.Environment["WWCP_INTEROP_CRASH_STAGE"] = stage;
-        using var process = Process.Start(start)!;
-        var output = process.StandardOutput.ReadToEndAsync(); var error = process.StandardError.ReadToEndAsync();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
-        try { await process.WaitForExitAsync(timeout.Token); }
-        finally { if (!process.HasExited) { process.Kill(entireProcessTree: true); await process.WaitForExitAsync(); } }
-        var diagnostic = await output + "\n" + await error;
-        Assert.That(process.ExitCode, Is.Not.Zero, diagnostic);
-        Assert.That(File.Exists(directory.ArchivePath + ".stage"), Is.True, diagnostic);
-        Assert.That(File.ReadAllText(directory.ArchivePath + ".stage"), Is.EqualTo(stage));
+        await ArchiveCrashTestSupport.Run(directory.ArchivePath, stage);
         using var recovered = RoamingNetworkHistory.Open(directory.ArchivePath);
         Assert.That(recovered.Head.Id, Is.EqualTo(replaced ? expected.Id : root));
         Assert.That(recovered.Head.Snapshot.Revision, Is.EqualTo(replaced ? 1 : 0));
@@ -106,14 +93,20 @@ public sealed class PersistenceTests
     {
         var path = Environment.GetEnvironmentVariable("WWCP_INTEROP_CRASH_PATH");
         if (path is null) Assert.Ignore("Executed only in a child process by the crash-recovery tests.");
+        if (Environment.GetEnvironmentVariable("WWCP_INTEROP_CRASH_OPERATION") is { } operation)
+        {
+            var requested = Environment.GetEnvironmentVariable("WWCP_INTEROP_CRASH_STAGE")!;
+            if (operation.StartsWith("Mapped", StringComparison.Ordinal)) MappedArchiveRecoveryTests.RunWorker(path!, operation, requested);
+            else if (operation.StartsWith("Bootstrap", StringComparison.Ordinal)) BootstrapCrashTests.RunWorker(path!, operation, requested);
+            else SnapshotRetentionCrashTests.RunWorker(path!, operation, requested);
+            return;
+        }
         var stage = Enum.Parse<ArchiveWriteStage>(Environment.GetEnvironmentVariable("WWCP_INTEROP_CRASH_STAGE")!);
         using var history = RoamingNetworkHistory.Open(path!);
         var commit = history.PrepareCommit(history.Head.Id, Batch(history.Head.Snapshot, "crash-change", Power("150 kW")));
         history.ArchiveWriteObserver = reached => {
             if (reached != stage) return;
-            File.WriteAllText(path + ".stage", reached.ToString());
-            // Exit immediately: no archive finally block, history disposal or test cleanup runs.
-            Environment.Exit(77);
+            ArchiveCrashTestSupport.Exit(path!, reached.ToString());
         };
         history.TryPublish(history.Head.Id, commit, out var result);
         Assert.Fail("The requested exit stage was not reached: " + result.Error);

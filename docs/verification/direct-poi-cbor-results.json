@@ -1,0 +1,109 @@
+{
+  "date": "2026-10-09",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "a08c6cd8c0a43be0462d1451e7031c0f27ea36d46f7e8657f6e35eafaca43f84",
+  "productionAssemblySHA256": "9403157c696d8ba9a7334ef20ee6529f72c26b5ff769bb896974c871fc935f19",
+  "testSourceSHA256": "aee485ec89c12a6540ba35cac9e228ac495818d129e211a75889bd59b6702304",
+  "testAssemblySHA256": "fd388286870ace98b3b9a45ddf20fa895f8203e4e536f48f343e1f90ab2999a8",
+  "benchmarkSourceSHA256": "a4f51376c2842d5cb2b527e917507e35c5ca9023301a5aeb121a5da32ebc3114",
+  "reportScriptSHA256": "69b92087a40bfb3de0ab367c6d63abb7e9310f33408a94c48708ae45b7ff94f7",
+  "reportHelperScriptSHA256": "449ecb869a7c6688c657d94afe5a623f1f50beb9dab8319b50d8ebe9611fb855",
+  "reconstructedBeforeProductionSourceSHA256": "79625b0d35447d953cec9924d478e87ce56e2583709fdc1b83455eeac223f283",
+  "beforeProductionAssemblySHA256": "63820b8feb03768460aa1bbbabc4e4aeedc1f15de53c5e1c398d91a14faee8ee",
+  "scopedPatchSHA256": "f175704c4ae0c4e04cad1511c3055e47eef1b4a2a43b7f3b35dfdf0f72604d6c",
+  "newTestCases": 59,
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/direct-poi-cbor/direct-poi-cbor-focused.trx",
+      "sha256": "202c5262b675acb1c0078367600673ffe153b061ce436c73a210e23d2966962e",
+      "times": {
+        "creation": "2026-10-09T01:33:23.0397999+02:00",
+        "queuing": "2026-10-09T01:33:23.0398001+02:00",
+        "start": "2026-10-09T01:33:21.9239928+02:00",
+        "finish": "2026-10-09T01:34:06.5202231+02:00"
+      },
+      "passed": 228,
+      "failed": 0,
+      "skipped": 0,
+      "excludedExplicitGenerators": [],
+      "counters": {
+        "total": 228,
+        "executed": 228,
+        "passed": 228,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/direct-poi-cbor/direct-poi-cbor-full.trx",
+      "sha256": "0835df015f59d606afbf2297341e437f5013f5a8ab7957dc676ff7ec88f800df",
+      "times": {
+        "creation": "2026-10-09T01:34:18.8012204+02:00",
+        "queuing": "2026-10-09T01:34:18.8012208+02:00",
+        "start": "2026-10-09T01:34:16.9261874+02:00",
+        "finish": "2026-10-09T01:38:08.6742825+02:00"
+      },
+      "passed": 1253,
+      "failed": 0,
+      "skipped": 1,
+      "excludedExplicitGenerators": [
+        "GenerateSnapshotRetentionVectors",
+        "GenerateReferenceVectors"
+      ],
+      "counters": {
+        "total": 1256,
+        "executed": 1253,
+        "passed": 1253,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  ],
+  "reports": [
+    {
+      "file": "docs/performance/child-etags-after.json",
+      "sha256": "2611a8b55c9777ecedb64f08e2f109569691a7f554398c84b5e484c5b6c1b808",
+      "workers": 80,
+      "measuredSamples": 400
+    },
+    {
+      "file": "docs/performance/direct-poi-cbor-after.json",
+      "sha256": "940a836743ad64b32bee628eb16dca409ce532b36a29b34a4a8c2a82d0e5df23",
+      "workers": 80,
+      "measuredSamples": 400
+    }
+  ],
+  "limits": {
+    "maxEncodedKeysPerWriter": 128,
+    "maxEncodedKeyBytesPerWriter": 16384,
+    "maxDepth": 64,
+    "completeCanonicalJSONBuffer": true,
+    "completeCBOROutputBuffer": true,
+    "completeCBORTree": false,
+    "archiveEncodedValueValidationUnchanged": true
+  },
+  "initialTestSetupCorrection": "Prepare the untagged canonical reference, preserve the nested JArray, and use an SI text supported by the current Styx text parser. No production correction."
+}

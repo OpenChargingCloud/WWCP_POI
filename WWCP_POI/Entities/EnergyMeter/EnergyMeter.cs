@@ -224,9 +224,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.FirmwareVersion            = FirmwareVersion;
             this.publicKeys = ImmutablePOIValues.CopyItems(PublicKeys?.Distinct());
             this.PublicKeyCertificateChain  = PublicKeyCertificateChain;
-            var software = TransparencySoftware?.Distinct().ToArray() ?? [];
+            var software = TransparencySoftware?.ToArray() ?? [];
             if (software.Any(item => item is null))
                 throw new ArgumentException("Transparency software must not contain null.", nameof(TransparencySoftware));
+            if (software.Select(value => value.TransparencySoftwareId).Distinct().Count() != software.Length)
+                throw new ArgumentException("A meter may contain only one assignment per software release.", nameof(TransparencySoftware));
             this.TransparencySoftware = System.Collections.Immutable.ImmutableArray.CreateRange(software);
 
         }
@@ -242,13 +244,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="CustomEnergyMeterParser">An optional delegate to parse custom energy meter JSON objects.</param>
         public static EnergyMeter Parse(JObject                                    JSON,
-                                        CustomJObjectParserDelegate<EnergyMeter>?  CustomEnergyMeterParser = null)
+                                        CustomJObjectParserDelegate<EnergyMeter>?  CustomEnergyMeterParser = null,
+                                        RoamingNetwork? Network = null)
         {
 
             if (TryParse(JSON,
                          out var energyMeter,
                          out var errorResponse,
-                         CustomEnergyMeterParser))
+                         CustomEnergyMeterParser, Network))
             {
                 return energyMeter;
             }
@@ -290,7 +293,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static Boolean TryParse(JObject                                    JSON,
                                        [NotNullWhen(true)] out EnergyMeter?       EnergyMeter,
                                        [NotNullWhen(false)] out String?           ErrorResponse,
-                                       CustomJObjectParserDelegate<EnergyMeter>?  CustomEnergyMeterParser = null)
+                                       CustomJObjectParserDelegate<EnergyMeter>?  CustomEnergyMeterParser = null,
+                                        RoamingNetwork? Network = null)
         {
 
             try
@@ -437,7 +441,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse TransparencySoftware          [optional]
 
                 var transparencySoftware = InfrastructureJson.Array(JSON, "transparencySoftware", token =>
-                    TransparencySoftwareStatus.Parse(InfrastructureJson.Entry(token)));
+                    TransparencySoftwareStatus.Parse(InfrastructureJson.Entry(token), Network: Network));
 
                 #endregion
 
@@ -498,11 +502,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Embedded">Whether this data is embedded into another data structure, e.g. into a charging station.</param>
         /// <param name="CustomEnergyMeterSerializer">A delegate to serialize custom energy meter JSON objects.</param>
         /// <param name="CustomTransparencySoftwareStatusSerializer">A delegate to serialize custom transparency software status JSON objects.</param>
-        /// <param name="CustomTransparencySoftwareSerializer">A delegate to serialize custom transparency software JSON objects.</param>
         public JObject ToJSON(Boolean                                                       Embedded                                     = false,
                               CustomJObjectSerializerDelegate<EnergyMeter>?                CustomEnergyMeterSerializer                  = null,
-                              CustomJObjectSerializerDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusSerializer   = null,
-                              CustomJObjectSerializerDelegate<TransparencySoftware>?        CustomTransparencySoftwareSerializer         = null)
+                              CustomJObjectSerializerDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusSerializer   = null)
         {
 
             var json = JSONObject.Create(
@@ -563,8 +565,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : null,
 
                            TransparencySoftware.Any()
-                               ? new JProperty("transparencySoftware",        new JArray(TransparencySoftware.Select(transparencySoftwareStatus => transparencySoftwareStatus.ToJSON(CustomTransparencySoftwareStatusSerializer,
-                                                                                                                                                                                      CustomTransparencySoftwareSerializer))))
+                               ? new JProperty("transparencySoftware",        new JArray(TransparencySoftware.Select(transparencySoftwareStatus => transparencySoftwareStatus.ToJSON(CustomTransparencySoftwareStatusSerializer))))
                                : null,
 
                                  new JProperty("lastChange",                  LastChangeDate. ToISO8601())
@@ -583,9 +584,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Clone()
 
         /// <summary>
-        /// Clone this object.
+        /// Clone this meter and its runtime, optionally resolving software/document references in a target network.
         /// </summary>
-        public EnergyMeter Clone()
+        public EnergyMeter Clone(RoamingNetwork? Network = null)
         {
             var copy = new EnergyMeter(
 
@@ -601,7 +602,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    FirmwareVersion is not null ? new String(FirmwareVersion.ToCharArray()) : null,
                    PublicKeys.Select(publicKey => publicKey.Clone()).ToArray(),
                    PublicKeyCertificateChain?.Clone(),
-                   TransparencySoftware.Select(transparencySoftwareStatus => transparencySoftwareStatus.Clone()).ToArray(),
+                   TransparencySoftware.Select(transparencySoftwareStatus => transparencySoftwareStatus.Clone(Network)).ToArray(),
 
                    AdminStatus,
                    Status,

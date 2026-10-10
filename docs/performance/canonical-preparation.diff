@@ -1,0 +1,280 @@
+--- a/WWCP_POI/ChangeSets/RoamingNetworkChangeSet.Signing.cs
++++ b/WWCP_POI/ChangeSets/RoamingNetworkChangeSet.Signing.cs
+@@ -180,6 +180,7 @@
+                 ArgumentNullException.ThrowIfNull(resolvePublicKey);
+                 if (Signatures.IsEmpty)
+                     throw new InvalidOperationException("The ChangeSet is unsigned.");
++                using var preparation = POICanonicalPreparation.Enter();
+                 for (var index = 0; index < Signatures.Length; index++)
+                 {
+                     var signature = Signatures[index];
+@@ -214,6 +215,20 @@
+                 throw new ArgumentException("The algorithm is not supported for asymmetric signing.", nameof(algorithm));
+             Required(keyId, nameof(keyId));
+ 
++            return POICanonicalPreparation.SigningBytes(this, WriteUnsignedContent, writer =>
++            {
++                writer.WriteStartObject();
++                writer.WriteString("Profile", SigningProfile);
++                writer.WriteString("Algorithm", algorithm.Name);
++                writer.WriteString("KeyId", keyId);
++                writer.WriteString("Encoding", "base64");
++                writer.WriteNull("ChangeSet");
++                writer.WriteEndObject();
++            }, "ChangeSet", () => GetOriginalSigningBytes(algorithm, keyId));
++        }
++
++        private Byte[] GetOriginalSigningBytes(COSEAlgorithm algorithm, String keyId)
++        {
+             using var stream = new MemoryStream();
+             using (var writer = new Utf8JsonWriter(stream))
+             {
+--- a/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Changes.cs
++++ b/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Changes.cs
+@@ -177,6 +177,7 @@
+             if (verifySignature is null)
+                 throw new RoamingNetworkChangeSetException(changeSet.Id, null, "A signed change set requires a signature verifier.");
+ 
++            using var preparation = POICanonicalPreparation.Enter();
+             for (var index = 0; index < changeSet.Signatures.Length; index++)
+             {
+                 var signature = changeSet.Signatures[index];
+--- a/WWCP_POI/History/RoamingNetworkCommit.Signing.cs
++++ b/WWCP_POI/History/RoamingNetworkCommit.Signing.cs
+@@ -35,6 +35,21 @@
+     {
+         if (!algorithm.IsSupportedForSigning) throw new ArgumentException("Unsupported signing algorithm.", nameof(algorithm));
+         if (String.IsNullOrWhiteSpace(keyId)) throw new ArgumentException("KeyId must not be empty.", nameof(keyId));
++        return POICanonicalPreparation.SigningBytes(this, WriteIdentity, writer =>
++        {
++            writer.WriteStartObject();
++            writer.WriteString("Profile", SignatureProfile);
++            writer.WriteString("Algorithm", algorithm.Name);
++            writer.WriteString("KeyId", keyId);
++            writer.WriteString("Encoding", "base64");
++            writer.WritePropertyName("CommitId"); Id.Hash.WriteTo(writer);
++            writer.WriteNull("Commit");
++            writer.WriteEndObject();
++        }, "Commit", () => GetOriginalSigningBytes(algorithm, keyId));
++    }
++
++    private Byte[] GetOriginalSigningBytes(COSEAlgorithm algorithm, String keyId)
++    {
+         using var stream = new MemoryStream();
+         using (var writer = new Utf8JsonWriter(stream))
+         {
+@@ -156,6 +171,7 @@
+         {
+             ArgumentNullException.ThrowIfNull(resolvePublicKey);
+             if (Signatures.IsEmpty) throw new InvalidOperationException("The commit is unsigned.");
++            using var preparation = POICanonicalPreparation.Enter();
+             for (var index = 0; index < Signatures.Length; index++)
+             {
+                 var signature = Signatures[index];
+--- a/WWCP_POI/History/RoamingNetworkCommit.cs
++++ b/WWCP_POI/History/RoamingNetworkCommit.cs
+@@ -127,9 +127,11 @@
+             (networkId != snapshot.State.Root.Id || revision != snapshot.State.Revision ||
+              appliedChangeSetId != snapshot.State.AppliedChangeSetId || !StateETags.SequenceEqual(snapshot.State.ETags)))
+             throw new ArgumentException("The snapshot payload must match the commit header.");
+-        Id = new(ETag.Compute(ETagFormat.JSON, GetIdentityBytes()));
++        var identity = POICanonicalPreparation.Capture(WriteIdentity);
++        Id = new(ETag.Compute(ETagFormat.JSON, identity.Span));
+         if (declaredId is { } expected && expected != Id)
+             throw new ArgumentException("The declared commit identity does not match the content.");
++        POICanonicalPreparation.Admit(this, identity);
+     }
+ 
+     /// <summary>
+@@ -204,12 +206,7 @@
+     /// Return the fixed profile's canonical unsigned UTF-8 JSON, independent of peer signatures.
+     /// </summary>
+     public Byte[] GetIdentityBytes()
+-    {
+-        using var stream = new MemoryStream();
+-        using (var writer = new Utf8JsonWriter(stream)) WriteIdentity(writer);
+-        using var document = JsonDocument.Parse(stream.ToArray());
+-        return CanonicalJSON.ToUTF8Bytes(document);
+-    }
++        => POICanonicalPreparation.Get(this, WriteIdentity).Copy();
+ 
+     private void WriteIdentity(Utf8JsonWriter writer)
+     {
+--- a/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
+@@ -164,6 +164,7 @@
+         RoamingNetworkHistoryLimits? limits = null)
+     {
+         using var document = JsonDocument.Parse(CheckJSONArchive(json, limits ?? new()));
++        using var preparation = POICanonicalPreparation.Enter();
+         var value = document.RootElement;
+         if (value.GetProperty("Profile").GetString() is BoundaryArchiveProfile or RetentionArchiveProfile)
+             return ParseBoundaryJSON(value, verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary);
+@@ -193,6 +194,7 @@
+     {
+         CheckCBORArchive(bytes, limits ?? new());
+         var index = POIArchiveCBORIndex.Read(bytes);
++        using var preparation = POICanonicalPreparation.Enter();
+         return ParseIndexedArchive(bytes, index, verifyBatchSignature, verifyCommitSignature,
+             authorizeCommit, authorizeSnapshotBoundary);
+     }
+@@ -203,6 +205,7 @@
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit)
+     {
++        using var preparation = POICanonicalPreparation.Enter();
+         var history = new RoamingNetworkHistory(RoamingNetwork.Parse(snapshot.ToJSON()), verifyBatchSignature, verifyCommitSignature, authorizeCommit);
+         try
+         {
+--- a/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs
+@@ -67,6 +67,7 @@
+         CheckCBORArchive(bytes, limits);
+         var index = POIArchiveCBORIndex.Read(bytes);
+         POIArchiveCBORIndex.RequireCanonical(bytes);
++        using var preparation = POICanonicalPreparation.Enter();
+         if (manifest.ArchiveProfile is BoundaryArchiveProfile or RetentionArchiveProfile)
+         {
+             var hasReceipts = manifest.ArchiveProfile == RetentionArchiveProfile;
+--- a/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs
+@@ -95,6 +95,7 @@
+     {
+         if (authorizeBoundary is null || verifyCommitSignature is null)
+             throw new ArgumentException("Snapshot-boundary recovery requires an explicit boundary policy and trusted signature verifier.");
++        using var preparation = POICanonicalPreparation.Enter();
+         var history = FromSnapshot(checkpoint, snapshot, authorizeBoundary, verifyCommitSignature,
+                                    verifyBatchSignature, authorizeCommit);
+         try
+--- a/WWCP_POI/History/RoamingNetworkHistory.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.cs
+@@ -294,6 +294,7 @@
+ 
+     private void VerifyCommit(RoamingNetworkCommit commit)
+     {
++        using var preparation = POICanonicalPreparation.Enter();
+         foreach (var signature in commit.Signatures)
+             if (verifyCommitSignature is null || !verifyCommitSignature(commit, signature))
+                 throw new ArgumentException($"Commit signature '{signature.KeyId}' was not accepted.");
+@@ -308,6 +309,7 @@
+     private void VerifyBatch(RoamingNetworkCommit commit)
+     {
+         if (commit.ChangeSet is not { } batch) return;
++        using var preparation = POICanonicalPreparation.Enter();
+         foreach (var signature in batch.Signatures)
+             if (verifyBatchSignature is null || !verifyBatchSignature(batch, signature))
+                 throw new ArgumentException($"Batch signature '{signature.KeyId}' was not accepted.");
+--- /dev/null
++++ b/WWCP_POI/Serialization/POICanonicalPreparation.cs
+@@ -0,0 +1,111 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Text.Json;
++using org.GraphDefined.Vanaheimr.Illias;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++/// <summary>
++/// Reuse successful unsigned canonical content within synchronous recovery or peer verification.
++/// The outer scope releases all entries; keys and trust decisions are never retained.
++/// </summary>
++internal sealed class POICanonicalPreparation
++{
++    internal const Int32 MaxEntries = 64;
++    internal const Int32 MaxValueBytes = 1024 * 1024;
++    internal const Int32 MaxTotalBytes = 4 * 1024 * 1024;
++    [ThreadStatic] private static POICanonicalPreparation? current;
++    private readonly Dictionary<Object, Content> values = new(ReferenceEqualityComparer.Instance);
++    internal static POICanonicalPreparation? Current => current;
++    internal Int32 Entries => values.Count;
++    internal Int32 Bytes { get; private set; }
++
++    internal readonly struct Scope(POICanonicalPreparation? owner) : IDisposable
++    {
++        public void Dispose()
++        {
++            if (owner is null || !ReferenceEquals(current, owner)) return;
++            current = null;
++            owner.values.Clear(); owner.Bytes = 0;
++        }
++    }
++
++    internal static Scope Enter()
++    {
++        if (current is not null) return new(null);
++        current = new(); return new(current);
++    }
++
++    internal sealed class Content(Byte[] bytes, Int32 depth)
++    {
++        internal ReadOnlySpan<Byte> Span => bytes;
++        internal Int32 Depth => depth;
++        internal Byte[] Copy() => (Byte[]) bytes.Clone();
++    }
++
++    internal static Content Capture(Action<Utf8JsonWriter> write)
++    {
++        using var stream = new MemoryStream();
++        using (var writer = new Utf8JsonWriter(stream)) write(writer);
++        using var document = JsonDocument.Parse(stream.ToArray());
++        var bytes = CanonicalJSON.ToUTF8Bytes(document);
++        var reader = new Utf8JsonReader(bytes);
++        var depth = 0;
++        while (reader.Read())
++            if (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.StartArray)
++                depth = Math.Max(depth, reader.CurrentDepth + 1);
++        return new(bytes, depth);
++    }
++
++    internal static Content Get(Object owner, Action<Utf8JsonWriter> write)
++    {
++        if (current is { } context && context.values.TryGetValue(owner, out var found)) return found;
++        var content = Capture(write);
++        Admit(owner, content);
++        return content;
++    }
++
++    // Constructor callers admit only after checking the declared content identity.
++    internal static void Admit(Object owner, Content content)
++    {
++        if (current is not { } context || context.values.ContainsKey(owner) || context.values.Count >= MaxEntries ||
++            content.Span.Length > MaxValueBytes || content.Span.Length > MaxTotalBytes - context.Bytes) return;
++        context.values.Add(owner, content); context.Bytes += content.Span.Length;
++    }
++
++    internal static Byte[] SigningBytes(Object owner, Action<Utf8JsonWriter> writeContent,
++        Action<Utf8JsonWriter> writeHeader, String field, Func<Byte[]> original)
++    {
++        // Individual calls cannot reuse unsigned bytes; keep their preceding complete factory.
++        if (current is null) return original();
++        Content content;
++        try { content = Get(owner, writeContent); }
++        catch (Exception error) when (error is JsonException or ArgumentException or InvalidOperationException or FormatException)
++        {
++            // Preserve the original envelope's validation order and diagnostics for invalid inputs.
++            return original();
++        }
++        // The signature envelope adds one container to the fixed JsonDocument depth contract.
++        if (content.Depth >= 64) return original();
++        var header = Capture(writeHeader);
++        var reader = new Utf8JsonReader(header.Span);
++        while (reader.Read())
++        {
++            if (reader.TokenType != JsonTokenType.PropertyName || reader.CurrentDepth != 1 || reader.GetString() != field) continue;
++            if (!reader.Read() || reader.TokenType != JsonTokenType.Null)
++                throw new InvalidOperationException("The canonical signature header requires a null payload placeholder.");
++            var start = checked((Int32) reader.TokenStartIndex);
++            var end = checked((Int32) reader.BytesConsumed);
++            var result = new Byte[checked(header.Span.Length - (end - start) + content.Span.Length)];
++            header.Span[..start].CopyTo(result);
++            content.Span.CopyTo(result.AsSpan(start));
++            header.Span[end..].CopyTo(result.AsSpan(start + content.Span.Length));
++            return result;
++        }
++        throw new InvalidOperationException("The canonical signature header is missing its payload placeholder.");
++    }
++}

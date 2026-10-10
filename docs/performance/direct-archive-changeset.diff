@@ -1,0 +1,221 @@
+--- a/WWCP_POI/ChangeSets/RoamingNetworkChangeSet.CBOR.cs
++++ b/WWCP_POI/ChangeSets/RoamingNetworkChangeSet.CBOR.cs
+@@ -25,6 +25,21 @@
+         var output = new System.Buffers.ArrayBufferWriter<Byte>();
+         new POICBORWriter(output).WriteChangeSet(document.RootElement, paths);
+         return output.WrittenSpan.ToArray();
++    }
++
++    /// <summary>
++    /// Emit this complete signed batch into an archive after standalone and remaining-depth preflight.
++    /// Exact scalar spelling and every peer envelope retain the standalone transport representation.
++    /// </summary>
++    internal void WriteArchiveCBOR(System.Buffers.IBufferWriter<Byte> output, Int32 remainingDepth)
++    {
++        var json = JsonSerializer.SerializeToUtf8Bytes(this);
++        using var document = JsonDocument.Parse(json);
++        ValidateSigningJSON(document.RootElement);
++        var paths = MeasurementPaths();
++        var scalars = new POIChangeSetScalarCache();
++        new POICBORPreflight(remainingDepth).ValidateChangeSet(document.RootElement, paths, scalars);
++        new POICBORWriter(output).WriteChangeSet(document.RootElement, paths, scalars);
+     }
+ 
+     /// <summary>
+--- a/WWCP_POI/Serialization/POICBORWriter.cs
++++ b/WWCP_POI/Serialization/POICBORWriter.cs
+@@ -23,6 +23,7 @@
+     private readonly Dictionary<String, Byte[]> keys = new(StringComparer.Ordinal);
+     private Int32 keyBytes;
+     private HashSet<String>? changeSetReadings;
++    private POIChangeSetScalarCache? changeSetScalars;
+     private const Int32 MaxCachedKeys = 128;
+     private const Int32 MaxCachedKeyBytes = 16384;
+ 
+@@ -44,9 +45,10 @@
+     /// Emit a validated ChangeSet document using its exact signed scalar codec and reading paths.
+     /// Only the two root header ETag pairs become native byte tuples.
+     /// </summary>
+-    internal void WriteChangeSet(JsonElement value, HashSet<String> readings)
++    internal void WriteChangeSet(JsonElement value, HashSet<String> readings, POIChangeSetScalarCache? scalars = null)
+     {
+         changeSetReadings = readings;
++        changeSetScalars = scalars;
+         WriteValue(value, null, "");
+         if (!writer.IsComplete) throw new CBORException("Incomplete ChangeSet CBOR value.");
+     }
+@@ -104,7 +106,7 @@
+                 break;
+             case JsonValueKind.String:
+                 if (changeSetReadings is not null && changeSetReadings.Contains(path))
+-                    WriteLeaf(RoamingNetworkChangeSet.EncodeTransportScalar(value, path, changeSetReadings));
++                    WriteLeaf(changeSetScalars?.Read(value, path, changeSetReadings) ?? RoamingNetworkChangeSet.EncodeTransportScalar(value, path, changeSetReadings));
+                 else writer.WriteTextString(value.GetString()!);
+                 break;
+             case JsonValueKind.True: writer.WriteBoolean(true); break;
+@@ -112,7 +114,7 @@
+             case JsonValueKind.Null: writer.WriteNull(); break;
+             case JsonValueKind.Number:
+                 if (changeSetReadings is not null)
+-                    WriteLeaf(RoamingNetworkChangeSet.EncodeTransportScalar(value, path, changeSetReadings));
++                    WriteLeaf(changeSetScalars?.Read(value, path, changeSetReadings) ?? RoamingNetworkChangeSet.EncodeTransportScalar(value, path, changeSetReadings));
+                 else if (value.TryGetInt64(out var signed)) writer.WriteInt64(signed);
+                 else if (value.TryGetUInt64(out var unsigned)) writer.WriteUInt64(unsigned);
+                 // Styx preserves exact decimal scales, exponents and bignums; never use binary floats.
+--- a/WWCP_POI/Serialization/POICBORPreflight.cs
++++ b/WWCP_POI/Serialization/POICBORPreflight.cs
+@@ -18,6 +18,8 @@
+ internal sealed class POICBORPreflight(Int32 remainingDepth, POICBORReadingCache? readings = null)
+ {
+     private CBORException? readerFailure;
++    private HashSet<String>? changeSetReadings;
++    private POIChangeSetScalarCache? changeSetScalars;
+     // Active parent maps use distinct depths. Clear each completed map before sibling reuse.
+     // Large maps are checked normally, but their oversized set is not retained in the pool.
+     private readonly HashSet<String>?[] namesAtDepth = new HashSet<String>?[64];
+@@ -25,6 +27,20 @@
+     internal Int32 PooledMapSets => namesAtDepth.Count(names => names is not null);
+ 
+     internal void Validate(JsonElement value, String kind)
++    {
++        changeSetReadings = null;
++        changeSetScalars = null;
++        ValidateCore(value, kind);
++    }
++
++    internal void ValidateChangeSet(JsonElement value, HashSet<String> paths, POIChangeSetScalarCache? scalars = null)
++    {
++        changeSetReadings = paths;
++        changeSetScalars = scalars;
++        ValidateCore(value, null);
++    }
++
++    private void ValidateCore(JsonElement value, String? kind)
+     {
+         readerFailure = null;
+         Visit(value, kind, 0, "");
+@@ -45,7 +61,8 @@
+                     {
+                         var name = field.Name;
+                         if (!names.Add(name)) throw new CBORException("Duplicate CBOR POI map key.");
+-                        if (kind is not null && name == "ETags")
++                        if ((kind is not null && name == "ETags") ||
++                            (changeSetReadings is not null && path.Length == 0 && name is "BeforeETags" or "AfterETags"))
+                         {
+                             if (field.Value.ValueKind != JsonValueKind.Array || field.Value.GetArrayLength() != 2)
+                                 throw new ArgumentException("ETags: expected the JSON and CBOR identifier arrays.");
+@@ -72,7 +89,7 @@
+                         else
+                         {
+                             var child = kind is null ? null : POIRepresentation.ChildKind(kind, name);
+-                            Visit(field.Value, child, depth + 1, child is null ? "" : path + "/" + Escape(name));
++                            Visit(field.Value, child, depth + 1, changeSetReadings is not null || child is not null ? path + "/" + Escape(name) : "");
+                         }
+                     }
+                 }
+@@ -88,16 +105,20 @@
+                 foreach (var item in value.EnumerateArray())
+                 {
+                     var child = item.ValueKind == JsonValueKind.Object ? kind : null;
+-                    Visit(item, child, depth + 1, child is null ? "" : path + "/" + index.ToString(CultureInfo.InvariantCulture));
++                    Visit(item, child, depth + 1, changeSetReadings is not null || child is not null ? path + "/" + index.ToString(CultureInfo.InvariantCulture) : "");
+                     index++;
+                 }
+                 break;
+             case JsonValueKind.Number:
+-                if (!value.TryGetInt64(out _) && !value.TryGetUInt64(out _))
++                if (changeSetReadings is not null)
++                    Leaf(changeSetScalars?.Read(value, path, changeSetReadings) ?? RoamingNetworkChangeSet.EncodeTransportScalar(value, path, changeSetReadings), depth);
++                else if (!value.TryGetInt64(out _) && !value.TryGetUInt64(out _))
+                     Leaf(CBORJSON.ToCBOR(value.GetRawText()), depth);
+                 break;
+             case JsonValueKind.String:
+-                _ = value.GetString();
++                if (changeSetReadings is not null && changeSetReadings.Contains(path))
++                    Leaf(changeSetScalars?.Read(value, path, changeSetReadings) ?? RoamingNetworkChangeSet.EncodeTransportScalar(value, path, changeSetReadings), depth);
++                else _ = value.GetString();
+                 break;
+             case JsonValueKind.True:
+             case JsonValueKind.False:
+--- a/WWCP_POI/Serialization/POIArchiveCBORWriter.cs
++++ b/WWCP_POI/Serialization/POIArchiveCBORWriter.cs
+@@ -79,6 +79,13 @@
+     internal void POI(IImmutablePOI value)
+         => POIRepresentation.WriteArchiveCBOR(value, output, 64 - depth);
+ 
++    /// <summary>
++    /// Preflight a signed ChangeSet before emitting its exact transport directly into this archive.
++    /// The caller owns partial-output disposal, destination lifetime and durable installation.
++    /// </summary>
++    internal void ChangeSet(RoamingNetworkChangeSet value)
++        => value.WriteArchiveCBOR(output, 64 - depth);
++
+     private void Enter()
+     {
+         if (depth == 64) throw new CBORException("The maximum CBOR nesting depth of 64 was exceeded.");
+--- a/WWCP_POI/History/POIArchiveCBORValues.cs
++++ b/WWCP_POI/History/POIArchiveCBORValues.cs
+@@ -25,7 +25,7 @@
+             ("StateETags", value => value.Array(commit.StateETags.Length, commit.StateETags, (output, tag) => output.Value(tag.ToCBOR()))),
+             ("AppliedChangeSetId", value => value.Value(commit.AppliedChangeSetId is { } id ? CBORValue.FromText(id) : CBORValue.Null)),
+             commit.Snapshot is { } snapshot ? ("Snapshot", value => WriteSnapshot(snapshot, value)) :
+-                ("ChangeSet", value => { if (commit.ChangeSet is { } batch) value.Encoded(batch.ToCBOR()); else value.Value(CBORValue.Null); }),
++                ("ChangeSet", value => { if (commit.ChangeSet is { } batch) value.ChangeSet(batch); else value.Value(CBORValue.Null); }),
+             ("Signatures", value => value.Array(commit.Signatures.Length, commit.Signatures, (output, signature) => output.Map(
+                 ("Profile", field => field.Text(signature.Profile)), ("Algorithm", field => field.Text(signature.Algorithm)),
+                 ("KeyId", field => field.Text(signature.KeyId)), ("Encoding", field => field.Text(signature.Encoding)),
+--- a/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
+@@ -100,7 +100,7 @@
+     /// <summary>
+     /// Write the exact deterministic CBOR archive to a writable stream, leaving it open and unflushed.
+     /// Outer maps, commits, receipts and preflight-validated POI snapshots are emitted directly.
+-    /// ChangeSets retain their per-value buffers. Failed output does not change history.
++    /// POI and ChangeSet payloads preflight before direct output. Failed output does not change history.
+     /// </summary>
+     public void WriteCBOR(Stream destination)
+     {
+--- /dev/null
++++ b/WWCP_POI/Serialization/POIChangeSetScalarCache.cs
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Text.Json;
++using org.GraphDefined.Vanaheimr.Illias;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++/// <summary>
++/// Reuse successful signed scalar codec results during one archive ChangeSet payload call.
++/// Numeric tokens and schema SI text stay exact; occurrence ownership and depth are checked anew.
++/// </summary>
++internal sealed class POIChangeSetScalarCache
++{
++    internal const Int32 MaxEntries = 64;
++    internal const Int32 MaxTextCharacters = 256;
++    internal const Int32 MaxTotalTextCharacters = 8192;
++    private readonly Dictionary<(JsonValueKind Kind, String Text), CBORValue> values = [];
++    internal Int32 Entries => values.Count;
++    internal Int32 TextCharacters { get; private set; }
++
++    internal CBORValue Read(JsonElement value, String path, HashSet<String> readings)
++    {
++        if (value.ValueKind != JsonValueKind.Number &&
++            (value.ValueKind != JsonValueKind.String || !readings.Contains(path)))
++            throw new ArgumentException("The signed scalar cache accepts only numbers and schema reading strings.");
++        var text = value.ValueKind == JsonValueKind.Number ? value.GetRawText() : value.GetString()!;
++        var key = (value.ValueKind, text);
++        if (values.TryGetValue(key, out var result)) return result;
++        result = RoamingNetworkChangeSet.EncodeTransportScalar(value, path, readings);
++        if (values.Count < MaxEntries && text.Length <= MaxTextCharacters &&
++            text.Length <= MaxTotalTextCharacters - TextCharacters && POICBORReadingCache.CanRetain(result))
++        {
++            values.Add(key, result); TextCharacters += text.Length;
++        }
++        return result;
++    }
++}

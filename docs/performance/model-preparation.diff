@@ -1,0 +1,95 @@
+--- a/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Import.cs
++++ b/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Import.cs
+@@ -41,9 +41,18 @@
+                                                       ref EntityMap                   map,
+                                                       DateTimeOffset?                 timestamp,
+                                                       List<InfrastructureEntityKey>?  imported  = null)
++            => ImportOwned((JObject) document.DeepClone(), type, parent, ref map, timestamp, imported);
++
++        // Only the entry point copies caller data. Descendants belong to that private copy;
++        // never pass a caller-owned document to this destructive import traversal.
++        private static InfrastructureEntityKey ImportOwned(JObject                         copy,
++                                                           InfrastructureEntityType        type,
++                                                           InfrastructureEntityKey?        parent,
++                                                           ref EntityMap                   map,
++                                                           DateTimeOffset?                 timestamp,
++                                                           List<InfrastructureEntityKey>?  imported)
+         {
+ 
+-            var copy = (JObject) document.DeepClone();
+             POIRepresentation.RemoveETags(copy, type.ToString());
+             POIRepresentation.RemoveRuntime(copy, type.ToString());
+             var idField = InfrastructureChangeSchema.IdField(type);
+@@ -85,7 +94,7 @@
+             imported?.Add(key);
+ 
+             foreach (var child in childDocuments)
+-                children = children.Add(Import(child.Document, child.Type, key, ref map, timestamp, imported));
++                children = children.Add(ImportOwned(child.Document, child.Type, key, ref map, timestamp, imported));
+ 
+             map = map.SetItem(key, map[key].With(children: children));
+ 
+--- a/WWCP_POI/Serialization/POISnapshotRepresentation.cs
++++ b/WWCP_POI/Serialization/POISnapshotRepresentation.cs
+@@ -15,8 +15,12 @@
+         => documents.TryGetValue(value, out var document) ? InfrastructureJson.ReadObject(document.JSON) : null;
+ 
+     internal static JObject CompleteImport(JObject source, JObject projection, String kind, Boolean ownedGraph = false)
+-    {
+-        var copy = (JObject) source.DeepClone();
++        => CompleteOwnedImport((JObject) source.DeepClone(), projection, kind, ownedGraph);
++
++    // The projection stays borrowed and read-only. Every mutable source descendant belongs
++    // to the private entry-point copy or to an explicit clone of a projected child below.
++    private static JObject CompleteOwnedImport(JObject copy, JObject projection, String kind, Boolean ownedGraph)
++    {
+         if (ownedGraph)
+             foreach (var field in new[] { "roamingNetworkId", "chargingStationOperatorId", "chargingPoolId", "chargingStationId", "EVSEId", "parkingOperatorId" })
+                 copy.Remove(field);
+@@ -65,21 +69,25 @@
+                         InfrastructureChangeSchema.Relations.TryGetValue(childType, out var childRelation) &&
+                         childRelation.Parent.ToString() == kind && childRelation.Field == property.Name;
+             if (property.Value is JObject child && projection[property.Name] is JObject projected)
+-                property.Value = CompleteImport(child, projected, childKind, owned);
++                property.Value = CompleteOwnedImport(child, projected, childKind, owned);
+             else if (property.Value is JArray children && projection[property.Name] is JArray projectedChildren)
+             {
+                 var lookup = Index(projectedChildren, childKind);
+                 for (var index = 0; index < children.Count; index++)
+                     if (children[index] is JObject item && Find(projectedChildren, item, childKind, index, lookup) is { } projectedItem)
+-                        children[index] = CompleteImport(item, projectedItem, childKind, owned);
++                        children[index] = CompleteOwnedImport(item, projectedItem, childKind, owned);
+             }
+         }
+         return copy;
+     }
+ 
+     internal static void Bind(IImmutablePOI value, JObject json)
+-    {
+-        var copy = (JObject) json.DeepClone();
++        => BindOwned(value, (JObject) json.DeepClone());
++
++    // Bind only detached documents; stored strings are captured before visiting their
++    // descendants, and no mutable JSON node is retained in the weak representation table.
++    private static void BindOwned(IImmutablePOI value, JObject copy)
++    {
+         var kind = value.GetType().Name;
+         POIRepresentation.RemoveETags(copy, kind);
+         POIRepresentation.RemoveRuntime(copy, kind);
+@@ -89,14 +97,14 @@
+         var lookups = new Dictionary<String, Dictionary<String, JObject>>(StringComparer.Ordinal);
+         foreach (var (field, child) in Children(value))
+         {
+-            if (copy[field] is JObject singleton) Bind(child, singleton);
++            if (copy[field] is JObject singleton) BindOwned(child, singleton);
+             else if (copy[field] is JArray array)
+             {
+                 var index = indexes.GetValueOrDefault(field);
+                 indexes[field] = index + 1;
+                 if (!lookups.TryGetValue(field, out var lookup)) lookups.Add(field, lookup = Index(array, child.GetType().Name));
+                 var identity = POIRepresentation.WithoutETags(() => POIJSON.Document(child));
+-                if (Find(array, identity, child.GetType().Name, index, lookup) is { } document) Bind(child, document);
++                if (Find(array, identity, child.GetType().Name, index, lookup) is { } document) BindOwned(child, document);
+             }
+         }
+     }

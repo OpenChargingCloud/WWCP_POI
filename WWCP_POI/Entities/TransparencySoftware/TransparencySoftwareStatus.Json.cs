@@ -32,13 +32,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
     {
 
         /// <summary>
-        /// Parse embedded software, legal status, certificate fields and the validity interval.
+        /// Parse software/document references and the legal status using this network version.
         /// </summary>
         private static Boolean TryParseDocument(JObject                                                   JSON,
                                                 [NotNullWhen(true)]  out TransparencySoftwareStatus?      result,
                                                 [NotNullWhen(false)] out String?                          error,
                                                 CustomJObjectParserDelegate<TransparencySoftwareStatus>?  custom,
-                                                CustomJObjectParserDelegate<TransparencySoftware>?        customSoftware)
+                                                RoamingNetwork?                                           network)
         {
 
             result = null;
@@ -48,8 +48,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 ArgumentNullException.ThrowIfNull(JSON);
 
-                var software = InfrastructureJson.Object(JSON, "transparencySoftware") ??
-                               throw new ArgumentException("transparencySoftware: missing software object.");
+                InfrastructureJson.ValidateFields(JSON, "transparencySoftwareId", "legalStatus", "certificateId");
+                var softwareId = TransparencySoftware_Id.Parse(TransparencyJson.RequiredText(JSON, "transparencySoftwareId"));
+                var software = network?.GetTransparencySoftwareById(softwareId) ??
+                               throw new ArgumentException($"transparencySoftwareId: unresolved software '{softwareId}'; supply its network registry.");
+                var certificateId = InfrastructureJson.Text(JSON, "certificateId");
+                var certificate = certificateId is null ? null : network?.GetTransparencySoftwareCertificateById(
+                    TransparencySoftwareCertificate_Id.Parse(certificateId)) ??
+                    throw new ArgumentException($"certificateId: unresolved document '{certificateId}'.");
 
                 var state = TransparencyJson.RequiredText(JSON, "legalStatus");
 
@@ -57,13 +63,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     throw new ArgumentException("legalStatus: invalid legal status.");
 
                 var parsed = new TransparencySoftwareStatus(
-                                 TransparencySoftware: InfrastructureJson.At("transparencySoftware",
-                                                                            () => POI.TransparencySoftware.Parse(software, customSoftware)),
-                                 LegalStatus:          legal,
-                                 Certificate:          InfrastructureJson.Text(JSON, "certificate"),
-                                 CertificateIssuer:    InfrastructureJson.Text(JSON, "certificateIssuer"),
-                                 NotBefore:            TransparencyJson.Date(JSON, "notBefore"),
-                                 NotAfter:             TransparencyJson.Date(JSON, "notAfter")
+                                 TransparencySoftware: software,
+                                 LegalStatus: legal,
+                                 Certificate: certificate
                              );
 
                 result = custom is null

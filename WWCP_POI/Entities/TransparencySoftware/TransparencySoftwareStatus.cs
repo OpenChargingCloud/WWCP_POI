@@ -15,488 +15,150 @@
  * limitations under the License.
  */
 
-#region Usings
-
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-
 using Newtonsoft.Json.Linq;
-
 using org.GraphDefined.Vanaheimr.Illias;
-using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
-#endregion
+namespace cloud.charging.open.protocols.WWCP.POI;
 
-namespace cloud.charging.open.protocols.WWCP.POI
+/// <summary>
+/// Static software applicability information for a meter, with an optional shared model/version document.
+/// Legal status is static POI data, independent of operational runtime schedules.
+/// </summary>
+public sealed partial class TransparencySoftwareStatus : IEquatable<TransparencySoftwareStatus>,
+    IComparable<TransparencySoftwareStatus>, IComparable
 {
+    /// <summary>
+    /// The software release resolved from this network version's registry.
+    /// </summary>
+    public TransparencySoftware TransparencySoftware { get; }
 
     /// <summary>
-    /// The transparency software status.
-    /// This information will e.g. be used for the German Calibration Law.
+    /// The referenced software release identity.
     /// </summary>
-    public sealed partial class TransparencySoftwareStatus : IEquatable<TransparencySoftwareStatus>,
-                                              IComparable<TransparencySoftwareStatus>,
-                                              IComparable
+    public TransparencySoftware_Id TransparencySoftwareId => TransparencySoftware.Id;
+
+    /// <summary>
+    /// The declared legal status of the software's use with this meter.
+    /// </summary>
+    public LegalStatus LegalStatus { get; }
+
+    /// <summary>
+    /// Optional shared station model/version approval or compatibility document.
+    /// </summary>
+    public TransparencySoftwareCertificate? Certificate { get; }
+
+    /// <summary>
+    /// The referenced document identity, when supplied.
+    /// </summary>
+    public TransparencySoftwareCertificate_Id? CertificateId => Certificate?.Id;
+
+    /// <summary>
+    /// Create an immutable software assignment. A supplied document must cover this release.
+    /// </summary>
+    public TransparencySoftwareStatus(TransparencySoftware TransparencySoftware, LegalStatus LegalStatus,
+                                      TransparencySoftwareCertificate? Certificate = null)
     {
-
-        #region Properties
-
-        /// <summary>
-        /// The transparency software.
-        /// </summary>
-        [Mandatory]
-        public TransparencySoftware  TransparencySoftware    { get; }
-
-        /// <summary>
-        /// The legal status of the transparency software.
-        /// </summary>
-        [Mandatory]
-        public LegalStatus           LegalStatus             { get; }
-
-        /// <summary>
-        /// The official certificate (identification) of the transparency software.
-        /// </summary>
-        [Optional]
-        public String?               Certificate             { get; }
-
-        /// <summary>
-        /// The official certificate issuer of the transparency software, e.g. 'German PTB'.
-        /// </summary>
-        [Optional]
-        public String?               CertificateIssuer       { get; }
-
-        /// <summary>
-        /// The timestamp when the certificate becomes valid.
-        /// </summary>
-        [Optional]
-        public DateTimeOffset?       NotBefore               { get; }
-
-        /// <summary>
-        /// The timestamp when the certificate becomes invalid.
-        /// </summary>
-        [Optional]
-        public DateTimeOffset?       NotAfter                { get; }
-
-        #endregion
-
-        #region Constructor(s)
-
-        /// <summary>
-        /// Create new transparency software status.
-        /// </summary>
-        /// <param name="TransparencySoftware"></param>
-        /// <param name="LegalStatus"></param>
-        /// <param name="Certificate"></param>
-        /// <param name="CertificateIssuer"></param>
-        /// <param name="NotBefore"></param>
-        /// <param name="NotAfter"></param>
-        public TransparencySoftwareStatus(TransparencySoftware  TransparencySoftware,
-                                          LegalStatus           LegalStatus,
-                                          String?               Certificate         = null,
-                                          String?               CertificateIssuer   = null,
-                                          DateTimeOffset?       NotBefore           = null,
-                                          DateTimeOffset?       NotAfter            = null)
-        {
-            ArgumentNullException.ThrowIfNull(TransparencySoftware);
-            if (LegalStatus.IsNullOrEmpty)
-                throw new ArgumentException("A legal status is required.", nameof(LegalStatus));
-            if (NotBefore > NotAfter)
-                throw new ArgumentException("notBefore must not be later than notAfter.", nameof(NotAfter));
-            this.TransparencySoftware  = TransparencySoftware;
-            this.LegalStatus           = LegalStatus;
-            this.Certificate           = Certificate;
-            this.CertificateIssuer     = CertificateIssuer;
-            this.NotBefore             = NotBefore?.ToUniversalTime();
-            this.NotAfter              = NotAfter?.ToUniversalTime();
-
-        }
-
-        #endregion
-
-
-        #region (static) Parse   (JSON, CustomTransparencySoftwareStatusParser = null)
-
-        /// <summary>
-        /// Parse the given JSON representation of a transparency software status.
-        /// </summary>
-        /// <param name="JSON">The JSON to parse.</param>
-        /// <param name="CustomTransparencySoftwareStatusParser">An optional delegate to parse custom transparency software status JSON objects.</param>
-        public static TransparencySoftwareStatus Parse(JObject                                                   JSON,
-                                                       CustomJObjectParserDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusParser = null,
-                                                       CustomJObjectParserDelegate<TransparencySoftware>?        CustomTransparencySoftwareParser       = null)
-        {
-
-            if (TryParse(JSON,
-                         out var transparencySoftwareStatus,
-                         out var errorResponse,
-                         CustomTransparencySoftwareStatusParser,
-                         CustomTransparencySoftwareParser))
-            {
-                return transparencySoftwareStatus!;
-            }
-
-            throw new ArgumentException("The given JSON representation of a transparency software status is invalid: " + errorResponse,
-                                        nameof(JSON));
-
-        }
-
-        #endregion
-
-        #region (static) TryParse(JSON, out TransparencySoftware, out ErrorResponse, CustomTransparencySoftwareParser = null)
-
-        // Note: The following is needed to satisfy pattern matching delegates! Do not refactor it!
-
-        /// <summary>
-        /// Try to parse the given JSON representation of a transparency software.
-        /// </summary>
-        /// <param name="JSON">The JSON to parse.</param>
-        /// <param name="TransparencySoftware">The parsed transparency software.</param>
-        /// <param name="ErrorResponse">An optional error response.</param>
-        public static Boolean TryParse(JObject                                              JSON,
-                                       [NotNullWhen(true)] out TransparencySoftwareStatus?  TransparencySoftware,
-                                       [NotNullWhen(false)] out String?                     ErrorResponse)
-
-            => TryParse(JSON,
-                        out TransparencySoftware,
-                        out ErrorResponse,
-                        null);
-
-
-        /// <summary>
-        /// Try to parse the given JSON representation of a transparency software status.
-        /// </summary>
-        /// <param name="JSON">The JSON to parse.</param>
-        /// <param name="TransparencySoftwareStatus">The parsed transparency software status.</param>
-        /// <param name="ErrorResponse">An optional error response.</param>
-        /// <param name="CustomTransparencySoftwareStatusParser">An optional delegate to parse custom transparency software status JSON objects.</param>
-        public static Boolean TryParse(JObject                                                   JSON,
-                                       [NotNullWhen(true)] out TransparencySoftwareStatus?       TransparencySoftwareStatus,
-                                       [NotNullWhen(false)] out String?                          ErrorResponse,
-                                       CustomJObjectParserDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusParser = null,
-                                       CustomJObjectParserDelegate<TransparencySoftware>?        CustomTransparencySoftwareParser       = null)
-            => TryParseDocument(JSON, out TransparencySoftwareStatus, out ErrorResponse,
-                                CustomTransparencySoftwareStatusParser, CustomTransparencySoftwareParser);
-
-        #endregion
-
-        #region ToJSON(CustomTransparencySoftwareStatusSerializer = null, CustomTransparencySoftwareSerializer = null)
-
-        /// <summary>
-        /// Return a JSON representation of this object.
-        /// </summary>
-        /// <param name="CustomTransparencySoftwareStatusSerializer">A delegate to serialize custom transparency software status JSON objects.</param>
-        /// <param name="CustomTransparencySoftwareSerializer">A delegate to serialize custom transparency software JSON objects.</param>
-        public JObject ToJSON(CustomJObjectSerializerDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusSerializer   = null,
-                              CustomJObjectSerializerDelegate<TransparencySoftware>?        CustomTransparencySoftwareSerializer         = null)
-        {
-
-            var JSON = JSONObject.Create(
-
-                                 new JProperty("transparencySoftware",   TransparencySoftware.ToJSON(CustomTransparencySoftwareSerializer)),
-                                 new JProperty("legalStatus",            LegalStatus.         ToString()),
-
-                           Certificate is not null
-                               ? new JProperty("certificate",            Certificate)
-                               : null,
-
-                           CertificateIssuer is not null
-                               ? new JProperty("certificateIssuer",      CertificateIssuer)
-                               : null,
-
-                           NotBefore.HasValue
-                               ? new JProperty("notBefore",              NotBefore.Value.ToString("O", CultureInfo.InvariantCulture))
-                               : null,
-
-                           NotAfter.HasValue
-                               ? new JProperty("notAfter",               NotAfter.Value.ToString("O", CultureInfo.InvariantCulture))
-                               : null
-
-                       );
-
-            return POIRepresentation.AddETags(this, CustomTransparencySoftwareStatusSerializer is not null
-                       ? CustomTransparencySoftwareStatusSerializer(this, JSON)
-                       : JSON);
-
-        }
-
-        #endregion
-
-        #region Clone()
-
-        /// <summary>
-        /// Clone this transparency software status.
-        /// </summary>
-        public TransparencySoftwareStatus Clone()
-
-            => new (
-                   TransparencySoftware.Clone(),
-                   LegalStatus.         Clone(),
-                   Certificate?.        CloneString(),
-                   CertificateIssuer?.  CloneString(),
-                   NotBefore,
-                   NotAfter
-               );
-
-        #endregion
-
-
-        #region Operator overloading
-
-        #region Operator == (TransparencySoftwareStatus1, TransparencySoftwareStatus2)
-
-        /// <summary>
-        /// Compares two instances of this object.
-        /// </summary>
-        /// <param name="TransparencySoftwareStatus1">A transparency software status.</param>
-        /// <param name="TransparencySoftwareStatus2">Another transparency software status.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator == (TransparencySoftwareStatus TransparencySoftwareStatus1,
-                                           TransparencySoftwareStatus TransparencySoftwareStatus2)
-        {
-
-            if (Object.ReferenceEquals(TransparencySoftwareStatus1, TransparencySoftwareStatus2))
-                return true;
-
-            if (TransparencySoftwareStatus1 is null || TransparencySoftwareStatus2 is null)
-                return false;
-
-            return TransparencySoftwareStatus1.Equals(TransparencySoftwareStatus2);
-
-        }
-
-        #endregion
-
-        #region Operator != (TransparencySoftwareStatus1, TransparencySoftwareStatus2)
-
-        /// <summary>
-        /// Compares two instances of this object.
-        /// </summary>
-        /// <param name="TransparencySoftwareStatus1">A transparency software status.</param>
-        /// <param name="TransparencySoftwareStatus2">Another transparency software status.</param>
-        /// <returns>False if both match; True otherwise.</returns>
-        public static Boolean operator != (TransparencySoftwareStatus TransparencySoftwareStatus1,
-                                           TransparencySoftwareStatus TransparencySoftwareStatus2)
-
-            => !(TransparencySoftwareStatus1 == TransparencySoftwareStatus2);
-
-        #endregion
-
-        #region Operator <  (TransparencySoftwareStatus1, TransparencySoftwareStatus2)
-
-        /// <summary>
-        /// Compares two instances of this object.
-        /// </summary>
-        /// <param name="TransparencySoftwareStatus1">A transparency software status.</param>
-        /// <param name="TransparencySoftwareStatus2">Another transparency software status.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator < (TransparencySoftwareStatus TransparencySoftwareStatus1,
-                                          TransparencySoftwareStatus TransparencySoftwareStatus2)
-
-            => TransparencySoftwareStatus1 is null
-                   ? throw new ArgumentNullException(nameof(TransparencySoftwareStatus1), "The give transparency software must not be null!")
-                   : TransparencySoftwareStatus1.CompareTo(TransparencySoftwareStatus2) < 0;
-
-        #endregion
-
-        #region Operator <= (TransparencySoftwareStatus1, TransparencySoftwareStatus2)
-
-        /// <summary>
-        /// Compares two instances of this object.
-        /// </summary>
-        /// <param name="TransparencySoftwareStatus1">A transparency software status.</param>
-        /// <param name="TransparencySoftwareStatus2">Another transparency software status.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <= (TransparencySoftwareStatus TransparencySoftwareStatus1,
-                                           TransparencySoftwareStatus TransparencySoftwareStatus2)
-
-            => !(TransparencySoftwareStatus1 > TransparencySoftwareStatus2);
-
-        #endregion
-
-        #region Operator >  (TransparencySoftwareStatus1, TransparencySoftwareStatus2)
-
-        /// <summary>
-        /// Compares two instances of this object.
-        /// </summary>
-        /// <param name="TransparencySoftwareStatus1">A transparency software status.</param>
-        /// <param name="TransparencySoftwareStatus2">Another transparency software status.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator > (TransparencySoftwareStatus TransparencySoftwareStatus1,
-                                          TransparencySoftwareStatus TransparencySoftwareStatus2)
-
-            => TransparencySoftwareStatus1 is null
-                   ? throw new ArgumentNullException(nameof(TransparencySoftwareStatus1), "The give transparency software must not be null!")
-                   : TransparencySoftwareStatus1.CompareTo(TransparencySoftwareStatus2) > 0;
-
-        #endregion
-
-        #region Operator >= (TransparencySoftwareStatus1, TransparencySoftwareStatus2)
-
-        /// <summary>
-        /// Compares two instances of this object.
-        /// </summary>
-        /// <param name="TransparencySoftwareStatus1">A transparency software status.</param>
-        /// <param name="TransparencySoftwareStatus2">Another transparency software status.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >= (TransparencySoftwareStatus TransparencySoftwareStatus1,
-                                           TransparencySoftwareStatus TransparencySoftwareStatus2)
-
-            => !(TransparencySoftwareStatus1 < TransparencySoftwareStatus2);
-
-        #endregion
-
-        #endregion
-
-        #region IComparable<TransparencySoftwareStatus> Members
-
-        #region CompareTo(Object)
-
-        /// <summary>
-        /// Compares two transparency software status for equality.
-        /// </summary>
-        /// <param name="Object">A transparency software status to compare with.</param>
-        public Int32 CompareTo(Object? Object)
-
-            => Object is TransparencySoftwareStatus transparencySoftwareStatus
-                   ? CompareTo(transparencySoftwareStatus)
-                   : throw new ArgumentException("The given object is not a transparency software status!",
-                                                 nameof(Object));
-
-        #endregion
-
-        #region CompareTo(TransparencySoftwareStatus)
-
-        /// <summary>
-        /// Compares two transparency software status for equality.
-        /// </summary>
-        /// <param name="TransparencySoftwareStatus">A transparency software status to compare with.</param>
-        public Int32 CompareTo(TransparencySoftwareStatus? TransparencySoftwareStatus)
-        {
-
-            if (TransparencySoftwareStatus is null)
-                throw new ArgumentNullException(nameof(TransparencySoftwareStatus), "The give transparency software must not be null!");
-
-            var c = TransparencySoftware.CompareTo(TransparencySoftwareStatus.TransparencySoftware);
-
-            if (c == 0)
-                c = LegalStatus.              CompareTo(TransparencySoftwareStatus.LegalStatus);
-
-            if (c == 0)
-                c = StringComparer.Ordinal.Compare(Certificate, TransparencySoftwareStatus.Certificate);
-            if (c == 0)
-                c = StringComparer.Ordinal.Compare(CertificateIssuer, TransparencySoftwareStatus.CertificateIssuer);
-            if (c == 0)
-                c = Nullable.Compare(NotBefore, TransparencySoftwareStatus.NotBefore);
-            if (c == 0)
-                c = Nullable.Compare(NotAfter, TransparencySoftwareStatus.NotAfter);
-
-            return c;
-
-        }
-
-        #endregion
-
-        #endregion
-
-        #region IEquatable<TransparencySoftwareStatus> Members
-
-        #region Equals(Object)
-
-        /// <summary>
-        /// Compares two transparency software status for equality.
-        /// </summary>
-        /// <param name="Object">A transparency software status to compare with.</param>
-        public override Boolean Equals(Object? Object)
-
-            => Object is TransparencySoftwareStatus transparencySoftwareStatus &&
-                   Equals(transparencySoftwareStatus);
-
-        #endregion
-
-        #region Equals(TransparencySoftwareStatus)
-
-        /// <summary>
-        /// Compares two transparency software status for equality.
-        /// </summary>
-        /// <param name="TransparencySoftwareStatus">A transparency software status to compare with.</param>
-        public Boolean Equals(TransparencySoftwareStatus? TransparencySoftwareStatus)
-
-            => TransparencySoftwareStatus is not null &&
-
-               TransparencySoftware.Equals(TransparencySoftwareStatus.TransparencySoftware) &&
-               LegalStatus.         Equals(TransparencySoftwareStatus.LegalStatus)          &&
-
-             ((Certificate       is     null &&  TransparencySoftwareStatus.Certificate       is     null) ||
-              (Certificate       is not null &&  TransparencySoftwareStatus.Certificate       is not null && Certificate.                  Equals(TransparencySoftwareStatus.Certificate)))                 &&
-
-             ((CertificateIssuer is     null &&  TransparencySoftwareStatus.CertificateIssuer is     null) ||
-              (CertificateIssuer is not null &&  TransparencySoftwareStatus.CertificateIssuer is not null && CertificateIssuer.            Equals(TransparencySoftwareStatus.CertificateIssuer)))           &&
-
-            ((!NotBefore.        HasValue    && !TransparencySoftwareStatus.NotBefore.        HasValue)    ||
-              (NotBefore.        HasValue    &&  TransparencySoftwareStatus.NotBefore.        HasValue    && NotBefore.Value.Equals(TransparencySoftwareStatus.NotBefore.Value))) &&
-
-            ((!NotAfter.         HasValue    && !TransparencySoftwareStatus.NotAfter.         HasValue)    ||
-              (NotAfter.         HasValue    &&  TransparencySoftwareStatus.NotAfter.         HasValue    && NotAfter.Value.Equals(TransparencySoftwareStatus.NotAfter.Value)));
-
-        #endregion
-
-        #endregion
-
-        #region (override) GetHashCode()
-
-        /// <summary>
-        /// Return the hash code of this object.
-        /// </summary>
-        public override Int32 GetHashCode()
-        {
-            unchecked
-            {
-
-                return TransparencySoftware.GetHashCode()       * 13 ^
-                       LegalStatus.         GetHashCode()       * 11 ^
-                      (Certificate?.        GetHashCode() ?? 0) * 7 ^
-                      (CertificateIssuer?.  GetHashCode() ?? 0) * 5 ^
-                      (NotBefore?.          GetHashCode() ?? 0) * 3 ^
-                      (NotAfter?.           GetHashCode() ?? 0);
-
-            }
-        }
-
-        #endregion
-
-        #region (override) ToString()
-
-        /// <summary>
-        /// Return a text representation of this object.
-        /// </summary>
-        public override String ToString()
-
-            => String.Concat(
-
-                   TransparencySoftware.Name,
-                   ": ",
-                   LegalStatus.ToString(),
-
-                   CertificateIssuer is not null
-                       ? " by " + CertificateIssuer
-                       : "",
-
-                   Certificate is not null
-                       ? ", certificate: " + Certificate.SubstringMax(20)
-                       : "",
-
-                   NotBefore.HasValue
-                       ? ", not before: " + NotBefore.Value.ToISO8601()
-                       : "",
-
-                   NotAfter.HasValue
-                       ? ", not after: "  + NotAfter. Value.ToISO8601()
-                       : ""
-
-               );
-
-        #endregion
-
+        ArgumentNullException.ThrowIfNull(TransparencySoftware);
+        if (LegalStatus.IsNullOrEmpty) throw new ArgumentException("A legal status is required.", nameof(LegalStatus));
+        if (Certificate is not null && !Certificate.Covers(TransparencySoftware.Id))
+            throw new ArgumentException("The approval document does not cover this software release.", nameof(Certificate));
+        this.TransparencySoftware = TransparencySoftware; this.LegalStatus = LegalStatus; this.Certificate = Certificate;
     }
 
+    /// <summary>
+    /// Export software and approval document references without duplicating their descriptions.
+    /// </summary>
+    public JObject ToJSON(CustomJObjectSerializerDelegate<TransparencySoftwareStatus>? CustomTransparencySoftwareStatusSerializer = null)
+    {
+        var json = new JObject(new JProperty("transparencySoftwareId", TransparencySoftwareId.ToString()),
+                               new JProperty("legalStatus", LegalStatus.ToString()));
+        if (CertificateId is { } certificate) json["certificateId"] = certificate.ToString();
+        return POIRepresentation.AddETags(this, CustomTransparencySoftwareStatusSerializer?.Invoke(this, json) ?? json);
+    }
+
+    /// <summary>
+    /// Parse an assignment using software and certificate registries from the same network version.
+    /// </summary>
+    public static TransparencySoftwareStatus Parse(JObject JSON,
+        CustomJObjectParserDelegate<TransparencySoftwareStatus>? CustomTransparencySoftwareStatusParser = null,
+        RoamingNetwork? Network = null)
+    {
+        if (TryParse(JSON, out var result, out var error, CustomTransparencySoftwareStatusParser, Network)) return result;
+        throw new ArgumentException(error, nameof(JSON));
+    }
+
+    /// <summary>
+    /// Try to parse an assignment without a custom parser.
+    /// </summary>
+    public static Boolean TryParse(JObject JSON, [NotNullWhen(true)] out TransparencySoftwareStatus? result,
+        [NotNullWhen(false)] out String? error)
+        => TryParse(JSON, out result, out error, null);
+
+    /// <summary>
+    /// Try to parse an assignment with its registry context.
+    /// </summary>
+    public static Boolean TryParse(JObject JSON, [NotNullWhen(true)] out TransparencySoftwareStatus? result,
+        [NotNullWhen(false)] out String? error,
+        CustomJObjectParserDelegate<TransparencySoftwareStatus>? custom = null, RoamingNetwork? Network = null)
+        => TryParseDocument(JSON, out result, out error, custom, Network);
+
+    /// <summary>
+    /// Copy this assignment, resolving shared descriptions in the target network when supplied.
+    /// </summary>
+    public TransparencySoftwareStatus Clone(RoamingNetwork? network = null)
+    {
+        var software = network is null ? TransparencySoftware :
+            network.GetTransparencySoftwareById(TransparencySoftwareId) ??
+            throw new ArgumentException($"Unresolved software reference '{TransparencySoftwareId}' in the target network.");
+        var certificate = network is null ? Certificate : CertificateId is { } id ?
+            network.GetTransparencySoftwareCertificateById(id) ??
+            throw new ArgumentException($"Unresolved certificate reference '{id}' in the target network.") : null;
+        return new(software, LegalStatus, certificate);
+    }
+
+    /// <summary>
+    /// Compare static assignments by reference identity and legal status.
+    /// </summary>
+    public Int32 CompareTo(TransparencySoftwareStatus? other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        var c = TransparencySoftwareId.CompareTo(other.TransparencySoftwareId);
+        if (c == 0) c = LegalStatus.CompareTo(other.LegalStatus);
+        if (c == 0) c = Nullable.Compare(CertificateId, other.CertificateId);
+        return c;
+    }
+
+    /// <summary>
+    /// Compare with another assignment.
+    /// </summary>
+    public Int32 CompareTo(Object? other) => other is TransparencySoftwareStatus status ? CompareTo(status) :
+        throw new ArgumentException("Expected a transparency software assignment.", nameof(other));
+
+    /// <summary>
+    /// Compare the stored reference identities and legal status.
+    /// </summary>
+    public Boolean Equals(TransparencySoftwareStatus? other) => other is not null && CompareTo(other) == 0;
+
+    /// <summary>
+    /// Compare with another assignment.
+    /// </summary>
+    public override Boolean Equals(Object? other) => other is TransparencySoftwareStatus status && Equals(status);
+
+    /// <summary>
+    /// Hash the same values used for equality.
+    /// </summary>
+    public override Int32 GetHashCode() => HashCode.Combine(TransparencySoftwareId, LegalStatus, CertificateId);
+
+    /// <summary>
+    /// Return a readable software applicability description.
+    /// </summary>
+    public override String ToString() => $"{TransparencySoftware.Name}: {LegalStatus}";
+
+    public static Boolean operator ==(TransparencySoftwareStatus? left, TransparencySoftwareStatus? right) => Equals(left, right);
+    public static Boolean operator !=(TransparencySoftwareStatus? left, TransparencySoftwareStatus? right) => !Equals(left, right);
+    public static Boolean operator <(TransparencySoftwareStatus left, TransparencySoftwareStatus right) => left.CompareTo(right) < 0;
+    public static Boolean operator >(TransparencySoftwareStatus left, TransparencySoftwareStatus right) => left.CompareTo(right) > 0;
+    public static Boolean operator <=(TransparencySoftwareStatus left, TransparencySoftwareStatus right) => left.CompareTo(right) <= 0;
+    public static Boolean operator >=(TransparencySoftwareStatus left, TransparencySoftwareStatus right) => left.CompareTo(right) >= 0;
 }

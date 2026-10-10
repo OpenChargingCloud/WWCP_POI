@@ -67,13 +67,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Indicates whether this identification is NOT null or empty.
         /// </summary>
         public Boolean IsNotNullOrEmpty
-            => Suffix.IsNullOrEmpty();
+            => Suffix.IsNotNullOrEmpty();
 
         /// <summary>
         /// Returns the length of the identification.
         /// </summary>
         public UInt64 Length
-            => (UInt64) (OperatorId.ToString(OperatorIdFormats.ISO_STAR).Length + 2 + Suffix.Length);
+            => (UInt64) (OperatorId.ToString().Length + 3 + Suffix.Length);
 
         #endregion
 
@@ -374,8 +374,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if ((Object) ChargingStationId is null)
                 throw new ArgumentNullException(nameof(ChargingStationId), "The given charging tariff group identification must not be null!");
 
-            // Compare the length of the identifications
-            var _Result = Length.CompareTo(ChargingStationId.Length);
+            // Compare normalized lengths so equal operator IDs keep equal ordering across text formats.
+            var _Result = (OperatorId.ToString(OperatorIdFormats.ISO_STAR).Length + Suffix.Length).
+                          CompareTo(ChargingStationId.OperatorId.ToString(OperatorIdFormats.ISO_STAR).Length + ChargingStationId.Suffix.Length);
 
             // If equal: Compare charging operator identifications
             if (_Result == 0)
@@ -457,7 +458,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return a text representation of this object.
         /// </summary>
         public override String ToString()
-            => String.Concat(OperatorId, "*T", Suffix);
+            => String.Concat(OperatorId, "*TG", Suffix);
 
         #endregion
 

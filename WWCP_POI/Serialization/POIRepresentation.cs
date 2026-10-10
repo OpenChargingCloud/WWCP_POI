@@ -34,15 +34,37 @@ public static class POIRepresentation
         if (IncludeRuntime && value is RoamingNetworkDataSnapshot)
             throw new ArgumentException("A static DataSnapshot has no runtime state. Export a RoamingNetwork to include current statuses.", nameof(IncludeRuntime));
         var kind = Kind(value);
+        var snapshot = value as RoamingNetworkDataSnapshot ?? (value as RoamingNetwork)?.DataSnapshot;
+        var childETags = snapshot?.ChildETags;
         var json = Document(value, IncludeRuntime);
         Prepare(json, kind, IncludeRuntime, IncludeVersionMetadata);
         Visit(json, kind, "", (document, type, path) =>
         {
             if (path.Length > 0 && !TaggedKinds.Contains(type)) return;
-            var staticContent = (JObject) document.DeepClone();
-            Prepare(staticContent, type, false);
+            // A network's authoritative static snapshot already owns these two immutable digests.
+            // Revision metadata and runtime overlays never enter their content identity.
+            if (path.Length == 0 && (value is RoamingNetwork or RoamingNetworkDataSnapshot))
+            {
+                document[POIContentProfile.PropertyName] = POIContentProfile.Id;
+                document["ETags"] = TagsJSON(value.ETags, DigestEncoding);
+                return;
+            }
+            // Prepare has already stripped static transport bookkeeping from the whole document.
+            // Visit is preorder: this node and its descendants have no newly attached tags yet.
+            // Hash the prepared subtree before adding its declarations, avoiding a second copy/pass.
+            if (childETags is null || !childETags.TryGet(type, path, out var tags))
+            {
+                var staticContent = document;
+                if (IncludeRuntime || (IncludeVersionMetadata && type == nameof(RoamingNetwork)))
+                {
+                    staticContent = (JObject) document.DeepClone();
+                    Prepare(staticContent, type, false);
+                }
+                tags = Tags(staticContent, type);
+                childETags?.Add(type, path, tags);
+            }
             document[POIContentProfile.PropertyName] = POIContentProfile.Id;
-            document["ETags"] = TagsJSON(Tags(staticContent, type), DigestEncoding);
+            document["ETags"] = TagsJSON(tags, DigestEncoding);
         });
         return json;
     }
@@ -149,31 +171,52 @@ public static class POIRepresentation
     }
 
     private static ImmutableArray<ETag> Tags(JObject json, String kind)
-        => [ETag.Compute(ETagFormat.JSON, CanonicalJSON.ToUTF8Bytes(json)),
-            ETag.Compute(ETagFormat.CBOR, Encode(json, kind))];
+    {
+        var canonicalJSON = CanonicalJSON.ToUTF8Bytes(json);
+        return [ETag.Compute(ETagFormat.JSON, canonicalJSON),
+                ETag.Compute(ETagFormat.CBOR, Encode(json, kind, canonicalJSON))];
+    }
 
     private static JArray TagsJSON(IEnumerable<ETag> tags, ETagDigestEncoding encoding = ETagDigestEncoding.HEX)
         => new(tags.Select(tag => tag.ToJSON(encoding)));
 
-    private static Byte[] Encode(JObject json, String kind)
+    private static Byte[] Encode(JObject json, String kind, Byte[]? canonicalJSON = null)
     {
-        var paths = new HashSet<String>(StringComparer.Ordinal);
-        var hasETags = false;
+        ValidateMeasurements(json, kind);
+        var bytes = canonicalJSON ?? CanonicalJSON.ToUTF8Bytes(json);
+        using var document = System.Text.Json.JsonDocument.Parse(bytes, new System.Text.Json.JsonDocumentOptions { MaxDepth = 64 });
+        var output = new System.Buffers.ArrayBufferWriter<Byte>();
+        new POICBORWriter(output).Write(document.RootElement, kind);
+        return output.WrittenSpan.ToArray();
+    }
+
+    /// <summary>
+    /// Emit a prepared static snapshot into an archive without a complete POI CBOR buffer.
+    /// All semantic codec and remaining reader-depth checks precede its first output byte.
+    /// </summary>
+    internal static void WriteArchiveCBOR(IImmutablePOI value, System.Buffers.IBufferWriter<Byte> output,
+                                         Int32 remainingDepth)
+    {
+        var kind = Kind(value);
+        var json = value.ToJSONWithETags(IncludeVersionMetadata: true);
+        ValidateMeasurements(json, kind);
+        var bytes = CanonicalJSON.ToUTF8Bytes(json);
+        using var document = System.Text.Json.JsonDocument.Parse(bytes, new System.Text.Json.JsonDocumentOptions { MaxDepth = 64 });
+        var readings = new POICBORReadingCache();
+        new POICBORPreflight(remainingDepth, readings).Validate(document.RootElement, kind);
+        new POICBORWriter(output, readings).Write(document.RootElement, kind);
+    }
+
+    private static void ValidateMeasurements(JObject json, String kind)
+    {
+        // Preserve validation order before canonical JSON rejects unsupported customer values.
         Visit(json, kind, "", (document, type, path) =>
         {
-            hasETags |= document["ETags"] is not null;
             foreach (var property in document.Properties())
-                if (property.Value.Type == JTokenType.String && IsMeasurement(type, property.Name))
-                {
-                    if (!MetrologicalValue.TryParse(property.Value.Value<String>()!, out _, out var error))
-                        throw new ArgumentException($"{path}/{property.Name}: cannot encode a Styx metrological value: {error}");
-                    paths.Add(path + "/" + Escape(property.Name));
-                }
+                if (property.Value.Type == JTokenType.String && IsMeasurement(type, property.Name) &&
+                    !MetrologicalValue.TryParse(property.Value.Value<String>()!, out _, out var error))
+                    throw new ArgumentException($"{path}/{property.Name}: cannot encode a Styx metrological value: {error}");
         });
-        var cbor = CBORJSON.ToCBOR(CanonicalJSON.ToUTF8Bytes(json), new CBORJSONOptions {
-            DetectMetrologicalValues = (path, _) => paths.Contains(path)
-        });
-        return (hasETags ? ConvertETagCBOR(cbor, kind, true) : cbor).ToByteArray(CBORWriterOptions.Canonical);
     }
 
     // Convert only schema-owned ETag arrays. Customer fields with the same name stay untouched.
@@ -232,7 +275,7 @@ public static class POIRepresentation
 
     private static readonly HashSet<String> TaggedKinds = new(RuntimeEntityKinds.Concat(new[] {
         nameof(ChargingConnector), nameof(ChargingCable), nameof(GridConnectionPoint), nameof(ChargingStationManufacturer),
-        nameof(TransparencySoftware), nameof(TransparencySoftwareStatus), nameof(Brand), nameof(EnergyMix),
+        nameof(TransparencySoftware), nameof(TransparencySoftwareCertificate), nameof(TransparencySoftwareStatus), nameof(Brand), nameof(EnergyMix),
         nameof(ChargingProduct), nameof(ParkingProduct), nameof(ChargingTariffElement), nameof(ChargingTariffRestriction),
         nameof(ChargingPriceComponent), nameof(Image), nameof(AdditionalGeoLocation), nameof(AuthenticationModes),
         nameof(PublicKey), nameof(ImmutableCryptoKeyInfo), nameof(RootCAInfo), nameof(EVRoamingPartnerInfo)
@@ -251,7 +294,7 @@ public static class POIRepresentation
     internal static void NormalizeStaticTimestamps(JObject json, String kind)
         => Visit(json, kind, "", (document, type, _) => {
             IEnumerable<String> fields = type switch {
-                nameof(TransparencySoftwareStatus) or nameof(RootCAInfo) or nameof(EVRoamingPartnerInfo) => ["notBefore", "notAfter"],
+                nameof(TransparencySoftwareStatus) or nameof(TransparencySoftwareCertificate) or nameof(RootCAInfo) or nameof(EVRoamingPartnerInfo) => ["notBefore", "notAfter"],
                 nameof(ChargingTariffRestriction) => ["startDate", "endDate"],
                 _ => RuntimeEntityKinds.Contains(type) ? ["created", "lastChange"] : []
             };
@@ -320,9 +363,10 @@ public static class POIRepresentation
             "energyMeters" when kind is nameof(ChargingPool) or nameof(ChargingStation) => nameof(EnergyMeter),
             "energyMeter" when kind is nameof(EVSE) or nameof(GridConnectionPoint) => nameof(EnergyMeter),
             "gridConnectionPoint" when kind == nameof(ChargingPool) => nameof(GridConnectionPoint),
-            "gridOperator" when kind == nameof(GridConnectionPoint) => nameof(GridOperator),
             "transparencySoftware" when kind == nameof(EnergyMeter) => nameof(TransparencySoftwareStatus),
-            "transparencySoftware" when kind == nameof(TransparencySoftwareStatus) => nameof(TransparencySoftware),
+            "transparencySoftware" when kind == nameof(RoamingNetwork) => nameof(TransparencySoftware),
+            "transparencySoftwareCertificates" when kind == nameof(RoamingNetwork) => nameof(TransparencySoftwareCertificate),
+            "parkingProducts" when kind == nameof(ParkingOperator) => nameof(ParkingProduct),
             "cable" when kind == nameof(ChargingConnector) => nameof(ChargingCable),
             "brand" or "brands" when RuntimeEntityKinds.Contains(kind) => nameof(Brand),
             "dataLicenses" when RuntimeEntityKinds.Contains(kind) || kind == nameof(Brand) => "DataLicense",

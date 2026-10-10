@@ -21,8 +21,8 @@ The audit covers the following locally defined domain objects:
 | Network, charging operator, provider, pool, station, EVSE, connector, tariff | Immutable properties, detached metadata and immutable membership |
 | EVSE, station, pool and tariff groups | Immutable configuration, allowed IDs and member references |
 | Cable, energy meter, grid connection point, grid operator, parking operator | Immutable metadata; meter/operator operational statuses remain mutable |
-| Manufacturer, transparency software and transparency software status | Immutable public identities, license metadata and legal certificate values |
-| Parking garage, space, sensor and space group | Immutable geometry, station references and sensor IDs |
+| Manufacturer, transparency software, certificate document and legal-status assignment | Immutable public identities, license metadata, model/version evidence and reference assignments |
+| Parking garage, space, sensor, space group and product | Immutable geometry, station/sensor/space/garage/product references and SI duration offers |
 | Brand, energy mix, charging/parking product, image, additional location | Immutable values or detached copies on access |
 | Tariff element, restriction and price component | Immutable arrays, ranges and SI quantities |
 | Public/ECC key, root CA and roaming partner information | Detached key bytes, custom data and multilingual text |
@@ -43,13 +43,18 @@ status aggregation delegates describe application runtime behavior and are not s
 
 ## Explicit content profile
 
-The static contract is `POIContentProfile.Id`, **`wwcp-poi-static-v1`**. Tagged complete JSON/CBOR
+The static contract is `POIContentProfile.Id`, **`wwcp-poi-static-v2`**. Tagged complete JSON/CBOR
 transports declare `contentProfile` at their schema-owned tagged nodes; complete parsers require
 this supported declaration when ETags are present. Fresh untagged input may omit it. The
 transport declaration is excluded from static storage and both digest inputs; customer fields
 with that name remain content. Commits bind `ContentProfile` into their identity and signatures.
 See [interoperability contracts and fixed references](INTEROPERABILITY.md) for byte rules,
-profile relationships, cross-replica tests and the development-envelope change.
+profile relationships, cross-replica fixtures and the model/profile change.
+
+Static-v2 owns software/certificate catalogs and parking products and uses ID references for
+shared operators. A referenced description is hashed at its owned graph location; changing it
+changes network ETags even if a referencing point/meter ETag stays equal. Tagged v1 documents
+are rejected. Recreate exports, batches and signatures; v2 fixed references have been regenerated.
 
 ## Two identifiers
 
@@ -57,7 +62,7 @@ These two identifiers describe static **state**. The separate typed `RoamingNetw
 hashes the canonical `wwcp-poi-commit-json-v1` header, ordered parents and unsigned batch content.
 Full [snapshot links](SNAPSHOTS.md) instead bind complete static state and administrator metadata
 under `wwcp-poi-snapshot-commit-json-v1`; their state ETags equal the parent's, while commit ID and
-history revision change. Static-v1 digest inputs are unchanged.
+history revision change without changing the parent's static-v2 data.
 It remains a JSON digest in CBOR transport; a transport encoding does not change its hash input.
 Both peer signature arrays are excluded. See [history identity](HISTORY.md#state-identity-and-commit-identity)
 for wire tuples, ancestry and archive recovery.
@@ -133,8 +138,10 @@ are unchanged because derived ETag fields are excluded from both hashes.
 
 The JSON identifier is SHA-256 of Styx `CanonicalJSON.ToUTF8Bytes`. This is Styx's deterministic
 RFC 8259 JSON format, with ordinal object-property order; it is not an RFC 8785 JCS claim.
-The CBOR identifier is SHA-256 of Styx CBOR using `CBORWriterOptions.Canonical`, which applies
-the RFC 8949 core deterministic encoding requirements.
+The CBOR identifier is SHA-256 of the deterministic encoding defined by Styx
+`CBORWriterOptions.Canonical`, which applies the RFC 8949 core deterministic requirements.
+The [direct POI writer](DIRECT-POI-CBOR.md) supplies sorted unique maps and definite counts
+before Styx emission, producing those same bytes without its complete-map sort buffers.
 
 For networks and data snapshots both encodings use the authoritative stored static properties,
 without reconstructing them through a domain serializer. Standalone support values retain their
@@ -322,6 +329,22 @@ can be added independently. See [signatures](SIGNATURES.md).
 The v2 signing input also binds every operation's complete `ElementPath`. This changes ChangeSet
 signature bytes/profile, not the static POI ETag profiles.
 
+## Digest reuse and measurement
+
+The authoritative network exposes its snapshot's cached immutable ETag pair. Tagged JSON/CBOR
+root exports reuse the pair, including when runtime or revision metadata is transported separately.
+Snapshot-only revision advancement shares this cache because all static entity/index maps are
+unchanged. Ordinary ChangeSets still compute fresh result identities. During fresh pair calculation,
+both encoders reuse one canonical JSON byte buffer without changing canonicalization, units or bytes.
+See [measured costs, before/after identities and practical limits](SCALING.md). The later
+[individual encoder baseline](ENCODING-COSTS.md) separates tagged child-digest/document work,
+canonical JSON, metrological value trees, native ETag conversion and deterministic CBOR output
+in the historical tree pipeline. The [direct POI encoder](DIRECT-POI-CBOR.md) replaces the complete
+CBOR trees with sorted definite emission; isolated old tree stages remain reference measurements.
+[The subsequent optimization](TAGGED-DOCUMENT-OPTIMIZATION.md) now hashes already prepared static
+subtrees before attaching declarations. Runtime-inclusive exports retain a separate static hash
+projection; the content/hash profile, child digests and transport bytes remain unchanged.
+
 ## Bootstrap transfer identities
 
 [Bootstrap](BOOTSTRAP.md) adds a CBOR ETag for the complete frozen archive, including original
@@ -330,4 +353,45 @@ These are distinct from static POI state identifiers and commit IDs. Fragment SH
 cover raw byte slices and have no representation label because a slice may not be valid CBOR
 on its own. JSON carries explicitly encoded Base64 bytes; CBOR uses native byte strings.
 Manifest hashes detect corruption; application channel/expected-identity policy authenticates
-the chosen archive and head. Existing state/commit/signature/reference byte profiles are unchanged.
+the chosen archive and head. Those measurements predate static-v2; current reference bytes
+were subsequently regenerated, while the historical performance reports retain their inputs.
+
+The later [bounded child ETag cache](CHILD-ETAG-CACHE.md) reuses immutable child digest pairs within
+a complete static snapshot context. Pure snapshot revisions share it; changed maps start fresh.
+Explicit entry/key/payload limits preserve the admitted traversal prefix. Runtime and transport
+views stay fresh; managed overhead and total retained-version memory are reported separately.
+Cold/warm and exact-output verification preserve static-v2 bytes and identities.
+
+The subsequent [direct ChangeSet CBOR encoder](DIRECT-CHANGESET-CBOR.md) removes complete
+batch/native-header-ETag trees while retaining the exact v2 scalar/signing rules and decoder.
+Matched long batches/multiple-peer results and 55 new cases accompany 283 focused / 1,308 full
+Release passes. Complete per-value JSON/output buffers and archive depth validation remain costs.
+
+The later [direct POI archive payload package](DIRECT-ARCHIVE-PAYLOAD.md) removes complete
+checkpoint/snapshot CBOR output buffers after preflight preserving standalone/remaining reader
+depth rules. That build retained canonical JSON/index, ChangeSet buffers, full archive rewriting
+and decoding/replay costs. Its 140 new cases, 423 focused and 1,448 full Release cases pass; earlier evidence
+above remains historical, and the new paired reports bind their own source/assembly fingerprints.
+
+## Later bounded POI archive preflight reuse
+
+[The preflight reuse package](PREFLIGHT-ALLOCATION.md) retains all pre-payload semantic/depth and
+atomicity contracts while decoding names once, pooling cleared bounded name sets, proving validated
+native ETag tuple shape and reusing bounded successful SI scalar trees within one payload call.
+All 494 focused / 1,519 full Release cases pass, including 71 new budget/depth/context/retry cases.
+Matching 80-worker/400-sample reports preserve every output and inventory; streamed 512-EVSE
+allocation changes 74.87 -> 66.03 MiB (-11.8%). Earlier measurements/counts remain historical.
+That build retained complete JSON/index and batch buffers, graph preparation and decoding/replay costs.
+
+## Later direct ChangeSet archive emission
+
+[The ChangeSet archive package](DIRECT-ARCHIVE-CHANGESET.md) removes complete per-batch CBOR
+output buffers after preflight preserving original exact signed scalars, native root ETags,
+both depth rules, equal peers and atomic failure/retry contracts. A bounded per-call scalar
+context reuses successful codec results while rechecking every occurrence's ownership/depth.
+All 708 focused / 1,733 full Release cases pass, including 214 new cases. Two matched series
+each contain 48 workers/240 samples per side and retain all output counts/digests/inventories.
+At 2,048 operations/four peers streamed signed-archive allocation changes
+32.27 -> 31.90 MiB (-1.1%). Earlier costs/counts remain historical; complete batch CBOR
+output buffers are now absent from borrowed archive output. Prepared POI/ChangeSet JSON/index,
+schema paths, metadata trees, public buffered results, fragment totals and replay remain costs.

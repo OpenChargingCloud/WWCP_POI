@@ -49,8 +49,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Content identifiers of the immutable POI data; runtime states are excluded.
+        /// Networks reuse their authoritative snapshot's lazy digest pair.
         /// </summary>
-        public System.Collections.Immutable.ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
+        public System.Collections.Immutable.ImmutableArray<ETag> ETags
+            => this is RoamingNetwork network ? network.DataSnapshot.ETags : POIRepresentation.GetETags(this);
 
         /// <summary>
         /// Restore persisted timestamps on a newly parsed entity without recording a change.

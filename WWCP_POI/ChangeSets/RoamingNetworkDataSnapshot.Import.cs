@@ -40,10 +40,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       InfrastructureEntityKey?        parent,
                                                       ref EntityMap                   map,
                                                       DateTimeOffset?                 timestamp,
-                                                      List<InfrastructureEntityKey>?  imported  = null)
+                                                      List<InfrastructureEntityKey>?  imported  = null,
+                                                      RoamingNetworkDataSnapshot?     reuse     = null,
+                                                      HashSet<InfrastructureEntityKey>? visited  = null)
+            => ImportOwned((JObject) document.DeepClone(), type, parent, ref map, timestamp, imported, reuse, visited);
+
+        // Only the entry point copies caller data. Descendants belong to that private copy;
+        // never pass a caller-owned document to this destructive import traversal.
+        private static InfrastructureEntityKey ImportOwned(JObject                         copy,
+                                                           InfrastructureEntityType        type,
+                                                           InfrastructureEntityKey?        parent,
+                                                           ref EntityMap                   map,
+                                                           DateTimeOffset?                 timestamp,
+                                                           List<InfrastructureEntityKey>?  imported,
+                                                           RoamingNetworkDataSnapshot?     reuse = null,
+                                                           HashSet<InfrastructureEntityKey>? visited = null)
         {
 
-            var copy = (JObject) document.DeepClone();
             POIRepresentation.RemoveETags(copy, type.ToString());
             POIRepresentation.RemoveRuntime(copy, type.ToString());
             var idField = InfrastructureChangeSchema.IdField(type);
@@ -51,7 +64,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        throw new ArgumentException($"Missing '{idField}'.");
             var key  = Key(type, text, parent?.Id);
 
-            if (map.ContainsKey(key))
+            if (visited is not null ? !visited.Add(key) : map.ContainsKey(key))
                 throw new ArgumentException($"Duplicate entity '{key}'.");
 
             copy[idField] = key.Id;
@@ -66,27 +79,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             NormalizeImportedTimestamps(copy);
+            POIRepresentation.NormalizeStaticTimestamps(copy, type.ToString());
             MetrologyJson.NormalizeEntity(copy, type);
 
             copy.Remove("revision");
             copy.Remove("appliedChangeSetId");
 
             var childDocuments = DetachChildDocuments(copy, type);
-            var children       = ImmutableHashSet<InfrastructureEntityKey>.Empty;
-            var properties     = copy.Properties().ToImmutableDictionary(
-                                     property => property.Name,
-                                     property => JsonDocumentValue(property.Value.ToString(Formatting.None)),
-                                     StringComparer.Ordinal);
+            if (reuse is null)
+            {
+                var children       = ImmutableHashSet<InfrastructureEntityKey>.Empty;
+                var properties     = copy.Properties().ToImmutableDictionary(
+                                         property => property.Name,
+                                         property => JsonDocumentValue(property.Value.ToString(Formatting.None)),
+                                         StringComparer.Ordinal);
 
-            // Insert a reservation before descendants, so duplicate IDs at every depth are detected.
-            map = map.Add(key, new InfrastructureEntitySnapshot(key, parent, properties, children));
+                // Insert a reservation before descendants, so duplicate IDs at every depth are detected.
+                map = map.Add(key, new InfrastructureEntitySnapshot(key, parent, properties, children));
 
+                imported?.Add(key);
+
+                foreach (var child in childDocuments)
+                    children = children.Add(ImportOwned(child.Document, child.Type, key, ref map, timestamp, imported));
+
+                map = map.SetItem(key, map[key].With(children: children));
+
+                return key;
+            }
+
+            var previous       = reuse.Entities.GetValueOrDefault(key);
+            var preparedProperties     = previous?.Properties ?? ImmutableDictionary<String, System.Text.Json.JsonElement>.Empty.WithComparers(StringComparer.Ordinal);
+            var fields         = new HashSet<String>(StringComparer.Ordinal);
+            foreach (var property in copy.Properties())
+            {
+                fields.Add(property.Name);
+                var raw = property.Value.ToString(Formatting.None);
+                // Compare after the ordinary import normalization, including exact numeric
+                // and escaped string spellings. Customer data is never canonicalized here.
+                if (!preparedProperties.TryGetValue(property.Name, out var existing) || existing.GetRawText() != raw)
+                    preparedProperties = preparedProperties.SetItem(property.Name, JsonDocumentValue(raw));
+            }
+            preparedProperties = preparedProperties.RemoveRange(preparedProperties.Keys.Where(field => !fields.Contains(field)));
+
+            var preparedChildren = previous?.Children ?? ImmutableHashSet<InfrastructureEntityKey>.Empty;
+            var suppliedChildren = new HashSet<InfrastructureEntityKey>();
+
+            // Reconstruction reserves keys in the visited set before descendants,
+            // retaining unchanged immutable map branches.
             imported?.Add(key);
 
             foreach (var child in childDocuments)
-                children = children.Add(Import(child.Document, child.Type, key, ref map, timestamp, imported));
+            {
+                var childKey = ImportOwned(child.Document, child.Type, key, ref map, timestamp, imported, reuse, visited);
+                suppliedChildren.Add(childKey);
+                preparedChildren = preparedChildren.Add(childKey);
+            }
+            preparedChildren = preparedChildren.Except(preparedChildren.Where(child => !suppliedChildren.Contains(child)));
 
-            map = map.SetItem(key, map[key].With(children: children));
+            var entity = previous is not null && previous.Parent == parent &&
+                         ReferenceEquals(previous.Properties, preparedProperties) && ReferenceEquals(previous.Children, preparedChildren)
+                             ? previous
+                             : new InfrastructureEntitySnapshot(key, parent, preparedProperties, preparedChildren);
+            map = map.SetItem(key, entity);
 
             return key;
 

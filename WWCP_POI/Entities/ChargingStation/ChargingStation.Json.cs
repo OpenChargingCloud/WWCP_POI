@@ -97,7 +97,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  MaxPower:            MetrologyJson.Read<Watt>(JSON, "maxPower", Watt.TryParse),
                                                  MaxCapacity:         MetrologyJson.Read<WattHour>(JSON, "maxCapacity", WattHour.TryParse),
                                                  EnergyMeters:        InfrastructureJson.Array(JSON, "energyMeters",
-                                                                                             token => EnergyMeter.Parse(InfrastructureJson.Entry(token))));
+                                                                                             token => EnergyMeter.Parse(InfrastructureJson.Entry(token), Network: ChargingPool?.RoamingNetwork)));
 
                 parsed.isFreeOfCharge = InfrastructureJson.Boolean(JSON, "isFreeOfCharge") ?? false;
                 parsed.ParseStationEVSEs(JSON, Context);

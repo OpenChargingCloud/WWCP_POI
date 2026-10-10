@@ -1,0 +1,591 @@
+diff --git a/WWCP_POI/History/POIArchiveCBORIndex.cs b/WWCP_POI/History/POIArchiveCBORIndex.cs
+index 7f6d4b6..2696dab 100644
+--- a/WWCP_POI/History/POIArchiveCBORIndex.cs
++++ b/WWCP_POI/History/POIArchiveCBORIndex.cs
+@@ -20,22 +20,25 @@ internal sealed class POIArchiveCBORIndex
+     internal Part[] Commits { get; private set; } = [];
+     internal Part[] Receipts { get; private set; } = [];
+ 
+-    internal static POIArchiveCBORIndex Read(ReadOnlySpan<Byte> bytes)
++    internal static POIArchiveCBORIndex Read(ReadOnlySpan<Byte> bytes, POIArchiveReadProgress progress = default)
+     {
++        progress.Check(POIArchiveReadStage.Index);
+         var result = new POIArchiveCBORIndex();
+         var reader = new CBORReader(bytes);
+         reader.ReadStartMap();
+         String? duplicate = null;
+         while (reader.PeekState() != CBORReaderState.EndMap)
+         {
++            progress.Check(POIArchiveReadStage.Index, reader.Position);
+             var name = reader.ReadTextString();
+             var start = reader.Position;
+-            if (name == "Commits") result.Commits = ReadParts(ref reader);
+-            else if (name == "RetentionReceipts") result.Receipts = ReadParts(ref reader);
+-            else ValidateValue(ref reader);
++            if (name == "Commits") result.Commits = ReadParts(ref reader, progress);
++            else if (name == "RetentionReceipts") result.Receipts = ReadParts(ref reader, progress);
++            else ValidateValue(ref reader, progress, POIArchiveReadStage.Index);
+             if (!result.fields.TryAdd(name, new(start, reader.Position - start))) duplicate ??= name;
+         }
+         reader.ReadEndMap();
++        progress.Check(POIArchiveReadStage.Index, reader.Position);
+         if (duplicate is not null) ThrowDuplicate(CBORValue.FromText(duplicate));
+         if (reader.BytesRemaining != 0) throw new CBORException("Unexpected trailing archive bytes.");
+         return result;
+@@ -57,38 +60,41 @@ internal sealed class POIArchiveCBORIndex
+     internal static ReadOnlySpan<Byte> Slice(ReadOnlySpan<Byte> bytes, Part part)
+         => bytes.Slice(part.Offset, part.Length);
+ 
+-    internal static void RequireCanonical(ReadOnlySpan<Byte> bytes)
++    internal static void RequireCanonical(ReadOnlySpan<Byte> bytes, POIArchiveReadProgress progress = default)
+     {
+         // WriterOptions.Canonical does not require preferred bignums. ReaderOptions.Canonical does.
+         // Match the existing writer/re-encoding contract, including its map and floating-point rules.
+         var reader = new CBORReader(bytes, new CBORReaderOptions { RequireDeterministic = true });
+-        try { ValidateValue(ref reader); }
++        progress.Check(POIArchiveReadStage.Canonical);
++        try { ValidateValue(ref reader, progress, POIArchiveReadStage.Canonical); }
+         catch (CBORException error)
+         { throw new ArgumentException("Bootstrap requires the deterministic CBOR archive representation.", error); }
++        progress.Check(POIArchiveReadStage.Canonical, reader.Position);
+         if (reader.BytesRemaining != 0) throw new ArgumentException("Bootstrap requires the deterministic CBOR archive representation.");
+     }
+ 
+-    private static Part[] ReadParts(ref CBORReader reader)
++    private static Part[] ReadParts(ref CBORReader reader, POIArchiveReadProgress progress)
+     {
+         var count = reader.ReadStartArray();
+         var parts = new List<Part>(count.HasValue ? Math.Min(count.Value, 128) : 0);
+         while (reader.PeekState() != CBORReaderState.EndArray)
+         {
+             var start = reader.Position;
+-            ValidateValue(ref reader);
++            ValidateValue(ref reader, progress, POIArchiveReadStage.Index);
+             parts.Add(new(start, reader.Position - start));
+         }
+         reader.ReadEndArray();
+         return parts.ToArray();
+     }
+ 
+-    private static void ValidateValue(ref CBORReader reader)
++    private static void ValidateValue(ref CBORReader reader, POIArchiveReadProgress progress, POIArchiveReadStage stage)
+     {
++        progress.Check(stage, reader.Position);
+         switch (reader.PeekState())
+         {
+             case CBORReaderState.StartArray:
+                 reader.ReadStartArray();
+-                while (reader.PeekState() != CBORReaderState.EndArray) ValidateValue(ref reader);
++                while (reader.PeekState() != CBORReaderState.EndArray) ValidateValue(ref reader, progress, stage);
+                 reader.ReadEndArray();
+                 break;
+ 
+@@ -99,8 +105,9 @@ internal sealed class POIArchiveCBORIndex
+                 while (reader.PeekState() != CBORReaderState.EndMap)
+                 {
+                     // Use the actual value model's equality, including structured/non-text keys.
++                    progress.Check(stage, reader.Position);
+                     var key = CBORValue.ReadFrom(ref reader);
+-                    ValidateValue(ref reader);
++                    ValidateValue(ref reader, progress, stage);
+                     if (!keys.Add(key)) duplicate ??= key;
+                 }
+                 reader.ReadEndMap();
+@@ -110,7 +117,7 @@ internal sealed class POIArchiveCBORIndex
+ 
+             case CBORReaderState.Tag:
+                 reader.ReadTag();
+-                ValidateValue(ref reader);
++                ValidateValue(ref reader, progress, stage);
+                 break;
+ 
+             default:
+@@ -119,6 +126,7 @@ internal sealed class POIArchiveCBORIndex
+                 _ = CBORValue.ReadFrom(ref reader);
+                 break;
+         }
++        progress.Check(stage, reader.Position);
+     }
+ 
+     private static void ThrowDuplicate(CBORValue key)
+@@ -138,16 +146,19 @@ internal ref struct POIArchiveCommitCursor
+     private readonly POIArchiveCBORIndex.Part[]? parts;
+     private readonly Int32 baseOffset;
+     private Int32 position;
++    private readonly POIArchiveReadProgress progress;
+ 
+     internal POIArchiveCommitCursor(IEnumerable<RoamingNetworkCommit> models)
+-    { this.models = models; enumerator = null; bytes = default; parts = null; baseOffset = 0; position = 0; }
++    { this.models = models; enumerator = null; bytes = default; parts = null; baseOffset = 0; position = 0; progress = default; }
+ 
+-    internal POIArchiveCommitCursor(ReadOnlySpan<Byte> bytes, POIArchiveCBORIndex.Part[] parts)
++    internal POIArchiveCommitCursor(ReadOnlySpan<Byte> bytes, POIArchiveCBORIndex.Part[] parts, POIArchiveReadProgress progress = default)
+     {
++        this.progress = progress; progress.Check(POIArchiveReadStage.SuffixCapture);
+         models = null; enumerator = null; this.parts = parts; position = 0;
+         baseOffset = parts.Length == 0 ? 0 : parts[0].Offset;
+         this.bytes = parts.Length == 0 ? [] : bytes.Slice(baseOffset,
+             parts[^1].Offset + parts[^1].Length - baseOffset).ToArray();
++        progress.Check(POIArchiveReadStage.SuffixCapture, this.bytes.Length);
+     }
+ 
+     internal Boolean MoveNext(out RoamingNetworkCommit commit)
+@@ -160,7 +171,9 @@ internal ref struct POIArchiveCommitCursor
+         else if (position < parts!.Length)
+         {
+             var part = parts[position++];
++            progress.Check(POIArchiveReadStage.CommitModel, part.Offset);
+             commit = RoamingNetworkCommit.ParseCBOR(bytes.Slice(part.Offset - baseOffset, part.Length));
++            progress.Check(POIArchiveReadStage.CommitModel, part.Offset + part.Length);
+             return true;
+         }
+         commit = null!;
+diff --git a/WWCP_POI/History/POIArchiveReadProgress.cs b/WWCP_POI/History/POIArchiveReadProgress.cs
+new file mode 100644
+index 0000000..b5836f6
+--- /dev/null
++++ b/WWCP_POI/History/POIArchiveReadProgress.cs
+@@ -0,0 +1,37 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++internal enum POIArchiveReadStage
++{
++    Limits,
++    Index,
++    Canonical,
++    CommitModel,
++    ReceiptModel,
++    RootState,
++    SuffixCapture,
++    Replay,
++    HeadState
++}
++
++/// <summary>
++/// Per-call cooperative parsing checks. No ambient state or retained history delegate owns this value.
++/// The optional internal observer permits deterministic cancellation at existing parser boundaries.
++/// Individual Styx, model, cryptography and memory-copy calls are not preempted.
++/// </summary>
++internal readonly struct POIArchiveReadProgress(CancellationToken token,
++    Action<POIArchiveReadStage, Int32>? observer = null)
++{
++    internal void Check(POIArchiveReadStage stage, Int32 position = 0)
++    {
++        if (!token.CanBeCanceled && observer is null) return;
++        token.ThrowIfCancellationRequested();
++        observer?.Invoke(stage, position);
++        token.ThrowIfCancellationRequested();
++    }
++}
+diff --git a/WWCP_POI/History/RoamingNetworkHistory.Archive.cs b/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
+index 8306155..7e39c58 100644
+--- a/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
+@@ -192,11 +192,22 @@ public sealed partial class RoamingNetworkHistory
+         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null,
+         RoamingNetworkHistoryLimits? limits = null)
+     {
+-        CheckCBORArchive(bytes, limits ?? new());
+-        var index = POIArchiveCBORIndex.Read(bytes);
++        return ParseCBORCore(bytes, verifyBatchSignature, verifyCommitSignature, authorizeCommit,
++            authorizeSnapshotBoundary, limits ?? new(), default);
++    }
++
++    private static RoamingNetworkHistory ParseCBORCore(ReadOnlySpan<Byte> bytes,
++        Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature,
++        Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
++        Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
++        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary,
++        RoamingNetworkHistoryLimits limits, POIArchiveReadProgress progress)
++    {
++        CheckCBORArchiveCore(bytes, limits, progress);
++        var index = POIArchiveCBORIndex.Read(bytes, progress);
+         using var preparation = POICanonicalPreparation.Enter();
+         return ParseIndexedArchive(bytes, index, verifyBatchSignature, verifyCommitSignature,
+-            authorizeCommit, authorizeSnapshotBoundary);
++            authorizeCommit, authorizeSnapshotBoundary, progress);
+     }
+ 
+     private static RoamingNetworkHistory Restore(RoamingNetworkDataSnapshot snapshot, RoamingNetworkCommit checkpoint,
+@@ -204,23 +215,39 @@ public sealed partial class RoamingNetworkHistory
+         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature,
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit)
++    {
++        return RestoreCore(snapshot, checkpoint, commits, headId, verifyBatchSignature,
++            verifyCommitSignature, authorizeCommit, default);
++    }
++
++    private static RoamingNetworkHistory RestoreCore(RoamingNetworkDataSnapshot snapshot, RoamingNetworkCommit checkpoint,
++        IEnumerable<RoamingNetworkCommit> commits, RoamingNetworkCommitId headId,
++        Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature,
++        Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
++        Func<RoamingNetworkCommit, Boolean>? authorizeCommit, POIArchiveReadProgress progress)
+     {
+         using var preparation = POICanonicalPreparation.Enter();
++        progress.Check(POIArchiveReadStage.RootState);
+         var history = new RoamingNetworkHistory(RoamingNetwork.ParseSnapshot(snapshot), verifyBatchSignature, verifyCommitSignature, authorizeCommit);
+         try
+         {
++            progress.Check(POIArchiveReadStage.RootState);
+             if (history.checkpointId != checkpoint.Id || checkpoint.Kind != RoamingNetworkCommitKind.Checkpoint)
+                 throw new ArgumentException("Checkpoint commit does not match the archived static checkpoint.");
++            progress.Check(POIArchiveReadStage.Replay);
+             if (!history.TryStoreCommit(checkpoint, out var rootResult)) throw new ArgumentException(rootResult.Error);
+             var seen = new HashSet<RoamingNetworkCommitId> { checkpoint.Id };
+             foreach (var commit in commits)
+             {
++                progress.Check(POIArchiveReadStage.Replay, seen.Count);
+                 if (!seen.Add(commit.Id)) throw new ArgumentException("Archive contains duplicate commit identities.");
+                 if (!history.TryStoreCommit(commit, out var result)) throw new ArgumentException(result.Error);
+             }
++            progress.Check(POIArchiveReadStage.HeadState);
+             if (!history.entries.TryGetValue(headId, out var headEntry)) throw new ArgumentException("Archive head is not retained.");
+             history.head = new(headEntry.Commit, ReferenceEquals(history.head.Snapshot, headEntry.Snapshot)
+                 ? history.head.Network : RoamingNetwork.ParseSnapshot(headEntry.Snapshot));
++            progress.Check(POIArchiveReadStage.HeadState);
+             return history;
+         }
+         catch { history.Dispose(); throw; }
+diff --git a/WWCP_POI/History/RoamingNetworkHistory.ArchiveLimits.cs b/WWCP_POI/History/RoamingNetworkHistory.ArchiveLimits.cs
+index ead6211..b6c10c8 100644
+--- a/WWCP_POI/History/RoamingNetworkHistory.ArchiveLimits.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.ArchiveLimits.cs
+@@ -86,41 +86,50 @@ public sealed partial class RoamingNetworkHistory
+     }
+ 
+     private static void CheckCBORArchive(ReadOnlySpan<Byte> bytes, RoamingNetworkHistoryLimits limits)
++        => CheckCBORArchiveCore(bytes, limits, default);
++
++    private static void CheckCBORArchiveCore(ReadOnlySpan<Byte> bytes, RoamingNetworkHistoryLimits limits,
++        POIArchiveReadProgress progress)
+     {
+         limits.Require(RoamingNetworkHistoryLimitKind.ArchiveBytes, bytes.Length);
++        progress.Check(POIArchiveReadStage.Limits);
+         var reader = new CBORReader(bytes);
+         reader.ReadStartMap();
+         Int64 commits = 1, receipts = 0, ids = 0;
+         while (reader.PeekState() != CBORReaderState.EndMap)
+         {
++            progress.Check(POIArchiveReadStage.Limits, reader.Position);
+             switch (reader.ReadTextString())
+             {
+                 case "Commits":
+-                    CountCBORArray(ref reader, limits, RoamingNetworkHistoryLimitKind.RetainedCommits, ref commits);
++                    CountCBORArray(ref reader, limits, RoamingNetworkHistoryLimitKind.RetainedCommits, ref commits, progress);
+                     break;
+                 case "RetentionReceipts":
+                     StartCBORArray(ref reader, limits, RoamingNetworkHistoryLimitKind.RetentionReceipts, receipts);
+                     while (reader.PeekState() != CBORReaderState.EndArray)
+                     {
++                        progress.Check(POIArchiveReadStage.Limits, reader.Position);
+                         limits.Require(RoamingNetworkHistoryLimitKind.RetentionReceipts, ++receipts);
+                         reader.ReadStartMap();
+                         while (reader.PeekState() != CBORReaderState.EndMap)
+                         {
++                            progress.Check(POIArchiveReadStage.Limits, reader.Position);
+                             var name = reader.ReadTextString();
+                             if (name is "PrunedCommits" or "ArchiveOnlyTips")
+-                                CountCBORArray(ref reader, limits, RoamingNetworkHistoryLimitKind.CatalogCommitIds, ref ids);
+-                            else reader.SkipValue();
++                                CountCBORArray(ref reader, limits, RoamingNetworkHistoryLimitKind.CatalogCommitIds, ref ids, progress);
++                            else SkipCBORValue(ref reader, progress);
+                         }
+                         reader.ReadEndMap();
+                     }
+                     reader.ReadEndArray();
+                     break;
+                 default:
+-                    reader.SkipValue();
++                    SkipCBORValue(ref reader, progress);
+                     break;
+             }
+         }
+         reader.ReadEndMap();
++        progress.Check(POIArchiveReadStage.Limits, reader.Position);
+         if (reader.BytesRemaining != 0) throw new ArgumentException("Trailing archive data.");
+     }
+ 
+@@ -131,15 +140,23 @@ public sealed partial class RoamingNetworkHistory
+     }
+ 
+     private static void CountCBORArray(ref CBORReader reader, RoamingNetworkHistoryLimits limits,
+-        RoamingNetworkHistoryLimitKind kind, ref Int64 count)
++        RoamingNetworkHistoryLimitKind kind, ref Int64 count, POIArchiveReadProgress progress)
+     {
+         StartCBORArray(ref reader, limits, kind, count);
+         while (reader.PeekState() != CBORReaderState.EndArray)
+         {
++            progress.Check(POIArchiveReadStage.Limits, reader.Position);
+             limits.Require(kind, ++count);
+-            reader.SkipValue();
++            SkipCBORValue(ref reader, progress);
+         }
+         reader.ReadEndArray();
+     }
+ 
++    private static void SkipCBORValue(ref CBORReader reader, POIArchiveReadProgress progress)
++    {
++        progress.Check(POIArchiveReadStage.Limits, reader.Position);
++        reader.SkipValue();
++        progress.Check(POIArchiveReadStage.Limits, reader.Position);
++    }
++
+ }
+diff --git a/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs b/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs
+index 1c47693..ddf6baa 100644
+--- a/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs
+@@ -62,11 +62,11 @@ public sealed partial class RoamingNetworkHistory
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
+         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary,
+-        RoamingNetworkHistoryLimits limits)
++        RoamingNetworkHistoryLimits limits, POIArchiveReadProgress progress = default)
+     {
+-        CheckCBORArchive(bytes, limits);
+-        var index = POIArchiveCBORIndex.Read(bytes);
+-        POIArchiveCBORIndex.RequireCanonical(bytes);
++        CheckCBORArchiveCore(bytes, limits, progress);
++        var index = POIArchiveCBORIndex.Read(bytes, progress);
++        POIArchiveCBORIndex.RequireCanonical(bytes, progress);
+         using var preparation = POICanonicalPreparation.Enter();
+         if (manifest.ArchiveProfile is BoundaryArchiveProfile or RetentionArchiveProfile)
+         {
+@@ -78,11 +78,11 @@ public sealed partial class RoamingNetworkHistory
+                 new RoamingNetworkCommitId(ETag.Parse(index.Value(bytes, "Head"))) != manifest.Head)
+                 throw new ArgumentException("Boundary archive contract, chain, head or count differs from the manifest.");
+             POIContentProfile.Require(RoamingNetworkCommit.Text(index.Value(bytes, "ContentProfile")));
+-            var snapshot = RoamingNetworkCommit.ParseCBOR(index.Slice(bytes, "SnapshotCommit"));
++            var snapshot = ReadIndexedRoot(bytes, index, "SnapshotCommit", progress);
+             if (snapshot.Id != manifest.Anchor) throw new ArgumentException("Snapshot anchor differs from the manifest.");
+-            var receipts = hasReceipts ? ReadIndexedReceipts(bytes, index) : [];
++            var receipts = hasReceipts ? ReadIndexedReceipts(bytes, index, progress) : [];
+             return RestoreIndexedBoundary(bytes, index, manifest.Checkpoint, snapshot, manifest.Head,
+-                verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, receipts);
++                verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, receipts, progress);
+         }
+         index.RequireFields(CompleteArchiveFields);
+         if (RoamingNetworkCommit.Text(index.Value(bytes, "Profile")) != manifest.ArchiveProfile)
+@@ -90,14 +90,14 @@ public sealed partial class RoamingNetworkHistory
+         POIContentProfile.Require(RoamingNetworkCommit.Text(index.Value(bytes, "ContentProfile")));
+         if ((Int64) index.Commits.Length + 1 != manifest.CommitCount)
+             throw new ArgumentException("Archive commit count differs from the manifest.");
+-        var checkpoint = RoamingNetworkCommit.ParseCBOR(index.Slice(bytes, "CheckpointCommit"));
++        var checkpoint = ReadIndexedRoot(bytes, index, "CheckpointCommit", progress);
+         var headId = new RoamingNetworkCommitId(ETag.Parse(index.Value(bytes, "Head")));
+         if (checkpoint.Id != manifest.Checkpoint || headId != manifest.Head)
+             throw new ArgumentException("Archive checkpoint or head differs from the manifest.");
+-        var commits = ReadIndexedCommits(bytes, index);
++        var commits = ReadIndexedCommits(bytes, index, progress);
+         RequireArchiveProfile(manifest.ArchiveProfile, commits);
+-        return Restore(RoamingNetworkDataSnapshot.ParseCBOR(index.Slice(bytes, "Checkpoint")),
+-            checkpoint, commits, headId, verifyBatchSignature, verifyCommitSignature, authorizeCommit);
++        return RestoreCore(ReadIndexedState(bytes, index, progress),
++            checkpoint, commits, headId, verifyBatchSignature, verifyCommitSignature, authorizeCommit, progress);
+     }
+ 
+     internal void PersistBootstrap(String path, Action<ArchiveWriteStage>? observer = null)
+diff --git a/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs b/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs
+index c7fba58..b3062d8 100644
+--- a/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.BoundaryArchive.cs
+@@ -91,26 +91,33 @@ public sealed partial class RoamingNetworkHistory
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
+         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeBoundary,
+-        ImmutableArray<RoamingNetworkRetentionReceipt> receipts)
++        ImmutableArray<RoamingNetworkRetentionReceipt> receipts, POIArchiveReadProgress progress = default)
+     {
+         if (authorizeBoundary is null || verifyCommitSignature is null)
+             throw new ArgumentException("Snapshot-boundary recovery requires an explicit boundary policy and trusted signature verifier.");
+         using var preparation = POICanonicalPreparation.Enter();
++        progress.Check(POIArchiveReadStage.RootState);
+         var history = FromSnapshot(checkpoint, snapshot, authorizeBoundary, verifyCommitSignature,
+                                    verifyBatchSignature, authorizeCommit);
+         try
+         {
++            progress.Check(POIArchiveReadStage.RootState);
++            progress.Check(POIArchiveReadStage.Replay);
+             var seen = new HashSet<RoamingNetworkCommitId> { snapshot.Id };
+             while (commits.MoveNext(out var commit))
+             {
++                progress.Check(POIArchiveReadStage.Replay, seen.Count);
+                 if (!seen.Add(commit.Id)) throw new ArgumentException("Archive contains duplicate commit identities.");
+                 if (!history.TryStoreCommit(commit, out var result)) throw new ArgumentException(result.Error);
+             }
++            progress.Check(POIArchiveReadStage.HeadState);
+             if (!history.entries.TryGetValue(headId, out var entry)) throw new ArgumentException("Archive head is not retained.");
+             history.head = new(entry.Commit, ReferenceEquals(history.head.Snapshot, entry.Snapshot)
+                 ? history.head.Network : RoamingNetwork.ParseSnapshot(entry.Snapshot));
++            progress.Check(POIArchiveReadStage.HeadState);
+             history.retentionReceipts = receipts.IsDefault ? [] : receipts;
+             history.archivedCommits = IndexReceipts(history.retentionReceipts, checkpoint);
++            progress.Check(POIArchiveReadStage.HeadState);
+             return history;
+         }
+         catch { history.Dispose(); throw; }
+diff --git a/WWCP_POI/History/RoamingNetworkHistory.IndexedArchive.cs b/WWCP_POI/History/RoamingNetworkHistory.IndexedArchive.cs
+index 17359b5..0bdaccb 100644
+--- a/WWCP_POI/History/RoamingNetworkHistory.IndexedArchive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.IndexedArchive.cs
+@@ -13,19 +13,29 @@ public sealed partial class RoamingNetworkHistory
+     private static readonly String[] CompleteArchiveFields =
+         ["Profile", "ContentProfile", "Checkpoint", "CheckpointCommit", "Commits", "Head"];
+ 
+-    private static ImmutableArray<RoamingNetworkCommit> ReadIndexedCommits(ReadOnlySpan<Byte> bytes, POIArchiveCBORIndex index)
++    private static ImmutableArray<RoamingNetworkCommit> ReadIndexedCommits(ReadOnlySpan<Byte> bytes,
++        POIArchiveCBORIndex index, POIArchiveReadProgress progress = default)
+     {
+         var result = ImmutableArray.CreateBuilder<RoamingNetworkCommit>(index.Commits.Length);
+         foreach (var part in index.Commits)
++        {
++            progress.Check(POIArchiveReadStage.CommitModel, part.Offset);
+             result.Add(RoamingNetworkCommit.ParseCBOR(POIArchiveCBORIndex.Slice(bytes, part)));
++            progress.Check(POIArchiveReadStage.CommitModel, part.Offset + part.Length);
++        }
+         return result.MoveToImmutable();
+     }
+ 
+-    private static ImmutableArray<RoamingNetworkRetentionReceipt> ReadIndexedReceipts(ReadOnlySpan<Byte> bytes, POIArchiveCBORIndex index)
++    private static ImmutableArray<RoamingNetworkRetentionReceipt> ReadIndexedReceipts(ReadOnlySpan<Byte> bytes,
++        POIArchiveCBORIndex index, POIArchiveReadProgress progress = default)
+     {
+         var result = ImmutableArray.CreateBuilder<RoamingNetworkRetentionReceipt>(index.Receipts.Length);
+         foreach (var part in index.Receipts)
++        {
++            progress.Check(POIArchiveReadStage.ReceiptModel, part.Offset);
+             result.Add(RoamingNetworkRetentionReceipt.ParseCBOR(POIArchiveCBORIndex.Slice(bytes, part)));
++            progress.Check(POIArchiveReadStage.ReceiptModel, part.Offset + part.Length);
++        }
+         if (result.Count == 0) throw new ArgumentException("A retention archive requires a nonempty receipt catalog.");
+         return result.MoveToImmutable();
+     }
+@@ -34,7 +44,7 @@ public sealed partial class RoamingNetworkHistory
+         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature,
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
+-        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeBoundary)
++        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeBoundary, POIArchiveReadProgress progress)
+     {
+         var profile = RoamingNetworkCommit.Text(index.Value(bytes, "Profile"));
+         if (profile is BoundaryArchiveProfile or RetentionArchiveProfile)
+@@ -42,21 +52,21 @@ public sealed partial class RoamingNetworkHistory
+             var hasReceipts = profile == RetentionArchiveProfile;
+             index.RequireFields(BoundaryFields(hasReceipts));
+             POIContentProfile.Require(RoamingNetworkCommit.Text(index.Value(bytes, "ContentProfile")));
+-            var receipts = hasReceipts ? ReadIndexedReceipts(bytes, index) : [];
++            var receipts = hasReceipts ? ReadIndexedReceipts(bytes, index, progress) : [];
+             var checkpoint = new RoamingNetworkCommitId(ETag.Parse(index.Value(bytes, "CheckpointId")));
+-            var root = RoamingNetworkCommit.ParseCBOR(index.Slice(bytes, "SnapshotCommit"));
++            var root = ReadIndexedRoot(bytes, index, "SnapshotCommit", progress);
+             var head = new RoamingNetworkCommitId(ETag.Parse(index.Value(bytes, "Head")));
+             return RestoreIndexedBoundary(bytes, index, checkpoint, root, head,
+-                verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeBoundary, receipts);
++                verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeBoundary, receipts, progress);
+         }
+         index.RequireFields(CompleteArchiveFields);
+         if (profile is not (ArchiveProfile or SnapshotArchiveProfile)) throw new ArgumentException("Unsupported history profile.");
+         POIContentProfile.Require(RoamingNetworkCommit.Text(index.Value(bytes, "ContentProfile")));
+-        var commits = ReadIndexedCommits(bytes, index);
++        var commits = ReadIndexedCommits(bytes, index, progress);
+         RequireArchiveProfile(profile, commits);
+-        return Restore(RoamingNetworkDataSnapshot.ParseCBOR(index.Slice(bytes, "Checkpoint")),
+-            RoamingNetworkCommit.ParseCBOR(index.Slice(bytes, "CheckpointCommit")), commits,
+-            new(ETag.Parse(index.Value(bytes, "Head"))), verifyBatchSignature, verifyCommitSignature, authorizeCommit);
++        return RestoreCore(ReadIndexedState(bytes, index, progress),
++            ReadIndexedRoot(bytes, index, "CheckpointCommit", progress), commits,
++            new(ETag.Parse(index.Value(bytes, "Head"))), verifyBatchSignature, verifyCommitSignature, authorizeCommit, progress);
+     }
+ 
+     private static RoamingNetworkHistory RestoreIndexedBoundary(ReadOnlySpan<Byte> bytes, POIArchiveCBORIndex index,
+@@ -65,11 +75,30 @@ public sealed partial class RoamingNetworkHistory
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
+         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeBoundary,
+-        ImmutableArray<RoamingNetworkRetentionReceipt> receipts)
++        ImmutableArray<RoamingNetworkRetentionReceipt> receipts, POIArchiveReadProgress progress = default)
+     {
+-        var cursor = new POIArchiveCommitCursor(bytes, index.Commits);
++        var cursor = new POIArchiveCommitCursor(bytes, index.Commits, progress);
+         try { return RestoreBoundaryCore(checkpoint, root, ref cursor, head, verifyBatchSignature,
+-            verifyCommitSignature, authorizeCommit, authorizeBoundary, receipts); }
++            verifyCommitSignature, authorizeCommit, authorizeBoundary, receipts, progress); }
+         finally { cursor.Dispose(); }
+     }
++
++    private static RoamingNetworkDataSnapshot ReadIndexedState(ReadOnlySpan<Byte> bytes, POIArchiveCBORIndex index,
++        POIArchiveReadProgress progress)
++    {
++        progress.Check(POIArchiveReadStage.RootState);
++        var state = RoamingNetworkDataSnapshot.ParseCBOR(index.Slice(bytes, "Checkpoint"));
++        progress.Check(POIArchiveReadStage.RootState);
++        return state;
++    }
++
++    private static RoamingNetworkCommit ReadIndexedRoot(ReadOnlySpan<Byte> bytes, POIArchiveCBORIndex index,
++        String name, POIArchiveReadProgress progress)
++    {
++        progress.Check(POIArchiveReadStage.CommitModel);
++        var root = RoamingNetworkCommit.ParseCBOR(index.Slice(bytes, name));
++        progress.Check(POIArchiveReadStage.CommitModel);
++        return root;
++    }
++
+ }
+diff --git a/WWCP_POI/History/RoamingNetworkHistory.InputStreams.cs b/WWCP_POI/History/RoamingNetworkHistory.InputStreams.cs
+index d2fd675..7ca4c52 100644
+--- a/WWCP_POI/History/RoamingNetworkHistory.InputStreams.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.InputStreams.cs
+@@ -11,7 +11,7 @@ public sealed partial class RoamingNetworkHistory
+     /// <summary>
+     /// Capture and recover a borrowed readable CBOR stream, leaving it open and never seeking it.
+     /// Byte limits reject at the first excess byte; full syntax validation still precedes trust.
+-    /// Cancellation is observed between reads, commits and callbacks; a blocking Read is not interrupted.
++    /// Cancellation is observed at reads and internal syntax/model/replay boundaries; a blocking Read or individual parser call is not interrupted.
+     /// </summary>
+     public static RoamingNetworkHistory ParseCBOR(Stream source,
+         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature = null,
+@@ -42,7 +42,7 @@ public sealed partial class RoamingNetworkHistory
+     /// <summary>
+     /// Asynchronously capture a borrowed CBOR stream and recover its static history with fresh local runtime.
+     /// The source owns its lifetime; temporary files, buffers and mapped views belong to this call.
+-    /// Replay is synchronous and observes cancellation at commit/callback boundaries, not inside scalar/model parsing.
++    /// Parsing and replay are synchronous, with cooperative checks in owned loops and around individual parser/model calls.
+     /// </summary>
+     public static async Task<RoamingNetworkHistory> ParseCBORAsync(Stream source,
+         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature = null,
+@@ -91,7 +91,8 @@ public sealed partial class RoamingNetworkHistory
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
+         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary, CancellationToken token,
+-        RoamingNetworkBootstrapManifest? manifest = null)
++        RoamingNetworkBootstrapManifest? manifest = null,
++        Action<POIArchiveReadStage, Int32>? parseObserver = null)
+     {
+         Boolean BatchTrust(RoamingNetworkChangeSet batch, RoamingNetworkChangeSetSignature peer)
+         { token.ThrowIfCancellationRequested(); var valid = verifyBatchSignature!(batch, peer); token.ThrowIfCancellationRequested(); return valid; }
+@@ -105,13 +106,14 @@ public sealed partial class RoamingNetworkHistory
+         try
+         {
+             token.ThrowIfCancellationRequested();
++            var progress = new POIArchiveReadProgress(token, parseObserver);
+             history = manifest is null
+-                ? ParseCBOR(bytes, verifyBatchSignature is null ? null : BatchTrust,
++                ? ParseCBORCore(bytes, verifyBatchSignature is null ? null : BatchTrust,
+                     verifyCommitSignature is null ? null : CommitTrust,
+-                    CommitAuthority, authorizeSnapshotBoundary is null ? null : BoundaryAuthority, limits)
++                    CommitAuthority, authorizeSnapshotBoundary is null ? null : BoundaryAuthority, limits, progress)
+                 : RestoreBootstrap(bytes, manifest, verifyBatchSignature is null ? null : BatchTrust,
+                     verifyCommitSignature is null ? null : CommitTrust,
+-                    CommitAuthority, authorizeSnapshotBoundary is null ? null : BoundaryAuthority, limits);
++                    CommitAuthority, authorizeSnapshotBoundary is null ? null : BoundaryAuthority, limits, progress);
+             token.ThrowIfCancellationRequested();
+             var result = history; history = null; return result;
+         }

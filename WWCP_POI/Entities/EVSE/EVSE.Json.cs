@@ -125,7 +125,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       MaxCurrent:         amperage,
                                       MaxPower:           power,
                                       MaxCapacity:        capacity,
-                                      EnergyMeter:        ParseEVSEEnergyMeter(JSON),
+                                      EnergyMeter:        ParseEVSEEnergyMeter(JSON, ChargingStation.RoamingNetwork),
                                       IsFreeOfCharge:     InfrastructureJson.Boolean(JSON, "isFreeOfCharge"),
                                       ChargingConnectors: connectors,
                                       DataSource:         InfrastructureJson.Text(JSON, "dataSource"),
@@ -181,10 +181,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Parse energy meter and tariff references
 
-        private static EnergyMeter? ParseEVSEEnergyMeter(JObject JSON)
+        private static EnergyMeter? ParseEVSEEnergyMeter(JObject JSON, RoamingNetwork? network)
 
             => InfrastructureJson.Object(JSON, "energyMeter") is { } meter
-                   ? InfrastructureJson.At("energyMeter", () => POI.EnergyMeter.Parse(meter))
+                   ? InfrastructureJson.At("energyMeter", () => POI.EnergyMeter.Parse(meter, Network: network))
                    : null;
 
         private static ImmutableArray<ChargingTariff_Id> ParseEVSETariffReferences(JObject JSON)

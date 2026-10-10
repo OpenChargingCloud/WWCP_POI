@@ -1,0 +1,110 @@
+{
+  "date": "2026-10-09",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "e5aeb5fcf182a0810f8c981f16d9652a858e045e3f091b1312f4d2d3318c7d92",
+  "productionAssemblySHA256": "dfd3f4d0e503f01d096b08be122e4e43fdf9b18fe109afbf830c64c7f42f5c75",
+  "testSourceSHA256": "1ef4c25bb6212555e2bb2351292e9c35a93cf576a061ff20f83617033472862e",
+  "testAssemblySHA256": "468e59023ab4907c3e6e18da6df979dcd528505cee02dacb4eaef01d0b7ba59b",
+  "benchmarkSourceSHA256": "182e777394626fb881b1298f50797dc58f3cfc8ca029fc97a37fdfd4f1b772bb",
+  "reportScriptSHA256": "7a13022ccd3b04701627d63ad772fa05ce773908ece3f5925e962f1500d98855",
+  "reconstructedBeforeProductionSourceSHA256": "aa1e89df9d1563f3772e06d5f60126b77a9d0b8c0b03355625b291bf7b7f27ef",
+  "beforeProductionAssemblySHA256": "dfac3f3fc09a404c91074f353025ac564f69d93d93f691f4b1e088a038afae7c",
+  "scopedPatchSHA256": "61421a18c1a919d761df2ef8b34f3d2028cc4eab5cc69c7f4c96ec3ae52b8b22",
+  "newTestCases": 140,
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/direct-archive-payload/direct-archive-payload-focused.trx",
+      "sha256": "96bcaa0075b7856f34262bd3211988a79cc76107b3e9af97c30bae2d7cbf49ae",
+      "times": {
+        "creation": "2026-10-09T02:32:51.0232931+02:00",
+        "queuing": "2026-10-09T02:32:51.0232941+02:00",
+        "start": "2026-10-09T02:32:49.7381437+02:00",
+        "finish": "2026-10-09T02:33:39.3375781+02:00"
+      },
+      "passed": 423,
+      "failed": 0,
+      "skipped": 0,
+      "excludedExplicitGenerators": [],
+      "counters": {
+        "total": 423,
+        "executed": 423,
+        "passed": 423,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/direct-archive-payload/direct-archive-payload-full.trx",
+      "sha256": "ce20096c1a075af5077e3ec3d701456e6bbec49de738f4c9c01d20d9d7a0d283",
+      "times": {
+        "creation": "2026-10-09T02:34:39.3680906+02:00",
+        "queuing": "2026-10-09T02:34:39.3680911+02:00",
+        "start": "2026-10-09T02:34:36.0733018+02:00",
+        "finish": "2026-10-09T02:40:51.9654426+02:00"
+      },
+      "passed": 1448,
+      "failed": 0,
+      "skipped": 1,
+      "excludedExplicitGenerators": [
+        "GenerateSnapshotRetentionVectors",
+        "GenerateReferenceVectors"
+      ],
+      "counters": {
+        "total": 1451,
+        "executed": 1448,
+        "passed": 1448,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  ],
+  "reports": [
+    {
+      "file": "docs/performance/direct-archive-payload-before.json",
+      "sha256": "c18d1cec39720608fb4c50626c31d7f2e26b1111068a3ef9f7a3b54e84980832",
+      "workers": 80,
+      "measuredSamples": 400
+    },
+    {
+      "file": "docs/performance/direct-archive-payload-after.json",
+      "sha256": "9eb6cb15190f42199881371241b4b658a3778fb0ba4e5708d7aa72cc9a63efb1",
+      "workers": 80,
+      "measuredSamples": 400
+    }
+  ],
+  "limits": {
+    "completeArchiveBufferInBorrowedOutput": false,
+    "completePerPOICBOROutputBufferInArchive": false,
+    "completeJSONBufferAndIndex": true,
+    "completeChangeSetOutputBuffer": true,
+    "applicationMetadataAndDecoderTreesRemain": true,
+    "maxDepth": 64,
+    "preflightBeforePayloadBytes": true,
+    "separateWriterAndSkipValueDepthRules": true,
+    "conservativeScalarDepthFastPath": true,
+    "archiveAndSigningProfilesUnchanged": true
+  }
+}

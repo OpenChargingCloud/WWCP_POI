@@ -92,6 +92,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          new JProperty("parkingSpaces",           POIJSON.Children(ParkingOperator.ParkingSpaces)),
                          new JProperty("parkingSensors",          POIJSON.Children(ParkingOperator.ParkingSensors)),
                          new JProperty("parkingSpaceGroups",      POIJSON.Children(ParkingOperator.ParkingSpaceGroups)),
+                         ParkingOperator.ParkingProducts.Length > 0 ? new JProperty("parkingProducts", POIJSON.Children(ParkingOperator.ParkingProducts)) : null,
                          new JProperty("localParkingSpaceIds",    new JArray(ParkingOperator.LocalParkingSpaceIds.Select(id => id.ToString()).Order(StringComparer.Ordinal))),
                          new JProperty("invalidParkingSpaceIds",  new JArray(ParkingOperator.InvalidParkingSpaceIds.Select(id => id.ToString()).Order(StringComparer.Ordinal)))
 
@@ -615,7 +616,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<ParkingSpace_Id>? LocalParkingSpaceIds = null,
                             IEnumerable<ParkingSpace>? ParkingSpaces = null,
                             IEnumerable<ParkingSensor>? ParkingSensors = null,
-                            IEnumerable<ParkingSpaceGroup>? ParkingSpaceGroups = null)
+                            IEnumerable<ParkingSpaceGroup>? ParkingSpaceGroups = null,
+                            IEnumerable<ParkingProduct>? ParkingProducts = null)
 
             : base(Id,
                    Name,
@@ -645,11 +647,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ParkingSpaces = POIGraphJSON.Unique(ParkingSpaces ?? [], InfrastructureEntityType.ParkingSpace, value => value.Id.ToString());
             this.ParkingSensors = POIGraphJSON.Unique(ParkingSensors ?? [], InfrastructureEntityType.ParkingSensor, value => value.Id.ToString());
             this.ParkingSpaceGroups = POIGraphJSON.Unique(ParkingSpaceGroups ?? [], InfrastructureEntityType.ParkingSpaceGroup, value => value.Id.ToString());
-            POIGraphJSON.ValidateParkingReferences(this);
+            this.ParkingProducts = POIGraphJSON.Unique(ParkingProducts ?? [], InfrastructureEntityType.ParkingProduct, value => value.Id.ToString());
             this._ParkingGarages = new EntityHashSet<ParkingOperator, ParkingGarage_Id, ParkingGarage>(this);
             foreach (var garage in ParkingGarages ?? [])
                 if (_ParkingGarages.TryAdd(garage).Result != CommandResult.Success)
                     throw new ArgumentException("Duplicate parking garage identifier.", nameof(ParkingGarages));
+            POIGraphJSON.ValidateParkingReferences(this);
 
         }
 

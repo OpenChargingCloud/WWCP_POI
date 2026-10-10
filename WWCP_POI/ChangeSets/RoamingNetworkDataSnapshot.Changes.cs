@@ -102,6 +102,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                 => ApplyElementChange(change, key, parent, map, references, changeSet.CreatedAt),
                         _                                       => throw new ArgumentException("Unsupported change kind.")
                     };
+                    if (key.Type == InfrastructureEntityType.TransparencySoftwareCertificate && map.ContainsKey(key) &&
+                        references.TryGetValue(key, out var consumers))
+                        Validate(consumers, map);
                 }
                 catch (Exception exception)
                 {
@@ -174,6 +177,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (verifySignature is null)
                 throw new RoamingNetworkChangeSetException(changeSet.Id, null, "A signed change set requires a signature verifier.");
 
+            using var preparation = POICanonicalPreparation.Enter();
             for (var index = 0; index < changeSet.Signatures.Length; index++)
             {
                 var signature = changeSet.Signatures[index];
@@ -227,8 +231,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             map = map.SetItem(owner, map[owner].With(children: map[owner].Children.Add(newKey)));
 
-            foreach (var importedKey in imported)
-                Validate(importedKey, map);
+            Validate(imported, map);
 
             foreach (var importedKey in imported)
                 references = AddReferences(map[importedKey], map, references);

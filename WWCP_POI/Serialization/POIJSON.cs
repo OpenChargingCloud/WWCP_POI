@@ -31,6 +31,7 @@ internal static class POIJSON
             GridOperator entity => InfrastructureJson.SnapshotMetadata(entity.ToJSON(), entity),
             GridConnectionPoint entity => GridPoint(entity),
             ChargingStationManufacturer entity => entity.ToJSON(),
+            TransparencySoftwareCertificate entity => entity.ToJSON(),
             TransparencySoftware entity => entity.ToJSON(),
             TransparencySoftwareStatus entity => entity.ToJSON(),
             Brand entity => entity.ToJSON(ExpandDataLicenses: InfoStatus.Expanded),
@@ -55,13 +56,11 @@ internal static class POIJSON
                                                entity.AllowedMemberIds.Select(id => id.ToString()), entity.Brand, entity.Priority, entity.Tariff, entity.DataLicenses),
             ChargingTariffGroup entity => entity.ToJSON(),
             ParkingOperator entity => Parking(entity),
-            ParkingGarage entity => ParkingNode(entity, entity.OSM_WayId, entity.Geometry, entity.ChargingStations),
-            ParkingSpace entity => ParkingNode(entity, entity.OSM_WayId, entity.Geometry, entity.ChargingStations, entity.Sensors),
+            ParkingGarage entity => ParkingNode(entity, entity.OSM_WayId, entity.Geometry, entity.ChargingStations, products: entity.ParkingProductIds),
+            ParkingSpace entity => ParkingNode(entity, entity.OSM_WayId, entity.Geometry, entity.ChargingStations, entity.Sensors, entity.ParkingProductIds, entity.ParkingGarageId),
             ParkingSensor entity => ParkingNode(entity, entity.OSM_WayId, entity.Geometry, entity.ChargingStations),
-            ParkingSpaceGroup entity => ParkingNode(entity, entity.OSM_WayId, entity.Geometry, entity.ChargingStations, entity.Sensors),
-            ParkingProduct entity => new JObject(new JProperty("@id", entity.Id.ToString()),
-                                                  entity.MinDuration is { } min ? new JProperty("minDuration", MetrologyJson.DurationText(min)) : null,
-                                                  entity.StopParkingAfterTime is { } stop ? new JProperty("stopParkingAfterTime", MetrologyJson.DurationText(stop)) : null),
+            ParkingSpaceGroup entity => ParkingNode(entity, entity.OSM_WayId, entity.Geometry, entity.ChargingStations, entity.Sensors, entity.ParkingProductIds, spaces: entity.ParkingSpaceIds),
+            ParkingProduct entity => ParkingProductDocument(entity),
             EVRoamingPartnerInfo entity => new JObject(new JProperty("eMobilityProviderId", entity.EMPId.ToString()),
                                                         new JProperty("name", entity.Name.ToJSON()),
                                                         new JProperty("comment", entity.Comment.ToJSON()),
@@ -90,6 +89,14 @@ internal static class POIJSON
         return json;
     }
 
+    private static JObject ParkingProductDocument(ParkingProduct entity)
+    {
+        var json = new JObject(new JProperty("@id", entity.Id.ToString()));
+        if (entity.MinDuration is { } minimum) json["minDuration"] = MetrologyJson.DurationText(minimum);
+        if (entity.StopParkingAfterTime is { } cutoff) json["stopParkingAfterTime"] = MetrologyJson.DurationText(cutoff);
+        return json;
+    }
+
     private static JObject Connector(ChargingConnector entity)
     {
         var json = entity.ToJSON();
@@ -109,7 +116,7 @@ internal static class POIJSON
     private static JObject GridPoint(GridConnectionPoint entity)
     {
         var json = entity.ToJSON();
-        json["gridOperator"] = Document(entity.GridOperator);
+        json["gridOperatorId"] = entity.GridOperatorId.ToString();
         if (entity.EnergyMeter is { } meter) json["energyMeter"] = Document(meter);
         return json;
     }
@@ -132,6 +139,8 @@ internal static class POIJSON
         json["chargingStationOperators"] = Children(entity.ChargingStationOperators);
         json["eMobilityProviders"] = Children(entity.EMobilityProviders);
         json["gridOperators"] = Children(entity.GridOperators);
+        json["transparencySoftware"] = Children(entity.TransparencySoftware);
+        json["transparencySoftwareCertificates"] = Children(entity.TransparencySoftwareCertificates);
         json["parkingOperators"] = Children(entity.ParkingOperators);
         json["chargingStationManufacturers"] = Children(entity.ChargingStationManufacturers);
         return json;
@@ -198,13 +207,17 @@ internal static class POIJSON
 
     private static JObject ParkingNode<TId, TAdmin, TStatus>(AImmutableEMobilityEntity<TId, TAdmin, TStatus> entity,
                              String? osmId, IEnumerable<GeoCoordinate> geometry, IEnumerable<ChargingStation> stations,
-                             IEnumerable<String>? sensors = null)
+                             IEnumerable<String>? sensors = null, IEnumerable<ParkingProduct_Id>? products = null,
+                             ParkingGarage_Id? garage = null, IEnumerable<ParkingSpace_Id>? spaces = null)
         where TId : IId where TAdmin : IComparable where TStatus : IComparable
     {
         var json = InfrastructureJson.SnapshotMetadata(new JObject(new JProperty("@id", entity.Id.ToString()),
                                      new JProperty("name", entity.Name.ToJSON()), new JProperty("description", entity.Description.ToJSON()),
                                      new JProperty("geometry", new JArray(geometry.Select(point => InfrastructureJson.LocationJSON(point, true)))),
                                      new JProperty("chargingStationIds", new JArray(stations.Select(station => station.Id.ToString()).Order(StringComparer.Ordinal)))), entity);
+        if (products is not null) json["parkingProductIds"] = new JArray(products.Select(id => id.ToString()).Order(StringComparer.Ordinal));
+        if (garage is { } garageId) json["parkingGarageId"] = garageId.ToString();
+        if (spaces is not null) json["parkingSpaceIds"] = new JArray(spaces.Select(id => id.ToString()).Order(StringComparer.Ordinal));
         if (osmId is not null) json["osmWayId"] = osmId;
         if (sensors is not null) json["sensors"] = new JArray(sensors.Order(StringComparer.Ordinal));
         return json;
@@ -217,6 +230,7 @@ internal static class POIJSON
         json["parkingSpaces"] = Children(entity.ParkingSpaces);
         json["parkingSensors"] = Children(entity.ParkingSensors);
         json["parkingSpaceGroups"] = Children(entity.ParkingSpaceGroups);
+        json["parkingProducts"] = Children(entity.ParkingProducts);
         json["invalidParkingSpaceIds"] = new JArray(entity.InvalidParkingSpaceIds.Select(id => id.ToString()).Order(StringComparer.Ordinal));
         json["localParkingSpaceIds"] = new JArray(entity.LocalParkingSpaceIds.Select(id => id.ToString()).Order(StringComparer.Ordinal));
         if (entity.Address is { } address) json["address"] = address.ToJSON(Embedded: true);

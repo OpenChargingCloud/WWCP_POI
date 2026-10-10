@@ -117,7 +117,8 @@ public partial class ParkingGarage
              InfrastructureJson.Text(json, "osmWayId"),
              InfrastructureJson.Array(json, "geometry", token => InfrastructureJson.Location(new JObject(new JProperty("geoLocation", token.DeepClone()))) ??
                  throw new ArgumentException("geometry: invalid coordinate.")),
-             POIReferenceJSON.Resolve(json, "chargingStationIds", ChargingStation_Id.Parse, stations ?? [], value => value.Id));
+             POIReferenceJSON.Resolve(json, "chargingStationIds", ChargingStation_Id.Parse, stations ?? [], value => value.Id),
+             InfrastructureJson.Array(json, "parkingProductIds", token => ParkingProduct_Id.Parse(POIReferenceJSON.Id(token))));
         InfrastructureJson.RestoreMetadata(json, result, ParkingGarageAdminStatusTypes.TryParse, ParkingGarageStatusTypes.TryParse);
         return result;
     }
@@ -147,7 +148,9 @@ public partial class ParkingSpace
              InfrastructureJson.Array(json, "geometry", token => InfrastructureJson.Location(new JObject(new JProperty("geoLocation", token.DeepClone()))) ??
                  throw new ArgumentException("geometry: invalid coordinate.")),
              POIReferenceJSON.Resolve(json, "chargingStationIds", ChargingStation_Id.Parse, stations ?? [], value => value.Id),
-             InfrastructureJson.Array(json, "sensors", POIReferenceJSON.Id));
+             InfrastructureJson.Array(json, "sensors", POIReferenceJSON.Id),
+             InfrastructureJson.Array(json, "parkingProductIds", token => ParkingProduct_Id.Parse(POIReferenceJSON.Id(token))),
+             InfrastructureJson.Text(json, "parkingGarageId") is { } garage ? ParkingGarage_Id.Parse(garage) : null);
         InfrastructureJson.RestoreMetadata(json, result, ParkingSpaceAdminStatusTypes.TryParse, ParkingSpaceStatusTypes.TryParse);
         return result;
     }
@@ -206,7 +209,9 @@ public partial class ParkingSpaceGroup
              InfrastructureJson.Array(json, "geometry", token => InfrastructureJson.Location(new JObject(new JProperty("geoLocation", token.DeepClone()))) ??
                  throw new ArgumentException("geometry: invalid coordinate.")),
              POIReferenceJSON.Resolve(json, "chargingStationIds", ChargingStation_Id.Parse, stations ?? [], value => value.Id),
-             InfrastructureJson.Array(json, "sensors", POIReferenceJSON.Id));
+             InfrastructureJson.Array(json, "sensors", POIReferenceJSON.Id),
+             InfrastructureJson.Array(json, "parkingProductIds", token => ParkingProduct_Id.Parse(POIReferenceJSON.Id(token))),
+             InfrastructureJson.Array(json, "parkingSpaceIds", token => ParkingSpace_Id.Parse(POIReferenceJSON.Id(token))));
         InfrastructureJson.RestoreMetadata(json, result, ParkingSpaceGroupAdminStatusTypes.TryParse, ParkingSpaceGroupStatusTypes.TryParse);
         return result;
     }

@@ -41,6 +41,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        /// <summary>
+        /// The stable identity of this software release, shared by all referring meters.
+        /// </summary>
+        public TransparencySoftware_Id Id { get; }
+
         private readonly OpenSourceLicense openSourceLicense;
 
         /// <summary>
@@ -107,7 +112,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="HowToUse">An optional URL where to find a manual how to use the transparency software.</param>
         /// <param name="MoreInformation">An optional URL where to find more information about the transparency software.</param>
         /// <param name="SourceCodeRepository">An optional URL where to find the source code of the transparency software.</param>
-        public TransparencySoftware(String             Name,
+        public TransparencySoftware(TransparencySoftware_Id Id,
+                                    String             Name,
                                     String             Version,
                                     OpenSourceLicense  OpenSourceLicense,
                                     String             Vendor,
@@ -117,6 +123,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     URL?               MoreInformation        = null,
                                     URL?               SourceCodeRepository   = null)
         {
+            if (Id.IsNullOrEmpty) throw new ArgumentException("A software identifier is required.", nameof(Id));
+            this.Id = Id;
             ArgumentException.ThrowIfNullOrWhiteSpace(Name);
             ArgumentException.ThrowIfNullOrWhiteSpace(Version);
             ArgumentException.ThrowIfNullOrWhiteSpace(Vendor);
@@ -213,6 +221,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var JSON = JSONObject.Create(
 
+                                 new JProperty("@id",                     Id.ToString()),
                                  new JProperty("name",                    Name),
                                  new JProperty("version",                 Version),
                                  new JProperty("openSourceLicense",       openSourceLicense.ToJSON(Embedded: true)),
@@ -252,6 +261,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public TransparencySoftware Clone()
 
             => new (
+                   Id,
                    Name.                 CloneString(),
                    Version.              CloneString(),
                    OpenSourceLicense.    Clone(),
@@ -401,7 +411,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (TransparencySoftware is null)
                 throw new ArgumentNullException(nameof(TransparencySoftware), "The give transparency software must not be null!");
 
-            var c = StringComparer.Ordinal.Compare(Name, TransparencySoftware.Name);
+            var c = Id.CompareTo(TransparencySoftware.Id);
+            if (c == 0) c = StringComparer.Ordinal.Compare(Name, TransparencySoftware.Name);
 
             if (c == 0)
                 c = StringComparer.Ordinal.Compare(Version, TransparencySoftware.Version);
@@ -458,6 +469,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => TransparencySoftware is not null &&
 
+               Id.Equals(TransparencySoftware.Id) &&
                Name.             Equals(TransparencySoftware.Name)              &&
                Version.          Equals(TransparencySoftware.Version)           &&
                openSourceLicense.Equals(TransparencySoftware.openSourceLicense) &&
@@ -489,7 +501,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             unchecked
             {
 
-                return Name.                 GetHashCode()       * 23 ^
+                return Id.GetHashCode() ^ Name.                 GetHashCode()       * 23 ^
                        Version.              GetHashCode()       * 19 ^
                        TransparencyJson.LicenseHash(openSourceLicense) * 13 ^
                        Vendor.               GetHashCode()       * 11 ^

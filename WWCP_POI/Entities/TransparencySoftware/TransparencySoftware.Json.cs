@@ -47,10 +47,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 ArgumentNullException.ThrowIfNull(JSON);
                 if (custom is null)
-                    InfrastructureJson.ValidateFields(JSON, "name", "version", "openSourceLicense", "vendor", "logo",
+                    InfrastructureJson.ValidateFields(JSON, "@id", "name", "version", "openSourceLicense", "vendor", "logo",
                                                       "howToUse", "moreInformation", "sourceCodeRepository");
 
                 var parsed = new TransparencySoftware(
+                                 Id:                   TransparencySoftware_Id.Parse(TransparencyJson.RequiredText(JSON, "@id")),
                                  Name:                 TransparencyJson.RequiredText(JSON, "name"),
                                  Version:              TransparencyJson.RequiredText(JSON, "version"),
                                  OpenSourceLicense:    InfrastructureJson.At("openSourceLicense", () => TransparencyJson.License(JSON)),

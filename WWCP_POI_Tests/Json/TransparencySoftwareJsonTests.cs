@@ -37,15 +37,27 @@ namespace WWCP_POI_Tests.Json
     [TestFixture]
     public sealed class TransparencySoftwareJsonTests
     {
-        private static TransparencySoftware Software(string version = "2.0") => new("Verifier", version,
+        private static TransparencySoftware Software(string version = "2.0") => new(TransparencySoftware_Id.Parse("verifier-" + version), "Verifier", version,
             new OpenSourceLicense(OpenSourceLicense_Id.Parse("MIT"), I18NString.Parse(JObject.Parse("""{"en":"MIT license","de":"MIT-Lizenz"}"""))!,
                 URL.Parse("https://example.org/license")), "Vendor",
             URL.Parse("https://example.org/logo.svg"), URL.Parse("https://example.org/manual"),
             URL.Parse("https://example.org/software"), URL.Parse("https://example.org/source"));
 
-        private static TransparencySoftwareStatus Status(string version = "2.0") => new(Software(version), LegalStatus.Verified, "certificate-1", "issuer-a",
-            DateTimeOffset.Parse("2026-01-01T12:30:00.1234567+02:00", CultureInfo.InvariantCulture),
-            DateTimeOffset.Parse("2027-01-01T12:30:00.7654321+02:00", CultureInfo.InvariantCulture));
+        private static TransparencySoftwareCertificate Certificate(string id = "certificate-1", DateTimeOffset? start = null)
+            => new(TransparencySoftwareCertificate_Id.Parse(id), "issuer-a", "station-model", "1.0",
+                [Software("2.0").Id, Software("3.0").Id, Software("4.0").Id],
+                notBefore: start ?? DateTimeOffset.Parse("2026-01-01T12:30:00.1234567+02:00", CultureInfo.InvariantCulture),
+                notAfter: DateTimeOffset.Parse("2027-01-01T12:30:00.7654321+02:00", CultureInfo.InvariantCulture));
+
+        private static TransparencySoftwareStatus Status(string version = "2.0") => new(Software(version), LegalStatus.Verified, Certificate());
+
+        private static TransparencySoftwareStatus ParseStatus(JObject json,
+            CustomJObjectParserDelegate<TransparencySoftwareStatus>? CustomTransparencySoftwareStatusParser = null)
+            => TransparencySoftwareStatus.Parse(json, CustomTransparencySoftwareStatusParser, Network());
+
+        private static bool TryParseStatus(JObject json, out TransparencySoftwareStatus? value, out string? error,
+            CustomJObjectParserDelegate<TransparencySoftwareStatus>? custom = null)
+            => TransparencySoftwareStatus.TryParse(json, out value, out error, custom, Network());
 
         private static EnergyMeter Meter() => new(EnergyMeter_Id.Parse("meter-1"), I18NString.Create("Meter"),
             TransparencySoftware: [Status("2.0"), Status("3.0")],
@@ -87,6 +99,8 @@ namespace WWCP_POI_Tests.Json
             }
             """);
 
+            json["transparencySoftware"] = new JArray(new[] { Software("2.0"), Software("3.0"), Software("4.0") }.Select(value => value.ToJSON()));
+            json["transparencySoftwareCertificates"] = new JArray(Certificate().ToJSON(), Certificate("certificate-2").ToJSON());
             json["chargingStationOperators"]![0]!["chargingPools"]![0]!["chargingStations"]![0]!["EVSEs"]![0]!["energyMeter"] = Meter().ToJSON();
 
             return RoamingNetwork.Parse(json);
@@ -140,7 +154,7 @@ namespace WWCP_POI_Tests.Json
         public void Minimal_software_omits_optional_links()
         {
 
-            var json = JObject.Parse("""{"name":"Verifier","version":"1","vendor":"Vendor","openSourceLicense":{"@id":"MIT"}}""");
+            var json = JObject.Parse("""{"@id":"verifier-1","name":"Verifier","version":"1","vendor":"Vendor","openSourceLicense":{"@id":"MIT"}}""");
             var parsed = TransparencySoftware.Parse(json);
 
             Assert.That(parsed.Logo, Is.Null);
@@ -231,13 +245,13 @@ namespace WWCP_POI_Tests.Json
                 CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
 
                 var source = Status();
-                var parsed = TransparencySoftwareStatus.Parse(JObject.Parse(source.ToJSON().ToString()));
+                var parsed = ParseStatus(JObject.Parse(source.ToJSON().ToString()));
 
                 Assert.That(parsed, Is.EqualTo(source));
                 Assert.That(parsed.GetHashCode(), Is.EqualTo(source.GetHashCode()));
-                Assert.That(parsed.NotBefore!.Value.Offset, Is.EqualTo(TimeSpan.Zero));
-                Assert.That(parsed.NotBefore.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(1234567));
-                Assert.That(parsed.NotAfter!.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(7654321));
+                Assert.That(parsed.Certificate!.NotBefore!.Value.Offset, Is.EqualTo(TimeSpan.Zero));
+                Assert.That(parsed.Certificate!.NotBefore.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(1234567));
+                Assert.That(parsed.Certificate!.NotAfter!.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(7654321));
                 Assert.That(JsonViews.EqualViews(parsed.ToJSON(), source.ToJSON()), Is.True);
 
             }
@@ -265,7 +279,7 @@ namespace WWCP_POI_Tests.Json
             var json = Status().ToJSON();
 
             json[field] = JToken.Parse(value);
-            Assert.That(TransparencySoftwareStatus.TryParse(json, out var result, out var error), Is.False);
+            Assert.That(TryParseStatus(json, out var result, out var error), Is.False);
             Assert.That(result, Is.Null);
             Assert.That(error, Is.Not.Empty);
 
@@ -275,18 +289,17 @@ namespace WWCP_POI_Tests.Json
         public void Optional_status_fields_can_be_absent_or_null_and_future_legal_statuses_are_preserved()
         {
 
-            var json = new JObject(new JProperty("transparencySoftware", Software().ToJSON()), new JProperty("legalStatus", "future-status"));
-            var minimal = TransparencySoftwareStatus.Parse(json);
+            var json = new JObject(new JProperty("transparencySoftwareId", Software().Id.ToString()), new JProperty("legalStatus", "future-status"));
+            var minimal = ParseStatus(json);
 
             Assert.That(minimal.Certificate, Is.Null);
-            Assert.That(minimal.NotBefore, Is.Null);
 
-            foreach (var field in new[] { "certificate", "certificateIssuer", "notBefore", "notAfter" })
+            foreach (var field in new[] { "certificateId" })
             {
                 json[field] = JValue.CreateNull();
             }
 
-            Assert.That(TransparencySoftwareStatus.Parse(json), Is.EqualTo(minimal));
+            Assert.That(ParseStatus(json), Is.EqualTo(minimal));
             Assert.That(minimal.LegalStatus.ToString(), Is.EqualTo("future-status"));
 
         }
@@ -297,25 +310,25 @@ namespace WWCP_POI_Tests.Json
         public void Validity_timestamps_require_offsets_and_normalize_to_UTC(string timestamp)
         {
 
-            var json = Status().ToJSON();
+            var json = Certificate().ToJSON();
 
             json["notBefore"] = timestamp;
 
             if (!timestamp.EndsWith('Z') && !timestamp.Contains('+'))
             {
-                Assert.That(TransparencySoftwareStatus.TryParse(json, out _, out _), Is.False);
+                Assert.Throws<ArgumentException>(() => TransparencySoftwareCertificate.Parse(json, Network()));
                 return;
             }
 
-            var parsed = TransparencySoftwareStatus.Parse(json);
+            var parsed = TransparencySoftwareCertificate.Parse(json, Network());
 
             Assert.That(parsed.NotBefore, Is.EqualTo(DateTimeOffset.Parse("2026-01-01T10:30:00.1234567Z", CultureInfo.InvariantCulture)));
             Assert.That(parsed.NotBefore!.Value.Offset, Is.EqualTo(TimeSpan.Zero));
-            Assert.That(parsed.GetHashCode(), Is.EqualTo(Status().GetHashCode()));
+            Assert.That(parsed.ETags, Is.EqualTo(Certificate().ETags));
 
         }
 
-        [TestCase("transparencySoftware")]
+        [TestCase("transparencySoftwareId")]
         [TestCase("legalStatus")]
         public void Missing_status_fields_are_rejected(string field)
         {
@@ -323,7 +336,7 @@ namespace WWCP_POI_Tests.Json
             var json = Status().ToJSON();
 
             json.Remove(field);
-            Assert.That(TransparencySoftwareStatus.TryParse(json, out var result, out var error), Is.False);
+            Assert.That(TryParseStatus(json, out var result, out var error), Is.False);
             Assert.That(result, Is.Null);
             Assert.That(error, Does.Contain(field));
 
@@ -339,14 +352,14 @@ namespace WWCP_POI_Tests.Json
             var secondLicense = new OpenSourceLicense(OpenSourceLicense_Id.Parse("mit"),
                                                 I18NString.Parse(JObject.Parse("""{"de":"Lizenz","en":"License"}"""))!,
                                                 URL.Parse("https://example.org/b"), URL.Parse("https://example.org/a"));
-            var first = new TransparencySoftware("Verifier", "2", firstLicense, "Vendor");
-            var second = new TransparencySoftware("Verifier", "2", secondLicense, "Vendor");
+            var first = new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), "Verifier", "2", firstLicense, "Vendor");
+            var second = new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), "Verifier", "2", secondLicense, "Vendor");
 
             Assert.That(first, Is.EqualTo(second));
             Assert.That(first.GetHashCode(), Is.EqualTo(second.GetHashCode()));
             Assert.That(first.CompareTo(second), Is.Zero);
 
-            var changedLicense = new TransparencySoftware("Verifier", "2", new OpenSourceLicense(OpenSourceLicense_Id.Parse("MIT"),
+            var changedLicense = new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), "Verifier", "2", new OpenSourceLicense(OpenSourceLicense_Id.Parse("MIT"),
                                                 I18NString.Create("Other terms"), URL.Parse("https://example.org/a")), "Vendor");
 
             Assert.That(first.CompareTo(changedLicense), Is.Not.Zero);
@@ -357,9 +370,9 @@ namespace WWCP_POI_Tests.Json
         public void Equivalent_license_URL_hosts_have_equal_software_and_status_hashes()
         {
 
-            var first = new TransparencySoftware("Verifier", "2", new OpenSourceLicense(OpenSourceLicense_Id.Parse("MIT"),
+            var first = new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), "Verifier", "2", new OpenSourceLicense(OpenSourceLicense_Id.Parse("MIT"),
                                                 URL.Parse("https://EXAMPLE.org/license")), "Vendor");
-            var second = new TransparencySoftware("Verifier", "2", new OpenSourceLicense(OpenSourceLicense_Id.Parse("mit"),
+            var second = new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), "Verifier", "2", new OpenSourceLicense(OpenSourceLicense_Id.Parse("mit"),
                                                 URL.Parse("https://example.org/license")), "Vendor");
 
             Assert.That(first, Is.EqualTo(second));
@@ -379,8 +392,8 @@ namespace WWCP_POI_Tests.Json
         public void Software_and_status_comparisons_distinguish_all_serialized_fields()
         {
 
-            var plain = new TransparencySoftware("Verifier", "2.0", OpenSourceLicense.MIT, "Vendor");
-            var logo = new TransparencySoftware("Verifier", "2.0", OpenSourceLicense.MIT, "Vendor", Logo: URL.Parse("https://example.org/logo"));
+            var plain = new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), "Verifier", "2.0", OpenSourceLicense.MIT, "Vendor");
+            var logo = new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), "Verifier", "2.0", OpenSourceLicense.MIT, "Vendor", Logo: URL.Parse("https://example.org/logo"));
 
             Assert.That(plain.CompareTo(logo), Is.Not.Zero);
             Assert.That(logo.CompareTo(plain), Is.EqualTo(-plain.CompareTo(logo)));
@@ -388,9 +401,9 @@ namespace WWCP_POI_Tests.Json
 
             var current = Status();
             var version = Status("3.0");
-            var certificate = new TransparencySoftwareStatus(Software(), LegalStatus.Verified, "certificate-2", "issuer-a", current.NotBefore, current.NotAfter);
-            var fractionalTime = new TransparencySoftwareStatus(Software(), LegalStatus.Verified, current.Certificate, current.CertificateIssuer,
-                                                current.NotBefore!.Value.AddTicks(1), current.NotAfter);
+            var certificate = new TransparencySoftwareStatus(Software(), LegalStatus.Verified, Certificate("certificate-2"));
+            var fractionalTime = new TransparencySoftwareStatus(Software(), LegalStatus.Verified,
+                Certificate("certificate-3", current.Certificate!.NotBefore!.Value.AddTicks(1)));
 
             Assert.That(new SortedSet<TransparencySoftwareStatus> { current, version, certificate, fractionalTime }.Count, Is.EqualTo(4));
             Assert.That(current.Equals(fractionalTime), Is.False);
@@ -404,7 +417,7 @@ namespace WWCP_POI_Tests.Json
             var description = I18NString.Create("Original");
             var links = new[] { URL.Parse("https://example.org/original") };
             var license = new OpenSourceLicense(OpenSourceLicense_Id.Parse("custom"), description, links);
-            var software = new TransparencySoftware("Verifier", "2", license, "Vendor");
+            var software = new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), "Verifier", "2", license, "Vendor");
             var before = software.ToJSON();
 
             links[0] = URL.Parse("https://example.org/changed");
@@ -422,28 +435,21 @@ namespace WWCP_POI_Tests.Json
 
             var nestedCalls = 0;
             var statusCalls = 0;
-            var parsed = TransparencySoftwareStatus.Parse(Status().ToJSON(),
-                                                CustomTransparencySoftwareStatusParser: (_, value) =>
-                                                {
-
-                                                    statusCalls++;
-
-                                                    return value;
-
-                                                },
-                                                CustomTransparencySoftwareParser: (_, value) =>
-                                                {
-
-                                                    nestedCalls++;
-
-                                                    return value;
-
-                                                });
+            TransparencySoftware.Parse(Software().ToJSON(), CustomTransparencySoftwareParser: (_, value) =>
+            {
+                nestedCalls++;
+                return value;
+            });
+            var parsed = ParseStatus(Status().ToJSON(), CustomTransparencySoftwareStatusParser: (_, value) =>
+            {
+                statusCalls++;
+                return value;
+            });
 
             Assert.That(nestedCalls, Is.EqualTo(1));
             Assert.That(statusCalls, Is.EqualTo(1));
 
-            var json = parsed.ToJSON(CustomTransparencySoftwareSerializer: (_, document) =>
+            var json = parsed.ToJSON(CustomTransparencySoftwareStatusSerializer: (_, document) =>
                                     {
 
                                         document["extension"] = 1;
@@ -452,11 +458,11 @@ namespace WWCP_POI_Tests.Json
 
                                     });
 
-            Assert.That(json["transparencySoftware"]!["extension"]!.Value<int>(), Is.EqualTo(1));
+            Assert.That(json["extension"]!.Value<int>(), Is.EqualTo(1));
             Assert.That(TransparencySoftware.TryParse(Software().ToJSON(), out var software, out var error, (_, _) => null!), Is.False);
             Assert.That(software, Is.Null);
             Assert.That(error, Does.Contain("returned null"));
-            Assert.That(TransparencySoftwareStatus.TryParse(Status().ToJSON(), out var status, out error, (_, _) => null!), Is.False);
+            Assert.That(TryParseStatus(Status().ToJSON(), out var status, out error, (_, _) => null!), Is.False);
             Assert.That(status, Is.Null);
             Assert.That(error, Does.Contain("returned null"));
 
@@ -472,7 +478,7 @@ namespace WWCP_POI_Tests.Json
             statuses.Clear();
             Assert.That(meter.TransparencySoftware.Count(), Is.EqualTo(2));
 
-            var restored = EnergyMeter.Parse(meter.ToJSON());
+            var restored = EnergyMeter.Parse(meter.ToJSON(), Network: Network());
 
             Assert.That(restored.TransparencySoftware, Is.EquivalentTo(meter.TransparencySoftware));
             Assert.That(restored.LastChangeDate, Is.EqualTo(meter.LastChangeDate).Within(TimeSpan.FromMilliseconds(1)));
@@ -487,7 +493,7 @@ namespace WWCP_POI_Tests.Json
             var json = Meter().ToJSON();
 
             json["transparencySoftware"]![1]!["notAfter"] = "2020-01-01T00:00:00Z";
-            Assert.That(EnergyMeter.TryParse(json, out var result, out var error), Is.False);
+            Assert.That(EnergyMeter.TryParse(json, out var result, out var error, Network: Network()), Is.False);
             Assert.That(result, Is.Null);
             Assert.That(error, Does.Contain("transparencySoftware[1]"));
 
@@ -522,8 +528,8 @@ namespace WWCP_POI_Tests.Json
             var document = JObject.Parse(oldMeter.GetRawText());
 
             document["transparencySoftware"]![0]!["legalStatus"] = "GermanCalibrationLaw";
-            document["transparencySoftware"]![0]!["certificate"] = "certificate-2";
-            document["transparencySoftware"]![0]!["transparencySoftware"]!["version"] = "4.0";
+            document["transparencySoftware"]![0]!["certificateId"] = "certificate-2";
+            document["transparencySoftware"]![0]!["transparencySoftwareId"] = Software("4.0").Id.ToString();
 
             var next = source.ApplyChangeSet(Set(source, oldMeter, JsonSerializer.Deserialize<JsonElement>(document.ToString())));
 
@@ -552,13 +558,13 @@ namespace WWCP_POI_Tests.Json
             var oldMeter = data.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["energyMeter"];
             var document = JObject.Parse(oldMeter.GetRawText());
 
-            document["transparencySoftware"]![0]!["transparencySoftware"]!["version"] = " ";
+            document["transparencySoftware"]![0]!["transparencySoftwareId"] = " ";
 
             var exception = Assert.Throws<RoamingNetworkChangeSetException>(() => source.ApplyChangeSet(Set(source, oldMeter,
                                                 JsonSerializer.Deserialize<JsonElement>(document.ToString()))));
 
             Assert.That(exception!.OperationIndex, Is.EqualTo(0));
-            Assert.That(exception.Message, Does.Contain("transparencySoftware[0]").And.Contain("version"));
+            Assert.That(exception.Message, Does.Contain("transparencySoftware[0]").And.Contain("transparencySoftwareId"));
             Assert.That(source.DataSnapshot, Is.SameAs(data));
 
         }
@@ -588,7 +594,7 @@ namespace WWCP_POI_Tests.Json
             }
 
             Assert.That(TransparencySoftware.TryParse(null!, out _, out _), Is.False);
-            Assert.That(TransparencySoftwareStatus.TryParse(null!, out _, out _), Is.False);
+            Assert.That(TryParseStatus(null!, out _, out _), Is.False);
 
         }
     }

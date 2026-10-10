@@ -41,7 +41,7 @@ public sealed partial class RoamingNetworkHistory
         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean> verifyCommit,
         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatch,
         Func<RoamingNetworkCommit, Boolean>? authorize)
-        : this(RoamingNetwork.Parse(boundary.SnapshotCommit.Snapshot!.State.ToJSON()), verifyBatch, verifyCommit, authorize)
+        : this(RoamingNetwork.ParseSnapshot(boundary.SnapshotCommit.Snapshot!.State), verifyBatch, verifyCommit, authorize)
     {
         checkpointId = boundary.Checkpoint;
         anchorId = boundary.Anchor;

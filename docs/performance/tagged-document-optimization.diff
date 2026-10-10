@@ -1,0 +1,25 @@
+diff --git a/WWCP_POI/Serialization/POIRepresentation.cs b/WWCP_POI/Serialization/POIRepresentation.cs
+--- a/WWCP_POI/Serialization/POIRepresentation.cs
++++ b/WWCP_POI/Serialization/POIRepresentation.cs
+@@ -47,10 +47,18 @@
+                 document["ETags"] = TagsJSON(value.ETags, DigestEncoding);
+                 return;
+             }
+-            var staticContent = (JObject) document.DeepClone();
+-            Prepare(staticContent, type, false);
++            // Prepare has already stripped static transport bookkeeping from the whole document.
++            // Visit is preorder: this node and its descendants have no newly attached tags yet.
++            // Hash the prepared subtree before adding its declarations, avoiding a second copy/pass.
++            var staticContent = document;
++            if (IncludeRuntime || (IncludeVersionMetadata && type == nameof(RoamingNetwork)))
++            {
++                staticContent = (JObject) document.DeepClone();
++                Prepare(staticContent, type, false);
++            }
++            var tags = Tags(staticContent, type);
+             document[POIContentProfile.PropertyName] = POIContentProfile.Id;
+-            document["ETags"] = TagsJSON(Tags(staticContent, type), DigestEncoding);
++            document["ETags"] = TagsJSON(tags, DigestEncoding);
+         });
+         return json;
+     }

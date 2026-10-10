@@ -58,16 +58,16 @@ public partial class EnergyMeter
     /// <summary>
     /// Parse a CBOR POI representation, including its metrological values and content identifiers.
     /// </summary>
-    public static EnergyMeter ParseCBOR(ReadOnlySpan<Byte> data)
-        => POIRepresentation.ParseCBOR(data, json => EnergyMeter.Parse(json));
+    public static EnergyMeter ParseCBOR(ReadOnlySpan<Byte> data, RoamingNetwork? network = null)
+        => POIRepresentation.ParseCBOR(data, json => EnergyMeter.Parse(json, Network: network));
 
     /// <summary>
     /// Try to parse a CBOR POI representation with the same parent context as JSON.
     /// </summary>
     public static Boolean TryParseCBOR(ReadOnlySpan<Byte> data,
                                        [NotNullWhen(true)] out EnergyMeter? value,
-                                       [NotNullWhen(false)] out String? error)
-        => POIRepresentation.TryParseCBOR(data, json => EnergyMeter.Parse(json), out value, out error);
+                                       [NotNullWhen(false)] out String? error, RoamingNetwork? network = null)
+        => POIRepresentation.TryParseCBOR(data, json => EnergyMeter.Parse(json, Network: network), out value, out error);
 }
 
 public partial class TransparencySoftware
@@ -92,16 +92,16 @@ public partial class TransparencySoftwareStatus
     /// <summary>
     /// Parse a CBOR POI representation, including its metrological values and content identifiers.
     /// </summary>
-    public static TransparencySoftwareStatus ParseCBOR(ReadOnlySpan<Byte> data)
-        => POIRepresentation.ParseCBOR(data, json => TransparencySoftwareStatus.Parse(json));
+    public static TransparencySoftwareStatus ParseCBOR(ReadOnlySpan<Byte> data, RoamingNetwork? network = null)
+        => POIRepresentation.ParseCBOR(data, json => TransparencySoftwareStatus.Parse(json, Network: network));
 
     /// <summary>
     /// Try to parse a CBOR POI representation with the same parent context as JSON.
     /// </summary>
     public static Boolean TryParseCBOR(ReadOnlySpan<Byte> data,
                                        [NotNullWhen(true)] out TransparencySoftwareStatus? value,
-                                       [NotNullWhen(false)] out String? error)
-        => POIRepresentation.TryParseCBOR(data, json => TransparencySoftwareStatus.Parse(json), out value, out error);
+                                       [NotNullWhen(false)] out String? error, RoamingNetwork? network = null)
+        => POIRepresentation.TryParseCBOR(data, json => TransparencySoftwareStatus.Parse(json, Network: network), out value, out error);
 }
 
 public partial class Brand

@@ -1,0 +1,209 @@
+--- a/WWCP_POI/Serialization/POIRepresentation.cs
++++ b/WWCP_POI/Serialization/POIRepresentation.cs
+@@ -182,23 +182,19 @@
+ 
+     private static Byte[] Encode(JObject json, String kind, Byte[]? canonicalJSON = null)
+     {
+-        var paths = new HashSet<String>(StringComparer.Ordinal);
+-        var hasETags = false;
++        // Preserve validation order before canonical JSON rejects unsupported customer values.
+         Visit(json, kind, "", (document, type, path) =>
+         {
+-            hasETags |= document["ETags"] is not null;
+             foreach (var property in document.Properties())
+-                if (property.Value.Type == JTokenType.String && IsMeasurement(type, property.Name))
+-                {
+-                    if (!MetrologicalValue.TryParse(property.Value.Value<String>()!, out _, out var error))
+-                        throw new ArgumentException($"{path}/{property.Name}: cannot encode a Styx metrological value: {error}");
+-                    paths.Add(path + "/" + Escape(property.Name));
+-                }
+-        });
+-        var cbor = CBORJSON.ToCBOR(canonicalJSON ?? CanonicalJSON.ToUTF8Bytes(json), new CBORJSONOptions {
+-            DetectMetrologicalValues = (path, _) => paths.Contains(path)
+-        });
+-        return (hasETags ? ConvertETagCBOR(cbor, kind, true) : cbor).ToByteArray(CBORWriterOptions.Canonical);
++                if (property.Value.Type == JTokenType.String && IsMeasurement(type, property.Name) &&
++                    !MetrologicalValue.TryParse(property.Value.Value<String>()!, out _, out var error))
++                    throw new ArgumentException($"{path}/{property.Name}: cannot encode a Styx metrological value: {error}");
++        });
++        var bytes = canonicalJSON ?? CanonicalJSON.ToUTF8Bytes(json);
++        using var document = System.Text.Json.JsonDocument.Parse(bytes, new System.Text.Json.JsonDocumentOptions { MaxDepth = 64 });
++        var output = new System.Buffers.ArrayBufferWriter<Byte>();
++        new POICBORWriter(output).Write(document.RootElement, kind);
++        return output.WrittenSpan.ToArray();
+     }
+ 
+     // Convert only schema-owned ETag arrays. Customer fields with the same name stay untouched.
+--- /dev/null
++++ b/WWCP_POI/Serialization/POICBORWriter.cs
+@@ -0,0 +1,170 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.Buffers;
++using System.Collections.Immutable;
++using System.Globalization;
++using System.Text.Json;
++using org.GraphDefined.Vanaheimr.Illias;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++/// <summary>
++/// Write canonical POI CBOR from canonical JSON without constructing complete CBOR value trees.
++/// Map order and uniqueness are checked here; scalar/tag/depth rules belong to Styx.
++/// </summary>
++internal sealed class POICBORWriter
++{
++    private readonly CBORWriter writer;
++    private readonly Dictionary<String, Byte[]> keys = new(StringComparer.Ordinal);
++    private Int32 keyBytes;
++    private const Int32 MaxCachedKeys = 128;
++    private const Int32 MaxCachedKeyBytes = 16384;
++
++    internal POICBORWriter(IBufferWriter<Byte> output)
++    {
++        // Every map is sorted before emission, every container has a definite count.
++        // Turning off Styx's second map sort prevents its complete-map scratch buffers.
++        writer = new(output, new CBORWriterOptions { PreferredFloatEncoding = true, MaxDepth = 64 });
++    }
++
++    internal void Write(JsonElement value, String kind)
++    {
++        WriteValue(value, kind, "");
++        if (!writer.IsComplete) throw new CBORException("Incomplete POI CBOR value.");
++    }
++
++    private void WriteValue(JsonElement value, String? kind, String path)
++    {
++        switch (value.ValueKind)
++        {
++            case JsonValueKind.Object:
++                var fields = value.EnumerateObject().Select(property => {
++                    var name = property.Name;
++                    return (Name: name, Key: Key(name), Value: property.Value);
++                }).ToArray();
++                Array.Sort(fields, (left, right) => left.Key.AsSpan().SequenceCompareTo(right.Key));
++                RequireUnique(fields.Select(field => field.Key));
++                writer.WriteStartMap(fields.Length);
++                foreach (var field in fields)
++                {
++                    writer.WriteTextString(field.Name);
++                    if (kind is not null && field.Name == "ETags") WriteETags(field.Value);
++                    else if (kind is not null && field.Value.ValueKind == JsonValueKind.String &&
++                             POIRepresentation.IsMeasurement(kind, field.Name))
++                    {
++                        if (!MetrologicalValue.TryParse(field.Value.GetString()!, out var reading, out var error))
++                            throw new ArgumentException($"{path}/{Escape(field.Name)}: cannot encode a Styx metrological value: {error}");
++                        // Only this small unit/uncertainty value uses a tree. Its maps are sorted too.
++                        WriteLeaf(reading.ToCBOR());
++                    }
++                    else
++                    {
++                        var child = kind is null ? null : POIRepresentation.ChildKind(kind, field.Name);
++                        WriteValue(field.Value, child, child is null ? "" : path + "/" + Escape(field.Name));
++                    }
++                }
++                writer.WriteEndMap();
++                break;
++            case JsonValueKind.Array:
++                writer.WriteStartArray(value.GetArrayLength());
++                var index = 0;
++                foreach (var item in value.EnumerateArray())
++                {
++                    // The schema visitor binds immediate object elements only, not nested arrays.
++                    var child = item.ValueKind == JsonValueKind.Object ? kind : null;
++                    WriteValue(item, child, child is null ? "" : path + "/" + index.ToString(CultureInfo.InvariantCulture));
++                    index++;
++                }
++                writer.WriteEndArray();
++                break;
++            case JsonValueKind.String: writer.WriteTextString(value.GetString()!); break;
++            case JsonValueKind.True: writer.WriteBoolean(true); break;
++            case JsonValueKind.False: writer.WriteBoolean(false); break;
++            case JsonValueKind.Null: writer.WriteNull(); break;
++            case JsonValueKind.Number:
++                if (value.TryGetInt64(out var signed)) writer.WriteInt64(signed);
++                else if (value.TryGetUInt64(out var unsigned)) writer.WriteUInt64(unsigned);
++                // Styx preserves exact decimal scales, exponents and bignums; never use binary floats.
++                else WriteLeaf(CBORJSON.ToCBOR(value.GetRawText()));
++                break;
++            default: throw new CBORException($"Unsupported POI JSON kind '{value.ValueKind}'.");
++        }
++    }
++
++    private void WriteETags(JsonElement value)
++    {
++        if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() != 2)
++            throw new ArgumentException("ETags: expected the JSON and CBOR identifier arrays.");
++        var tags = ETag.ValidatePair(ImmutableArray.Create(ReadETag(value[0]), ReadETag(value[1])), "ETags");
++        writer.WriteStartArray(2);
++        foreach (var tag in tags)
++        {
++            writer.WriteStartArray(3);
++            writer.WriteTextString(tag.FormatText);
++            writer.WriteTextString(tag.AlgorithmText);
++            writer.WriteByteString(tag.Digest.AsSpan());
++            writer.WriteEndArray();
++        }
++        writer.WriteEndArray();
++    }
++
++    private static ETag ReadETag(JsonElement value)
++    {
++        if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() != 4 ||
++            value.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String))
++            throw new ArgumentException("A JSON ETag must be [format, algorithm, encoding, encodedDigest].");
++        return ETag.FromTextParts(value[0].GetString()!, value[1].GetString()!, value[2].GetString()!, value[3].GetString()!);
++    }
++
++    private void WriteLeaf(CBORValue value)
++    {
++        switch (value.Kind)
++        {
++            case CBORValueKind.Map:
++                var fields = value.AsMap().Select(field => (Key: field.Key.ToByteArray(CBORWriterOptions.Canonical), Field: field)).ToArray();
++                Array.Sort(fields, (left, right) => left.Key.AsSpan().SequenceCompareTo(right.Key));
++                RequireUnique(fields.Select(field => field.Key));
++                writer.WriteStartMap(fields.Length);
++                foreach (var field in fields) { WriteLeaf(field.Field.Key); WriteLeaf(field.Field.Value); }
++                writer.WriteEndMap();
++                break;
++            case CBORValueKind.Array:
++                var items = value.AsArray(); writer.WriteStartArray(items.Count);
++                foreach (var item in items) WriteLeaf(item);
++                writer.WriteEndArray();
++                break;
++            case CBORValueKind.Tagged:
++                writer.WriteTag(value.Tag); WriteLeaf(value.UntaggedValue);
++                break;
++            default: value.WriteTo(writer); break;
++        }
++    }
++
++    private Byte[] Key(String name)
++    {
++        if (keys.TryGetValue(name, out var key)) return key;
++        key = CBORValue.FromText(name).ToByteArray(CBORWriterOptions.Canonical);
++        if (keys.Count < MaxCachedKeys && key.Length <= MaxCachedKeyBytes - keyBytes)
++        {
++            keys.Add(name, key); keyBytes += key.Length;
++        }
++        return key;
++    }
++
++    private static void RequireUnique(IEnumerable<Byte[]> sorted)
++    {
++        Byte[]? previous = null;
++        foreach (var key in sorted)
++        {
++            if (previous is not null && previous.AsSpan().SequenceEqual(key))
++                throw new CBORException("Duplicate CBOR POI map key.");
++            previous = key;
++        }
++    }
++
++    private static String Escape(String value) => value.Replace("~", "~0").Replace("/", "~1");
++}

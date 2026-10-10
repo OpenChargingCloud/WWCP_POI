@@ -96,8 +96,6 @@ public sealed partial class RoamingNetwork
             },
             POIRuntimeTargetKind.GridConnectionPointEnergyMeter => owner is ChargingPool pool &&
                 pool.GridConnectionPoint?.EnergyMeter is { } meter && meter.Id == EnergyMeter_Id.Parse(target.ChildId!) ? meter : null,
-            POIRuntimeTargetKind.GridConnectionPointGridOperator => owner is ChargingPool pool &&
-                pool.GridConnectionPoint?.GridOperator is { } op && op.Id == GridOperator_Id.Parse(target.ChildId!) ? op : null,
             _ => null
         };
         return child ?? throw new ArgumentException("The runtime child does not exist in the specified ownership slot.");

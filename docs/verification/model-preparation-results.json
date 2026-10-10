@@ -1,0 +1,379 @@
+{
+  "date": "2026-10-09",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "172c10558d0df4431d4bc90aad476cb864dccd062d64be8196a8ad820455b587",
+  "productionAssemblySHA256": "06c1510660cbf408de8d25f7a0f5f777aafef369a8259c92aea0c9f6a2adcf4f",
+  "beforeProductionSourceSHA256": "328a5730f63430272eaa08818d555484c23a01c42bd13176ae465d72f1a10204",
+  "beforeProductionAssemblySHA256": "acfe94a80ad8520d77d709755ae0fd29e70b701276a856441c4d616ba293d66f",
+  "beforeEvidence": "docs/verification/mapped-recovery-results.json",
+  "productionPatch": {
+    "file": "docs/performance/model-preparation.diff",
+    "sha256": "37dd1ebcb48d5d2750f7b3c13bf315790e0997ced79f95c841febffef14ffdda",
+    "modifiedFiles": [
+      "WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.Import.cs",
+      "WWCP_POI/Serialization/POISnapshotRepresentation.cs"
+    ],
+    "addedFiles": [],
+    "reverseCheckPassed": true,
+    "reverseAppliedInPrivateCopyRestoresExactBeforeBytes": true,
+    "privateCheckoutEOL": "Per-file original LF/CRLF rules in private .gitattributes; normalized text patch."
+  },
+  "testSourceSHA256": "4e62ee0d3a8756b5476086dfae6d929e72e1fcbd332a428745d569b9fccac4c8",
+  "testAssemblySHA256": "a43ce0b70ef25267dda19e45d71192e9192d8228986d5c7a528dda91d1fd11ad",
+  "testChangedFiles": [
+    "Interoperability/ModelPreparationTests.cs",
+    "Interoperability/SnapshotPreparationOracle.cs",
+    "Interoperability/SnapshotImportOracle.cs"
+  ],
+  "newTestCases": 88,
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/model-preparation/model-fixture-definitive.trx",
+      "sha256": "0123ec5155abbf03750627c7563463c882693d2a87ad95e57261c03ecb253ea7",
+      "counters": {
+        "total": 88,
+        "executed": 88,
+        "passed": 88,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "newFixturePassed": 88,
+      "times": {
+        "creation": "2026-10-09T17:14:07.8215177+02:00",
+        "queuing": "2026-10-09T17:14:07.8215180+02:00",
+        "start": "2026-10-09T17:14:05.9378090+02:00",
+        "finish": "2026-10-09T17:14:10.4944277+02:00"
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/model-preparation/model-focused-definitive.trx",
+      "sha256": "65e64edf5f4c9f7c9c16e436215757600525d60facb8ba240f4b17a3047495af",
+      "counters": {
+        "total": 1943,
+        "executed": 1942,
+        "passed": 1942,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "newFixturePassed": 88,
+      "times": {
+        "creation": "2026-10-09T17:14:40.9268444+02:00",
+        "queuing": "2026-10-09T17:14:40.9268446+02:00",
+        "start": "2026-10-09T17:14:39.0302062+02:00",
+        "finish": "2026-10-09T17:20:17.1704008+02:00"
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/model-preparation/model-full-definitive.trx",
+      "sha256": "461c2fa943a78fe636475af1ac018c8499c453ed62ff9cd566c44401caacb448",
+      "counters": {
+        "total": 2275,
+        "executed": 2274,
+        "passed": 2274,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "newFixturePassed": 88,
+      "times": {
+        "creation": "2026-10-09T17:14:40.8267979+02:00",
+        "queuing": "2026-10-09T17:14:40.8267984+02:00",
+        "start": "2026-10-09T17:14:39.2590361+02:00",
+        "finish": "2026-10-09T17:20:18.9819449+02:00"
+      }
+    }
+  ],
+  "benchmarkSourceSHA256": "d389ff298008f62c33535621d24b04508bfb82d0af5f0e1af3552740fd867186",
+  "rebuiltBenchmarkAssemblySHA256": "cc6c4919b1f193582958d5a08103d12576c5cfd3cd19dd794d6ee6a82ce18552",
+  "measurementBenchmarkAssemblySHA256": "c82ca65658b52849124f3bb7897f97ce6bff5b710283eb87a4d7800b73a7b2ba",
+  "benchmarkCSharpSourceUnchanged": true,
+  "preservedHarnessBinaryUsedOnBothSides": true,
+  "harnessMethod": "The unchanged preserved harness and runtime/dependency files are used in two private folders; only the after production library/PDB are replaced. No public/private benchmark binding signature changes in this package.",
+  "excludedExplicitGenerators": [
+    "GenerateReferenceVectors",
+    "GenerateSnapshotRetentionVectors"
+  ],
+  "referenceFiles": [
+    {
+      "file": "docs/interoperability/changeset.cbor",
+      "sha256": "2e9ca50bf982c5797fa5301beadd7399c38967031325d305909fd1a9ddaff2e3"
+    },
+    {
+      "file": "docs/interoperability/changeset.json",
+      "sha256": "5149f33a4d0f04cca1b077c5bb5888da6f7670fb970c08ed9b8d2be01d58e461"
+    },
+    {
+      "file": "docs/interoperability/commit.cbor",
+      "sha256": "dd808c2f667ed99ac1f319fbbe480b7bfa7a1cd0c2fffb9d0c72a4dd49441f64"
+    },
+    {
+      "file": "docs/interoperability/commit.json",
+      "sha256": "16e1c0b8e5e26b741a915882f6445df61985a74813da4e0bde8df96b0dcdc9e2"
+    },
+    {
+      "file": "docs/interoperability/history.cbor",
+      "sha256": "4ad8c59d47e8738c9005a303a150552077ba4dc0ab990e2a62c42b66d889ed53"
+    },
+    {
+      "file": "docs/interoperability/history.json",
+      "sha256": "173f11f152a749ee7d25a8f629351eec9c0da8366ddf7881353c1bafbc8e16e3"
+    },
+    {
+      "file": "docs/interoperability/merge.cbor",
+      "sha256": "c94096478440e4e714cc1d73ff39d73da0181faf485fd16b0d6ff9369fa9c966"
+    },
+    {
+      "file": "docs/interoperability/merge.json",
+      "sha256": "6e3f4a476d1da2678528ab3a7abcba770258b5d7c229e71aa280fbb294cb6a9c"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.cbor",
+      "sha256": "c8ec4ad4ed107ea6a7b801f8ad5fad78b93a42f12905148824f78a2b1b1dec49"
+    },
+    {
+      "file": "docs/interoperability/pruned-bootstrap-manifest.json",
+      "sha256": "abeea6cdfea5e449c56a771cd0caa14ed45a874962336d353e5c0fe7a1436dfc"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.cbor",
+      "sha256": "408ce78ba3c28befe90b6b159f9e12146046146717e698d31f1789e74804e3ac"
+    },
+    {
+      "file": "docs/interoperability/pruned-history.json",
+      "sha256": "fad7ba55d04bffc11312ca01112da1c0920adbd0221123981460630ebe42a34a"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.cbor",
+      "sha256": "903a0f7e5de856c92d893476fb081633da45a4cdc2587f5b18a3bec9f0810e9b"
+    },
+    {
+      "file": "docs/interoperability/resolved-merge.json",
+      "sha256": "52c32069a8f96baa7826998fdc5180e7781d8e875bb04618d93ff51e0589160c"
+    },
+    {
+      "file": "docs/interoperability/retention-plan.json",
+      "sha256": "53d6e4f920b2801e72acd3c9ddcd9916d24e0f365883829c7fe12faeaa4e3c73"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.cbor",
+      "sha256": "18865a3f1ee8e9319a9dc63fb9c47c55d86ce6c95ac19e425f9144c0d31d5f29"
+    },
+    {
+      "file": "docs/interoperability/retention-receipt.json",
+      "sha256": "f486190cd0fa2de10bd39cabfe3d582a27814dc27a41ac8e4529cc727041894b"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.cbor",
+      "sha256": "0a5b8a2389bb4d603cbb17e6c6f75a24736a82bdfb49c56b4e206d6120e9ade7"
+    },
+    {
+      "file": "docs/interoperability/snapshot-boundary-history.json",
+      "sha256": "7c5363c00863993d47c1b1cc9e723486521f640294fbce71207ef018fe061af5"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.cbor",
+      "sha256": "1d6593f6cfbef65f4b310cb173a81cadea5010e96f6f3cd2454e29701450bb47"
+    },
+    {
+      "file": "docs/interoperability/snapshot-commit.json",
+      "sha256": "c1cbf4389ded04c16a78f45980ff5b68f440e012a5e936929418cc3db368a18c"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.cbor",
+      "sha256": "608218579b163fbf3eb71b7932fe4a9483bf089953e448793d02d27114074531"
+    },
+    {
+      "file": "docs/interoperability/snapshot-complete-history.json",
+      "sha256": "4bc9b76e36a992d73df3632b5f18d678d29aa33a0be42fcb311710818e1820e4"
+    },
+    {
+      "file": "docs/interoperability/snapshot-retention.vectors.json",
+      "sha256": "b773e90f3ba2f9c1ae110163bddc48a5da76eadad04e522cfa852d16dbb412c9"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.cbor",
+      "sha256": "ca17c05ea79af48847fe95268b3743b5eea2901fad1a14a7369a98867e70d1b8"
+    },
+    {
+      "file": "docs/interoperability/snapshot-suffix-page.json",
+      "sha256": "9b1d6039d962c1060732539670204869e4db55f67bcc04a109adf226515ef415"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.cbor",
+      "sha256": "b813800ae3bddbc98e216a7cd47f92075843c19a43c71fda82e971dc4b29f0e5"
+    },
+    {
+      "file": "docs/interoperability/snapshot.canonical.json",
+      "sha256": "f278409b12987017f2270170c57f2f732b36068a5b606a958ea7da028c1dc36d"
+    },
+    {
+      "file": "docs/interoperability/snapshot.cbor",
+      "sha256": "dbf002f25a428e1588f150fd6a69f352da6bda8d420b06c3dc2f8c1633eec89f"
+    },
+    {
+      "file": "docs/interoperability/snapshot.input.json",
+      "sha256": "10c250ec20ff14a8d1e330262ec8ba53b0a70a3a380b80da4fb6fbf113bbe7b1"
+    },
+    {
+      "file": "docs/interoperability/snapshot.json",
+      "sha256": "70a684f485bcf208440455656c69463e4d1058d330de91504ffdae31171f81bd"
+    },
+    {
+      "file": "docs/interoperability/vectors.json",
+      "sha256": "7684f6096567f7cb40f9316a30c6d8601b80b329c2727be5a53b51cc37143201"
+    }
+  ],
+  "referenceFilesUnchanged": true,
+  "sharedDependencies": [
+    {
+      "name": "Styx.dll",
+      "sha256": "1655174175e2abb259ead391c8e58aa71c089e71142c04a88581d31f3b7956ac",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "WWCP_CoreData.dll",
+      "sha256": "4630250928e031ad4fc7c531c6786d3cca3e952f851f3f184903b3d3d19c0cba",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "org.GraphDefined.Vanaheimr.Hermod.dll",
+      "sha256": "7355657890caf64a8e922e3d11bb14e835c398b6dd76f013d3987e035535a43c",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "Newtonsoft.Json.dll",
+      "sha256": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    },
+    {
+      "name": "BouncyCastle.Cryptography.dll",
+      "sha256": "ef92fc661e8d7ba8ec4d39a7cdfcdba41f14cb327f0d24fe79d0b5bb428899b5",
+      "testAndBenchmarkCopiesEqual": true,
+      "unchangedFromBaseline": true
+    }
+  ],
+  "reportScriptSHA256": "2a8f679c8bb718ef1ae577017daf965df3046d0a4a0333f4c0a2f8df7571a9e8",
+  "scope": {
+    "entryPointCopiesPreserved": true,
+    "privateDescendantCopiesRemoved": true,
+    "projectedReplacementCopiesPreserved": true,
+    "normalizationAndValidationOrderPreserved": true,
+    "persistentPreparationCacheAdded": false,
+    "mutableJSONNodesRetained": false,
+    "signatureTrustCached": false,
+    "eagerCompleteAndLazyBoundaryModelsPreserved": true,
+    "publicSignaturesChanged": false
+  },
+  "testOracleSources": [
+    {
+      "file": "WWCP_POI_Tests/Interoperability/SnapshotPreparationOracle.cs",
+      "sha256": "749346f87fafb3cc9d5a04fac8a8afdcbc24a381f1ecd060911bb16be0915a34"
+    },
+    {
+      "file": "WWCP_POI_Tests/Interoperability/SnapshotImportOracle.cs",
+      "sha256": "a25041a101718b9132c2ee057c8567f957fadfa38780022455a0bdd4e33c0672"
+    }
+  ],
+  "testOracleScope": "Frozen preceding recursive-copy traversals; scalar/schema helpers remain the production helpers. Inputs, outputs, exact imported properties and exception types/messages are compared.",
+  "testFixtureCorrections": [
+    "Use the actual timestamped status object contract.",
+    "Compare the imported added subtree, excluding the separately touched owner.",
+    "Use the actual received CBOR payload field order in the importer oracle.",
+    "Check declared ETags through the existing POIRepresentation.ParseJSON contract."
+  ],
+  "measurements": [
+    {
+      "file": "docs/performance/model-preparation-before.json",
+      "sha256": "59b090704fc1f60d367cdc656a9d0f96cedee04928205d59d8d2e70cfdb010a9",
+      "workers": 42,
+      "samples": 126,
+      "times": {
+        "start": "2026-10-09T15:20:33.952158+00:00",
+        "finish": "2026-10-09T15:31:57.962048+00:00"
+      }
+    },
+    {
+      "file": "docs/performance/model-preparation-after.json",
+      "sha256": "343d326f3ca5239b98ea057e329d84067c44bfe8038a72fe1c1e722baacbe6c8",
+      "workers": 42,
+      "samples": 126,
+      "times": {
+        "start": "2026-10-09T15:31:57.963862+00:00",
+        "finish": "2026-10-09T15:41:41.439590+00:00"
+      }
+    }
+  ],
+  "measurementWorkers": 84,
+  "measurementSamples": 252,
+  "matchedPreparedInputs": "docs/performance/mapped-file-controls.json",
+  "matchedInputsSHA256": "d140f4072956ea58e89935c617f96505ae3226e9c64ff8042483470f780b2722",
+  "summary": {
+    "file": "docs/performance/model-preparation-summary.md",
+    "sha256": "d69ff94c4d6b2fcbef469c728e179eb1fcc1ef4c7dec9fd11c19b6c821ae49fc"
+  },
+  "formalLauncherSHA256": "0d0dce72e15e6f1e7e61858a4081ff8ee75ffb658c7647c077e818848c50a9c3",
+  "portableLauncherFile": "WWCP_POI_Benchmarks/model_preparation_measure.py",
+  "portableLauncherSHA256": "224e08cecc5335c5371700d1d6dc0150d76d1475eea863e0175f894ca29f12cd",
+  "formalWorkerArguments": "--worker --shape <fixed JSON shape> --operation <read-cbor-model|read-restore|read-cbor> --samples 3 --warmups 3",
+  "formalLauncherMethod": "Original local sequential worker launcher; the portable CLI reproduces the same shapes/worker arguments and verifies explicit source/binary bindings.",
+  "noTaskBuildTestOverlap": true,
+  "preservedSourcesAndSharedDependenciesVerified": true,
+  "limits": {
+    "sharedDesktop": true,
+    "affinityControlled": false,
+    "retainedMemoryExactBound": false,
+    "allTimingImprovementsGuaranteed": false,
+    "modelOnlyBoundarySuffixEager": true
+  },
+  "documentationLinks": {
+    "checked": 1030,
+    "missing": 0
+  },
+  "scopedWhitespaceCheckPassed": true,
+  "reportValidatorRejected": [
+    "incomplete",
+    "missing-worker",
+    "changed-inventory",
+    "changed-model",
+    "changed-dependency"
+  ],
+  "summaryReproducesExactly": true,
+  "portableLauncherVerifyOnlyPassedBothBindings": true
+}

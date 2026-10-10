@@ -1,0 +1,44 @@
+using System.Text.Json;
+using Microsoft.Diagnostics.Tracing.Etlx;
+using Microsoft.Diagnostics.Tracing.Parsers.Clr;
+
+using var log = new TraceLog(TraceLog.CreateFromEventPipeDataFile(args[0]));
+var sites = new Dictionary<String, (Int64 Bytes, Int32 Events)>();
+var types = new Dictionary<String, (Int64 Bytes, Int32 Events)>();
+var inclusive = new Dictionary<String, (Int64 Bytes, Int32 Events)>();
+var all = 0; var stacked = 0; var matched = 0; var total = 0L;
+var selectors = new[] { "RoamingNetworkDataSnapshot.Project", "RoamingNetworkDataSnapshot.ValidationDocument",
+    "RoamingNetworkDataSnapshot.OwnJSON", "ValidationProjection.Project", "ValidationProjection.Create", "RoamingNetwork.RestoreVersionedSnapshot",
+    "POISnapshotRepresentation.CompleteOwnedImport", "POISnapshotRepresentation.BindOwned",
+    "RoamingNetwork.ParseSnapshot", "RoamingNetworkDataSnapshot.ApplyChangeSet",
+    "RoamingNetworkDataSnapshot.ImportOwned", "RoamingNetworkDataSnapshot.Capture" };
+foreach (var trace in log.Events)
+{
+    if (trace is not GCAllocationTickTraceData item) continue;
+    all++; var frames = new List<String>();
+    for (var frame = item.CallStack(); frame is not null; frame = frame.Caller)
+        frames.Add(frame.CodeAddress.FullMethodName);
+    if (frames.Count > 0) stacked++;
+    if (!frames.Any(frame => frame.Contains("WWCP_POI_Benchmarks.Measurement.Run"))) continue;
+    matched++; var bytes = item.AllocationAmount64; total += bytes;
+    if (frames.Any(frame => frame.Contains("RoamingNetworkDataSnapshot.Project") || frame.Contains("ValidationProjection.Project")))
+        Add(inclusive, "ValidationProjectionTraversal", bytes);
+    Add(types, item.TypeName, bytes);
+    var site = frames.FirstOrDefault(frame => frame.Contains("cloud.charging.open.protocols.WWCP.POI")) ?? "no resolved POI frame";
+    Add(sites, site, bytes);
+    foreach (var selector in selectors)
+        if (frames.Any(frame => frame.Contains(selector))) Add(inclusive, selector, bytes);
+}
+object[] Rows(Dictionary<String, (Int64 Bytes, Int32 Events)> source) => source.OrderByDescending(item => item.Value.Bytes)
+    .Select(item => (object)new { Name = item.Key, SampledBytes = item.Value.Bytes, Events = item.Value.Events }).ToArray();
+var result = new { Trace = Path.GetFileName(args[0]), AllAllocationEvents = all, EventsWithResolvedStacks = stacked,
+    MeasurementStackEvents = matched, SampledAllocationBytes = total,
+    Method = "GC allocation ticks with resolved Measurement.Run stack; weighted sampling, not exact site totals. Setup/warmup/checks excluded by stack.",
+    InclusiveSites = Rows(inclusive), NearestPOISites = Rows(sites), Types = Rows(types) };
+File.WriteAllText(args[1], JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }) + "\n");
+Console.WriteLine($"Allocation ticks: {all}; with stacks: {stacked}; Measurement.Run: {matched}; sampled MiB: {total/1048576d:F2}");
+if (matched == 0) throw new InvalidOperationException("No resolved measurement allocation stacks.");
+static void Add(Dictionary<String, (Int64 Bytes, Int32 Events)> map, String name, Int64 bytes)
+{
+    var previous = map.GetValueOrDefault(name); map[name] = (previous.Bytes + bytes, previous.Events + 1);
+}

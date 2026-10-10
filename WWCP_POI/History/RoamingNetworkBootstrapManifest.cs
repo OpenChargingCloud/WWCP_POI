@@ -13,7 +13,7 @@ namespace cloud.charging.open.protocols.WWCP.POI;
 
 /// <summary>
 /// Receiver-controlled bounds for bootstrap transport, staging and archive replay.
-/// Archive replay currently requires a complete in-memory CBOR document.
+/// Archive replay requires complete input bytes and retained models/states, with indexed CBOR validation.
 /// </summary>
 public sealed class RoamingNetworkBootstrapLimits
 {
@@ -33,7 +33,7 @@ public sealed class RoamingNetworkBootstrapLimits
     public Int32 MaxChunks { get; }
 
     /// <summary>
-    /// Maximum retained commit count, including the checkpoint.
+    /// Maximum retained commit count, including the checkpoint or snapshot root.
     /// </summary>
     public Int32 MaxCommits { get; }
 
@@ -48,16 +48,33 @@ public sealed class RoamingNetworkBootstrapLimits
     public Int32 MaxManifestBytes { get; }
 
     /// <summary>
+    /// Local archive bounds also checked against actual containers before final decoding and replay.
+    /// </summary>
+    public RoamingNetworkHistoryLimits HistoryLimits { get; }
+
+    /// <summary>
+    /// Maximum pruning receipts in the decoded archive.
+    /// </summary>
+    public Int32 MaxRetentionReceipts => HistoryLimits.MaxRetentionReceipts;
+
+    /// <summary>
+    /// Maximum total entries in all pruning receipts' two commit-ID arrays.
+    /// </summary>
+    public Int32 MaxCatalogCommitIds => HistoryLimits.MaxCatalogCommitIds;
+
+    /// <summary>
     /// Construct positive local limits. Incoming manifests cannot enlarge them.
     /// </summary>
     public RoamingNetworkBootstrapLimits(Int32 maxArchiveBytes = 256 * 1024 * 1024,
         Int32 maxChunkBytes = 1024 * 1024, Int32 maxChunks = 4096, Int32 maxCommits = 100000,
-        Int32 maxWireBytes = 2 * 1024 * 1024, Int32 maxManifestBytes = 512 * 1024)
+        Int32 maxWireBytes = 2 * 1024 * 1024, Int32 maxManifestBytes = 512 * 1024,
+        Int32 maxRetentionReceipts = 4096, Int32 maxCatalogCommitIds = 1000000)
     {
         if (maxArchiveBytes < 1 || maxChunkBytes < 1 || maxChunks < 1 || maxCommits < 1 ||
             maxWireBytes < 1 || maxManifestBytes < 1) throw new ArgumentOutOfRangeException(nameof(maxArchiveBytes));
         MaxArchiveBytes = maxArchiveBytes; MaxChunkBytes = maxChunkBytes; MaxChunks = maxChunks;
         MaxCommits = maxCommits; MaxWireBytes = maxWireBytes; MaxManifestBytes = maxManifestBytes;
+        HistoryLimits = new(maxArchiveBytes, maxCommits, maxRetentionReceipts, maxCatalogCommitIds);
     }
 }
 

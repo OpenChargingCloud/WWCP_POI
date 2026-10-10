@@ -1,0 +1,237 @@
+--- a/WWCP_POI/Serialization/POIRepresentation.cs
++++ b/WWCP_POI/Serialization/POIRepresentation.cs
+@@ -202,8 +202,9 @@
+         ValidateMeasurements(json, kind);
+         var bytes = CanonicalJSON.ToUTF8Bytes(json);
+         using var document = System.Text.Json.JsonDocument.Parse(bytes, new System.Text.Json.JsonDocumentOptions { MaxDepth = 64 });
+-        new POICBORPreflight(remainingDepth).Validate(document.RootElement, kind);
+-        new POICBORWriter(output).Write(document.RootElement, kind);
++        var readings = new POICBORReadingCache();
++        new POICBORPreflight(remainingDepth, readings).Validate(document.RootElement, kind);
++        new POICBORWriter(output, readings).Write(document.RootElement, kind);
+     }
+ 
+     private static void ValidateMeasurements(JObject json, String kind)
+--- a/WWCP_POI/Serialization/POICBORWriter.cs
++++ b/WWCP_POI/Serialization/POICBORWriter.cs
+@@ -19,14 +19,16 @@
+ internal sealed class POICBORWriter
+ {
+     private readonly CBORWriter writer;
++    private readonly POICBORReadingCache? readings;
+     private readonly Dictionary<String, Byte[]> keys = new(StringComparer.Ordinal);
+     private Int32 keyBytes;
+     private HashSet<String>? changeSetReadings;
+     private const Int32 MaxCachedKeys = 128;
+     private const Int32 MaxCachedKeyBytes = 16384;
+ 
+-    internal POICBORWriter(IBufferWriter<Byte> output)
++    internal POICBORWriter(IBufferWriter<Byte> output, POICBORReadingCache? readings = null)
+     {
++        this.readings = readings;
+         // Every map is sorted before emission, every container has a definite count.
+         // Turning off Styx's second map sort prevents its complete-map scratch buffers.
+         writer = new(output, new CBORWriterOptions { PreferredFloatEncoding = true, MaxDepth = 64 });
+@@ -70,10 +72,15 @@
+                     else if (kind is not null && field.Value.ValueKind == JsonValueKind.String &&
+                              POIRepresentation.IsMeasurement(kind, field.Name))
+                     {
+-                        if (!MetrologicalValue.TryParse(field.Value.GetString()!, out var reading, out var error))
+-                            throw new ArgumentException($"{path}/{Escape(field.Name)}: cannot encode a Styx metrological value: {error}");
+-                        // Only this small unit/uncertainty value uses a tree. Its maps are sorted too.
+-                        WriteLeaf(reading.ToCBOR());
++                        var text = field.Value.GetString()!;
++                        if (readings is not null) WriteLeaf(readings.Read(text, path + "/" + Escape(field.Name)));
++                        else
++                        {
++                            if (!MetrologicalValue.TryParse(text, out var reading, out var error))
++                                throw new ArgumentException($"{path}/{Escape(field.Name)}: cannot encode a Styx metrological value: {error}");
++                            // Only this small unit/uncertainty value uses a tree. Its maps are sorted too.
++                            WriteLeaf(reading.ToCBOR());
++                        }
+                     }
+                     else
+                     {
+--- a/WWCP_POI/Serialization/POICBORPreflight.cs
++++ b/WWCP_POI/Serialization/POICBORPreflight.cs
+@@ -15,12 +15,18 @@
+ /// Validate prepared POI JSON before emitting a borrowed archive payload.
+ /// Preserve standalone writer limits and the archive reader's remaining-depth rules.
+ /// </summary>
+-internal sealed class POICBORPreflight(Int32 remainingDepth)
++internal sealed class POICBORPreflight(Int32 remainingDepth, POICBORReadingCache? readings = null)
+ {
+     private CBORException? readerFailure;
++    // Active parent maps use distinct depths. Clear each completed map before sibling reuse.
++    // Large maps are checked normally, but their oversized set is not retained in the pool.
++    private readonly HashSet<String>?[] namesAtDepth = new HashSet<String>?[64];
++    internal const Int32 MaxPooledMapNames = 128;
++    internal Int32 PooledMapSets => namesAtDepth.Count(names => names is not null);
+ 
+     internal void Validate(JsonElement value, String kind)
+     {
++        readerFailure = null;
+         Visit(value, kind, 0, "");
+         // Standalone codec failures precede the old Encoded/SkipValue validation.
+         if (readerFailure is not null) throw readerFailure;
+@@ -32,30 +38,48 @@
+         {
+             case JsonValueKind.Object:
+                 Enter(depth, value.EnumerateObject().Any());
+-                var names = new HashSet<String>(StringComparer.Ordinal);
+-                foreach (var field in value.EnumerateObject())
++                var names = namesAtDepth[depth] ??= new HashSet<String>(StringComparer.Ordinal);
++                try
+                 {
+-                    if (!names.Add(field.Name)) throw new CBORException("Duplicate CBOR POI map key.");
+-                    if (kind is not null && field.Name == "ETags")
++                    foreach (var field in value.EnumerateObject())
+                     {
+-                        if (field.Value.ValueKind != JsonValueKind.Array || field.Value.GetArrayLength() != 2)
+-                            throw new ArgumentException("ETags: expected the JSON and CBOR identifier arrays.");
+-                        var tags = ETag.ValidatePair(ImmutableArray.Create(POICBORWriter.ReadETag(field.Value[0]),
+-                                                                          POICBORWriter.ReadETag(field.Value[1])), "ETags");
+-                        Leaf(CBORValue.FromArray(tags.Select(tag => tag.ToCBOR())), depth + 1);
++                        var name = field.Name;
++                        if (!names.Add(name)) throw new CBORException("Duplicate CBOR POI map key.");
++                        if (kind is not null && name == "ETags")
++                        {
++                            if (field.Value.ValueKind != JsonValueKind.Array || field.Value.GetArrayLength() != 2)
++                                throw new ArgumentException("ETags: expected the JSON and CBOR identifier arrays.");
++                            var tags = ETag.ValidatePair(ImmutableArray.Create(POICBORWriter.ReadETag(field.Value[0]),
++                                                                              POICBORWriter.ReadETag(field.Value[1])), "ETags");
++                            // A validated pair emits two arrays of text/text/32 digest bytes.
++                            // Its exact structural bound is two, with no tags or nested scalars.
++                            if (!Fits(2, depth + 1))
++                                Leaf(CBORValue.FromArray(tags.Select(tag => tag.ToCBOR())), depth + 1);
++                        }
++                        else if (kind is not null && field.Value.ValueKind == JsonValueKind.String &&
++                                 POIRepresentation.IsMeasurement(kind, name))
++                        {
++                            var text = field.Value.GetString()!;
++                            var fieldPath = path + "/" + Escape(name);
++                            if (readings is not null) Leaf(readings.Read(text, fieldPath), depth + 1);
++                            else
++                            {
++                                if (!MetrologicalValue.TryParse(text, out var reading, out var error))
++                                    throw new ArgumentException($"{fieldPath}: cannot encode a Styx metrological value: {error}");
++                                Leaf(reading.ToCBOR(), depth + 1);
++                            }
++                        }
++                        else
++                        {
++                            var child = kind is null ? null : POIRepresentation.ChildKind(kind, name);
++                            Visit(field.Value, child, depth + 1, child is null ? "" : path + "/" + Escape(name));
++                        }
+                     }
+-                    else if (kind is not null && field.Value.ValueKind == JsonValueKind.String &&
+-                             POIRepresentation.IsMeasurement(kind, field.Name))
+-                    {
+-                        if (!MetrologicalValue.TryParse(field.Value.GetString()!, out var reading, out var error))
+-                            throw new ArgumentException($"{path}/{Escape(field.Name)}: cannot encode a Styx metrological value: {error}");
+-                        Leaf(reading.ToCBOR(), depth + 1);
+-                    }
+-                    else
+-                    {
+-                        var child = kind is null ? null : POIRepresentation.ChildKind(kind, field.Name);
+-                        Visit(field.Value, child, depth + 1, child is null ? "" : path + "/" + Escape(field.Name));
+-                    }
++                }
++                finally
++                {
++                    if (names.Count > MaxPooledMapNames) namesAtDepth[depth] = null;
++                    names.Clear();
+                 }
+                 break;
+             case JsonValueKind.Array:
+@@ -99,7 +123,7 @@
+         // Generated scalar trees have valid keys/types; only depth can reject their encoding.
+         // Away from the boundary no temporary leaf encoding is needed. Near it, use Styx.
+         var bound = DepthBound(value);
+-        if (bound <= 64 - depth && (readerFailure is not null || bound <= remainingDepth - depth)) return;
++        if (Fits(bound, depth)) return;
+         // Only this scalar's number/unit/digest structure is buffered. A complete POI value
+         // is never encoded here. Writer and SkipValue intentionally have different budgets.
+         var bytes = value.ToByteArray(new CBORWriterOptions { Deterministic = true, PreferredFloatEncoding = true, MaxDepth = 64 - depth });
+@@ -111,6 +135,9 @@
+         }
+         catch (CBORException error) { readerFailure = error; }
+     }
++
++    private Boolean Fits(Int32 bound, Int32 depth)
++        => bound <= 64 - depth && (readerFailure is not null || bound <= remainingDepth - depth);
+ 
+     private static Int32 DepthBound(CBORValue value)
+     {
+--- /dev/null
++++ b/WWCP_POI/Serialization/POICBORReadingCache.cs
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using org.GraphDefined.Vanaheimr.Illias;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++/// <summary>
++/// Reuse successful Styx metrological scalar trees during one archive POI payload call.
++/// Exact text binds the scalar codec; schema ownership and depth are checked at every use.
++/// </summary>
++internal sealed class POICBORReadingCache
++{
++    internal const Int32 MaxEntries = 32;
++    internal const Int32 MaxTextCharacters = 256;
++    internal const Int32 MaxTotalTextCharacters = 4096;
++    internal const Int32 MaxNodesPerEntry = 128;
++    internal const Int32 MaxScalarPayloadPerNode = 256;
++
++    private readonly Dictionary<String, CBORValue> values = new(StringComparer.Ordinal);
++    internal Int32 Entries => values.Count;
++    internal Int32 TextCharacters { get; private set; }
++
++    internal CBORValue Read(String text, String path)
++    {
++        if (values.TryGetValue(text, out var value)) return value;
++        if (!MetrologicalValue.TryParse(text, out var reading, out var error))
++            throw new ArgumentException($"{path}: cannot encode a Styx metrological value: {error}");
++        value = reading.ToCBOR();
++        if (values.Count < MaxEntries && text.Length <= MaxTextCharacters &&
++            text.Length <= MaxTotalTextCharacters - TextCharacters)
++        {
++            if (CanRetain(value))
++            {
++                values.Add(text, value);
++                TextCharacters += text.Length;
++            }
++        }
++        return value;
++    }
++
++    internal static Boolean CanRetain(CBORValue value)
++    {
++        var nodes = 0;
++        return Admissible(value, ref nodes);
++    }
++
++    private static Boolean Admissible(CBORValue value, ref Int32 nodes)
++    {
++        if (++nodes > MaxNodesPerEntry) return false;
++        switch (value.Kind)
++        {
++            case CBORValueKind.TextString: return value.AsText().Length <= MaxScalarPayloadPerNode;
++            case CBORValueKind.ByteString: return value.AsBytes().Length <= MaxScalarPayloadPerNode;
++            case CBORValueKind.Tagged: return Admissible(value.UntaggedValue, ref nodes);
++            case CBORValueKind.Array:
++                foreach (var item in value.AsArray()) if (!Admissible(item, ref nodes)) return false;
++                break;
++            case CBORValueKind.Map:
++                foreach (var field in value.AsMap())
++                    if (!Admissible(field.Key, ref nodes) || !Admissible(field.Value, ref nodes)) return false;
++                break;
++        }
++        return true;
++    }
++}

@@ -147,7 +147,8 @@ public sealed class BootstrapTests
         Assert.That(() => { if (cbor) RoamingNetworkBootstrapManifest.ParseCBOR(manifest.ToCBOR(), new(maxChunks: 1, maxArchiveBytes: bytes.Length - 1));
                           else RoamingNetworkBootstrapManifest.Parse(manifest.ToJSON(), new(maxArchiveBytes: bytes.Length - 1)); }, Throws.ArgumentException);
         using var branched = BranchedHistory();
-        Assert.That(() => branched.CreateBootstrap(limits: new(maxCommits: 1)), Throws.ArgumentException);
+        var excessive = Assert.Throws<RoamingNetworkHistoryLimitException>(() => branched.CreateBootstrap(limits: new(maxCommits: 1)))!;
+        Assert.That(excessive.Violation, Is.EqualTo(new RoamingNetworkHistoryLimitViolation(RoamingNetworkHistoryLimitKind.RetainedCommits, 1, 5)));
         Assert.That(() => new RoamingNetworkBootstrapLimits(maxArchiveBytes: 0), Throws.TypeOf<ArgumentOutOfRangeException>());
     }
 

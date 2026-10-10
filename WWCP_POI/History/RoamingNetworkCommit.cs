@@ -127,9 +127,31 @@ public sealed partial class RoamingNetworkCommit
             (networkId != snapshot.State.Root.Id || revision != snapshot.State.Revision ||
              appliedChangeSetId != snapshot.State.AppliedChangeSetId || !StateETags.SequenceEqual(snapshot.State.ETags)))
             throw new ArgumentException("The snapshot payload must match the commit header.");
-        Id = new(ETag.Compute(ETagFormat.JSON, GetIdentityBytes()));
+        var identity = POICanonicalPreparation.Capture(WriteIdentity);
+        Id = new(ETag.Compute(ETagFormat.JSON, identity.Span));
         if (declaredId is { } expected && expected != Id)
             throw new ArgumentException("The declared commit identity does not match the content.");
+        POICanonicalPreparation.Admit(this, identity);
+    }
+
+    // Only callers with an unchanged unsigned payload use this constructor. The source has
+    // already passed every header/content/declared-ID check; new peer arrays still need validation.
+    private RoamingNetworkCommit(RoamingNetworkCommit source,
+                                ImmutableArray<RoamingNetworkChangeSetSignature> signatures,
+                                RoamingNetworkChangeSet? changeSet)
+    {
+        Signatures = signatures.IsDefault ? [] : signatures;
+        if (Signatures.Any(signature => signature is null))
+            throw new ArgumentException("Signatures must not contain null entries.");
+        Id = source.Id;
+        RoamingNetworkId = source.RoamingNetworkId;
+        Revision = source.Revision;
+        Parents = source.Parents;
+        StateETags = source.StateETags;
+        AppliedChangeSetId = source.AppliedChangeSetId;
+        ChangeSet = changeSet;
+        Snapshot = source.Snapshot;
+        POICanonicalPreparation.Share(source, this);
     }
 
     /// <summary>
@@ -188,7 +210,7 @@ public sealed partial class RoamingNetworkCommit
     /// Replace the commit signature array without changing unsigned content.
     /// </summary>
     public RoamingNetworkCommit WithSignatures(ImmutableArray<RoamingNetworkChangeSetSignature> signatures)
-        => new(RoamingNetworkId, Revision, Parents, StateETags, AppliedChangeSetId, ChangeSet, signatures, Id, Snapshot);
+        => new(this, signatures, ChangeSet);
 
     /// <summary>
     /// Replace only batch peer envelopes, rejecting any change to identity-bearing content.
@@ -197,19 +219,35 @@ public sealed partial class RoamingNetworkCommit
     {
         ArgumentNullException.ThrowIfNull(changeSet);
         if (ChangeSet is null) throw new InvalidOperationException("This commit has no batch.");
+        if (SameUnsignedBatch(ChangeSet, changeSet)) return new(this, Signatures, changeSet);
         return new(RoamingNetworkId, Revision, Parents, StateETags, AppliedChangeSetId, changeSet, Signatures, Id);
+    }
+
+    private static Boolean SameUnsignedBatch(RoamingNetworkChangeSet source, RoamingNetworkChangeSet replacement)
+    {
+        if (ReferenceEquals(source, replacement)) return true;
+        // Shared immutable operation/ETag arrays prove the exact validated order and values.
+        // Signature copies detach metadata, so compare its exact JSON spelling and ordinal keys.
+        // Independent parses or different spellings use the full constructor, even if canonical
+        // content ultimately matches. Record equality and JSON semantic equality are insufficient.
+        if (source.Id != replacement.Id || source.RoamingNetworkId != replacement.RoamingNetworkId ||
+            source.BaseRevision != replacement.BaseRevision || source.CreatedAt != replacement.CreatedAt ||
+            source.Changes != replacement.Changes || source.BeforeETags != replacement.BeforeETags ||
+            source.AfterETags != replacement.AfterETags || source.Description.Count != replacement.Description.Count ||
+            source.Metadata.Count != replacement.Metadata.Count) return false;
+        foreach (var entry in source.Description)
+            if (!replacement.Description.TryGetValue(entry.Key, out var text) || text != entry.Value) return false;
+        foreach (var entry in source.Metadata)
+            if (!replacement.Metadata.TryGetValue(entry.Key, out var value) ||
+                value.GetRawText() != entry.Value.GetRawText()) return false;
+        return true;
     }
 
     /// <summary>
     /// Return the fixed profile's canonical unsigned UTF-8 JSON, independent of peer signatures.
     /// </summary>
     public Byte[] GetIdentityBytes()
-    {
-        using var stream = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(stream)) WriteIdentity(writer);
-        using var document = JsonDocument.Parse(stream.ToArray());
-        return CanonicalJSON.ToUTF8Bytes(document);
-    }
+        => POICanonicalPreparation.Get(this, WriteIdentity).Copy();
 
     private void WriteIdentity(Utf8JsonWriter writer)
     {

@@ -5,7 +5,6 @@
  */
 
 using System.Collections.Immutable;
-using System.Text;
 using System.Text.Json;
 using org.GraphDefined.Vanaheimr.Illias;
 
@@ -26,48 +25,46 @@ public sealed partial class RoamingNetworkHistory
 
     private String CurrentBoundaryArchiveProfile => retentionReceipts.IsEmpty ? BoundaryArchiveProfile : RetentionArchiveProfile;
 
-    private String BoundaryJSON(ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
-                                RoamingNetworkCommitId root, RoamingNetworkCommitId headId)
+    private void WriteBoundaryJSON(Utf8JsonWriter writer, ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
+                                     RoamingNetworkCommitId root, RoamingNetworkCommitId headId)
     {
-        using var stream = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(stream))
+        writer.WriteStartObject();
+        writer.WriteString("Profile", CurrentBoundaryArchiveProfile);
+        writer.WriteString("ContentProfile", POIContentProfile.Id);
+        writer.WritePropertyName("CheckpointId"); checkpointId.Hash.WriteTo(writer);
+        writer.WritePropertyName("SnapshotCommit"); source[root].Commit.WriteTo(writer);
+        writer.WritePropertyName("Commits"); writer.WriteStartArray();
+        foreach (var entry in OrderedEntries(source, root))
+            if (entry.Commit.Id != root) entry.Commit.WriteTo(writer);
+        writer.WriteEndArray();
+        writer.WritePropertyName("Head"); headId.Hash.WriteTo(writer);
+        if (!retentionReceipts.IsEmpty)
         {
-            writer.WriteStartObject();
-            writer.WriteString("Profile", CurrentBoundaryArchiveProfile);
-            writer.WriteString("ContentProfile", POIContentProfile.Id);
-            writer.WritePropertyName("CheckpointId"); checkpointId.Hash.WriteTo(writer);
-            writer.WritePropertyName("SnapshotCommit"); source[root].Commit.WriteTo(writer);
-            writer.WritePropertyName("Commits"); writer.WriteStartArray();
-            foreach (var entry in OrderedEntries(source, root))
-                if (entry.Commit.Id != root) entry.Commit.WriteTo(writer);
+            writer.WritePropertyName("RetentionReceipts"); writer.WriteStartArray();
+            foreach (var receipt in retentionReceipts) receipt.WriteTo(writer);
             writer.WriteEndArray();
-            writer.WritePropertyName("Head"); headId.Hash.WriteTo(writer);
-            if (!retentionReceipts.IsEmpty)
-            {
-                writer.WritePropertyName("RetentionReceipts"); writer.WriteStartArray();
-                foreach (var receipt in retentionReceipts) receipt.WriteTo(writer);
-                writer.WriteEndArray();
-            }
-            writer.WriteEndObject();
         }
-        return Encoding.UTF8.GetString(stream.ToArray());
+        writer.WriteEndObject();
     }
 
-    private Byte[] BoundaryArchive(ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
-                                    RoamingNetworkCommitId root, RoamingNetworkCommitId headId,
-                                    ImmutableArray<RoamingNetworkRetentionReceipt>? receipts = null)
+    private void WriteBoundaryArchive(Stream destination, ImmutableDictionary<RoamingNetworkCommitId, Entry> source,
+                                       RoamingNetworkCommitId root, RoamingNetworkCommitId headId,
+                                       ImmutableArray<RoamingNetworkRetentionReceipt>? receipts = null)
     {
         var catalog = receipts ?? retentionReceipts;
-        var fields = new List<(String Key, CBORValue Value)> {
-            ("Profile", CBORValue.FromText(catalog.IsEmpty ? BoundaryArchiveProfile : RetentionArchiveProfile)),
-            ("ContentProfile", CBORValue.FromText(POIContentProfile.Id)),
-            ("CheckpointId", checkpointId.ToCBOR()),
-            ("SnapshotCommit", source[root].Commit.ToCBORValue()),
-            ("Commits", CBORValue.FromArray(OrderedEntries(source, root).Where(entry => entry.Commit.Id != root)
-                .Select(entry => entry.Commit.ToCBORValue()))),
-            ("Head", headId.ToCBOR()) };
-        if (!catalog.IsEmpty) fields.Add(("RetentionReceipts", CBORValue.FromArray(catalog.Select(receipt => receipt.ToCBORValue()))));
-        return RoamingNetworkCommit.Map(fields.ToArray()).ToByteArray(CBORWriterOptions.Canonical);
+        var fields = new List<(String Name, Action<POIArchiveCBORWriter> Write)> {
+            ("Profile", value => value.Text(catalog.IsEmpty ? BoundaryArchiveProfile : RetentionArchiveProfile)),
+            ("ContentProfile", value => value.Text(POIContentProfile.Id)),
+            ("CheckpointId", value => value.Value(checkpointId.ToCBOR())),
+            ("SnapshotCommit", value => source[root].Commit.WriteArchiveCBOR(value)),
+            ("Commits", value => value.Array(source.Count - 1, OrderedEntries(source, root).Where(entry => entry.Commit.Id != root),
+                (output, entry) => entry.Commit.WriteArchiveCBOR(output))),
+            ("Head", value => value.Value(headId.ToCBOR())) };
+        if (!catalog.IsEmpty) fields.Add(("RetentionReceipts", value => value.Array(catalog.Length, catalog,
+            (output, receipt) => receipt.WriteArchiveCBOR(output))));
+        using var writer = new POIArchiveCBORWriter(destination);
+        writer.Map(fields.ToArray());
+        writer.Complete();
     }
 
     private static String[] BoundaryFields(Boolean hasReceipts)
@@ -82,22 +79,45 @@ public sealed partial class RoamingNetworkHistory
         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeBoundary,
         ImmutableArray<RoamingNetworkRetentionReceipt> receipts = default)
     {
+        var cursor = new POIArchiveCommitCursor(commits);
+        try { return RestoreBoundaryCore(checkpoint, snapshot, ref cursor, headId,
+            verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeBoundary, receipts); }
+        finally { cursor.Dispose(); }
+    }
+
+    private static RoamingNetworkHistory RestoreBoundaryCore(RoamingNetworkCommitId checkpoint,
+        RoamingNetworkCommit snapshot, ref POIArchiveCommitCursor commits, RoamingNetworkCommitId headId,
+        Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature,
+        Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+        Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
+        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeBoundary,
+        ImmutableArray<RoamingNetworkRetentionReceipt> receipts, POIArchiveReadProgress progress = default)
+    {
         if (authorizeBoundary is null || verifyCommitSignature is null)
             throw new ArgumentException("Snapshot-boundary recovery requires an explicit boundary policy and trusted signature verifier.");
+        using var preparation = POICanonicalPreparation.Enter();
+        progress.Check(POIArchiveReadStage.RootState);
         var history = FromSnapshot(checkpoint, snapshot, authorizeBoundary, verifyCommitSignature,
                                    verifyBatchSignature, authorizeCommit);
         try
         {
+            progress.Check(POIArchiveReadStage.RootState);
+            progress.Check(POIArchiveReadStage.Replay);
             var seen = new HashSet<RoamingNetworkCommitId> { snapshot.Id };
-            foreach (var commit in commits)
+            while (commits.MoveNext(out var commit))
             {
+                progress.Check(POIArchiveReadStage.Replay, seen.Count);
                 if (!seen.Add(commit.Id)) throw new ArgumentException("Archive contains duplicate commit identities.");
                 if (!history.TryStoreCommit(commit, out var result)) throw new ArgumentException(result.Error);
             }
+            progress.Check(POIArchiveReadStage.HeadState);
             if (!history.entries.TryGetValue(headId, out var entry)) throw new ArgumentException("Archive head is not retained.");
-            history.head = new(entry.Commit, RoamingNetwork.Parse(entry.Snapshot.ToJSON()));
+            history.head = new(entry.Commit, ReferenceEquals(history.head.Snapshot, entry.Snapshot)
+                ? history.head.Network : RoamingNetwork.ParseSnapshot(entry.Snapshot));
+            progress.Check(POIArchiveReadStage.HeadState);
             history.retentionReceipts = receipts.IsDefault ? [] : receipts;
             history.archivedCommits = IndexReceipts(history.retentionReceipts, checkpoint);
+            progress.Check(POIArchiveReadStage.HeadState);
             return history;
         }
         catch { history.Dispose(); throw; }
@@ -122,19 +142,4 @@ public sealed partial class RoamingNetworkHistory
             verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeBoundary, receipts);
     }
 
-    private static RoamingNetworkHistory ParseBoundaryCBOR(CBORValue value,
-        Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature,
-        Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
-        Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
-        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeBoundary)
-    {
-        var hasReceipts = RoamingNetworkCommit.Text(value.AsMap().Single(entry => RoamingNetworkCommit.Text(entry.Key) == "Profile").Value) == RetentionArchiveProfile;
-        var fields = RoamingNetworkCommit.Fields(value, BoundaryFields(hasReceipts));
-        POIContentProfile.Require(RoamingNetworkCommit.Text(fields["ContentProfile"]));
-        var receipts = hasReceipts ? fields["RetentionReceipts"].AsArray().Select(RoamingNetworkRetentionReceipt.ParseCBORValue).ToImmutableArray() : [];
-        if (hasReceipts && receipts.IsEmpty) throw new ArgumentException("A retention archive requires a nonempty receipt catalog.");
-        return RestoreBoundary(new(ETag.Parse(fields["CheckpointId"])), RoamingNetworkCommit.ParseCBORValue(fields["SnapshotCommit"]),
-            fields["Commits"].AsArray().Select(RoamingNetworkCommit.ParseCBORValue), new(ETag.Parse(fields["Head"])),
-            verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeBoundary, receipts);
-    }
 }

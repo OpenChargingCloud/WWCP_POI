@@ -1,0 +1,159 @@
+diff --git a/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.cs b/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.cs
+--- a/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.cs
++++ b/WWCP_POI/ChangeSets/RoamingNetworkDataSnapshot.cs
+@@ -38,6 +38,10 @@
+     {
+ 
+         private readonly Lazy<ImmutableArray<ETag>> contentETags;
++        // The context binds the complete entity map, root and fixed content profile.
++        // Share it only with snapshot-only revisions, never with a changed entity map.
++        private readonly Lazy<POIChildETagCache> childETags;
++        internal POIChildETagCache ChildETags => childETags.Value;
+         private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ReferenceMap, ReferenceMap> tariffIndexes = new();
+ 
+         #region Properties
+@@ -82,7 +86,8 @@
+                                            Int64                    revision,
+                                            String?                  appliedChangeSetId,
+                                            ReferenceMap?           references = null,
+-                                           Lazy<ImmutableArray<ETag>>? sharedContentETags = null)
++                                           Lazy<ImmutableArray<ETag>>? sharedContentETags = null,
++                                           Lazy<POIChildETagCache>? sharedChildETags = null)
+         {
+ 
+             Root               = root;
+@@ -91,6 +96,7 @@
+             AppliedChangeSetId = appliedChangeSetId;
+             References         = references ?? ReferenceMap.Empty;
+             contentETags       = sharedContentETags ?? new(() => POIRepresentation.GetETags(this));
++            childETags         = sharedChildETags ?? new(() => new POIChildETagCache());
+ 
+         }
+ 
+@@ -100,7 +106,7 @@
+         /// Advance history bookkeeping while sharing unchanged static entities, indexes and content digests.
+         /// </summary>
+         internal RoamingNetworkDataSnapshot AdvanceSnapshotRevision()
+-            => new(Root, Entities, checked(Revision + 1), AppliedChangeSetId, References, contentETags);
++            => new(Root, Entities, checked(Revision + 1), AppliedChangeSetId, References, contentETags, childETags);
+ 
+         #region Read entities and JSON
+ 
+diff --git a/WWCP_POI/Serialization/POIRepresentation.cs b/WWCP_POI/Serialization/POIRepresentation.cs
+--- a/WWCP_POI/Serialization/POIRepresentation.cs
++++ b/WWCP_POI/Serialization/POIRepresentation.cs
+@@ -34,6 +34,8 @@
+         if (IncludeRuntime && value is RoamingNetworkDataSnapshot)
+             throw new ArgumentException("A static DataSnapshot has no runtime state. Export a RoamingNetwork to include current statuses.", nameof(IncludeRuntime));
+         var kind = Kind(value);
++        var snapshot = value as RoamingNetworkDataSnapshot ?? (value as RoamingNetwork)?.DataSnapshot;
++        var childETags = snapshot?.ChildETags;
+         var json = Document(value, IncludeRuntime);
+         Prepare(json, kind, IncludeRuntime, IncludeVersionMetadata);
+         Visit(json, kind, "", (document, type, path) =>
+@@ -50,13 +52,17 @@
+             // Prepare has already stripped static transport bookkeeping from the whole document.
+             // Visit is preorder: this node and its descendants have no newly attached tags yet.
+             // Hash the prepared subtree before adding its declarations, avoiding a second copy/pass.
+-            var staticContent = document;
+-            if (IncludeRuntime || (IncludeVersionMetadata && type == nameof(RoamingNetwork)))
+-            {
+-                staticContent = (JObject) document.DeepClone();
+-                Prepare(staticContent, type, false);
+-            }
+-            var tags = Tags(staticContent, type);
++            if (childETags is null || !childETags.TryGet(type, path, out var tags))
++            {
++                var staticContent = document;
++                if (IncludeRuntime || (IncludeVersionMetadata && type == nameof(RoamingNetwork)))
++                {
++                    staticContent = (JObject) document.DeepClone();
++                    Prepare(staticContent, type, false);
++                }
++                tags = Tags(staticContent, type);
++                childETags?.Add(type, path, tags);
++            }
+             document[POIContentProfile.PropertyName] = POIContentProfile.Id;
+             document["ETags"] = TagsJSON(tags, DigestEncoding);
+         });
+diff --git a/WWCP_POI/Serialization/POIChildETagCache.cs b/WWCP_POI/Serialization/POIChildETagCache.cs
+--- /dev/null
++++ b/WWCP_POI/Serialization/POIChildETagCache.cs
+@@ -0,0 +1,77 @@
++using System.Collections.Immutable;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++/// <summary>
++/// Bounded digest pairs belonging to one complete immutable snapshot context.
++/// Admission preserves the traversal prefix; saturation never evicts useful ancestor entries.
++/// </summary>
++internal sealed class POIChildETagCache
++{
++    internal const Int32 DefaultMaxEntries = 4096;
++    internal const Int64 DefaultMaxPayloadBytes = 1048576;
++    internal const Int32 DefaultMaxKeyCharacters = 1024;
++
++    private readonly Object gate = new();
++    private readonly Dictionary<(String Kind, String Path), ImmutableArray<ETag>> entries = [];
++    private readonly Int32 maxEntries;
++    private readonly Int64 maxPayloadBytes;
++    private readonly Int32 maxKeyCharacters;
++    private Int64 payloadBytes;
++    private Int64 hits;
++    private Int64 misses;
++    private Int64 rejected;
++
++    /// <summary>
++    /// Logical retained payload counts UTF-16 key characters and the two 32-byte digests.
++    /// Object headers, array/dictionary capacity and synchronization overhead are additional.
++    /// </summary>
++    internal readonly record struct State(Int32 Entries, Int64 PayloadBytes, Int64 Hits, Int64 Misses, Int64 Rejected);
++
++    internal POIChildETagCache(Int32 maxEntries = DefaultMaxEntries,
++                              Int64 maxPayloadBytes = DefaultMaxPayloadBytes,
++                              Int32 maxKeyCharacters = DefaultMaxKeyCharacters)
++    {
++        ArgumentOutOfRangeException.ThrowIfNegative(maxEntries);
++        ArgumentOutOfRangeException.ThrowIfNegative(maxPayloadBytes);
++        ArgumentOutOfRangeException.ThrowIfNegative(maxKeyCharacters);
++        this.maxEntries = maxEntries;
++        this.maxPayloadBytes = maxPayloadBytes;
++        this.maxKeyCharacters = maxKeyCharacters;
++    }
++
++    internal State Statistics
++    {
++        get { lock (gate) return new(entries.Count, payloadBytes, hits, misses, rejected); }
++    }
++
++    internal Boolean TryGet(String kind, String path, out ImmutableArray<ETag> tags)
++    {
++        lock (gate)
++        {
++            if (entries.TryGetValue((kind, path), out tags)) { hits++; return true; }
++            misses++; return false;
++        }
++    }
++
++    /// <summary>
++    /// Admit only successful immutable pairs. Callers compute outside the lock; concurrent
++    /// misses may repeat work, but only one pair is retained and failures cannot poison entries.
++    /// </summary>
++    internal void Add(String kind, String path, ImmutableArray<ETag> tags)
++    {
++        ETag.ValidatePair(tags, "Child ETags");
++        var characters = (Int64) kind.Length + path.Length;
++        var bytes = 64 + 2 * characters;
++        lock (gate)
++        {
++            if (entries.ContainsKey((kind, path))) return;
++            if (entries.Count >= maxEntries || characters > maxKeyCharacters || bytes > maxPayloadBytes - payloadBytes)
++            {
++                rejected++; return;
++            }
++            entries.Add((kind, path), tags);
++            payloadBytes += bytes;
++        }
++    }
++}

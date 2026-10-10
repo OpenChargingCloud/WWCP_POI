@@ -227,19 +227,18 @@ public sealed class StructuralMergeTests
     }
 
     [Test]
-    public void Removing_a_registry_grid_operator_does_not_remove_the_independently_owned_connection_point_operator()
+    public void Referenced_registry_grid_operator_cannot_be_removed_and_edits_reach_connection_points()
     {
-        var network = Network(); using var history = History(network.ApplyChangeSet(Batch(network.DataSnapshot, "grid-registry",
-            RoamingNetworkChange.Add("GridOperator", "DE*GRD", Value("""{"id":"DE*GRD","name":{"en":"Registry"}}"""), "RoamingNetwork", "interop-network"))));
-        var root = history.Head.Id;
-        var left = Prepare(history, root, "remove-registry", RoamingNetworkChange.Remove("GridOperator", "DE*GRD"));
-        var right = Prepare(history, root, "edit-embedded", RoamingNetworkChange.UpdateElementProperty("ChargingPool", Pool,
-            [new("gridConnectionPoint"), new("gridOperator")], "name", null, Value("{\"en\":\"Embedded\"}")));
-        Publish(history, left); Store(history, right);
-        var merged = Resolved(history, left, right, _ => throw new AssertionException("Independent slots cannot conflict."), out var report);
-        Assert.That(report.Conflicts, Is.Empty); Publish(history, merged);
-        Assert.That(history.Head.Snapshot.Entities.Keys.Any(key => key.Type == InfrastructureEntityType.GridOperator), Is.False);
-        Assert.That(history.Head.Snapshot.GetEntity(InfrastructureEntityType.ChargingPool, Pool).Properties["gridConnectionPoint"].GetProperty("gridOperator").GetProperty("name").GetProperty("en").GetString(), Is.EqualTo("Embedded"));
+        using var history = History(); var root = history.Head.Id;
+        Assert.Throws<RoamingNetworkChangeSetException>(() =>
+            Prepare(history, root, "remove-registry", RoamingNetworkChange.Remove("GridOperator", "DE*GRD")));
+        var edit = Prepare(history, root, "edit-registry", RoamingNetworkChange.UpdateProperty("GridOperator", "DE*GRD",
+            "name", null, Value("{\"en\":\"Shared operator\"}")));
+        Publish(history, edit);
+        var network = history.Head.Network;
+        var op = network.GridOperators.Single();
+        Assert.That(network.ChargingPools.Single().GridConnectionPoint!.GridOperator, Is.SameAs(op));
+        Assert.That(op.Name.ToJSON()["en"]!.Value<String>(), Is.EqualTo("Shared operator"));
     }
 
     [Test]

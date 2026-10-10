@@ -1,0 +1,3298 @@
+{
+  "Environment": {
+    "TimestampUTC": "2026-10-09T20:01:44.916335+00:00",
+    "Label": "parser-cancellation-before",
+    "Suite": "parser-cancellation",
+    "BuildConfiguration": "Release",
+    "ProcessesPerOperation": 2,
+    "WarmupsPerProcess": 3,
+    "SamplesPerProcess": 3,
+    "ProductionSourceSHA256": "e34e03190e19cbef2356050e17fbbdfad4c8a8927bb73d0707b57fadfcc7992a",
+    "BenchmarkSourceSHA256": "f8a0d1d9cb4b9a23abb2256e650435ae123fd0802b86766475de207ce7c6bef1",
+    "ProductionAssemblySHA256": "7c2765701c9ec18d96348f33793512a77538f8d30bed1f74b5920d8d3bbe8bf0",
+    "BenchmarkAssemblySHA256": "4ab73bc43f96f4629391f27f395124f54af40458a81f55dc85e86f94e11efda5",
+    "SourceBindingSHA256": "8a6efdf9dac393d2950fc63ec473744b619a5ca706a32914a1a9c11e42ff099e",
+    "DotnetSDK": "10.0.401",
+    "InstalledRuntimes": "Microsoft.AspNetCore.All 2.1.30 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.All]\nMicrosoft.AspNetCore.App 2.1.30 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 3.1.18 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 3.1.21 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 3.1.26 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 3.1.28 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 3.1.29 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 3.1.31 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 3.1.32 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 5.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 5.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 5.0.17 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 6.0.5 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 6.0.6 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 6.0.8 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 6.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 6.0.11 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 6.0.26 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 8.0.31 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 9.0.20 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.AspNetCore.App 10.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.AspNetCore.App]\nMicrosoft.NETCore.App 2.1.30 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 3.1.18 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 3.1.21 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 3.1.26 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 3.1.28 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 3.1.29 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 3.1.31 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 3.1.32 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 5.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 5.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 5.0.17 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 6.0.4 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 6.0.5 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 6.0.6 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 6.0.8 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 6.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 6.0.11 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 6.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 6.0.15 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 6.0.26 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 8.0.8 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 8.0.31 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 9.0.20 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.NETCore.App 10.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.NETCore.App]\nMicrosoft.WindowsDesktop.App 3.1.18 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 3.1.21 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 3.1.26 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 3.1.28 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 3.1.29 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 3.1.31 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 3.1.32 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 5.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 5.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 5.0.17 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 6.0.4 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 6.0.5 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 6.0.6 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 6.0.8 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 6.0.9 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 6.0.11 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 6.0.15 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 6.0.26 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 8.0.8 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 8.0.31 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 9.0.20 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]\nMicrosoft.WindowsDesktop.App 10.0.12 [C:\\Program Files\\dotnet\\shared\\Microsoft.WindowsDesktop.App]",
+    "Method": "Sequential fresh dotnet workers; no overlapping task builds/tests; shared Windows desktop; setup/warmup excluded.",
+    "OS": "Windows-11-10.0.26300-SP0",
+    "Cpu": "AMD64 Family 23 Model 113 Stepping 0, AuthenticAMD",
+    "LogicalProcessors": 16,
+    "RuntimeTuning": {
+      "DOTNET_TieredCompilation": null,
+      "DOTNET_TieredPGO": null,
+      "DOTNET_ReadyToRun": null
+    },
+    "RuntimeConfigSHA256": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097",
+    "SharedDependencies": [
+      {
+        "name": "Azure.Core.dll",
+        "sha256": "1d6df436afdc73c30d476be938f6513c90ef8fc884a7bae280091a9bed0a5490"
+      },
+      {
+        "name": "Azure.Identity.dll",
+        "sha256": "31574a3d35ffeb0e25a00ebb317937222fe5283b91af608613f2e3bf0f26c50a"
+      },
+      {
+        "name": "BouncyCastle.Cryptography.dll",
+        "sha256": "ef92fc661e8d7ba8ec4d39a7cdfcdba41f14cb327f0d24fe79d0b5bb428899b5"
+      },
+      {
+        "name": "Microsoft.Bcl.AsyncInterfaces.dll",
+        "sha256": "f1e1d6e1a2990071b450bdf6c9618408ac0e3f24a3c7a3bef1f50508ba732ca5"
+      },
+      {
+        "name": "Microsoft.Diagnostics.NETCore.Client.dll",
+        "sha256": "e2cc9e1f6c97b3c4ee45ebabaa92408eb9b2fc81cb08ceeb342fe48bf79db15f"
+      },
+      {
+        "name": "Microsoft.Diagnostics.Runtime.dll",
+        "sha256": "52d5f113180bb0f70b1a9b10608aef93b187364ac689885d2d3c734102d850a2"
+      },
+      {
+        "name": "Microsoft.Extensions.Configuration.Abstractions.dll",
+        "sha256": "da2203cd85e701598210999e6714e4cc83d20b833b4afa923e3b84196d6f72aa"
+      },
+      {
+        "name": "Microsoft.Extensions.DependencyInjection.Abstractions.dll",
+        "sha256": "da04edc338d5aa0f38a1f5fa5ff3ee7e36affe9c961daf3ea724a428bd746bc6"
+      },
+      {
+        "name": "Microsoft.Extensions.DependencyInjection.dll",
+        "sha256": "2d0e268bf76b4ce36a55ebb2767354db956c6660de65d6cccfc35c957fb12cfc"
+      },
+      {
+        "name": "Microsoft.Extensions.Diagnostics.Abstractions.dll",
+        "sha256": "4d20c015406a7bf1a6478f1b6af567d972fa2ba4727de6134ff2c641f90ab36c"
+      },
+      {
+        "name": "Microsoft.Extensions.FileProviders.Abstractions.dll",
+        "sha256": "39e7fcd41d10abeffcf2b224237bed64ae98f99d94e329bd19f447451eda3abc"
+      },
+      {
+        "name": "Microsoft.Extensions.Hosting.Abstractions.dll",
+        "sha256": "fb21feb2c6aafe2607a8b1d500c2b86535cd1b48b67ef878139dc7818c70ce4d"
+      },
+      {
+        "name": "Microsoft.Extensions.Logging.Abstractions.dll",
+        "sha256": "7c242f8ca612fa1acc61f78efd5f8c89e01bd0bd47dc4ecc65e0e6e24f1a1668"
+      },
+      {
+        "name": "Microsoft.Extensions.Logging.dll",
+        "sha256": "05b76234f2a5eb945b268ced706cb4d81446778ea6bd6910298b5e9111170b4a"
+      },
+      {
+        "name": "Microsoft.Extensions.Options.dll",
+        "sha256": "b4ff561da6a7b11b68341f9fd32cab3f8b23cdd8b40332b9fd8bed73a9ee7de3"
+      },
+      {
+        "name": "Microsoft.Extensions.Primitives.dll",
+        "sha256": "67642533eb87e8dadeb9026de59ff4b66cc9bf35c0cfbedfef7b79bc6d8b30bc"
+      },
+      {
+        "name": "Microsoft.Identity.Client.dll",
+        "sha256": "5795027e9ae95eececb310a4fed3c502bb368039d186ab0884f64b7792b84717"
+      },
+      {
+        "name": "Microsoft.Identity.Client.Extensions.Msal.dll",
+        "sha256": "07109a2f30df782300077a567ade47cbd0a0502c75cd7c8a62192f7d64bb004e"
+      },
+      {
+        "name": "Microsoft.IdentityModel.Abstractions.dll",
+        "sha256": "24e97b54b6b5c234a124a336757e3116617ac6c30b655cdae74517dc2ecb5746"
+      },
+      {
+        "name": "Newtonsoft.Json.dll",
+        "sha256": "a28c251dfe36d881e9e2462e171441b8b0ec156fe3f452602c9149b1b9efe05b"
+      },
+      {
+        "name": "org.GraphDefined.Vanaheimr.Hermod.dll",
+        "sha256": "7355657890caf64a8e922e3d11bb14e835c398b6dd76f013d3987e035535a43c"
+      },
+      {
+        "name": "Styx.dll",
+        "sha256": "1655174175e2abb259ead391c8e58aa71c089e71142c04a88581d31f3b7956ac"
+      },
+      {
+        "name": "System.ClientModel.dll",
+        "sha256": "dec5e22b71a1685c5e6e97cd28b629f0aa6703fb87b6950df28e79fc1804290c"
+      },
+      {
+        "name": "System.Configuration.ConfigurationManager.dll",
+        "sha256": "f6f445777420df03447d74f63671dfe97f8b833836ceb4643af76fa2e0c66a1b"
+      },
+      {
+        "name": "System.Diagnostics.EventLog.dll",
+        "sha256": "77aae5ac102caa9c8bdd8473bc55ed7de246b3e06171c6393bad7f959c1a7bf5"
+      },
+      {
+        "name": "System.Diagnostics.PerformanceCounter.dll",
+        "sha256": "fcc74baee4e7184dc70f9e28d758d75eb124a4fcebe3b368b890182906b1f698"
+      },
+      {
+        "name": "System.IO.Ports.dll",
+        "sha256": "e751931b4bf7ff27953c053b015fa1c299a0034c3c8777e4f49009e1e4176872"
+      },
+      {
+        "name": "System.Memory.Data.dll",
+        "sha256": "2c1035b0106dbb2de7913d151e06071ed617bb58bbb3d6cd46a2dd0f6a03617b"
+      },
+      {
+        "name": "System.Security.Cryptography.ProtectedData.dll",
+        "sha256": "b61a1445b99a1486a5d9abbd45d766497f136270f5b04862defee1fc054ded14"
+      },
+      {
+        "name": "WWCP_CoreData.dll",
+        "sha256": "4630250928e031ad4fc7c531c6786d3cca3e952f851f3f184903b3d3d19c0cba"
+      }
+    ],
+    "FinishedUTC": "2026-10-09T20:11:30.172819+00:00"
+  },
+  "Complete": true,
+  "Runs": [
+    {
+      "Shape": {
+        "Name": "recover-graph-128",
+        "EVSEs": 128,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 291,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:a54567322278127b02bc3a8ef884997b5054257a84d518b3d047451e54ce4431|cbor:sha256:hex:bd19da2facb123d3d918eed6072304c24dbede4941d9d76bac0997e3ee877ecd",
+      "ArchiveIdentity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 1.0216,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 4806336,
+          "SampledManagedPeakBytes": 4814560,
+          "WorkingSetBeforeBytes": 134221824,
+          "SampledWorkingSetPeakBytes": 134295552,
+          "ProcessLifetimePeakWorkingSetBytes": 141185024,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 1.1549,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 4806768,
+          "SampledManagedPeakBytes": 4814992,
+          "WorkingSetBeforeBytes": 115531776,
+          "SampledWorkingSetPeakBytes": 115531776,
+          "ProcessLifetimePeakWorkingSetBytes": 141185024,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 1.117,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 4765848,
+          "SampledManagedPeakBytes": 4774072,
+          "WorkingSetBeforeBytes": 115527680,
+          "SampledWorkingSetPeakBytes": 115527680,
+          "ProcessLifetimePeakWorkingSetBytes": 141185024,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 249862,
+        "InputJSONBytes": 153021,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-128",
+        "EVSEs": 128,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 291,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:a54567322278127b02bc3a8ef884997b5054257a84d518b3d047451e54ce4431|cbor:sha256:hex:bd19da2facb123d3d918eed6072304c24dbede4941d9d76bac0997e3ee877ecd",
+      "ArchiveIdentity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.9984,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 4866120,
+          "SampledManagedPeakBytes": 4874344,
+          "WorkingSetBeforeBytes": 110018560,
+          "SampledWorkingSetPeakBytes": 110108672,
+          "ProcessLifetimePeakWorkingSetBytes": 140738560,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 1.0046,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 4825488,
+          "SampledManagedPeakBytes": 4833712,
+          "WorkingSetBeforeBytes": 110120960,
+          "SampledWorkingSetPeakBytes": 110125056,
+          "ProcessLifetimePeakWorkingSetBytes": 140738560,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 1.0149,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 4784568,
+          "SampledManagedPeakBytes": 4792792,
+          "WorkingSetBeforeBytes": 110125056,
+          "SampledWorkingSetPeakBytes": 110125056,
+          "ProcessLifetimePeakWorkingSetBytes": 140738560,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 249862,
+        "InputJSONBytes": 153021,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-128",
+        "EVSEs": 128,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor",
+      "Entities": 291,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:a54567322278127b02bc3a8ef884997b5054257a84d518b3d047451e54ce4431|cbor:sha256:hex:bd19da2facb123d3d918eed6072304c24dbede4941d9d76bac0997e3ee877ecd",
+      "ArchiveIdentity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 755.2524,
+          "CpuMilliseconds": 1515.625,
+          "AllocatedBytes": 397687368,
+          "ManagedBeforeBytes": 4771168,
+          "SampledManagedPeakBytes": 34623336,
+          "WorkingSetBeforeBytes": 119140352,
+          "SampledWorkingSetPeakBytes": 131665920,
+          "ProcessLifetimePeakWorkingSetBytes": 142348288,
+          "Gen0": 50,
+          "Gen1": 16,
+          "Gen2": 3,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 702.3268,
+          "CpuMilliseconds": 1234.375,
+          "AllocatedBytes": 397661512,
+          "ManagedBeforeBytes": 4771712,
+          "SampledManagedPeakBytes": 32162488,
+          "WorkingSetBeforeBytes": 122109952,
+          "SampledWorkingSetPeakBytes": 132702208,
+          "ProcessLifetimePeakWorkingSetBytes": 142348288,
+          "Gen0": 50,
+          "Gen1": 17,
+          "Gen2": 3,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 715.312,
+          "CpuMilliseconds": 984.375,
+          "AllocatedBytes": 395330136,
+          "ManagedBeforeBytes": 4772040,
+          "SampledManagedPeakBytes": 41334984,
+          "WorkingSetBeforeBytes": 125034496,
+          "SampledWorkingSetPeakBytes": 134316032,
+          "ProcessLifetimePeakWorkingSetBytes": 142348288,
+          "Gen0": 50,
+          "Gen1": 15,
+          "Gen2": 4,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 249862,
+        "InputJSONBytes": 153021,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 3602240,
+        "RetainedCommits": 13,
+        "RetainedSnapshots": 2
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-128",
+        "EVSEs": 128,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor",
+      "Entities": 291,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:a54567322278127b02bc3a8ef884997b5054257a84d518b3d047451e54ce4431|cbor:sha256:hex:bd19da2facb123d3d918eed6072304c24dbede4941d9d76bac0997e3ee877ecd",
+      "ArchiveIdentity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 753.634,
+          "CpuMilliseconds": 1375,
+          "AllocatedBytes": 396388144,
+          "ManagedBeforeBytes": 4887960,
+          "SampledManagedPeakBytes": 40768800,
+          "WorkingSetBeforeBytes": 118681600,
+          "SampledWorkingSetPeakBytes": 135069696,
+          "ProcessLifetimePeakWorkingSetBytes": 147615744,
+          "Gen0": 48,
+          "Gen1": 17,
+          "Gen2": 2,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 947.1418,
+          "CpuMilliseconds": 1640.625,
+          "AllocatedBytes": 395979080,
+          "ManagedBeforeBytes": 4806552,
+          "SampledManagedPeakBytes": 35038840,
+          "WorkingSetBeforeBytes": 105648128,
+          "SampledWorkingSetPeakBytes": 130809856,
+          "ProcessLifetimePeakWorkingSetBytes": 147615744,
+          "Gen0": 50,
+          "Gen1": 17,
+          "Gen2": 4,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 794.0901,
+          "CpuMilliseconds": 1203.125,
+          "AllocatedBytes": 395630608,
+          "ManagedBeforeBytes": 4888904,
+          "SampledManagedPeakBytes": 31381016,
+          "WorkingSetBeforeBytes": 116518912,
+          "SampledWorkingSetPeakBytes": 131522560,
+          "ProcessLifetimePeakWorkingSetBytes": 147615744,
+          "Gen0": 49,
+          "Gen1": 15,
+          "Gen2": 3,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 249862,
+        "InputJSONBytes": 153021,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 3683544,
+        "RetainedCommits": 13,
+        "RetainedSnapshots": 2
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-128",
+        "EVSEs": 128,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 291,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:a54567322278127b02bc3a8ef884997b5054257a84d518b3d047451e54ce4431|cbor:sha256:hex:bd19da2facb123d3d918eed6072304c24dbede4941d9d76bac0997e3ee877ecd",
+      "ArchiveIdentity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 716.1712,
+          "CpuMilliseconds": 1078.125,
+          "AllocatedBytes": 396200528,
+          "ManagedBeforeBytes": 4770784,
+          "SampledManagedPeakBytes": 37249072,
+          "WorkingSetBeforeBytes": 102219776,
+          "SampledWorkingSetPeakBytes": 132042752,
+          "ProcessLifetimePeakWorkingSetBytes": 139554816,
+          "Gen0": 49,
+          "Gen1": 15,
+          "Gen2": 3,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 680.2257,
+          "CpuMilliseconds": 1296.875,
+          "AllocatedBytes": 396017168,
+          "ManagedBeforeBytes": 4771400,
+          "SampledManagedPeakBytes": 39702400,
+          "WorkingSetBeforeBytes": 120049664,
+          "SampledWorkingSetPeakBytes": 132935680,
+          "ProcessLifetimePeakWorkingSetBytes": 139554816,
+          "Gen0": 50,
+          "Gen1": 16,
+          "Gen2": 4,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 645.49,
+          "CpuMilliseconds": 953.125,
+          "AllocatedBytes": 395634952,
+          "ManagedBeforeBytes": 4771728,
+          "SampledManagedPeakBytes": 38017456,
+          "WorkingSetBeforeBytes": 123949056,
+          "SampledWorkingSetPeakBytes": 133693440,
+          "ProcessLifetimePeakWorkingSetBytes": 139554816,
+          "Gen0": 49,
+          "Gen1": 13,
+          "Gen2": 3,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 249862,
+        "InputJSONBytes": 153021,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-128",
+        "EVSEs": 128,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 291,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:a54567322278127b02bc3a8ef884997b5054257a84d518b3d047451e54ce4431|cbor:sha256:hex:bd19da2facb123d3d918eed6072304c24dbede4941d9d76bac0997e3ee877ecd",
+      "ArchiveIdentity": "cbor:sha256:hex:af78756eba45cf3623b02c5924ea05821b0e4986bd5fb530cde3adc490e39a5a",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 742.9705,
+          "CpuMilliseconds": 1265.625,
+          "AllocatedBytes": 398934208,
+          "ManagedBeforeBytes": 4768344,
+          "SampledManagedPeakBytes": 30606960,
+          "WorkingSetBeforeBytes": 118898688,
+          "SampledWorkingSetPeakBytes": 135122944,
+          "ProcessLifetimePeakWorkingSetBytes": 142409728,
+          "Gen0": 51,
+          "Gen1": 17,
+          "Gen2": 4,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 691.5365,
+          "CpuMilliseconds": 1296.875,
+          "AllocatedBytes": 398812800,
+          "ManagedBeforeBytes": 4768960,
+          "SampledManagedPeakBytes": 35388936,
+          "WorkingSetBeforeBytes": 122253312,
+          "SampledWorkingSetPeakBytes": 132595712,
+          "ProcessLifetimePeakWorkingSetBytes": 142409728,
+          "Gen0": 50,
+          "Gen1": 19,
+          "Gen2": 3,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 658.8692,
+          "CpuMilliseconds": 1328.125,
+          "AllocatedBytes": 397101960,
+          "ManagedBeforeBytes": 4769216,
+          "SampledManagedPeakBytes": 29313968,
+          "WorkingSetBeforeBytes": 120315904,
+          "SampledWorkingSetPeakBytes": 128696320,
+          "ProcessLifetimePeakWorkingSetBytes": 142409728,
+          "Gen0": 50,
+          "Gen1": 16,
+          "Gen2": 3,
+          "Result": {
+            "OutputBytes": 249862,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:7bd420bd95e400319a30b64e22cd523ecfb7d56b7380fd3fa322d08c4a802a83"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 249862,
+        "InputJSONBytes": 153021,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-512",
+        "EVSEs": 512,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 1155,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:bdc8cb5f0a4ba94d8d59f2e7974c2318074c1c9c55c9ff94060547378e1ceca7|cbor:sha256:hex:256935fc9501db386d1e81e205874c11968bf69678456e081440ba961628f18b",
+      "ArchiveIdentity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 5.0161,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 15360168,
+          "SampledManagedPeakBytes": 15368392,
+          "WorkingSetBeforeBytes": 246153216,
+          "SampledWorkingSetPeakBytes": 246231040,
+          "ProcessLifetimePeakWorkingSetBytes": 300060672,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 4.2942,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 15360600,
+          "SampledManagedPeakBytes": 15368824,
+          "WorkingSetBeforeBytes": 222601216,
+          "SampledWorkingSetPeakBytes": 222605312,
+          "ProcessLifetimePeakWorkingSetBytes": 300060672,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 4.5083,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 15360744,
+          "SampledManagedPeakBytes": 15368968,
+          "WorkingSetBeforeBytes": 222605312,
+          "SampledWorkingSetPeakBytes": 222605312,
+          "ProcessLifetimePeakWorkingSetBytes": 300060672,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 948637,
+        "InputJSONBytes": 544530,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-512",
+        "EVSEs": 512,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 1155,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:bdc8cb5f0a4ba94d8d59f2e7974c2318074c1c9c55c9ff94060547378e1ceca7|cbor:sha256:hex:256935fc9501db386d1e81e205874c11968bf69678456e081440ba961628f18b",
+      "ArchiveIdentity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 5.5648,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 15372400,
+          "SampledManagedPeakBytes": 15380624,
+          "WorkingSetBeforeBytes": 250368000,
+          "SampledWorkingSetPeakBytes": 250462208,
+          "ProcessLifetimePeakWorkingSetBytes": 296886272,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 4.3205,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 15372832,
+          "SampledManagedPeakBytes": 15381056,
+          "WorkingSetBeforeBytes": 225976320,
+          "SampledWorkingSetPeakBytes": 225980416,
+          "ProcessLifetimePeakWorkingSetBytes": 296886272,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 4.2037,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 15372976,
+          "SampledManagedPeakBytes": 15381200,
+          "WorkingSetBeforeBytes": 225980416,
+          "SampledWorkingSetPeakBytes": 225980416,
+          "ProcessLifetimePeakWorkingSetBytes": 296886272,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 948637,
+        "InputJSONBytes": 544530,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-512",
+        "EVSEs": 512,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor",
+      "Entities": 1155,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:bdc8cb5f0a4ba94d8d59f2e7974c2318074c1c9c55c9ff94060547378e1ceca7|cbor:sha256:hex:256935fc9501db386d1e81e205874c11968bf69678456e081440ba961628f18b",
+      "ArchiveIdentity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 2667.0218,
+          "CpuMilliseconds": 3546.875,
+          "AllocatedBytes": 1567145040,
+          "ManagedBeforeBytes": 15373872,
+          "SampledManagedPeakBytes": 100657688,
+          "WorkingSetBeforeBytes": 177041408,
+          "SampledWorkingSetPeakBytes": 210636800,
+          "ProcessLifetimePeakWorkingSetBytes": 304922624,
+          "Gen0": 189,
+          "Gen1": 71,
+          "Gen2": 14,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2649.7139,
+          "CpuMilliseconds": 3375,
+          "AllocatedBytes": 1567143048,
+          "ManagedBeforeBytes": 15373432,
+          "SampledManagedPeakBytes": 102569400,
+          "WorkingSetBeforeBytes": 156467200,
+          "SampledWorkingSetPeakBytes": 202825728,
+          "ProcessLifetimePeakWorkingSetBytes": 304922624,
+          "Gen0": 189,
+          "Gen1": 71,
+          "Gen2": 14,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2619.8924,
+          "CpuMilliseconds": 3390.625,
+          "AllocatedBytes": 1567143560,
+          "ManagedBeforeBytes": 15373760,
+          "SampledManagedPeakBytes": 94488840,
+          "WorkingSetBeforeBytes": 164450304,
+          "SampledWorkingSetPeakBytes": 199815168,
+          "ProcessLifetimePeakWorkingSetBytes": 304922624,
+          "Gen0": 189,
+          "Gen1": 71,
+          "Gen2": 14,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 948637,
+        "InputJSONBytes": 544530,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 14087816,
+        "RetainedCommits": 13,
+        "RetainedSnapshots": 2
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-512",
+        "EVSEs": 512,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor",
+      "Entities": 1155,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:bdc8cb5f0a4ba94d8d59f2e7974c2318074c1c9c55c9ff94060547378e1ceca7|cbor:sha256:hex:256935fc9501db386d1e81e205874c11968bf69678456e081440ba961628f18b",
+      "ArchiveIdentity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 2815.4741,
+          "CpuMilliseconds": 4015.625,
+          "AllocatedBytes": 1566558296,
+          "ManagedBeforeBytes": 15334656,
+          "SampledManagedPeakBytes": 95705216,
+          "WorkingSetBeforeBytes": 166539264,
+          "SampledWorkingSetPeakBytes": 199430144,
+          "ProcessLifetimePeakWorkingSetBytes": 317358080,
+          "Gen0": 188,
+          "Gen1": 71,
+          "Gen2": 13,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2636.6042,
+          "CpuMilliseconds": 3437.5,
+          "AllocatedBytes": 1566585744,
+          "ManagedBeforeBytes": 15334216,
+          "SampledManagedPeakBytes": 91382928,
+          "WorkingSetBeforeBytes": 173953024,
+          "SampledWorkingSetPeakBytes": 194797568,
+          "ProcessLifetimePeakWorkingSetBytes": 317358080,
+          "Gen0": 189,
+          "Gen1": 67,
+          "Gen2": 13,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2673.5324,
+          "CpuMilliseconds": 3343.75,
+          "AllocatedBytes": 1566583408,
+          "ManagedBeforeBytes": 15334544,
+          "SampledManagedPeakBytes": 90588280,
+          "WorkingSetBeforeBytes": 164536320,
+          "SampledWorkingSetPeakBytes": 191328256,
+          "ProcessLifetimePeakWorkingSetBytes": 317358080,
+          "Gen0": 189,
+          "Gen1": 71,
+          "Gen2": 14,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 948637,
+        "InputJSONBytes": 544530,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 14054848,
+        "RetainedCommits": 13,
+        "RetainedSnapshots": 2
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-512",
+        "EVSEs": 512,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 1155,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:bdc8cb5f0a4ba94d8d59f2e7974c2318074c1c9c55c9ff94060547378e1ceca7|cbor:sha256:hex:256935fc9501db386d1e81e205874c11968bf69678456e081440ba961628f18b",
+      "ArchiveIdentity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 2767.3773,
+          "CpuMilliseconds": 3656.25,
+          "AllocatedBytes": 1569467832,
+          "ManagedBeforeBytes": 15395040,
+          "SampledManagedPeakBytes": 101337696,
+          "WorkingSetBeforeBytes": 176353280,
+          "SampledWorkingSetPeakBytes": 217485312,
+          "ProcessLifetimePeakWorkingSetBytes": 304152576,
+          "Gen0": 190,
+          "Gen1": 68,
+          "Gen2": 14,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 3200.9234,
+          "CpuMilliseconds": 4265.625,
+          "AllocatedBytes": 1569424968,
+          "ManagedBeforeBytes": 15394600,
+          "SampledManagedPeakBytes": 94938336,
+          "WorkingSetBeforeBytes": 170278912,
+          "SampledWorkingSetPeakBytes": 203194368,
+          "ProcessLifetimePeakWorkingSetBytes": 304152576,
+          "Gen0": 189,
+          "Gen1": 66,
+          "Gen2": 14,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 3892.7944,
+          "CpuMilliseconds": 5000,
+          "AllocatedBytes": 1569468344,
+          "ManagedBeforeBytes": 15394928,
+          "SampledManagedPeakBytes": 98130936,
+          "WorkingSetBeforeBytes": 151511040,
+          "SampledWorkingSetPeakBytes": 208322560,
+          "ProcessLifetimePeakWorkingSetBytes": 304152576,
+          "Gen0": 190,
+          "Gen1": 68,
+          "Gen2": 14,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 948637,
+        "InputJSONBytes": 544530,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-graph-512",
+        "EVSEs": 512,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 1155,
+      "RetainedCommits": 13,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:bdc8cb5f0a4ba94d8d59f2e7974c2318074c1c9c55c9ff94060547378e1ceca7|cbor:sha256:hex:256935fc9501db386d1e81e205874c11968bf69678456e081440ba961628f18b",
+      "ArchiveIdentity": "cbor:sha256:hex:1142ed43b20704b94ac0bbaeb1d3d48525ced4ddd5204d1e864c732feb2ee965",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 2639.4299,
+          "CpuMilliseconds": 3531.25,
+          "AllocatedBytes": 1569783280,
+          "ManagedBeforeBytes": 15362992,
+          "SampledManagedPeakBytes": 103460496,
+          "WorkingSetBeforeBytes": 166404096,
+          "SampledWorkingSetPeakBytes": 201973760,
+          "ProcessLifetimePeakWorkingSetBytes": 306388992,
+          "Gen0": 189,
+          "Gen1": 67,
+          "Gen2": 13,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2645.8786,
+          "CpuMilliseconds": 3281.25,
+          "AllocatedBytes": 1569800880,
+          "ManagedBeforeBytes": 15362552,
+          "SampledManagedPeakBytes": 101457224,
+          "WorkingSetBeforeBytes": 170786816,
+          "SampledWorkingSetPeakBytes": 195772416,
+          "ProcessLifetimePeakWorkingSetBytes": 306388992,
+          "Gen0": 189,
+          "Gen1": 67,
+          "Gen2": 14,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2956.792,
+          "CpuMilliseconds": 3859.375,
+          "AllocatedBytes": 1569789216,
+          "ManagedBeforeBytes": 15362880,
+          "SampledManagedPeakBytes": 103432440,
+          "WorkingSetBeforeBytes": 156250112,
+          "SampledWorkingSetPeakBytes": 191746048,
+          "ProcessLifetimePeakWorkingSetBytes": 306388992,
+          "Gen0": 188,
+          "Gen1": 65,
+          "Gen2": 13,
+          "Result": {
+            "OutputBytes": 948637,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:d2f5e483e7a359303001325af6501b89bf3222b86ef2cfbf538ea5844a1c2c15"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v2",
+        "InputCBORBytes": 948637,
+        "InputJSONBytes": 544530,
+        "CommitPeers": 13,
+        "BatchPeers": 10,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-pruned-4",
+        "EVSEs": 16,
+        "Changes": 32,
+        "Branches": 4,
+        "SnapshotEvery": 8,
+        "Retentions": 4,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 39,
+      "RetainedCommits": 42,
+      "Receipts": 4,
+      "CatalogIds": 23,
+      "StaticIdentity": "json:sha256:hex:7d0f6e6d5abb16f9799aa7a2f2c4e5c68d9bebb484295ffc7e7a2e4ad6c6fde1|cbor:sha256:hex:507c67a7f18efd007442d56ff639966ffbd8ebb8ab970577c8991ac03b2ecb4f",
+      "ArchiveIdentity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.5846,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 2768,
+          "ManagedBeforeBytes": 2324624,
+          "SampledManagedPeakBytes": 2332848,
+          "WorkingSetBeforeBytes": 88043520,
+          "SampledWorkingSetPeakBytes": 88121344,
+          "ProcessLifetimePeakWorkingSetBytes": 96772096,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.5902,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 2768,
+          "ManagedBeforeBytes": 2304408,
+          "SampledManagedPeakBytes": 2312632,
+          "WorkingSetBeforeBytes": 87744512,
+          "SampledWorkingSetPeakBytes": 87744512,
+          "ProcessLifetimePeakWorkingSetBytes": 96772096,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.4262,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 2768,
+          "ManagedBeforeBytes": 2283968,
+          "SampledManagedPeakBytes": 2292192,
+          "WorkingSetBeforeBytes": 87740416,
+          "SampledWorkingSetPeakBytes": 87744512,
+          "ProcessLifetimePeakWorkingSetBytes": 96772096,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v4",
+        "InputCBORBytes": 105525,
+        "InputJSONBytes": 106105,
+        "CommitPeers": 42,
+        "BatchPeers": 37,
+        "Snapshots": 5,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-pruned-4",
+        "EVSEs": 16,
+        "Changes": 32,
+        "Branches": 4,
+        "SnapshotEvery": 8,
+        "Retentions": 4,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 39,
+      "RetainedCommits": 42,
+      "Receipts": 4,
+      "CatalogIds": 23,
+      "StaticIdentity": "json:sha256:hex:7d0f6e6d5abb16f9799aa7a2f2c4e5c68d9bebb484295ffc7e7a2e4ad6c6fde1|cbor:sha256:hex:507c67a7f18efd007442d56ff639966ffbd8ebb8ab970577c8991ac03b2ecb4f",
+      "ArchiveIdentity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.5119,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 2768,
+          "ManagedBeforeBytes": 2323720,
+          "SampledManagedPeakBytes": 2331944,
+          "WorkingSetBeforeBytes": 86163456,
+          "SampledWorkingSetPeakBytes": 86245376,
+          "ProcessLifetimePeakWorkingSetBytes": 95318016,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.4164,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 2768,
+          "ManagedBeforeBytes": 2303568,
+          "SampledManagedPeakBytes": 2311792,
+          "WorkingSetBeforeBytes": 86257664,
+          "SampledWorkingSetPeakBytes": 86261760,
+          "ProcessLifetimePeakWorkingSetBytes": 95318016,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.5757,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 2768,
+          "ManagedBeforeBytes": 2283128,
+          "SampledManagedPeakBytes": 2291352,
+          "WorkingSetBeforeBytes": 86257664,
+          "SampledWorkingSetPeakBytes": 86257664,
+          "ProcessLifetimePeakWorkingSetBytes": 95318016,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v4",
+        "InputCBORBytes": 105525,
+        "InputJSONBytes": 106105,
+        "CommitPeers": 42,
+        "BatchPeers": 37,
+        "Snapshots": 5,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-pruned-4",
+        "EVSEs": 16,
+        "Changes": 32,
+        "Branches": 4,
+        "SnapshotEvery": 8,
+        "Retentions": 4,
+        "Locations": 256
+      },
+      "Operation": "read-cbor",
+      "Entities": 39,
+      "RetainedCommits": 42,
+      "Receipts": 4,
+      "CatalogIds": 23,
+      "StaticIdentity": "json:sha256:hex:7d0f6e6d5abb16f9799aa7a2f2c4e5c68d9bebb484295ffc7e7a2e4ad6c6fde1|cbor:sha256:hex:507c67a7f18efd007442d56ff639966ffbd8ebb8ab970577c8991ac03b2ecb4f",
+      "ArchiveIdentity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 560.601,
+          "CpuMilliseconds": 1156.25,
+          "AllocatedBytes": 111735808,
+          "ManagedBeforeBytes": 2308808,
+          "SampledManagedPeakBytes": 12524120,
+          "WorkingSetBeforeBytes": 92110848,
+          "SampledWorkingSetPeakBytes": 97181696,
+          "ProcessLifetimePeakWorkingSetBytes": 97198080,
+          "Gen0": 13,
+          "Gen1": 5,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 485.9745,
+          "CpuMilliseconds": 859.375,
+          "AllocatedBytes": 111756392,
+          "ManagedBeforeBytes": 2288864,
+          "SampledManagedPeakBytes": 13928192,
+          "WorkingSetBeforeBytes": 96727040,
+          "SampledWorkingSetPeakBytes": 99315712,
+          "ProcessLifetimePeakWorkingSetBytes": 99319808,
+          "Gen0": 13,
+          "Gen1": 2,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 445.9023,
+          "CpuMilliseconds": 1078.125,
+          "AllocatedBytes": 111735808,
+          "ManagedBeforeBytes": 2309776,
+          "SampledManagedPeakBytes": 10153312,
+          "WorkingSetBeforeBytes": 96198656,
+          "SampledWorkingSetPeakBytes": 97865728,
+          "ProcessLifetimePeakWorkingSetBytes": 99319808,
+          "Gen0": 13,
+          "Gen1": 5,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v4",
+        "InputCBORBytes": 105525,
+        "InputJSONBytes": 106105,
+        "CommitPeers": 42,
+        "BatchPeers": 37,
+        "Snapshots": 5,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 885712,
+        "RetainedCommits": 42,
+        "RetainedSnapshots": 5
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-pruned-4",
+        "EVSEs": 16,
+        "Changes": 32,
+        "Branches": 4,
+        "SnapshotEvery": 8,
+        "Retentions": 4,
+        "Locations": 256
+      },
+      "Operation": "read-cbor",
+      "Entities": 39,
+      "RetainedCommits": 42,
+      "Receipts": 4,
+      "CatalogIds": 23,
+      "StaticIdentity": "json:sha256:hex:7d0f6e6d5abb16f9799aa7a2f2c4e5c68d9bebb484295ffc7e7a2e4ad6c6fde1|cbor:sha256:hex:507c67a7f18efd007442d56ff639966ffbd8ebb8ab970577c8991ac03b2ecb4f",
+      "ArchiveIdentity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 394.377,
+          "CpuMilliseconds": 609.375,
+          "AllocatedBytes": 111718600,
+          "ManagedBeforeBytes": 2307040,
+          "SampledManagedPeakBytes": 14471808,
+          "WorkingSetBeforeBytes": 93671424,
+          "SampledWorkingSetPeakBytes": 94830592,
+          "ProcessLifetimePeakWorkingSetBytes": 99344384,
+          "Gen0": 13,
+          "Gen1": 5,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 389.6765,
+          "CpuMilliseconds": 656.25,
+          "AllocatedBytes": 111718600,
+          "ManagedBeforeBytes": 2287096,
+          "SampledManagedPeakBytes": 13064696,
+          "WorkingSetBeforeBytes": 94310400,
+          "SampledWorkingSetPeakBytes": 95797248,
+          "ProcessLifetimePeakWorkingSetBytes": 99344384,
+          "Gen0": 13,
+          "Gen1": 2,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 400.0882,
+          "CpuMilliseconds": 828.125,
+          "AllocatedBytes": 111739184,
+          "ManagedBeforeBytes": 2287424,
+          "SampledManagedPeakBytes": 14195400,
+          "WorkingSetBeforeBytes": 95399936,
+          "SampledWorkingSetPeakBytes": 97562624,
+          "ProcessLifetimePeakWorkingSetBytes": 99344384,
+          "Gen0": 13,
+          "Gen1": 5,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v4",
+        "InputCBORBytes": 105525,
+        "InputJSONBytes": 106105,
+        "CommitPeers": 42,
+        "BatchPeers": 37,
+        "Snapshots": 5,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 866016,
+        "RetainedCommits": 42,
+        "RetainedSnapshots": 5
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-pruned-4",
+        "EVSEs": 16,
+        "Changes": 32,
+        "Branches": 4,
+        "SnapshotEvery": 8,
+        "Retentions": 4,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 39,
+      "RetainedCommits": 42,
+      "Receipts": 4,
+      "CatalogIds": 23,
+      "StaticIdentity": "json:sha256:hex:7d0f6e6d5abb16f9799aa7a2f2c4e5c68d9bebb484295ffc7e7a2e4ad6c6fde1|cbor:sha256:hex:507c67a7f18efd007442d56ff639966ffbd8ebb8ab970577c8991ac03b2ecb4f",
+      "ArchiveIdentity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 784.6041,
+          "CpuMilliseconds": 984.375,
+          "AllocatedBytes": 112040880,
+          "ManagedBeforeBytes": 2301736,
+          "SampledManagedPeakBytes": 13029016,
+          "WorkingSetBeforeBytes": 93884416,
+          "SampledWorkingSetPeakBytes": 95612928,
+          "ProcessLifetimePeakWorkingSetBytes": 99422208,
+          "Gen0": 13,
+          "Gen1": 6,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 547.8731,
+          "CpuMilliseconds": 937.5,
+          "AllocatedBytes": 111978712,
+          "ManagedBeforeBytes": 2281768,
+          "SampledManagedPeakBytes": 14865904,
+          "WorkingSetBeforeBytes": 95084544,
+          "SampledWorkingSetPeakBytes": 96370688,
+          "ProcessLifetimePeakWorkingSetBytes": 99422208,
+          "Gen0": 13,
+          "Gen1": 4,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 428.3162,
+          "CpuMilliseconds": 921.875,
+          "AllocatedBytes": 111954752,
+          "ManagedBeforeBytes": 2282096,
+          "SampledManagedPeakBytes": 8873168,
+          "WorkingSetBeforeBytes": 96038912,
+          "SampledWorkingSetPeakBytes": 98304000,
+          "ProcessLifetimePeakWorkingSetBytes": 99422208,
+          "Gen0": 13,
+          "Gen1": 6,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v4",
+        "InputCBORBytes": 105525,
+        "InputJSONBytes": 106105,
+        "CommitPeers": 42,
+        "BatchPeers": 37,
+        "Snapshots": 5,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-pruned-4",
+        "EVSEs": 16,
+        "Changes": 32,
+        "Branches": 4,
+        "SnapshotEvery": 8,
+        "Retentions": 4,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 39,
+      "RetainedCommits": 42,
+      "Receipts": 4,
+      "CatalogIds": 23,
+      "StaticIdentity": "json:sha256:hex:7d0f6e6d5abb16f9799aa7a2f2c4e5c68d9bebb484295ffc7e7a2e4ad6c6fde1|cbor:sha256:hex:507c67a7f18efd007442d56ff639966ffbd8ebb8ab970577c8991ac03b2ecb4f",
+      "ArchiveIdentity": "cbor:sha256:hex:1e3c602902c1725b810f41572f33e0fafde101a9f3effb1aa67fb4bd3647cc69",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 406.4274,
+          "CpuMilliseconds": 453.125,
+          "AllocatedBytes": 112015216,
+          "ManagedBeforeBytes": 2290248,
+          "SampledManagedPeakBytes": 13045416,
+          "WorkingSetBeforeBytes": 96104448,
+          "SampledWorkingSetPeakBytes": 97398784,
+          "ProcessLifetimePeakWorkingSetBytes": 100777984,
+          "Gen0": 13,
+          "Gen1": 5,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 321.1629,
+          "CpuMilliseconds": 531.25,
+          "AllocatedBytes": 112015216,
+          "ManagedBeforeBytes": 2270280,
+          "SampledManagedPeakBytes": 12659192,
+          "WorkingSetBeforeBytes": 96858112,
+          "SampledWorkingSetPeakBytes": 98037760,
+          "ProcessLifetimePeakWorkingSetBytes": 100777984,
+          "Gen0": 13,
+          "Gen1": 4,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 307.3631,
+          "CpuMilliseconds": 734.375,
+          "AllocatedBytes": 111868152,
+          "ManagedBeforeBytes": 2270608,
+          "SampledManagedPeakBytes": 13785168,
+          "WorkingSetBeforeBytes": 98889728,
+          "SampledWorkingSetPeakBytes": 100548608,
+          "ProcessLifetimePeakWorkingSetBytes": 100777984,
+          "Gen0": 13,
+          "Gen1": 4,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 105525,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:6f491ae9caf908b656b744c5a0ca6be435decd9dd6fe046431d83bdc1ff5a4eb"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v4",
+        "InputCBORBytes": 105525,
+        "InputJSONBytes": 106105,
+        "CommitPeers": 42,
+        "BatchPeers": 37,
+        "Snapshots": 5,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-boundary-16",
+        "EVSEs": 16,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 39,
+      "RetainedCommits": 8,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:e56c957106c402e11724680a842c9271c2ea1bb476f005569dd00599ada7efab|cbor:sha256:hex:c7051a4c1041fb121b0cf80b831c3bd5f95fa92e1d87eeaaeb3e9f5b3c8561a6",
+      "ArchiveIdentity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.1302,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1923912,
+          "SampledManagedPeakBytes": 1932136,
+          "WorkingSetBeforeBytes": 78458880,
+          "SampledWorkingSetPeakBytes": 78540800,
+          "ProcessLifetimePeakWorkingSetBytes": 79867904,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.1295,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1924344,
+          "SampledManagedPeakBytes": 1932568,
+          "WorkingSetBeforeBytes": 78561280,
+          "SampledWorkingSetPeakBytes": 78565376,
+          "ProcessLifetimePeakWorkingSetBytes": 79867904,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.1279,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1903904,
+          "SampledManagedPeakBytes": 1912128,
+          "WorkingSetBeforeBytes": 78565376,
+          "SampledWorkingSetPeakBytes": 78565376,
+          "ProcessLifetimePeakWorkingSetBytes": 79867904,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v3",
+        "InputCBORBytes": 30343,
+        "InputJSONBytes": 25339,
+        "CommitPeers": 8,
+        "BatchPeers": 6,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-boundary-16",
+        "EVSEs": 16,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 39,
+      "RetainedCommits": 8,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:e56c957106c402e11724680a842c9271c2ea1bb476f005569dd00599ada7efab|cbor:sha256:hex:c7051a4c1041fb121b0cf80b831c3bd5f95fa92e1d87eeaaeb3e9f5b3c8561a6",
+      "ArchiveIdentity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.1293,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1929088,
+          "SampledManagedPeakBytes": 1937312,
+          "WorkingSetBeforeBytes": 78270464,
+          "SampledWorkingSetPeakBytes": 78356480,
+          "ProcessLifetimePeakWorkingSetBytes": 79912960,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.1291,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1929520,
+          "SampledManagedPeakBytes": 1937744,
+          "WorkingSetBeforeBytes": 78368768,
+          "SampledWorkingSetPeakBytes": 78372864,
+          "ProcessLifetimePeakWorkingSetBytes": 79912960,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.1627,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1909080,
+          "SampledManagedPeakBytes": 1917304,
+          "WorkingSetBeforeBytes": 78372864,
+          "SampledWorkingSetPeakBytes": 78372864,
+          "ProcessLifetimePeakWorkingSetBytes": 79912960,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v3",
+        "InputCBORBytes": 30343,
+        "InputJSONBytes": 25339,
+        "CommitPeers": 8,
+        "BatchPeers": 6,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-boundary-16",
+        "EVSEs": 16,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor",
+      "Entities": 39,
+      "RetainedCommits": 8,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:e56c957106c402e11724680a842c9271c2ea1bb476f005569dd00599ada7efab|cbor:sha256:hex:c7051a4c1041fb121b0cf80b831c3bd5f95fa92e1d87eeaaeb3e9f5b3c8561a6",
+      "ArchiveIdentity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 179.2817,
+          "CpuMilliseconds": 265.625,
+          "AllocatedBytes": 43010528,
+          "ManagedBeforeBytes": 1929448,
+          "SampledManagedPeakBytes": 10578808,
+          "WorkingSetBeforeBytes": 80211968,
+          "SampledWorkingSetPeakBytes": 82157568,
+          "ProcessLifetimePeakWorkingSetBytes": 84692992,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 1,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 181.16,
+          "CpuMilliseconds": 265.625,
+          "AllocatedBytes": 42989728,
+          "ManagedBeforeBytes": 1930064,
+          "SampledManagedPeakBytes": 10690976,
+          "WorkingSetBeforeBytes": 82173952,
+          "SampledWorkingSetPeakBytes": 82817024,
+          "ProcessLifetimePeakWorkingSetBytes": 84692992,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 171.4237,
+          "CpuMilliseconds": 250,
+          "AllocatedBytes": 42989728,
+          "ManagedBeforeBytes": 1909808,
+          "SampledManagedPeakBytes": 8689320,
+          "WorkingSetBeforeBytes": 82833408,
+          "SampledWorkingSetPeakBytes": 83107840,
+          "ProcessLifetimePeakWorkingSetBytes": 84692992,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v3",
+        "InputCBORBytes": 30343,
+        "InputJSONBytes": 25339,
+        "CommitPeers": 8,
+        "BatchPeers": 6,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 455824,
+        "RetainedCommits": 8,
+        "RetainedSnapshots": 2
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-boundary-16",
+        "EVSEs": 16,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor",
+      "Entities": 39,
+      "RetainedCommits": 8,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:e56c957106c402e11724680a842c9271c2ea1bb476f005569dd00599ada7efab|cbor:sha256:hex:c7051a4c1041fb121b0cf80b831c3bd5f95fa92e1d87eeaaeb3e9f5b3c8561a6",
+      "ArchiveIdentity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 164.1978,
+          "CpuMilliseconds": 250,
+          "AllocatedBytes": 42995384,
+          "ManagedBeforeBytes": 1923200,
+          "SampledManagedPeakBytes": 10580920,
+          "WorkingSetBeforeBytes": 80281600,
+          "SampledWorkingSetPeakBytes": 82501632,
+          "ProcessLifetimePeakWorkingSetBytes": 84992000,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 164.9144,
+          "CpuMilliseconds": 156.25,
+          "AllocatedBytes": 42974800,
+          "ManagedBeforeBytes": 1923816,
+          "SampledManagedPeakBytes": 8029232,
+          "WorkingSetBeforeBytes": 82518016,
+          "SampledWorkingSetPeakBytes": 82927616,
+          "ProcessLifetimePeakWorkingSetBytes": 84992000,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 173.239,
+          "CpuMilliseconds": 171.875,
+          "AllocatedBytes": 42974800,
+          "ManagedBeforeBytes": 1924144,
+          "SampledManagedPeakBytes": 10707328,
+          "WorkingSetBeforeBytes": 83185664,
+          "SampledWorkingSetPeakBytes": 83275776,
+          "ProcessLifetimePeakWorkingSetBytes": 84992000,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v3",
+        "InputCBORBytes": 30343,
+        "InputJSONBytes": 25339,
+        "CommitPeers": 8,
+        "BatchPeers": 6,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 453512,
+        "RetainedCommits": 8,
+        "RetainedSnapshots": 2
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-boundary-16",
+        "EVSEs": 16,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 39,
+      "RetainedCommits": 8,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:e56c957106c402e11724680a842c9271c2ea1bb476f005569dd00599ada7efab|cbor:sha256:hex:c7051a4c1041fb121b0cf80b831c3bd5f95fa92e1d87eeaaeb3e9f5b3c8561a6",
+      "ArchiveIdentity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 168.3189,
+          "CpuMilliseconds": 234.375,
+          "AllocatedBytes": 43132800,
+          "ManagedBeforeBytes": 1934344,
+          "SampledManagedPeakBytes": 10764904,
+          "WorkingSetBeforeBytes": 84606976,
+          "SampledWorkingSetPeakBytes": 84959232,
+          "ProcessLifetimePeakWorkingSetBytes": 85114880,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 168.9663,
+          "CpuMilliseconds": 250,
+          "AllocatedBytes": 43112216,
+          "ManagedBeforeBytes": 1934960,
+          "SampledManagedPeakBytes": 8328448,
+          "WorkingSetBeforeBytes": 84971520,
+          "SampledWorkingSetPeakBytes": 85000192,
+          "ProcessLifetimePeakWorkingSetBytes": 85114880,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 171.7075,
+          "CpuMilliseconds": 312.5,
+          "AllocatedBytes": 43112216,
+          "ManagedBeforeBytes": 1935288,
+          "SampledManagedPeakBytes": 5356152,
+          "WorkingSetBeforeBytes": 85090304,
+          "SampledWorkingSetPeakBytes": 86532096,
+          "ProcessLifetimePeakWorkingSetBytes": 86532096,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v3",
+        "InputCBORBytes": 30343,
+        "InputJSONBytes": 25339,
+        "CommitPeers": 8,
+        "BatchPeers": 6,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-boundary-16",
+        "EVSEs": 16,
+        "Changes": 8,
+        "Branches": 2,
+        "SnapshotEvery": 4,
+        "Retentions": 0,
+        "Locations": 256
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 39,
+      "RetainedCommits": 8,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:e56c957106c402e11724680a842c9271c2ea1bb476f005569dd00599ada7efab|cbor:sha256:hex:c7051a4c1041fb121b0cf80b831c3bd5f95fa92e1d87eeaaeb3e9f5b3c8561a6",
+      "ArchiveIdentity": "cbor:sha256:hex:fced2f5006f3472b9bb42baf33bea0993c9e2255762b78b4908b5da4d604b854",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 174.2969,
+          "CpuMilliseconds": 250,
+          "AllocatedBytes": 43125096,
+          "ManagedBeforeBytes": 1928312,
+          "SampledManagedPeakBytes": 11357792,
+          "WorkingSetBeforeBytes": 84815872,
+          "SampledWorkingSetPeakBytes": 85221376,
+          "ProcessLifetimePeakWorkingSetBytes": 85319680,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 161.5881,
+          "CpuMilliseconds": 156.25,
+          "AllocatedBytes": 43104512,
+          "ManagedBeforeBytes": 1928928,
+          "SampledManagedPeakBytes": 8241920,
+          "WorkingSetBeforeBytes": 85250048,
+          "SampledWorkingSetPeakBytes": 85270528,
+          "ProcessLifetimePeakWorkingSetBytes": 85319680,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 183.2791,
+          "CpuMilliseconds": 343.75,
+          "AllocatedBytes": 43104512,
+          "ManagedBeforeBytes": 1929256,
+          "SampledManagedPeakBytes": 9925832,
+          "WorkingSetBeforeBytes": 85254144,
+          "SampledWorkingSetPeakBytes": 86605824,
+          "ProcessLifetimePeakWorkingSetBytes": 86605824,
+          "Gen0": 5,
+          "Gen1": 3,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 30343,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:c6545654a12da8aba5ab854b0af4362848bb0b273688b938a9787b2552b7fe55"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v3",
+        "InputCBORBytes": 30343,
+        "InputJSONBytes": 25339,
+        "CommitPeers": 8,
+        "BatchPeers": 6,
+        "Snapshots": 2,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-1-peers-1",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 1,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 6,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:6a1ec3a2a57c309cd270452a85cf4553e00b40cf2b5e874aa1e7e48aee25dad4|cbor:sha256:hex:f82c789aa7da9337a9dae6d5eda6f95d0bacd8a828a061cde70b4072aae20831",
+      "ArchiveIdentity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.0347,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1138544,
+          "SampledManagedPeakBytes": 1146768,
+          "WorkingSetBeforeBytes": 74108928,
+          "SampledWorkingSetPeakBytes": 74186752,
+          "ProcessLifetimePeakWorkingSetBytes": 74186752,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.0387,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1137384,
+          "SampledManagedPeakBytes": 1145608,
+          "WorkingSetBeforeBytes": 74199040,
+          "SampledWorkingSetPeakBytes": 74203136,
+          "ProcessLifetimePeakWorkingSetBytes": 74203136,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.0334,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1136144,
+          "SampledManagedPeakBytes": 1144368,
+          "WorkingSetBeforeBytes": 74203136,
+          "SampledWorkingSetPeakBytes": 74203136,
+          "ProcessLifetimePeakWorkingSetBytes": 74203136,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 4144,
+        "InputJSONBytes": 4399,
+        "CommitPeers": 2,
+        "BatchPeers": 1,
+        "Snapshots": 0,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-1-peers-1",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 1,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 6,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:6a1ec3a2a57c309cd270452a85cf4553e00b40cf2b5e874aa1e7e48aee25dad4|cbor:sha256:hex:f82c789aa7da9337a9dae6d5eda6f95d0bacd8a828a061cde70b4072aae20831",
+      "ArchiveIdentity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 0.0425,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1142576,
+          "SampledManagedPeakBytes": 1150800,
+          "WorkingSetBeforeBytes": 74153984,
+          "SampledWorkingSetPeakBytes": 74227712,
+          "ProcessLifetimePeakWorkingSetBytes": 74227712,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.0444,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1141352,
+          "SampledManagedPeakBytes": 1149576,
+          "WorkingSetBeforeBytes": 74244096,
+          "SampledWorkingSetPeakBytes": 74244096,
+          "ProcessLifetimePeakWorkingSetBytes": 74244096,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 0.0433,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 1140112,
+          "SampledManagedPeakBytes": 1148336,
+          "WorkingSetBeforeBytes": 74240000,
+          "SampledWorkingSetPeakBytes": 74240000,
+          "ProcessLifetimePeakWorkingSetBytes": 74244096,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 4144,
+        "InputJSONBytes": 4399,
+        "CommitPeers": 2,
+        "BatchPeers": 1,
+        "Snapshots": 0,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-1-peers-1",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 1,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor",
+      "Entities": 6,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:6a1ec3a2a57c309cd270452a85cf4553e00b40cf2b5e874aa1e7e48aee25dad4|cbor:sha256:hex:f82c789aa7da9337a9dae6d5eda6f95d0bacd8a828a061cde70b4072aae20831",
+      "ArchiveIdentity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 24.7811,
+          "CpuMilliseconds": 31.25,
+          "AllocatedBytes": 4740632,
+          "ManagedBeforeBytes": 1141008,
+          "SampledManagedPeakBytes": 5902096,
+          "WorkingSetBeforeBytes": 74637312,
+          "SampledWorkingSetPeakBytes": 74723328,
+          "ProcessLifetimePeakWorkingSetBytes": 74723328,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 28.2861,
+          "CpuMilliseconds": 31.25,
+          "AllocatedBytes": 4742016,
+          "ManagedBeforeBytes": 1140032,
+          "SampledManagedPeakBytes": 5901112,
+          "WorkingSetBeforeBytes": 74756096,
+          "SampledWorkingSetPeakBytes": 74760192,
+          "ProcessLifetimePeakWorkingSetBytes": 74760192,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 32.3769,
+          "CpuMilliseconds": 46.875,
+          "AllocatedBytes": 4740632,
+          "ManagedBeforeBytes": 1136208,
+          "SampledManagedPeakBytes": 5897288,
+          "WorkingSetBeforeBytes": 74760192,
+          "SampledWorkingSetPeakBytes": 74776576,
+          "ProcessLifetimePeakWorkingSetBytes": 74776576,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 4144,
+        "InputJSONBytes": 4399,
+        "CommitPeers": 2,
+        "BatchPeers": 1,
+        "Snapshots": 0,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 77520,
+        "RetainedCommits": 2,
+        "RetainedSnapshots": 0
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-1-peers-1",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 1,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor",
+      "Entities": 6,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:6a1ec3a2a57c309cd270452a85cf4553e00b40cf2b5e874aa1e7e48aee25dad4|cbor:sha256:hex:f82c789aa7da9337a9dae6d5eda6f95d0bacd8a828a061cde70b4072aae20831",
+      "ArchiveIdentity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 21.8286,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 4740848,
+          "ManagedBeforeBytes": 1141032,
+          "SampledManagedPeakBytes": 5902056,
+          "WorkingSetBeforeBytes": 74178560,
+          "SampledWorkingSetPeakBytes": 74268672,
+          "ProcessLifetimePeakWorkingSetBytes": 74268672,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 21.9694,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 4742232,
+          "ManagedBeforeBytes": 1140056,
+          "SampledManagedPeakBytes": 5901080,
+          "WorkingSetBeforeBytes": 74301440,
+          "SampledWorkingSetPeakBytes": 74321920,
+          "ProcessLifetimePeakWorkingSetBytes": 74321920,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 20.9758,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 4740848,
+          "ManagedBeforeBytes": 1136232,
+          "SampledManagedPeakBytes": 5897256,
+          "WorkingSetBeforeBytes": 74305536,
+          "SampledWorkingSetPeakBytes": 74317824,
+          "ProcessLifetimePeakWorkingSetBytes": 74321920,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 4144,
+        "InputJSONBytes": 4399,
+        "CommitPeers": 2,
+        "BatchPeers": 1,
+        "Snapshots": 0,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 77616,
+        "RetainedCommits": 2,
+        "RetainedSnapshots": 0
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-1-peers-1",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 1,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 6,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:6a1ec3a2a57c309cd270452a85cf4553e00b40cf2b5e874aa1e7e48aee25dad4|cbor:sha256:hex:f82c789aa7da9337a9dae6d5eda6f95d0bacd8a828a061cde70b4072aae20831",
+      "ArchiveIdentity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 16.4638,
+          "CpuMilliseconds": 31.25,
+          "AllocatedBytes": 4810864,
+          "ManagedBeforeBytes": 1136568,
+          "SampledManagedPeakBytes": 5968024,
+          "WorkingSetBeforeBytes": 74698752,
+          "SampledWorkingSetPeakBytes": 74784768,
+          "ProcessLifetimePeakWorkingSetBytes": 74784768,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 17.2592,
+          "CpuMilliseconds": 31.25,
+          "AllocatedBytes": 4812248,
+          "ManagedBeforeBytes": 1135592,
+          "SampledManagedPeakBytes": 5966360,
+          "WorkingSetBeforeBytes": 74866688,
+          "SampledWorkingSetPeakBytes": 74887168,
+          "ProcessLifetimePeakWorkingSetBytes": 74887168,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 15.1795,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 4810864,
+          "ManagedBeforeBytes": 1131768,
+          "SampledManagedPeakBytes": 5962536,
+          "WorkingSetBeforeBytes": 74870784,
+          "SampledWorkingSetPeakBytes": 74870784,
+          "ProcessLifetimePeakWorkingSetBytes": 74887168,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 4144,
+        "InputJSONBytes": 4399,
+        "CommitPeers": 2,
+        "BatchPeers": 1,
+        "Snapshots": 0,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-1-peers-1",
+        "EVSEs": 1,
+        "Changes": 1,
+        "Branches": 1,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 6,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:6a1ec3a2a57c309cd270452a85cf4553e00b40cf2b5e874aa1e7e48aee25dad4|cbor:sha256:hex:f82c789aa7da9337a9dae6d5eda6f95d0bacd8a828a061cde70b4072aae20831",
+      "ArchiveIdentity": "cbor:sha256:hex:51454363ec1e8c9fa9743f5230e13163e43683080988fdeb4f2a65083dc942ec",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 25.4601,
+          "CpuMilliseconds": 31.25,
+          "AllocatedBytes": 4811080,
+          "ManagedBeforeBytes": 1140888,
+          "SampledManagedPeakBytes": 5972288,
+          "WorkingSetBeforeBytes": 74477568,
+          "SampledWorkingSetPeakBytes": 74563584,
+          "ProcessLifetimePeakWorkingSetBytes": 74563584,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 25.5994,
+          "CpuMilliseconds": 31.25,
+          "AllocatedBytes": 4812464,
+          "ManagedBeforeBytes": 1139848,
+          "SampledManagedPeakBytes": 5970624,
+          "WorkingSetBeforeBytes": 74592256,
+          "SampledWorkingSetPeakBytes": 74629120,
+          "ProcessLifetimePeakWorkingSetBytes": 74629120,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 14.8382,
+          "CpuMilliseconds": 15.625,
+          "AllocatedBytes": 4811080,
+          "ManagedBeforeBytes": 1136088,
+          "SampledManagedPeakBytes": 5966888,
+          "WorkingSetBeforeBytes": 74600448,
+          "SampledWorkingSetPeakBytes": 74600448,
+          "ProcessLifetimePeakWorkingSetBytes": 74629120,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 4144,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:f53e03d55a9828a071631a510c15707a791f485458b267d7451a82bdb16f8979"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 4144,
+        "InputJSONBytes": 4399,
+        "CommitPeers": 2,
+        "BatchPeers": 1,
+        "Snapshots": 0,
+        "MaxBatchOperations": 1
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-2048-peers-4",
+        "EVSEs": 512,
+        "Changes": 2048,
+        "Branches": 4,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 1155,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:8def5decc6c4523c0fa7dbbdad0e425ee9c9148d7f1f36f8c1c208ebe8b2858a|cbor:sha256:hex:654297afdc631547652050e52c26ad71ab6da6e7a74fbb922c5c9edb54e76505",
+      "ArchiveIdentity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 1.0707,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 16576816,
+          "SampledManagedPeakBytes": 16585040,
+          "WorkingSetBeforeBytes": 198963200,
+          "SampledWorkingSetPeakBytes": 199049216,
+          "ProcessLifetimePeakWorkingSetBytes": 268054528,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 1.0689,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 16577248,
+          "SampledManagedPeakBytes": 16585472,
+          "WorkingSetBeforeBytes": 199061504,
+          "SampledWorkingSetPeakBytes": 199065600,
+          "ProcessLifetimePeakWorkingSetBytes": 268054528,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 1.057,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 16577392,
+          "SampledManagedPeakBytes": 16585616,
+          "WorkingSetBeforeBytes": 179019776,
+          "SampledWorkingSetPeakBytes": 179019776,
+          "ProcessLifetimePeakWorkingSetBytes": 268054528,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 613720,
+        "InputJSONBytes": 540479,
+        "CommitPeers": 8,
+        "BatchPeers": 4,
+        "Snapshots": 0,
+        "MaxBatchOperations": 2048
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-2048-peers-4",
+        "EVSEs": 512,
+        "Changes": 2048,
+        "Branches": 4,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor-limits",
+      "Entities": 1155,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:8def5decc6c4523c0fa7dbbdad0e425ee9c9148d7f1f36f8c1c208ebe8b2858a|cbor:sha256:hex:654297afdc631547652050e52c26ad71ab6da6e7a74fbb922c5c9edb54e76505",
+      "ArchiveIdentity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 1.9378,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 16563992,
+          "SampledManagedPeakBytes": 16572216,
+          "WorkingSetBeforeBytes": 254672896,
+          "SampledWorkingSetPeakBytes": 254767104,
+          "ProcessLifetimePeakWorkingSetBytes": 271478784,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 1.1063,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 16564424,
+          "SampledManagedPeakBytes": 16572648,
+          "WorkingSetBeforeBytes": 235188224,
+          "SampledWorkingSetPeakBytes": 235188224,
+          "ProcessLifetimePeakWorkingSetBytes": 271478784,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 1.0717,
+          "CpuMilliseconds": 0,
+          "AllocatedBytes": 760,
+          "ManagedBeforeBytes": 16564568,
+          "SampledManagedPeakBytes": 16572792,
+          "WorkingSetBeforeBytes": 235188224,
+          "SampledWorkingSetPeakBytes": 235188224,
+          "ProcessLifetimePeakWorkingSetBytes": 271478784,
+          "Gen0": 0,
+          "Gen1": 0,
+          "Gen2": 0,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 613720,
+        "InputJSONBytes": 540479,
+        "CommitPeers": 8,
+        "BatchPeers": 4,
+        "Snapshots": 0,
+        "MaxBatchOperations": 2048
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-2048-peers-4",
+        "EVSEs": 512,
+        "Changes": 2048,
+        "Branches": 4,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor",
+      "Entities": 1155,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:8def5decc6c4523c0fa7dbbdad0e425ee9c9148d7f1f36f8c1c208ebe8b2858a|cbor:sha256:hex:654297afdc631547652050e52c26ad71ab6da6e7a74fbb922c5c9edb54e76505",
+      "ArchiveIdentity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 2352.4726,
+          "CpuMilliseconds": 3406.25,
+          "AllocatedBytes": 1528360880,
+          "ManagedBeforeBytes": 16534528,
+          "SampledManagedPeakBytes": 76200160,
+          "WorkingSetBeforeBytes": 188710912,
+          "SampledWorkingSetPeakBytes": 188768256,
+          "ProcessLifetimePeakWorkingSetBytes": 254029824,
+          "Gen0": 184,
+          "Gen1": 35,
+          "Gen2": 6,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2243.9259,
+          "CpuMilliseconds": 2921.875,
+          "AllocatedBytes": 1528185544,
+          "ManagedBeforeBytes": 16600184,
+          "SampledManagedPeakBytes": 96541096,
+          "WorkingSetBeforeBytes": 173637632,
+          "SampledWorkingSetPeakBytes": 199589888,
+          "ProcessLifetimePeakWorkingSetBytes": 254029824,
+          "Gen0": 184,
+          "Gen1": 36,
+          "Gen2": 6,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2241.5587,
+          "CpuMilliseconds": 3187.5,
+          "AllocatedBytes": 1528348008,
+          "ManagedBeforeBytes": 16436568,
+          "SampledManagedPeakBytes": 79693040,
+          "WorkingSetBeforeBytes": 182525952,
+          "SampledWorkingSetPeakBytes": 202039296,
+          "ProcessLifetimePeakWorkingSetBytes": 254029824,
+          "Gen0": 184,
+          "Gen1": 36,
+          "Gen2": 6,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 613720,
+        "InputJSONBytes": 540479,
+        "CommitPeers": 8,
+        "BatchPeers": 4,
+        "Snapshots": 0,
+        "MaxBatchOperations": 2048
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 12256216,
+        "RetainedCommits": 2,
+        "RetainedSnapshots": 0
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-2048-peers-4",
+        "EVSEs": 512,
+        "Changes": 2048,
+        "Branches": 4,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor",
+      "Entities": 1155,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:8def5decc6c4523c0fa7dbbdad0e425ee9c9148d7f1f36f8c1c208ebe8b2858a|cbor:sha256:hex:654297afdc631547652050e52c26ad71ab6da6e7a74fbb922c5c9edb54e76505",
+      "ArchiveIdentity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 2228.8842,
+          "CpuMilliseconds": 2796.875,
+          "AllocatedBytes": 1530288280,
+          "ManagedBeforeBytes": 16517856,
+          "SampledManagedPeakBytes": 76395360,
+          "WorkingSetBeforeBytes": 178225152,
+          "SampledWorkingSetPeakBytes": 191774720,
+          "ProcessLifetimePeakWorkingSetBytes": 277737472,
+          "Gen0": 183,
+          "Gen1": 34,
+          "Gen2": 5,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2176.91,
+          "CpuMilliseconds": 2531.25,
+          "AllocatedBytes": 1530124224,
+          "ManagedBeforeBytes": 16583440,
+          "SampledManagedPeakBytes": 78895784,
+          "WorkingSetBeforeBytes": 172814336,
+          "SampledWorkingSetPeakBytes": 188641280,
+          "ProcessLifetimePeakWorkingSetBytes": 277737472,
+          "Gen0": 183,
+          "Gen1": 34,
+          "Gen2": 5,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2190.8847,
+          "CpuMilliseconds": 3203.125,
+          "AllocatedBytes": 1530287720,
+          "ManagedBeforeBytes": 16419824,
+          "SampledManagedPeakBytes": 76861048,
+          "WorkingSetBeforeBytes": 166350848,
+          "SampledWorkingSetPeakBytes": 196632576,
+          "ProcessLifetimePeakWorkingSetBytes": 277737472,
+          "Gen0": 183,
+          "Gen1": 34,
+          "Gen2": 5,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 613720,
+        "InputJSONBytes": 540479,
+        "CommitPeers": 8,
+        "BatchPeers": 4,
+        "Snapshots": 0,
+        "MaxBatchOperations": 2048
+      },
+      "ReplayRetention": {
+        "ManagedDeltaBytes": 12281416,
+        "RetainedCommits": 2,
+        "RetainedSnapshots": 0
+      }
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-2048-peers-4",
+        "EVSEs": 512,
+        "Changes": 2048,
+        "Branches": 4,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 1155,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:8def5decc6c4523c0fa7dbbdad0e425ee9c9148d7f1f36f8c1c208ebe8b2858a|cbor:sha256:hex:654297afdc631547652050e52c26ad71ab6da6e7a74fbb922c5c9edb54e76505",
+      "ArchiveIdentity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 2414.7879,
+          "CpuMilliseconds": 3234.375,
+          "AllocatedBytes": 1530830864,
+          "ManagedBeforeBytes": 16580728,
+          "SampledManagedPeakBytes": 98945896,
+          "WorkingSetBeforeBytes": 188911616,
+          "SampledWorkingSetPeakBytes": 204546048,
+          "ProcessLifetimePeakWorkingSetBytes": 275841024,
+          "Gen0": 184,
+          "Gen1": 35,
+          "Gen2": 6,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2619.9436,
+          "CpuMilliseconds": 3625,
+          "AllocatedBytes": 1530815864,
+          "ManagedBeforeBytes": 16482440,
+          "SampledManagedPeakBytes": 75825856,
+          "WorkingSetBeforeBytes": 190062592,
+          "SampledWorkingSetPeakBytes": 191524864,
+          "ProcessLifetimePeakWorkingSetBytes": 275841024,
+          "Gen0": 183,
+          "Gen1": 36,
+          "Gen2": 5,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2117.3575,
+          "CpuMilliseconds": 2906.25,
+          "AllocatedBytes": 1530645728,
+          "ManagedBeforeBytes": 16646640,
+          "SampledManagedPeakBytes": 87005056,
+          "WorkingSetBeforeBytes": 164089856,
+          "SampledWorkingSetPeakBytes": 200638464,
+          "ProcessLifetimePeakWorkingSetBytes": 275841024,
+          "Gen0": 183,
+          "Gen1": 36,
+          "Gen2": 5,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 613720,
+        "InputJSONBytes": 540479,
+        "CommitPeers": 8,
+        "BatchPeers": 4,
+        "Snapshots": 0,
+        "MaxBatchOperations": 2048
+      },
+      "ReplayRetention": null
+    },
+    {
+      "Shape": {
+        "Name": "recover-batch-2048-peers-4",
+        "EVSEs": 512,
+        "Changes": 2048,
+        "Branches": 4,
+        "SnapshotEvery": 0,
+        "Retentions": 0,
+        "Locations": 0
+      },
+      "Operation": "read-cbor-input-token",
+      "Entities": 1155,
+      "RetainedCommits": 2,
+      "Receipts": 0,
+      "CatalogIds": 0,
+      "StaticIdentity": "json:sha256:hex:8def5decc6c4523c0fa7dbbdad0e425ee9c9148d7f1f36f8c1c208ebe8b2858a|cbor:sha256:hex:654297afdc631547652050e52c26ad71ab6da6e7a74fbb922c5c9edb54e76505",
+      "ArchiveIdentity": "cbor:sha256:hex:cdfa9e1f191d765245be3f1c83e22959355ed92ab2d06aa078d0d043a9a6b9f8",
+      "Samples": [
+        {
+          "ElapsedMilliseconds": 2228.4659,
+          "CpuMilliseconds": 2734.375,
+          "AllocatedBytes": 1529804184,
+          "ManagedBeforeBytes": 16416512,
+          "SampledManagedPeakBytes": 86651448,
+          "WorkingSetBeforeBytes": 167428096,
+          "SampledWorkingSetPeakBytes": 187277312,
+          "ProcessLifetimePeakWorkingSetBytes": 267190272,
+          "Gen0": 184,
+          "Gen1": 40,
+          "Gen2": 6,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2159.5035,
+          "CpuMilliseconds": 2937.5,
+          "AllocatedBytes": 1529634152,
+          "ManagedBeforeBytes": 16581072,
+          "SampledManagedPeakBytes": 78275976,
+          "WorkingSetBeforeBytes": 168148992,
+          "SampledWorkingSetPeakBytes": 179769344,
+          "ProcessLifetimePeakWorkingSetBytes": 267190272,
+          "Gen0": 183,
+          "Gen1": 39,
+          "Gen2": 5,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        },
+        {
+          "ElapsedMilliseconds": 2144.4636,
+          "CpuMilliseconds": 3062.5,
+          "AllocatedBytes": 1529795528,
+          "ManagedBeforeBytes": 16417456,
+          "SampledManagedPeakBytes": 77495328,
+          "WorkingSetBeforeBytes": 161419264,
+          "SampledWorkingSetPeakBytes": 182280192,
+          "ProcessLifetimePeakWorkingSetBytes": 267190272,
+          "Gen0": 183,
+          "Gen1": 39,
+          "Gen2": 5,
+          "Result": {
+            "OutputBytes": 613720,
+            "WrittenBytes": 0,
+            "Identity": "json:sha256:hex:b98e52a436c9fcc5edf4d2dc300cf86b4af17e31aef9e10bec4cf9c7bcc2e4b9"
+          }
+        }
+      ],
+      "ChildETagRetention": null,
+      "ChildETagState": null,
+      "RecoveryInventory": {
+        "Profile": "wwcp-poi-history-v1",
+        "InputCBORBytes": 613720,
+        "InputJSONBytes": 540479,
+        "CommitPeers": 8,
+        "BatchPeers": 4,
+        "Snapshots": 0,
+        "MaxBatchOperations": 2048
+      },
+      "ReplayRetention": null
+    }
+  ]
+}

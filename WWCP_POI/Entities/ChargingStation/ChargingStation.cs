@@ -1237,7 +1237,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.ChargingPool                        = ChargingPool;
 
-            this.EnergyMeters = ImmutablePOIValues.CopyEnergyMeters(EnergyMeters);
+            this.EnergyMeters = ImmutablePOIValues.CopyEnergyMeters(EnergyMeters, ChargingPool?.RoamingNetwork);
 
             this.address                             = ImmutablePOIValues.Copy(Address);
             this.geoLocation                         = GeoLocation;

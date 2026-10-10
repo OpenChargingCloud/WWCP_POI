@@ -200,6 +200,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var operators = new List<ChargingStationOperator>();
             var providers = new List<EMobilityProvider>();
 
+            var catalogs = new JObject();
+            foreach (var type in new[] { InfrastructureEntityType.GridOperator, InfrastructureEntityType.ChargingStationManufacturer,
+                                        InfrastructureEntityType.TransparencySoftware, InfrastructureEntityType.TransparencySoftwareCertificate })
+                catalogs[InfrastructureChangeSchema.Relations[type].Field] = new JArray(
+                    snapshot.Entities[snapshot.Root].Children.Where(key => key.Type == type).
+                        Select(key => snapshot.GetEntityJSON(key.Type, key.Id)));
+            ParseNetworkCatalogs(catalogs);
+
             foreach (var key in snapshot.Entities[snapshot.Root].Children)
             {
                 var document = snapshot.GetEntityJSON(key.Type, key.Id);
@@ -218,7 +226,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 projectedEMobilityProviders.TryAdd(provider.Id, provider);
 
             var children = new JObject();
-            foreach (var type in new[] { InfrastructureEntityType.GridOperator, InfrastructureEntityType.ChargingStationManufacturer, InfrastructureEntityType.ParkingOperator })
+            foreach (var type in new[] { InfrastructureEntityType.ParkingOperator })
                 children[InfrastructureChangeSchema.Relations[type].Field] = new JArray(
                     snapshot.Entities[snapshot.Root].Children.Where(key => key.Type == type).
                         Select(key => snapshot.GetEntityJSON(key.Type, key.Id)));
@@ -230,7 +238,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Restore revision metadata
 
-        internal void RestoreVersionedSnapshot(JObject json)
+        internal void RestoreVersionedSnapshot(JObject json, RoamingNetworkDataSnapshot? preparedSnapshot = null)
         {
 
             var revision = json["revision"];
@@ -244,7 +252,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("appliedChangeSetId requires revision metadata.");
             var projection = POIRepresentation.WithoutETags(() => POIJSON.Document(this));
             var content = POISnapshotRepresentation.CompleteImport(json, projection, nameof(RoamingNetwork), ownedGraph: true);
-            dataSnapshot = RoamingNetworkDataSnapshot.Capture(content, number, changeSetId);
+            dataSnapshot = preparedSnapshot is not null && preparedSnapshot.MatchesCompletedDocument(content, number, changeSetId)
+                               ? preparedSnapshot
+                               : RoamingNetworkDataSnapshot.Capture(content, number, changeSetId, preparedSnapshot);
             POISnapshotRepresentation.Bind(this, dataSnapshot.GetDocument());
 
         }

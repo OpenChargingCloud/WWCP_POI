@@ -42,7 +42,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ParkingProduct_Id  Id                      { get; }
 
         /// <summary>
-        /// The electric vehicle wants to charge at least for this amount of time.
+        /// The minimum parking duration.
         /// </summary>
         public TimeSpan?          MinDuration             { get; }
 
@@ -59,13 +59,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Create a new parking product.
         /// </summary>
         /// <param name="Id"></param>
-        /// <param name="MinDuration">The electric vehicle wants to charge at least for this amount of time.</param>
+        /// <param name="MinDuration">The minimum parking duration.</param>
         /// <param name="StopParkingAfterTime">Stop parking after this amount of time.</param>
         public ParkingProduct(ParkingProduct_Id  Id,
                               TimeSpan?          MinDuration            = null,
                               TimeSpan?          StopParkingAfterTime   = null)
         {
 
+            if (Id.IsNullOrEmpty) throw new ArgumentException("A parking product identifier is required.", nameof(Id));
+            if (MinDuration < TimeSpan.Zero || StopParkingAfterTime < TimeSpan.Zero)
+                throw new ArgumentException("Parking durations must not be negative.");
+            if (MinDuration > StopParkingAfterTime)
+                throw new ArgumentException("minDuration must not exceed stopParkingAfterTime.");
             this.Id                     = Id;
             this.MinDuration            = MinDuration;
             this.StopParkingAfterTime   = StopParkingAfterTime;

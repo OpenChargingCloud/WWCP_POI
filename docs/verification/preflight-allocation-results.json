@@ -1,0 +1,133 @@
+{
+  "date": "2026-10-09",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "8b0c7b41d18a5f61fbfd6039a0d59b1ae75d53aea74b48503886db425550e42f",
+  "productionAssemblySHA256": "32efece4ae173db6037fba75381803008054243c2f6fd4d015f1fe1ea5786877",
+  "testSourceSHA256": "4057ab8dae1827366c17f988a7d74957c8507d7ffb72fd7b54f69656c45137e5",
+  "testAssemblySHA256": "0dd1124f5131ac2de9b3b9fc60795f04f30836bb6e9e17a2581bbffc68fcebeb",
+  "benchmarkSourceSHA256": "182e777394626fb881b1298f50797dc58f3cfc8ca029fc97a37fdfd4f1b772bb",
+  "reportScriptSHA256": "7a13022ccd3b04701627d63ad772fa05ce773908ece3f5925e962f1500d98855",
+  "reconstructedBeforeProductionSourceSHA256": "e5aeb5fcf182a0810f8c981f16d9652a858e045e3f091b1312f4d2d3318c7d92",
+  "beforeProductionAssemblySHA256": "dfd3f4d0e503f01d096b08be122e4e43fdf9b18fe109afbf830c64c7f42f5c75",
+  "scopedPatchSHA256": "e788cb4f9de3fc155059c9bfec2c0f9cc5ff59b79d97c3486e4a2dc791220d36",
+  "newTestCases": 71,
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/preflight-allocation/preflight-allocation-focused-final.trx",
+      "sha256": "775b8f521433a188f3055bcf508f83ae0b3b745a932da197d1ab6040b88e6a64",
+      "times": {
+        "creation": "2026-10-09T03:32:35.1846681+02:00",
+        "queuing": "2026-10-09T03:32:35.1846686+02:00",
+        "start": "2026-10-09T03:32:33.7204595+02:00",
+        "finish": "2026-10-09T03:33:45.3140468+02:00"
+      },
+      "passed": 494,
+      "failed": 0,
+      "skipped": 0,
+      "excludedExplicitGenerators": [],
+      "counters": {
+        "total": 494,
+        "executed": 494,
+        "passed": 494,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/preflight-allocation/preflight-allocation-full.trx",
+      "sha256": "e3b7a4eb83f59b291a974819881bebf4086d4bd0b09545c525b8d01afd93d7f8",
+      "times": {
+        "creation": "2026-10-09T03:35:00.0677842+02:00",
+        "queuing": "2026-10-09T03:35:00.0677850+02:00",
+        "start": "2026-10-09T03:34:57.9669112+02:00",
+        "finish": "2026-10-09T03:39:33.4371277+02:00"
+      },
+      "passed": 1519,
+      "failed": 0,
+      "skipped": 1,
+      "excludedExplicitGenerators": [
+        "GenerateReferenceVectors",
+        "GenerateSnapshotRetentionVectors"
+      ],
+      "counters": {
+        "total": 1522,
+        "executed": 1519,
+        "passed": 1519,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  ],
+  "initialTestSetupCorrection": "The schema fixture used evses instead of the declared EVSEs field. Correcting only the test restores its intended two-reading admission assertion. Six additional exact tree-admission boundaries were added before the final build and 494/1519-case runs.",
+  "reports": [
+    {
+      "file": "docs/performance/direct-archive-payload-after.json",
+      "sha256": "9eb6cb15190f42199881371241b4b658a3778fb0ba4e5708d7aa72cc9a63efb1",
+      "workers": 80,
+      "measuredSamples": 400
+    },
+    {
+      "file": "docs/performance/preflight-allocation-after.json",
+      "sha256": "01d4b1a5860e7f3222c7ce5106c2cd0bb835afdafa7add7113e6c9b1178e4fd1",
+      "workers": 80,
+      "measuredSamples": 400
+    }
+  ],
+  "limits": {
+    "completePerPOICBOROutputBufferInArchive": false,
+    "completeJSONBufferAndIndex": true,
+    "completeChangeSetOutputBuffer": true,
+    "maxDepth": 64,
+    "preflightBeforePayloadBytes": true,
+    "separateWriterAndSkipValueDepthRules": true,
+    "readingsPerCallMaxEntries": 32,
+    "readingMaxTextCharacters": 256,
+    "readingMaxTotalTextCharacters": 4096,
+    "readingMaxNodesPerEntry": 128,
+    "readingMaxScalarCharactersOrBytesPerNode": 256,
+    "pooledMapDepthSlots": 64,
+    "pooledMapMaxNames": 128,
+    "clearedMapKeyReferences": true,
+    "totalTransientInputMemoryBound": false,
+    "crossCallReadingRetention": false,
+    "archiveAndSigningProfilesUnchanged": true
+  },
+  "generatedSummaryWordingCorrection": {
+    "original": "No build or test ran alongside either benchmark report.",
+    "replacement": "No benchmark-task build or test ran alongside either report. Other local .NET work was observed during this task.",
+    "reason": "Qualify the unchanged generic report overlap statement as benchmark-task-only; external .NET work was observed. Checked tables and all measurement data remain unchanged."
+  },
+  "generatedReports": [
+    {
+      "file": "docs/performance/preflight-allocation-comparison.md",
+      "sha256": "ca2332da990840d608a558fd4123321d53488604c30973c18989ac940296da70"
+    },
+    {
+      "file": "docs/performance/preflight-allocation-summary.md",
+      "sha256": "f3b7cb6f6140d16657060e9c2f5b5c02e761133a186c16a5d01989f2886c732d"
+    }
+  ]
+}

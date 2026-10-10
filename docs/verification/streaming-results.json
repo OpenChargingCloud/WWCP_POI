@@ -1,0 +1,118 @@
+{
+  "date": "2026-10-08",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "882ef87016d841bbdf1f2e2684beba75d500e305b437d5083a0fe56811f66c3e",
+  "productionAssemblySHA256": "62201061576d4b182895c0ddf563bd5d18d1e716cc925a05c1cea51f99c59056",
+  "testSourceSHA256": "469fb273f771ad94017ba234e87ba8d18181ad51851d7f4f0f6b154035c1cfc4",
+  "testAssemblySHA256": "d3539e29751fd790ab41a6baed360b98016e2ef5e38310e19bd00c3630cfd2e5",
+  "newCases": {
+    "ArchiveStreamingTests": 70,
+    "ArchiveStreamingFailureTests": 25,
+    "BootstrapStreamingTests": 54
+  },
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/streaming/streaming-focused.trx",
+      "sha256": "3ee35754dafd323db8ab86eee762ed0a8323e37f8d10494e331d8a56efd3578d",
+      "times": {
+        "creation": "2026-10-08T21:38:41.0663656+02:00",
+        "queuing": "2026-10-08T21:38:41.0663661+02:00",
+        "start": "2026-10-08T21:38:40.0812358+02:00",
+        "finish": "2026-10-08T21:39:15.7860613+02:00"
+      },
+      "passed": 149,
+      "failed": 0,
+      "skipped": 0,
+      "excludedExplicitGenerators": [],
+      "rawNotExecuted": 0,
+      "counters": {
+        "total": 149,
+        "executed": 149,
+        "passed": 149,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/streaming/streaming-crash-regression.trx",
+      "sha256": "1a2c9b911ccbcb24326b8c6ed9516e9cee0e7826921630ce0f6139fd16af99ce",
+      "times": {
+        "creation": "2026-10-08T21:39:52.7170778+02:00",
+        "queuing": "2026-10-08T21:39:52.7170780+02:00",
+        "start": "2026-10-08T21:39:48.2154701+02:00",
+        "finish": "2026-10-08T21:41:57.1914978+02:00"
+      },
+      "passed": 130,
+      "failed": 0,
+      "skipped": 1,
+      "excludedExplicitGenerators": [],
+      "rawNotExecuted": 1,
+      "counters": {
+        "total": 131,
+        "executed": 130,
+        "passed": 130,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/streaming/streaming-full.trx",
+      "sha256": "898ff6091006e3f5368883ad18af3ff6f5af087e5f6240fca2fbffd36ef5094f",
+      "times": {
+        "creation": "2026-10-08T21:42:52.5924304+02:00",
+        "queuing": "2026-10-08T21:42:52.5924308+02:00",
+        "start": "2026-10-08T21:42:51.1431377+02:00",
+        "finish": "2026-10-08T21:46:06.5881503+02:00"
+      },
+      "passed": 1174,
+      "failed": 0,
+      "skipped": 1,
+      "excludedExplicitGenerators": [
+        "GenerateSnapshotRetentionVectors",
+        "GenerateReferenceVectors"
+      ],
+      "rawNotExecuted": 3,
+      "counters": {
+        "total": 1177,
+        "executed": 1174,
+        "passed": 1174,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  ]
+}

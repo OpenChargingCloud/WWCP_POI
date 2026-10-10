@@ -1,0 +1,171 @@
+{
+  "date": "2026-10-09",
+  "configuration": "Release",
+  "framework": "net10.0",
+  "productionSourceSHA256": "4a580ff39348bf76092fe2b6d57f932f3602684f049c8cb86e380a289b7e99db",
+  "productionAssemblySHA256": "c16496874a6535ef405bc3218eeca095b6117b8b1761186c639ef67bce6a665d",
+  "testSourceSHA256": "9102012650b2d5bd39aad503fa6615e64aa9c64a15f850cfea5993ca8949fb01",
+  "testAssemblySHA256": "bb02a1e500478ed1e580ce2b0066ef1c710df100b23641ca350d0c94e7dc294d",
+  "benchmarkSourceSHA256": "1dd1dd479212d20792d1dd3907a5873a1c049bef09837fa35c67729a89e9a9fa",
+  "benchmarkAssemblySHA256": "fc3b55909d299e6e2837455bf4e192b6ca06928a01f11beaa353470169d0646e",
+  "beforeBenchmarkAssemblySHA256": "ccbe51337f750416529e4d5316e5f1a51a85835bb43082f24a3fb8bcf85ddc4b",
+  "reportScriptSHA256": "0dbc77a40481405e98d7fefca24ff9c5a12751cd5c5e180fece264f80ce9f985",
+  "reconstructedBeforeProductionSourceSHA256": "8b0c7b41d18a5f61fbfd6039a0d59b1ae75d53aea74b48503886db425550e42f",
+  "beforeProductionAssemblySHA256": "32efece4ae173db6037fba75381803008054243c2f6fd4d015f1fe1ea5786877",
+  "scopedPatchSHA256": "2e550d771ec52aadb434f7f2d39a26747c656498e43f50f314edf1d78451518b",
+  "newTestCases": 214,
+  "runs": [
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/direct-archive-changeset/direct-archive-changeset-focused-final.trx",
+      "sha256": "d7a0e040db9cee5ca2254ec92a54c3f0083e2b54c6b2c86a8e0a818f17ef7afb",
+      "times": {
+        "creation": "2026-10-09T04:24:21.7006363+02:00",
+        "queuing": "2026-10-09T04:24:21.7006366+02:00",
+        "start": "2026-10-09T04:24:20.6044522+02:00",
+        "finish": "2026-10-09T04:26:10.0166351+02:00"
+      },
+      "passed": 708,
+      "failed": 0,
+      "skipped": 0,
+      "excludedExplicitGenerators": [],
+      "counters": {
+        "total": 708,
+        "executed": 708,
+        "passed": 708,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    },
+    {
+      "file": "WWCP_POI_Tests/bin/TestResults/direct-archive-changeset/direct-archive-changeset-full.trx",
+      "sha256": "bc729cbffc7a5a539b50f14bf11528a5c347e64ea9db44088db42477ca3e915f",
+      "times": {
+        "creation": "2026-10-09T04:26:39.8683652+02:00",
+        "queuing": "2026-10-09T04:26:39.8683656+02:00",
+        "start": "2026-10-09T04:26:38.1699233+02:00",
+        "finish": "2026-10-09T04:31:42.0064014+02:00"
+      },
+      "passed": 1733,
+      "failed": 0,
+      "skipped": 1,
+      "excludedExplicitGenerators": [
+        "GenerateReferenceVectors",
+        "GenerateSnapshotRetentionVectors"
+      ],
+      "counters": {
+        "total": 1736,
+        "executed": 1733,
+        "passed": 1733,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      }
+    }
+  ],
+  "initialTestSetupCorrections": [
+    "The initial fixture build used a nonexistent Slot helper and an ambiguous Time name; both fixture references were corrected before any tests ran.",
+    "The initial focused run passed 707 cases and failed one cache-budget expectation: two 256-digit numeric fixtures were identical. Fixed-length distinct prefixes correct only the test data; the final focused/full runs use the corrected test binary."
+  ],
+  "reports": [
+    {
+      "file": "docs/performance/direct-archive-changeset-scaling-before.json",
+      "sha256": "79aa0f311ed489cf0f0b86439f07f0465d086533fe89f18bd2337b493efbfe96",
+      "workers": 48,
+      "measuredSamples": 240
+    },
+    {
+      "file": "docs/performance/direct-archive-changeset-scaling-after.json",
+      "sha256": "5f3cef3f7e0c9221cc9ad9f065823653586aa36c16d7106158482ee6669154b6",
+      "workers": 48,
+      "measuredSamples": 240
+    },
+    {
+      "file": "docs/performance/direct-archive-changeset-batches-before.json",
+      "sha256": "9f7bdef001f585bd6bdc0c98279f763610464cb98810d5b1d9567a9761020efa",
+      "workers": 48,
+      "measuredSamples": 240
+    },
+    {
+      "file": "docs/performance/direct-archive-changeset-batches-after.json",
+      "sha256": "6535bb0cb9d2ebd8bbcddf1a111ba5ee43a01acf952821abe54f13a5b384a5d9",
+      "workers": 48,
+      "measuredSamples": 240
+    }
+  ],
+  "generatedReports": [
+    {
+      "file": "docs/performance/direct-archive-changeset-scaling-summary.md",
+      "sha256": "8180319e634b706758a0808ae7bb3324be9f0a7a3fb22ce874f76847f31953a5"
+    },
+    {
+      "file": "docs/performance/direct-archive-changeset-scaling-comparison.md",
+      "sha256": "5631f0934df40124bfe676b4d071a235ddac52d19b1c9bcf5fa3b8d1ef3f22be"
+    },
+    {
+      "file": "docs/performance/direct-archive-changeset-batches-summary.md",
+      "sha256": "57148feb73255db3094edcd258bccb176ed21da08ee3f3be3d7ee4cf98b67d82"
+    },
+    {
+      "file": "docs/performance/direct-archive-changeset-batches-comparison.md",
+      "sha256": "06a1164dabb0f773e5cebb28811c7b92e62ed3180f650b6e5f87a85ab5af54ca"
+    }
+  ],
+  "measurementMethod": {
+    "pairedSuites": [
+      "scaling",
+      "batcharchives"
+    ],
+    "workersPerReport": 48,
+    "samplesPerReport": 240,
+    "processesPerOperation": 2,
+    "warmupsPerProcess": 5,
+    "samplesPerProcess": 5,
+    "taskBuildTestOverlap": false,
+    "dedicatedHost": false,
+    "newColdWarmSnapshotMeasurements": false,
+    "batchJSONControl": "Complete canonical signed ChangeSet, not JSON archive."
+  },
+  "limits": {
+    "completePerPOICBOROutputBufferInArchive": false,
+    "completeChangeSetCBOROutputBufferInArchive": false,
+    "completePOIAndChangeSetJSONBufferAndIndex": true,
+    "preparedChangeSetSchemaPaths": true,
+    "completePublicToCBORResultBuffer": true,
+    "metadataAndDecoderTrees": true,
+    "maxDepth": 64,
+    "preflightBeforePayloadBytes": true,
+    "separateWriterAndSkipValueDepthRules": true,
+    "changeSetScalarsPerCallMaxEntries": 64,
+    "scalarMaxInputTextCharacters": 256,
+    "scalarMaxTotalInputTextCharacters": 8192,
+    "scalarMaxNodesPerEntry": 128,
+    "scalarMaxCharactersOrBytesPerNode": 256,
+    "pooledMapDepthSlots": 64,
+    "pooledMapMaxNames": 128,
+    "clearedMapKeyReferences": true,
+    "totalTransientInputMemoryBound": false,
+    "crossCallScalarRetention": false,
+    "archiveAndSigningProfilesUnchanged": true
+  }
+}

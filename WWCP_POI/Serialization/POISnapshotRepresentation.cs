@@ -15,8 +15,12 @@ internal static class POISnapshotRepresentation
         => documents.TryGetValue(value, out var document) ? InfrastructureJson.ReadObject(document.JSON) : null;
 
     internal static JObject CompleteImport(JObject source, JObject projection, String kind, Boolean ownedGraph = false)
+        => CompleteOwnedImport((JObject) source.DeepClone(), projection, kind, ownedGraph);
+
+    // The projection stays borrowed and read-only. Every mutable source descendant belongs
+    // to the private entry-point copy or to an explicit clone of a projected child below.
+    private static JObject CompleteOwnedImport(JObject copy, JObject projection, String kind, Boolean ownedGraph)
     {
-        var copy = (JObject) source.DeepClone();
         if (ownedGraph)
             foreach (var field in new[] { "roamingNetworkId", "chargingStationOperatorId", "chargingPoolId", "chargingStationId", "EVSEId", "parkingOperatorId" })
                 copy.Remove(field);
@@ -65,21 +69,25 @@ internal static class POISnapshotRepresentation
                         InfrastructureChangeSchema.Relations.TryGetValue(childType, out var childRelation) &&
                         childRelation.Parent.ToString() == kind && childRelation.Field == property.Name;
             if (property.Value is JObject child && projection[property.Name] is JObject projected)
-                property.Value = CompleteImport(child, projected, childKind, owned);
+                property.Value = CompleteOwnedImport(child, projected, childKind, owned);
             else if (property.Value is JArray children && projection[property.Name] is JArray projectedChildren)
             {
                 var lookup = Index(projectedChildren, childKind);
                 for (var index = 0; index < children.Count; index++)
                     if (children[index] is JObject item && Find(projectedChildren, item, childKind, index, lookup) is { } projectedItem)
-                        children[index] = CompleteImport(item, projectedItem, childKind, owned);
+                        children[index] = CompleteOwnedImport(item, projectedItem, childKind, owned);
             }
         }
         return copy;
     }
 
     internal static void Bind(IImmutablePOI value, JObject json)
+        => BindOwned(value, (JObject) json.DeepClone());
+
+    // Bind only detached documents; stored strings are captured before visiting their
+    // descendants, and no mutable JSON node is retained in the weak representation table.
+    private static void BindOwned(IImmutablePOI value, JObject copy)
     {
-        var copy = (JObject) json.DeepClone();
         var kind = value.GetType().Name;
         POIRepresentation.RemoveETags(copy, kind);
         POIRepresentation.RemoveRuntime(copy, kind);
@@ -89,14 +97,15 @@ internal static class POISnapshotRepresentation
         var lookups = new Dictionary<String, Dictionary<String, JObject>>(StringComparer.Ordinal);
         foreach (var (field, child) in Children(value))
         {
-            if (copy[field] is JObject singleton) Bind(child, singleton);
+            if (copy[field] is JObject singleton) BindOwned(child, singleton);
             else if (copy[field] is JArray array)
             {
                 var index = indexes.GetValueOrDefault(field);
                 indexes[field] = index + 1;
                 if (!lookups.TryGetValue(field, out var lookup)) lookups.Add(field, lookup = Index(array, child.GetType().Name));
-                var identity = POIRepresentation.WithoutETags(() => POIJSON.Document(child));
-                if (Find(array, identity, child.GetType().Name, index, lookup) is { } document) Bind(child, document);
+                var identity = Identity(child);
+                var document = identity is { } id ? lookup.GetValueOrDefault(id) : index < array.Count ? array[index] as JObject : null;
+                if (document is not null) BindOwned(child, document);
             }
         }
     }
@@ -133,6 +142,42 @@ internal static class POISnapshotRepresentation
                                       : kind == nameof(EnergyMeter) ? EnergyMeter_Id.Parse(id).ToString().ToUpperInvariant() : id;
     }
 
+    // These immutable values have already passed the full domain parser and projection.
+    // Binding needs only their stable identity, not another serialization of their subtree.
+    private static String? Identity(IImmutablePOI value)
+    {
+        var id = value switch {
+            RoamingNetwork item => item.Id.ToString(),
+            ChargingStationOperator item => item.Id.ToString(),
+            EMobilityProvider item => item.Id.ToString(),
+            ChargingPool item => item.Id.ToString(),
+            ChargingStation item => item.Id.ToString(),
+            EVSE item => item.Id.ToString(),
+            ChargingConnector item => item.Id.ToString(),
+            ChargingTariff item => item.Id.ToString(),
+            EVSEGroup item => item.Id.ToString(),
+            ChargingStationGroup item => item.Id.ToString(),
+            ChargingPoolGroup item => item.Id.ToString(),
+            ChargingTariffGroup item => item.Id.ToString(),
+            TransparencySoftware item => item.Id.ToString(),
+            TransparencySoftwareCertificate item => item.Id.ToString(),
+            ChargingStationManufacturer item => item.Id.ToString(),
+            GridOperator item => item.Id.ToString(),
+            ParkingOperator item => item.Id.ToString(),
+            ParkingGarage item => item.Id.ToString(),
+            ParkingProduct item => item.Id.ToString(),
+            ParkingSpace item => item.Id.ToString(),
+            ParkingSensor item => item.Id.ToString(),
+            ParkingSpaceGroup item => item.Id.ToString(),
+            EnergyMeter item => item.Id.ToString().ToUpperInvariant(),
+            ChargingTariffElement or ChargingPriceComponent or ChargingTariffRestriction or TransparencySoftwareStatus => null,
+            _ => Identity(POIRepresentation.WithoutETags(() => POIJSON.Document(value)), value.GetType().Name)
+        };
+        return id is not null && Enum.TryParse<InfrastructureEntityType>(value.GetType().Name, out var type)
+                   ? InfrastructureChangeSchema.Identity(type, id)
+                   : id;
+    }
+
     private static Dictionary<String, JObject> Index(JArray array, String kind)
     {
         var lookup = new Dictionary<String, JObject>(StringComparer.Ordinal);
@@ -151,6 +196,8 @@ internal static class POISnapshotRepresentation
             case RoamingNetwork network:
                 foreach (var child in network.ChargingStationOperators) yield return ("chargingStationOperators", child);
                 foreach (var child in network.EMobilityProviders) yield return ("eMobilityProviders", child);
+                foreach (var child in network.TransparencySoftware) yield return ("transparencySoftware", child);
+                foreach (var child in network.TransparencySoftwareCertificates) yield return ("transparencySoftwareCertificates", child);
                 foreach (var child in network.GridOperators) yield return ("gridOperators", child);
                 foreach (var child in network.ParkingOperators) yield return ("parkingOperators", child);
                 foreach (var child in network.ChargingStationManufacturers) yield return ("chargingStationManufacturers", child);
@@ -180,14 +227,10 @@ internal static class POISnapshotRepresentation
                 if (connector.ChargingCable is { } cable) yield return ("cable", cable);
                 break;
             case GridConnectionPoint point:
-                yield return ("gridOperator", point.GridOperator);
                 if (point.EnergyMeter is { } pointMeter) yield return ("energyMeter", pointMeter);
                 break;
             case EnergyMeter meter:
                 foreach (var child in meter.TransparencySoftware) yield return ("transparencySoftware", child);
-                break;
-            case TransparencySoftwareStatus status:
-                yield return ("transparencySoftware", status.TransparencySoftware);
                 break;
             case ChargingTariff tariff:
                 foreach (var child in tariff.TariffElements) yield return ("elements", child);
@@ -197,6 +240,7 @@ internal static class POISnapshotRepresentation
                 foreach (var child in element.ChargingTariffRestrictions) yield return ("restrictions", child);
                 break;
             case ParkingOperator parking:
+                foreach (var child in parking.ParkingProducts) yield return ("parkingProducts", child);
                 foreach (var child in parking.ParkingGarages) yield return ("parkingGarages", child);
                 foreach (var child in parking.ParkingSpaces) yield return ("parkingSpaces", child);
                 foreach (var child in parking.ParkingSensors) yield return ("parkingSensors", child);

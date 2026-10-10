@@ -19,7 +19,8 @@ Full [snapshot links](SNAPSHOTS.md) participate in ordinary ancestry and merge-b
 Their original parent remains retained. They advance revision but preserve static data and all
 operation-derived lifetime origins; a snapshot is not an entity removal/reintroduction. Merge
 preparation defaults its timestamp from both payload timestamps, including snapshot creation time.
-Dedicated merge-through-snapshot coverage is pending. [Authorized snapshot boundaries](SNAPSHOT-BOUNDARIES.md)
+Dedicated snapshot/retention tests now cover suffix merges, runtime preservation, unavailable bases
+and crossing old parents; see [verification](VERIFICATION-SNAPSHOTS-RETENTION.md). [Authorized snapshot boundaries](SNAPSHOT-BOUNDARIES.md)
 now support known suffix merges while refusing unavailable requested tips or explicit bases with
 `HistoryRequired` and typed `MissingCommits`. They do not prove pre-boundary object lifetimes or
 replace missing historical bases with an invented comparison. Sufficient earlier history is required
@@ -98,7 +99,7 @@ creation metadata also starts a new lifetime. Continuous same-identity property 
 preserve lifetimes; owner recreation propagates to all owned graph and nested descendants.
 
 Lifetimes cover graph entities and schema-addressed owned values, including meters, connection
-points, embedded operators, cables, brands and licenses. Reference strings are membership values;
+points, cables, brands and licenses. Shared registry operators have graph lifetimes. Reference strings are membership values;
 their removal/readdition does not recreate the referenced target. Collections without addressed
 identities retain whole-value comparison. Connector origins retain their EVSE scope and nested
 origins retain their complete schema ownership path.
@@ -243,10 +244,11 @@ issues are reported together. If the same consumer/field/target fails again afte
 it is returned unresolved without calling the resolver repeatedly for that address.
 
 Admission lists are distinct from active group membership: future `allowedMemberIds` do not
-require targets, whereas `EVSEIds`/station/pool/tariff member lists do. Registry GridOperators and
-embedded connection-point GridOperators remain independent owned descriptions; removing the
-registry node creates no reference conflict for the embedded description. Parking sensor/space
-references additionally enforce their parking operator scope.
+require targets, whereas `EVSEIds`/station/pool/tariff member lists do. Points reference registered
+GridOperators, so deletion with a surviving point is a reference conflict. Software/certificate
+IDs in meter assignments are also indexed, and certificate edits revalidate software coverage.
+Nested dependencies are attributed to the owner's complete meter/point property. Parking
+sensor/space/garage/product references enforce the same parking operator scope.
 
 ## Generated operations and application
 
@@ -307,7 +309,7 @@ Only schema-indexed graph references participate. Unsupported dependency cycles,
 domain states and cyclic full-subtree additions can still return `InvalidResult`. A caller can
 provide a deliberate ordered transition when additional domain-specific intermediate values are
 required. New reference-transition behavior has build evidence; broader regression coverage remains
-planned. The existing referenced-replacement fixture now expects a prepared plan and has not been rerun.
+planned. The existing referenced-replacement fixture now passes with its explicit prepared plan.
 
 Preview/preparation operate only on static snapshots. `TryPublish` later captures the current left
 head's live runtime values under its publication gate. Right-branch runtime values and operational
@@ -374,8 +376,8 @@ New replicas can also receive the checkpoint and all original signed branches th
 bounded, restartable [bootstrap](BOOTSTRAP.md) workflow before continuing incremental exchange.
 ### Structural merge evidence
 
-[StructuralMergeTests](../WWCP_POI_Tests/Interoperability/StructuralMergeTests.cs) had **34 passing
-cases** in the last full run, before operation-history lifetimes and temporary reference plans.
+[StructuralMergeTests](../WWCP_POI_Tests/Interoperability/StructuralMergeTests.cs) has **34 passing
+cases** in the 2026-10-08 full run, including operation-history lifetimes and temporary reference plans.
 Owner deletion versus descendant edits is tested for pools/stations/EVSEs in both branch
 orders, with explicit complete-subtree choices and signed archive recovery. Further cases cover
 nested meter deletion/recreation, graph recreation, equal/different graph additions, connector
@@ -383,7 +385,7 @@ scope, simultaneous deleted tariff references, active groups versus admission li
 grid-operator slots, owner moves and parking-scope violations. Invalid resolution shapes cannot
 bypass graph/identity/ownership constraints; reference decisions are revalidated without loops or
 stale errors. The formerly rejected referenced-replacement case now expects explicit detachment,
-restoration and unchanged history during preparation; its revised expectation has not been rerun.
+restoration and unchanged history during preparation; its revised expectation now passes.
 
 Criss-cross history tests produce two best common ancestors, reject an arbitrary earlier base,
 require an explicit choice and bind that choice into deterministic unsigned merge identity.
@@ -392,7 +394,14 @@ head/history/runtime on exceptions and successfully retry after failure. These c
 without changing existing cryptographic reference profiles/bytes.
 
 Operation-history lifetime handling now covers reused creation metadata as described above;
-dedicated regression coverage remains planned. Exhaustive deletion/recreation/reference/ownership
+the full suite reruns the existing cases and explicitly resolves recreated-EVSE adoption before
+checking its runtime reset. The [73-case model fixture](VERIFICATION-DOMAIN-MODEL.md) adds shared
+registry/reference conflicts, disjoint catalog/parking edits, recreation in both branch orders and
+signed second-parent adoption. Temporary plans now detach software/document assignments at all
+meter positions and required operator references by clearing the optional connection-point slot.
+Meter assignment edits preserve meter lifetimes; clearing a point resets its child meter runtime.
+Restoration replaces pending operations within the affected field, including deeper element edits.
+Broader regression coverage remains planned. Exhaustive deletion/recreation/reference/ownership
 combinations, broader reference-transition coverage, recursive virtual bases, rebase APIs,
-multi-tip merges and performance evidence remain in the
+multi-tip merges and merge performance evidence remain in the
 [roadmap](ROADMAP.md).

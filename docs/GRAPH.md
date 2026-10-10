@@ -4,7 +4,7 @@
 
 ## Ownership
 
-The versioned graph includes 19 independently addressed node types. Each node has one owner;
+The versioned graph includes 22 independently addressed node types. Each node has one owner;
 only the roaming network is a root. Owning collections use expanded objects in complete network
 JSON/CBOR. Group membership, tariff assignments and parking links use identifier strings.
 
@@ -15,6 +15,8 @@ JSON/CBOR. Group membership, tariff assignments and parking links use identifier
 | Network | `chargingStationManufacturers` | ChargingStationManufacturer | `@id` |
 | Network | `gridOperators` | GridOperator | `id` |
 | Network | `parkingOperators` | ParkingOperator | `id` |
+| Network | `transparencySoftware` | TransparencySoftware | `@id` |
+| Network | `transparencySoftwareCertificates` | TransparencySoftwareCertificate | `@id` |
 | ChargingStationOperator | `chargingPools` | ChargingPool | `@id` |
 | ChargingStationOperator | `chargingTariffs` | ChargingTariff | `@id` |
 | ChargingStationOperator | `EVSEGroups` | EVSEGroup | `@id` |
@@ -28,14 +30,15 @@ JSON/CBOR. Group membership, tariff assignments and parking links use identifier
 | ParkingOperator | `parkingSpaces` | ParkingSpace | `@id` |
 | ParkingOperator | `parkingSensors` | ParkingSensor | `@id` |
 | ParkingOperator | `parkingSpaceGroups` | ParkingSpaceGroup | `@id` |
+| ParkingOperator | `parkingProducts` | ParkingProduct | `@id` |
 
 The root uses `@id`. All other graph identities are unique per node type within a network,
 except connectors. Domain comparison rules apply: group suffixes and parking child IDs are
-case-sensitive; manufacturer and parking operator IDs are case-insensitive. A group's embedded
+case-sensitive, as are software/certificate/product IDs; manufacturer and parking operator IDs are case-insensitive. A group's embedded
 operator identity must match its owner. Different group types can have equal wire IDs.
 
-Import tariffs and infrastructure before groups, and charging infrastructure before parking
-operators. Network parsers perform this ordering themselves, regardless of JSON property order.
+Import grid operators, manufacturers, software and certificates before infrastructure. Import
+tariffs and infrastructure before groups, and charging infrastructure before parking operators. Network parsers perform this ordering themselves, regardless of JSON property order.
 Materialized groups refer to infrastructure objects in that same version. Public collection access
 does not expose registration or in-place static mutation APIs. Build a complete JSON document,
 use the available immutable constructors, or add nodes through ChangeSets.
@@ -57,6 +60,13 @@ Both whole-property and addressed element operations maintain the index incremen
 | Parking garage/space/sensor/space group | `chargingStationIds` | Existing station in the network |
 | Parking space/space group | `sensors` | Sensor owned by the same parking operator |
 | ParkingOperator | `localParkingSpaceIds`, `invalidParkingSpaceIds` | Space owned by that parking operator |
+| ParkingSpace | Optional `parkingGarageId` | Garage owned by the same parking operator |
+| ParkingSpaceGroup | `parkingSpaceIds` | Spaces owned by the same parking operator; overlapping groups allowed |
+| Parking garage/space/space group | `parkingProductIds` | Products owned by the same parking operator |
+| Pool connection point | Required `gridOperatorId` | Registered grid operator in the network |
+| Meter legal-status assignment | `transparencySoftwareId`, optional `certificateId` | Registered software release and certificate in the network |
+| TransparencySoftwareCertificate | `verifiedTransparencySoftwareIds`, `compatibleTransparencySoftwareIds` | Registered software releases in the network |
+| TransparencySoftwareCertificate | Optional `chargingStationManufacturerId` | Registered manufacturer in the network |
 
 Every indexed reference must resolve, and a reference array cannot repeat a domain identity.
 A target cannot be removed while surviving consumers reference it. Removing an owned subtree
@@ -80,10 +90,15 @@ active IDs; an explicitly empty list permits no active members. Parsers reject m
 would otherwise be silently filtered by constructor predicates. Executable inclusion predicates
 are application configuration and are not persisted.
 
-Parking space groups currently retain station/sensor references and geometry; the domain class
-has no parking-space membership property. Garages, spaces, sensors and space groups are direct
-children of the parking operator. Garage-to-space ownership and parking products are not modeled
-as additional graph relations by this package.
+Garages, spaces, sensors, space groups and products remain direct children of the parking
+operator. A space optionally references a garage; groups reference spaces and can overlap.
+`GetAvailableParkingProducts(spaceId)` returns the deduplicated union of direct space, garage and
+containing-group offers. It does not combine prices or choose precedence. See [domain decisions](DOMAIN-MODEL.md).
+
+Nested point/meter references are indexed against their graph owner and containing property
+(`gridConnectionPoint`, `energyMeters` or `energyMeter`). Merge reports and temporary detachment
+therefore identify that property. Certificate edits revalidate consuming assignments, including
+whether the document still covers the selected software release.
 
 ## Create and edit a group
 
@@ -126,10 +141,14 @@ The schema allowlist follows the persisted domain contract:
 | Manufacturer | `name`, `description`, `cryptoKeys` |
 | GridOperator | `name`, `description`, `dataSource`, `customData`, `logos`, `address`, `geoLocation`, `telephone`, `eMailAddress`, `homepage`, `hotline`, `priority`, `dataLicenses` |
 | ParkingOperator | `name`, `description`, `dataSource`, `customData`, `logos`, `address`, `geoLocation`, `telephone`, `eMailAddress`, `homepage`, `hotlinePhoneNumber`, `dataLicenses`, local/invalid parking space IDs |
-| Parking garage/space/sensor/space group | `name`, `description`, `osmWayId`, `geometry`, `chargingStationIds`; spaces/space groups additionally `sensors` |
+| Parking garage/space/sensor/space group | `name`, `description`, `osmWayId`, `geometry`, `chargingStationIds`; spaces/space groups additionally `sensors`; garages/spaces/groups `parkingProductIds`; space `parkingGarageId`; group `parkingSpaceIds` |
+| ParkingProduct | `minDuration`, `stopParkingAfterTime` |
+| TransparencySoftware | `name`, `version`, `openSourceLicense`, `vendor`, `logo`, `howToUse`, `moreInformation`, `sourceCodeRepository` |
+| TransparencySoftwareCertificate | `issuer`, `chargingStationModel`, `chargingStationModelVersion`, optional `chargingStationManufacturerId`, `documentNumber`, `documentURL`, validity and verified/compatible software IDs |
 
 Identity, parent, managed timestamp and owned child fields cannot be edited as properties.
-Manufacturers have no managed node timestamps; their ancestors still receive the batch timestamp.
+Manufacturers, software releases, certificate documents and parking products have no managed
+node timestamps; their ancestors still receive the batch timestamp.
 Other added graph nodes receive deterministic missing timestamps from the batch's `CreatedAt`.
 
 ## Content identifiers and runtime
@@ -142,16 +161,20 @@ including valid optional nulls, without a domain serialization roundtrip. Graph 
 stored-property profile change earlier content identifiers; recalculate them and prepare/sign new
 batches against the current profile. See [snapshot defaults](ETAGS-CBOR.md#versioned-property-presence-and-defaults).
 
-Grid connection points continue to embed an independent immutable GridOperator description,
-including its network ID. A network's `gridOperators` registry is separately owned. An equal
-operator ID does not create an alias, force equal configuration or synchronize runtime between
-these two slots. Unifying these descriptions into a single registry reference is a future contract
-decision; changing the registry alone does not update embedded connection-point descriptions.
+A point stores only `gridOperatorId` and resolves the registry object in its network version.
+Many points share one description and one operational schedule. Updating that registry node
+changes its own and the network's ETags; a point's ETag can remain unchanged because it contains
+an ID reference. Software/certificate references follow the same rule: descriptions are hashed
+once at their owned network location. Complete network ETags cover all referenced catalog content.
+
+The `wwcp-poi-static-v2` ownership/reference contract changes state digests and downstream commit
+identities. Tagged v1 exports/archives are unsupported; current reference artifacts use v2.
 
 Groups, grid/parking operators and parking children retain mutable operational/admin statuses.
 Use `POIRuntimeTarget.Entity(type, id)` for them. Static derivation captures their histories and
 capacities into independent objects. Removing and reintroducing a node starts a new lifetime.
-Connectors and manufacturers have no status schedules and reject runtime targeting.
+Connectors, manufacturers, software, certificates and parking products have no status schedules
+and reject runtime targeting.
 
 `ToJSONSnapshot()` and `ToCBOR(IncludeRuntime: true)` can carry their current statuses;
 `DataSnapshot` stores none. Standalone group/parking parsers still need explicit membership

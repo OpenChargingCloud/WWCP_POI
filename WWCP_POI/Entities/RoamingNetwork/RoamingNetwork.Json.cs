@@ -125,6 +125,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        [NotNullWhen(false)] out String?              error,
                                        CustomJObjectParserDelegate<RoamingNetwork>?  CustomRoamingNetworkParser,
                                        InfrastructureJsonParsingContext?             Context                    = null)
+            => TryParseCore(JSON, out network, out error, CustomRoamingNetworkParser, Context, null);
+
+        private static Boolean TryParseCore(JObject JSON,
+            [NotNullWhen(true)] out RoamingNetwork? network,
+            [NotNullWhen(false)] out String? error,
+            CustomJObjectParserDelegate<RoamingNetwork>? CustomRoamingNetworkParser,
+            InfrastructureJsonParsingContext? Context,
+            RoamingNetworkDataSnapshot? snapshot)
         {
 
             network = null;
@@ -137,6 +145,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var parsed = ParseNetworkProperties(JSON);
 
                 parsed.ParseDataLicenses(JSON);
+                parsed.ParseNetworkCatalogs(JSON);
                 parsed.ParseChargingStationOperators(JSON, Context);
                 parsed.ParseEMobilityProviders(JSON, Context);
                 parsed.ParseNetworkChildren(JSON);
@@ -147,7 +156,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    RoamingNetworkAdminStatusType.TryParse,
                                                    RoamingNetworkStatusType.TryParse);
 
-                parsed.RestoreVersionedSnapshot(JSON);
+                parsed.RestoreVersionedSnapshot(JSON, snapshot);
 
                 network = CustomRoamingNetworkParser is null
                               ? parsed
@@ -166,6 +175,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         #endregion
+
+        /// <summary>
+        /// Reconstruct fresh model/runtime objects while retaining an exactly matching immutable snapshot.
+        /// All domain parsing and representation completion run before snapshot reuse is considered.
+        /// </summary>
+        internal static RoamingNetwork ParseSnapshot(RoamingNetworkDataSnapshot snapshot)
+        {
+            var document = snapshot.GetDocument();
+            _ = snapshot.ETags;
+            if (TryParseCore(document, out var network, out var error, null, null, snapshot))
+                return network;
+            throw new ArgumentException($"Invalid roaming network JSON: {error}", "JSON");
+        }
 
         #region Parse network properties
 

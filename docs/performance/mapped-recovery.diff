@@ -1,0 +1,527 @@
+--- a/WWCP_POI/History/POIArchiveInputSpool.cs
++++ b/WWCP_POI/History/POIArchiveInputSpool.cs
+@@ -3,8 +3,6 @@
+  * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
+  * Licensed under the Affero GPL license, Version 3.0.
+  */
+-
+-using System.IO.MemoryMappedFiles;
+ 
+ namespace cloud.charging.open.protocols.WWCP.POI;
+ 
+@@ -100,18 +98,13 @@
+     internal ValueTask FlushAsync(CancellationToken cancellationToken)
+         => file is null ? ValueTask.CompletedTask : new(file.FlushAsync(cancellationToken));
+ 
+-    internal unsafe RoamingNetworkHistory Read(Restore restore)
++    internal RoamingNetworkHistory Read(Restore restore)
+     {
+         if (file is null) return restore(memory!.GetBuffer().AsSpan(0, Length));
+         file.Flush();
+         observer?.Invoke(POIArchiveInputStage.BeforeMap, path!);
+-        using var mapping = MemoryMappedFile.CreateFromFile(file, null, Length, MemoryMappedFileAccess.Read,
+-            HandleInheritability.None, leaveOpen: true);
+-        using var view = mapping.CreateViewAccessor(0, Length, MemoryMappedFileAccess.Read);
+-        Byte* pointer = null;
+-        view.SafeMemoryMappedViewHandle.AcquirePointer(ref pointer);
+-        try { return restore(new ReadOnlySpan<Byte>(pointer + view.PointerOffset, Length)); }
+-        finally { view.SafeMemoryMappedViewHandle.ReleasePointer(); }
++        using var input = new POIArchiveMappedFile(file, limits);
++        return restore(input.Bytes);
+     }
+ 
+     public void Dispose() { try { file?.Dispose(); } finally { try { lease?.Dispose(); } finally { memory?.Dispose(); } } }
+--- /dev/null
++++ b/WWCP_POI/History/POIArchiveMappedFile.cs
+@@ -0,0 +1,72 @@
++/*
++ * Copyright (c) 2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
++ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
++ * Licensed under the Affero GPL license, Version 3.0.
++ */
++
++using System.IO.MemoryMappedFiles;
++
++namespace cloud.charging.open.protocols.WWCP.POI;
++
++/// <summary>
++/// Scoped read-only file input. No span may escape its owner or survive disposal.
++/// Existing archives are held with read sharing only; private spools retain their own file lifetime.
++/// </summary>
++internal sealed unsafe class POIArchiveMappedFile : IDisposable
++{
++    private readonly FileStream? ownedFile;
++    private MemoryMappedFile? mapping;
++    private MemoryMappedViewAccessor? view;
++    private Byte* pointer;
++    private Boolean acquired;
++    private Boolean disposed;
++    internal Int32 Length { get; }
++
++    internal ReadOnlySpan<Byte> Bytes
++    {
++        get
++        {
++            ObjectDisposedException.ThrowIf(disposed, this);
++            return Length == 0 ? ReadOnlySpan<Byte>.Empty : new(pointer + view!.PointerOffset, Length);
++        }
++    }
++
++    internal POIArchiveMappedFile(String path, RoamingNetworkHistoryLimits limits)
++        : this(new FileStream(Path.GetFullPath(path), FileMode.Open, FileAccess.Read, FileShare.Read), limits, true) { }
++
++    internal POIArchiveMappedFile(FileStream file, RoamingNetworkHistoryLimits limits)
++        : this(file, limits, false) { }
++
++    private POIArchiveMappedFile(FileStream file, RoamingNetworkHistoryLimits limits, Boolean ownFile)
++    {
++        ownedFile = ownFile ? file : null;
++        try
++        {
++            var length = file.Length;
++            limits.Require(RoamingNetworkHistoryLimitKind.ArchiveBytes, length);
++            Length = checked((Int32) length);
++            if (Length == 0) return;
++            mapping = MemoryMappedFile.CreateFromFile(file, null, Length, MemoryMappedFileAccess.Read,
++                HandleInheritability.None, leaveOpen: true);
++            view = mapping.CreateViewAccessor(0, Length, MemoryMappedFileAccess.Read);
++            view.SafeMemoryMappedViewHandle.AcquirePointer(ref pointer);
++            acquired = true;
++        }
++        catch { Dispose(); throw; }
++    }
++
++    public void Dispose()
++    {
++        if (disposed) return;
++        disposed = true;
++        try
++        {
++            if (acquired) { view!.SafeMemoryMappedViewHandle.ReleasePointer(); acquired = false; pointer = null; }
++        }
++        finally
++        {
++            try { view?.Dispose(); }
++            finally { try { mapping?.Dispose(); } finally { ownedFile?.Dispose(); } }
++        }
++    }
++}
+--- a/WWCP_POI/History/RoamingNetworkBootstrapReceiver.cs
++++ b/WWCP_POI/History/RoamingNetworkBootstrapReceiver.cs
+@@ -24,7 +24,8 @@
+     PersistenceFailure,
+     Unavailable,
+     LimitExceeded,
+-    ActivationRecovered
++    ActivationRecovered,
++    Cancelled
+ }
+ 
+ /// <summary>
+@@ -161,6 +162,8 @@
+     /// Actual archive container counts are bounded before materialization and replay, independent of manifest claims.
+     /// Explicit recoverExistingArchive permits reopening only the exact manifest-bound persisted archive,
+     /// with a writer lease and freshly supplied verification/authorization; no existing bytes are replaced.
++    /// Bounded capture releases its mapped input before durable installation. Cancellation is checked
++    /// between chunks/commits/callbacks and before installation; atomic publication completes once started.
+     /// </summary>
+     public Boolean TryActivate(ETag expectedManifest, out RoamingNetworkHistory? history,
+         out RoamingNetworkBootstrapResult result, Boolean activate = false, String? archivePath = null,
+@@ -169,7 +172,8 @@
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
+         Func<RoamingNetworkBootstrapManifest, Boolean>? authorizeBootstrap = null,
+         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null,
+-        Boolean recoverExistingArchive = false)
++        Boolean recoverExistingArchive = false, RoamingNetworkArchiveReadOptions? readOptions = null,
++        CancellationToken cancellationToken = default)
+     {
+         lock (gate)
+         {
+@@ -178,42 +182,57 @@
+             RoamingNetworkHistory? validated = null;
+             try
+             {
++                cancellationToken.ThrowIfCancellationRequested();
+                 if (recoverExistingArchive && (!activate || archivePath is null))
+                     return Fail(RoamingNetworkBootstrapOutcome.InvalidData, "Archive recovery requires explicit activation and an archive path.", out result);
+                 if (expectedManifest != Manifest.Id) return Fail(RoamingNetworkBootstrapOutcome.ManifestMismatch, "Activation requires the expected manifest identity.", out result);
+-                if (authorizeBootstrap is not null && !authorizeBootstrap(Manifest))
++                var authorized = authorizeBootstrap?.Invoke(Manifest) ?? true;
++                cancellationToken.ThrowIfCancellationRequested();
++                if (!authorized)
+                     return Fail(RoamingNetworkBootstrapOutcome.InvalidData, "The bootstrap manifest was not authorized.", out result);
+-                Scan();
++                Scan(cancellationToken);
+                 if (nextChunk != Manifest.ChunkCount) return Fail(RoamingNetworkBootstrapOutcome.Incomplete, "Transfer is incomplete; request NextChunk to resume.", out result);
+-                var bytes = new Byte[Manifest.ArchiveBytes];
+-                for (var index = 0; index < Manifest.ChunkCount; index++)
++                var recovered = false;
++                using (var spool = new POIArchiveInputSpool(readOptions ?? new(), limits.HistoryLimits, false, InputObserver))
+                 {
+-                    var data = ReadBounded(ChunkPath(index), Manifest.Length(index));
+-                    Validate(index, data);
+-                    data.CopyTo(bytes, index * Manifest.ChunkBytes);
++                    for (var index = 0; index < Manifest.ChunkCount; index++)
++                    {
++                        cancellationToken.ThrowIfCancellationRequested();
++                        var data = ReadBounded(ChunkPath(index), Manifest.Length(index));
++                        Validate(index, data);
++                        cancellationToken.ThrowIfCancellationRequested();
++                        spool.Append(data);
++                    }
++                    validated = spool.Read(bytes =>
++                    {
++                        cancellationToken.ThrowIfCancellationRequested();
++                        if (ETag.Compute(ETagFormat.CBOR, bytes) != Manifest.ArchiveETag)
++                            throw new ArgumentException("Complete archive digest differs from the manifest.");
++                        var restored = RoamingNetworkHistory.RestoreCapturedInput(bytes, limits.HistoryLimits,
++                            verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, cancellationToken, Manifest);
++                        if (activate && archivePath is not null && recoverExistingArchive && File.Exists(archivePath))
++                        {
++                            restored.Dispose();
++                            restored = RoamingNetworkHistory.RecoverBootstrapArchive(archivePath, bytes, Manifest,
++                                verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, limits.HistoryLimits, cancellationToken);
++                            recovered = true;
++                        }
++                        return restored;
++                    });
+                 }
+-                if (ETag.Compute(ETagFormat.CBOR, bytes) != Manifest.ArchiveETag)
+-                    throw new ArgumentException("Complete archive digest differs from the manifest.");
+-                validated = RoamingNetworkHistory.RestoreBootstrap(bytes, Manifest, verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, limits.HistoryLimits);
++                cancellationToken.ThrowIfCancellationRequested();
+                 if (!activate)
+                 {
+                     result = Result(RoamingNetworkBootstrapOutcome.ActivationAvailable); return true;
+                 }
+-                var recovered = false;
+-                if (archivePath is not null)
+-                {
+-                    if (recoverExistingArchive && File.Exists(archivePath))
+-                    {
+-                        validated.Dispose();
+-                        validated = RoamingNetworkHistory.RecoverBootstrapArchive(archivePath, bytes, Manifest,
+-                            verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, limits.HistoryLimits);
+-                        recovered = true;
+-                    }
+-                    else validated.PersistBootstrap(archivePath, ActivationWriteObserver);
+-                }
++                // Input views and temporary reader leases are closed before durable installation.
++                // Once installation starts, its existing atomic publication contract determines the result.
++                if (archivePath is not null && !recovered) validated.PersistBootstrap(archivePath, ActivationWriteObserver);
+                 history = validated; validated = null;
+                 result = Result(recovered ? RoamingNetworkBootstrapOutcome.ActivationRecovered : RoamingNetworkBootstrapOutcome.Activated); return true;
+             }
++            catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
++            { return Fail(RoamingNetworkBootstrapOutcome.Cancelled, exception.Message, out result); }
+             catch (RoamingNetworkHistoryLimitException exception)
+             {
+                 result = new(RoamingNetworkBootstrapOutcome.LimitExceeded, Manifest, nextChunk,
+@@ -227,16 +246,18 @@
+         }
+     }
+ 
+-    private void Scan()
++    private void Scan(CancellationToken cancellationToken = default)
+     {
+         var prefix = 0;
+         for (var index = 0; index < Manifest.ChunkCount; index++)
+         {
++            cancellationToken.ThrowIfCancellationRequested();
+             if (!File.Exists(ChunkPath(index))) continue;
+             if (index != prefix) throw new ArgumentException("Stored fragments contain a gap; staging is not a valid ordered prefix.");
+             Validate(index, ReadBounded(ChunkPath(index), Manifest.Length(index)));
+             prefix++;
+         }
++        cancellationToken.ThrowIfCancellationRequested();
+         nextChunk = prefix;
+     }
+ 
+@@ -312,4 +333,5 @@
+     internal enum BootstrapWriteStage { BeforeTemporaryWrite, TemporaryFileFlushed, ReceiptInstalled }
+     internal Action<BootstrapWriteStage>? WriteObserver { get; set; }
+     internal Action<ArchiveWriteStage>? ActivationWriteObserver { get; set; }
++    internal Action<POIArchiveInputStage, String>? InputObserver { get; set; }
+ }
+--- a/WWCP_POI/History/RoamingNetworkColdArchiveResult.cs
++++ b/WWCP_POI/History/RoamingNetworkColdArchiveResult.cs
+@@ -21,7 +21,8 @@
+     ReceiptMismatch,
+     CommitNotRetained,
+     LimitExceeded,
+-    InvalidInput
++    InvalidInput,
++    Cancelled
+ }
+ 
+ /// <summary>
+--- a/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Archive.cs
+@@ -244,7 +244,8 @@
+ 
+     /// <summary>
+     /// Acquire the archive's writer lease and recover all retained commits before accepting publication.
+-    /// Check file length before allocation and local container limits before decoding and replay.
++    /// Check known file length before mapping and local container limits before decoding and replay.
++    /// Release the mapped input before returning the writer; cancellation applies only to recovery.
+     /// Failure releases the lease and leaves the archive unchanged.
+     /// </summary>
+     public static RoamingNetworkHistory Open(String path,
+@@ -252,19 +253,24 @@
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature = null,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
+         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null,
+-        RoamingNetworkHistoryLimits? limits = null)
++        RoamingNetworkHistoryLimits? limits = null, CancellationToken cancellationToken = default)
+     {
+         limits ??= new();
++        cancellationToken.ThrowIfCancellationRequested();
+         var resolved = Path.GetFullPath(path);
+         var lease = AcquireLease(resolved);
++        RoamingNetworkHistory? history = null;
+         try
+         {
+-            var history = ParseCBOR(ReadArchiveBytes(resolved, limits), verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, limits);
++            using (var input = new POIArchiveMappedFile(resolved, limits))
++                history = RestoreCapturedInput(input.Bytes, limits, verifyBatchSignature, verifyCommitSignature,
++                    authorizeCommit, authorizeSnapshotBoundary, cancellationToken);
++            cancellationToken.ThrowIfCancellationRequested();
+             history.archivePath = resolved;
+             history.archiveLease = lease;
+             return history;
+         }
+-        catch { lease.Dispose(); throw; }
++        catch { history?.Dispose(); lease.Dispose(); throw; }
+     }
+ 
+     private void AcquireArchive(String path)
+--- a/WWCP_POI/History/RoamingNetworkHistory.ArchiveLimits.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.ArchiveLimits.cs
+@@ -142,14 +142,4 @@
+         reader.ReadEndArray();
+     }
+ 
+-    private static Byte[] ReadArchiveBytes(String path, RoamingNetworkHistoryLimits limits)
+-    {
+-        using var file = new FileStream(Path.GetFullPath(path), FileMode.Open, FileAccess.Read, FileShare.Read);
+-        var length = file.Length;
+-        limits.Require(RoamingNetworkHistoryLimitKind.ArchiveBytes, length);
+-        var bytes = new Byte[(Int32) length];
+-        file.ReadExactly(bytes);
+-        if (file.ReadByte() != -1) throw new IOException("Archive length changed while reading.");
+-        return bytes;
+-    }
+ }
+--- a/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Bootstrap.cs
+@@ -14,7 +14,7 @@
+     /// <summary>
+     /// Freeze the complete static archive under the history gate for bounded bootstrap transfer.
+     /// Original checkpoint, head, all retained branches and peer signatures are preserved.
+-    /// Export encodes directly into bounded frozen fragments; final replay still materializes the archive.
++    /// Export encodes directly into bounded frozen fragments; final replay retains decoded models and states.
+     /// </summary>
+     public RoamingNetworkBootstrapSource CreateBootstrap(Int32 chunkBytes = 64 * 1024, RoamingNetworkBootstrapLimits? limits = null)
+     {
+@@ -117,20 +117,25 @@
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
+         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary,
+-        RoamingNetworkHistoryLimits limits)
++        RoamingNetworkHistoryLimits limits, CancellationToken cancellationToken = default)
+     {
++        cancellationToken.ThrowIfCancellationRequested();
+         var resolved = Path.GetFullPath(path);
+         var lease = AcquireLease(resolved);
++        RoamingNetworkHistory? history = null;
+         try
+         {
+-            var stored = ReadArchiveBytes(resolved, limits);
+-            if (!stored.AsSpan().SequenceEqual(expectedBytes))
+-                throw new ArgumentException("The existing activation archive differs from the exact manifest-bound archive.");
+-            var history = RestoreBootstrap(stored, manifest, verifyBatchSignature, verifyCommitSignature,
+-                authorizeCommit, authorizeSnapshotBoundary, limits);
++            using (var stored = new POIArchiveMappedFile(resolved, limits))
++            {
++                if (!stored.Bytes.SequenceEqual(expectedBytes))
++                    throw new ArgumentException("The existing activation archive differs from the exact manifest-bound archive.");
++                history = RestoreCapturedInput(stored.Bytes, limits, verifyBatchSignature, verifyCommitSignature,
++                    authorizeCommit, authorizeSnapshotBoundary, cancellationToken, manifest);
++            }
++            cancellationToken.ThrowIfCancellationRequested();
+             history.archivePath = resolved; history.archiveLease = lease;
+             return history;
+         }
+-        catch { lease.Dispose(); throw; }
++        catch { history?.Dispose(); lease.Dispose(); throw; }
+     }
+ }
+--- a/WWCP_POI/History/RoamingNetworkHistory.ColdArchives.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.ColdArchives.cs
+@@ -17,6 +17,7 @@
+     /// The first digest match must pass verification and receipt membership; trust failure never falls back.
+     /// Success returns a separate in-memory history with fresh runtime and no persistent writer lease.
+     /// An optional requested commit must be retained; otherwise CommitLookup describes older archival evidence.
++    /// Matching bytes stay mapped through verification and are released before returning. Cancellation returns no history.
+     /// Receipt provenance remains the application's responsibility, with an optional current authorization callback.
+     /// </summary>
+     public static Boolean TryReadColdArchive(RoamingNetworkRetentionReceipt receipt, RoamingNetworkColdArchiveCatalog catalog,
+@@ -26,7 +27,7 @@
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
+         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null,
+         RoamingNetworkHistoryLimits? limits = null, RoamingNetworkCommitId? requestedCommit = null,
+-        Func<RoamingNetworkRetentionReceipt, Boolean>? authorizeReceipt = null)
++        Func<RoamingNetworkRetentionReceipt, Boolean>? authorizeReceipt = null, CancellationToken cancellationToken = default)
+     {
+         history = null;
+         RoamingNetworkHistory? restored = null;
+@@ -39,17 +40,21 @@
+             ArgumentNullException.ThrowIfNull(catalog);
+             if (requestedCommit is { IsValid: false }) throw new ArgumentException("Invalid requested commit identity.", nameof(requestedCommit));
+             limits ??= new();
++            cancellationToken.ThrowIfCancellationRequested();
+             verifying = true;
+-            if (authorizeReceipt is not null && !authorizeReceipt(receipt))
++            var authorized = authorizeReceipt?.Invoke(receipt) ?? true;
++            cancellationToken.ThrowIfCancellationRequested();
++            if (!authorized)
+             {
+                 result = new(RoamingNetworkColdArchiveOutcome.Unauthorized, receipt, Error: "The application did not authorize this receipt.");
+                 return false;
+             }
+-            Byte[]? bytes = null;
++            cancellationToken.ThrowIfCancellationRequested();
+             foreach (var path in catalog.GetCandidates(receipt.SourceArchiveETag))
+             {
+-                Byte[] candidate;
+-                try { candidate = ReadArchiveBytes(path, limits); }
++                cancellationToken.ThrowIfCancellationRequested();
++                POIArchiveMappedFile candidate;
++                try { candidate = new(path, limits); }
+                 catch (RoamingNetworkHistoryLimitException exception)
+                 {
+                     attempts.Add(new(path, RoamingNetworkColdArchiveCandidateOutcome.LimitExceeded,
+@@ -68,23 +73,31 @@
+                     attempts.Add(new(path, RoamingNetworkColdArchiveCandidateOutcome.ReadFailure, Error: exception.Message));
+                     continue;
+                 }
+-                var observed = ETag.Compute(ETagFormat.CBOR, candidate);
+-                if (observed != receipt.SourceArchiveETag)
++                using (candidate)
+                 {
+-                    attempts.Add(new(path, RoamingNetworkColdArchiveCandidateOutcome.DigestMismatch, observed));
+-                    continue;
++                    cancellationToken.ThrowIfCancellationRequested();
++                    var observed = ETag.Compute(ETagFormat.CBOR, candidate.Bytes);
++                    cancellationToken.ThrowIfCancellationRequested();
++                    if (observed != receipt.SourceArchiveETag)
++                    {
++                        attempts.Add(new(path, RoamingNetworkColdArchiveCandidateOutcome.DigestMismatch, observed));
++                        continue;
++                    }
++                    attempts.Add(new(path, RoamingNetworkColdArchiveCandidateOutcome.DigestMatched, observed));
++                    selected = path;
++                    restored = RestoreCapturedInput(candidate.Bytes, limits, verifyBatchSignature, verifyCommitSignature,
++                        authorizeCommit, authorizeSnapshotBoundary, cancellationToken);
+                 }
+-                attempts.Add(new(path, RoamingNetworkColdArchiveCandidateOutcome.DigestMatched, observed));
+-                bytes = candidate; selected = path; break;
++                break;
+             }
+-            if (bytes is null)
++            if (restored is null)
+             {
+                 result = new(attempts.All(attempt => attempt.Outcome == RoamingNetworkColdArchiveCandidateOutcome.NotFound)
+                     ? RoamingNetworkColdArchiveOutcome.ArchiveNotFound : RoamingNetworkColdArchiveOutcome.CandidatesRejected,
+                     receipt, attempts.ToImmutable(), "No readable candidate matched the expected archive digest.");
+                 return false;
+             }
+-            restored = ParseCBOR(bytes, verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, limits);
++            cancellationToken.ThrowIfCancellationRequested();
+             var commits = restored.Commits.ToDictionary(commit => commit.Id);
+             if (restored.CheckpointId != receipt.Checkpoint || restored.AnchorId != receipt.BeforeAnchor || restored.Head.Id != receipt.Head ||
+                 !commits.TryGetValue(receipt.AfterAnchor, out var snapshot) || snapshot.Kind != RoamingNetworkCommitKind.Snapshot || snapshot.Signatures.IsEmpty ||
+@@ -101,9 +114,15 @@
+                     "The requested commit is not retained in this cold archive.", selected, lookup);
+                 return false;
+             }
++            cancellationToken.ThrowIfCancellationRequested();
+             history = restored; restored = null;
+             result = new(RoamingNetworkColdArchiveOutcome.Recovered, receipt, attempts.ToImmutable(), ResolvedPath: selected, CommitLookup: lookup);
+             return true;
++        }
++        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
++        {
++            result = new(RoamingNetworkColdArchiveOutcome.Cancelled, receipt, attempts.ToImmutable(), exception.Message, selected);
++            return false;
+         }
+         catch (RoamingNetworkHistoryLimitException exception)
+         {
+--- a/WWCP_POI/History/RoamingNetworkHistory.InputStreams.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.InputStreams.cs
+@@ -86,11 +86,12 @@
+         if (count < 0 || count > requested) throw new IOException("The input stream returned an invalid read count.");
+     }
+ 
+-    private static RoamingNetworkHistory RestoreCapturedInput(ReadOnlySpan<Byte> bytes, RoamingNetworkHistoryLimits limits,
++    internal static RoamingNetworkHistory RestoreCapturedInput(ReadOnlySpan<Byte> bytes, RoamingNetworkHistoryLimits limits,
+         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature,
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit,
+-        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary, CancellationToken token)
++        Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary, CancellationToken token,
++        RoamingNetworkBootstrapManifest? manifest = null)
+     {
+         Boolean BatchTrust(RoamingNetworkChangeSet batch, RoamingNetworkChangeSetSignature peer)
+         { token.ThrowIfCancellationRequested(); var valid = verifyBatchSignature!(batch, peer); token.ThrowIfCancellationRequested(); return valid; }
+@@ -104,10 +105,13 @@
+         try
+         {
+             token.ThrowIfCancellationRequested();
+-            history = ParseCBOR(bytes,
+-                verifyBatchSignature is null ? null : BatchTrust,
+-                verifyCommitSignature is null ? null : CommitTrust,
+-                CommitAuthority, authorizeSnapshotBoundary is null ? null : BoundaryAuthority, limits);
++            history = manifest is null
++                ? ParseCBOR(bytes, verifyBatchSignature is null ? null : BatchTrust,
++                    verifyCommitSignature is null ? null : CommitTrust,
++                    CommitAuthority, authorizeSnapshotBoundary is null ? null : BoundaryAuthority, limits)
++                : RestoreBootstrap(bytes, manifest, verifyBatchSignature is null ? null : BatchTrust,
++                    verifyCommitSignature is null ? null : CommitTrust,
++                    CommitAuthority, authorizeSnapshotBoundary is null ? null : BoundaryAuthority, limits);
+             token.ThrowIfCancellationRequested();
+             var result = history; history = null; return result;
+         }
+--- a/WWCP_POI/History/RoamingNetworkHistory.Retention.cs
++++ b/WWCP_POI/History/RoamingNetworkHistory.Retention.cs
+@@ -28,22 +28,25 @@
+     /// Read an independently stored cold archive into a separate in-memory history after checking its exact digest.
+     /// Recovery rechecks caller-supplied trust and initializes fresh runtime; the cold file is never opened for mutation.
+     /// A cold archive from an earlier pruning event may itself require snapshot-boundary authorization.
+-    /// Local limits bound file bytes before allocation and container counts before decoding/replay.
++    /// Local limits bound known file bytes before mapping and container counts before decoding/replay.
++    /// The input mapping is held through digest/trust checks and released before return.
+     /// </summary>
+     public static RoamingNetworkHistory ReadColdArchive(String path, ETag expectedArchiveETag,
+         Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifyBatchSignature = null,
+         Func<RoamingNetworkCommit, RoamingNetworkChangeSetSignature, Boolean>? verifyCommitSignature = null,
+         Func<RoamingNetworkCommit, Boolean>? authorizeCommit = null,
+         Func<RoamingNetworkSnapshotBoundary, Boolean>? authorizeSnapshotBoundary = null,
+-        RoamingNetworkHistoryLimits? limits = null)
++        RoamingNetworkHistoryLimits? limits = null, CancellationToken cancellationToken = default)
+     {
+         if (!expectedArchiveETag.IsValid || expectedArchiveETag.Format != ETagFormat.CBOR)
+             throw new ArgumentException("A valid CBOR archive digest is required.", nameof(expectedArchiveETag));
+         limits ??= new();
+-        var bytes = ReadArchiveBytes(path, limits);
+-        if (ETag.Compute(ETagFormat.CBOR, bytes) != expectedArchiveETag)
++        cancellationToken.ThrowIfCancellationRequested();
++        using var input = new POIArchiveMappedFile(path, limits);
++        if (ETag.Compute(ETagFormat.CBOR, input.Bytes) != expectedArchiveETag)
+             throw new ArgumentException("Cold archive digest mismatch.");
+-        return ParseCBOR(bytes, verifyBatchSignature, verifyCommitSignature, authorizeCommit, authorizeSnapshotBoundary, limits);
++        return RestoreCapturedInput(input.Bytes, limits, verifyBatchSignature, verifyCommitSignature,
++            authorizeCommit, authorizeSnapshotBoundary, cancellationToken);
+     }
+ 
+     /// <summary>

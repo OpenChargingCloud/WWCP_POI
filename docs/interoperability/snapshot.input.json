@@ -13,26 +13,49 @@
     "decimal": 1.250,
     "optional": null
   },
+  "gridOperators": [{"id":"DE*GRD","name":{"en":"Grid"}, "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}],
+  "transparencySoftware": [
+    {"@id":"verifier-2", "name":"Meter verifier", "version":"2.0", "vendor":"Example vendor", "openSourceLicense":{"@id":"MIT", "description":{"en":"MIT License"}, "URLs":["https://opensource.org/licenses/MIT"]}},
+    {"@id":"verifier-3", "name":"Meter verifier", "version":"3.0", "vendor":"Example vendor", "openSourceLicense":{"@id":"MIT", "description":{"en":"MIT License"}, "URLs":["https://opensource.org/licenses/MIT"]}}
+  ],
+  "transparencySoftwareCertificates": [{
+    "@id":"approval-42", "issuer":"Example inspection organization",
+    "chargingStationModel":"Station X", "chargingStationModelVersion":"3.1",
+    "verifiedTransparencySoftwareIds":["verifier-2"], "compatibleTransparencySoftwareIds":["verifier-3"],
+    "documentNumber":"42/2026", "notBefore":"2026-01-01T00:00:00.1234567Z", "notAfter":"2030-01-01T00:00:00Z"
+  }],
+  "parkingOperators": [{
+    "id":"parking-op", "name":{"en":"Parking operator"},
+    "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z",
+    "parkingProducts":[{"@id":"short-stay", "minDuration":"300 s", "stopParkingAfterTime":"7200 s"}, {"@id":"long-stay", "minDuration":"600 s", "stopParkingAfterTime":"28800 s"}],
+    "parkingGarages":[{"@id":"garage-1", "parkingProductIds":["short-stay"], "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}],
+    "parkingSpaces":[{"@id":"space-1", "parkingGarageId":"garage-1", "parkingProductIds":["long-stay"], "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}],
+    "parkingSpaceGroups":[
+      {"@id":"group-1", "parkingSpaceIds":["space-1"], "parkingProductIds":["short-stay"], "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"},
+      {"@id":"group-2", "parkingSpaceIds":["space-1"], "parkingProductIds":["long-stay"], "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}
+    ]
+  }],
   "chargingStationOperators": [{
     "@id": "DE*ABC", "name": {"en":"Operator"},
     "created": "2026-01-01T00:00:00Z", "lastChange": "2026-01-01T00:00:00Z",
     "chargingPools": [{
       "@id": "DE*ABC*P1", "name": {"en":"Pool"},
       "created": "2026-01-01T00:00:00Z", "lastChange": "2026-01-01T00:00:00Z",
-      "energyMeters": [{"id":"pool-meter","role":"grid", "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}],
+      "energyMeters": [{"id":"pool-meter","role":"grid", "transparencySoftware":[{"transparencySoftwareId":"verifier-2", "legalStatus":"verified", "certificateId":"approval-42"}], "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}],
       "gridConnectionPoint": {
-        "gridOperator": {"id":"DE*GRD","name":{"en":"Grid"}, "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"},
+        "gridOperatorId": "DE*GRD",
         "nominalVoltage": "400 V", "nominalFrequency": "50 Hz",
         "contractedImportPower": "250000 W", "contractedImportApparentPower": "300 kVA"
       },
       "chargingStations": [{
         "@id": "DE*ABC*S1", "name":{"en":"Station"},
         "created": "2026-01-01T00:00:00Z", "lastChange": "2026-01-01T00:00:00Z",
-        "energyMeters": [{"id":"station-meter","role":"pv", "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}],
+        "energyMeters": [{"id":"station-meter","role":"pv", "transparencySoftware":[{"transparencySoftwareId":"verifier-3", "legalStatus":"compatible", "certificateId":"approval-42"}], "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}],
         "EVSEs": [{
           "@id":"DE*ABC*E1", "currentType":["DC"], "maxPower":"100000 W",
           "created": "2026-01-01T00:00:00Z", "lastChange": "2026-01-01T00:00:00Z",
           "physicalReference": null,
+          "energyMeter":{"id":"evse-meter", "transparencySoftware":[{"transparencySoftwareId":"verifier-2", "legalStatus":"verified", "certificateId":"approval-42"}], "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"},
           "socketOutlets":[{"@id":"1","type":"CCS","lockable":false}]
         }]
       }]

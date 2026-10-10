@@ -133,7 +133,7 @@ Version 3 archive fields are exactly `Profile`, `ContentProfile`, `CheckpointId`
 `Commits` and `Head`. `Commits` excludes the root and contains parent-before-child original
 envelopes. Manifest count includes the root, and its identity binds checkpoint, anchor, head,
 archive identity, fragment digests and layout. Profile/anchor/archive/count/head disagreements fail.
-Fragment envelopes remain `wwcp-poi-bootstrap-chunk-v1`. Static-v1, snapshot identity/signatures
+Fragment envelopes remain `wwcp-poi-bootstrap-chunk-v1`. Static-v2, snapshot identity/signatures
 and complete-history version 1/2 contracts retain their existing preimages.
 Version 4 additionally preserves [explicit pruning receipts](RETENTION.md). They distinguish recorded
 archived identities from merely unknown IDs, without authenticating omitted history by themselves.
@@ -196,13 +196,31 @@ globally fresh batch IDs; full-history receivers enforce their complete retained
 
 ## Evidence and next work
 
-The library builds; no boundary-specific tests have been added or executed in this package.
-Dedicated JSON/CBOR/signature vectors, fresh-policy rejection, rollback decisions, resumable activation,
-large-anchor incremental limits, atomic import/recovery, runtime continuity, excluded branches and
-cross-boundary merge coverage remain pending. These new profiles are not yet frozen reference vectors.
+[SnapshotBoundaryTests](../WWCP_POI_Tests/Interoperability/SnapshotBoundaryTests.cs) now has 14 passing
+cases covering fresh signature/chain/rollback policy, recovery, revoked boundaries, large-root page
+bounds, retained local peers, resumable bootstrap activation, suffix merge/runtime and older bases.
+Retention tests also verify bootstrap exclusions without inventing pruning receipts. Fixed boundary
+and page regression artifacts are included in the 952-test full run. See [verification](VERIFICATION-SNAPSHOTS-RETENTION.md).
+The [process-crash package](CRASH-RECOVERY.md) now checks snapshot publication and repeated pruning
+in already partial histories, with exact old/new roots/catalogs, fresh authorization/signature checks,
+cold retrieval, released leases, retry and signed continuation. Independent peers, exhaustive DAG
+cases, power loss and uninstrumented interruption within writes/renames remain additional work.
+The [bootstrap crash package](BOOTSTRAP-CRASH-RECOVERY.md) also exercises v3/v4 receipt/activation
+exits and exact destination recovery with freshly authorized original chain/anchor pairs.
 
 Snapshot exports and separate boundary creation leave the source intact. [Explicit retention](RETENTION.md)
 can additionally archive and prune an existing history under a reviewed plan, preserving its exact
 head/runtime and installing a new signed root. History-v4/manifest-v4 preserve its pruning receipts.
 Only recorded archived IDs establish the local `Archived` lookup classification; absent IDs alone
 do not. Retention schedules and automatic boundary switching remain application work.
+
+### Subsequent exact root/head snapshot reuse
+
+[Root/head reconstruction](SNAPSHOT-RECONSTRUCTION.md) now conditionally retains an immutable
+snapshot after the complete domain parser, references, metadata and representation completion.
+Every stored property byte, child and version must match; different spellings/defaults use the
+existing capture path. Separate histories keep independent runtime objects; a private root-only
+head can keep its freshly validated root model. Every peer/current policy, eager/lazy error timing,
+cancellation and atomic publication remain intact. No persistent model or trust cache is added.
+The package adds 86 cases and matched model/signature/restore/full-recovery measurements with
+unchanged prepared inputs, outputs, C# harness and dependencies. Earlier results remain historical.
