@@ -221,9 +221,9 @@ namespace WWCP_POI_Tests.Json
 
             var updated = next.EVSEs.Single(evse => evse.Id.ToString() == "DE*ABC*E1").EnergyMeter!.TransparencySoftware.First();
 
-            Assert.That(updated.TransparencySoftware.Version, Is.EqualTo("4.0"));
+            Assert.That(updated.TransparencySoftware.Version, Is.EqualTo(TransparencySoftwareVersion.Parse("4.0")));
             Assert.That(updated.LegalStatus, Is.EqualTo(LegalStatus.GermanCalibrationLaw));
-            Assert.That(source.EVSEs.Single(evse => evse.Id.ToString() == "DE*ABC*E1").EnergyMeter!.TransparencySoftware.First().TransparencySoftware.Version, Is.EqualTo("2.0"));
+            Assert.That(source.EVSEs.Single(evse => evse.Id.ToString() == "DE*ABC*E1").EnergyMeter!.TransparencySoftware.First().TransparencySoftware.Version, Is.EqualTo(TransparencySoftwareVersion.Parse("2.0")));
 
             var restored = RoamingNetwork.Parse(next.ToJSONSnapshot().ToString());
 
