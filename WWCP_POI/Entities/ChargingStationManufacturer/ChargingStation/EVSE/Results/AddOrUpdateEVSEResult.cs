@@ -1,0 +1,342 @@
+﻿/*
+ * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
+ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
+ *
+ * Licensed under the Affero GPL license, Version 3.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.gnu.org/licenses/agpl.html
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#region Usings
+
+using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod;
+
+#endregion
+
+namespace cloud.charging.open.protocols.WWCP.POI
+{
+
+    /// <summary>
+    /// The result of an add or update EVSE request.
+    /// </summary>
+    public class AddOrUpdateEVSEResult : AEnitityResult<EVSE, EVSE_Id>
+    {
+
+        #region Properties
+
+        public EVSE?             EVSE
+            => Entity;
+
+        public ChargingStation?  ChargingStation    { get; internal set; }
+
+        public AddedOrUpdated?    AddedOrUpdated     { get; internal set; }
+
+        #endregion
+
+        #region Constructor(s)
+
+        public AddOrUpdateEVSEResult(EVSE                  EVSE,
+                                     CommandResult    Result,
+                                     EventTracking_Id?      EventTrackingId   = null,
+                                     IId?                   SenderId          = null,
+                                     Object?                Sender            = null,
+                                     ChargingStation?      ChargingStation   = null,
+                                     AddedOrUpdated?        AddedOrUpdated    = null,
+                                     I18NString?            Description       = null,
+                                     IEnumerable<Warning>?  Warnings          = null,
+                                     TimeSpan?              Runtime           = null)
+
+            : base(EVSE,
+                   Result,
+                   EventTrackingId,
+                   SenderId,
+                   Sender,
+                   Description,
+                   Warnings,
+                   Runtime)
+
+        {
+
+            this.ChargingStation  = ChargingStation;
+            this.AddedOrUpdated   = AddedOrUpdated;
+
+        }
+
+        #endregion
+
+
+        #region (static) AdminDown    (EVSE, ...)
+
+        public static AddOrUpdateEVSEResult
+
+            AdminDown(EVSE                  EVSE,
+                      EventTracking_Id?      EventTrackingId   = null,
+                      IId?                   SenderId          = null,
+                      Object?                Sender            = null,
+                      ChargingStation?      ChargingStation   = null,
+                      I18NString?            Description       = null,
+                      IEnumerable<Warning>?  Warnings          = null,
+                      TimeSpan?              Runtime           = null)
+
+                => new (EVSE,
+                        CommandResult.AdminDown,
+                        EventTrackingId,
+                        SenderId,
+                        Sender,
+                        ChargingStation,
+                        org.GraphDefined.Vanaheimr.Illias.AddedOrUpdated.NoOperation,
+                        Description,
+                        Warnings,
+                        Runtime);
+
+        #endregion
+
+        #region (static) NoOperation  (EVSE, ...)
+
+        public static AddOrUpdateEVSEResult
+
+            NoOperation(EVSE                  EVSE,
+                        EventTracking_Id?      EventTrackingId   = null,
+                        IId?                   SenderId          = null,
+                        Object?                Sender            = null,
+                        ChargingStation?      ChargingStation   = null,
+                        I18NString?            Description       = null,
+                        IEnumerable<Warning>?  Warnings          = null,
+                        TimeSpan?              Runtime           = null)
+
+                => new (EVSE,
+                        CommandResult.NoOperation,
+                        EventTrackingId,
+                        SenderId,
+                        Sender,
+                        ChargingStation,
+                        org.GraphDefined.Vanaheimr.Illias.AddedOrUpdated.NoOperation,
+                        Description,
+                        Warnings,
+                        Runtime);
+
+        #endregion
+
+
+        #region (static) Enqueued     (EVSE, ...)
+
+        public static AddOrUpdateEVSEResult
+
+            Enqueued(EVSE                  EVSE,
+                     EventTracking_Id?      EventTrackingId   = null,
+                     IId?                   SenderId          = null,
+                     Object?                Sender            = null,
+                     ChargingStation?      ChargingStation   = null,
+                     I18NString?            Description       = null,
+                     IEnumerable<Warning>?  Warnings          = null,
+                     TimeSpan?              Runtime           = null)
+
+                => new (EVSE,
+                        CommandResult.Enqueued,
+                        EventTrackingId,
+                        SenderId,
+                        Sender,
+                        ChargingStation,
+                        org.GraphDefined.Vanaheimr.Illias.AddedOrUpdated.Enqueued,
+                        Description,
+                        Warnings,
+                        Runtime);
+
+        #endregion
+
+        #region (static) Added        (EVSE, ...)
+
+        public static AddOrUpdateEVSEResult
+
+            Added(EVSE                  EVSE,
+                  EventTracking_Id?      EventTrackingId   = null,
+                  IId?                   SenderId          = null,
+                  Object?                Sender            = null,
+                  ChargingStation?      ChargingStation   = null,
+                  I18NString?            Description       = null,
+                  IEnumerable<Warning>?  Warnings          = null,
+                  TimeSpan?              Runtime           = null)
+
+                => new (EVSE,
+                        CommandResult.Success,
+                        EventTrackingId,
+                        SenderId,
+                        Sender,
+                        ChargingStation,
+                        org.GraphDefined.Vanaheimr.Illias.AddedOrUpdated.Add,
+                        Description,
+                        Warnings,
+                        Runtime);
+
+        #endregion
+
+        #region (static) Updated      (EVSE, ...)
+
+        public static AddOrUpdateEVSEResult
+
+            Updated(EVSE                  EVSE,
+                    EventTracking_Id?      EventTrackingId   = null,
+                    IId?                   SenderId          = null,
+                    Object?                Sender            = null,
+                    ChargingStation?      ChargingStation   = null,
+                    I18NString?            Description       = null,
+                    IEnumerable<Warning>?  Warnings          = null,
+                    TimeSpan?              Runtime           = null)
+
+                => new (EVSE,
+                        CommandResult.Success,
+                        EventTrackingId,
+                        SenderId,
+                        Sender,
+                        ChargingStation,
+                        org.GraphDefined.Vanaheimr.Illias.AddedOrUpdated.Update,
+                        Description,
+                        Warnings,
+                        Runtime);
+
+        #endregion
+
+
+        #region (static) ArgumentError(EVSE, Description, ...)
+
+        public static AddOrUpdateEVSEResult
+
+            ArgumentError(EVSE                  EVSE,
+                          I18NString             Description,
+                          EventTracking_Id?      EventTrackingId   = null,
+                          IId?                   SenderId          = null,
+                          Object?                Sender            = null,
+                          ChargingStation?      ChargingStation   = null,
+                          IEnumerable<Warning>?  Warnings          = null,
+                          TimeSpan?              Runtime           = null)
+
+                => new (EVSE,
+                        CommandResult.ArgumentError,
+                        EventTrackingId,
+                        SenderId,
+                        Sender,
+                        ChargingStation,
+                        org.GraphDefined.Vanaheimr.Illias.AddedOrUpdated.Failed,
+                        Description,
+                        Warnings,
+                        Runtime);
+
+        #endregion
+
+        #region (static) Error        (EVSE, Description, ...)
+
+        public static AddOrUpdateEVSEResult
+
+            Error(EVSE                  EVSE,
+                  I18NString             Description,
+                  EventTracking_Id?      EventTrackingId   = null,
+                  IId?                   SenderId          = null,
+                  Object?                Sender            = null,
+                  ChargingStation?      ChargingStation   = null,
+                  IEnumerable<Warning>?  Warnings          = null,
+                  TimeSpan?              Runtime           = null)
+
+                => new (EVSE,
+                        CommandResult.Error,
+                        EventTrackingId,
+                        SenderId,
+                        Sender,
+                        ChargingStation,
+                        org.GraphDefined.Vanaheimr.Illias.AddedOrUpdated.Failed,
+                        Description,
+                        Warnings,
+                        Runtime);
+
+        #endregion
+
+        #region (static) Error        (EVSE, Exception,   ...)
+
+        public static AddOrUpdateEVSEResult
+
+            Error(EVSE                  EVSE,
+                  Exception              Exception,
+                  EventTracking_Id?      EventTrackingId   = null,
+                  IId?                   SenderId          = null,
+                  Object?                Sender            = null,
+                  ChargingStation?      ChargingStation   = null,
+                  IEnumerable<Warning>?  Warnings          = null,
+                  TimeSpan?              Runtime           = null)
+
+                => new (EVSE,
+                        CommandResult.Error,
+                        EventTrackingId,
+                        SenderId,
+                        Sender,
+                        ChargingStation,
+                        org.GraphDefined.Vanaheimr.Illias.AddedOrUpdated.Failed,
+                        Exception.Message.ToI18NString(),
+                        Warnings,
+                        Runtime);
+
+        #endregion
+
+        #region (static) Timeout      (EVSE, Timeout,     ...)
+
+        public static AddOrUpdateEVSEResult
+
+            Timeout(EVSE                  EVSE,
+                    TimeSpan               Timeout,
+                    EventTracking_Id?      EventTrackingId   = null,
+                    IId?                   SenderId          = null,
+                    Object?                Sender            = null,
+                    ChargingStation?      ChargingStation   = null,
+                    IEnumerable<Warning>?  Warnings          = null,
+                    TimeSpan?              Runtime           = null)
+
+                => new (EVSE,
+                        CommandResult.Timeout,
+                        EventTrackingId,
+                        SenderId,
+                        Sender,
+                        ChargingStation,
+                        org.GraphDefined.Vanaheimr.Illias.AddedOrUpdated.Failed,
+                        $"Timeout after {Timeout.TotalSeconds} seconds!".ToI18NString(),
+                        Warnings,
+                        Runtime);
+
+        #endregion
+
+        #region (static) LockTimeout  (EVSE, Timeout,     ...)
+
+        public static AddOrUpdateEVSEResult
+
+            LockTimeout(EVSE                  EVSE,
+                        TimeSpan               Timeout,
+                        EventTracking_Id?      EventTrackingId   = null,
+                        IId?                   SenderId          = null,
+                        Object?                Sender            = null,
+                        ChargingStation?      ChargingStation   = null,
+                        IEnumerable<Warning>?  Warnings          = null,
+                        TimeSpan?              Runtime           = null)
+
+                => new (EVSE,
+                        CommandResult.LockTimeout,
+                        EventTrackingId,
+                        SenderId,
+                        Sender,
+                        ChargingStation,
+                        org.GraphDefined.Vanaheimr.Illias.AddedOrUpdated.Failed,
+                        $"Lock timeout after {Timeout.TotalSeconds} seconds!".ToI18NString(),
+                        Warnings,
+                        Runtime);
+
+        #endregion
+
+
+    }
+
+}
