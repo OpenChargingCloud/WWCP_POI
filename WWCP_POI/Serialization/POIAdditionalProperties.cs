@@ -41,7 +41,7 @@ internal static class POIAdditionalProperties
                 if (value.PaymentOptions.Any()) json["paymentOptions"] = new JArray(value.PaymentOptions.Select(item => item.ToString()));
                 if (value.Features.Any()) json["features"] = new JArray(value.Features.Select(item => item.ToString()));
                 if (value.VehicleTypes.Any()) json["vehicleTypes"] = new JArray(value.VehicleTypes.Select(item => item.ToString()));
-                if (value.Images.Any()) json["images"] = new JArray(value.Images.Select(item => POIJSON.Document(item)));
+                if (value.Images.Any()) json["images"] = new JArray(value.Images.Select(item => item.ToJSON()));
                 if (value.ServiceIdentification is { } ServiceIdentificationValue) json["serviceIdentification"] = JToken.FromObject(ServiceIdentificationValue);
                 if (value.ModelCode is { } ModelCodeValue) json["modelCode"] = JToken.FromObject(ModelCodeValue);
                 if (value.Published is { } PublishedValue) json["published"] = JToken.FromObject(PublishedValue);

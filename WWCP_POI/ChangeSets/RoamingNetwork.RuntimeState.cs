@@ -139,7 +139,7 @@ public sealed partial class RoamingNetwork
             var sourcePoint = entity.GridConnectionPoint;
             var connectionMeterRuntime = CaptureMeterRuntime(sourcePoint?.EnergyMeter,
                 sourcePoint?.EnergyMeter is { } sourceMeter && ResetsNested(InfrastructureEntityType.ChargingPool,
-                    entity.Id.ToString(), [new("gridConnectionPoint", sourcePoint.Id), new("energyMeter", sourceMeter.Id.ToString())]));
+                    entity.Id.ToString(), [new("gridConnectionPoint", sourcePoint.Id?.ToString()), new("energyMeter", sourceMeter.Id.ToString())]));
             var connectionPointId = entity.GridConnectionPoint?.Id;
             restore.Add(target =>
             {
@@ -150,7 +150,7 @@ public sealed partial class RoamingNetwork
                 foreach (var meter in pool.EnergyMeters)
                     if (meterRuntime.TryGetValue(meter.Id.ToString(), out var restoreMeter))
                         restoreMeter(meter);
-                if (String.Equals(connectionPointId, pool.GridConnectionPoint?.Id, StringComparison.Ordinal))
+                if (String.Equals(connectionPointId?.ToString(), pool.GridConnectionPoint?.Id?.ToString(), StringComparison.Ordinal))
                 {
                     connectionMeterRuntime(pool.GridConnectionPoint?.EnergyMeter);
                 }

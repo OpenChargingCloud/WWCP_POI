@@ -34,22 +34,6 @@ public partial class ChargingStationManufacturer : IImmutablePOI
     public ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
 }
 
-public partial class TransparencySoftware : IImmutablePOI
-{
-    /// <summary>
-    /// Content identifiers of the immutable POI data; runtime states are excluded.
-    /// </summary>
-    public ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
-}
-
-public partial class TransparencySoftwareStatus : IImmutablePOI
-{
-    /// <summary>
-    /// Content identifiers of the immutable POI data; runtime states are excluded.
-    /// </summary>
-    public ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
-}
-
 public partial class Brand : IImmutablePOI
 {
     /// <summary>
@@ -82,14 +66,6 @@ public partial class ParkingProduct : IImmutablePOI
     public ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
 }
 
-public partial class Image : IImmutablePOI
-{
-    /// <summary>
-    /// Content identifiers of the immutable POI data; runtime states are excluded.
-    /// </summary>
-    public ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
-}
-
 public partial class EVRoamingPartnerInfo : IImmutablePOI
 {
     /// <summary>
@@ -99,22 +75,6 @@ public partial class EVRoamingPartnerInfo : IImmutablePOI
 }
 
 public partial class RootCAInfo : IImmutablePOI
-{
-    /// <summary>
-    /// Content identifiers of the immutable POI data; runtime states are excluded.
-    /// </summary>
-    public ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
-}
-
-public partial class ImmutableI18NString : IImmutablePOI
-{
-    /// <summary>
-    /// Content identifiers of the immutable POI data; runtime states are excluded.
-    /// </summary>
-    public ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
-}
-
-public partial class ImmutableOpeningTimes : IImmutablePOI
 {
     /// <summary>
     /// Content identifiers of the immutable POI data; runtime states are excluded.

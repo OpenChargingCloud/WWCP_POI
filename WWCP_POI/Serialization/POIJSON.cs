@@ -31,9 +31,6 @@ internal static class POIJSON
             GridOperator entity => InfrastructureJson.SnapshotMetadata(entity.ToJSON(), entity),
             GridConnectionPoint entity => GridPoint(entity),
             ChargingStationManufacturer entity => entity.ToJSON(),
-            TransparencySoftwareCertificate entity => entity.ToJSON(),
-            TransparencySoftware entity => entity.ToJSON(),
-            TransparencySoftwareStatus entity => entity.ToJSON(),
             Brand entity => entity.ToJSON(ExpandDataLicenses: InfoStatus.Expanded),
             EnergyMix entity => entity.ToJSON(),
             ChargingProduct entity => entity.ToJSON(),
@@ -41,10 +38,7 @@ internal static class POIJSON
             ChargingTariffElement entity => entity.ToJSON(),
             ChargingPriceComponent entity => entity.ToJSON(),
             AdditionalGeoLocation entity => entity.ToJSON(),
-            Image entity => entity.ToJSON(),
             AuthenticationModes entity => entity.ToJSON(),
-            ImmutableI18NString entity => entity.ToJSON(),
-            ImmutableOpeningTimes entity => entity.ToJSON(),
             ImmutableCryptoKeyInfo entity => entity.ToJSON(),
             ECCPublicKey entity => ((PublicKey) entity).ToJSON(),
             PublicKey entity => entity.ToJSON(),
@@ -139,8 +133,8 @@ internal static class POIJSON
         json["chargingStationOperators"] = Children(entity.ChargingStationOperators);
         json["eMobilityProviders"] = Children(entity.EMobilityProviders);
         json["gridOperators"] = Children(entity.GridOperators);
-        json["transparencySoftware"] = Children(entity.TransparencySoftware);
-        json["transparencySoftwareCertificates"] = Children(entity.TransparencySoftwareCertificates);
+        json["transparencySoftware"] = Values(entity.TransparencySoftware, value => value.ToJSON());
+        json["transparencySoftwareCertificates"] = Values(entity.TransparencySoftwareCertificates, value => value.ToJSON());
         json["parkingOperators"] = Children(entity.ParkingOperators);
         json["chargingStationManufacturers"] = Children(entity.ChargingStationManufacturers);
         return json;
@@ -185,7 +179,13 @@ internal static class POIJSON
     }
 
     internal static JArray Children<T>(IEnumerable<T> values) where T : IImmutablePOI
-        => new(values.Select(value => Document(value)).OrderBy(json => (json["@id"] ?? json["id"])?.Value<String>(), StringComparer.Ordinal));
+        => Values(values, value => Document(value));
+
+    /// <summary>
+    /// Values that are no POI documents of their own, in the order of their identities.
+    /// </summary>
+    internal static JArray Values<T>(IEnumerable<T> values, Func<T, JObject> toJSON)
+        => new(values.Select(toJSON).OrderBy(json => (json["@id"] ?? json["id"])?.Value<String>(), StringComparer.Ordinal));
 
     private static JObject Group<TId, TAdmin, TStatus>(AImmutableEMobilityEntity<TId, TAdmin, TStatus> entity,
                     ChargingStationOperator op, String memberField, IEnumerable<String> memberIds,

@@ -21,7 +21,7 @@ using org.GraphDefined.Vanaheimr.Illias;
 
 #endregion
 
-namespace cloud.charging.open.protocols.WWCP.POI.CSM
+namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>

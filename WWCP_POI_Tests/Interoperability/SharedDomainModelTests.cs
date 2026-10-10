@@ -135,35 +135,22 @@ public sealed class SharedDomainModelTests
         finally { CultureInfo.CurrentCulture = previous; }
     }
 
-    [TestCase("Software", false)]
-    [TestCase("Software", true)]
-    [TestCase("Certificate", false)]
-    [TestCase("Certificate", true)]
-    [TestCase("Meter", false)]
-    [TestCase("Meter", true)]
-    public void Standalone_transports_validate_declared_ETags_and_resolve_context(String kind, Boolean cbor)
+    /// <summary>
+    /// Transparency software and its documents are values of the network, without ETags of their own.
+    /// </summary>
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Standalone_transports_validate_declared_ETags_and_resolve_context(Boolean cbor)
     {
         var network = Source();
-        IImmutablePOI original = kind switch {
-            "Software" => network.TransparencySoftware[0],
-            "Certificate" => network.TransparencySoftwareCertificates[0],
-            _ => network.ChargingPools.First().EnergyMeters[0]
-        };
-        IImmutablePOI Read(JObject json) => kind switch {
-            "Software" => POIRepresentation.ParseJSON(json, value => TransparencySoftware.Parse(value)),
-            "Certificate" => POIRepresentation.ParseJSON(json, value => TransparencySoftwareCertificate.Parse(value, network)),
-            _ => POIRepresentation.ParseJSON(json, value => EnergyMeter.Parse(value, Network: network))
-        };
-        IImmutablePOI restored = cbor ? kind switch {
-            "Software" => TransparencySoftware.ParseCBOR(original.ToCBOR()),
-            "Certificate" => TransparencySoftwareCertificate.ParseCBOR(original.ToCBOR(), network),
-            _ => EnergyMeter.ParseCBOR(original.ToCBOR(), network)
-        } : Read(original.ToJSONWithETags());
+        IImmutablePOI original = network.ChargingPools.First().EnergyMeters[0];
+        IImmutablePOI Read(JObject json) => POIRepresentation.ParseJSON(json, value => EnergyMeter.Parse(value, Network: network));
+        IImmutablePOI restored = cbor ? EnergyMeter.ParseCBOR(original.ToCBOR(), network) : Read(original.ToJSONWithETags());
         Assert.That(restored.ETags, Is.EqualTo(original.ETags));
         var tampered = original.ToJSONWithETags();
-        tampered[kind switch { "Software" => "vendor", "Certificate" => "issuer", _ => "role" }] = "changed";
+        tampered["role"] = "changed";
         Assert.Throws<ArgumentException>(() => Read(tampered));
-        if (kind == "Meter") Assert.Throws<ArgumentException>(() => EnergyMeter.ParseCBOR(original.ToCBOR()));
+        Assert.Throws<ArgumentException>(() => EnergyMeter.ParseCBOR(original.ToCBOR()));
     }
 
     [TestCase("duplicate-grid")]
@@ -228,10 +215,10 @@ public sealed class SharedDomainModelTests
         Assert.That(TransparencySoftwareCertificate_Id.Parse(Certificate42), Is.Not.EqualTo(TransparencySoftwareCertificate_Id.Parse(Certificate42.ToUpperInvariant())));
         var ids = new List<TransparencySoftware_Id> { software };
         var certificate = new TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id.Parse("new-document"), "Issuer", "Model", "Version", ids);
-        var tags = certificate.ETags;
+        var json = certificate.ToJSON().ToString();
         ids.Clear();
         Assert.That(certificate.VerifiedTransparencySoftwareIds, Is.EqualTo(new[] { software }));
-        Assert.That(certificate.ETags, Is.EqualTo(tags));
+        Assert.That(certificate.ToJSON().ToString(), Is.EqualTo(json));
     }
 
     [Test]
@@ -302,7 +289,7 @@ public sealed class SharedDomainModelTests
     public void Catalog_nodes_support_ordered_add_edit_and_remove()
     {
         var source = Source();
-        var software = Value("""{"@id":"unused-release","name":"Other verifier","version":"1","vendor":"Other vendor","openSourceLicense":{"@id":"MIT"}}""");
+        var software = Value("""{"@id":"unused-release","name":{"en":"Other verifier"},"version":"1","vendor":"Other vendor","openSourceLicenses":[{"@id":"MIT"}]}""");
         var document = Value("""{"@id":"unused-document","issuer":"Other issuer","chargingStationModel":"Model Y","chargingStationModelVersion":"1","compatibleTransparencySoftwareIds":["unused-release"]}""");
         var next = Derive(source,
             RoamingNetworkChange.Add("TransparencySoftware", "unused-release", software, "RoamingNetwork", source.Id.ToString()),
@@ -571,7 +558,7 @@ public sealed class SharedDomainModelTests
     {
         var source = Source();
         if (kind == "software") source = Derive(source, RoamingNetworkChange.Add("TransparencySoftware", "unused", Value("""
-            {"@id":"unused","name":"Unused","version":"1","vendor":"Vendor","openSourceLicense":{"@id":"MIT"}}
+            {"@id":"unused","name":{"en":"Unused"},"version":"1","vendor":"Vendor","openSourceLicenses":[{"@id":"MIT"}]}
             """), "RoamingNetwork", source.Id.ToString()));
         if (kind == "product") source = Derive(source, RoamingNetworkChange.Add("ParkingProduct", "unused", Value("""{"@id":"unused"}"""), "ParkingOperator", "parking-op"));
         if (kind == "grid") source = Derive(source, RoamingNetworkChange.Add("ChargingPool", "DE*ABC*P3", Value("""{"@id":"DE*ABC*P3"}"""), "ChargingStationOperator", "DE*ABC"));

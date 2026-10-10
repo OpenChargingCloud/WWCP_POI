@@ -126,7 +126,7 @@ internal static class POIElementSchema
                                              "voltageLevel", "connectionType", "nominalVoltage", "nominalFrequency", "contractedImportPower",
                                              "contractedExportPower", "contractedImportApparentPower", "contractedExportApparentPower",
                                              "connectionAgreementId", "networkLocationId", "marketLocationIds", "meteringLocationIds"],
-            [nameof(ChargingCable)] = ["@context", "length", "resistance", "lossCompensationName", "lossCompensationIdentification"],
+            [nameof(ChargingCable)] = ["id", "@context", "length", "resistance", "lossCompensationName", "lossCompensationIdentification"],
             [nameof(Brand)] = ["id", "@context", "name", "description", "logo", "homepage", "dataLicenses"],
             ["DataLicense"] = ["@id", "@context", "description", "URLs"]
         };
@@ -192,7 +192,8 @@ internal static class POIElementSchema
         if (kind == nameof(EnergyMeter) && property == "role") return NormalizeRole(value);
         if (value.Type == JTokenType.Null || kind is not (nameof(GridConnectionPoint) or nameof(ChargingCable))) return value;
         var document = new JObject(new JProperty(property, value.DeepClone()));
-        // Cable normalization parses a complete cable; all its fields are optional.
+        // Cable normalization parses a complete cable; its mandatory "id" is lent for any other property.
+        if (kind == nameof(ChargingCable) && property != "id") document["id"] = "cable";
         return ((JObject) Normalize(kind, document))[property]?.DeepClone() ?? value.DeepClone();
     }
 

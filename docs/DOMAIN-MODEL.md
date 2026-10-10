@@ -60,14 +60,16 @@ Example fragment of a complete network document:
   "transparencySoftware": [
     {
       "@id": "verifier-2",
-      "name": "Meter verifier",
+      "name": { "en": "Meter verifier" },
       "version": "2.0",
       "vendor": "Example software vendor",
-      "openSourceLicense": {
-        "@id": "MIT",
-        "description": { "en": "MIT License" },
-        "URLs": ["https://opensource.org/licenses/MIT"]
-      }
+      "openSourceLicenses": [
+        {
+          "@id": "MIT",
+          "description": { "en": "MIT License" },
+          "URLs": ["https://opensource.org/licenses/MIT"]
+        }
+      ]
     }
   ],
   "transparencySoftwareCertificates": [

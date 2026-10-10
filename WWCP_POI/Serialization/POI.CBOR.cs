@@ -70,40 +70,6 @@ public partial class EnergyMeter
         => POIRepresentation.TryParseCBOR(data, json => EnergyMeter.Parse(json, Network: network), out value, out error);
 }
 
-public partial class TransparencySoftware
-{
-    /// <summary>
-    /// Parse a CBOR POI representation, including its metrological values and content identifiers.
-    /// </summary>
-    public static TransparencySoftware ParseCBOR(ReadOnlySpan<Byte> data)
-        => POIRepresentation.ParseCBOR(data, json => TransparencySoftware.Parse(json));
-
-    /// <summary>
-    /// Try to parse a CBOR POI representation with the same parent context as JSON.
-    /// </summary>
-    public static Boolean TryParseCBOR(ReadOnlySpan<Byte> data,
-                                       [NotNullWhen(true)] out TransparencySoftware? value,
-                                       [NotNullWhen(false)] out String? error)
-        => POIRepresentation.TryParseCBOR(data, json => TransparencySoftware.Parse(json), out value, out error);
-}
-
-public partial class TransparencySoftwareStatus
-{
-    /// <summary>
-    /// Parse a CBOR POI representation, including its metrological values and content identifiers.
-    /// </summary>
-    public static TransparencySoftwareStatus ParseCBOR(ReadOnlySpan<Byte> data, RoamingNetwork? network = null)
-        => POIRepresentation.ParseCBOR(data, json => TransparencySoftwareStatus.Parse(json, Network: network));
-
-    /// <summary>
-    /// Try to parse a CBOR POI representation with the same parent context as JSON.
-    /// </summary>
-    public static Boolean TryParseCBOR(ReadOnlySpan<Byte> data,
-                                       [NotNullWhen(true)] out TransparencySoftwareStatus? value,
-                                       [NotNullWhen(false)] out String? error, RoamingNetwork? network = null)
-        => POIRepresentation.TryParseCBOR(data, json => TransparencySoftwareStatus.Parse(json, Network: network), out value, out error);
-}
-
 public partial class Brand
 {
     /// <summary>
@@ -190,23 +156,6 @@ public readonly partial struct ChargingPriceComponent
         => POIRepresentation.ParseCBOR(data, json => ChargingPriceComponent.Parse(json));
 }
 
-public partial class Image
-{
-    /// <summary>
-    /// Parse a CBOR POI representation, including its metrological values and content identifiers.
-    /// </summary>
-    public static Image ParseCBOR(ReadOnlySpan<Byte> data)
-        => POIRepresentation.ParseCBOR(data, json => Image.Parse(json));
-
-    /// <summary>
-    /// Try to parse a CBOR POI representation with the same parent context as JSON.
-    /// </summary>
-    public static Boolean TryParseCBOR(ReadOnlySpan<Byte> data,
-                                       [NotNullWhen(true)] out Image? value,
-                                       [NotNullWhen(false)] out String? error)
-        => POIRepresentation.TryParseCBOR(data, json => Image.Parse(json), out value, out error);
-}
-
 public readonly partial struct AdditionalGeoLocation
 {
     /// <summary>
@@ -265,40 +214,6 @@ public partial class ParkingProduct
                                        [NotNullWhen(true)] out ParkingProduct? value,
                                        [NotNullWhen(false)] out String? error)
         => POIRepresentation.TryParseCBOR(data, json => ParkingProduct.Parse(json), out value, out error);
-}
-
-public partial class ImmutableI18NString
-{
-    /// <summary>
-    /// Parse a CBOR POI representation, including its metrological values and content identifiers.
-    /// </summary>
-    public static ImmutableI18NString ParseCBOR(ReadOnlySpan<Byte> data)
-        => POIRepresentation.ParseCBOR(data, json => ImmutableI18NString.Parse(json));
-
-    /// <summary>
-    /// Try to parse a CBOR POI representation with the same parent context as JSON.
-    /// </summary>
-    public static Boolean TryParseCBOR(ReadOnlySpan<Byte> data,
-                                       [NotNullWhen(true)] out ImmutableI18NString? value,
-                                       [NotNullWhen(false)] out String? error)
-        => POIRepresentation.TryParseCBOR(data, json => ImmutableI18NString.Parse(json), out value, out error);
-}
-
-public partial class ImmutableOpeningTimes
-{
-    /// <summary>
-    /// Parse a CBOR POI representation, including its metrological values and content identifiers.
-    /// </summary>
-    public static ImmutableOpeningTimes ParseCBOR(ReadOnlySpan<Byte> data)
-        => POIRepresentation.ParseCBOR(data, json => ImmutableOpeningTimes.Parse(json));
-
-    /// <summary>
-    /// Try to parse a CBOR POI representation with the same parent context as JSON.
-    /// </summary>
-    public static Boolean TryParseCBOR(ReadOnlySpan<Byte> data,
-                                       [NotNullWhen(true)] out ImmutableOpeningTimes? value,
-                                       [NotNullWhen(false)] out String? error)
-        => POIRepresentation.TryParseCBOR(data, json => ImmutableOpeningTimes.Parse(json), out value, out error);
 }
 
 public partial class ImmutableCryptoKeyInfo

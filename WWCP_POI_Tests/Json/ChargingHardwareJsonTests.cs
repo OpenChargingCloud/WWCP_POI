@@ -38,7 +38,7 @@ namespace WWCP_POI_Tests.Json
         public void Cable_roundtrip_preserves_units_and_compensation(bool embedded)
         {
 
-            var source = new ChargingCable(Meter.From_m(5.25m), Ohm.Parse_µΩ("1250.5"), "Calibration A", long.MaxValue);
+            var source = new ChargingCable(ChargingCable_Id.Parse("C1"), Meter.From_m(5.25m), Ohm.Parse_µΩ("1250.5"), "Calibration A", long.MaxValue);
             var json = source.ToJSON(embedded)!;
 
             Assert.That(json["resistance"]!.Value<string>(), Is.EqualTo("1250.5 µΩ"));
@@ -49,6 +49,7 @@ namespace WWCP_POI_Tests.Json
             Assert.Multiple(() =>
                                             {
 
+                                                Assert.That(parsed.Id, Is.EqualTo(source.Id));
                                                 Assert.That(parsed.Length, Is.EqualTo(source.Length));
                                                 Assert.That(parsed.Resistance, Is.EqualTo(source.Resistance));
                                                 Assert.That(parsed.LossCompensationName, Is.EqualTo(source.LossCompensationName));
@@ -60,10 +61,10 @@ namespace WWCP_POI_Tests.Json
 
         [TestCase(false)]
         [TestCase(true)]
-        public void Empty_cable_roundtrip_is_valid(bool embedded)
+        public void A_cable_with_only_its_id_roundtrips(bool embedded)
         {
 
-            var json = new ChargingCable().ToJSON(embedded)!;
+            var json = new ChargingCable(ChargingCable_Id.Parse("C1")).ToJSON(embedded)!;
 
             Assert.That(ChargingCable.TryParse(json, out var parsed, out var error), Is.True, error);
             Assert.That(parsed!.Length, Is.Null);
@@ -71,12 +72,15 @@ namespace WWCP_POI_Tests.Json
 
         }
 
-        [TestCase("{\"length\":\"invalid\"}")]
-        [TestCase("{\"resistance\":[]}")]
-        [TestCase("{\"lossCompensationIdentification\":\"invalid\"}")]
-        [TestCase("{\"lossCompensationName\":{}}")]
-        [TestCase("{\"lossCompensationName\":42}")]
-        [TestCase("{\"lossCompensationIdentification\":1.5}")]
+        [TestCase("{}")]
+        [TestCase("{\"id\":\"\"}")]
+        [TestCase("{\"length\":\"1 m\"}")]
+        [TestCase("{\"id\":\"C1\",\"length\":\"invalid\"}")]
+        [TestCase("{\"id\":\"C1\",\"resistance\":[]}")]
+        [TestCase("{\"id\":\"C1\",\"lossCompensationIdentification\":\"invalid\"}")]
+        [TestCase("{\"id\":\"C1\",\"lossCompensationName\":{}}")]
+        [TestCase("{\"id\":\"C1\",\"lossCompensationName\":42}")]
+        [TestCase("{\"id\":\"C1\",\"lossCompensationIdentification\":1.5}")]
         public void Cable_rejects_malformed_fields(string text)
         {
 
@@ -90,7 +94,7 @@ namespace WWCP_POI_Tests.Json
         public void Cable_zero_values_are_preserved()
         {
 
-            var source = new ChargingCable(Meter.From_m(0), Ohm.Parse_µΩ("0"), LossCompensationIdentification: 0);
+            var source = new ChargingCable(ChargingCable_Id.Parse("C1"), Meter.From_m(0), Ohm.Parse_µΩ("0"), LossCompensationIdentification: 0);
             var parsed = ChargingCable.Parse(source.ToJSON()!);
 
             Assert.That(parsed.Length, Is.EqualTo(source.Length));
@@ -119,7 +123,7 @@ namespace WWCP_POI_Tests.Json
         {
 
             var source = new ChargingConnector(ChargingConnector_Id.Parse(2), ChargingConnectorType.Parse("CCS"),
-                                                                               new ChargingCable(Meter.From_m(3.5m), Ohm.Parse_µΩ("750")), lockable);
+                                                                               new ChargingCable(ChargingCable_Id.Parse("C1"), Meter.From_m(3.5m), Ohm.Parse_µΩ("750")), lockable);
             var json = source.ToJSON(embedded)!;
 
             Assert.That(json["lockable"]!.Value<bool>(), Is.EqualTo(lockable));
@@ -158,14 +162,14 @@ namespace WWCP_POI_Tests.Json
         public void Connector_forwards_custom_nested_cable_parser()
         {
 
-            var json = new ChargingConnector(ChargingConnectorType.Parse("Type2"), new ChargingCable(Meter.From_m(1))).ToJSON()!;
+            var json = new ChargingConnector(ChargingConnectorType.Parse("Type2"), new ChargingCable(ChargingCable_Id.Parse("C1"), Meter.From_m(1))).ToJSON()!;
             var calls = 0;
             var parsed = ChargingConnector.Parse(json, CustomChargingCableParser: (_, cable) =>
                                             {
 
                                                 calls++;
 
-                                                return new ChargingCable(cable.Length, LossCompensationName: "custom");
+                                                return new ChargingCable(cable.Id, cable.Length, LossCompensationName: "custom");
 
                                             });
 

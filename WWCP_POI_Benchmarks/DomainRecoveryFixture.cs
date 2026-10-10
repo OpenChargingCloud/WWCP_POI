@@ -174,8 +174,8 @@ internal sealed class DomainRecoveryFixture : IDisposable
         var root = Node("benchmark-network");
         root["gridOperators"] = new JArray(new[] { "DE*GRD", "DE*ALT" }.Select(id => { var item = Node(id); item["id"] = id; item.Remove("@id"); return item; }));
         root["transparencySoftware"] = new JArray(Enumerable.Range(1, 4).Select(index => new JObject {
-            ["@id"] = "verifier-" + index, ["name"] = "Meter verifier", ["version"] = index + ".0", ["vendor"] = "Domain vendor",
-            ["openSourceLicense"] = new JObject { ["@id"] = "MIT", ["description"] = new JObject { ["en"] = "MIT License" } } }));
+            ["@id"] = "verifier-" + index, ["name"] = new JObject { ["en"] = "Meter verifier" }, ["version"] = index + ".0", ["vendor"] = "Domain vendor",
+            ["openSourceLicenses"] = new JArray(new JObject { ["@id"] = "MIT", ["description"] = new JObject { ["en"] = "MIT License" } }) }));
         root["transparencySoftwareCertificates"] = new JArray(Enumerable.Range(1, 2).Select(index => new JObject {
             ["@id"] = "approval-" + index, ["issuer"] = "Example inspection organization", ["chargingStationModel"] = "Station X",
             ["chargingStationModelVersion"] = "3.1", ["verifiedTransparencySoftwareIds"] = new JArray("verifier-" + (index * 2 - 1)),

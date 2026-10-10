@@ -59,7 +59,8 @@ snapshot signatures directly using BouncyCastle. The ordinary run never rewrites
 
 These are fixed local regression references; independent peer interoperability remains open.
 Both manifests and all 29 companion artifacts were regenerated for static-v2 on 2026-10-08,
-including state digests, commit IDs and signatures. The ordinary static-v2 run is recorded in
+including state digests, commit IDs and signatures, and again on 2026-10-10 for transparency
+software with a multi-language name and a list of licenses. The ordinary static-v2 run is recorded in
 [current model verification](../VERIFICATION-DOMAIN-MODEL.md). Earlier
 [executed evidence and limits](../VERIFICATION-SNAPSHOTS-RETENTION.md) records the preceding
 static-v1 baseline.

@@ -15,8 +15,8 @@
   },
   "gridOperators": [{"id":"DE*GRD","name":{"en":"Grid"}, "created":"2026-01-01T00:00:00Z", "lastChange":"2026-01-01T00:00:00Z"}],
   "transparencySoftware": [
-    {"@id":"verifier-2", "name":"Meter verifier", "version":"2.0", "vendor":"Example vendor", "openSourceLicense":{"@id":"MIT", "description":{"en":"MIT License"}, "URLs":["https://opensource.org/licenses/MIT"]}},
-    {"@id":"verifier-3", "name":"Meter verifier", "version":"3.0", "vendor":"Example vendor", "openSourceLicense":{"@id":"MIT", "description":{"en":"MIT License"}, "URLs":["https://opensource.org/licenses/MIT"]}}
+    {"@id":"verifier-2", "name":{"en":"Meter verifier", "de":"Zählerprüfprogramm"}, "version":"2.0", "vendor":"Example vendor", "openSourceLicenses":[{"@id":"MIT", "description":{"en":"MIT License"}, "URLs":["https://opensource.org/licenses/MIT"]}, {"@id":"Apache-2.0", "description":{"en":"Apache License 2.0"}, "URLs":["https://opensource.org/licenses/Apache-2.0"]}]},
+    {"@id":"verifier-3", "name":{"en":"Meter verifier"}, "version":"3.0", "vendor":"Example vendor", "openSourceLicenses":[{"@id":"MIT", "description":{"en":"MIT License"}, "URLs":["https://opensource.org/licenses/MIT"]}]}
   ],
   "transparencySoftwareCertificates": [{
     "@id":"approval-42", "issuer":"Example inspection organization",

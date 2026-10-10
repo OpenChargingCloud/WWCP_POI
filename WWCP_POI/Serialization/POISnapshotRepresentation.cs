@@ -159,8 +159,6 @@ internal static class POISnapshotRepresentation
             ChargingStationGroup item => item.Id.ToString(),
             ChargingPoolGroup item => item.Id.ToString(),
             ChargingTariffGroup item => item.Id.ToString(),
-            TransparencySoftware item => item.Id.ToString(),
-            TransparencySoftwareCertificate item => item.Id.ToString(),
             ChargingStationManufacturer item => item.Id.ToString(),
             GridOperator item => item.Id.ToString(),
             ParkingOperator item => item.Id.ToString(),
@@ -170,7 +168,7 @@ internal static class POISnapshotRepresentation
             ParkingSensor item => item.Id.ToString(),
             ParkingSpaceGroup item => item.Id.ToString(),
             EnergyMeter item => item.Id.ToString().ToUpperInvariant(),
-            ChargingTariffElement or ChargingPriceComponent or ChargingTariffRestriction or TransparencySoftwareStatus => null,
+            ChargingTariffElement or ChargingPriceComponent or ChargingTariffRestriction => null,
             _ => Identity(POIRepresentation.WithoutETags(() => POIJSON.Document(value)), value.GetType().Name)
         };
         return id is not null && Enum.TryParse<InfrastructureEntityType>(value.GetType().Name, out var type)
@@ -196,8 +194,6 @@ internal static class POISnapshotRepresentation
             case RoamingNetwork network:
                 foreach (var child in network.ChargingStationOperators) yield return ("chargingStationOperators", child);
                 foreach (var child in network.EMobilityProviders) yield return ("eMobilityProviders", child);
-                foreach (var child in network.TransparencySoftware) yield return ("transparencySoftware", child);
-                foreach (var child in network.TransparencySoftwareCertificates) yield return ("transparencySoftwareCertificates", child);
                 foreach (var child in network.GridOperators) yield return ("gridOperators", child);
                 foreach (var child in network.ParkingOperators) yield return ("parkingOperators", child);
                 foreach (var child in network.ChargingStationManufacturers) yield return ("chargingStationManufacturers", child);
@@ -228,9 +224,6 @@ internal static class POISnapshotRepresentation
                 break;
             case GridConnectionPoint point:
                 if (point.EnergyMeter is { } pointMeter) yield return ("energyMeter", pointMeter);
-                break;
-            case EnergyMeter meter:
-                foreach (var child in meter.TransparencySoftware) yield return ("transparencySoftware", child);
                 break;
             case ChargingTariff tariff:
                 foreach (var child in tariff.TariffElements) yield return ("elements", child);

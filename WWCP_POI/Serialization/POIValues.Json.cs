@@ -4,7 +4,6 @@ using System.Text.Json;
 using Newtonsoft.Json.Linq;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
-using cloud.charging.open.protocols.WWCP.POI.CSM;
 using Org.BouncyCastle.Asn1.Nist;
 using Org.BouncyCastle.Asn1.Sec;
 using Org.BouncyCastle.Crypto.Parameters;
@@ -51,29 +50,6 @@ public partial class ImmutableCryptoKeyInfo
     /// Parse a detached key description. Public serialization excludes private key material.
     /// </summary>
     public static ImmutableCryptoKeyInfo Parse(JObject json) => new(json);
-}
-
-public partial class ImmutableI18NString
-{
-    /// <summary>
-    /// Reconstruct immutable multilingual text.
-    /// </summary>
-    public static ImmutableI18NString Parse(JObject json)
-    {
-        var copy = (JObject) json.DeepClone();
-        copy.Remove("ETags");
-        return new(copy.HasValues ? I18NString.Parse(copy) ?? throw new ArgumentException("Invalid multilingual text.") : I18NString.Empty);
-    }
-}
-
-public partial class ImmutableOpeningTimes
-{
-    /// <summary>
-    /// Reconstruct immutable opening hours using the existing opening-hours validation.
-    /// </summary>
-    public static ImmutableOpeningTimes Parse(JObject json)
-        => new(InfrastructureJson.Openings(new JObject(new JProperty("openingTimes", json.DeepClone()))) ??
-               throw new ArgumentException("Invalid opening hours."));
 }
 
 public partial class ParkingProduct

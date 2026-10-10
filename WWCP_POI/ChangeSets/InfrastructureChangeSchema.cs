@@ -18,7 +18,6 @@
 #region Usings
 
 using System.Globalization;
-using cloud.charging.open.protocols.WWCP.POI.CSM;
 
 using Newtonsoft.Json.Linq;
 
@@ -243,7 +242,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 [InfrastructureEntityType.ParkingSensor] = ["osmWayId", "geometry", "chargingStationIds"],
                 [InfrastructureEntityType.ParkingSpaceGroup] = ["osmWayId", "geometry", "chargingStationIds", "sensors", "parkingSpaceIds", "parkingProductIds"],
                 [InfrastructureEntityType.ParkingProduct] = ["minDuration", "stopParkingAfterTime"],
-                [InfrastructureEntityType.TransparencySoftware] = ["name", "version", "openSourceLicense", "vendor", "logo", "howToUse", "moreInformation", "sourceCodeRepository"],
+                [InfrastructureEntityType.TransparencySoftware] = ["name", "version", "openSourceLicenses", "vendor", "logo", "howToUse", "moreInformation", "sourceCodeRepository"],
                 [InfrastructureEntityType.TransparencySoftwareCertificate] = ["issuer", "chargingStationModel", "chargingStationModelVersion",
                     "chargingStationManufacturerId", "documentNumber", "documentURL", "verifiedTransparencySoftwareIds",
                     "compatibleTransparencySoftwareIds", "notBefore", "notAfter"]

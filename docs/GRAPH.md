@@ -35,8 +35,9 @@ JSON/CBOR. Group membership, tariff assignments and parking links use identifier
 The root uses `@id`. All other graph identities are unique per node type within a network,
 except connectors. Domain comparison rules apply: group suffixes and parking child IDs are
 case-sensitive, as are software/certificate/product IDs; manufacturer and parking operator IDs are case-insensitive. A group's embedded
-operator identity must match its owner. Each group type has its own wire ID prefix: `*GE` for EVSE,
-`*GS` for charging station, `*GP` for charging pool and `*TG` for charging tariff groups, as in WWCP Core.
+operator identity must match its owner. Each group type has its own wire ID prefix: `*EG` for EVSE,
+`*SG` for charging station, `*PG` for charging pool and `*TG` for charging tariff groups: the entity's
+letter first, then `G`. WWCP Core still writes `*GE`, `*GS` and `*GP`.
 
 Import grid operators, manufacturers, software and certificates before infrastructure. Import
 tariffs and infrastructure before groups, and charging infrastructure before parking operators. Network parsers perform this ordering themselves, regardless of JSON property order.
@@ -144,7 +145,7 @@ The schema allowlist follows the persisted domain contract:
 | ParkingOperator | `name`, `description`, `dataSource`, `customData`, `logos`, `address`, `geoLocation`, `telephone`, `eMailAddress`, `homepage`, `hotlinePhoneNumber`, `dataLicenses`, local/invalid parking space IDs |
 | Parking garage/space/sensor/space group | `name`, `description`, `osmWayId`, `geometry`, `chargingStationIds`; spaces/space groups additionally `sensors`; garages/spaces/groups `parkingProductIds`; space `parkingGarageId`; group `parkingSpaceIds` |
 | ParkingProduct | `minDuration`, `stopParkingAfterTime` |
-| TransparencySoftware | `name`, `version`, `openSourceLicense`, `vendor`, `logo`, `howToUse`, `moreInformation`, `sourceCodeRepository` |
+| TransparencySoftware | `name`, `version`, `openSourceLicenses`, `vendor`, `logo`, `howToUse`, `moreInformation`, `sourceCodeRepository` |
 | TransparencySoftwareCertificate | `issuer`, `chargingStationModel`, `chargingStationModelVersion`, optional `chargingStationManufacturerId`, `documentNumber`, `documentURL`, validity and verified/compatible software IDs |
 
 Identity, parent, managed timestamp and owned child fields cannot be edited as properties.

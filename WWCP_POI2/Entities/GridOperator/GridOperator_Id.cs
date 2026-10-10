@@ -120,7 +120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            var MatchCollection = OperatorId_RegEx.Matches(Text);
+            var MatchCollection = OperatorId_RegEx.Matches(Text.ToUpperInvariant());
 
             if (MatchCollection.Count != 1)
                 throw new ArgumentException($"Illegal text representation of a grid operator identification: '{Text}'!",
@@ -180,7 +180,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Text.IsNullOrEmpty())
                 return false;
 
-            var MatchCollection = OperatorId_RegEx.Matches(Text);
+            var MatchCollection = OperatorId_RegEx.Matches(Text.ToUpperInvariant());
 
             if (MatchCollection.Count != 1 ||
                 !Country.TryParseAlpha2Code(MatchCollection[0].Groups[1].Value, out var countryCode))

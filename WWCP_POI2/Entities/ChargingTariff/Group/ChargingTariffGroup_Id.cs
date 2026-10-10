@@ -40,7 +40,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for parsing a charging tariff group identification.
         /// </summary>
-        public  static readonly Regex  ChargingTariffGroupId_RegEx  = new (@"^([A-Z]{2}\*?[A-Z0-9]{3})\*?TG([a-zA-Z0-9_][a-zA-Z0-9_\*\-\.€\$]{0,50})$",
+        public  static readonly Regex  ChargingTariffGroupId_RegEx  = new (@"^([A-Za-z]{2}\*?[A-Za-z0-9]{3})\*?TG([a-zA-Z0-9_][a-zA-Z0-9_\*\-\.€\$]{0,49})$",
                                                                            RegexOptions.IgnorePatternWhitespace);
 
         #endregion

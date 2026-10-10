@@ -26,7 +26,7 @@ infer physical units from property names, or maintain alternate input representa
 | Shared catalogs | Network-owned grid operators, identified software releases and certificate documents; points/meters contain ID references |
 | Parking relationships | Operator-owned products, optional space-to-garage reference, overlapping groups and deduplicated offer union |
 | Tariff substructures | Elements, price components and restrictions remain values without IDs |
-| Software licenses | Object at `openSourceLicense`, with `@id`; no string licenses, ID alias or alternative license key |
+| Software licenses | Nonempty array of objects at `openSourceLicenses`, each with `@id`; no string licenses, single license object, ID alias or alternative license key |
 | Data licenses | Local parser for the emitted `@id` contract; no rewrites to satisfy a different dependency parser |
 | Authentication | Removed obsolete `DirectPayment` subclass; typed modes use `number`/`stationCode` |
 | Property spelling | `energyMix`, `daysOfWeek`, `uri`, `howToUse`, `moreInformation`, `sourceCodeRepository`; no spelling aliases |

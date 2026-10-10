@@ -568,8 +568,8 @@ optional expected current status and optional static ETags. It updates the exist
 schedule without changing the static snapshot, revision, timestamps or ETags. Direct domain status
 setters remain available. See [runtime updates](docs/RUNTIME.md) for targeting and publication rules.
 
-`ImmutableI18NString` and `ImmutableOpeningTimes` are local immutable replacements for mutable
-Illias values. Collections are detached on input; mutable nested dependency values are copied
+Texts and opening hours use Styx's `ImmutableI18NString` and `ImmutableOpeningTimes`, the
+immutable cousins of the mutable Illias values. Collections are detached on input; mutable nested dependency values are copied
 on input and access. Energy meters expose immutable static data and their own mutable runtime
 statuses. Dependency `IEntity` text access returns detached copies, and `IInternalData` mutation
 of static data is rejected. `InternalData` is mutable application runtime context.

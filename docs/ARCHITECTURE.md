@@ -97,8 +97,9 @@ are filled from the parsed projection; optional static property presence remains
 
 Static properties and parent links cannot be reassigned after construction. Collection inputs are
 materialized and detached; public static collections use immutable arrays or detached enumerations.
-Names, descriptions and arrival instructions use the local `ImmutableI18NString`; opening hours
-use `ImmutableOpeningTimes`. Mutable nested dependency values, such as addresses, licenses and
+Names, descriptions and arrival instructions use Styx's `ImmutableI18NString`; opening hours
+use its `ImmutableOpeningTimes`. Both are values inside an entity, covered by its ETags, and
+carry no ETags of their own. Mutable nested dependency values, such as addresses, licenses and
 cryptographic public keys, are copied on input and access so that their mutation cannot alter
 entity POI data. Energy meters have immutable static data and mutable runtime schedules; owners
 retain their meter instance so callers can update those schedules directly.

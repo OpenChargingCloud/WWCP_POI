@@ -18,22 +18,24 @@
 using org.GraphDefined.Vanaheimr.Hermod;
 using org.GraphDefined.Vanaheimr.Illias;
 
-namespace cloud.charging.open.protocols.WWCP.POI.SMM
+using cloud.charging.open.protocols.WWCP.POI;
+
+namespace cloud.charging.open.protocols.WWCP
 {
-    public interface ISmartMeterDevice
+    public interface IEnergyMeterDevice
     {
         I18NString Description { get; }
-        SmartMeterDevice_Id Id { get; }
-        SmartMeterManufacturer_Id ManufacturerId { get; }
-        SmartMeterModel_Id ModelId { get; }
+        EnergyMeter_Id Id { get; }
+        EnergyMeterManufacturer_Id ManufacturerId { get; }
+        EnergyMeterModel_Id ModelId { get; }
         I18NString Name { get; }
 
         bool AddCryptoKey(CryptoKeyInfo CryptoKeyInfo);
-        ISmartMeterDevice Clone();
+        IEnergyMeterDevice Clone();
         int CompareTo(object? Object);
-        int CompareTo(ISmartMeterDevice SmartMeterDevice);
+        int CompareTo(IEnergyMeterDevice EnergyMeterDevice);
         bool Equals(object? Object);
-        bool Equals(ISmartMeterDevice SmartMeterDevice);
+        bool Equals(IEnergyMeterDevice EnergyMeterDevice);
         int GetHashCode();
         string ToString();
     }

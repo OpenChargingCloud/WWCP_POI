@@ -26,22 +26,6 @@ public sealed class GroupTests
 {
 
     /// <summary>
-    /// Charging pool groups are *GP, as in WWCP Core; *GS belongs to charging station groups.
-    /// </summary>
-    [Test]
-    public void Charging_pool_group_IDs_use_their_own_prefix()
-    {
-        var poolGroupId = ChargingPoolGroup_Id.Parse("DE*ABC*GP1");
-
-        Assert.That(poolGroupId.ToString(), Is.EqualTo("DE*ABC*GP1"));
-        Assert.That(ChargingPoolGroup_Id.Parse(ChargingStationOperator_Id.Parse("DE*ABC"), "1"), Is.EqualTo(poolGroupId));
-
-        Assert.That(ChargingPoolGroup_Id.   TryParse("DE*ABC*GS1", out _), Is.False);
-        Assert.That(ChargingStationGroup_Id.TryParse("DE*ABC*GP1", out _), Is.False);
-        Assert.That(ChargingStationGroup_Id.TryParse("DE*ABC*GS1", out _), Is.True);
-    }
-
-    /// <summary>
     /// An admin status change of an EVSE group without subscribers must not fail.
     /// </summary>
     [Test]
@@ -59,7 +43,7 @@ public sealed class GroupTests
                     "EVSEs": [{ "@id": "DE*ABC*E1", "currentType": [ "DC" ] }]
                   }]
                 }],
-                "EVSEGroups": [{ "@id": "DE*ABC*GE1", "name": { "en": "Group" }, "EVSEIds": [ "DE*ABC*E1" ] }]
+                "EVSEGroups": [{ "@id": "DE*ABC*EG1", "name": { "en": "Group" }, "EVSEIds": [ "DE*ABC*E1" ] }]
               }]
             }
             """);

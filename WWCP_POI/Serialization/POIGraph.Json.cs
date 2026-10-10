@@ -7,7 +7,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Newtonsoft.Json.Linq;
-using cloud.charging.open.protocols.WWCP.POI.CSM;
 
 namespace cloud.charging.open.protocols.WWCP.POI;
 
@@ -138,7 +137,7 @@ public sealed partial class RoamingNetwork
         foreach (var value in POIGraphJSON.Read(json, InfrastructureEntityType.ChargingStationManufacturer, ChargingStationManufacturer.Parse, value => value.Id.ToString()))
             projectedManufacturers.TryAdd(value.Id, value);
         projectedTransparencySoftware = POIGraphJSON.Read(json, InfrastructureEntityType.TransparencySoftware,
-            document => POI.TransparencySoftware.Parse(document), value => value.Id.ToString());
+            document => POI.TransparencySoftware.Parse(POIEnvelope.Content(document)), value => value.Id.ToString());
         projectedSoftwareReferences = projectedTransparencySoftware.ToImmutableDictionary(value => value.Id);
         projectedTransparencySoftwareCertificates = POIGraphJSON.Read(json, InfrastructureEntityType.TransparencySoftwareCertificate,
             document => TransparencySoftwareCertificate.Parse(document, this), value => value.Id.ToString());

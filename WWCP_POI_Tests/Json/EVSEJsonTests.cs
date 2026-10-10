@@ -58,7 +58,7 @@ namespace WWCP_POI_Tests.Json
                                                                 MaxPower: Watt.Parse("100000.125"), MaxCapacity: WattHour.Parse("0"),
                                                                 IsFreeOfCharge: true, DataSource: "inventory",
                                                                 ChargingConnectors: [new ChargingConnector(ChargingConnector_Id.Parse(1), ChargingConnectorType.Parse("CCS"),
-                    new ChargingCable(Meter.From_m(5.25m)), false)],
+                    new ChargingCable(ChargingCable_Id.Parse("C1"), Meter.From_m(5.25m)), false)],
                                                                 CustomData: CustomDataNew.ParseJSON("{\"vendor\":{\"serial\":\"A1\"}}"));
                 var json = source.ToJSON(Embedded: true, IncludeCustomData: true)!;
 

@@ -1651,8 +1651,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          );
 
             JSON["gridOperators"] = POIJSON.Children(GridOperators);
-            JSON["transparencySoftware"] = POIJSON.Children(TransparencySoftware);
-            JSON["transparencySoftwareCertificates"] = POIJSON.Children(TransparencySoftwareCertificates);
+            JSON["transparencySoftware"] = POIJSON.Values(TransparencySoftware, value => value.ToJSON());
+            JSON["transparencySoftwareCertificates"] = POIJSON.Values(TransparencySoftwareCertificates, value => value.ToJSON());
             JSON["parkingOperators"] = POIJSON.Children(ParkingOperators);
             JSON["chargingStationManufacturers"] = POIJSON.Children(ChargingStationManufacturers);
 

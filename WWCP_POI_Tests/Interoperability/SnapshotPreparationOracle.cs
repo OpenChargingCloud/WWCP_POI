@@ -153,8 +153,6 @@ internal static class SnapshotPreparationOracle
             case RoamingNetwork network:
                 foreach (var child in network.ChargingStationOperators) yield return ("chargingStationOperators", child);
                 foreach (var child in network.EMobilityProviders) yield return ("eMobilityProviders", child);
-                foreach (var child in network.TransparencySoftware) yield return ("transparencySoftware", child);
-                foreach (var child in network.TransparencySoftwareCertificates) yield return ("transparencySoftwareCertificates", child);
                 foreach (var child in network.GridOperators) yield return ("gridOperators", child);
                 foreach (var child in network.ParkingOperators) yield return ("parkingOperators", child);
                 foreach (var child in network.ChargingStationManufacturers) yield return ("chargingStationManufacturers", child);
@@ -185,9 +183,6 @@ internal static class SnapshotPreparationOracle
                 break;
             case GridConnectionPoint point:
                 if (point.EnergyMeter is { } pointMeter) yield return ("energyMeter", pointMeter);
-                break;
-            case EnergyMeter meter:
-                foreach (var child in meter.TransparencySoftware) yield return ("transparencySoftware", child);
                 break;
             case ChargingTariff tariff:
                 foreach (var child in tariff.TariffElements) yield return ("elements", child);

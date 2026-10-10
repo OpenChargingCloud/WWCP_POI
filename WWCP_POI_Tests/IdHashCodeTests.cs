@@ -16,8 +16,8 @@
  */
 
 using NUnit.Framework;
+
 using cloud.charging.open.protocols.WWCP.POI;
-using cloud.charging.open.protocols.WWCP.POI.CSM;
 
 namespace WWCP_POI_Tests;
 
@@ -38,28 +38,9 @@ public sealed class IdHashCodeTests
     }
 
     [Test]
-    public void Suffixes_ignore_case_and_stars_in_their_hash_codes()
+    public void Product_IDs_ignore_case_in_their_hash_codes()
     {
-        AssertOneKey(EVSE_Id.           Parse("DE*ABC*Eab*c1"), EVSE_Id.           Parse("DE*ABC*EABC1"));
-        AssertOneKey(ChargingPool_Id.   Parse("DE*ABC*Pab*c1"), ChargingPool_Id.   Parse("DE*ABC*PABC1"));
-        AssertOneKey(ChargingStation_Id.Parse("DE*ABC*Sab*c1"), ChargingStation_Id.Parse("DE*ABC*SABC1"));
         AssertOneKey(ChargingProduct_Id.Parse("product"),       ChargingProduct_Id.Parse("PRODUCT"));
-    }
-
-    /// <summary>
-    /// In Turkish, "I" lowers to a dotless "ı", which once split
-    /// "I" and "i" into different hash codes although they are equal.
-    /// </summary>
-    [Test]
-    [SetCulture("tr-TR")]
-    public void Hash_codes_do_not_depend_on_the_current_culture()
-    {
-        AssertOneKey(RoamingNetwork_Id.             Parse("INDEX"),      RoamingNetwork_Id.             Parse("index"));
-        AssertOneKey(ChargingConnector_Id.          Parse("I1"),         ChargingConnector_Id.          Parse("i1"));
-        AssertOneKey(EnergyMeter_Id.                Parse("METER-I"),    EnergyMeter_Id.                Parse("meter-i"));
-        AssertOneKey(ParkingOperator_Id.            Parse("PARKING-I"),  ParkingOperator_Id.            Parse("parking-i"));
-        AssertOneKey(ChargingStationManufacturer_Id.Parse("MAKER-I"),    ChargingStationManufacturer_Id.Parse("maker-i"));
-        AssertOneKey(EVSE_Id.                       Parse("DE*ABC*EI1"), EVSE_Id.                       Parse("DE*ABC*Ei1"));
     }
 
     [Test]

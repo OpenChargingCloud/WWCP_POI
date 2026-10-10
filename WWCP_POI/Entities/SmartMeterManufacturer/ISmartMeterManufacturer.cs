@@ -18,12 +18,14 @@
 using org.GraphDefined.Vanaheimr.Hermod;
 using org.GraphDefined.Vanaheimr.Illias;
 
-namespace cloud.charging.open.protocols.WWCP.POI.SMM
+using cloud.charging.open.protocols.WWCP.POI;
+
+namespace cloud.charging.open.protocols.WWCP
 {
     public interface ISmartMeterManufacturer
     {
         I18NString Description { get; }
-        SmartMeterManufacturer_Id Id { get; }
+        EnergyMeterManufacturer_Id Id { get; }
         I18NString Name { get; }
 
         bool AddCryptoKey(CryptoKeyInfo CryptoKeyInfo);

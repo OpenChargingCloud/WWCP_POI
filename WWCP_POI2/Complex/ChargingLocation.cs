@@ -71,10 +71,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Constructor(s)
 
-        private ChargingLocation(EVSE_Id?                     EVSEId                      = null,
-                                 ChargingStation_Id?          ChargingStationId           = null,
-                                 ChargingPool_Id?             ChargingPoolId              = null,
-                                 ChargingStationOperator_Id?  ChargingStationOperatorId   = null)
+        public ChargingLocation(EVSE_Id?                     EVSEId                      = null,
+                                ChargingStation_Id?          ChargingStationId           = null,
+                                ChargingPool_Id?             ChargingPoolId              = null,
+                                ChargingStationOperator_Id?  ChargingStationOperatorId   = null)
         {
 
             this.EVSEId                     = EVSEId;

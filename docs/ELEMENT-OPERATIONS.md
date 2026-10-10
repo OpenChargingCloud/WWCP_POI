@@ -83,7 +83,7 @@ the network. Deletion protection is maintained by `DataSnapshot.References`; see
 | EVSE/connection-point `energyMeter` | Optional singleton meter | Owner/property; optional meter ID assertion |
 | Pool `gridConnectionPoint` | Optional singleton | Owner/property; optional connection-point `id` assertion |
 | Connection-point `gridOperatorId` | Required scalar reference | Update the point property; registry description uses graph operations |
-| Connector `cable` | Optional singleton value | Owner/property; no element ID |
+| Connector `cable` | Optional singleton value | Owner/property; its required `id` is part of the value |
 | Operator/pool/station `brands`, EVSE `brand` | Array of expanded brands | Brand `id` |
 | Tariff/EVSE-group/station-group/pool-group `brand` | Optional singleton brand | Owner/property; optional brand ID assertion |
 | Network/operator/provider/pool/station/EVSE `dataLicenses` | Array of expanded licenses | License `@id` |

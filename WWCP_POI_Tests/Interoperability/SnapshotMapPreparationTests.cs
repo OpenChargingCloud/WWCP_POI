@@ -20,8 +20,8 @@ public sealed class SnapshotMapPreparationTests
         var document = DomainRecoveryFixture.CreateDocument(16);
         var owner = document["chargingStationOperators"]![0]!;
         foreach (var (field, memberField, member, id) in new[] {
-            ("EVSEGroups", "EVSEIds", "DE*ABC*E1", "DE*ABC*GE1"), ("chargingStationGroups", "chargingStationIds", "DE*ABC*S1", "DE*ABC*GS1"),
-            ("chargingPoolGroups", "chargingPoolIds", "DE*ABC*P1", "DE*ABC*GP1"), ("chargingTariffGroups", "chargingTariffIds", "DE*ABC*T1", "DE*ABC*TG1") })
+            ("EVSEGroups", "EVSEIds", "DE*ABC*E1", "DE*ABC*EG1"), ("chargingStationGroups", "chargingStationIds", "DE*ABC*S1", "DE*ABC*SG1"),
+            ("chargingPoolGroups", "chargingPoolIds", "DE*ABC*P1", "DE*ABC*PG1"), ("chargingTariffGroups", "chargingTariffIds", "DE*ABC*T1", "DE*ABC*TG1") })
         {
             var group = new JObject { ["@id"] = id, [memberField] = new JArray(member),
                 ["created"] = "2026-01-01T00:00:00Z", ["lastChange"] = "2026-01-01T00:00:00Z" };
@@ -199,7 +199,8 @@ public sealed class SnapshotMapPreparationTests
             foreach (var (_, child) in (IEnumerable<(String, IImmutablePOI)>)children.Invoke(null, [value])!) Visit(child);
         }
         Visit(network);
-        Assert.That(kinds.Intersect(Enum.GetNames<InfrastructureEntityType>()).Count(), Is.EqualTo(22));
+        // Transparency software and its documents are values of the network, bound with it.
+        Assert.That(kinds.Intersect(Enum.GetNames<InfrastructureEntityType>()).Count(), Is.EqualTo(20));
         Assert.That(kinds, Does.Contain(nameof(EnergyMeter)).And.Contain(nameof(ChargingTariffElement)).And.Contain(nameof(ChargingPriceComponent)));
         Assert.That(count, Is.GreaterThan(100));
     }

@@ -221,8 +221,8 @@ registry and an optional owned meter. Edit its properties or replace it; JSON nu
 Changing its identity resets the point meter, while the shared operator retains its schedule.
 See [Grid connections](../../docs/GRIDCONNECTIONS.md).
 
-Software JSON requires an `openSourceLicense` object (`@id`, `description`, `URLs`), never a
-string license. Software links, license URLs and document URLs must be absolute. Certificate
+Software JSON requires a multi-language `name` and a nonempty `openSourceLicenses` array of license
+objects (`@id`, `description`, `URLs`), never a string license. Software links, license URLs and document URLs must be absolute. Certificate
 `NotBefore`/`NotAfter` are nullable UTC-normalized `DateTimeOffset` values with tick precision;
 JSON timestamps require `Z` or an explicit offset. Reversed intervals, duplicate/disjoint-list
 violations and dangling references fail validation. At least one verified or compatible software

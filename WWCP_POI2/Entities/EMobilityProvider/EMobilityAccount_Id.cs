@@ -65,8 +65,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for parsing an electric mobility account identification.
         /// </summary>
-        public static readonly Regex eMobilityAccountId_RegEx  = new (@"^([A-Za-z]{2}\-?[A-Za-z0-9]{3})\-?C([A-Za-z0-9]{8})\-?([\d|A-Za-z])$|" +         // ISO
-                                                                      @"^([A-Za-z]{2}[\*|\-]?[A-Za-z0-9]{3})[\*|\-]?([A-Za-z0-9]{6})[\*|\-]?([\d|X])$",  // DIN
+        public static readonly Regex eMobilityAccountId_RegEx  = new (@"^([A-Za-z]{2}\-?[A-Za-z0-9]{3})\-?C([A-Za-z0-9]{8})(?:\-?([A-Za-z0-9]))?$|" +         // ISO
+                                                                      @"^([A-Za-z]{2}[\*\-]?[A-Za-z0-9]{3})[\*\-]?([A-Za-z0-9]{6})[\*\-]?([\dX])$",  // DIN
                                                                       RegexOptions.IgnorePatternWhitespace);
                                                                  //new Regex(@"^([A-Za-z]{2}\*[A-Za-z0-9]{3})\*([A-Za-z0-9]{6})\*([0-9|X])$ |"  +   // OICP DIN STAR:  DE*BMW*0010LY*3
                                                                  //          @"^([A-Za-z]{2}-[A-Za-z0-9]{3})-([A-Za-z0-9]{6})-([0-9|X])$ |"     +   // OICP DIN HYPEN: DE-BMW-0010LY-3
@@ -274,7 +274,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                      Text,
                                                      providerId,
                                                      matchCollection[0].Groups[2].Value,
-                                                     matchCollection[0].Groups[3].Value[0]
+                                                     matchCollection[0].Groups[3].Success
+                                                         ? matchCollection[0].Groups[3].Value[0]
+                                                         : null
                                                  );
 
                         return true;

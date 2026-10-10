@@ -232,7 +232,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                var matchCollection = ChargingStationOperatorId_RegEx.Matches(Text);
+                var matchCollection = ChargingStationOperatorId_RegEx.Matches(Text.ToUpperInvariant());
 
                 if (matchCollection.Count != 1)
                     return false;

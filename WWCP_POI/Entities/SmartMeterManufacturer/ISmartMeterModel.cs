@@ -17,20 +17,22 @@
 
 using org.GraphDefined.Vanaheimr.Illias;
 
-namespace cloud.charging.open.protocols.WWCP.POI.SMM
+using cloud.charging.open.protocols.WWCP.POI;
+
+namespace cloud.charging.open.protocols.WWCP.POI
 {
-    public interface ISmartMeterModel
+    public interface IEnergyMeterModel
     {
         I18NString Description { get; }
-        SmartMeterModel_Id Id { get; }
-        SmartMeterManufacturer_Id ManufacturerId { get; }
+        EnergyMeterModel_Id Id { get; }
+        EnergyMeterManufacturer_Id ManufacturerId { get; }
         I18NString Name { get; }
 
-        ISmartMeterModel Clone();
+        IEnergyMeterModel Clone();
         int CompareTo(object? Object);
-        int CompareTo(ISmartMeterModel SmartMeterModel);
+        int CompareTo(IEnergyMeterModel EnergyMeterModel);
         bool Equals(object? Object);
-        bool Equals(ISmartMeterModel SmartMeterModel);
+        bool Equals(IEnergyMeterModel EnergyMeterModel);
         int GetHashCode();
         string ToString();
     }

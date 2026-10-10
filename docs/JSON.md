@@ -391,8 +391,10 @@ coordinate, product and authentication details.
 - Charging modes require a flat array of enum names; nested arrays are rejected.
 - `currentType` remains an array of enum names.
 - Energy mixes require `energySources` and `environmentalImpacts` arrays; use `[]` for unknown composition.
-- Software `openSourceLicense` requires a license object with `@id`; string licenses and alternative
-  field names are rejected. Optional descriptions and URLs belong to that object.
+- Software `name` is a multi-language object, and `openSourceLicenses` is a nonempty array of license
+  objects with distinct `@id`s, written in a canonical order; string names, string licenses, a single
+  `openSourceLicense` object and alternative field names are rejected. Optional descriptions and URLs
+  belong to each license object.
 - Custom parsers and serializers support application extensions at the domain API.
   Snapshot capture and ChangeSet validation still use the explicit schema; extension fields should
   use supported `customData` or receive corresponding schema/parser support.

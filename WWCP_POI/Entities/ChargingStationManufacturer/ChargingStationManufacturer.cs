@@ -10,7 +10,6 @@ using System.Collections.Immutable;
 using Newtonsoft.Json.Linq;
 using org.GraphDefined.Vanaheimr.Hermod;
 using org.GraphDefined.Vanaheimr.Illias;
-using cloud.charging.open.protocols.WWCP.POI.CSM;
 
 namespace cloud.charging.open.protocols.WWCP.POI;
 
