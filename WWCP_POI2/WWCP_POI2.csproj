@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Hermod\Hermod\Hermod.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Entities\ChargingStationOperator\Group\" />
+    <Folder Include="Entities\EMobilityProvider\Group\" />
+  </ItemGroup>
+
+</Project>

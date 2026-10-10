@@ -74,7 +74,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Returns the length of the identification.
         /// </summary>
         public UInt64 Length
-            => (UInt64) (OperatorId.ToString(OperatorIdFormats.ISO_STAR).Length + 3 + Suffix.Length);
+            => (UInt64) (OperatorId.ToString().Length + 3 + Suffix.Length);
 
         #endregion
 
@@ -164,7 +164,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static ChargingStationGroup_Id Parse(ChargingStationOperator_Id  OperatorId,
                                                     String                      Suffix)
 
-            => Parse(OperatorId.ToString(OperatorIdFormats.ISO_STAR) + "*GS" + Suffix);
+            => Parse(OperatorId.ToString() + "*GS" + Suffix);
 
         #endregion
 
@@ -179,7 +179,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     ChargingTariffGroup_Id      ChargingTariffGroupId,
                                                     String                      Suffix)
 
-            => Parse(OperatorId.ToString(OperatorIdFormats.ISO_STAR) + "*GS_" + ChargingTariffGroupId + "_" + Suffix);
+            => Parse(OperatorId.ToString() + "*GS_" + ChargingTariffGroupId + "_" + Suffix);
 
         #endregion
 

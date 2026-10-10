@@ -122,11 +122,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public UInt64 Length
 
-            => OperatorId.Format switch {
-                   OperatorIdFormats.DIN       => OperatorId.Length + 1 + (UInt64) Suffix.Length,
-                   OperatorIdFormats.ISO_STAR  => OperatorId.Length + 2 + (UInt64) Suffix.Length,
-                   _                           => OperatorId.Length + 1 + (UInt64) Suffix.Length,  // ISO
-               };
+            => OperatorId.Length + 2 + (UInt64) Suffix.Length;
 
         #endregion
 
@@ -242,11 +238,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static ChargingPool_Id Parse(ChargingStationOperator_Id  ChargingStationOperatorId,
                                             String                      Suffix)
 
-            => ChargingStationOperatorId.Format switch {
-                   OperatorIdFormats.ISO_STAR  => Parse(String.Concat(ChargingStationOperatorId.ToString(), "*P", Suffix)),
-                   OperatorIdFormats.ISO       => Parse(String.Concat(ChargingStationOperatorId.ToString(),  "P", Suffix)),
-                   _                           => Parse(String.Concat(ChargingStationOperatorId.ToString(), "*P", Suffix))
-               };
+            => Parse(String.Concat(ChargingStationOperatorId.ToString(), "*P", Suffix));
 
         #endregion
 
@@ -278,11 +270,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static ChargingPool_Id? TryParse(ChargingStationOperator_Id  ChargingStationOperatorId,
                                                 String                      Suffix)
 
-            => ChargingStationOperatorId.Format switch {
-                   OperatorIdFormats.ISO_STAR  => TryParse(String.Concat(ChargingStationOperatorId.ToString(),                           "*P", Suffix)),
-                   OperatorIdFormats.ISO       => TryParse(String.Concat(ChargingStationOperatorId.ToString(),                            "P", Suffix)),
-                   _                           => TryParse(String.Concat(ChargingStationOperatorId.ToString(OperatorIdFormats.ISO_STAR), "*P", Suffix))
-               };
+            => TryParse(String.Concat(ChargingStationOperatorId.ToString(),                           "*P", Suffix));
 
         #endregion
 
@@ -352,11 +340,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        String                      Suffix,
                                        out ChargingPool_Id         ChargingPoolId)
 
-            => ChargingStationOperatorId.Format switch {
-                   OperatorIdFormats.ISO_STAR  => TryParse(String.Concat(ChargingStationOperatorId.ToString(),                           "*P", Suffix), out ChargingPoolId),
-                   OperatorIdFormats.ISO       => TryParse(String.Concat(ChargingStationOperatorId.ToString(),                            "P", Suffix), out ChargingPoolId),
-                   _                           => TryParse(String.Concat(ChargingStationOperatorId.ToString(OperatorIdFormats.ISO_STAR), "*P", Suffix), out ChargingPoolId)
-               };
+            => TryParse(String.Concat(ChargingStationOperatorId.ToString(),                           "*P", Suffix), out ChargingPoolId);
 
         #endregion
 
@@ -563,11 +547,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => OperatorId.Format switch {
-                   OperatorIdFormats.ISO       => String.Concat(OperatorId,  "P", Suffix),
-                   OperatorIdFormats.ISO_STAR  => String.Concat(OperatorId, "*P", Suffix),
-                   _                           => String.Concat(OperatorId, "*P", Suffix)
-               };
+            => String.Concat(OperatorId, "*P", Suffix);
 
         #endregion
 

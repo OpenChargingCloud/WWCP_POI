@@ -39,12 +39,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The regular expression for parsing a charging station operator identification.
+        /// The regular expression for parsing a grid operator identification:
+        /// the ISO 15118 form "DE*ABC" or "DEABC"; the obsolete DIN "+49*822" is no POI identification.
         /// </summary>
-        public static readonly Regex  OperatorId_RegEx  = new Regex(@"^([A-Z]{2})(\*?)([A-Z0-9]{3})$ | "  +
-                                                                    @"^\+?([0-9]{1,5})\*([0-9]{3,6})$ | " +
-                                                                    @"^([0-9]{1,5})$",
-                                                                    RegexOptions.IgnorePatternWhitespace);
+        public static readonly Regex  OperatorId_RegEx  = new (@"^([A-Z]{2})\*?([A-Z0-9]{3})$");
 
         #endregion
 
@@ -59,11 +57,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The identifier suffix.
         /// </summary>
         public String             Suffix        { get; }
-
-        /// <summary>
-        /// The format of the charging station operator identification.
-        /// </summary>
-        public OperatorIdFormats  Format        { get; }
 
         /// <summary>
         /// Indicates whether this identification is null or empty.
@@ -81,52 +74,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Returns the length of the identification.
         /// </summary>
         public UInt64 Length
-        {
-            get
-            {
-
-                switch (Format)
-                {
-
-                    case OperatorIdFormats.DIN:
-                        return (UInt64) (CountryCode.TelefonCode.ToString().Length + 1 + Suffix.Length);
-
-                    case OperatorIdFormats.ISO_STAR:
-                        return (UInt64) (CountryCode.Alpha2Code.Length             + 1 + Suffix.Length);
-
-                    default:  // ISO
-                        return (UInt64) (CountryCode.Alpha2Code.Length                 + Suffix.Length);
-
-                }
-
-            }
-        }
+            => (UInt64) (CountryCode.Alpha2Code.Length + 1 + Suffix.Length);
 
         #endregion
 
         #region Constructor(s)
 
         /// <summary>
-        /// Create a new charging station operator identification.
+        /// Create a new grid operator identification.
         /// </summary>
         /// <param name="CountryCode">The country code.</param>
-        /// <param name="Suffix">The suffix of the charging station operator identification.</param>
-        /// <param name="Format">The format of the charging station operator identification.</param>
-        private GridOperator_Id(Country            CountryCode,
-                                           String             Suffix,
-                                           OperatorIdFormats  Format = OperatorIdFormats.ISO)
+        /// <param name="Suffix">The suffix of the grid operator identification.</param>
+        private GridOperator_Id(Country  CountryCode,
+                                String   Suffix)
         {
 
             #region Initial checks
 
             if (Suffix.IsNullOrEmpty())
-                throw new ArgumentNullException(nameof(Suffix),  "The charging station operator identification suffix must not be null or empty!");
+                throw new ArgumentNullException(nameof(Suffix),  "The grid operator identification suffix must not be null or empty!");
 
             #endregion
 
             this.CountryCode  = CountryCode;
             this.Suffix       = Suffix;
-            this.Format       = Format;
 
         }
 
@@ -136,63 +107,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Parse(Text)
 
         /// <summary>
-        /// Parse the given text representation of a charging station operator identification.
+        /// Parse the given text representation of a grid operator identification.
         /// </summary>
-        /// <param name="Text">A text representation of a charging station operator identification.</param>
+        /// <param name="Text">A text representation of a grid operator identification.</param>
         public static GridOperator_Id Parse(String Text)
         {
 
             #region Initial checks
 
             if (Text.IsNullOrEmpty())
-                throw new ArgumentNullException(nameof(Text), "The given text representation of a charging station operator identification must not be null or empty!");
+                throw new ArgumentNullException(nameof(Text), "The given text representation of a grid operator identification must not be null or empty!");
 
             #endregion
 
             var MatchCollection = OperatorId_RegEx.Matches(Text);
 
             if (MatchCollection.Count != 1)
-                throw new ArgumentException($"Illegal text representation of a charging station operator identification: '{Text}'!",
+                throw new ArgumentException($"Illegal text representation of a grid operator identification: '{Text}'!",
                                             nameof(Text));
 
-            Country _CountryCode;
+            if (Country.TryParseAlpha2Code(MatchCollection[0].Groups[1].Value, out var countryCode))
+                return new GridOperator_Id(countryCode,
+                                           MatchCollection[0].Groups[2].Value);
 
-            // DE...
-            if (Country.TryParseAlpha2Code(MatchCollection[0]. Groups[1].Value.ToUpper(), out _CountryCode))
-                return new GridOperator_Id(_CountryCode,
-                                                      MatchCollection[0].Groups[3].Value,
-                                                      MatchCollection[0].Groups[2].Value == "*" ? OperatorIdFormats.ISO_STAR : OperatorIdFormats.ISO);
-
-            // +49*...
-            if (Country.TryParseTelefonCode(MatchCollection[0].Groups[4].Value.ToUpper(), out _CountryCode))
-                return new GridOperator_Id(_CountryCode,
-                                                      MatchCollection[0].Groups[5].Value,
-                                                      OperatorIdFormats.DIN);
-
-            // Just e.g. "822"...
-            if (MatchCollection[0].Groups[6].Success)
-                return new GridOperator_Id(Country.Germany,
-                                                      MatchCollection[0].Groups[6].Value,
-                                                      OperatorIdFormats.DIN);
-
-            throw new ArgumentException($"Unknown country or telephone code in the charging station operator identification: '{Text}'!",
+            throw new ArgumentException($"Unknown country code in the grid operator identification: '{Text}'!",
                                         nameof(Text));
 
         }
 
         #endregion
 
-        #region Parse(CountryCode, Suffix, IdFormat = IdFormatType.ISO)
+        #region Parse(CountryCode, Suffix)
 
         /// <summary>
-        /// Parse the given string as an charging station operator identification.
+        /// Parse the given string as a grid operator identification.
         /// </summary>
         /// <param name="CountryCode">A country code.</param>
-        /// <param name="Suffix">The suffix of an charging station operator identification.</param>
-        /// <param name="IdFormat">The format of the charging station operator identification [old|new].</param>
-        public static GridOperator_Id Parse(Country            CountryCode,
-                                                       String             Suffix,
-                                                       OperatorIdFormats  IdFormat = OperatorIdFormats.ISO)
+        /// <param name="Suffix">The suffix of a grid operator identification.</param>
+        public static GridOperator_Id Parse(Country  CountryCode,
+                                            String   Suffix)
         {
 
             #region Initial checks
@@ -201,140 +154,57 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentNullException(nameof(CountryCode),  "The given country must not be null!");
 
             if (Suffix.IsNullOrEmpty())
-                throw new ArgumentNullException(nameof(Suffix),       "The given charging station operator identification suffix must not be null or empty!");
+                throw new ArgumentNullException(nameof(Suffix),       "The given grid operator identification suffix must not be null or empty!");
 
             #endregion
 
-            switch (IdFormat)
-            {
-
-                case OperatorIdFormats.ISO:
-                    return Parse(CountryCode.Alpha2Code + Suffix);
-
-                case OperatorIdFormats.ISO_STAR:
-                    return Parse(CountryCode.Alpha2Code + "*" + Suffix);
-
-                default: // DIN:
-                    return Parse("+" + CountryCode.TelefonCode.ToString() + "*" + Suffix);
-
-            }
+            return Parse(CountryCode.Alpha2Code + "*" + Suffix);
 
         }
 
         #endregion
 
-        #region TryParse(Text, out ChargingStationOperatorId)
+        #region TryParse(Text, out GridOperatorId)
 
         /// <summary>
-        /// Try to parse the given text representation of a charging station operator identification.
+        /// Try to parse the given text representation of a grid operator identification.
         /// </summary>
-        /// <param name="Text">A text representation of a charging station operator identification.</param>
-        /// <param name="ChargingStationOperatorId">The parsed charging station operator identification.</param>
-        public static Boolean TryParse(String                          Text,
-                                       out GridOperator_Id  ChargingStationOperatorId)
+        /// <param name="Text">A text representation of a grid operator identification.</param>
+        /// <param name="GridOperatorId">The parsed grid operator identification.</param>
+        public static Boolean TryParse(String               Text,
+                                       out GridOperator_Id  GridOperatorId)
         {
 
-            #region Initial checks
+            GridOperatorId = default!;
 
             if (Text.IsNullOrEmpty())
-            {
-                ChargingStationOperatorId = default(GridOperator_Id);
                 return false;
-            }
 
-            #endregion
+            var MatchCollection = OperatorId_RegEx.Matches(Text);
 
-            try
-            {
+            if (MatchCollection.Count != 1 ||
+                !Country.TryParseAlpha2Code(MatchCollection[0].Groups[1].Value, out var countryCode))
+                return false;
 
-                var MatchCollection = OperatorId_RegEx.Matches(Text);
+            GridOperatorId = new GridOperator_Id(countryCode,
+                                                 MatchCollection[0].Groups[2].Value);
 
-                if (MatchCollection.Count != 1)
-                {
-                    ChargingStationOperatorId = default(GridOperator_Id);
-                    return false;
-                }
-
-                Country _CountryCode;
-
-                // DE...
-                if (Country.TryParseAlpha2Code(MatchCollection[0].Groups[1].Value, out _CountryCode))
-                {
-
-                    ChargingStationOperatorId = new GridOperator_Id(_CountryCode,
-                                                                               MatchCollection[0].Groups[3].Value,
-                                                                               MatchCollection[0].Groups[2].Value == "*" ? OperatorIdFormats.ISO_STAR : OperatorIdFormats.ISO);
-
-                    return true;
-
-                }
-
-                // +49*...
-                if (Country.TryParseTelefonCode(MatchCollection[0].Groups[4].Value, out _CountryCode))
-                {
-
-                    ChargingStationOperatorId = new GridOperator_Id(_CountryCode,
-                                                                               MatchCollection[0].Groups[5].Value,
-                                                                               OperatorIdFormats.DIN);
-
-                    return true;
-
-                }
-
-
-                // Just e.g. "822"...
-                if (MatchCollection[0].Groups[6].Success)
-                {
-
-                    ChargingStationOperatorId = new GridOperator_Id(Country.Germany,
-                                                                               MatchCollection[0].Groups[6].Value,
-                                                                               OperatorIdFormats.DIN);
-
-                    return true;
-
-                }
-
-            }
-
-#pragma warning disable RCS1075  // Avoid empty catch clause that catches System.Exception.
-#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
-            catch
-#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
-#pragma warning restore RCS1075  // Avoid empty catch clause that catches System.Exception.
-            { }
-
-            ChargingStationOperatorId = default(GridOperator_Id);
-            return false;
+            return true;
 
         }
-
-        #endregion
-
-        #region ChangeFormat(NewFormat)
-
-        /// <summary>
-        /// Return a new charging station operator identification in the given format.
-        /// </summary>
-        /// <param name="NewFormat">The new charging station operator identification format.</param>
-        public GridOperator_Id ChangeFormat(OperatorIdFormats NewFormat)
-
-            => new GridOperator_Id(CountryCode,
-                                              Suffix,
-                                              NewFormat);
 
         #endregion
 
         #region Clone()
 
         /// <summary>
-        /// Clone this charging station operator identification.
+        /// Clone this grid operator identification.
         /// </summary>
         public GridOperator_Id Clone()
 
             => new (
                    CountryCode.Clone(),
-                   Suffix.     CloneString(),
-                   Format
+                   Suffix.     CloneString()
                );
 
         #endregion
@@ -569,59 +439,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (override) ToString()
 
         /// <summary>
-        /// Return a text representation of this object.
+        /// Return a text representation of this object: always the ISO 15118 form with a '*' separator.
         /// </summary>
         public override String ToString()
-        {
 
-            switch (Format)
-            {
-
-                case OperatorIdFormats.DIN:
-                    return "+" + CountryCode.TelefonCode.ToString() + "*" + Suffix;
-
-                case OperatorIdFormats.ISO_STAR:
-                    return CountryCode.Alpha2Code + "*" + Suffix;
-
-                default: // ISO
-                    return CountryCode.Alpha2Code       + Suffix;
-
-            }
-
-        }
-
-        #endregion
-
-        #region ToString(Format)
-
-        /// <summary>
-        /// Return the identification in the given format.
-        /// </summary>
-        /// <param name="Format">The format of the identification.</param>
-        public String ToString(OperatorIdFormats Format)
-        {
-
-            switch (Format)
-            {
-
-                case OperatorIdFormats.ISO:
-                    return String.Concat(CountryCode.Alpha2Code,
-                                         Suffix);
-
-                case OperatorIdFormats.ISO_STAR:
-                    return String.Concat(CountryCode.Alpha2Code,
-                                         "*",
-                                         Suffix);
-
-                default: // DIN
-                    return String.Concat("+",
-                                         CountryCode.TelefonCode,
-                                         "*",
-                                         Suffix);
-
-            }
-
-        }
+            => String.Concat(CountryCode?.Alpha2Code, "*", Suffix ?? "");
 
         #endregion
 

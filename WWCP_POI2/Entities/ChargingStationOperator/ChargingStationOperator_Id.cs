@@ -17,7 +17,6 @@
 
 #region Usings
 
-using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -26,30 +25,6 @@ using org.GraphDefined.Vanaheimr.Illias;
 
 namespace cloud.charging.open.protocols.WWCP.POI
 {
-
-    /// <summary>
-    /// The different formats of charging station operator identifications.
-    /// </summary>
-    public enum OperatorIdFormats
-    {
-
-        /// <summary>
-        /// The old DIN format.
-        /// </summary>
-        DIN,
-
-        /// <summary>
-        /// The new ISO format.
-        /// </summary>
-        ISO,
-
-        /// <summary>
-        /// The new ISO format with a '*' as separator.
-        /// </summary>
-        ISO_STAR
-
-    }
-
 
     /// <summary>
     /// Extension methods for charging station operator identifications.
@@ -80,7 +55,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static ChargingPool_Id CreatePoolId(this ChargingStationOperator_Id  ChargingStationOperatorId,
                                                    String?                          AdditionalSuffix   = null)
 
-            => ChargingPool_Id.Parse(ChargingStationOperatorId, AdditionalSuffix ?? "");
+            => ChargingPool_Id.Parse(
+                   ChargingStationOperatorId,
+                   AdditionalSuffix ?? ""
+               );
 
     }
 
@@ -99,10 +77,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for parsing a charging station operator identification.
         /// </summary>
-        public static readonly Regex  OperatorId_RegEx  = new (@"^([A-Z]{2})(\*?)([A-Z0-9]{3})$ | "  +
-                                                               @"^\+?([0-9]{1,5})\*([0-9]{3,6})$ | " +
-                                                               @"^([0-9]{1,5})$",
-                                                               RegexOptions.IgnorePatternWhitespace);
+        public static readonly Regex  ChargingStationOperatorId_RegEx = new (@"^([A-Z]{2})\*?([A-Z0-9]{3})$");
 
         #endregion
 
@@ -119,32 +94,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public String             Suffix        { get; }
 
         /// <summary>
-        /// The format of the charging station operator identification.
-        /// </summary>
-        public OperatorIdFormats  Format        { get; }
-
-        /// <summary>
         /// Indicates whether this identification is null or empty.
         /// </summary>
-        public Boolean IsNullOrEmpty
+        public Boolean  IsNullOrEmpty
             => Suffix.IsNullOrEmpty();
 
         /// <summary>
         /// Indicates whether this identification is NOT null or empty.
         /// </summary>
-        public Boolean IsNotNullOrEmpty
+        public Boolean  IsNotNullOrEmpty
             => Suffix.IsNotNullOrEmpty();
 
         /// <summary>
         /// Returns the length of the identification.
         /// </summary>
-        public UInt64 Length
+        public UInt64   Length
 
-            => Format switch {
-                   OperatorIdFormats.DIN       => (UInt64) (CountryCode.TelefonCode.ToString().Length + 1 + Suffix.Length),
-                   OperatorIdFormats.ISO_STAR  => (UInt64) (CountryCode.Alpha2Code.Length             + 1 + Suffix.Length),
-                   _                           => (UInt64) (CountryCode.Alpha2Code.Length             +     Suffix.Length),
-               };
+            => (UInt64) (CountryCode.Alpha2Code.Length + 1 + Suffix.Length);
 
         #endregion
 
@@ -155,22 +121,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="CountryCode">The country code.</param>
         /// <param name="Suffix">The suffix of the charging station operator identification.</param>
-        /// <param name="Format">The format of the charging station operator identification.</param>
-        private ChargingStationOperator_Id(Country            CountryCode,
-                                           String             Suffix,
-                                           OperatorIdFormats  Format = OperatorIdFormats.ISO)
+        private ChargingStationOperator_Id(Country  CountryCode,
+                                           String   Suffix)
         {
 
             this.CountryCode  = CountryCode;
-            this.Suffix       = Suffix.Trim();
-            this.Format       = Format;
+            this.Suffix       = Suffix;
 
         }
 
         #endregion
 
 
-        #region (static) Parse   (Text)
+        #region (static) Parse    (Text)
 
         /// <summary>
         /// Parse the given text representation of a charging station operator identification.
@@ -189,27 +152,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Parse   (CountryCode, Suffix, IdFormat = ISO_STAR)
+        #region (static) Parse    (CountryCode, Suffix)
 
         /// <summary>
         /// Parse the given string as an charging station operator identification.
         /// </summary>
         /// <param name="CountryCode">A country code.</param>
         /// <param name="Suffix">The suffix of an charging station operator identification.</param>
-        /// <param name="IdFormat">The format of the charging station operator identification [old|new].</param>
-        public static ChargingStationOperator_Id Parse(Country            CountryCode,
-                                                       String             Suffix,
-                                                       OperatorIdFormats  IdFormat = OperatorIdFormats.ISO_STAR)
+        public static ChargingStationOperator_Id Parse(Country  CountryCode,
+                                                       String   Suffix)
 
-            => IdFormat switch {
-                   OperatorIdFormats.ISO       => Parse(String.Concat(     CountryCode.Alpha2Code,                  Suffix.Trim())),
-                   OperatorIdFormats.ISO_STAR  => Parse(String.Concat(     CountryCode.Alpha2Code,             "*", Suffix.Trim())),
-                   _                           => Parse(String.Concat("+", CountryCode.TelefonCode.ToString(), "*", Suffix.Trim()))
-               };
+            => Parse(
+                   String.Concat(
+                       CountryCode.Alpha2Code,
+                       "*",
+                       Suffix.Trim()
+                   )
+               );
 
         #endregion
 
-        #region (static) TryParse(Text)
+        #region (static) TryParse (Text)
 
         /// <summary>
         /// Try to parse the given text representation of a charging station operator identification.
@@ -227,33 +190,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) TryParse(CountryCode, Suffix, IdFormat = ISO_STAR)
+        #region (static) TryParse (CountryCode, Suffix)
 
         /// <summary>
         /// Try to parse the given text representation of a charging station operator identification.
         /// </summary>
-        /// <param name="Text">A text representation of a charging station operator identification.</param>
-        public static ChargingStationOperator_Id? TryParse(Country            CountryCode,
-                                                           String             Suffix,
-                                                           OperatorIdFormats  IdFormat   = OperatorIdFormats.ISO_STAR)
+        /// <param name="CountryCode">A country code.</param>
+        /// <param name="Suffix">The suffix of an charging station operator identification.</param>
+        public static ChargingStationOperator_Id? TryParse(Country  CountryCode,
+                                                           String   Suffix)
 
-            => IdFormat switch {
-                OperatorIdFormats.ISO       => TryParse(String.Concat(     CountryCode.Alpha2Code,                  Suffix.Trim())),
-                OperatorIdFormats.ISO_STAR  => TryParse(String.Concat(     CountryCode.Alpha2Code,             "*", Suffix.Trim())),
-                _                           => TryParse(String.Concat("+", CountryCode.TelefonCode.ToString(), "*", Suffix.Trim()))
-            };
+            => TryParse(String.Concat(CountryCode.Alpha2Code, "*", Suffix.Trim()));
 
         #endregion
 
-        #region (static) TryParse(Text, out ChargingStationOperatorId)
+        #region (static) TryParse (Text,                out ChargingStationOperatorId)
 
         /// <summary>
         /// Try to parse the given text representation of a charging station operator identification.
         /// </summary>
         /// <param name="Text">A text representation of a charging station operator identification.</param>
         /// <param name="ChargingStationOperatorId">The parsed charging station operator identification.</param>
-        public static Boolean TryParse(String                                              Text,
-                                       [NotNullWhen(true)] out ChargingStationOperator_Id  ChargingStationOperatorId)
+        public static Boolean TryParse(String                          Text,
+                                       out ChargingStationOperator_Id  ChargingStationOperatorId)
         {
 
             #region Initial checks
@@ -273,49 +232,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                var matchCollection = OperatorId_RegEx.Matches(Text.ToUpperInvariant());
+                var matchCollection = ChargingStationOperatorId_RegEx.Matches(Text);
 
                 if (matchCollection.Count != 1)
                     return false;
 
-                // DE...
                 if (Country.TryParseAlpha2Code(matchCollection[0].Groups[1].Value, out var countryCode))
                 {
 
                     ChargingStationOperatorId = new (countryCode,
-                                                     matchCollection[0].Groups[3].Value,
-                                                     matchCollection[0].Groups[2].Value == "*" ? OperatorIdFormats.ISO_STAR : OperatorIdFormats.ISO);
+                                                     matchCollection[0].Groups[2].Value);
 
                     return true;
 
                 }
 
-                // +49*...
-                if (Country.TryParseTelefonCode(matchCollection[0].Groups[4].Value, out countryCode))
-                {
-
-                    ChargingStationOperatorId = new (countryCode,
-                                                     matchCollection[0].Groups[5].Value,
-                                                     OperatorIdFormats.DIN);
-
-                    return true;
-
-                }
-
-
-                // Just e.g. "822"...
-                if (matchCollection[0].Groups[6].Success)
-                {
-
-                    ChargingStationOperatorId = new (Country.Germany,
-                                                     matchCollection[0].Groups[6].Value,
-                                                     OperatorIdFormats.DIN);
-
-                    return true;
-
-                }
-
-                // An unknown country or telephone code
                 return false;
 
             }
@@ -329,37 +260,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) TryParse(CountryCode, Suffix, out ChargingStationOperatorId)
+        #region (static) TryParse (CountryCode, Suffix, out ChargingStationOperatorId)
 
         /// <summary>
         /// Try to parse the given text representation of a charging station operator identification.
         /// </summary>
-        /// <param name="Text">A text representation of a charging station operator identification.</param>
+        /// <param name="CountryCode">A country code.</param>
+        /// <param name="Suffix">The suffix of an charging station operator identification.</param>
         /// <param name="ChargingStationOperatorId">The parsed charging station operator identification.</param>
         public static Boolean TryParse(Country                         CountryCode,
                                        String                          Suffix,
-                                       out ChargingStationOperator_Id  ChargingStationOperatorId,
-                                       OperatorIdFormats               IdFormat   = OperatorIdFormats.ISO_STAR)
+                                       out ChargingStationOperator_Id  ChargingStationOperatorId)
 
-            => IdFormat switch {
-                   OperatorIdFormats.ISO       => TryParse(String.Concat(     CountryCode.Alpha2Code,                  Suffix.Trim()), out ChargingStationOperatorId),
-                   OperatorIdFormats.ISO_STAR  => TryParse(String.Concat(     CountryCode.Alpha2Code,             "*", Suffix.Trim()), out ChargingStationOperatorId),
-                   _                           => TryParse(String.Concat("+", CountryCode.TelefonCode.ToString(), "*", Suffix.Trim()), out ChargingStationOperatorId)
-               };
-
-        #endregion
-
-        #region ChangeFormat(NewFormat)
-
-        /// <summary>
-        /// Return a new charging station operator identification in the given format.
-        /// </summary>
-        /// <param name="NewFormat">The new charging station operator identification format.</param>
-        public ChargingStationOperator_Id ChangeFormat(OperatorIdFormats NewFormat)
-
-            => new (CountryCode,
-                    Suffix,
-                    NewFormat);
+            => TryParse(
+                   String.Concat(
+                       CountryCode.Alpha2Code,
+                       "*",
+                       Suffix.Trim()
+                   ),
+                   out ChargingStationOperatorId
+               );
 
         #endregion
 
@@ -372,8 +292,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => new (
                    CountryCode.Clone(),
-                   Suffix.     CloneString(),
-                   Format
+                   Suffix.     CloneString()
                );
 
         #endregion
@@ -564,27 +483,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (override) ToString()
 
         /// <summary>
-        /// Return a text representation of this object.
+        /// Return a text representation of this object: always the ISO 15118 form with a '*' separator.
         /// </summary>
         public override String ToString()
 
-            => ToString(Format);
-
-        #endregion
-
-        #region ToString(Format)
-
-        /// <summary>
-        /// Return the identification in the given format.
-        /// </summary>
-        /// <param name="Format">The format of the identification.</param>
-        public String ToString(OperatorIdFormats Format)
-
-            => Format switch {
-                   OperatorIdFormats.DIN       => String.Concat("+", CountryCode.TelefonCode.ToString(), "*", Suffix ?? ""),
-                   OperatorIdFormats.ISO_STAR  => String.Concat(     CountryCode.Alpha2Code,             "*", Suffix ?? ""),
-                   _                           => String.Concat(     CountryCode.Alpha2Code,                  Suffix ?? "")
-               };
+            => String.Concat(
+                   CountryCode?.Alpha2Code,
+                   "*",
+                   Suffix ?? ""
+               );
 
         #endregion
 

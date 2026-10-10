@@ -114,7 +114,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => type switch
             {
                 InfrastructureEntityType.RoamingNetwork           => RoamingNetwork_Id.Parse(text).ToString().ToUpperInvariant(),
-                InfrastructureEntityType.ChargingStationOperator => ChargingStationOperator_Id.Parse(text).ToString(OperatorIdFormats.ISO_STAR).ToUpperInvariant(),
+                InfrastructureEntityType.ChargingStationOperator => ChargingStationOperator_Id.Parse(text).ToString().ToUpperInvariant(),
                 InfrastructureEntityType.EMobilityProvider        => ProviderIdentity(EMobilityProvider_Id.Parse(text)),
                 InfrastructureEntityType.ChargingPool             => PoolIdentity(ChargingPool_Id.Parse(text)),
                 InfrastructureEntityType.ChargingStation          => StationIdentity(ChargingStation_Id.Parse(text)),
@@ -140,7 +140,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => id.CountryCode.Alpha2Code + ":" + id.Suffix;
 
         private static String GroupIdentity(ChargingStationOperator_Id operatorId, String suffix)
-            => operatorId.ToString(OperatorIdFormats.ISO_STAR).ToUpperInvariant() + ":" + suffix;
+            => operatorId.ToString().ToUpperInvariant() + ":" + suffix;
 
         internal static String IdField(InfrastructureEntityType type)
             => type is InfrastructureEntityType.GridOperator or InfrastructureEntityType.ParkingOperator ? "id" : "@id";
@@ -168,7 +168,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static String OperatorEntityIdentity(ChargingStationOperator_Id  operatorId,
                                                      String                      suffix)
 
-            => operatorId.ToString(OperatorIdFormats.ISO_STAR).ToUpperInvariant() + ":" +
+            => operatorId.ToString().ToUpperInvariant() + ":" +
                suffix.Replace("*", "").ToUpperInvariant();
 
         internal static Boolean SameId(InfrastructureEntityType  type,

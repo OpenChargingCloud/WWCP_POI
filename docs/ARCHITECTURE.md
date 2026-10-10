@@ -74,6 +74,10 @@ graph identities; tariff substructures remain values without IDs. Supported nest
 forms are normalized for comparison where the corresponding domain ID supports that equivalence.
 The stored JSON keeps the parsed ID's wire spelling.
 
+Operator, EVSE, station, pool, tariff, group and grid operator IDs follow ISO 15118-2 Annex H and
+the IDACS ID format: the `*` separators are optional on input (`DEABCE1` equals `DE*ABC*E1`), and
+the domain IDs always write them. The obsolete DIN SPEC 91286 forms (`+49*822`, `822`) are rejected.
+
 Connector IDs are local. Connector `1` under EVSE `DE*ABC*E1` and connector `1` under
 `DE*ABC*E2` have different keys. Connector operations and lookups must supply the EVSE scope.
 

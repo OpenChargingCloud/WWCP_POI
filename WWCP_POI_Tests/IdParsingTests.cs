@@ -26,21 +26,35 @@ public sealed class IdParsingTests
 {
 
     /// <summary>
-    /// Only a bare operator number like "822" is German by default;
-    /// an unknown country or telephone code is no operator at all.
+    /// An unknown country code is no operator at all.
     /// </summary>
     [Test]
-    public void Unknown_country_codes_are_not_German_operators()
+    public void Unknown_country_codes_are_no_operators()
     {
         Assert.That(ChargingStationOperator_Id.TryParse("QQ*ABC"),   Is.Null);
-        Assert.That(ChargingStationOperator_Id.TryParse("+12345*123"), Is.Null);
         Assert.That(EVSE_Id.                   TryParse("QQ*ABC*E1"), Is.Null);
         Assert.That(GridOperator_Id.           TryParse("QQ*ABC", out _), Is.False);
         Assert.That(() => GridOperator_Id.Parse("QQ*ABC"), Throws.ArgumentException.With.Message.Contains("'QQ*ABC'"));
+    }
 
-        Assert.That(ChargingStationOperator_Id.TryParse("822")?.CountryCode,    Is.EqualTo(Country.Germany));
-        Assert.That(ChargingStationOperator_Id.TryParse("+49*822")?.CountryCode, Is.EqualTo(Country.Germany));
-        Assert.That(GridOperator_Id.Parse("822").CountryCode,                    Is.EqualTo(Country.Germany));
+    /// <summary>
+    /// POI identifications follow ISO 15118 / IDACS: the '*' separators are optional on input
+    /// and always written; the obsolete DIN SPEC 91286 forms are no POI identifications.
+    /// </summary>
+    [Test]
+    public void Identifications_are_ISO_with_optional_separators_and_written_with_them()
+    {
+        Assert.That(ChargingStationOperator_Id.Parse("DEABC").     ToString(), Is.EqualTo("DE*ABC"));
+        Assert.That(EVSE_Id.                   Parse("DEABCE1").   ToString(), Is.EqualTo("DE*ABC*E1"));
+        Assert.That(ChargingStation_Id.        Parse("DEABCS1").   ToString(), Is.EqualTo("DE*ABC*S1"));
+        Assert.That(ChargingPool_Id.           Parse("DEABCP1").   ToString(), Is.EqualTo("DE*ABC*P1"));
+        Assert.That(GridOperator_Id.           Parse("DEGRD").     ToString(), Is.EqualTo("DE*GRD"));
+        Assert.That(EVSE_Id.                   Parse("DEABCE1"),               Is.EqualTo(EVSE_Id.Parse("DE*ABC*E1")));
+
+        Assert.That(ChargingStationOperator_Id.TryParse("822"),           Is.Null);
+        Assert.That(ChargingStationOperator_Id.TryParse("+49*822"),       Is.Null);
+        Assert.That(EVSE_Id.                   TryParse("+49*822*12345"), Is.Null);
+        Assert.That(GridOperator_Id.           TryParse("+49*822", out _), Is.False);
     }
 
     /// <summary>

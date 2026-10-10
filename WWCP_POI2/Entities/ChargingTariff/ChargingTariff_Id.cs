@@ -104,11 +104,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public UInt64 Length
 
-            => OperatorId.Format switch {
-                   OperatorIdFormats.DIN       => OperatorId.Length + 1 + (UInt64) Suffix.Length,
-                   OperatorIdFormats.ISO_STAR  => OperatorId.Length + 2 + (UInt64) Suffix.Length,
-                   _                           => OperatorId.Length + 1 + (UInt64) Suffix.Length,  // ISO
-               };
+            => OperatorId.Length + 2 + (UInt64) Suffix.Length;
 
         #endregion
 
@@ -177,11 +173,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static ChargingTariff_Id Parse(ChargingStationOperator_Id  OperatorId,
                                               String                      Suffix)
 
-            => OperatorId.Format switch {
-                   OperatorIdFormats.ISO       => Parse(String.Concat(OperatorId,  "T", Suffix)),
-                   OperatorIdFormats.ISO_STAR  => Parse(String.Concat(OperatorId, "*T", Suffix)),
-                   _                           => Parse(String.Concat(OperatorId, "*T", Suffix))
-               };
+            => Parse(String.Concat(OperatorId, "*T", Suffix));
 
         #endregion
 
@@ -197,11 +189,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               ChargingTariffGroup_Id      TariffGroupId,
                                               String                      Suffix)
 
-            => OperatorId.Format switch {
-                   OperatorIdFormats.ISO       => Parse(String.Concat(OperatorId,  "T", TariffGroupId, "_", Suffix)),
-                   OperatorIdFormats.ISO_STAR  => Parse(String.Concat(OperatorId, "*T", TariffGroupId, "_", Suffix)),
-                   _                           => Parse(String.Concat(OperatorId, "*T", TariffGroupId, "_", Suffix))
-               };
+            => Parse(String.Concat(OperatorId, "*T", TariffGroupId, "_", Suffix));
 
         #endregion
 
@@ -233,11 +221,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static ChargingTariff_Id? TryParse(ChargingStationOperator_Id  OperatorId,
                                                   String                      Suffix)
 
-            => OperatorId.Format switch {
-                   OperatorIdFormats.ISO       => TryParse(String.Concat(OperatorId,  "T", Suffix)),
-                   OperatorIdFormats.ISO_STAR  => TryParse(String.Concat(OperatorId, "*T", Suffix)),
-                   _                           => TryParse(String.Concat(OperatorId, "*T", Suffix))
-               };
+            => TryParse(String.Concat(OperatorId, "*T", Suffix));
 
         #endregion
 
@@ -253,11 +237,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   ChargingTariffGroup_Id      TariffGroupId,
                                                   String                      Suffix)
 
-            => OperatorId.Format switch {
-                   OperatorIdFormats.ISO       => TryParse(String.Concat(OperatorId,  "T", TariffGroupId, "_", Suffix)),
-                   OperatorIdFormats.ISO_STAR  => TryParse(String.Concat(OperatorId, "*T", TariffGroupId, "_", Suffix)),
-                   _                           => TryParse(String.Concat(OperatorId, "*T", TariffGroupId, "_", Suffix))
-               };
+            => TryParse(String.Concat(OperatorId, "*T", TariffGroupId, "_", Suffix));
 
         #endregion
 
@@ -328,11 +308,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        String                      Suffix,
                                        out ChargingTariff_Id       ChargingTariffId)
 
-            => OperatorId.Format switch {
-                   OperatorIdFormats.ISO       => TryParse(String.Concat(OperatorId,  "T", Suffix), out ChargingTariffId),
-                   OperatorIdFormats.ISO_STAR  => TryParse(String.Concat(OperatorId, "*T", Suffix), out ChargingTariffId),
-                   _                           => TryParse(String.Concat(OperatorId, "*T", Suffix), out ChargingTariffId)
-               };
+            => TryParse(String.Concat(OperatorId, "*T", Suffix), out ChargingTariffId);
 
         #endregion
 
@@ -350,11 +326,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        String                      Suffix,
                                        out ChargingTariff_Id       ChargingTariffId)
 
-            => OperatorId.Format switch {
-                   OperatorIdFormats.ISO       => TryParse(String.Concat(OperatorId,  "T", TariffGroupId, "_", Suffix), out ChargingTariffId),
-                   OperatorIdFormats.ISO_STAR  => TryParse(String.Concat(OperatorId, "*T", TariffGroupId, "_", Suffix), out ChargingTariffId),
-                   _                           => TryParse(String.Concat(OperatorId, "*T", TariffGroupId, "_", Suffix), out ChargingTariffId)
-               };
+            => TryParse(String.Concat(OperatorId, "*T", TariffGroupId, "_", Suffix), out ChargingTariffId);
 
         #endregion
 
@@ -552,7 +524,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             unchecked
             {
 
-                return (OperatorId.IsNullOrEmpty ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(OperatorId.ToString(OperatorIdFormats.ISO_STAR))) ^
+                return (OperatorId.IsNullOrEmpty ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(OperatorId.ToString())) ^
                        (Suffix is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Suffix.Replace("*", "")));
 
             }
@@ -567,11 +539,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => OperatorId.Format switch {
-                   OperatorIdFormats.ISO       => String.Concat(OperatorId,  "T", Suffix),
-                   OperatorIdFormats.ISO_STAR  => String.Concat(OperatorId, "*T", Suffix),
-                   _                           => String.Concat(OperatorId, "*T", Suffix)
-               };
+            => String.Concat(OperatorId, "*T", Suffix);
 
         #endregion
 

@@ -163,7 +163,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static ChargingTariffGroup_Id Parse(ChargingStationOperator_Id  OperatorId,
                                               String                      Suffix)
 
-            => Parse(OperatorId.ToString(OperatorIdFormats.ISO_STAR) + "*TG" + Suffix);
+            => Parse(OperatorId.ToString() + "*TG" + Suffix);
 
         #endregion
 
@@ -367,8 +367,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentNullException(nameof(ChargingStationId), "The given charging tariff group identification must not be null!");
 
             // Compare normalized lengths so equal operator IDs keep equal ordering across text formats.
-            var _Result = (OperatorId.ToString(OperatorIdFormats.ISO_STAR).Length + Suffix.Length).
-                          CompareTo(ChargingStationId.OperatorId.ToString(OperatorIdFormats.ISO_STAR).Length + ChargingStationId.Suffix.Length);
+            var _Result = (OperatorId.ToString().Length + Suffix.Length).
+                          CompareTo(ChargingStationId.OperatorId.ToString().Length + ChargingStationId.Suffix.Length);
 
             // If equal: Compare charging operator identifications
             if (_Result == 0)
