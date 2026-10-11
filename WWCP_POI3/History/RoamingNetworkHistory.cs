@@ -93,6 +93,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
+    /// Called for every commit a history takes, in their order, while the history is locked:
+    /// return quickly and do not change the history from here.
+    /// </summary>
+    /// <param name="Announcement">A slim notice of the commit.</param>
+    public delegate void OnRoamingNetworkCommitAnnouncementDelegate(RoamingNetworkCommitAnnouncement Announcement);
+
+
+    /// <summary>
     /// The history of a roaming network as a chain of commits, held in memory.
     /// With one leading server (model a), the leader publishes change sets as new commits,
     /// and the other servers start from a snapshot of its head and append its commits.
@@ -135,6 +143,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => Volatile.Read(ref head);
 
         /// <summary>
+        /// The current admin status and status of the entities of the head version, kept across versions.
+        /// </summary>
+        public RoamingNetworkRuntimeStatus  RuntimeStatus    { get; }
+
+        /// <summary>
         /// The number of commits this history holds, including its root.
         /// </summary>
         public Int32                 Count
@@ -150,6 +163,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Events
+
+        /// <summary>
+        /// Called for every commit this history takes, published here or appended from the leading server,
+        /// in their order, while the history is locked: return quickly and do not change the history from there.
+        /// </summary>
+        public event OnRoamingNetworkCommitAnnouncementDelegate? OnCommitAnnouncement;
+
+        #endregion
+
         #region Constructor(s)
 
         private RoamingNetworkHistory(RoamingNetworkCommit  Root,
@@ -159,6 +182,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.RoamingNetworkId  = RoamingNetwork.Id;
             this.Root              = Root;
             this.head              = new RoamingNetworkHead(Root, RoamingNetwork);
+            this.RuntimeStatus     = new RoamingNetworkRuntimeStatus(this);
 
             Remember(Root);
 
@@ -471,8 +495,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var commit  = RoamingNetworkCommit.Next(head.Commit, changeSet, roamingNetwork);
                 var newHead = new RoamingNetworkHead(commit, roamingNetwork);
 
-                Remember(commit);
-                Volatile.Write(ref this.head, newHead);
+                Advance(newHead);
 
                 return new (RoamingNetworkPublishStatus.Published, newHead, commit, rebased);
 
@@ -544,8 +567,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                Remember(Commit);
-                Volatile.Write(ref this.head, new RoamingNetworkHead(Commit, roamingNetwork));
+                Advance(new RoamingNetworkHead(Commit, roamingNetwork));
 
                 ErrorResponse = null;
                 return true;
@@ -588,6 +610,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ErrorResponse = null;
             return true;
+
+        }
+
+        #endregion
+
+
+        #region (private) Advance(NewHead)
+
+        /// <summary>
+        /// Take the commit of the given new head, while the history is locked:
+        /// remember it, move the head, drop the runtime status of removed entities, and announce it.
+        /// </summary>
+        private void Advance(RoamingNetworkHead NewHead)
+        {
+
+            Remember(NewHead.Commit);
+            Volatile.Write(ref head, NewHead);
+
+            RuntimeStatus.Prune(NewHead.RoamingNetwork);
+
+            var announcement = new RoamingNetworkCommitAnnouncement(NewHead.Commit, Timestamp.Now);
+
+            // One failing subscriber must neither fail the commit nor keep it from the others.
+            foreach (var subscriber in OnCommitAnnouncement?.GetInvocationList().Cast<OnRoamingNetworkCommitAnnouncementDelegate>() ?? [])
+            {
+                try
+                {
+                    subscriber(announcement);
+                }
+                catch
+                { }
+            }
 
         }
 

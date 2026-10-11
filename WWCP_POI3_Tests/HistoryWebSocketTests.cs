@@ -1,0 +1,836 @@
+/*
+ * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
+ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
+ *
+ * Licensed under the Affero GPL license, Version 3.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.gnu.org/licenses/agpl.html
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#region Usings
+
+using System.Net;
+using System.Net.WebSockets;
+using System.Collections.Concurrent;
+using System.Text;
+using System.Threading.Channels;
+
+using Newtonsoft.Json.Linq;
+
+using NUnit.Framework;
+
+using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+
+#endregion
+
+namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
+{
+
+    /// <summary>
+    /// A follower talking to a leader over the WebSocket of a history.
+    /// </summary>
+    [TestFixture]
+    public class HistoryWebSocketTests
+    {
+
+        #region (class) TestClient
+
+        /// <summary>
+        /// A .NET ClientWebSocket, which matches the answers to its requests by their identifications.
+        /// </summary>
+        private sealed class TestClient : IAsyncDisposable
+        {
+
+            private readonly ClientWebSocket                                                    webSocket  = new ();
+            private readonly ConcurrentDictionary<String, TaskCompletionSource<POIWebSocketMessage>>  pending    = new ();
+            private          Task?                                                              receiver;
+
+            /// <summary>
+            /// The identifications of all answers, in the order they came in.
+            /// </summary>
+            public ConcurrentQueue<String>  Received     { get; } = new ();
+
+            /// <summary>
+            /// The pushes of the server, with whether they came in binary frames.
+            /// </summary>
+            public Channel<(POIWebSocketMessage Message, Boolean Binary)>  Pushes  { get; } = Channel.CreateUnbounded<(POIWebSocketMessage, Boolean)>();
+
+            /// <summary>
+            /// Completed when the server closed the connection, with its close status.
+            /// </summary>
+            public TaskCompletionSource<WebSocketCloseStatus?>  ClosedByServer  { get; } = new (TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public WebSocketState           State
+                => webSocket.State;
+
+            public static async Task<TestClient> Connect(Uri URL)
+            {
+
+                var client = new TestClient();
+
+                await client.webSocket.ConnectAsync(URL, CancellationToken.None);
+
+                client.receiver = client.Receive();
+
+                return client;
+
+            }
+
+            private async Task Receive()
+            {
+
+                var buffer = new Byte[64 * 1024];
+
+                try
+                {
+                    while (webSocket.State == WebSocketState.Open)
+                    {
+
+                        using var message = new MemoryStream();
+                        WebSocketReceiveResult result;
+
+                        do
+                        {
+                            result = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
+                            message.Write(buffer, 0, result.Count);
+                        }
+                        while (!result.EndOfMessage);
+
+                        if (result.MessageType == WebSocketMessageType.Close)
+                        {
+                            ClosedByServer.TrySetResult(result.CloseStatus);
+                            return;
+                        }
+
+                        var parsed = result.MessageType == WebSocketMessageType.Binary
+                                         ? POIWebSocketMessage.TryParse(message.ToArray(),                       out var answer, out var error)
+                                         : POIWebSocketMessage.TryParse(Encoding.UTF8.GetString(message.ToArray()), out answer,   out error);
+
+                        var message2 = parsed ? answer! : error!;
+
+                        if (message2.MessageType == POIWebSocketMessageType.Send)
+                        {
+                            Pushes.Writer.TryWrite((message2, result.MessageType == WebSocketMessageType.Binary));
+                            continue;
+                        }
+
+                        Received.Enqueue(message2.MessageId);
+
+                        if (pending.TryRemove(message2.MessageId, out var waiting))
+                            waiting.TrySetResult(message2);
+
+                    }
+                }
+                catch (WebSocketException)
+                {
+                    ClosedByServer.TrySetResult(null);
+                }
+
+            }
+
+            public async Task<(POIWebSocketMessage Message, Boolean Binary)> NextPush()
+            {
+
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+                return await Pushes.Reader.ReadAsync(timeout.Token);
+
+            }
+
+            public Task<POIWebSocketMessage> Request(String      MessageId,
+                                                     String      Action,
+                                                     JObject?    Payload       = null,
+                                                     Boolean     Binary        = false,
+                                                     CBORValue?  PayloadCBOR   = null)
+
+                => SendAndWait(POIWebSocketMessage.Request(MessageId, Action, Payload, PayloadCBOR), Binary);
+
+            public async Task<POIWebSocketMessage> SendAndWait(POIWebSocketMessage  Message,
+                                                               Boolean              Binary   = false)
+            {
+
+                var waiting = Expect(Message.MessageId);
+
+                await Send(Message, Binary);
+
+                return await waiting;
+
+            }
+
+            public Task<POIWebSocketMessage> Expect(String MessageId)
+            {
+
+                var waiting = pending.GetOrAdd(MessageId, _ => new TaskCompletionSource<POIWebSocketMessage>(TaskCreationOptions.RunContinuationsAsynchronously));
+
+                return waiting.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            }
+
+            public Task Send(POIWebSocketMessage  Message,
+                             Boolean              Binary   = false)
+
+                => Binary
+                       ? webSocket.SendAsync(Message.ToCBORBytes(),                     WebSocketMessageType.Binary, true, CancellationToken.None)
+                       : webSocket.SendAsync(Encoding.UTF8.GetBytes(Message.ToJSONText()), WebSocketMessageType.Text,   true, CancellationToken.None);
+
+            public Task SendText(String Text)
+
+                => webSocket.SendAsync(Encoding.UTF8.GetBytes(Text), WebSocketMessageType.Text, true, CancellationToken.None);
+
+            public void Abort()
+                => webSocket.Abort();
+
+            public async ValueTask DisposeAsync()
+            {
+
+                try
+                {
+                    if (webSocket.State == WebSocketState.Open)
+                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", new CancellationTokenSource(TimeSpan.FromSeconds(2)).Token);
+                }
+                catch
+                { }
+
+                webSocket.Dispose();
+
+                if (receiver is not null)
+                    await receiver.WaitAsync(TimeSpan.FromSeconds(2)).ContinueWith(_ => { });
+
+            }
+
+        }
+
+        #endregion
+
+        #region Data
+
+        private HTTPServer?             httpServer;
+        private POI_API?                poiAPI;
+        private RoamingNetworkHistory?  leader;
+        private POIWebSocketServer?     webSocketServer;
+
+        #endregion
+
+        #region SetUp / TearDown
+
+        [SetUp]
+        public void SetUp()
+        {
+
+            httpServer  = new HTTPServer(
+                              IPAddress:  IPv4Address.Localhost,
+                              TCPPort:    IPPort.Zero,
+                              AutoStart:  true
+                          );
+
+            poiAPI      = new POI_API(httpServer);
+
+            leader      = RoamingNetworkHistory.Start(
+                              new RoamingNetwork(
+                                  Id:          RoamingNetwork_Id.Parse("rn1"),
+                                  Name:        I18NString.Create(Languages.en, "Roaming Network 1"),
+                                  DataSource:  "v0",
+                                  Created:     DateTimeOffset.Parse("2026-01-01T00:00:00Z")
+                              )
+                          );
+
+            poiAPI.AddRoamingNetworkHistory(leader);
+
+            poiAPI.TryGetHistoryWebSocketServer(leader.RoamingNetworkId, out webSocketServer);
+
+        }
+
+        [TearDown]
+        public async Task TearDown()
+        {
+
+            if (httpServer is not null)
+                await httpServer.DisposeAsync();
+
+            if (poiAPI is not null)
+                await poiAPI.DisposeAsync();
+
+        }
+
+        #endregion
+
+
+        #region Connect(RoamingNetworkId = "rn1")
+
+        private Task<TestClient> Connect(String RoamingNetworkId = "rn1")
+
+            => TestClient.Connect(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/{RoamingNetworkId}/history/ws"));
+
+        #endregion
+
+        #region Publish(Value, Minute)
+
+        private RoamingNetworkPublishResult Publish(String Value, Int32 Minute)
+
+            => leader!.Publish(
+                   leader.Head.RoamingNetwork.CreateChangeSet(
+                       [ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, Value) ],
+                       Description:  I18NString.Create(Languages.en, "Data source " + Value),
+                       CreatedAt:    DateTimeOffset.Parse("2026-10-11T12:00:00Z").AddMinutes(Minute)
+                   )
+               );
+
+        #endregion
+
+        #region ChangeSet(History, Value)
+
+        private static RoamingNetworkChangeSet ChangeSet(RoamingNetworkHistory  History,
+                                                         String                 Value)
+
+            => History.Head.RoamingNetwork.CreateChangeSet(
+                   [ RoamingNetworkChange.UpdateProperty(History.Head.RoamingNetwork, "dataSource", null, Value) ],
+                   CreatedAt: DateTimeOffset.Parse("2026-10-11T13:00:00Z")
+               );
+
+        #endregion
+
+        #region Eventually(Condition)
+
+        private static async Task<Boolean> Eventually(Func<Boolean> Condition)
+        {
+
+            for (var i = 0; i < 100; i++)
+            {
+
+                if (Condition())
+                    return true;
+
+                await Task.Delay(50);
+
+            }
+
+            return Condition();
+
+        }
+
+        #endregion
+
+
+        #region A_follower_catches_up_over_the_WebSocket()
+
+        [Test]
+        public async Task A_follower_catches_up_over_the_WebSocket()
+        {
+
+            Publish("v1", 1);
+
+            await using var client = await Connect();
+
+            // 1. Start from a snapshot of the leader's head.
+            var snapshot = await client.Request("1", "snapshot");
+
+            Assert.That(snapshot.MessageType,  Is.EqualTo(POIWebSocketMessageType.Response), snapshot.ErrorDescription);
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(snapshot.Payload!, out var follower, out var error1),  Is.True, error1);
+
+            Publish("v2", 2);
+            Publish("v3", 3);
+
+            // 2. Look at what is new: the metadata only.
+            var head    = await client.Request("2", "head");
+            var infos   = await client.Request("3", "commitInfos", new JObject(new JProperty("since", follower!.Head.Commit.Id.ToString())));
+
+            // 3. Fetch the commits completely, one page of one commit, and one commit by its identification.
+            var page    = await client.Request("4", "commits", new JObject(new JProperty("since", follower.Head.Commit.Id.ToString()),
+                                                                           new JProperty("max",   1)));
+            var single  = await client.Request("5", "commit",  new JObject(new JProperty("commitId", leader!.Head.Commit.Id.ToString())));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(head.Payload!["revision"]!.Value<Int32>(),                                  Is.EqualTo(3));
+                Assert.That(infos.Payload!["commitInfos"]!.Count(),                                     Is.EqualTo(2));
+                Assert.That(infos.Payload["commitInfos"]![0]!["description"]!["en"]!.Value<String>(),  Is.EqualTo("Data source v2"));
+                Assert.That(page.Payload!["commits"]!.Count(),                                          Is.EqualTo(1));
+            }
+
+            var commits = new[] {
+                              RoamingNetworkCommit.Parse(page.Payload["commits"]![0]!.ToString()),
+                              RoamingNetworkCommit.Parse(single.Payload!.ToString())
+                          };
+
+            Assert.That(follower.TryAppend(commits, out var appended, out var error2),  Is.True, error2);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(appended,                                  Is.EqualTo(2));
+                Assert.That(follower.Head.Commit.Id,                   Is.EqualTo(leader.Head.Commit.Id));
+                Assert.That(follower.Head.RoamingNetwork.DataSource,   Is.EqualTo("v3"));
+            }
+
+        }
+
+        #endregion
+
+        #region A_follower_syncs_in_CBOR()
+
+        [Test]
+        public async Task A_follower_syncs_in_CBOR()
+        {
+
+            poiAPI!.AuthorizeChangeSetSubmission = (request, changeSet) => true;
+
+            Publish("v1", 1);
+
+            await using var client = await Connect();
+
+            // The snapshot in CBOR, as the HTTP API gives it.
+            var snapshot = await client.Request("1", "snapshot", Binary: true);
+
+            Assert.That(snapshot.PayloadCBOR.HasValue,  Is.True);
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(snapshot.PayloadCBOR!.Value, out var follower, out var error),  Is.True, error);
+
+            // A change set in CBOR.
+            var published = await client.Request("2", "commitChangeSet",
+                                                  Binary:       true,
+                                                  PayloadCBOR:  CBORValue.FromMap([
+                                                                    new (CBORValue.FromText("changeSet"),     ChangeSet(follower!, "from CBOR").ToCBOR()),
+                                                                    new (CBORValue.FromText("expectedHead"),  CBORValue.FromText(follower!.Head.Commit.Id.ToString()))
+                                                                ]));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(published.MessageType,                                     Is.EqualTo(POIWebSocketMessageType.Response), published.ErrorDescription);
+                Assert.That(published.GetPayloadJSON()!["status"]!.Value<String>(),    Is.EqualTo("Published"));
+                Assert.That(leader!.Head.RoamingNetwork.DataSource,                    Is.EqualTo("from CBOR"));
+            }
+
+        }
+
+        #endregion
+
+        #region Requests_are_answered_asynchronously()
+
+        [Test]
+        public async Task Requests_are_answered_asynchronously()
+        {
+
+            var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            webSocketServer!.AddCommand("slow", async request => {
+                await gate.Task;
+                return request.Respond(new JObject(new JProperty("slow", true)));
+            });
+
+            await using var client = await Connect();
+
+            var slow  = client.Expect("s1");
+            await client.Send(POIWebSocketMessage.Request("s1", "slow"));
+
+            // Answered while the slow request is still waiting...
+            var head  = await client.Request("h1", "head");
+
+            Assert.That(slow.IsCompleted,  Is.False);
+
+            gate.SetResult();
+
+            // ...and the slow one afterwards.
+            var slowAnswer = await slow;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(head.MessageType,                          Is.EqualTo(POIWebSocketMessageType.Response));
+                Assert.That(slowAnswer.Payload!["slow"]!.Value<Boolean>(),  Is.True);
+                Assert.That(client.Received.ToArray(),                 Is.EqualTo(new[] { "h1", "s1" }));
+            }
+
+        }
+
+        #endregion
+
+        #region Errors_are_answered_with_request_errors()
+
+        [Test]
+        public async Task Errors_are_answered_with_request_errors()
+        {
+
+            var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            webSocketServer!.AddCommand("slow", async request => {
+                await gate.Task;
+                return request.Respond([]);
+            });
+
+            webSocketServer!.AddCommand("broken", request => throw new InvalidOperationException("secret details"));
+
+            await using var client = await Connect();
+
+            var garbage       = client.Expect("-1");
+            await client.SendText("no JSON");
+
+            var unknown       = await client.Request("1", "unknownAction");
+            var unknownCommit = await client.Request("2", "commit",      new JObject(new JProperty("commitId", new String('0', 64))));
+            var invalidSince  = await client.Request("3", "commitInfos", new JObject(new JProperty("since",    "nope")));
+            var broken        = await client.Request("4", "broken");
+
+            // The same identification while its request is still processed.
+            var slow          = client.Expect("5");
+            await client.Send(POIWebSocketMessage.Request("5", "slow"));
+            var duplicate     = await client.Request("5", "head");
+
+            gate.SetResult();
+            await slow;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That((await garbage).ErrorCode,  Is.EqualTo(POIWebSocketErrorCodes.RpcFrameworkError));
+                Assert.That(unknown.ErrorCode,          Is.EqualTo(POIWebSocketErrorCodes.NotImplemented));
+                Assert.That(unknownCommit.ErrorCode,    Is.EqualTo(POIWebSocketErrorCodes.NotFound));
+                Assert.That(invalidSince.ErrorCode,     Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+
+                Assert.That(broken.ErrorCode,           Is.EqualTo(POIWebSocketErrorCodes.InternalError));
+                Assert.That(broken.ErrorDescription,    Does.Not.Contain("secret"));
+
+                Assert.That(duplicate.ErrorCode,        Is.EqualTo(POIWebSocketErrorCodes.RpcFrameworkError));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Change_sets_are_committed_over_the_WebSocket()
+
+        [Test]
+        public async Task Change_sets_are_committed_over_the_WebSocket()
+        {
+
+            await using var client = await Connect();
+
+            var head0      = leader!.Head.Commit.Id;
+            var changeSet  = ChangeSet(leader, "A");
+            var payload    = new JObject(new JProperty("changeSet", changeSet.ToJSON()));
+
+            var refused    = await client.Request("1", "commitChangeSet", payload);
+
+            poiAPI!.AuthorizeChangeSetSubmission = (request, changeSet) => request.Path.ToString().EndsWith("/history/ws");
+
+            var published  = await client.Request("2", "commitChangeSet", payload);
+            var again      = await client.Request("3", "commitChangeSet", payload);
+            var stale      = await client.Request("4", "commitChangeSet", new JObject(new JProperty("changeSet",     ChangeSet(leader, "B").ToJSON()),
+                                                                                       new JProperty("expectedHead",  head0.ToString())));
+            var invalid    = await client.Request("5", "commitChangeSet", new JObject(new JProperty("changeSet",     "no change set")));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(refused.ErrorCode,                                    Is.EqualTo(POIWebSocketErrorCodes.SecurityError));
+
+                Assert.That(published.Payload!["status"]!.Value<String>(),        Is.EqualTo("Published"));
+                Assert.That(published.Payload["@id"]!.Value<String>(),            Is.EqualTo(leader.Head.Commit.Id.ToString()));
+                Assert.That(again.Payload!["status"]!.Value<String>(),            Is.EqualTo("AlreadyPublished"));
+
+                Assert.That(stale.Payload!["status"]!.Value<String>(),            Is.EqualTo("HeadMoved"));
+                Assert.That(stale.Payload["head"]!["revision"]!.Value<Int32>(),   Is.EqualTo(1));
+
+                Assert.That(invalid.ErrorCode,                                    Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+
+                Assert.That(leader.Head.Commit.Revision,                          Is.EqualTo(1));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_session_ends_with_its_connection()
+
+        [Test]
+        public async Task A_session_ends_with_its_connection()
+        {
+
+            var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            webSocketServer!.AddCommand("forever", async request => {
+
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, request.CancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    cancelled.TrySetResult();
+                    throw;
+                }
+
+                return request.Respond([]);
+
+            });
+
+            var client = await Connect();
+
+            await client.Send(POIWebSocketMessage.Request("1", "forever"));
+            await client.Request("2", "head");
+
+            Assert.That(webSocketServer.Sessions.Count(),  Is.EqualTo(1));
+
+            // The connection breaks, without any close frame.
+            client.Abort();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(await Eventually(() => !webSocketServer.Sessions.Any()),   Is.True, "The session outlived its connection.");
+                Assert.That(await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(5)).ContinueWith(task => task.IsCompletedSuccessfully),
+                            Is.True,
+                            "The request of the closed connection was not cancelled.");
+            }
+
+            await client.DisposeAsync();
+
+        }
+
+        #endregion
+
+        #region Clients_learn_the_topics()
+
+        [Test]
+        public async Task Clients_learn_the_topics()
+        {
+
+            await using var client = await Connect();
+
+            var topics = await client.Request("1", "topics");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(topics.Payload!["topics"]!.Select(topic => topic["name"]!.Value<String>()),
+                            Is.EqualTo(new[] { "adminStatusUpdates", "commitAnnouncements", "statusUpdates" }));
+                Assert.That(topics.Payload["topics"]![1]!["action"]!.Value<String>(),  Is.EqualTo("commitAnnouncement"));
+            }
+
+        }
+
+        #endregion
+
+        #region Subscribers_hear_of_new_commits()
+
+        [Test]
+        public async Task Subscribers_hear_of_new_commits()
+        {
+
+            await using var client      = await Connect();
+            await using var bystander   = await Connect();
+
+            var subscribed  = await client.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("commitAnnouncements"))));
+            await bystander.Request("1", "head");
+
+            var parent      = leader!.Head.Commit.Id;
+            Publish("v1", 1);
+
+            var (push, binary) = await client.NextPush();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(subscribed.Payload!["topics"]!.Values<String>(),            Is.EqualTo(new[] { "commitAnnouncements" }));
+
+                Assert.That(push.Action,                                                Is.EqualTo("commitAnnouncement"));
+                Assert.That(push.MessageId,                                             Is.EqualTo("p1"));
+                Assert.That(binary,                                                     Is.False);
+                Assert.That(push.Payload!["commitId"]!.Value<String>(),                 Is.EqualTo(leader.Head.Commit.Id.ToString()));
+                Assert.That(push.Payload["parentIds"]!.Values<String>(),                Is.EqualTo(new[] { parent.ToString() }));
+                Assert.That(push.Payload["revision"]!.Value<Int32>(),                   Is.EqualTo(1));
+                Assert.That(push.Payload["description"]!["en"]!.Value<String>(),        Is.EqualTo("Data source v1"));
+                Assert.That(push.Payload["timestamp"],                                  Is.Not.Null);
+                Assert.That(push.Payload["eTags"],                                      Is.Null);
+
+                Assert.That(bystander.Pushes.Reader.Count,                              Is.Zero);
+
+            }
+
+        }
+
+        #endregion
+
+        #region Status_updates_are_pushed_in_CBOR_and_end_with_unsubscribe()
+
+        [Test]
+        public async Task Status_updates_are_pushed_in_CBOR_and_end_with_unsubscribe()
+        {
+
+            await using var client = await Connect();
+
+            await client.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("statusUpdates", "adminStatusUpdates"))), Binary: true);
+
+            leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "available",    DateTimeOffset.Parse("2026-10-11T12:00:00Z"), out _, out _);
+            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), "rn1", "operational",  DateTimeOffset.Parse("2026-10-11T12:00:00Z"), out _, out _);
+
+            var (status, statusBinary)  = await client.NextPush();
+            var (admin,  _)             = await client.NextPush();
+
+            var unsubscribed            = await client.Request("2", "unsubscribe", new JObject(new JProperty("topics", new JArray("statusUpdates"))));
+
+            leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "offline",      DateTimeOffset.Parse("2026-10-11T12:01:00Z"), out _, out _);
+            leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), "rn1", "outOfService", DateTimeOffset.Parse("2026-10-11T12:01:00Z"), out _, out _);
+
+            var (lastAdmin, _)          = await client.NextPush();
+            var runtimeStatus           = await client.Request("3", "runtimeStatus");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(statusBinary,                                                       Is.True);
+                Assert.That(status.Action,                                                      Is.EqualTo("statusUpdate"));
+                Assert.That(status.GetPayloadJSON()!["value"]!.Value<String>(),                 Is.EqualTo("available"));
+                Assert.That(admin.Action,                                                       Is.EqualTo("adminStatusUpdate"));
+
+                Assert.That(unsubscribed.GetPayloadJSON()!["topics"]!.Values<String>(),         Is.EqualTo(new[] { "adminStatusUpdates" }));
+
+                // The status update after unsubscribing never came.
+                Assert.That(lastAdmin.Action,                                                   Is.EqualTo("adminStatusUpdate"));
+                Assert.That(lastAdmin.GetPayloadJSON()!["oldValue"]!.Value<String>(),           Is.EqualTo("operational"));
+                Assert.That(client.Pushes.Reader.Count,                                         Is.Zero);
+
+                Assert.That(runtimeStatus.Payload!["runtimeStatus"]!.Count(),                   Is.EqualTo(2));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Unknown_topics_are_refused()
+
+        [Test]
+        public async Task Unknown_topics_are_refused()
+        {
+
+            await using var client = await Connect();
+
+            var unknown  = await client.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("statusUpdates", "gossip"))));
+            var invalid  = await client.Request("2", "subscribe", new JObject(new JProperty("topics", "statusUpdates")));
+            var empty    = await client.Request("3", "subscribe", new JObject(new JProperty("topics", new JArray())));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(unknown.ErrorCode,                                             Is.EqualTo(POIWebSocketErrorCodes.PropertyConstraintViolation));
+                Assert.That(unknown.ErrorDetails!["unknownTopics"]!.Values<String>(),     Is.EqualTo(new[] { "gossip" }));
+                Assert.That(invalid.ErrorCode,                                             Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+                Assert.That(empty.ErrorCode,                                               Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+                Assert.That(webSocketServer!.Sessions.Single().Subscriptions,              Is.Empty);
+            }
+
+        }
+
+        #endregion
+
+        #region Subscriptions_end_with_their_connection()
+
+        [Test]
+        public async Task Subscriptions_end_with_their_connection()
+        {
+
+            var client = await Connect();
+
+            await client.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("commitAnnouncements"))));
+
+            Assert.That(webSocketServer!.Push(POI_API.CommitAnnouncementsTopic, []),  Is.EqualTo(1));
+
+            client.Abort();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(await Eventually(() => !webSocketServer.Sessions.Any()),      Is.True);
+                Assert.That(webSocketServer.Push(POI_API.CommitAnnouncementsTopic, []),   Is.Zero);
+            }
+
+            await client.DisposeAsync();
+
+        }
+
+        #endregion
+
+        #region A_client_that_does_not_keep_up_is_disconnected()
+
+        [Test]
+        public async Task A_client_that_does_not_keep_up_is_disconnected()
+        {
+
+            webSocketServer!.MaxQueuedPushes = 1;
+
+            await using var client = await Connect();
+
+            await client.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("commitAnnouncements"))));
+
+            var payload = new JObject(new JProperty("filler", new String('x', 16 * 1024)));
+
+            for (var i = 0; i < 1000 && webSocketServer.Sessions.Any(); i++)
+                webSocketServer.Push(POI_API.CommitAnnouncementsTopic, payload);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(webSocketServer.Sessions,                                                   Is.Empty);
+                Assert.That(await client.ClosedByServer.Task.WaitAsync(TimeSpan.FromSeconds(10)),        Is.EqualTo(WebSocketCloseStatus.PolicyViolation));
+            }
+
+        }
+
+        #endregion
+
+        #region The_WebSocket_path_answers_plain_requests()
+
+        [Test]
+        public async Task The_WebSocket_path_answers_plain_requests()
+        {
+
+            using var httpClient = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/") };
+
+            using var known    = await httpClient.GetAsync("rn1/history/ws");
+            using var unknown  = await httpClient.GetAsync("rn2/history/ws");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(known.StatusCode,    Is.EqualTo(HttpStatusCode.UpgradeRequired));
+                Assert.That(unknown.StatusCode,  Is.EqualTo(HttpStatusCode.NotFound));
+            }
+
+        }
+
+        #endregion
+
+        #region Clients_can_be_required_to_authenticate()
+
+        [Test]
+        public async Task Clients_can_be_required_to_authenticate()
+        {
+
+            poiAPI!.AuthenticateWebSocketClient = (request, cancellationToken) =>
+                Task.FromResult(request.Authorization is HTTPBasicAuthentication basic && basic.Username == "alice" && basic.Password == "secret"
+                                    ? "alice"
+                                    : null);
+
+            await Assert.ThatAsync(async () => await Connect(), Throws.InstanceOf<WebSocketException>());
+
+            using var alice = new ClientWebSocket();
+            alice.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("alice:secret")));
+            await alice.ConnectAsync(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"), CancellationToken.None);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(alice.State,                                            Is.EqualTo(WebSocketState.Open));
+                Assert.That(await Eventually(() => webSocketServer!.WebSocketConnections.Any(connection => connection.Login == "alice")),  Is.True);
+            }
+
+            await alice.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None);
+
+        }
+
+        #endregion
+
+    }
+
+}

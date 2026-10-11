@@ -103,12 +103,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region AddRoamingNetworkHistory   (History)
 
         /// <summary>
-        /// Serve the given history of a roaming network.
+        /// Serve the given history of a roaming network, over HTTP and over its WebSocket.
         /// </summary>
         /// <param name="History">The history of a roaming network.</param>
         public Boolean AddRoamingNetworkHistory(RoamingNetworkHistory History)
+        {
 
-            => roamingNetworkHistories.TryAdd(History.RoamingNetworkId, History);
+            var webSocketServer = CreateHistoryWebSocketServer(History);
+
+            if (!historyWebSocketServers.TryAdd(History.RoamingNetworkId, webSocketServer))
+            {
+                webSocketServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                return false;
+            }
+
+            if (!roamingNetworkHistories.TryAdd(History.RoamingNetworkId, History))
+            {
+                historyWebSocketServers.TryRemove(History.RoamingNetworkId, out _);
+                webSocketServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                return false;
+            }
+
+            ConnectHistoryWebSocketServer(History, webSocketServer);
+
+            return true;
+
+        }
 
         #endregion
 

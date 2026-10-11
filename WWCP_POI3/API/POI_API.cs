@@ -56,6 +56,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.roamingNetworkRemoval   = new VotingNotificator<POI_API, RoamingNetwork, Boolean>(() => new VetoVote(), true);
 
             RegisterHistoryURLTemplates();
+            RegisterWebSocketURLTemplates();
 
         }
 

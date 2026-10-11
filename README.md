@@ -19,7 +19,8 @@ Charging pools, stations, EVSEs and e-mobility providers follow.
   timestamps to the millisecond. CBOR uses the keys and values of JSON.
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
   They identify a version; `CalcETags()` and `ValidateETags(…)`.
-- **Runtime:** admin status and status are not content and have no ETags.
+- **Runtime:** admin status and status are not content and have no ETags,
+  see `RuntimeStatus` of a history below.
 
 ## Change sets
 
@@ -63,6 +64,11 @@ follower.TryAppend(commits!, out _, out _);
   The id is the SHA-256 of the commit's canonical JSON without signatures; it is checked when read.
 - **Followers** start from a snapshot (head commit and complete network) and append commits;
   each must follow the head and lead to its ETags.
+- **Announcements:** `OnCommitAnnouncement` tells of every commit a history takes, in order:
+  timestamp, commit id, parent ids, revision, description.
+- **Runtime status:** `history.RuntimeStatus.TryUpdate(kind, entityType, entityId, value, timestamp, …)`
+  for the network and its operators; kept across versions, dropped with its entity.
+  An older timestamp is `Outdated`, the same value `Unchanged`; `OnStatusUpdate` tells of the rest.
 
 `POI_API` serves a history in JSON, or in CBOR for `Accept: application/cbor` (also as request body):
 
@@ -78,10 +84,33 @@ follower.TryAppend(commits!, out _, out _);
 Submitting is refused unless `AuthorizeChangeSetSubmission` decides who may submit what;
 signed change sets need `VerifyChangeSetSignature`.
 
+### WebSocket
+
+`GET ~/roamingNetworks/{id}/history/ws` upgrades to a WebSocket with OCPP-J frames,
+JSON in text frames, CBOR in binary frames; every request is answered in its own format.
+
+```
+[2, "42", "commitInfos", { "since": "9f3c…", "max": 10 }]    request
+[3, "42", { "commitInfos": [ … ] }]                          response
+[4, "42", "NotFound", "The commit … is unknown here!", {}]   request error
+```
+
+- **Actions:** `head`, `snapshot`, `commitInfos`, `commits`, `commit {commitId}`,
+  `commitChangeSet {changeSet, expectedHead?, rebase?}` → `{status, …}`, `runtimeStatus`.
+- **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
+  `commitAnnouncements`, `adminStatusUpdates`, `statusUpdates`. Pushes are sends, `[6, "p1", action, payload]`,
+  in the format of the last `subscribe`. They end with the connection; a client that falls more than
+  `MaxQueuedPushes` behind is disconnected and catches up after reconnecting.
+- **Async:** requests are processed concurrently, up to `MaxConcurrentRequests` per connection;
+  answers come when ready and are matched by their id. A connection's requests are cancelled when it closes.
+- **Errors:** the codes of OCPP-J plus `NotFound`; an unreadable frame is answered on id `"-1"`.
+- **Access:** open like the HTTP reads, unless `AuthenticateWebSocketClient` is set;
+  `commitChangeSet` asks `AuthorizeChangeSetSubmission` with the upgrade request.
+
 ## Open
 
 - Persistence and retention of histories
-- Runtime status as a channel of its own
+- Status updates by clients (`setStatus`), finer subscription filters, energy status with EVSEs
 - Commits signed by the leader
 - Further entities: charging pools, stations, EVSEs, e-mobility providers, …
 

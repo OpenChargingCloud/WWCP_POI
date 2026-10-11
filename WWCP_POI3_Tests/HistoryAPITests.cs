@@ -88,6 +88,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             if (httpServer is not null)
                 await httpServer.DisposeAsync();
 
+            if (poiAPI is not null)
+                await poiAPI.DisposeAsync();
+
         }
 
         #endregion
