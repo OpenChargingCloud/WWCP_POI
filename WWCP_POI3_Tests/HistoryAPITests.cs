@@ -181,6 +181,180 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region Post(ChangeSet, Query = "")
+
+        private async Task<(HttpStatusCode StatusCode, JObject JSON)> Post(RoamingNetworkChangeSet  ChangeSet,
+                                                                         String                   Query   = "")
+        {
+
+            using var content   = new StringContent(ChangeSet.ToJSON().ToString(), System.Text.Encoding.UTF8, "application/json");
+            using var response  = await httpClient!.PostAsync("changeSets" + Query, content);
+
+            return (response.StatusCode, JObject.Parse(await response.Content.ReadAsStringAsync()));
+
+        }
+
+        #endregion
+
+        #region ChangeSet(History, Property, Value)
+
+        private static RoamingNetworkChangeSet ChangeSet(RoamingNetworkHistory  History,
+                                                         String                 Property,
+                                                         JToken                 Value)
+
+            => History.Head.RoamingNetwork.CreateChangeSet(
+                   [ RoamingNetworkChange.UpdateProperty(History.Head.RoamingNetwork, Property, null, Value) ],
+                   CreatedAt: DateTimeOffset.Parse("2026-10-11T13:00:00Z")
+               );
+
+        #endregion
+
+
+        #region Submitting_is_refused_unless_enabled()
+
+        [Test]
+        public async Task Submitting_is_refused_unless_enabled()
+        {
+
+            var (statusCode, json) = await Post(ChangeSet(leader!, "dataSource", "v1"));
+
+            Assert.That(statusCode,                               Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.That(json["description"]!.Value<String>(),     Does.Contain("not enabled"));
+            Assert.That(leader!.Head.Commit.Revision,             Is.Zero);
+
+        }
+
+        #endregion
+
+        #region A_follower_submits_a_change_set_and_catches_up()
+
+        [Test]
+        public async Task A_follower_submits_a_change_set_and_catches_up()
+        {
+
+            poiAPI!.AuthorizeChangeSetSubmission = (request, changeSet) => true;
+
+            RoamingNetworkHistory.TryFromSnapshot((await Get("snapshot")).Text, out var follower, out _);
+
+            // The follower prepares a change set against its head and submits it to the leader...
+            var changeSet  = ChangeSet(follower!, "dataSource", "from the follower");
+            var published  = await Post(changeSet, $"?expectedHead={follower!.Head.Commit.Id}");
+            var again      = await Post(changeSet);
+
+            // ...and gets it back as a commit, as every other follower does.
+            leader!.TryGetCommitsSince(follower.Head.Commit.Id, out var commits, out _);
+            follower.TryAppend(commits!, out _, out _);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(published.StatusCode,                                  Is.EqualTo(HttpStatusCode.Created));
+                Assert.That(published.JSON["status"]!.Value<String>(),             Is.EqualTo("Published"));
+                Assert.That(published.JSON["rebased"]!.Value<Boolean>(),           Is.False);
+                Assert.That(published.JSON["@id"]!.Value<String>(),                Is.EqualTo(leader.Head.Commit.Id.ToString()));
+
+                Assert.That(again.StatusCode,                                      Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(again.JSON["status"]!.Value<String>(),                 Is.EqualTo("AlreadyPublished"));
+
+                Assert.That(follower.Head.Commit.Id,                               Is.EqualTo(leader.Head.Commit.Id));
+                Assert.That(follower.Head.RoamingNetwork.DataSource,               Is.EqualTo("from the follower"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Concurrent_submissions()
+
+        [Test]
+        public async Task Concurrent_submissions()
+        {
+
+            poiAPI!.AuthorizeChangeSetSubmission = (request, changeSet) => true;
+
+            var head0      = leader!.Head.Commit.Id;
+
+            // Three change sets against the same head.
+            var a          = ChangeSet(leader, "dataSource",  "A");
+            var b          = ChangeSet(leader, "name",        new JObject(new JProperty("en", "B")));
+            var c          = ChangeSet(leader, "dataSource",  "C");
+
+            var postA      = await Post(a);
+            var staleB     = await Post(b, $"?expectedHead={head0}");
+            var notFitB    = await Post(b);
+            var rebasedB   = await Post(b, "?rebase=true");
+            var conflictC  = await Post(c, "?rebase=true");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(postA.StatusCode,                                  Is.EqualTo(HttpStatusCode.Created));
+
+                Assert.That(staleB.StatusCode,                                 Is.EqualTo(HttpStatusCode.Conflict));
+                Assert.That(staleB.JSON["head"]!["revision"]!.Value<Int32>(),  Is.EqualTo(1));
+                Assert.That(notFitB.StatusCode,                                Is.EqualTo(HttpStatusCode.Conflict));
+
+                Assert.That(rebasedB.StatusCode,                               Is.EqualTo(HttpStatusCode.Created));
+                Assert.That(rebasedB.JSON["rebased"]!.Value<Boolean>(),        Is.True);
+
+                Assert.That(conflictC.StatusCode,                              Is.EqualTo((HttpStatusCode) 422));
+                Assert.That(conflictC.JSON["description"]!.Value<String>(),    Does.Contain("no longer the expected old value"));
+
+                Assert.That(leader.Head.Commit.Revision,                       Is.EqualTo(2));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Invalid_submissions_are_refused()
+
+        [Test]
+        public async Task Invalid_submissions_are_refused()
+        {
+
+            var allowed = true;
+
+            poiAPI!.AuthorizeChangeSetSubmission = (request, changeSet) => allowed;
+
+            var otherNetwork  = new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn2"), Created: DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
+            var otherHistory  = RoamingNetworkHistory.Start(otherNetwork);
+
+            using var garbage = new StringContent("{ \"no\": \"change set\" }", System.Text.Encoding.UTF8, "application/json");
+            using var invalid = await httpClient!.PostAsync("changeSets", garbage);
+
+            var wrongNetwork  = await Post(ChangeSet(otherHistory, "dataSource", "x"));
+            var invalidRebase = await Post(ChangeSet(leader!, "dataSource", "x"), "?rebase=yes");
+
+            var signed        = await Post(ChangeSet(leader!, "dataSource", "x").Sign(new Org.BouncyCastle.Crypto.Parameters.Ed25519PrivateKeyParameters(new Byte[32], 0),
+                                                                                    "alice",
+                                                                                    COSEAlgorithm.Ed25519));
+
+            allowed = false;
+            var forbidden     = await Post(ChangeSet(leader!, "dataSource", "x"));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(invalid.StatusCode,        Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(wrongNetwork.StatusCode,   Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(invalidRebase.StatusCode,  Is.EqualTo(HttpStatusCode.BadRequest));
+
+                // Signed, but the leader has no verifier for signatures.
+                Assert.That(signed.StatusCode,                                Is.EqualTo((HttpStatusCode) 422));
+                Assert.That(signed.JSON["description"]!.Value<String>(),      Does.Contain("requires a signature verifier"));
+
+                Assert.That(forbidden.StatusCode,                             Is.EqualTo(HttpStatusCode.Forbidden));
+                Assert.That(leader!.Head.Commit.Revision,                     Is.Zero);
+
+            }
+
+        }
+
+        #endregion
+
         #region Errors_are_answered_in_JSON()
 
         [Test]

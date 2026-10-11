@@ -32,15 +32,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// The histories of roaming networks over HTTP, read only, as JSON:
-    /// what another server needs to start from a snapshot and to catch up with the commits since.
+    /// A delegate deciding whether the sender of the given HTTP request may submit the given change set.
+    /// </summary>
+    /// <param name="Request">The HTTP request.</param>
+    /// <param name="ChangeSet">The submitted change set.</param>
+    public delegate Boolean AuthorizeChangeSetSubmissionDelegate(HTTPRequest              Request,
+                                                                 RoamingNetworkChangeSet  ChangeSet);
+
+
+    /// <summary>
+    /// The histories of roaming networks over HTTP, as JSON:
+    /// what another server needs to start from a snapshot, to catch up with the commits since,
+    /// and to submit its change sets to the leading server.
     /// </summary>
     /// <remarks>
-    /// GET ~/roamingNetworks/{roamingNetworkId}/history/head                                  the metadata of the head commit
-    /// GET ~/roamingNetworks/{roamingNetworkId}/history/snapshot                              the head commit and the complete roaming network
-    /// GET ~/roamingNetworks/{roamingNetworkId}/history/commitInfos?since={commitId}&amp;max={n}   the metadata of the commits since, without changes
-    /// GET ~/roamingNetworks/{roamingNetworkId}/history/commits?since={commitId}&amp;max={n}       the complete commits since
-    /// GET ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}                    one complete commit
+    /// GET  ~/roamingNetworks/{roamingNetworkId}/history/head                                  the metadata of the head commit
+    /// GET  ~/roamingNetworks/{roamingNetworkId}/history/snapshot                              the head commit and the complete roaming network
+    /// GET  ~/roamingNetworks/{roamingNetworkId}/history/commitInfos?since={commitId}&amp;max={n}   the metadata of the commits since, without changes
+    /// GET  ~/roamingNetworks/{roamingNetworkId}/history/commits?since={commitId}&amp;max={n}       the complete commits since
+    /// GET  ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}                    one complete commit
+    /// POST ~/roamingNetworks/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&amp;rebase=true
+    ///                                                                                         publish a change set as the new head commit
     /// Without "since", the commits since the root are returned. "max" is at most MaxCommitsPerRequest.
     /// </remarks>
     public partial class POI_API
@@ -54,6 +66,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const Int32 MaxCommitsPerRequest = RoamingNetworkHistory.DefaultMaxCommits;
 
         private readonly ConcurrentDictionary<RoamingNetwork_Id, RoamingNetworkHistory> roamingNetworkHistories = [];
+
+        #endregion
+
+        #region Properties
+
+        /// <summary>
+        /// Decides who may submit which change sets. Without it, submitting change sets is refused:
+        /// a server has to decide on purpose whom it lets change its roaming networks.
+        /// </summary>
+        public AuthorizeChangeSetSubmissionDelegate?  AuthorizeChangeSetSubmission    { get; set; }
+
+        /// <summary>
+        /// Verifies the signatures of submitted change sets with trusted keys; without it, signed change sets are refused.
+        /// </summary>
+        public VerifyChangeSetSignatureDelegate?      VerifyChangeSetSignature        { get; set; }
+
+        /// <summary>
+        /// The limits for reading submitted change sets.
+        /// </summary>
+        public RoamingNetworkChangeSetLimits          ChangeSetLimits                 { get; set; } = RoamingNetworkChangeSetLimits.Default;
 
         #endregion
 
@@ -160,6 +192,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region POST ~/roamingNetworks/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&rebase=true
+
+            AddHandler(history + "/changeSets",
+                       HTTPMethod:    HTTPMethod.POST,
+                       HTTPDelegate:  request => Task.FromResult(SubmitChangeSet(request)));
+
+            #endregion
+
             #region GET ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}
 
             AddHandler(history + "/commits/{commitId}",
@@ -180,6 +220,113 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        ));
 
             #endregion
+
+        }
+
+        #endregion
+
+
+        #region (private) SubmitChangeSet(Request)
+
+        /// <summary>
+        /// Publish the change set in the body of the request as the new head commit.
+        /// 201 Created:          published now; the metadata of the commit, and whether it was rebased
+        /// 200 OK:               published before, also in a rebased version; the metadata of its commit
+        /// 409 Conflict:         the head moved, or the change set does not fit it; the metadata of the head
+        /// 422 Unprocessable:    refused, e.g. as it conflicts or a signature is invalid
+        /// 400 Bad Request:      no valid change set, or one for another roaming network
+        /// 403 Forbidden:        submitting is not enabled, or not allowed for the sender
+        /// </summary>
+        private HTTPResponse SubmitChangeSet(HTTPRequest Request)
+        {
+
+            if (!TryGetHistory(Request, out var history, out var errorResponse))
+                return errorResponse;
+
+            if (AuthorizeChangeSetSubmission is null)
+                return ErrorResponse(Request, HTTPStatusCode.Forbidden, "Submitting change sets is not enabled here!");
+
+            #region Parse the change set and the options
+
+            var text = Request.HTTPBodyAsUTF8String;
+
+            if (String.IsNullOrWhiteSpace(text))
+                return ErrorResponse(Request, HTTPStatusCode.BadRequest, "The request must contain a change set!");
+
+            if (!RoamingNetworkChangeSet.TryParse(text, out var changeSet, out var changeSetError, ChangeSetLimits))
+                return ErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid change set: " + changeSetError);
+
+            if (changeSet.RoamingNetworkId != history.RoamingNetworkId)
+                return ErrorResponse(Request, HTTPStatusCode.BadRequest, $"The change set is for the roaming network '{changeSet.RoamingNetworkId}', not for '{history.RoamingNetworkId}'!");
+
+            RoamingNetworkCommit_Id? expectedHead = null;
+
+            if (Request.QueryString.GetString("expectedHead") is String expectedHeadText)
+            {
+
+                if (!RoamingNetworkCommit_Id.TryParse(expectedHeadText, out var parsedExpectedHead))
+                    return ErrorResponse(Request, HTTPStatusCode.BadRequest, $"Invalid commit identification '{expectedHeadText}'!");
+
+                expectedHead = parsedExpectedHead;
+
+            }
+
+            var rebaseText = Request.QueryString.GetString("rebase");
+
+            if (rebaseText is not null && rebaseText is not ("true" or "false"))
+                return ErrorResponse(Request, HTTPStatusCode.BadRequest, $"Invalid rebase option '{rebaseText}'; use true or false!");
+
+            #endregion
+
+            if (!AuthorizeChangeSetSubmission(Request, changeSet))
+                return ErrorResponse(Request, HTTPStatusCode.Forbidden, "The sender may not submit this change set!");
+
+            var result = history.Publish(changeSet,
+                                         expectedHead,
+                                         rebaseText == "true",
+                                         VerifyChangeSetSignature);
+
+            return result.Status switch {
+
+                       RoamingNetworkPublishStatus.Published         => JSONResponse(Request,
+                                                                                     HTTPStatusCode.Created,
+                                                                                     PublishedJSON(result)),
+
+                       RoamingNetworkPublishStatus.AlreadyPublished  => JSONResponse(Request,
+                                                                                     HTTPStatusCode.OK,
+                                                                                     PublishedJSON(result)),
+
+                       RoamingNetworkPublishStatus.HeadMoved         => JSONResponse(Request,
+                                                                                     HTTPStatusCode.Conflict,
+                                                                                     new JObject(
+                                                                                         new JProperty("description",  result.ErrorResponse),
+                                                                                         new JProperty("head",         new RoamingNetworkCommitInfo(result.Head.Commit).ToJSON())
+                                                                                     )),
+
+                       _                                             => ErrorResponse(Request,
+                                                                                      HTTPStatusCode.UnprocessableEntity,
+                                                                                      result.ErrorResponse)
+
+                   };
+
+        }
+
+        #endregion
+
+        #region (private static) PublishedJSON(Result)
+
+        /// <summary>
+        /// The metadata of the commit of a published change set, and whether it was rebased.
+        /// </summary>
+        private static JObject PublishedJSON(RoamingNetworkPublishResult Result)
+        {
+
+            var json = new RoamingNetworkCommitInfo(Result.Commit!).ToJSON();
+
+            json.Add("status",   Result.Status.ToString());
+            json.Add("rebased",  Result.Rebased);
+
+            return json;
 
         }
 

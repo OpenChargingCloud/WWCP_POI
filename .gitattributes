@@ -1,3 +1,3 @@
 # Fixed interoperability artifacts must retain their exact bytes across checkouts.
-docs/interoperability/*.json text eol=lf
-docs/interoperability/*.cbor binary
+old/docs/interoperability/*.json text eol=lf
+old/docs/interoperability/*.cbor binary
