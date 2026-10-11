@@ -301,7 +301,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             get
             {
-                return ImmutablePOIValues.Copy(address);
+                return address; //ImmutablePOIValues.Copy(address);
             }
 
 

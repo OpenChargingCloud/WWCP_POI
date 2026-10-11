@@ -261,11 +261,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               InfoStatus                                                  ExpandDataLicenses                        = InfoStatus.ShowIdOnly,
                               InfoStatus                                                  ExpandEMobilityProviderId                 = InfoStatus.ShowIdOnly,
 
-                              CustomJObjectSerializerDelegate<RoamingNetwork>?           CustomRoamingNetworkSerializer            = null)
-                              //CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null,
-                              //CustomJObjectSerializerDelegate<ChargingPool>?             CustomChargingPoolSerializer              = null,
-                              //CustomJObjectSerializerDelegate<ChargingStation>?          CustomChargingStationSerializer           = null,
-                              //CustomJObjectSerializerDelegate<EVSE>?                     CustomEVSESerializer                      = null)
+                              CustomJObjectSerializerDelegate<RoamingNetwork>?            CustomRoamingNetworkSerializer            = null)
+                              //CustomJObjectSerializerDelegate<ChargingStationOperator>?   CustomChargingStationOperatorSerializer   = null,
+                              //CustomJObjectSerializerDelegate<ChargingPool>?              CustomChargingPoolSerializer              = null,
+                              //CustomJObjectSerializerDelegate<ChargingStation>?           CustomChargingStationSerializer           = null,
+                              //CustomJObjectSerializerDelegate<EVSE>?                      CustomEVSESerializer                      = null)
         {
 
             var JSON = JSONObject.Create(
