@@ -1,0 +1,249 @@
+/*
+ * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
+ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
+ *
+ * Licensed under the Affero GPL license, Version 3.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.gnu.org/licenses/agpl.html
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#region Usings
+
+using Newtonsoft.Json.Linq;
+
+using NUnit.Framework;
+
+using Org.BouncyCastle.Crypto.Parameters;
+
+using org.GraphDefined.Vanaheimr.Illias;
+
+#endregion
+
+namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
+{
+
+    /// <summary>
+    /// Changes and change sets with JToken values, their JSON and their signatures.
+    /// </summary>
+    [TestFixture]
+    public class ChangeSetTests
+    {
+
+        #region Data
+
+        private static readonly Ed25519PrivateKeyParameters Alice = new (Convert.FromHexString("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), 0);
+
+        private static RoamingNetwork NewNetwork()
+
+            => new (
+                   Id:           RoamingNetwork_Id.Parse("rn1"),
+                   Name:         I18NString.Create(Languages.en, "Roaming Network 1"),
+                   DataSource:   "test"
+               );
+
+        private static RoamingNetworkChangeSet NewChangeSet()
+        {
+
+            var rn1   = NewNetwork();
+            var eTags = rn1.CalcETags();
+
+            return new RoamingNetworkChangeSet(
+                       Id:                ChangeSet_Id.Parse("cs1"),
+                       RoamingNetworkId:  rn1.Id,
+                       CreatedAt:         DateTimeOffset.Parse("2026-10-11T12:34:56.7891234Z"),
+                       Changes:           [
+                                              RoamingNetworkChange.UpdateProperty(rn1, "dataSource", OldValue: "test", NewValue: "test2"),
+                                              RoamingNetworkChange.UpdateProperty(rn1, "name",       OldValue: null,   NewValue: new JObject(new JProperty("en", "Network 1"))),
+                                              RoamingNetworkChange.RemoveProperty(rn1, "description")
+                                          ],
+                       BeforeETags:       eTags,
+                       AfterETags:        eTags,
+                       Description:       I18NString.Create(Languages.en, "Hello world!"),
+                       // A text that looks like a date must stay this exact text.
+                       Metadata:          new JObject(new JProperty("validFrom", "2026-01-01T00:00:00Z"))
+                   );
+
+        }
+
+        #endregion
+
+
+        #region A_change_reads_back_its_JSON()
+
+        [Test]
+        public void A_change_reads_back_its_JSON()
+        {
+
+            var change = RoamingNetworkChange.UpdateElementProperty(
+                             EntityType:    "ChargingStationOperator",
+                             EntityId:      "DE*GEF",
+                             ElementPath:   [ new POIElementPathSegment("addresses", "home") ],
+                             PropertyName:  "city",
+                             OldValue:      new JObject(new JProperty("de", "Jena")),
+                             NewValue:      new JObject(new JProperty("de", "Erfurt"))
+                         );
+
+            var parsed = RoamingNetworkChange.Parse(change.ToJSON());
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(parsed,                                          Is.EqualTo(change));
+                Assert.That(JToken.DeepEquals(parsed.ToJSON(), change.ToJSON()),  Is.True);
+                Assert.That(parsed.ElementPath.Single().ElementId,           Is.EqualTo("home"));
+            }
+
+        }
+
+        #endregion
+
+        #region A_change_refuses_JSON_null()
+
+        [Test]
+        public void A_change_refuses_JSON_null()
+        {
+
+            var rn1 = NewNetwork();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(() => RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, JValue.CreateNull()),
+                            Throws.ArgumentException);
+
+                Assert.That(RoamingNetworkChange.TryParse(JObject.Parse("""
+                                {
+                                    "kind":          "UpdateProperty",
+                                    "entityType":    "RoamingNetwork",
+                                    "entityId":      "rn1",
+                                    "propertyName":  "dataSource",
+                                    "newValue":      null
+                                }
+                                """), out _, out var error),
+                            Is.False);
+
+                Assert.That(error, Does.Contain("RemoveProperty"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_change_refuses_an_unknown_kind()
+
+        [Test]
+        public void A_change_refuses_an_unknown_kind()
+        {
+
+            Assert.That(RoamingNetworkChange.TryParse(JObject.Parse("""{ "kind": "Rename", "entityType": "RoamingNetwork", "entityId": "rn1" }"""),
+                                                      out _,
+                                                      out var error),
+                        Is.False);
+
+            Assert.That(error, Does.Contain("Rename"));
+
+        }
+
+        #endregion
+
+        #region The_values_of_a_change_are_its_own()
+
+        [Test]
+        public void The_values_of_a_change_are_its_own()
+        {
+
+            var given   = new JObject(new JProperty("en", "Network 1"));
+            var change  = RoamingNetworkChange.UpdateProperty(NewNetwork(), "name", null, given);
+
+            given["en"] = "changed by the caller";
+            change.NewValue!["en"] = "changed by a reader";
+
+            Assert.That(change.NewValue!["en"]!.Value<String>(), Is.EqualTo("Network 1"));
+
+        }
+
+        #endregion
+
+
+        #region A_change_set_reads_back_its_JSON_text()
+
+        [Test]
+        public void A_change_set_reads_back_its_JSON_text()
+        {
+
+            var cs1   = NewChangeSet();
+            var text  = cs1.ToJSON().ToString(Newtonsoft.Json.Formatting.Indented);
+            var cs2   = RoamingNetworkChangeSet.Parse(text);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(cs2.Id,                                        Is.EqualTo(cs1.Id));
+                Assert.That(cs2.RoamingNetworkId,                          Is.EqualTo(cs1.RoamingNetworkId));
+                Assert.That(cs2.CreatedAt,                                 Is.EqualTo(DateTimeOffset.Parse("2026-10-11T12:34:56.789Z")));
+                Assert.That(cs2.Changes,                                   Is.EqualTo(cs1.Changes));
+                Assert.That(cs2.BeforeETags,                               Is.EqualTo(cs1.BeforeETags));
+                Assert.That(cs2.AfterETags,                                Is.EqualTo(cs1.AfterETags));
+                Assert.That(cs2.Description,                               Is.EqualTo(cs1.Description));
+                Assert.That(cs2.Metadata["validFrom"]!.Type,               Is.EqualTo(JTokenType.String));
+                Assert.That(CanonicalJSON.Serialize(cs2.ToJSON()),         Is.EqualTo(CanonicalJSON.Serialize(cs1.ToJSON())));
+            }
+
+        }
+
+        #endregion
+
+        #region A_change_set_refuses_an_invalid_change()
+
+        [Test]
+        public void A_change_set_refuses_an_invalid_change()
+        {
+
+            var json = NewChangeSet().ToJSON();
+            ((JArray) json["changes"]!)[1]["kind"] = "Rename";
+
+            Assert.That(RoamingNetworkChangeSet.TryParse(json, out _, out var error), Is.False);
+            Assert.That(error,                                                        Does.Contain("Invalid change 1"));
+
+        }
+
+        #endregion
+
+        #region A_signature_survives_the_JSON_text()
+
+        [Test]
+        public void A_signature_survives_the_JSON_text()
+        {
+
+            var signed     = NewChangeSet().Sign(Alice, "alice", COSEAlgorithm.Ed25519);
+            var parsed     = RoamingNetworkChangeSet.Parse(signed.ToJSON().ToString());
+
+            var tampered   = signed.ToJSON();
+            tampered["description"]!["en"] = "Hello moon!";
+            var forged     = RoamingNetworkChangeSet.Parse(tampered.ToString());
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(parsed.Signatures,  Is.EqualTo(signed.Signatures));
+
+                Assert.That(parsed.VerifySignature(parsed.Signatures[0], Alice.GeneratePublicKey(), "alice", out var error1),  Is.True,  error1);
+                Assert.That(forged.VerifySignature(forged.Signatures[0], Alice.GeneratePublicKey(), "alice", out var error2),  Is.False);
+                Assert.That(parsed.VerifySignature(parsed.Signatures[0], Alice.GeneratePublicKey(), "bob",   out var error3),  Is.False);
+
+            }
+
+        }
+
+        #endregion
+
+    }
+
+}

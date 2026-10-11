@@ -98,6 +98,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        public static ChangeSet_Id NewRandom(UInt16? Length = null)
+            => new (RandomExtensions.RandomString(Length ?? 32));
+
         #region (static) Parse   (Text)
 
         /// <summary>

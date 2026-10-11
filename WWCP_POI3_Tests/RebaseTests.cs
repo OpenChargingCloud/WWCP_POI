@@ -1,0 +1,263 @@
+/*
+ * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
+ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
+ *
+ * Licensed under the Affero GPL license, Version 3.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.gnu.org/licenses/agpl.html
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#region Usings
+
+using Newtonsoft.Json.Linq;
+
+using NUnit.Framework;
+
+using Org.BouncyCastle.Crypto.Parameters;
+
+using org.GraphDefined.Vanaheimr.Illias;
+
+#endregion
+
+namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
+{
+
+    /// <summary>
+    /// Rebasing change sets prepared concurrently against an older version of a roaming network.
+    /// </summary>
+    [TestFixture]
+    public class RebaseTests
+    {
+
+        #region Data
+
+        private static readonly Ed25519PrivateKeyParameters Alice = new (Convert.FromHexString("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"), 0);
+
+        private static RoamingNetwork NewNetwork(Boolean WithDescription = true)
+
+            => new (
+                   Id:                        RoamingNetwork_Id.Parse("rn1"),
+                   Name:                      I18NString.Create(Languages.en, "Roaming Network 1"),
+                   Description:               WithDescription
+                                                  ? I18NString.Create(Languages.en, "My first roaming network!")
+                                                  : null,
+                   DataSource:                "test",
+                   ChargingStationOperators:  [ new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"), I18NString.Create(Languages.en, "GraphDefined")) ]
+               );
+
+        #endregion
+
+
+        #region A_fitting_change_set_stays_as_it_is()
+
+        [Test]
+        public void A_fitting_change_set_stays_as_it_is()
+        {
+
+            var rn1  = NewNetwork();
+            var cs1  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]);
+
+            Assert.That(rn1.TryRebase(cs1, out var rebased, out var error),  Is.True, error);
+            Assert.That(rebased,                                             Is.SameAs(cs1));
+
+        }
+
+        #endregion
+
+        #region Changes_of_other_values_are_rebased()
+
+        [Test]
+        public void Changes_of_other_values_are_rebased()
+        {
+
+            var rn1   = NewNetwork();
+            var csA   = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]);
+            var csB   = rn1.CreateChangeSet([
+                            RoamingNetworkChange.RemoveProperty(rn1, "description"),
+                            RoamingNetworkChange.Add(new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*NEW")))
+                        ],
+                        Description: I18NString.Create(Languages.en, "B"),
+                        Metadata:    new JObject(new JProperty("author", "bob")));
+
+            var csC   = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "name", null, new JObject(new JProperty("en", "C"))) ]);
+
+            var rn2   = rn1.ApplyChangeSet(csA);
+            var csB2  = rn2.Rebase(csB);
+            var rn3   = rn2.ApplyChangeSet(csB2);
+            var csC3  = rn3.Rebase(rn2.Rebase(csC));
+            var rn4   = rn3.ApplyChangeSet(csC3);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(csB2.Id,                                      Is.Not.EqualTo(csB.Id));
+                Assert.That(csB2.BeforeETags,                             Is.EqualTo(rn2.CalcETags()));
+                Assert.That(csB2.Changes,                                 Is.EqualTo(csB.Changes));
+                Assert.That(csB2.Description,                             Is.EqualTo(csB.Description));
+                Assert.That(csB2.CreatedAt,                               Is.EqualTo(csB.CreatedAt));
+                Assert.That(csB2.Metadata["author"]!.Value<String>(),     Is.EqualTo("bob"));
+                Assert.That(csB2.Metadata["rebasedFrom"]![0]!["@id"]!.Value<String>(),  Is.EqualTo(csB.Id.ToString()));
+
+                Assert.That(rn3.DataSource,                               Is.EqualTo("A"));
+                Assert.That(rn3.Description.Count,                        Is.Zero);
+                Assert.That(rn3.ChargingStationOperators.Count(),         Is.EqualTo(2));
+
+                // Rebased twice: both originals are named.
+                Assert.That(csC3.Metadata["rebasedFrom"]!.Count(),        Is.EqualTo(2));
+                Assert.That(rn4.Name[Languages.en],                       Is.EqualTo("C"));
+                Assert.That(rn4.Revision,                                 Is.EqualTo(3));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Changes_of_the_same_value_conflict()
+
+        [Test]
+        public void Changes_of_the_same_value_conflict()
+        {
+
+            var rn1  = NewNetwork();
+            var csA  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]);
+            var csB  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "B") ]);
+
+            var rn2  = rn1.ApplyChangeSet(csA);
+
+            Assert.That(rn2.TryRebase(csB, out _, out var error),  Is.False);
+            Assert.That(error,                                     Does.Contain("can not be rebased").And.Contain("no longer the expected old value"));
+
+        }
+
+        #endregion
+
+        #region A_value_expected_absent_conflicts()
+
+        [Test]
+        public void A_value_expected_absent_conflicts()
+        {
+
+            var rn1  = NewNetwork(WithDescription: false);
+            var csA  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "description", null, new JObject(new JProperty("en", "A"))) ]);
+            var csB  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "description", null, new JObject(new JProperty("en", "B"))) ]);
+
+            // The old value "absent" survives the JSON text.
+            var csBviaJSON  = RoamingNetworkChangeSet.Parse(csB.ToJSON().ToString());
+
+            var rn2  = rn1.ApplyChangeSet(csA);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(csB.       Changes[0].OldValue!.Type,          Is.EqualTo(JTokenType.Null));
+                Assert.That(csBviaJSON.Changes[0].OldValue!.Type,          Is.EqualTo(JTokenType.Null));
+
+                Assert.That(rn2.TryRebase(csBviaJSON, out _, out var error),  Is.False);
+                Assert.That(error,                                            Does.Contain("'description' is no longer the expected old value"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_change_without_old_value_is_not_rebased()
+
+        [Test]
+        public void A_change_without_old_value_is_not_rebased()
+        {
+
+            var rn1       = NewNetwork();
+            var rn2       = rn1.ApplyChangeSet(rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]));
+
+            // Made by hand, not by CreateChangeSet: no old value.
+            var handMade  = new RoamingNetworkChangeSet(
+                                ChangeSet_Id.NewRandom(),
+                                rn1.Id,
+                                Timestamp.Now,
+                                [ RoamingNetworkChange.UpdateProperty(rn1, "name", null, new JObject(new JProperty("en", "X"))) ],
+                                rn1.CalcETags(),
+                                rn1.CalcETags()
+                            );
+
+            Assert.That(rn2.TryRebase(handMade, out _, out var error),  Is.False);
+            Assert.That(error,                                          Does.Contain("Change 0 has no old value"));
+
+        }
+
+        #endregion
+
+        #region A_signed_change_set_is_verified_and_rebased_unsigned()
+
+        [Test]
+        public void A_signed_change_set_is_verified_and_rebased_unsigned()
+        {
+
+            var rn1        = NewNetwork();
+            var csA        = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]);
+            var csB        = rn1.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(rn1, "description") ]).
+                                 Sign(Alice, "alice", COSEAlgorithm.Ed25519);
+
+            var rn2        = rn1.ApplyChangeSet(csA);
+            var publicKey  = Alice.GeneratePublicKey();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn2.TryRebase(csB, out _, out var error1),  Is.False);
+                Assert.That(error1,                                     Does.Contain("requires a signature verifier"));
+
+                Assert.That(rn2.TryRebase(csB,
+                                          out var rebased,
+                                          out var error2,
+                                          (changeSet, signature) => changeSet.VerifySignature(signature, publicKey, "alice", out _)),
+                            Is.True,
+                            error2);
+
+                Assert.That(rebased!.Signatures,                        Is.Empty);
+                Assert.That(rn2.ApplyChangeSet(rebased).Description.Count,  Is.Zero);
+
+            }
+
+        }
+
+        #endregion
+
+        #region Empty_values_survive_the_JSON_text()
+
+        /// <summary>
+        /// JSONObject.Create leaves out empty values; changes and change sets must not.
+        /// </summary>
+        [Test]
+        public void Empty_values_survive_the_JSON_text()
+        {
+
+            var rn1    = NewNetwork();
+            var empty  = rn1.CreateChangeSet([]);
+            var none   = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray()) ]);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(RoamingNetworkChangeSet.Parse(empty.ToJSON().ToString()).Changes,                  Is.Empty);
+                Assert.That(RoamingNetworkChangeSet.Parse(none. ToJSON().ToString()).Changes[0].NewValue,      Is.EqualTo(new JArray()).Using<JToken>(JToken.DeepEquals));
+                Assert.That(rn1.ApplyChangeSet(RoamingNetworkChangeSet.Parse(none.ToJSON().ToString())).DataLicenses,  Is.Empty);
+
+            }
+
+        }
+
+        #endregion
+
+    }
+
+}

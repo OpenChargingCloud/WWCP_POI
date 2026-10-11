@@ -4,12 +4,17 @@
  * Licensed under the Affero GPL license, Version 3.0.
  */
 
+#region Usings
+
 using System.Diagnostics.CodeAnalysis;
-using System.Globalization;
-using System.Text.Json;
+
+using Newtonsoft.Json.Linq;
 
 using Org.BouncyCastle.Crypto;
+
 using org.GraphDefined.Vanaheimr.Illias;
+
+#endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
 {
@@ -18,9 +23,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     {
 
         /// <summary>
-        /// Versioned, domain-separated Styx canonical JSON profile for complete ChangeSet signatures.
+        /// Versioned, domain-separated Styx canonical JSON profile for complete ChangeSet signatures; v3 signs the Newtonsoft JSON representation.
         /// </summary>
-        public const String SigningProfile = "wwcp-poi-changeset-json-v2";
+        public const String SigningProfile = "wwcp-poi-changeset-json-v3";
 
         /// <summary>
         /// Append a peer signature using Styx's asymmetric COSE algorithm primitives and return
@@ -187,7 +192,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ArgumentNullException.ThrowIfNull(resolvePublicKey);
                 if (Signatures.IsEmpty)
                     throw new InvalidOperationException("The ChangeSet is unsigned.");
-                using var preparation = POICanonicalPreparation.Enter();
                 for (var index = 0; index < Signatures.Length; index++)
                 {
                     var signature = Signatures[index];
@@ -218,142 +222,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         /// <summary>
-        /// Return the fixed profile's canonical UTF-8 signature input, independent of serializer options.
-        /// ETags use HEX; operation numbers and unit strings retain their exact JSON representations.
+        /// Return the fixed profile's canonical UTF-8 signature input:
+        /// the signature header and the JSON representation of this batch without its signatures,
+        /// written as Styx canonical JSON. ETags use HEX.
         /// </summary>
-        public Byte[] GetSigningBytes(COSEAlgorithm algorithm, String keyId)
+        /// <param name="Algorithm">The signature algorithm.</param>
+        /// <param name="KeyId">The application identifier of the signing key.</param>
+        public Byte[] GetSigningBytes(COSEAlgorithm  Algorithm,
+                                      String         KeyId)
         {
 
-            if (!algorithm.IsSupportedForSigning)
-                throw new ArgumentException("The algorithm is not supported for asymmetric signing.", nameof(algorithm));
+            if (!Algorithm.IsSupportedForSigning)
+                throw new ArgumentException("The algorithm is not supported for asymmetric signing.", nameof(Algorithm));
 
-            //Required(keyId, nameof(keyId));
+            if (String.IsNullOrWhiteSpace(KeyId))
+                throw new ArgumentException("A key identification is required.", nameof(KeyId));
 
-            return POICanonicalPreparation.SigningBytes(this, WriteUnsignedContent, writer =>
-            {
-                writer.WriteStartObject();
-                writer.WriteString("Profile", SigningProfile);
-                writer.WriteString("Algorithm", algorithm.Name);
-                writer.WriteString("KeyId", keyId);
-                writer.WriteString("Encoding", "base64");
-                writer.WriteNull("ChangeSet");
-                writer.WriteEndObject();
-            }, "ChangeSet", () => GetOriginalSigningBytes(algorithm, keyId));
+            return CanonicalJSON.ToUTF8Bytes(
+                       new JObject(
+                           new JProperty("profile",    SigningProfile),
+                           new JProperty("algorithm",  Algorithm.Name),
+                           new JProperty("keyId",      KeyId),
+                           new JProperty("encoding",   "base64"),
+                           new JProperty("changeSet",  ToJSON(IncludeSignatures: false))
+                       )
+                   );
 
-        }
-
-        private Byte[] GetOriginalSigningBytes(COSEAlgorithm algorithm, String keyId)
-        {
-            using var stream = new MemoryStream();
-            using (var writer = new Utf8JsonWriter(stream))
-            {
-                writer.WriteStartObject();
-                writer.WriteString("Profile", SigningProfile);
-                writer.WriteString("Algorithm", algorithm.Name);
-                writer.WriteString("KeyId", keyId);
-                writer.WriteString("Encoding", "base64");
-                writer.WritePropertyName("ChangeSet");
-                WriteUnsignedContent(writer);
-                writer.WriteEndObject();
-            }
-            using var document = JsonDocument.Parse(stream.ToArray());
-            return CanonicalJSON.ToUTF8Bytes(document);
-        }
-
-        // Shared by the v2 batch signature and the commit identity profile.
-        internal void WriteUnsignedContent(Utf8JsonWriter writer)
-        {
-            writer.WriteStartObject();
-            writer.WriteString("Id",               Id.              ToString());
-            writer.WriteString("RoamingNetworkId", RoamingNetworkId.ToString());
-            writer.WriteNumber("BaseRevision", BaseRevision);
-            writer.WriteString("CreatedAt", CreatedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
-            WriteSigningETags(writer, "BeforeETags", BeforeETags);
-            WriteSigningETags(writer, "AfterETags", AfterETags);
-            writer.WritePropertyName("Description");
-            writer.WriteStartObject();
-            foreach (var entry in Description)
-                writer.WriteString(entry.Language.ToString(), entry.Text);
-            writer.WriteEndObject();
-            writer.WritePropertyName("Metadata");
-            writer.WriteStartObject();
-            foreach (var entry in Metadata)
-            {
-                writer.WritePropertyName(entry.Key);
-                ValidateSigningJSON(entry.Value);
-                entry.Value.WriteTo(writer);
-            }
-            writer.WriteEndObject();
-            writer.WritePropertyName("Changes");
-            writer.WriteStartArray();
-            foreach (var operation in Changes)
-            {
-                writer.WriteStartObject();
-                writer.WriteString("Kind", operation.Kind.ToString());
-                writer.WriteString("EntityType", operation.EntityType);
-                writer.WriteString("EntityId", operation.EntityId);
-                if (operation.PropertyName is { } property)
-                    writer.WriteString("PropertyName", property);
-                if (operation.ParentEntityType is { } parentType)
-                    writer.WriteString("ParentEntityType", parentType);
-                if (operation.ParentEntityId is { } parentId)
-                    writer.WriteString("ParentEntityId", parentId);
-                writer.WritePropertyName("ElementPath");
-                writer.WriteStartArray();
-                foreach (var segment in operation.ElementPath)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteString("PropertyName", segment.PropertyName);
-                    if (segment.ElementId is { } elementId)
-                        writer.WriteString("ElementId", elementId);
-                    writer.WriteEndObject();
-                }
-                writer.WriteEndArray();
-                WriteSigningValue(writer, "OldValue", operation.OldValue);
-                WriteSigningValue(writer, "NewValue", operation.NewValue);
-                writer.WriteEndObject();
-            }
-            writer.WriteEndArray();
-            writer.WriteEndObject();
-        }
-
-        private static void WriteSigningETags(Utf8JsonWriter writer, String field,
-                                               System.Collections.Immutable.ImmutableArray<ETag> tags)
-        {
-            writer.WritePropertyName(field);
-            writer.WriteStartArray();
-            foreach (var tag in tags)
-                tag.WriteTo(writer);
-            writer.WriteEndArray();
-        }
-
-        private static void WriteSigningValue(Utf8JsonWriter writer, String field, JsonElement? value)
-        {
-            if (value is { } element)
-            {
-                ValidateSigningJSON(element);
-                writer.WritePropertyName(field);
-                element.WriteTo(writer);
-            }
-        }
-
-        internal static void ValidateSigningJSON(JsonElement value)
-        {
-            if (value.ValueKind == JsonValueKind.Undefined)
-                throw new ArgumentException("Undefined JSON values cannot be signed or stored as metadata.");
-            if (value.ValueKind == JsonValueKind.Object)
-            {
-                var names = new HashSet<String>(StringComparer.Ordinal);
-                foreach (var property in value.EnumerateObject())
-                {
-                    if (!names.Add(property.Name))
-                        throw new ArgumentException($"Duplicate JSON property '{property.Name}' is not allowed in signed content.");
-                    ValidateSigningJSON(property.Value);
-                }
-            }
-            else if (value.ValueKind == JsonValueKind.Array)
-                foreach (var item in value.EnumerateArray())
-                    ValidateSigningJSON(item);
         }
 
     }

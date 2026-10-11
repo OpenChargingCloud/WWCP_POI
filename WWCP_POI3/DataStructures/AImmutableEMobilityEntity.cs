@@ -17,7 +17,11 @@
 
 #region Usings
 
+using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+
+using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
@@ -43,18 +47,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         where TStatus      : IComparable
 
     {
-
-        ///// <summary>
-        ///// SHA-256 identifiers of the canonical JSON and deterministic CBOR POI representations.
-        ///// </summary>
-        //ImmutableArray<ETag> ETags { get; }
-
-        ///// <summary>
-        ///// Content identifiers of the immutable POI data; runtime states are excluded.
-        ///// Networks reuse their authoritative snapshot's lazy digest pair.
-        ///// </summary>
-        //public System.Collections.Immutable.ImmutableArray<ETag> ETags
-        //    => this is RoamingNetwork network ? network.DataSnapshot.ETags : POIRepresentation.GetETags(this);
 
         /// <summary>
         /// Restore persisted timestamps on a newly parsed entity without recording a change.
@@ -102,16 +94,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The multi-language name of this entity.
         /// </summary>
-        private readonly ImmutableI18NString immutableName;
         [Optional]
-        public ImmutableI18NString Name => immutableName;
+        public ImmutableI18NString     Name                     { get; private set; }
 
         /// <summary>
         /// The multi-language description of this entity.
         /// </summary>
-        private readonly ImmutableI18NString immutableDescription;
         [Optional]
-        public ImmutableI18NString Description => immutableDescription;
+        public ImmutableI18NString     Description              { get; private set; }
+
+        /// <summary>
+        /// The source of this information, e.g. the WWCP importer used.
+        /// </summary>
+        [Optional]
+        public String?                 DataSource               { get; private set; }
+
+        /// <summary>
+        /// Identifiers of the canonical JSON and deterministic CBOR representations.
+        /// </summary>
+        public ImmutableArray<ETag>    ETags                    { get; private set; } = [];
 
 
         #region AdminStatus
@@ -228,35 +229,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ETag
+        //public UInt64   Length
+        //    => 0;
 
-        private String? eTag;
-
-        /// <summary>
-        /// A unique status identification of this entity.
-        /// </summary>
-        [Mandatory]
-        public String? ETag => eTag;
-
-        #endregion
-
-        #region DataSource
-
-        private String? dataSource;
-
-        /// <summary>
-        /// The source of this information, e.g. the WWCP importer used.
-        /// </summary>
-        [Optional]
-        public String? DataSource => dataSource;
-
-        #endregion
-
-        public UInt64   Length
-            => 0;
-
-        public Boolean  IsNullOrEmpty
-            => false;
+        //public Boolean  IsNullOrEmpty
+        //    => false;
 
         #endregion
 
@@ -270,20 +247,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="CustomData">Optional customer specific data, e.g. in combination with custom parsers and serializers.</param>
         /// <param name="InternalData">Optional internal data.</param>
         public AImmutableEMobilityEntity(TId                         Id,
-                                I18NString?                 Name                         = null,
-                                I18NString?                 Description                  = null,
+                                         ImmutableI18NString?        Name                         = null,
+                                         ImmutableI18NString?        Description                  = null,
 
-                                Timestamped<TAdminStatus>?  InitialAdminStatus           = null,
-                                Timestamped<TStatus>?       InitialStatus                = null,
-                                UInt16                      MaxAdminStatusScheduleSize   = DefaultMaxAdminStatusScheduleSize,
-                                UInt16                      MaxStatusScheduleSize        = DefaultMaxStatusScheduleSize,
+                                         Timestamped<TAdminStatus>?  InitialAdminStatus           = null,
+                                         Timestamped<TStatus>?       InitialStatus                = null,
+                                         UInt16                      MaxAdminStatusScheduleSize   = DefaultMaxAdminStatusScheduleSize,
+                                         UInt16                      MaxStatusScheduleSize        = DefaultMaxStatusScheduleSize,
 
-                                String?                     DataSource                   = null,
-                                DateTimeOffset?             Created                      = null,
-                                DateTimeOffset?             LastChange                   = null,
+                                         String?                     DataSource                   = null,
+                                         DateTimeOffset?             Created                      = null,
+                                         DateTimeOffset?             LastChange                   = null,
 
-                                CustomDataNew?              CustomData                   = null,
-                                UserDefinedDictionary?      InternalData                 = null)
+                                         CustomDataNew?              CustomData                   = null,
+                                         UserDefinedDictionary?      InternalData                 = null)
 
             : base(CustomData,
                    InternalData,
@@ -299,16 +276,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            this.Id          = Id;
-            this.eTag        = null;
-            // Construction is not a data change; preserve the supplied creation/change timestamps.
-            this.dataSource  = DataSource;
-
-
-            immutableName = (Name ?? I18NString.Empty).Clone();
-
-            immutableDescription = (Description ?? I18NString.Empty).Clone();
-
+            this.Id           = Id;
+            this.Name         = Name        ?? ImmutableI18NString.Empty;
+            this.Description  = Description ?? ImmutableI18NString.Empty;
+            this.DataSource   = DataSource;
 
             #region AdminStatusSchedule
 
@@ -327,7 +298,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 this.statusSchedule.     Insert(InitialStatus.Value);
 
             #endregion
-
 
         }
 
@@ -494,6 +464,280 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
         #endregion
+
+        #region ETags
+
+        #region (private) MergeWithETags(ETag)
+
+        /// <summary>
+        /// Merge the new ETag with the existing ones, replacing only the ETag of the same format
+        /// and keeping the others, ordered by their format: JSON before CBOR.
+        /// </summary>
+        /// <param name="ETag">The new ETag.</param>
+        private ImmutableArray<ETag> MergeWithETags(ETag ETag)
+        {
+
+            ETags = [ .. (ETags.IsDefault ? [] : ETags).
+                             Where  (eTag => eTag.Format != ETag.Format).
+                             Append (ETag).
+                             OrderBy(eTag => eTag.Format) ];
+
+            return ETags;
+
+        }
+
+        #endregion
+
+        #region CalcETags (JSON, Replace = true)
+
+        /// <summary>
+        /// Calculate the ETag(s) of the given canonical JSON representation and store them in this entity.
+        /// </summary>
+        /// <param name="JSON">The canonical JSON representation.</param>
+        /// <param name="Replace">Whether to replace the existing ETags or merge with them.</param>
+        public ImmutableArray<ETag> CalcETags(JObject  JSON,
+                                              Boolean  Replace   = true)
+        {
+
+            var eTag = ETag.Compute(
+                           ETagFormat.JSON,
+                           CanonicalJSON.ToUTF8Bytes(JSON)
+                       );
+
+            if (Replace)
+            {
+                ETags = [ eTag ];
+                return ETags;
+            }
+
+            return MergeWithETags(eTag);
+
+        }
+
+        #endregion
+
+        #region CalcETags (CBOR, Replace = true)
+
+        /// <summary>
+        /// Calculate the ETag(s) of the given deterministic CBOR representation and store them in this entity.
+        /// </summary>
+        /// <param name="CBOR">The deterministic CBOR representation.</param>
+        /// <param name="Replace">Whether to replace the existing ETags or merge with them.</param>
+        public ImmutableArray<ETag> CalcETags(CBORValue  CBOR,
+                                              Boolean    Replace   = true)
+        {
+
+            var eTag = ETag.Compute(
+                           ETagFormat.CBOR,
+                           CBOR.ToByteArray(CBORWriterOptions.Canonical)
+                       );
+
+            if (Replace)
+            {
+                ETags = [ eTag ];
+                return ETags;
+            }
+
+            return MergeWithETags(eTag);
+
+        }
+
+        #endregion
+
+        #region CalcETags (JSON, CBOR)
+
+        /// <summary>
+        /// Calculate the ETag(s) of the given canonical JSON and deterministic CBOR representations
+        /// and store them in this entity.
+        /// </summary>
+        /// <param name="JSON">The canonical JSON representation.</param>
+        /// <param name="CBOR">The deterministic CBOR representation.</param>
+        public ImmutableArray<ETag> CalcETags(JObject   JSON,
+                                              CBORValue CBOR)
+        {
+
+            ETags = [
+
+                        ETag.Compute(
+                            ETagFormat.JSON,
+                            CanonicalJSON.ToUTF8Bytes(JSON)
+                        ),
+
+                        ETag.Compute(
+                            ETagFormat.CBOR,
+                            CBOR.ToByteArray(CBORWriterOptions.Canonical)
+                        )
+
+                    ];
+
+            return ETags;
+
+        }
+
+        #endregion
+
+
+        #region ValidateETags (JSON, out ErrorResponse)
+
+        /// <summary>
+        /// Validate the ETags declared in the given JSON representation of this entity:
+        /// The JSON ETag must be the ETag of the representation without its ETags,
+        /// every other declared ETag must equal the stored ETag of its format, if one is stored.
+        /// The representation must be the one the ETags were calculated over, e.g. not an embedded one.
+        /// </summary>
+        /// <param name="JSON">The JSON representation including its ETags.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public Boolean ValidateETags(JObject                           JSON,
+                                     [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            if (JSON?["eTags"] is not JArray eTagsJSON)
+            {
+                ErrorResponse = "The JSON representation has no ETags!";
+                return false;
+            }
+
+            var declaredETags = new List<ETag>();
+
+            foreach (var eTagJSON in eTagsJSON)
+            {
+                try
+                {
+                    declaredETags.Add(ETag.Parse(eTagJSON));
+                }
+                catch (Exception e)
+                {
+                    ErrorResponse = "Invalid ETag: " + e.Message;
+                    return false;
+                }
+            }
+
+            var content = (JObject) JSON.DeepClone();
+            content.Remove("eTags");
+
+            return ValidateETags(
+                       declaredETags,
+                       ETag.Compute(
+                           ETagFormat.JSON,
+                           CanonicalJSON.ToUTF8Bytes(content)
+                       ),
+                       out ErrorResponse
+                   );
+
+        }
+
+        #endregion
+
+        #region ValidateETags (CBOR, out ErrorResponse)
+
+        /// <summary>
+        /// Validate the ETags declared in the given CBOR representation of this entity:
+        /// The CBOR ETag must be the ETag of the representation without its ETags,
+        /// every other declared ETag must equal the stored ETag of its format, if one is stored.
+        /// The representation must be the one the ETags were calculated over, e.g. not an embedded one.
+        /// </summary>
+        /// <param name="CBOR">The CBOR representation including its ETags.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public Boolean ValidateETags(CBORValue                         CBOR,
+                                     [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            if (CBOR.Kind != CBORValueKind.Map ||
+               !CBOR.TryGetValue(CBORValue.FromText("eTags"), out var eTagsCBOR) ||
+                eTagsCBOR.Kind != CBORValueKind.Array)
+            {
+                ErrorResponse = "The CBOR representation has no ETags!";
+                return false;
+            }
+
+            var declaredETags = new List<ETag>();
+
+            foreach (var eTagCBOR in eTagsCBOR.AsArray())
+            {
+                try
+                {
+                    declaredETags.Add(ETag.Parse(eTagCBOR));
+                }
+                catch (Exception e)
+                {
+                    ErrorResponse = "Invalid ETag: " + e.Message;
+                    return false;
+                }
+            }
+
+            var content = CBORValue.FromMap(CBOR.AsMap().Where(entry => !(entry.Key.TryGetText(out var key) && key == "eTags")));
+
+            return ValidateETags(
+                       declaredETags,
+                       ETag.Compute(
+                           ETagFormat.CBOR,
+                           content.ToByteArray(CBORWriterOptions.Canonical)
+                       ),
+                       out ErrorResponse
+                   );
+
+        }
+
+        #endregion
+
+        #region (private) ValidateETags (DeclaredETags, CalculatedETag, out ErrorResponse)
+
+        /// <summary>
+        /// Validate the declared ETags against the ETag calculated over the content
+        /// and against the stored ETags of the other formats.
+        /// </summary>
+        /// <param name="DeclaredETags">The ETags declared in a representation.</param>
+        /// <param name="CalculatedETag">The ETag calculated over the representation without its ETags.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        private Boolean ValidateETags(IReadOnlyList<ETag>               DeclaredETags,
+                                      ETag                              CalculatedETag,
+                                      [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            var duplicateFormat = DeclaredETags.GroupBy(eTag => eTag.Format).FirstOrDefault(group => group.Count() > 1);
+
+            if (duplicateFormat is not null)
+            {
+                ErrorResponse = $"The {duplicateFormat.Key} ETag must not be declared twice!";
+                return false;
+            }
+
+            var declaredETags = DeclaredETags.Where(eTag => eTag.Format == CalculatedETag.Format).ToArray();
+
+            if (declaredETags.Length == 0)
+            {
+                ErrorResponse = $"The {CalculatedETag.Format} ETag is missing!";
+                return false;
+            }
+
+            if (!declaredETags[0].Equals(CalculatedETag))
+            {
+                ErrorResponse = $"The {CalculatedETag.Format} ETag does not match the content!";
+                return false;
+            }
+
+            foreach (var declaredETag in DeclaredETags.Where(eTag => eTag.Format != CalculatedETag.Format))
+            {
+
+                var storedETags = (ETags.IsDefault ? [] : ETags).Where(eTag => eTag.Format == declaredETag.Format).ToArray();
+
+                if (storedETags.Length > 0 && !storedETags[0].Equals(declaredETag))
+                {
+                    ErrorResponse = $"The {declaredETag.Format} ETag does not match the stored one!";
+                    return false;
+                }
+
+            }
+
+            ErrorResponse = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #endregion
+
 
 
         #region (protected) LogEvent(Logger, LogHandler, ...)

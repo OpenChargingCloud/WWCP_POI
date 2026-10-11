@@ -40,16 +40,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Creates a change set.
         /// </summary>
         [JsonConstructor]
-        public RoamingNetworkChangeSet(String                                id,
-                                       String                                roamingNetworkId,
-                                       Int64                                 baseRevision,
-                                       DateTimeOffset                        createdAt,
-                                       ImmutableArray<RoamingNetworkChange>  changes,
-                                       ImmutableArray<ETag>                  beforeETags,
-                                       ImmutableArray<ETag>                  afterETags,
-                                       ImmutableArray<RoamingNetworkChangeSetSignature> signatures = default,
-                                       ImmutableDictionary<String, String>? description      = null,
-                                       ImmutableDictionary<String, JsonElement>? metadata    = null)
+        public RoamingNetworkChangeSet(String                                            id,
+                                       String                                            roamingNetworkId,
+                                       Int64                                             baseRevision,
+                                       DateTimeOffset                                    createdAt,
+                                       ImmutableArray<RoamingNetworkChange>              changes,
+                                       ImmutableArray<ETag>                              beforeETags,
+                                       ImmutableArray<ETag>                              afterETags,
+                                       ImmutableArray<RoamingNetworkChangeSetSignature>  signatures    = default,
+                                       ImmutableDictionary<String, String>?              description   = null,
+                                       ImmutableDictionary<String, JsonElement>?         metadata      = null)
         {
 
             Id = Required(id, nameof(id));
@@ -65,16 +65,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("Changes must be an initialized collection without null entries.", nameof(changes));
             }
 
-            BaseRevision = baseRevision;
-            CreatedAt = createdAt.ToUniversalTime();
-            Changes = changes;
-            BeforeETags = ETag.ValidatePair(beforeETags, nameof(beforeETags));
-            AfterETags = ETag.ValidatePair(afterETags, nameof(afterETags));
-            Signatures = signatures.IsDefault ? ImmutableArray<RoamingNetworkChangeSetSignature>.Empty : signatures;
+            BaseRevision  = baseRevision;
+            CreatedAt     = createdAt.ToUniversalTime();
+            Changes       = changes;
+            BeforeETags   = ETag.ValidatePair(beforeETags, nameof(beforeETags));
+            AfterETags    = ETag.ValidatePair(afterETags,  nameof(afterETags));
+            Signatures    = signatures.IsDefault ? ImmutableArray<RoamingNetworkChangeSetSignature>.Empty : signatures;
             if (Signatures.Any(signature => signature is null))
                 throw new ArgumentException("Signatures must not contain null entries.", nameof(signatures));
-            Description = CopyDescription(description);
-            Metadata = CopyMetadata(metadata);
+            Description   = CopyDescription(description);
+            Metadata      = CopyMetadata   (metadata);
 
         }
 

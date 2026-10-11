@@ -43,7 +43,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// SHA-256 with a 32-byte digest.
         /// </summary>
-        SHA256
+        SHA256,
+
+        /// <summary>
+        /// SHA-384 with a 48-byte digest.
+        /// </summary>
+        SHA384,
+
+        /// <summary>
+        /// SHA-512 with a 64-byte digest.
+        /// </summary>
+        SHA512
 
     }
 

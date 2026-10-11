@@ -17,9 +17,12 @@
 
 #region Usings
 
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
+
+using Newtonsoft.Json.Linq;
+
+using org.GraphDefined.Vanaheimr.Illias;
 
 #endregion
 
@@ -32,268 +35,829 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed record RoamingNetworkChange
     {
 
+        #region Data
+
+        private readonly JToken? oldValue;
+        private readonly JToken? newValue;
+
+        #endregion
+
+        #region Properties
+
         /// <summary>
         /// The operation to perform.
         /// </summary>
-        public RoamingNetworkChangeKind Kind { get; private init; }
+        public RoamingNetworkChangeKind               Kind                { get; }
 
         /// <summary>
         /// The infrastructure entity type targeted by graph operations or owning a nested element path.
         /// </summary>
-        public String EntityType { get; private init; }
+        public String                                 EntityType          { get; }
 
         /// <summary>
         /// The identifier of the target graph entity or owner of a nested element path.
         /// </summary>
-        public String EntityId { get; private init; }
+        public String                                 EntityId            { get; }
 
         /// <summary>
         /// The JSON property to update, for property operations.
         /// </summary>
-        public String? PropertyName { get; }
+        public String?                                PropertyName        { get; }
 
         /// <summary>
         /// The ordered ownership path from the addressed graph entity to one nested value.
-        /// Empty for graph Add/Remove and top-level UpdateProperty operations.
+        /// Empty for graph Add/Remove and top-level property operations.
         /// </summary>
-        public ImmutableArray<POIElementPathSegment> ElementPath { get; }
+        public ImmutableArray<POIElementPathSegment>  ElementPath         { get; }
 
         /// <summary>
         /// The explicit parent type, when required by the operation.
         /// </summary>
-        public String? ParentEntityType { get; }
+        public String?                                ParentEntityType    { get; }
 
         /// <summary>
         /// The explicit parent identifier; connectors require their EVSE scope.
         /// </summary>
-        public String? ParentEntityId { get; }
+        public String?                                ParentEntityId      { get; }
 
         /// <summary>
         /// An optional expected previous value for optimistic conflict detection.
+        /// Null means: the previous value is not checked.
+        /// A JSON null means: the value is expected to be absent.
+        /// Every read returns an independent copy.
         /// </summary>
-        public JsonElement? OldValue { get; }
+        public JToken?                                OldValue
+            => oldValue?.DeepClone();
 
         /// <summary>
-        /// The new document or property value; a defined JSON null clears a property.
+        /// The new entity document or property value.
+        /// Every read returns an independent copy.
         /// </summary>
-        public JsonElement? NewValue { get; }
+        public JToken?                                NewValue
+            => newValue?.DeepClone();
 
+        #endregion
 
+        #region Constructor(s)
 
         /// <summary>
         /// Create a validated operation owning independent copies of its JSON values.
+        /// JSON null is not a value here: a property is cleared by RemoveProperty.
         /// </summary>
-        /// <param name="kind">The operation to perform.</param>
-        /// <param name="entityType">A stable entity type, for example <c>ChargingStation</c>.</param>
-        /// <param name="entityId">The entity's canonical identifier.</param>
-        /// <param name="propertyName">The property being changed, for property updates.</param>
-        /// <param name="oldValue">An optional expected previous value for conflict detection.</param>
-        /// <param name="newValue">The new property value or full entity document. A defined JSON null clears a property.</param>
-        /// <param name="parentEntityType">The optional graph parent type; connectors require their EVSE scope.</param>
-        /// <param name="parentEntityId">The optional graph parent identity.</param>
-        /// <param name="elementPath">The structured ownership path for nested element operations; empty for graph operations.</param>
-        public RoamingNetworkChange(RoamingNetworkChangeKind               kind,
-                                    String                                 entityType,
-                                    String                                 entityId,
-                                    String?                                propertyName,
-                                    JsonElement?                           oldValue,
-                                    JsonElement?                           newValue,
-                                    String?                                parentEntityType   = null,
-                                    String?                                parentEntityId     = null,
-                                    ImmutableArray<POIElementPathSegment>  elementPath        = default)
+        /// <param name="Kind">The operation to perform.</param>
+        /// <param name="EntityType">A stable entity type, for example <c>ChargingStation</c>.</param>
+        /// <param name="EntityId">The entity's canonical identifier.</param>
+        /// <param name="PropertyName">The property being changed, for property updates.</param>
+        /// <param name="OldValue">An optional expected previous value for conflict detection.</param>
+        /// <param name="NewValue">The new property value or full entity document.</param>
+        /// <param name="ParentEntityType">The optional graph parent type; connectors require their EVSE scope.</param>
+        /// <param name="ParentEntityId">The optional graph parent identity.</param>
+        /// <param name="ElementPath">The structured ownership path for nested element operations; empty for graph operations.</param>
+        public RoamingNetworkChange(RoamingNetworkChangeKind               Kind,
+                                    String                                 EntityType,
+                                    String                                 EntityId,
+                                    String?                                PropertyName,
+                                    JToken?                                OldValue,
+                                    JToken?                                NewValue,
+                                    String?                                ParentEntityType   = null,
+                                    String?                                ParentEntityId     = null,
+                                    ImmutableArray<POIElementPathSegment>  ElementPath        = default)
         {
 
-            if (!Enum.IsDefined(kind))
-                throw new ArgumentOutOfRangeException(nameof(kind));
+            if (!Enum.IsDefined(Kind))
+                throw new ArgumentOutOfRangeException(nameof(Kind));
 
-            EntityType = Required(entityType, nameof(entityType));
-            EntityId   = Required(entityId,   nameof(entityId));
+            this.EntityType  = Required(EntityType, nameof(EntityType));
+            this.EntityId    = Required(EntityId,   nameof(EntityId));
 
-            if ((parentEntityType is null) != (parentEntityId is null))
+            if ((ParentEntityType is null) != (ParentEntityId is null))
                 throw new ArgumentException("Parent type and parent identifier must be supplied together.");
 
-            ParentEntityType = parentEntityType is null ? null : Required(parentEntityType, nameof(parentEntityType));
-            ParentEntityId   = parentEntityId   is null ? null : Required(parentEntityId,   nameof(parentEntityId));
+            this.ParentEntityType  = ParentEntityType is null ? null : Required(ParentEntityType, nameof(ParentEntityType));
+            this.ParentEntityId    = ParentEntityId   is null ? null : Required(ParentEntityId,   nameof(ParentEntityId));
 
-            if (oldValue?.ValueKind == JsonValueKind.Undefined || newValue?.ValueKind == JsonValueKind.Undefined)
-                throw new ArgumentException("JSON values must be defined.");
+            if (OldValue?.Type is JTokenType.Undefined ||
+                NewValue?.Type is JTokenType.Null or JTokenType.Undefined)
+            {
+                throw new ArgumentException("A new JSON value must not be null or undefined; a property is cleared by RemoveProperty.");
+            }
 
-            var elementOperation = kind is RoamingNetworkChangeKind.AddElement            or
+            var elementOperation = Kind is RoamingNetworkChangeKind.AddElement            or
                                            RoamingNetworkChangeKind.RemoveElement         or
                                            RoamingNetworkChangeKind.ReplaceElement        or
                                            RoamingNetworkChangeKind.UpdateElementProperty or
                                            RoamingNetworkChangeKind.RemoveElementProperty;
 
-            if (elementOperation && (elementPath.IsDefaultOrEmpty || elementPath.Any(segment => segment is null)))
-                throw new ArgumentException("Element operations require a nonempty path without null segments.", nameof(elementPath));
+            if (elementOperation && (ElementPath.IsDefaultOrEmpty || ElementPath.Any(segment => segment is null)))
+                throw new ArgumentException("Element operations require a nonempty path without null segments.", nameof(ElementPath));
 
-            if (!elementOperation && !elementPath.IsDefaultOrEmpty)
-                throw new ArgumentException("Only element operations may contain an element path.", nameof(elementPath));
+            if (!elementOperation && !ElementPath.IsDefaultOrEmpty)
+                throw new ArgumentException("Only element operations may contain an element path.", nameof(ElementPath));
 
-            switch (kind)
+            switch (Kind)
             {
 
-                case RoamingNetworkChangeKind.Add when newValue?.ValueKind != JsonValueKind.Object ||
-                                                                                           oldValue.HasValue || propertyName is not null:
+                case RoamingNetworkChangeKind.Add when NewValue is not JObject || OldValue is not null || PropertyName is not null:
                     throw new ArgumentException("Add requires an entity object and no old value or property name.");
 
-                case RoamingNetworkChangeKind.Remove when newValue.HasValue || propertyName is not null:
+                case RoamingNetworkChangeKind.Remove when NewValue is not null || PropertyName is not null:
                     throw new ArgumentException("Remove must not contain a new value or property name.");
 
-                case RoamingNetworkChangeKind.UpdateProperty when !newValue.HasValue || String.IsNullOrWhiteSpace(propertyName):
+                case RoamingNetworkChangeKind.UpdateProperty when NewValue is null || String.IsNullOrWhiteSpace(PropertyName):
                     throw new ArgumentException("UpdateProperty requires a property name and a new JSON value.");
 
-                case RoamingNetworkChangeKind.AddElement when !newValue.HasValue || oldValue.HasValue || propertyName is not null:
+                case RoamingNetworkChangeKind.AddElement when NewValue is null || OldValue is not null || PropertyName is not null:
                     throw new ArgumentException("AddElement requires a new value and no old value or property name.");
 
-                case RoamingNetworkChangeKind.RemoveElement when newValue.HasValue || propertyName is not null:
+                case RoamingNetworkChangeKind.RemoveElement when NewValue is not null || PropertyName is not null:
                     throw new ArgumentException("RemoveElement must not contain a new value or property name.");
 
-                case RoamingNetworkChangeKind.ReplaceElement when !newValue.HasValue || propertyName is not null:
+                case RoamingNetworkChangeKind.ReplaceElement when NewValue is null || PropertyName is not null:
                     throw new ArgumentException("ReplaceElement requires a new value and no property name.");
 
-                case RoamingNetworkChangeKind.UpdateElementProperty when !newValue.HasValue || String.IsNullOrWhiteSpace(propertyName):
+                case RoamingNetworkChangeKind.UpdateElementProperty when NewValue is null || String.IsNullOrWhiteSpace(PropertyName):
                     throw new ArgumentException("UpdateElementProperty requires a property name and a new value.");
 
                 case RoamingNetworkChangeKind.RemoveProperty or RoamingNetworkChangeKind.RemoveElementProperty
-                    when newValue.HasValue || String.IsNullOrWhiteSpace(propertyName):
+                    when NewValue is not null || String.IsNullOrWhiteSpace(PropertyName):
                     throw new ArgumentException("Property removal requires a property name and no new value.");
 
             }
 
-            Kind          = kind;
-            PropertyName  = propertyName;
-            OldValue      = oldValue?.Clone();
-            NewValue      = newValue?.Clone();
-            ElementPath   = elementOperation ? elementPath : [];
+            this.Kind          = Kind;
+            this.PropertyName  = PropertyName;
+            this.oldValue      = OldValue?.DeepClone();
+            this.newValue      = NewValue?.DeepClone();
+            this.ElementPath   = elementOperation ? ElementPath : [];
 
         }
 
+        #endregion
 
 
-
-
-
-
+        #region Add                   (EntityType, EntityId, Entity, ...)
 
         /// <summary>
         /// Add an entity using its JSON representation.
         /// </summary>
-        public static RoamingNetworkChange Add(String       entityType,
-                                               String       entityId,
-                                               JsonElement  entity)
+        /// <param name="EntityType">The type of the new entity.</param>
+        /// <param name="EntityId">The identification of the new entity.</param>
+        /// <param name="Entity">The JSON representation of the new entity.</param>
+        /// <param name="ParentEntityType">The optional graph parent type.</param>
+        /// <param name="ParentEntityId">The optional graph parent identity.</param>
+        public static RoamingNetworkChange Add(String   EntityType,
+                                               String   EntityId,
+                                               JObject  Entity,
+                                               String?  ParentEntityType   = null,
+                                               String?  ParentEntityId     = null)
 
-            => new(RoamingNetworkChangeKind.Add, entityType, entityId, null, null, entity);
+            => new (RoamingNetworkChangeKind.Add,
+                    EntityType,
+                    EntityId,
+                    null,
+                    null,
+                    Entity,
+                    ParentEntityType,
+                    ParentEntityId);
+
+        #endregion
+
+        #region Add                   (ChargingStationOperator)
 
         /// <summary>
-        /// Add an entity beneath an explicit parent.
+        /// Add the given charging station operator to its roaming network.
         /// </summary>
-        public static RoamingNetworkChange Add(String       entityType,
-                                               String       entityId,
-                                               JsonElement  entity,
-                                               String       parentEntityType,
-                                               String       parentEntityId)
-            => new(RoamingNetworkChangeKind.Add, entityType, entityId, null, null, entity, parentEntityType, parentEntityId);
+        /// <param name="ChargingStationOperator">The new charging station operator.</param>
+        public static RoamingNetworkChange Add(ChargingStationOperator ChargingStationOperator)
+
+            => Add(nameof(POI.ChargingStationOperator),
+                   ChargingStationOperator.Id.ToString(),
+                   ChargingStationOperator.ToEmbeddedJSON());
+
+        #endregion
+
+        #region Remove                (ChargingStationOperatorId, OldValue = null)
 
         /// <summary>
-        /// Remove an entity.
+        /// Remove the given charging station operator from its roaming network,
+        /// optionally checking its complete previous JSON representation.
         /// </summary>
-        public static RoamingNetworkChange Remove(String  entityType,
-                                                  String  entityId)
-            => new(RoamingNetworkChangeKind.Remove, entityType, entityId, null, null, null);
+        /// <param name="ChargingStationOperatorId">The identification of the charging station operator.</param>
+        /// <param name="OldValue">The optional expected previous JSON representation of the charging station operator.</param>
+        public static RoamingNetworkChange Remove(ChargingStationOperator_Id  ChargingStationOperatorId,
+                                                  JToken?                     OldValue   = null)
+
+            => Remove(nameof(POI.ChargingStationOperator),
+                      ChargingStationOperatorId.ToString(),
+                      OldValue);
+
+        #endregion
+
+        #region Remove                (EntityType, EntityId, OldValue = null, ...)
 
         /// <summary>
         /// Remove an entity, optionally checking its complete previous document.
         /// </summary>
-        public static RoamingNetworkChange Remove(String        entityType,
-                                                  String        entityId,
-                                                  JsonElement?  oldValue,
-                                                  String?       parentEntityType = null,
-                                                  String?       parentEntityId   = null)
-            => new(RoamingNetworkChangeKind.Remove, entityType, entityId, null, oldValue, null, parentEntityType, parentEntityId);
+        /// <param name="EntityType">The type of the entity.</param>
+        /// <param name="EntityId">The identification of the entity.</param>
+        /// <param name="OldValue">The optional expected previous JSON representation of the entity.</param>
+        /// <param name="ParentEntityType">The optional graph parent type.</param>
+        /// <param name="ParentEntityId">The optional graph parent identity.</param>
+        public static RoamingNetworkChange Remove(String   EntityType,
+                                                  String   EntityId,
+                                                  JToken?  OldValue           = null,
+                                                  String?  ParentEntityType   = null,
+                                                  String?  ParentEntityId     = null)
+
+            => new (RoamingNetworkChangeKind.Remove,
+                    EntityType,
+                    EntityId,
+                    null,
+                    OldValue,
+                    null,
+                    ParentEntityType,
+                    ParentEntityId);
+
+        #endregion
+
+        #region UpdateProperty        (EntityType, EntityId, PropertyName, OldValue, NewValue, ...)
 
         /// <summary>
         /// Update one entity property, optionally asserting its previous value.
         /// </summary>
-        public static RoamingNetworkChange UpdateProperty(String        entityType,
-                                                          String        entityId,
-                                                          String        propertyName,
-                                                          JsonElement?  oldValue,
-                                                          JsonElement   newValue,
-                                                          String?       parentEntityType = null,
-                                                          String?       parentEntityId   = null)
-            => new(RoamingNetworkChangeKind.UpdateProperty, entityType, entityId, propertyName, oldValue, newValue, parentEntityType, parentEntityId);
+        /// <param name="EntityType">The type of the entity.</param>
+        /// <param name="EntityId">The identification of the entity.</param>
+        /// <param name="PropertyName">The JSON property to update.</param>
+        /// <param name="OldValue">The optional expected previous value.</param>
+        /// <param name="NewValue">The new value.</param>
+        /// <param name="ParentEntityType">The optional graph parent type.</param>
+        /// <param name="ParentEntityId">The optional graph parent identity.</param>
+        public static RoamingNetworkChange UpdateProperty(String   EntityType,
+                                                          String   EntityId,
+                                                          String   PropertyName,
+                                                          JToken?  OldValue,
+                                                          JToken   NewValue,
+                                                          String?  ParentEntityType   = null,
+                                                          String?  ParentEntityId     = null)
+
+            => new (RoamingNetworkChangeKind.UpdateProperty,
+                    EntityType,
+                    EntityId,
+                    PropertyName,
+                    OldValue,
+                    NewValue,
+                    ParentEntityType,
+                    ParentEntityId);
+
+        #endregion
+
+        #region UpdateProperty        (RoamingNetwork, PropertyName, OldValue, NewValue)
 
         /// <summary>
-        /// Add one identified collection element or an absent optional singleton property.
+        /// Update one property of the given roaming network, optionally asserting its previous value.
         /// </summary>
-        public static RoamingNetworkChange AddElement(String entityType, String entityId,
-                                                      ImmutableArray<POIElementPathSegment> elementPath, JsonElement value,
-                                                      String? parentEntityType = null, String? parentEntityId = null)
-            => new(RoamingNetworkChangeKind.AddElement, entityType, entityId, null, null, value,
-                   parentEntityType, parentEntityId, elementPath);
+        /// <param name="RoamingNetwork">The roaming network.</param>
+        /// <param name="PropertyName">The JSON property to update.</param>
+        /// <param name="OldValue">The optional expected previous value.</param>
+        /// <param name="NewValue">The new value.</param>
+        public static RoamingNetworkChange UpdateProperty(RoamingNetwork  RoamingNetwork,
+                                                          String          PropertyName,
+                                                          JToken?         OldValue,
+                                                          JToken          NewValue)
+
+            => UpdateProperty(nameof(POI.RoamingNetwork),
+                              RoamingNetwork.Id.ToString(),
+                              PropertyName,
+                              OldValue,
+                              NewValue);
+
+        #endregion
+
+        #region UpdateProperty        (ChargingStationOperator, PropertyName, OldValue, NewValue)
 
         /// <summary>
-        /// Remove one collection element or optional singleton, with an optional complete precondition.
+        /// Update one property of the given charging station operator, optionally asserting its previous value.
         /// </summary>
-        public static RoamingNetworkChange RemoveElement(String entityType, String entityId,
-                                                         ImmutableArray<POIElementPathSegment> elementPath, JsonElement? oldValue = null,
-                                                         String? parentEntityType = null, String? parentEntityId = null)
-            => new(RoamingNetworkChangeKind.RemoveElement, entityType, entityId, null, oldValue, null,
-                   parentEntityType, parentEntityId, elementPath);
+        /// <param name="ChargingStationOperator">The charging station operator.</param>
+        /// <param name="PropertyName">The JSON property to update.</param>
+        /// <param name="OldValue">The optional expected previous value.</param>
+        /// <param name="NewValue">The new value.</param>
+        public static RoamingNetworkChange UpdateProperty(ChargingStationOperator  ChargingStationOperator,
+                                                          String                   PropertyName,
+                                                          JToken?                  OldValue,
+                                                          JToken                   NewValue)
 
-        /// <summary>
-        /// Replace one existing collection element or singleton, with an optional complete precondition.
-        /// </summary>
-        public static RoamingNetworkChange ReplaceElement(String entityType, String entityId,
-                                                          ImmutableArray<POIElementPathSegment> elementPath,
-                                                          JsonElement? oldValue, JsonElement newValue,
-                                                          String? parentEntityType = null, String? parentEntityId = null)
-            => new(RoamingNetworkChangeKind.ReplaceElement, entityType, entityId, null, oldValue, newValue,
-                   parentEntityType, parentEntityId, elementPath);
+            => UpdateProperty(nameof(POI.ChargingStationOperator),
+                              ChargingStationOperator.Id.ToString(),
+                              PropertyName,
+                              OldValue,
+                              NewValue);
 
-        /// <summary>
-        /// Update one static property of an existing nested object while retaining its other properties.
-        /// </summary>
-        public static RoamingNetworkChange UpdateElementProperty(String entityType, String entityId,
-                                                                 ImmutableArray<POIElementPathSegment> elementPath,
-                                                                 String propertyName, JsonElement? oldValue, JsonElement newValue,
-                                                                 String? parentEntityType = null, String? parentEntityId = null)
-            => new(RoamingNetworkChangeKind.UpdateElementProperty, entityType, entityId, propertyName, oldValue, newValue,
-                   parentEntityType, parentEntityId, elementPath);
+        #endregion
+
+        #region RemoveProperty        (EntityType, EntityId, PropertyName, OldValue = null, ...)
 
         /// <summary>
         /// Remove an existing optional entity property, optionally asserting its previous value.
         /// </summary>
-        public static RoamingNetworkChange RemoveProperty(String entityType, String entityId, String propertyName,
-                                                          JsonElement? oldValue = null, String? parentEntityType = null,
-                                                          String? parentEntityId = null)
-            => new(RoamingNetworkChangeKind.RemoveProperty, entityType, entityId, propertyName, oldValue, null,
-                   parentEntityType, parentEntityId);
+        /// <param name="EntityType">The type of the entity.</param>
+        /// <param name="EntityId">The identification of the entity.</param>
+        /// <param name="PropertyName">The JSON property to remove.</param>
+        /// <param name="OldValue">The optional expected previous value.</param>
+        /// <param name="ParentEntityType">The optional graph parent type.</param>
+        /// <param name="ParentEntityId">The optional graph parent identity.</param>
+        public static RoamingNetworkChange RemoveProperty(String   EntityType,
+                                                          String   EntityId,
+                                                          String   PropertyName,
+                                                          JToken?  OldValue           = null,
+                                                          String?  ParentEntityType   = null,
+                                                          String?  ParentEntityId     = null)
+
+            => new (RoamingNetworkChangeKind.RemoveProperty,
+                    EntityType,
+                    EntityId,
+                    PropertyName,
+                    OldValue,
+                    null,
+                    ParentEntityType,
+                    ParentEntityId);
+
+        #endregion
+
+        #region RemoveProperty        (RoamingNetwork, PropertyName, OldValue = null)
+
+        /// <summary>
+        /// Remove an existing optional property of the given roaming network, optionally asserting its previous value.
+        /// </summary>
+        /// <param name="RoamingNetwork">The roaming network.</param>
+        /// <param name="PropertyName">The JSON property to remove.</param>
+        /// <param name="OldValue">The optional expected previous value.</param>
+        public static RoamingNetworkChange RemoveProperty(RoamingNetwork  RoamingNetwork,
+                                                          String          PropertyName,
+                                                          JToken?         OldValue   = null)
+
+            => RemoveProperty(nameof(POI.RoamingNetwork),
+                              RoamingNetwork.Id.ToString(),
+                              PropertyName,
+                              OldValue);
+
+        #endregion
+
+        #region RemoveProperty        (ChargingStationOperator, PropertyName, OldValue = null)
+
+        /// <summary>
+        /// Remove an existing optional property of the given charging station operator, optionally asserting its previous value.
+        /// </summary>
+        /// <param name="ChargingStationOperator">The charging station operator.</param>
+        /// <param name="PropertyName">The JSON property to remove.</param>
+        /// <param name="OldValue">The optional expected previous value.</param>
+        public static RoamingNetworkChange RemoveProperty(ChargingStationOperator  ChargingStationOperator,
+                                                          String                   PropertyName,
+                                                          JToken?                  OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingStationOperator),
+                              ChargingStationOperator.Id.ToString(),
+                              PropertyName,
+                              OldValue);
+
+        #endregion
+
+        #region AddElement            (EntityType, EntityId, ElementPath, Value, ...)
+
+        /// <summary>
+        /// Add one identified collection element or an absent optional singleton property.
+        /// </summary>
+        public static RoamingNetworkChange AddElement(String                                 EntityType,
+                                                      String                                 EntityId,
+                                                      ImmutableArray<POIElementPathSegment>  ElementPath,
+                                                      JToken                                 Value,
+                                                      String?                                ParentEntityType   = null,
+                                                      String?                                ParentEntityId     = null)
+
+            => new (RoamingNetworkChangeKind.AddElement,
+                    EntityType,
+                    EntityId,
+                    null,
+                    null,
+                    Value,
+                    ParentEntityType,
+                    ParentEntityId,
+                    ElementPath);
+
+        #endregion
+
+        #region RemoveElement         (EntityType, EntityId, ElementPath, OldValue = null, ...)
+
+        /// <summary>
+        /// Remove one collection element or optional singleton, with an optional complete precondition.
+        /// </summary>
+        public static RoamingNetworkChange RemoveElement(String                                 EntityType,
+                                                         String                                 EntityId,
+                                                         ImmutableArray<POIElementPathSegment>  ElementPath,
+                                                         JToken?                                OldValue           = null,
+                                                         String?                                ParentEntityType   = null,
+                                                         String?                                ParentEntityId     = null)
+
+            => new (RoamingNetworkChangeKind.RemoveElement,
+                    EntityType,
+                    EntityId,
+                    null,
+                    OldValue,
+                    null,
+                    ParentEntityType,
+                    ParentEntityId,
+                    ElementPath);
+
+        #endregion
+
+        #region ReplaceElement        (EntityType, EntityId, ElementPath, OldValue, NewValue, ...)
+
+        /// <summary>
+        /// Replace one existing collection element or singleton, with an optional complete precondition.
+        /// </summary>
+        public static RoamingNetworkChange ReplaceElement(String                                 EntityType,
+                                                          String                                 EntityId,
+                                                          ImmutableArray<POIElementPathSegment>  ElementPath,
+                                                          JToken?                                OldValue,
+                                                          JToken                                 NewValue,
+                                                          String?                                ParentEntityType   = null,
+                                                          String?                                ParentEntityId     = null)
+
+            => new (RoamingNetworkChangeKind.ReplaceElement,
+                    EntityType,
+                    EntityId,
+                    null,
+                    OldValue,
+                    NewValue,
+                    ParentEntityType,
+                    ParentEntityId,
+                    ElementPath);
+
+        #endregion
+
+        #region UpdateElementProperty (EntityType, EntityId, ElementPath, PropertyName, OldValue, NewValue, ...)
+
+        /// <summary>
+        /// Update one static property of an existing nested object while retaining its other properties.
+        /// </summary>
+        public static RoamingNetworkChange UpdateElementProperty(String                                 EntityType,
+                                                                 String                                 EntityId,
+                                                                 ImmutableArray<POIElementPathSegment>  ElementPath,
+                                                                 String                                 PropertyName,
+                                                                 JToken?                                OldValue,
+                                                                 JToken                                 NewValue,
+                                                                 String?                                ParentEntityType   = null,
+                                                                 String?                                ParentEntityId     = null)
+
+            => new (RoamingNetworkChangeKind.UpdateElementProperty,
+                    EntityType,
+                    EntityId,
+                    PropertyName,
+                    OldValue,
+                    NewValue,
+                    ParentEntityType,
+                    ParentEntityId,
+                    ElementPath);
+
+        #endregion
+
+        #region RemoveElementProperty (EntityType, EntityId, ElementPath, PropertyName, OldValue = null, ...)
 
         /// <summary>
         /// Remove an existing optional element property without clearing the element's runtime lifetime.
         /// </summary>
-        public static RoamingNetworkChange RemoveElementProperty(String entityType, String entityId,
-                                                                 ImmutableArray<POIElementPathSegment> elementPath,
-                                                                 String propertyName, JsonElement? oldValue = null,
-                                                                 String? parentEntityType = null, String? parentEntityId = null)
-            => new(RoamingNetworkChangeKind.RemoveElementProperty, entityType, entityId, propertyName, oldValue, null,
-                   parentEntityType, parentEntityId, elementPath);
+        public static RoamingNetworkChange RemoveElementProperty(String                                 EntityType,
+                                                                 String                                 EntityId,
+                                                                 ImmutableArray<POIElementPathSegment>  ElementPath,
+                                                                 String                                 PropertyName,
+                                                                 JToken?                                OldValue           = null,
+                                                                 String?                                ParentEntityType   = null,
+                                                                 String?                                ParentEntityId     = null)
+
+            => new (RoamingNetworkChangeKind.RemoveElementProperty,
+                    EntityType,
+                    EntityId,
+                    PropertyName,
+                    OldValue,
+                    null,
+                    ParentEntityType,
+                    ParentEntityId,
+                    ElementPath);
+
+        #endregion
 
 
+        #region Parse    (JSON)
+
+        /// <summary>
+        /// Parse the given JSON representation of a roaming network change.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        public static RoamingNetworkChange Parse(JObject JSON)
+        {
+
+            if (TryParse(JSON,
+                         out var roamingNetworkChange,
+                         out var errorResponse))
+            {
+                return roamingNetworkChange;
+            }
+
+            throw new ArgumentException("The given JSON representation of a roaming network change is invalid: " + errorResponse,
+                                        nameof(JSON));
+
+        }
+
+        #endregion
+
+        #region TryParse (JSON, out RoamingNetworkChange, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given JSON representation of a roaming network change.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="RoamingNetworkChange">The parsed roaming network change.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public static Boolean TryParse(JObject                                         JSON,
+                                       [NotNullWhen(true)]  out RoamingNetworkChange?  RoamingNetworkChange,
+                                       [NotNullWhen(false)] out String?                ErrorResponse)
+        {
+
+            RoamingNetworkChange = null;
+
+            try
+            {
+
+                if (JSON is null)
+                {
+                    ErrorResponse = "The given JSON object must not be null!";
+                    return false;
+                }
+
+                #region Parse Kind                [mandatory]
+
+                if (!JSON.ParseMandatoryText("kind",
+                                             "change kind",
+                                             out var kindText,
+                                             out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!Enum.TryParse<RoamingNetworkChangeKind>(kindText, ignoreCase: false, out var kind) ||
+                    !Enum.IsDefined(kind)                                                              ||
+                    kind.ToString() != kindText)
+                {
+                    ErrorResponse = $"Unknown change kind '{kindText}'!";
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse EntityType          [mandatory]
+
+                if (!JSON.ParseMandatoryText("entityType",
+                                             "entity type",
+                                             out var entityType,
+                                             out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse EntityId            [mandatory]
+
+                if (!JSON.ParseMandatoryText("entityId",
+                                             "entity identification",
+                                             out var entityId,
+                                             out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse PropertyName        [optional]
+
+                if (JSON.ParseOptional("propertyName",
+                                       "property name",
+                                       out String? propertyName,
+                                       out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+                #region Parse ParentEntityType    [optional]
+
+                if (JSON.ParseOptional("parentEntityType",
+                                       "parent entity type",
+                                       out String? parentEntityType,
+                                       out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+                #region Parse ParentEntityId      [optional]
+
+                if (JSON.ParseOptional("parentEntityId",
+                                       "parent entity identification",
+                                       out String? parentEntityId,
+                                       out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+                #region Parse ElementPath         [optional]
+
+                var elementPath = ImmutableArray<POIElementPathSegment>.Empty;
+
+                if (JSON["elementPath"] is JToken elementPathJSON)
+                {
+
+                    if (elementPathJSON is not JArray elementPathArray)
+                    {
+                        ErrorResponse = "The element path must be a JSON array!";
+                        return false;
+                    }
+
+                    foreach (var segmentJSON in elementPathArray)
+                    {
+
+                        if (segmentJSON is not JObject segmentObject)
+                        {
+                            ErrorResponse = "An element path segment must be a JSON object!";
+                            return false;
+                        }
+
+                        if (!POIElementPathSegment.TryParse(segmentObject, out var segment, out var segmentError))
+                        {
+                            ErrorResponse = "Invalid element path segment: " + segmentError;
+                            return false;
+                        }
+
+                        elementPath = elementPath.Add(segment);
+
+                    }
+
+                }
+
+                #endregion
+
+                #region Parse OldValue/NewValue   [optional]
+
+                var oldValue = JSON["oldValue"];
+                var newValue = JSON["newValue"];
+
+                #endregion
 
 
+                RoamingNetworkChange = new RoamingNetworkChange(
+                                           kind,
+                                           entityType,
+                                           entityId,
+                                           propertyName,
+                                           oldValue,
+                                           newValue,
+                                           parentEntityType,
+                                           parentEntityId,
+                                           elementPath
+                                       );
+
+                ErrorResponse = null;
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                RoamingNetworkChange  = null;
+                ErrorResponse         = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region ToJSON()
+
+        /// <summary>
+        /// Return a JSON representation of this roaming network change.
+        /// </summary>
+        public JObject ToJSON()
+        {
+
+            var json = JSONObject.Create(
+
+                                 new JProperty("kind",               Kind.ToString()),
+                                 new JProperty("entityType",         EntityType),
+                                 new JProperty("entityId",           EntityId),
+
+                           PropertyName is not null
+                               ? new JProperty("propertyName",       PropertyName)
+                               : null,
+
+                           ParentEntityType is not null
+                               ? new JProperty("parentEntityType",   ParentEntityType)
+                               : null,
+
+                           ParentEntityId is not null
+                               ? new JProperty("parentEntityId",     ParentEntityId)
+                               : null,
+
+                           ElementPath.Length > 0
+                               ? new JProperty("elementPath",        new JArray(ElementPath.Select(segment => segment.ToJSON())))
+                               : null
+
+                       );
+
+            // Added directly: JSONObject.Create leaves out JSON null and empty values,
+            // but an expected absent old value (null) or an empty new value ([], {}, "") is a value here.
+            if (oldValue is not null)
+                json.Add("oldValue", oldValue.DeepClone());
+
+            if (newValue is not null)
+                json.Add("newValue", newValue.DeepClone());
+
+            return json;
+
+        }
+
+        #endregion
 
 
+        #region Equals(RoamingNetworkChange)
+
+        /// <summary>
+        /// Compares two roaming network changes for equality, their JSON values by their content.
+        /// </summary>
+        /// <param name="RoamingNetworkChange">A roaming network change to compare with.</param>
+        public Boolean Equals(RoamingNetworkChange? RoamingNetworkChange)
+
+            => RoamingNetworkChange is not null &&
+
+               Kind             == RoamingNetworkChange.Kind             &&
+               EntityType       == RoamingNetworkChange.EntityType       &&
+               EntityId         == RoamingNetworkChange.EntityId         &&
+               PropertyName     == RoamingNetworkChange.PropertyName     &&
+               ParentEntityType == RoamingNetworkChange.ParentEntityType &&
+               ParentEntityId   == RoamingNetworkChange.ParentEntityId   &&
+
+               ElementPath.SequenceEqual(RoamingNetworkChange.ElementPath) &&
+
+               JToken.DeepEquals(oldValue, RoamingNetworkChange.oldValue) &&
+               JToken.DeepEquals(newValue, RoamingNetworkChange.newValue);
+
+        #endregion
+
+        #region GetHashCode()
+
+        /// <summary>
+        /// Return the hash code of this object.
+        /// </summary>
+        public override Int32 GetHashCode()
+
+            => HashCode.Combine(Kind,
+                                EntityType,
+                                EntityId,
+                                PropertyName,
+                                ParentEntityType,
+                                ParentEntityId,
+                                ElementPath.Length);
+
+        #endregion
+
+        #region ToString()
+
+        /// <summary>
+        /// Return a text representation of this object.
+        /// </summary>
+        public override String ToString()
+
+            => $"{Kind} {EntityType} '{EntityId}'{(PropertyName is not null ? $" .{PropertyName}" : "")}";
+
+        #endregion
 
 
-        private static String Required(String  value,
-                                       String  parameterName)
-            => !String.IsNullOrWhiteSpace(value) ? value : throw new ArgumentException("Value must not be empty.", parameterName);
+        #region (private static) Required(Value, ParameterName)
 
+        private static String Required(String  Value,
+                                       String  ParameterName)
 
+            => !String.IsNullOrWhiteSpace(Value)
+                   ? Value
+                   : throw new ArgumentException("Value must not be empty.", ParameterName);
 
+        #endregion
 
     }
 

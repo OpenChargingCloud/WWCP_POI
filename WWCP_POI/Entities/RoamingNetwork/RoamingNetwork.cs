@@ -124,8 +124,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// discount) or allow a simplified testing (production, qa, featureX, ...)
     /// </summary>
     public sealed partial class RoamingNetwork : AImmutableEMobilityEntity<RoamingNetwork_Id,
-                                                   RoamingNetworkAdminStatusType,
-                                                   RoamingNetworkStatusType>
+                                                                           RoamingNetworkAdminStatusType,
+                                                                           RoamingNetworkStatusType>
     {
 
         #region Data
@@ -347,6 +347,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
             get { EnsureSnapshotProjection(); return projectedChargingStationOperators; }
         }
+
 
         /// <summary>
         /// The operators in this immutable network version.

@@ -33,13 +33,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// An abstract e-mobility entity.
     /// </summary>
     public abstract class AImmutableEMobilityEntity<TId,
-                                           TAdminStatus,
-                                           TStatus> : AImmutableInternalData,
-                                                      IImmutablePOI,
-                                                      IEntity<TId>,
-                                                      IHasId<TId>,
-                                                      IAdminStatus<TAdminStatus>,
-                                                      IStatus<TStatus>
+                                                    TAdminStatus,
+                                                    TStatus> : AImmutableInternalData,
+                                                               IImmutablePOI,
+                                                               IEntity<TId>,
+                                                               IHasId<TId>,
+                                                               IAdminStatus<TAdminStatus>,
+                                                               IStatus<TStatus>
 
         where TId          : IId
         where TAdminStatus : IComparable

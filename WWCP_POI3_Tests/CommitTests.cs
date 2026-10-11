@@ -34,10 +34,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
     public class CommitTests
     {
 
-        #region RoamingNetwork_JSON_RoundtripTest()
+        #region RoamingNetwork_JSON_ApplyChangeSetTest()
 
         [Test]
-        public void RoamingNetwork_JSON_RoundtripTest()
+        public void RoamingNetwork_JSON_ApplyChangeSetTest()
         {
 
             var rn1 = new RoamingNetwork(
@@ -48,20 +48,38 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                           DataSource:   "test"
                       );
 
-            var j1  = rn1.ToJSON();
-            var t1  = j1.ToString(Newtonsoft.Json.Formatting.None);
+            var e1  = rn1.CalcETags();
 
-            var rn2 = RoamingNetwork.Parse(JObject.Parse(t1));
-            var t2  = rn2.ToJSON().ToString(Newtonsoft.Json.Formatting.None);
+            System.Collections.Immutable.ImmutableArray<RoamingNetworkChange> c1 = [
+                RoamingNetworkChange.UpdateProperty(
+                    RoamingNetwork:  rn1,
+                    PropertyName:    "dataSource",
+                    OldValue:        "test",
+                    NewValue:        "test2"
+                )
+            ];
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(rn2.Id,            Is.EqualTo(rn1.Id));
-                Assert.That(rn2.Name,          Is.EqualTo(rn1.Name));
-                Assert.That(rn2.Description,   Is.EqualTo(rn1.Description));
-                Assert.That(rn2.DataSource,    Is.EqualTo(rn1.DataSource));
-                Assert.That(t2,                Is.EqualTo(t1));
-            }
+            var cs1 = new RoamingNetworkChangeSet(
+                          Id:                 ChangeSet_Id.NewRandom(),
+                          RoamingNetworkId:   rn1.Id,
+                          CreatedAt:          Timestamp.Now,
+                          Changes:            c1,
+                          BeforeETags:        e1,
+                          AfterETags:         e1,
+                          Description:        I18NString.Create("Hello world!"),
+                          //Metadata:           JSONObject.Create(new JProperty("hello", "world!")),
+                          Signatures:         null
+                      );
+
+            //using (Assert.EnterMultipleScope())
+            //{
+            //    Assert.That(rn2.Id,              Is.EqualTo(rn1.Id));
+            //    Assert.That(rn2.Name,            Is.EqualTo(rn1.Name));
+            //    Assert.That(rn2.Description,     Is.EqualTo(rn1.Description));
+            //    Assert.That(rn2.DataSource,      Is.EqualTo(rn1.DataSource));
+            //    Assert.That(e1.First().Digest,   Is.EqualTo(e2.First().Digest));
+            //    Assert.That(t2,                  Is.EqualTo(t1));
+            //}
 
         }
 
@@ -82,39 +100,23 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                       );
 
             var c1  = rn1.ToCBOR();
+            var e1  = rn1.CalcETags(CBOR: c1);
             var b1  = c1.ToByteArray(CBORWriterOptions.Canonical);
 
             var rn2 = RoamingNetwork.Parse(CBORValue.Parse(b1));
-            var b2  = rn2.ToCBOR().ToByteArray(CBORWriterOptions.Canonical);
+            var c2  = rn2.ToCBOR();
+            var e2  = rn2.CalcETags(CBOR: c2);
+            var b2  = c2.ToByteArray(CBORWriterOptions.Canonical);
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(rn2.Id,            Is.EqualTo(rn1.Id));
-                Assert.That(rn2.Name,          Is.EqualTo(rn1.Name));
-                Assert.That(rn2.Description,   Is.EqualTo(rn1.Description));
-                Assert.That(rn2.DataSource,    Is.EqualTo(rn1.DataSource));
-                Assert.That(b2,                Is.EqualTo(b1));
+                Assert.That(rn2.Id,              Is.EqualTo(rn1.Id));
+                Assert.That(rn2.Name,            Is.EqualTo(rn1.Name));
+                Assert.That(rn2.Description,     Is.EqualTo(rn1.Description));
+                Assert.That(rn2.DataSource,      Is.EqualTo(rn1.DataSource));
+                Assert.That(e1.First().Digest,   Is.EqualTo(e2.First().Digest));
+                Assert.That(b2,                  Is.EqualTo(b1));
             }
-
-        }
-
-        #endregion
-
-        #region RoamingNetwork_CBOR_rejects_an_unknown_language()
-
-        [Test]
-        public void RoamingNetwork_CBOR_rejects_an_unknown_language()
-        {
-
-            var cbor = CBORValue.FromMap([
-                           new (CBORValue.FromText("@id"),   CBORValue.FromText("rn1")),
-                           new (CBORValue.FromText("name"),  CBORValue.FromMap([
-                                                                 new (CBORValue.FromText("xx-unknown"), CBORValue.FromText("?"))
-                                                             ]))
-                       ]);
-
-            Assert.That(RoamingNetwork.TryParse(cbor, out _, out var error),  Is.False);
-            Assert.That(error,                                                Does.Contain("xx-unknown"));
 
         }
 

@@ -1,8 +1,31 @@
+/*
+ * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
+ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
+ *
+ * Licensed under the Affero GPL license, Version 3.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.gnu.org/licenses/agpl.html
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#region Usings
+
+using System.Security.Cryptography;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
-using System.Security.Cryptography;
+
 using Newtonsoft.Json.Linq;
+
 using org.GraphDefined.Vanaheimr.Illias;
+
+#endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI;
 
@@ -14,72 +37,92 @@ namespace cloud.charging.open.protocols.WWCP.POI;
 public readonly struct ETag : IEquatable<ETag>
 {
 
-    private readonly ImmutableArray<Byte> digest;
+    private readonly ImmutableArray<Byte> HashDigest;
 
     /// <summary>
     /// The canonical content representation.
     /// </summary>
-    public ETagFormat Format { get; }
+    public ETagFormat            Format           { get; }
 
     /// <summary>
     /// The digest algorithm.
     /// </summary>
-    public ETagHashAlgorithm Algorithm { get; }
+    public ETagHashAlgorithm     HashAlgorithm    { get; }
 
     /// <summary>
     /// Immutable digest bytes, detached from constructor input.
     /// </summary>
-    public ImmutableArray<Byte> Digest
-        => digest.IsDefault ? [] : digest;
+    public ImmutableArray<Byte>  Digest
+        => HashDigest.IsDefault
+               ? []
+               : HashDigest;
 
     /// <summary>
     /// Whether this value is initialized and has a supported format, algorithm and digest length.
     /// The default struct value is invalid and cannot be serialized or used as a precondition.
     /// </summary>
-    public Boolean IsValid => !digest.IsDefault && digest.Length == 32 &&
-                              Format is ETagFormat.JSON or ETagFormat.CBOR && Algorithm == ETagHashAlgorithm.SHA256;
+    public Boolean IsValid => !HashDigest.IsDefault &&
+                              Format is ETagFormat.JSON or ETagFormat.CBOR &&
+                              HashDigest.Length == DigestLength(HashAlgorithm);
+
+    /// <summary>
+    /// The number of digest bytes of the given hash algorithm, or 0 for an unsupported one.
+    /// </summary>
+    /// <param name="HashAlgorithm">A hash algorithm.</param>
+    public static Int32 DigestLength(ETagHashAlgorithm HashAlgorithm)
+
+        => HashAlgorithm switch {
+               ETagHashAlgorithm.SHA256  => 32,
+               ETagHashAlgorithm.SHA384  => 48,
+               ETagHashAlgorithm.SHA512  => 64,
+               _                         => 0
+           };
 
     /// <summary>
     /// The lowercase hexadecimal digest for textual transports and display.
     /// </summary>
     public String DigestHex
     {
-        get { RequireValid(); return Convert.ToHexStringLower(digest.AsSpan()); }
+        get { RequireValid(); return Convert.ToHexStringLower(HashDigest.AsSpan()); }
     }
 
 
 
-
+    #region Constructor(s)
 
     /// <summary>
-    /// Construct an identifier from a supported format, hash algorithm and digest bytes.
+    /// Create a new ETag with a supported format, algorithm and digest bytes.
     /// </summary>
-    public ETag(ETagFormat          format,
-                ETagHashAlgorithm   algorithm,
-                ReadOnlySpan<Byte>  digest)
+    /// <param name="Format">The format of the canonical content representation.</param>
+    /// <param name="HashAlgorithm">The digest algorithm used to compute the identifier.</param>
+    /// <param name="HashDigest">The digest bytes, which must be exactly 32 bytes for SHA-256.</param>
+    public ETag(ETagFormat          Format,
+                ETagHashAlgorithm   HashAlgorithm,
+                ReadOnlySpan<Byte>  HashDigest)
     {
 
-        if (format is not (ETagFormat.JSON or ETagFormat.CBOR))
-            throw new ArgumentOutOfRangeException(nameof(format));
+        if (Format is not (ETagFormat.JSON or ETagFormat.CBOR))
+            throw new ArgumentOutOfRangeException(nameof(Format),         "The only supported formats are JSON and CBOR!");
 
-        if (algorithm != ETagHashAlgorithm.SHA256)
-            throw new ArgumentOutOfRangeException(nameof(algorithm));
+        if (HashAlgorithm is not (ETagHashAlgorithm.SHA256 or ETagHashAlgorithm.SHA384 or ETagHashAlgorithm.SHA512))
+            throw new ArgumentOutOfRangeException(nameof(HashAlgorithm),  "The only supported hash algorithms are SHA-256, SHA-384 and SHA-512!");
 
-        if (digest.Length != 32)
-            throw new ArgumentException("A SHA-256 digest must contain exactly 32 bytes.", nameof(digest));
+        if (HashAlgorithm is ETagHashAlgorithm.SHA256 && HashDigest.Length != 32)
+            throw new ArgumentException("A SHA-256 digest must contain exactly 32 bytes.", nameof(HashDigest));
 
-        Format = format;
-        Algorithm = algorithm;
-        this.digest = ImmutableArray.CreateRange(digest.ToArray());
+        if (HashAlgorithm is ETagHashAlgorithm.SHA384 && HashDigest.Length != 48)
+            throw new ArgumentException("A SHA-384 digest must contain exactly 48 bytes.", nameof(HashDigest));
+
+        if (HashAlgorithm is ETagHashAlgorithm.SHA512 && HashDigest.Length != 64)
+            throw new ArgumentException("A SHA-512 digest must contain exactly 64 bytes.", nameof(HashDigest));
+
+        this.Format         = Format;
+        this.HashAlgorithm  = HashAlgorithm;
+        this.HashDigest     = [.. HashDigest.ToArray()];
 
     }
 
-
-
-
-
-
-
+    #endregion
 
 
 
@@ -88,8 +131,32 @@ public readonly struct ETag : IEquatable<ETag>
     /// <summary>
     /// Compute a SHA-256 identifier over already canonicalized content bytes.
     /// </summary>
-    public static ETag Compute(ETagFormat format, ReadOnlySpan<Byte> canonicalContent)
-        => new(format, ETagHashAlgorithm.SHA256, SHA256.HashData(canonicalContent));
+    public static ETag Compute(ETagFormat          Format,
+                               ReadOnlySpan<Byte>  CanonicalContent)
+
+        => new (Format,
+                ETagHashAlgorithm.SHA256,
+                SHA256.HashData(CanonicalContent));
+
+    /// <summary>
+    /// Compute an identifier with the given hash algorithm over already canonicalized content bytes.
+    /// </summary>
+    /// <param name="Format">The format of the canonical content.</param>
+    /// <param name="HashAlgorithm">The hash algorithm.</param>
+    /// <param name="CanonicalContent">The canonical content bytes.</param>
+    public static ETag Compute(ETagFormat          Format,
+                               ETagHashAlgorithm   HashAlgorithm,
+                               ReadOnlySpan<Byte>  CanonicalContent)
+
+        => new (Format,
+                HashAlgorithm,
+                HashAlgorithm switch {
+                    ETagHashAlgorithm.SHA256  => SHA256.HashData(CanonicalContent),
+                    ETagHashAlgorithm.SHA384  => SHA384.HashData(CanonicalContent),
+                    ETagHashAlgorithm.SHA512  => SHA512.HashData(CanonicalContent),
+                    _                         => throw new ArgumentOutOfRangeException(nameof(HashAlgorithm), "Unsupported ETag hash algorithm!")
+                });
+
 
     /// <summary>
     /// Parse the human-readable format:algorithm:encoding:digest representation.
@@ -110,10 +177,80 @@ public readonly struct ETag : IEquatable<ETag>
     /// <summary>
     /// Try to parse a human-readable identifier.
     /// </summary>
-    public static Boolean TryParse(String? text, out ETag value, [NotNullWhen(false)] out String? error)
+    public static Boolean TryParse(String                            Text,
+                                   out ETag                          Value,
+                                   [NotNullWhen(false)] out String?  ErrorResponse)
     {
-        try { value = Parse(text!); error = null; return true; }
-        catch (ArgumentException exception) { value = default; error = exception.Message; return false; }
+
+        Value = default;
+
+        try
+        {
+
+            var parts = Text.Split(':');
+
+            if (parts.Length != 4)
+            {
+                ErrorResponse = "Expected format:algorithm:encoding:digest!";
+                return false;
+            }
+
+            var parsedFormat    = ParseFormat   (parts[0]);
+            var parsedAlgorithm = ParseAlgorithm(parts[1]);
+            Byte[] bytes;
+
+            switch (parts[2])
+            {
+
+                case "hex":
+                    if (parts[3].AsSpan().IndexOfAnyExcept("0123456789abcdef") >= 0)
+                    {
+                        ErrorResponse = "A HEX digest requires lowercase hexadecimal digits.";
+                        return false;
+                    }
+
+                    try
+                    {
+                        bytes = Convert.FromHexString(parts[3]);
+                    }
+                    catch
+                    {
+                        ErrorResponse = "Invalid HEX encoding!";
+                        return false;
+                    }
+
+                    break;
+
+                case "base64":
+                    try
+                    {
+                        bytes = Convert.FromBase64String(parts[3]);
+                    }
+                    catch
+                    {
+                        ErrorResponse = "Invalid Base64 encoding!";
+                        return false;
+                    }
+
+                    break;
+
+                default:
+                    ErrorResponse = "Unsupported ETag digest encoding!";
+                    return false;
+
+            }
+
+            Value          = new (parsedFormat, parsedAlgorithm, bytes);
+            ErrorResponse  = null;
+            return true;
+
+        }
+        catch (Exception exception) {
+            Value          = default;
+            ErrorResponse  = exception.Message;
+            return false;
+        }
+
     }
 
     /// <summary>
@@ -125,7 +262,12 @@ public readonly struct ETag : IEquatable<ETag>
         if (json is not JArray array || array.Count != 4 || array.Any(item => item.Type != JTokenType.String))
             throw new ArgumentException("A JSON ETag must be [format, algorithm, encoding, encodedDigest].", nameof(json));
 
-        return FromTextParts(array[0].Value<String>()!, array[1].Value<String>()!, array[2].Value<String>()!, array[3].Value<String>()!);
+        return FromTextParts(
+                   array[0].Value<String>()!,
+                   array[1].Value<String>()!,
+                   array[2].Value<String>()!,
+                   array[3].Value<String>()!
+               );
 
     }
 
@@ -140,9 +282,12 @@ public readonly struct ETag : IEquatable<ETag>
 
         var items = cbor.AsArray();
 
-        if (!items[0].TryGetText(out var format) || !items[1].TryGetText(out var algorithm) ||
+        if (!items[0].TryGetText (out var format)    ||
+            !items[1].TryGetText (out var algorithm) ||
             !items[2].TryGetBytes(out var bytes))
+        {
             throw new ArgumentException("A CBOR ETag requires text format/algorithm and a digest byte string.", nameof(cbor));
+        }
 
         return new (ParseFormat(format), ParseAlgorithm(algorithm), bytes);
 
@@ -151,7 +296,8 @@ public readonly struct ETag : IEquatable<ETag>
     /// <summary>
     /// Parse one complete CBOR-encoded identifier using the strict Styx reader.
     /// </summary>
-    public static ETag ParseCBOR(ReadOnlySpan<Byte> bytes) => Parse(CBORValue.Parse(bytes));
+    public static ETag ParseCBOR(ReadOnlySpan<Byte> bytes)
+        => Parse(CBORValue.Parse(bytes));
 
     /// <summary>
     /// Serialize as [format, algorithm, encoding, encodedDigest], using HEX by default.
@@ -182,7 +328,7 @@ public readonly struct ETag : IEquatable<ETag>
     {
         RequireValid();
         return CBORValue.FromArray(CBORValue.FromText(FormatText), CBORValue.FromText(AlgorithmText),
-                                   CBORValue.FromBytes(digest.ToArray()));
+                                   CBORValue.FromBytes(HashDigest.ToArray()));
     }
 
     /// <summary>
@@ -200,7 +346,7 @@ public readonly struct ETag : IEquatable<ETag>
     /// Compare format, algorithm and digest content rather than backing-array identity.
     /// </summary>
     public Boolean Equals(ETag other)
-        => Format == other.Format && Algorithm == other.Algorithm && digest.AsSpan().SequenceEqual(other.digest.AsSpan());
+        => Format == other.Format && HashAlgorithm == other.HashAlgorithm && HashDigest.AsSpan().SequenceEqual(other.HashDigest.AsSpan());
 
     /// <summary>
     /// Compare a boxed identifier by value.
@@ -214,8 +360,8 @@ public readonly struct ETag : IEquatable<ETag>
     {
         unchecked
         {
-            var hash = ((Int32) Format * 397) ^ (Int32) Algorithm;
-            foreach (var value in digest.AsSpan()) hash = hash * 31 + value;
+            var hash = ((Int32) Format * 397) ^ (Int32) HashAlgorithm;
+            foreach (var value in HashDigest.AsSpan()) hash = hash * 31 + value;
             return hash;
         }
     }
@@ -233,8 +379,10 @@ public readonly struct ETag : IEquatable<ETag>
     internal String FormatText => Format switch {
         ETagFormat.JSON => "json", ETagFormat.CBOR => "cbor", _ => throw new InvalidOperationException("Unsupported ETag format.")
     };
-    internal String AlgorithmText => Algorithm == ETagHashAlgorithm.SHA256 ? "sha256" :
-                                     throw new InvalidOperationException("Unsupported ETag algorithm.");
+    internal String AlgorithmText => HashAlgorithm switch {
+        ETagHashAlgorithm.SHA256 => "sha256", ETagHashAlgorithm.SHA384 => "sha384", ETagHashAlgorithm.SHA512 => "sha512",
+        _ => throw new InvalidOperationException("Unsupported ETag algorithm.")
+    };
 
     internal CBORValue ToTextCBOR()
         => CBORValue.FromArray(CBORValue.FromText(FormatText), CBORValue.FromText(AlgorithmText),
@@ -254,8 +402,8 @@ public readonly struct ETag : IEquatable<ETag>
         {
 
             case "hex":
-                if (encodedDigest.Length != 64 || encodedDigest.AsSpan().IndexOfAnyExcept("0123456789abcdef") >= 0)
-                    throw new ArgumentException("A SHA-256 digest requires 64 lowercase hexadecimal digits.", nameof(encodedDigest));
+                if (encodedDigest.Length != 2 * DigestLength(parsedAlgorithm) || encodedDigest.AsSpan().IndexOfAnyExcept("0123456789abcdef") >= 0)
+                    throw new ArgumentException($"A {algorithm} digest requires {2 * DigestLength(parsedAlgorithm)} lowercase hexadecimal digits.", nameof(encodedDigest));
                 bytes = Convert.FromHexString(encodedDigest);
                 break;
 
@@ -274,7 +422,7 @@ public readonly struct ETag : IEquatable<ETag>
 
         }
 
-        return new(parsedFormat, parsedAlgorithm, bytes);
+        return new (parsedFormat, parsedAlgorithm, bytes);
 
     }
 
@@ -282,8 +430,8 @@ public readonly struct ETag : IEquatable<ETag>
     {
         RequireValid();
         return encoding switch {
-            ETagDigestEncoding.HEX => Convert.ToHexStringLower(digest.AsSpan()),
-            ETagDigestEncoding.Base64 => Convert.ToBase64String(digest.AsSpan()),
+            ETagDigestEncoding.HEX => Convert.ToHexStringLower(HashDigest.AsSpan()),
+            ETagDigestEncoding.Base64 => Convert.ToBase64String(HashDigest.AsSpan()),
             _ => throw new ArgumentOutOfRangeException(nameof(encoding))
         };
     }
@@ -298,11 +446,15 @@ public readonly struct ETag : IEquatable<ETag>
         _ => throw new ArgumentException("Unsupported ETag format.", nameof(format))
     };
     private static ETagHashAlgorithm ParseAlgorithm(String algorithm)
-        => algorithm == "sha256" ? ETagHashAlgorithm.SHA256 : throw new ArgumentException("Unsupported ETag hash algorithm.", nameof(algorithm));
+        => algorithm switch {
+            "sha256" => ETagHashAlgorithm.SHA256, "sha384" => ETagHashAlgorithm.SHA384, "sha512" => ETagHashAlgorithm.SHA512,
+            _ => throw new ArgumentException("Unsupported ETag hash algorithm.", nameof(algorithm))
+        };
 
     private void RequireValid()
     {
-        if (!IsValid) throw new InvalidOperationException("An uninitialized ETag cannot be serialized.");
+        if (!IsValid)
+            throw new InvalidOperationException("An uninitialized ETag cannot be serialized.");
     }
 
     internal static ImmutableArray<ETag> ValidatePair(ImmutableArray<ETag> tags, String parameterName)

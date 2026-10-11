@@ -190,7 +190,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               DateTimeOffset?                 LastChange                   = null,
 
                               CustomDataNew?                  CustomData                   = null,
-                              UserDefinedDictionary?          InternalData                 = null)
+                              UserDefinedDictionary?          InternalData                 = null,
+
+                              IEnumerable<DataLicense>?              DataLicenses               = null,
+                              IEnumerable<ChargingStationOperator>?  ChargingStationOperators   = null)
 
             : base(Id,
                    Name,
@@ -206,6 +209,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    InternalData)
 
         {
+
+            #region Data licenses and charging station operators
+
+            foreach (var dataLicense in DataLicenses ?? [])
+            {
+
+                ArgumentNullException.ThrowIfNull(dataLicense, nameof(DataLicenses));
+
+                if (!dataLicenses.TryAdd(dataLicense.Id, dataLicense))
+                    throw new ArgumentException($"The data license '{dataLicense.Id}' must not be given twice!", nameof(DataLicenses));
+
+            }
+
+            foreach (var chargingStationOperator in ChargingStationOperators ?? [])
+            {
+
+                ArgumentNullException.ThrowIfNull(chargingStationOperator, nameof(ChargingStationOperators));
+
+                if (!chargingStationOperators.TryAdd(chargingStationOperator.Id, chargingStationOperator))
+                    throw new ArgumentException($"The charging station operator '{chargingStationOperator.Id}' must not be given twice!", nameof(ChargingStationOperators));
+
+            }
+
+            #endregion
 
             #region Link events
 
@@ -351,12 +378,70 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse DataLicenses   [optional]
+
+                if (!POIDataLicenses.TryParse(JSON["dataLicenses"],
+                                              JSON["dataLicenseIds"],
+                                              out var dataLicenses,
+                                              out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse ChargingStationOperators [optional]
+
+                if (JSON.ContainsKey("chargingStationOperatorIds"))
+                {
+                    ErrorResponse = "Charging station operators given only by their identifications can not be read; they must be given completely as 'chargingStationOperators'!";
+                    return false;
+                }
+
+                var chargingStationOperators = new List<ChargingStationOperator>();
+
+                if (JSON["chargingStationOperators"] is JToken chargingStationOperatorsJSON)
+                {
+
+                    if (chargingStationOperatorsJSON is not JArray chargingStationOperatorsArray)
+                    {
+                        ErrorResponse = "The charging station operators must be a JSON array!";
+                        return false;
+                    }
+
+                    foreach (var chargingStationOperatorJSON in chargingStationOperatorsArray)
+                    {
+
+                        if (chargingStationOperatorJSON is not JObject chargingStationOperatorObject)
+                        {
+                            ErrorResponse = "A charging station operator must be a JSON object!";
+                            return false;
+                        }
+
+                        if (!ChargingStationOperator.TryParse(chargingStationOperatorObject,
+                                                              out var chargingStationOperator,
+                                                              out var chargingStationOperatorError))
+                        {
+                            ErrorResponse = chargingStationOperatorError;
+                            return false;
+                        }
+
+                        chargingStationOperators.Add(chargingStationOperator);
+
+                    }
+
+                }
+
+                #endregion
+
 
                 RoamingNetwork = new RoamingNetwork(
                                      id,
                                      name,
                                      description,
-                                     DataSource: dataSource
+                                     DataSource:                dataSource,
+                                     DataLicenses:              dataLicenses,
+                                     ChargingStationOperators:  chargingStationOperators
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -386,19 +471,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public JObject ToJSON(Boolean                                                    Embedded                                  = false,
 
                               InfoStatus                                                 ExpandRoamingNetworkIds                   = InfoStatus.ShowIdOnly,
-                              InfoStatus                                                 ExpandChargingStationOperatorIds          = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandChargingStationOperatorIds          = InfoStatus.Expanded,
                               InfoStatus                                                 ExpandChargingPoolIds                     = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandChargingStationIds                  = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandBrandIds                            = InfoStatus.ShowIdOnly,
-                              InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.Expanded,
                               InfoStatus                                                 ExpandEMobilityProviderId                 = InfoStatus.ShowIdOnly,
 
                               CustomJObjectSerializerDelegate<RoamingNetwork>?           CustomRoamingNetworkSerializer            = null,
-                              CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null)
+                              CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null,
                               //CustomJObjectSerializerDelegate<ChargingPool>?             CustomChargingPoolSerializer              = null,
                               //CustomJObjectSerializerDelegate<ChargingStation>?          CustomChargingStationSerializer           = null,
-                              //CustomJObjectSerializerDelegate<EVSE>?                     CustomEVSESerializer                      = null)
+                              //CustomJObjectSerializerDelegate<EVSE>?                     CustomEVSESerializer                      = null,
+
+                              Boolean                                                    IncludeETags                              = true,
+                              ETagDigestEncoding?                                        ETagDigestEncoding                        = null)
+
         {
 
             var JSON = JSONObject.Create(
@@ -419,47 +508,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              ? new JProperty("dataSource",      DataSource)
                              : null,
 
-                         DataLicenses.Any()
+                         DataLicenses.Any() && ExpandDataLicenses != InfoStatus.Hidden
                              ? ExpandDataLicenses.Switch(
                                  () => new JProperty(
                                            "dataLicenseIds",
-                                           new JArray(DataLicenses.SafeSelect(license => license.Id.ToString()))
+                                           DataLicenses.ToPOIIdsJSON()
                                        ),
                                  () => new JProperty(
                                            "dataLicenses",
-                                           DataLicenses.ToJSON()
+                                           DataLicenses.ToPOIJSON()
                                        ))
                              : null,
 
-                         ChargingStationOperators.Any()
+                         ChargingStationOperators.Any() && ExpandChargingStationOperatorIds != InfoStatus.Hidden
                              ? ExpandChargingStationOperatorIds.Switch(
 
                                    () => new JProperty(
                                              "chargingStationOperatorIds",
                                              new JArray(
-                                                 ChargingStationOperators.
-                                                     Select (chargingStationOperator => chargingStationOperator.Id).
-                                                     OrderBy(chargingStationOperator => chargingStationOperator).
-                                                     Select (chargingStationOperator => chargingStationOperator.ToString())
+                                                 OrderedChargingStationOperators.
+                                                     Select(chargingStationOperator => chargingStationOperator.Id.ToString())
                                              )
                                          ),
 
                                    () => new JProperty(
                                              "chargingStationOperators",
                                              new JArray(
-                                                 ChargingStationOperators.
-                                                     OrderBy(chargingStationOperator => chargingStationOperator).
-                                                     ToJSON (Embedded:                                 true,
-                                                             ExpandRoamingNetworkId:                   InfoStatus.Hidden,
-                                                             ExpandChargingPoolIds:                    ExpandChargingPoolIds,
-                                                             ExpandChargingStationIds:                 ExpandChargingStationIds,
-                                                             ExpandEVSEIds:                            ExpandEVSEIds,
-                                                             ExpandBrandIds:                           ExpandBrandIds,
-                                                             ExpandDataLicenses:                       ExpandDataLicenses,
-                                                             CustomChargingStationOperatorSerializer:  CustomChargingStationOperatorSerializer))))
-                                                          //   CustomChargingPoolSerializer:             CustomChargingPoolSerializer,
-                                                          //   CustomChargingStationSerializer:          CustomChargingStationSerializer,
-                                                          //   CustomEVSESerializer:                     CustomEVSESerializer))))
+                                                 OrderedChargingStationOperators.
+                                                     Select(chargingStationOperator => chargingStationOperator.ToJSON(
+                                                                                           Embedded:                                 true,
+                                                                                           ExpandRoamingNetworkId:                   InfoStatus.Hidden,
+                                                                                           ExpandChargingPoolIds:                    ExpandChargingPoolIds,
+                                                                                           ExpandChargingStationIds:                 ExpandChargingStationIds,
+                                                                                           ExpandEVSEIds:                            ExpandEVSEIds,
+                                                                                           ExpandBrandIds:                           ExpandBrandIds,
+                                                                                           ExpandDataLicenses:                       ExpandDataLicenses,
+                                                                                           CustomChargingStationOperatorSerializer:  CustomChargingStationOperatorSerializer
+                                                                                       ))
+                                             )
+                                         ))
 
                              : null
 
@@ -547,6 +634,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             //           : JSON);
 
                              );
+
+            // The ETags describe the content without them, irrespective of the view options.
+            if (IncludeETags && ETags.Length > 0)
+                JSON.Add("eTags",  new JArray(ETags.Select(eTag => eTag.ToJSON(ETagDigestEncoding ?? POI.ETagDigestEncoding.HEX))));
 
             return CustomRoamingNetworkSerializer is not null
                        ? CustomRoamingNetworkSerializer(this, JSON)
@@ -659,12 +750,73 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse DataLicenses   [optional]
+
+                JToken? dataLicensesJSON    = null;
+                JToken? dataLicenseIdsJSON  = null;
+
+                if (CBOR.TryGetValue(CBORValue.FromText("dataLicenses"),   out var dataLicensesCBOR))
+                    dataLicensesJSON    = CBORJSON.ToJSON(dataLicensesCBOR);
+
+                if (CBOR.TryGetValue(CBORValue.FromText("dataLicenseIds"), out var dataLicenseIdsCBOR))
+                    dataLicenseIdsJSON  = CBORJSON.ToJSON(dataLicenseIdsCBOR);
+
+                if (!POIDataLicenses.TryParse(dataLicensesJSON,
+                                              dataLicenseIdsJSON,
+                                              out var dataLicenses,
+                                              out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse ChargingStationOperators [optional]
+
+                if (CBOR.TryGetValue(CBORValue.FromText("chargingStationOperatorIds"), out _))
+                {
+                    ErrorResponse = "Charging station operators given only by their identifications can not be read; they must be given completely as 'chargingStationOperators'!";
+                    return false;
+                }
+
+                var chargingStationOperators = new List<ChargingStationOperator>();
+
+                if (CBOR.TryGetValue(CBORValue.FromText("chargingStationOperators"), out var chargingStationOperatorsCBOR))
+                {
+
+                    if (chargingStationOperatorsCBOR.Kind != CBORValueKind.Array)
+                    {
+                        ErrorResponse = "The charging station operators must be a CBOR array!";
+                        return false;
+                    }
+
+                    foreach (var chargingStationOperatorCBOR in chargingStationOperatorsCBOR.AsArray())
+                    {
+
+                        if (!ChargingStationOperator.TryParse(chargingStationOperatorCBOR,
+                                                              out var chargingStationOperator,
+                                                              out var chargingStationOperatorError))
+                        {
+                            ErrorResponse = chargingStationOperatorError;
+                            return false;
+                        }
+
+                        chargingStationOperators.Add(chargingStationOperator);
+
+                    }
+
+                }
+
+                #endregion
+
 
                 RoamingNetwork = new RoamingNetwork(
                                      id,
                                      name,
                                      description,
-                                     DataSource: dataSource
+                                     DataSource:                dataSource,
+                                     DataLicenses:              dataLicenses,
+                                     ChargingStationOperators:  chargingStationOperators
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -695,7 +847,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="CustomRoamingNetworkSerializer">An optional delegate to customize the CBOR representation.</param>
         public CBORValue ToCBOR(Boolean                                        Embedded                         = false,
-                                CustomCBORSerializerDelegate<RoamingNetwork>?  CustomRoamingNetworkSerializer   = null)
+                                CustomCBORSerializerDelegate<RoamingNetwork>?  CustomRoamingNetworkSerializer   = null,
+                                Boolean                                        IncludeETags                     = true)
         {
 
             var CBOR = new CBORMap {
@@ -714,20 +867,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 CBOR.Add(CBORValue.FromText("dataSource"),            CBORValue.FromText(DataSource));
 
             if (DataLicenses.Any())
-                CBOR.Add(CBORValue.FromText("dataLicenseIds"),        CBORValue.FromArray(DataLicenses.Select(license => CBORValue.FromText(license.Id.ToString()))));
+                CBOR.Add(CBORValue.FromText("dataLicenses"),          CBORJSON.ToCBOR(DataLicenses.ToPOIJSON()));
 
             if (ChargingStationOperators.Any())
-                CBOR.Add(CBORValue.FromText("chargingStationOperatorIds"),
-                         CBORValue.FromArray(ChargingStationOperators.
-                                                 Select (chargingStationOperator   => chargingStationOperator.Id).
-                                                 OrderBy(chargingStationOperatorId => chargingStationOperatorId).
-                                                 Select (chargingStationOperatorId => CBORValue.FromText(chargingStationOperatorId.ToString()))));
+                CBOR.Add(CBORValue.FromText("chargingStationOperators"),
+                         CBORValue.FromArray(OrderedChargingStationOperators.
+                                                 Select(chargingStationOperator => chargingStationOperator.ToCBOR(Embedded: true))));
+
+            // The ETags describe the content without them, irrespective of the view options.
+            if (IncludeETags && ETags.Length > 0)
+                CBOR.Add(CBORValue.FromText("eTags"),                 CBORValue.FromArray(ETags.Select(eTag => eTag.ToCBOR())));
 
             return CustomRoamingNetworkSerializer is not null
                        ? CustomRoamingNetworkSerializer(this, CBOR)
                        : CBOR;
 
         }
+
+        #endregion
+
+
+        #region CalcETags()
+
+        /// <summary>
+        /// Calculate the ETags of the canonical JSON and CBOR representations of this roaming network,
+        /// both without ETags, without view options and without custom serializers.
+        /// </summary>
+        public ImmutableArray<ETag> CalcETags()
+
+            => CalcETags(
+                   ToJSON(IncludeETags: false),
+                   ToCBOR(IncludeETags: false)
+               );
 
         #endregion
 
@@ -744,6 +915,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<ChargingStationOperator> ChargingStationOperators
             => chargingStationOperators.Values;
+
+        /// <summary>
+        /// The operators ordered by their identification (ordinal), as in the JSON and CBOR representations.
+        /// </summary>
+        private IEnumerable<ChargingStationOperator> OrderedChargingStationOperators
+            => chargingStationOperators.Values.OrderBy(chargingStationOperator => chargingStationOperator.Id.ToString(), StringComparer.Ordinal);
 
 
         #region ChargingStationOperatorExists    (ChargingStationOperator)

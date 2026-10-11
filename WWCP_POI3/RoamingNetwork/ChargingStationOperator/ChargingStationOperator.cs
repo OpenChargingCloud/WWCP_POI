@@ -467,13 +467,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="RoamingNetwork">The associated roaming network.</param>
         /// <param name="Name">The official (multi-language) name of the EVSE Operator.</param>
         /// <param name="Description">An optional (multi-language) description of the EVSE Operator.</param>
-        /// <param name="EVRoamingPartners">An enumeration of EV roaming partners.</param>
-        ///
-        /// <param name="Configurator">A delegate to configure the new charging station operator after its creation.</param>
+        /// <param name="Logo">An optional logo.</param>
+        /// <param name="Address">An optional address of the headquarter.</param>
+        /// <param name="GeoLocation">An optional geographical location.</param>
+        /// <param name="Telephone">An optional telephone number.</param>
+        /// <param name="EMailAddress">An optional e-mail address.</param>
+        /// <param name="Homepage">An optional homepage.</param>
+        /// <param name="HotlinePhoneNumber">An optional hotline phone number.</param>
+        /// <param name="TermsAndConditionsURL">An optional URL of the terms and conditions.</param>
+        /// <param name="DataLicenses">Optional data licenses.</param>
         public ChargingStationOperator(ChargingStationOperator_Id                            Id,
                                        //RoamingNetwork                                        RoamingNetwork,
                                        I18NString?                                           Name                                   = null,
                                        I18NString?                                           Description                            = null,
+
+                                       URL?                                                  Logo                                   = null,
+                                       Address?                                              Address                                = null,
+                                       GeoCoordinate?                                        GeoLocation                            = null,
+                                       PhoneNumber?                                          Telephone                              = null,
+                                       SimpleEMailAddress?                                   EMailAddress                           = null,
+                                       URL?                                                  Homepage                               = null,
+                                       PhoneNumber?                                          HotlinePhoneNumber                     = null,
+                                       URL?                                                  TermsAndConditionsURL                  = null,
+                                       IEnumerable<DataLicense>?                             DataLicenses                           = null,
 
                                        Timestamped<ChargingStationOperatorAdminStatusType>?  InitialAdminStatus                     = null,
                                        Timestamped<ChargingStationOperatorStatusType>?       InitialStatus                          = null,
@@ -507,6 +523,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             //this.RoamingNetwork = RoamingNetwork;
             //this.chargingPools = new EntityHashSet<ChargingStationOperator, ChargingPool_Id, ChargingPool>(this);
+
+            this.logo                   = Logo;
+            this.address                = Address;
+            this.geoLocation            = GeoLocation;
+            this.telephone              = Telephone;
+            this.eMailAddress           = EMailAddress;
+            this.homepage               = Homepage;
+            this.hotlinePhoneNumber     = HotlinePhoneNumber;
+            this.termsAndConditionsURL  = TermsAndConditionsURL;
+
+            var dataLicenses = (DataLicenses ?? []).ToArray();
+
+            if (dataLicenses.Any(dataLicense => dataLicense is null))
+                throw new ArgumentException("Data licenses must not contain null entries.", nameof(DataLicenses));
+
+            if (dataLicenses.Select(dataLicense => dataLicense.Id).Distinct().Count() != dataLicenses.Length)
+                throw new ArgumentException("A data license must not be given twice.", nameof(DataLicenses));
+
+            this.immutableDataLicenses  = [.. dataLicenses.Ordered()];
 
             #region Link events
 
@@ -684,8 +719,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                ExpandDataLicenses != InfoStatus.Hidden
                                    ? ExpandDataLicenses.Switch(
-                                         () => new JProperty("dataLicenseIds",  new JArray(DataLicenses.SafeSelect(license => license.Id.ToString()))),
-                                         () => new JProperty("dataLicenses",    DataLicenses.ToJSON()))
+                                         () => new JProperty("dataLicenseIds",  DataLicenses.ToPOIIdsJSON()),
+                                         () => new JProperty("dataLicenses",    DataLicenses.ToPOIJSON()))
                                    : null,
 
                                RoamingNetwork is not null && ExpandRoamingNetworkId != InfoStatus.Hidden
@@ -719,9 +754,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                           ))
                                    : null,
 
-                               //GeoLocation.HasValue
-                               //    ? new JProperty("geoLocation",         InfrastructureJson.LocationJSON(GeoLocation.Value, true))
-                               //    : null,
+                               GeoLocation.HasValue
+                                   ? new JProperty("geoLocation",         GeoLocation.Value.ToJSON(Embedded: true))
+                                   : null,
 
                                Telephone.HasValue
                                    ? new JProperty("telephone",           Telephone.ToString())
