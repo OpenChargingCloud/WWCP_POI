@@ -18,7 +18,6 @@
 #region Usings
 
 using org.GraphDefined.Vanaheimr.Illias;
-using org.GraphDefined.Vanaheimr.Hermod;
 
 #endregion
 
@@ -42,8 +41,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Constructor(s)
 
-        public AddOrUpdateRoamingNetworkResult(RoamingNetwork        RoamingNetwork,
-                                               CommandResult    Result,
+        public AddOrUpdateRoamingNetworkResult(RoamingNetwork         RoamingNetwork,
+                                               CommandResult          Result,
                                                EventTracking_Id?      EventTrackingId   = null,
                                                IId?                   SenderId          = null,
                                                Object?                Sender            = null,
@@ -70,7 +69,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) AdminDown    (RoamingNetwork, ...)
+        #region (static) AdminDown     (RoamingNetwork, ...)
 
         public static AddOrUpdateRoamingNetworkResult
 
@@ -82,7 +81,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                       IEnumerable<Warning>?  Warnings          = null,
                       TimeSpan?              Runtime           = null)
 
-                => new (RoamingNetwork,
+                => new  (RoamingNetwork,
                         CommandResult.AdminDown,
                         EventTrackingId,
                         SenderId,
@@ -94,7 +93,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) NoOperation  (RoamingNetwork, ...)
+        #region (static) NoOperation   (RoamingNetwork, ...)
 
         public static AddOrUpdateRoamingNetworkResult
 
@@ -106,7 +105,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         IEnumerable<Warning>?  Warnings          = null,
                         TimeSpan?              Runtime           = null)
 
-                => new (RoamingNetwork,
+                => new  (RoamingNetwork,
                         CommandResult.NoOperation,
                         EventTrackingId,
                         SenderId,
@@ -119,7 +118,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) Enqueued     (RoamingNetwork, ...)
+        #region (static) Enqueued      (RoamingNetwork, ...)
 
         public static AddOrUpdateRoamingNetworkResult
 
@@ -131,7 +130,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                      IEnumerable<Warning>?  Warnings          = null,
                      TimeSpan?              Runtime           = null)
 
-                => new (RoamingNetwork,
+                => new  (RoamingNetwork,
                         CommandResult.Enqueued,
                         EventTrackingId,
                         SenderId,
@@ -143,7 +142,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Added        (RoamingNetwork, ...)
+        #region (static) Added         (RoamingNetwork, ...)
 
         public static AddOrUpdateRoamingNetworkResult
 
@@ -155,7 +154,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                   IEnumerable<Warning>?  Warnings          = null,
                   TimeSpan?              Runtime           = null)
 
-                => new (RoamingNetwork,
+                => new  (RoamingNetwork,
                         CommandResult.Success,
                         EventTrackingId,
                         SenderId,
@@ -167,7 +166,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Updated      (RoamingNetwork, ...)
+        #region (static) Updated       (RoamingNetwork, ...)
 
         public static AddOrUpdateRoamingNetworkResult
 
@@ -179,7 +178,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     IEnumerable<Warning>?  Warnings          = null,
                     TimeSpan?              Runtime           = null)
 
-                => new (RoamingNetwork,
+                => new  (RoamingNetwork,
                         CommandResult.Success,
                         EventTrackingId,
                         SenderId,
@@ -192,7 +191,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) ArgumentError(RoamingNetwork, Description, ...)
+        #region (static) ArgumentError (RoamingNetwork, Description, ...)
 
         public static AddOrUpdateRoamingNetworkResult
 
@@ -204,7 +203,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                           IEnumerable<Warning>?  Warnings          = null,
                           TimeSpan?              Runtime           = null)
 
-                => new (RoamingNetwork,
+                => new  (RoamingNetwork,
                         CommandResult.ArgumentError,
                         EventTrackingId,
                         SenderId,
@@ -216,7 +215,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Error        (RoamingNetwork, Description, ...)
+        #region (static) Error         (RoamingNetwork, Description, ...)
 
         public static AddOrUpdateRoamingNetworkResult
 
@@ -228,7 +227,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                   IEnumerable<Warning>?  Warnings          = null,
                   TimeSpan?              Runtime           = null)
 
-                => new (RoamingNetwork,
+                => new  (RoamingNetwork,
                         CommandResult.Error,
                         EventTrackingId,
                         SenderId,
@@ -240,7 +239,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Error        (RoamingNetwork, Exception,   ...)
+        #region (static) Error         (RoamingNetwork, Exception,   ...)
 
         public static AddOrUpdateRoamingNetworkResult
 
@@ -252,7 +251,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                   IEnumerable<Warning>?  Warnings          = null,
                   TimeSpan?              Runtime           = null)
 
-                => new (RoamingNetwork,
+                => new  (RoamingNetwork,
                         CommandResult.Error,
                         EventTrackingId,
                         SenderId,
@@ -264,7 +263,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Timeout      (RoamingNetwork, Timeout,     ...)
+        #region (static) Timeout       (RoamingNetwork, Timeout,     ...)
 
         public static AddOrUpdateRoamingNetworkResult
 
@@ -276,7 +275,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     IEnumerable<Warning>?  Warnings          = null,
                     TimeSpan?              Runtime           = null)
 
-                => new (RoamingNetwork,
+                => new  (RoamingNetwork,
                         CommandResult.Timeout,
                         EventTrackingId,
                         SenderId,
@@ -288,7 +287,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) LockTimeout  (RoamingNetwork, Timeout,     ...)
+        #region (static) LockTimeout   (RoamingNetwork, Timeout,     ...)
 
         public static AddOrUpdateRoamingNetworkResult
 
@@ -300,7 +299,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         IEnumerable<Warning>?  Warnings          = null,
                         TimeSpan?              Runtime           = null)
 
-                => new (RoamingNetwork,
+                => new  (RoamingNetwork,
                         CommandResult.LockTimeout,
                         EventTrackingId,
                         SenderId,
