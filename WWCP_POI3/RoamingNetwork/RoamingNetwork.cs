@@ -178,8 +178,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="MaxAdminStatusScheduleSize">The maximum number of entries in the admin status history.</param>
         /// <param name="MaxStatusScheduleSize">The maximum number of entries in the status history.</param>
         public RoamingNetwork(RoamingNetwork_Id               Id,
-                              I18NString?                     Name                         = null,
-                              I18NString?                     Description                  = null,
+                              ImmutableI18NString?            Name                         = null,
+                              ImmutableI18NString?            Description                  = null,
                               RoamingNetworkAdminStatusType?  InitialAdminStatus           = null,
                               RoamingNetworkStatusType?       InitialStatus                = null,
                               UInt16?                         MaxAdminStatusScheduleSize   = null,
@@ -244,28 +244,161 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
 
-        #region ToJSON(this RoamingNetwork, Embedded = false, ...)
+        #region Parse    (JSON, ...)
+
+        /// <summary>
+        /// Parse the given JSON representation of a roaming network.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="CustomRoamingNetworkParser">An optional delegate to parse custom roaming network JSON objects.</param>
+        public static RoamingNetwork Parse(JObject                                       JSON,
+                                           CustomJObjectParserDelegate<RoamingNetwork>?  CustomRoamingNetworkParser   = null)
+        {
+
+            if (TryParse(JSON,
+                         out var roamingNetwork,
+                         out var errorResponse,
+                         CustomRoamingNetworkParser))
+            {
+                return roamingNetwork;
+            }
+
+            throw new ArgumentException("The given JSON representation of a roaming network is invalid: " + errorResponse,
+                                        nameof(JSON));
+
+        }
+
+        #endregion
+
+        #region TryParse (JSON, out RoamingNetwork, out ErrorResponse, ...)
+
+        /// <summary>
+        /// Try to parse the given JSON representation of a roaming network.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="RoamingNetwork">The parsed roaming network.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="CustomRoamingNetworkParser">An optional delegate to parse custom roaming network JSON objects.</param>
+        public static Boolean TryParse(JObject                                       JSON,
+                                       [NotNullWhen(true)]  out RoamingNetwork?      RoamingNetwork,
+                                       [NotNullWhen(false)] out String?              ErrorResponse,
+                                       CustomJObjectParserDelegate<RoamingNetwork>?  CustomRoamingNetworkParser   = null)
+        {
+
+            RoamingNetwork  = null;
+            ErrorResponse   = null;
+
+            try
+            {
+
+                if (JSON?.HasValues != true)
+                {
+                    ErrorResponse = "The given JSON object must not be null or empty!";
+                    return false;
+                }
+
+                #region Parse Id             [mandatory]
+
+                if (!JSON.ParseMandatory("@id",
+                                         "roaming network identification",
+                                         RoamingNetwork_Id.TryParse,
+                                         out RoamingNetwork_Id id,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse Name           [optional]
+
+                if (JSON.ParseOptionalJSON("name",
+                                           "network name",
+                                           ImmutableI18NString.TryParse,
+                                           out ImmutableI18NString? name,
+                                           out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+                #region Parse Description    [optional]
+
+                if (JSON.ParseOptionalJSON("description",
+                                           "network description",
+                                           I18NString.TryParse,
+                                           out I18NString? description,
+                                           out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+                #region Parse DataSource     [optional]
+
+                if (JSON.ParseOptional("dataSource",
+                                       "data source",
+                                       out String? dataSource,
+                                       out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+
+                RoamingNetwork = new RoamingNetwork(
+                                     id,
+                                     name,
+                                     description,
+                                     DataSource: dataSource
+                                 );
+
+                if (CustomRoamingNetworkParser is not null)
+                    RoamingNetwork = CustomRoamingNetworkParser(JSON,
+                                                                RoamingNetwork);
+
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                RoamingNetwork  = null;
+                ErrorResponse   = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region ToJSON   (Embedded = false, ...)
 
         /// <summary>
         /// Return a JSON representation of the given roaming network.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        public JObject ToJSON(Boolean                                                     Embedded                                  = false,
+        public JObject ToJSON(Boolean                                                    Embedded                                  = false,
 
-                              InfoStatus                                                  ExpandRoamingNetworkIds                   = InfoStatus.ShowIdOnly,
-                              InfoStatus                                                  ExpandChargingStationOperatorIds          = InfoStatus.ShowIdOnly,
-                              InfoStatus                                                  ExpandChargingPoolIds                     = InfoStatus.ShowIdOnly,
-                              InfoStatus                                                  ExpandChargingStationIds                  = InfoStatus.ShowIdOnly,
-                              InfoStatus                                                  ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
-                              InfoStatus                                                  ExpandBrandIds                            = InfoStatus.ShowIdOnly,
-                              InfoStatus                                                  ExpandDataLicenses                        = InfoStatus.ShowIdOnly,
-                              InfoStatus                                                  ExpandEMobilityProviderId                 = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandRoamingNetworkIds                   = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandChargingStationOperatorIds          = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandChargingPoolIds                     = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandChargingStationIds                  = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandBrandIds                            = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandEMobilityProviderId                 = InfoStatus.ShowIdOnly,
 
-                              CustomJObjectSerializerDelegate<RoamingNetwork>?            CustomRoamingNetworkSerializer            = null)
-                              //CustomJObjectSerializerDelegate<ChargingStationOperator>?   CustomChargingStationOperatorSerializer   = null,
-                              //CustomJObjectSerializerDelegate<ChargingPool>?              CustomChargingPoolSerializer              = null,
-                              //CustomJObjectSerializerDelegate<ChargingStation>?           CustomChargingStationSerializer           = null,
-                              //CustomJObjectSerializerDelegate<EVSE>?                      CustomEVSESerializer                      = null)
+                              CustomJObjectSerializerDelegate<RoamingNetwork>?           CustomRoamingNetworkSerializer            = null,
+                              CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null)
+                              //CustomJObjectSerializerDelegate<ChargingPool>?             CustomChargingPoolSerializer              = null,
+                              //CustomJObjectSerializerDelegate<ChargingStation>?          CustomChargingStationSerializer           = null,
+                              //CustomJObjectSerializerDelegate<EVSE>?                     CustomEVSESerializer                      = null)
         {
 
             var JSON = JSONObject.Create(
@@ -288,31 +421,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                          DataLicenses.Any()
                              ? ExpandDataLicenses.Switch(
-                                 () => new JProperty("dataLicenseIds",  new JArray(DataLicenses.SafeSelect(license => license.Id.ToString()))),
-                                 () => new JProperty("dataLicenses",    DataLicenses.ToJSON()))
+                                 () => new JProperty(
+                                           "dataLicenseIds",
+                                           new JArray(DataLicenses.SafeSelect(license => license.Id.ToString()))
+                                       ),
+                                 () => new JProperty(
+                                           "dataLicenses",
+                                           DataLicenses.ToJSON()
+                                       ))
+                             : null,
+
+                         ChargingStationOperators.Any()
+                             ? ExpandChargingStationOperatorIds.Switch(
+
+                                   () => new JProperty(
+                                             "chargingStationOperatorIds",
+                                             new JArray(
+                                                 ChargingStationOperators.
+                                                     Select (chargingStationOperator => chargingStationOperator.Id).
+                                                     OrderBy(chargingStationOperator => chargingStationOperator).
+                                                     Select (chargingStationOperator => chargingStationOperator.ToString())
+                                             )
+                                         ),
+
+                                   () => new JProperty(
+                                             "chargingStationOperators",
+                                             new JArray(
+                                                 ChargingStationOperators.
+                                                     OrderBy(chargingStationOperator => chargingStationOperator).
+                                                     ToJSON (Embedded:                                 true,
+                                                             ExpandRoamingNetworkId:                   InfoStatus.Hidden,
+                                                             ExpandChargingPoolIds:                    ExpandChargingPoolIds,
+                                                             ExpandChargingStationIds:                 ExpandChargingStationIds,
+                                                             ExpandEVSEIds:                            ExpandEVSEIds,
+                                                             ExpandBrandIds:                           ExpandBrandIds,
+                                                             ExpandDataLicenses:                       ExpandDataLicenses,
+                                                             CustomChargingStationOperatorSerializer:  CustomChargingStationOperatorSerializer))))
+                                                          //   CustomChargingPoolSerializer:             CustomChargingPoolSerializer,
+                                                          //   CustomChargingStationSerializer:          CustomChargingStationSerializer,
+                                                          //   CustomEVSESerializer:                     CustomEVSESerializer))))
+
                              : null
-
-            //             ChargingStationOperators.Any()
-            //                 ? ExpandChargingStationOperatorIds.Switch(
-
-            //                       () => new JProperty("chargingStationOperatorIds",  new JArray(ChargingStationOperators.Select(op => op.Id).
-            //                                                                                                    OrderBy(id => id).
-            //                                                                                                    Select (id => id.ToString()))),
-
-            //                       () => new JProperty("chargingStationOperators",    new JArray(ChargingStationOperators.
-            //                                                                                                    OrderBy(cso => cso).
-            //                                                                                                    ToJSON (Embedded: true,
-            //                                                                                                            ExpandRoamingNetworkId:                   InfoStatus.Hidden,
-            //                                                                                                            ExpandChargingPoolIds:                    ExpandChargingPoolIds,
-            //                                                                                                            ExpandChargingStationIds:                 ExpandChargingStationIds,
-            //                                                                                                            ExpandEVSEIds:                            ExpandEVSEIds,
-            //                                                                                                            ExpandBrandIds:                           ExpandBrandIds,
-            //                                                                                                            ExpandDataLicenses:                       ExpandDataLicenses,
-            //                                                                                                            CustomChargingStationOperatorSerializer:  CustomChargingStationOperatorSerializer,
-            //                                                                                                            CustomChargingPoolSerializer:             CustomChargingPoolSerializer,
-            //                                                                                                            CustomChargingStationSerializer:          CustomChargingStationSerializer,
-            //                                                                                                            CustomEVSESerializer:                     CustomEVSESerializer))))
-            //                 : null,
 
             //             !ChargingStationOperators.Any() || ExpandChargingStationOperatorIds == InfoStatus.Expanded
             //                 ? null
@@ -404,6 +553,261 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        : JSON;
 
         }
+
+        #endregion
+
+
+        #region Parse    (CBOR, ...)
+
+        /// <summary>
+        /// Parse the given CBOR representation of a roaming network.
+        /// </summary>
+        /// <param name="CBOR">The CBOR to parse.</param>
+        /// <param name="CustomRoamingNetworkParser">An optional delegate to parse custom roaming network CBOR maps.</param>
+        public static RoamingNetwork Parse(CBORValue                                  CBOR,
+                                           CustomCBORParserDelegate<RoamingNetwork>?  CustomRoamingNetworkParser   = null)
+        {
+
+            if (TryParse(CBOR,
+                         out var roamingNetwork,
+                         out var errorResponse,
+                         CustomRoamingNetworkParser))
+            {
+                return roamingNetwork;
+            }
+
+            throw new ArgumentException("The given CBOR representation of a roaming network is invalid: " + errorResponse,
+                                        nameof(CBOR));
+
+        }
+
+        #endregion
+
+        #region TryParse (CBOR, out RoamingNetwork, out ErrorResponse, ...)
+
+        /// <summary>
+        /// Try to parse the given CBOR representation of a roaming network.
+        /// It uses the same keys as the JSON representation.
+        /// </summary>
+        /// <param name="CBOR">The CBOR to parse.</param>
+        /// <param name="RoamingNetwork">The parsed roaming network.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="CustomRoamingNetworkParser">An optional delegate to parse custom roaming network CBOR maps.</param>
+        public static Boolean TryParse(CBORValue                                  CBOR,
+                                       [NotNullWhen(true)]  out RoamingNetwork?   RoamingNetwork,
+                                       [NotNullWhen(false)] out String?           ErrorResponse,
+                                       CustomCBORParserDelegate<RoamingNetwork>?  CustomRoamingNetworkParser   = null)
+        {
+
+            RoamingNetwork  = null;
+            ErrorResponse   = null;
+
+            try
+            {
+
+                #region Parse Id             [mandatory]
+
+                if (!CBOR.ParseMandatory("@id",
+                                         "roaming network identification",
+                                         RoamingNetwork_Id.TryParse,
+                                         out RoamingNetwork_Id id,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse Name           [optional]
+
+                if (CBOR.ParseOptional("name",
+                                       "network name",
+                                       I18NString.TryParse,
+                                       out I18NString? name,
+                                       out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+                #region Parse Description    [optional]
+
+                if (CBOR.ParseOptional("description",
+                                       "network description",
+                                       I18NString.TryParse,
+                                       out I18NString? description,
+                                       out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+                #region Parse DataSource     [optional]
+
+                if (CBOR.ParseOptionalText("dataSource",
+                                           "data source",
+                                           out var dataSource,
+                                           out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+
+                RoamingNetwork = new RoamingNetwork(
+                                     id,
+                                     name,
+                                     description,
+                                     DataSource: dataSource
+                                 );
+
+                if (CustomRoamingNetworkParser is not null)
+                    RoamingNetwork = CustomRoamingNetworkParser(CBOR,
+                                                                RoamingNetwork);
+
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                RoamingNetwork  = null;
+                ErrorResponse   = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region ToCBOR   (Embedded = false, ...)
+
+        /// <summary>
+        /// Return a CBOR representation of the given roaming network,
+        /// using the same keys as its JSON representation.
+        /// Write it with CBORWriterOptions.Canonical for deterministic bytes.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomRoamingNetworkSerializer">An optional delegate to customize the CBOR representation.</param>
+        public CBORValue ToCBOR(Boolean                                        Embedded                         = false,
+                                CustomCBORSerializerDelegate<RoamingNetwork>?  CustomRoamingNetworkSerializer   = null)
+        {
+
+            var CBOR = new CBORMap {
+                           { CBORValue.FromText("@id"),               CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                CBOR.Add(CBORValue.FromText("@context"),              CBORValue.FromText(JSONLDContext));
+
+            CBOR.Add(CBORValue.FromText("name"),                      Name.ToCBOR());
+
+            if (Description.IsNotNullOrEmpty())
+                CBOR.Add(CBORValue.FromText("description"),           Description.ToCBOR());
+
+            if (DataSource is not null && DataSource.IsNeitherNullNorEmpty())
+                CBOR.Add(CBORValue.FromText("dataSource"),            CBORValue.FromText(DataSource));
+
+            if (DataLicenses.Any())
+                CBOR.Add(CBORValue.FromText("dataLicenseIds"),        CBORValue.FromArray(DataLicenses.Select(license => CBORValue.FromText(license.Id.ToString()))));
+
+            if (ChargingStationOperators.Any())
+                CBOR.Add(CBORValue.FromText("chargingStationOperatorIds"),
+                         CBORValue.FromArray(ChargingStationOperators.
+                                                 Select (chargingStationOperator   => chargingStationOperator.Id).
+                                                 OrderBy(chargingStationOperatorId => chargingStationOperatorId).
+                                                 Select (chargingStationOperatorId => CBORValue.FromText(chargingStationOperatorId.ToString()))));
+
+            return CustomRoamingNetworkSerializer is not null
+                       ? CustomRoamingNetworkSerializer(this, CBOR)
+                       : CBOR;
+
+        }
+
+        #endregion
+
+
+
+
+
+        #region Charging station operators
+
+        private readonly ConcurrentDictionary<ChargingStationOperator_Id, ChargingStationOperator> chargingStationOperators = [];
+
+        /// <summary>
+        /// The operators in this immutable network version.
+        /// </summary>
+        public IEnumerable<ChargingStationOperator> ChargingStationOperators
+            => chargingStationOperators.Values;
+
+
+        #region ChargingStationOperatorExists    (ChargingStationOperator)
+
+        /// <summary>
+        /// Check if the given charging station operator identification is already present within the roaming network.
+        /// </summary>
+        /// <param name="ChargingStationOperatorId">The unique identification of the charging station operator.</param>
+        public Boolean ChargingStationOperatorExists(ChargingStationOperator  ChargingStationOperator)
+            => chargingStationOperators.ContainsKey(ChargingStationOperator.Id);
+
+        /// <summary>
+        /// Determines whether the given user identification exists within this API.
+        /// </summary>
+        /// <param name="UserId">The unique identification of an user.</param>
+        public Boolean ChargingStationOperatorExists(ChargingStationOperator_Id? ChargingStationOperatorId)
+
+            => ChargingStationOperatorId.HasValue &&
+               ChargingStationOperatorId.IsNotNullOrEmpty() &&
+               chargingStationOperators.ContainsKey(ChargingStationOperatorId.Value);
+
+        #endregion
+
+        #region GetChargingStationOperatorById   (ChargingStationOperatorId)
+
+        /// <summary>
+        /// Get the charging station operator having the given unique identification.
+        /// </summary>
+        /// <param name="ChargingStationOperatorId">The unique identification of a charging station operator.</param>
+        public ChargingStationOperator? GetChargingStationOperatorById(ChargingStationOperator_Id ChargingStationOperatorId)
+        {
+
+            if (chargingStationOperators.TryGetValue(ChargingStationOperatorId, out var chargingStationOperator))
+                return chargingStationOperator;
+
+            return null;
+
+        }
+
+        #endregion
+
+        #region TryGetChargingStationOperatorById(ChargingStationOperatorId, out ChargingStationOperator)
+
+        /// <summary>
+        /// Try to get the charging station operator having the given unique identification.
+        /// </summary>
+        /// <param name="ChargingStationOperatorId">The unique identification of a charging station operator.</param>
+        /// <param name="ChargingStationOperator">The charging station operator.</param>
+        public Boolean TryGetChargingStationOperatorById(ChargingStationOperator_Id?                       ChargingStationOperatorId,
+                                                         [NotNullWhen(true)] out ChargingStationOperator?  ChargingStationOperator)
+        {
+
+            if (ChargingStationOperatorId.HasValue &&
+                chargingStationOperators.TryGetValue(ChargingStationOperatorId.Value, out ChargingStationOperator))
+            {
+                return true;
+            }
+
+            ChargingStationOperator = null;
+            return false;
+
+        }
+
+        #endregion
 
         #endregion
 

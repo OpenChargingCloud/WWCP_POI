@@ -91,14 +91,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// a notice is returned; merge=true prepares a new unsigned batch for separate application.
         /// Runtime values are never stored or compared by this merge check.
         /// </summary>
-        public Boolean TryMerge(RoamingNetworkChangeSet                  left,
-                                RoamingNetworkChangeSet                  right,
-                                out RoamingNetworkChangeSet?             mergedChangeSet,
-                                out RoamingNetworkChangeSetMergeResult   result,
-                                Boolean                                  merge             = false,
-                                String?                                  mergedChangeSetId = null,
-                                DateTimeOffset?                          createdAt         = null,
-                                Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? verifySignature = null)
+        public Boolean TryMerge(RoamingNetworkChangeSet                                                    left,
+                                RoamingNetworkChangeSet                                                    right,
+                                out RoamingNetworkChangeSet?                                               mergedChangeSet,
+                                out RoamingNetworkChangeSetMergeResult                                     result,
+                                Boolean                                                                    merge               = false,
+                                String?                                                                    mergedChangeSetId   = null,
+                                DateTimeOffset?                                                            createdAt           = null,
+                                Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>?  verifySignature     = null)
+
             => DataSnapshot.TryMerge(left, right, out mergedChangeSet, out result,
                                      merge, mergedChangeSetId, createdAt, verifySignature);
 
@@ -110,8 +111,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Every peer signature requires a caller-provided verifier using trusted keys.
         /// ChangeSet.Sign/VerifySignature provide the built-in canonical signing profile.
         /// </summary>
-        public RoamingNetwork ApplyChangeSet(RoamingNetworkChangeSet                  changeSet,
-                                             Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>? VerifySignature = null)
+        public RoamingNetwork ApplyChangeSet(RoamingNetworkChangeSet                                                    changeSet,
+                                             Func<RoamingNetworkChangeSet, RoamingNetworkChangeSetSignature, Boolean>?  VerifySignature   = null)
         {
 
             var snapshot = DataSnapshot.ApplyChangeSet(changeSet, VerifySignature);

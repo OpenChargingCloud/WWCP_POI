@@ -43,19 +43,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class RoamingNetworkChangeSetMergeIssue
     {
 
-        internal RoamingNetworkChangeSetMergeIssue(String                   message,
-                                                   String?                  changeSetId   = null,
-                                                   Int32?                   operationIndex = null,
-                                                   InfrastructureEntityKey? entity        = null,
-                                                   String?                  propertyName  = null,
-                                                   ImmutableArray<POIElementPathSegment> elementPath = default)
+        internal RoamingNetworkChangeSetMergeIssue(String                                 message,
+                                                   String?                                changeSetId      = null,
+                                                   Int32?                                 operationIndex   = null,
+                                                   InfrastructureEntityKey?               entity           = null,
+                                                   String?                                propertyName     = null,
+                                                   ImmutableArray<POIElementPathSegment>  elementPath      = default)
         {
+
             Message        = message;
             ChangeSetId    = changeSetId;
             OperationIndex = operationIndex;
             Entity         = entity;
             PropertyName   = propertyName;
             ElementPath    = elementPath.IsDefault ? [] : elementPath;
+
         }
 
         /// <summary>
@@ -96,9 +98,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class RoamingNetworkChangeSetMergeResult
     {
 
-        internal RoamingNetworkChangeSetMergeResult(RoamingNetworkChangeSetMergeStatus              status,
-                                                    String                                         message,
-                                                    ImmutableArray<RoamingNetworkChangeSetMergeIssue> issues)
+        internal RoamingNetworkChangeSetMergeResult(RoamingNetworkChangeSetMergeStatus                 status,
+                                                    String                                             message,
+                                                    ImmutableArray<RoamingNetworkChangeSetMergeIssue>  issues)
         {
             Status  = status;
             Message = message;

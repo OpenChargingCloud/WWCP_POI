@@ -11,8 +11,4 @@
     <ProjectReference Include="..\WWCP_POI2\WWCP_POI2.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Runtime\" />
-  </ItemGroup>
-
 </Project>

@@ -61,9 +61,9 @@ internal static class MetrologyJson
 
     internal static void WriteElectricalLimits(JObject json, Ampere? current, Watt? power, WattHour? capacity)
     {
-        if (current is { } amperage) json["maxCurrent"] = Text(amperage);
-        if (power is { } watts) json["maxPower"] = Text(watts);
-        if (capacity is { } energy) json["maxCapacity"] = Text(energy);
+        if (current  is { } amperage) json["maxCurrent"]  = Text(amperage);
+        if (power    is { } watts)    json["maxPower"]    = Text(watts);
+        if (capacity is { } energy)   json["maxCapacity"] = Text(energy);
     }
 
     internal static T? Read<T>(JObject json, String field,

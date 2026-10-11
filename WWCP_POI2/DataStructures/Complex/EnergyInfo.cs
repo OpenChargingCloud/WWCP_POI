@@ -75,7 +75,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region Parse/TryParse
+        #region Parse
 
         /// <summary>
         /// Parse the given JSON representation of an energy information.
@@ -93,6 +93,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         nameof(JSON));
 
         }
+
+        #endregion
+
+        #region TryParse
 
         /// <summary>
         /// Try to parse the given JSON representation of an energy information.

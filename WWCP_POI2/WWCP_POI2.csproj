@@ -11,11 +11,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Entities\ChargingStationManufacturer\ChargingStation\EVSE\Group\AdminStatus\" />
-    <Folder Include="Entities\ChargingStationManufacturer\ChargingStation\Group\AdminStatus\" />
-    <Folder Include="Entities\ChargingStationOperator\ChargingPool\Group\AdminStatus\" />
-    <Folder Include="Entities\ChargingStationOperator\Group\" />
-    <Folder Include="Entities\EMobilityProvider\Group\" />
+    <Folder Include="RoamingNetwork\ChargingStationManufacturer\ChargingStation\EVSE\Group\AdminStatus\" />
+    <Folder Include="RoamingNetwork\ChargingStationManufacturer\ChargingStation\Group\AdminStatus\" />
+    <Folder Include="RoamingNetwork\ChargingStationOperator\ChargingPool\Group\AdminStatus\" />
+    <Folder Include="RoamingNetwork\ChargingStationOperator\Group\" />
+    <Folder Include="RoamingNetwork\EMobilityProvider\Group\" />
   </ItemGroup>
 
 </Project>
