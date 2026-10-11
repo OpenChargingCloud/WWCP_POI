@@ -64,7 +64,7 @@ follower.TryAppend(commits!, out _, out _);
 - **Followers** start from a snapshot (head commit and complete network) and append commits;
   each must follow the head and lead to its ETags.
 
-`POI_API` serves a history in JSON:
+`POI_API` serves a history in JSON, or in CBOR for `Accept: application/cbor` (also as request body):
 
 | Request | Returns |
 |---|---|
@@ -73,14 +73,13 @@ follower.TryAppend(commits!, out _, out _);
 | `GET ~/roamingNetworks/{id}/history/commitInfos?since={commitId}&max={n}` | metadata of the commits since |
 | `GET ~/roamingNetworks/{id}/history/commits?since={commitId}&max={n}` | complete commits since |
 | `GET ~/roamingNetworks/{id}/history/commits/{commitId}` | one commit |
-| `POST ~/roamingNetworks/{id}/history/changeSets?expectedHead={commitId}&rebase=true` | 201 published, 200 already published, 409 head moved, 422 refused |
+| `COMMIT ~/roamingNetworks/{id}/history/changeSets?expectedHead={commitId}&rebase=true` | 201 published, 200 already published, 409 head moved, 422 refused |
 
 Submitting is refused unless `AuthorizeChangeSetSubmission` decides who may submit what;
 signed change sets need `VerifyChangeSetSignature`.
 
 ## Open
 
-- CBOR over HTTP
 - Persistence and retention of histories
 - Runtime status as a channel of its own
 - Commits signed by the leader
@@ -92,6 +91,12 @@ signed change sets need `VerifyChangeSetSignature`.
 dotnet test WWCP_POI3_Tests/WWCP_POI3_Tests.csproj
 ```
 
-## License
+## Funding
 
-Affero GPL 3.0, see `LICENSE`. Contributions under the `Contributor License Agreement.txt`.
+This Open Source project is partially funded by the [NGI Zero Commons Fund](https://nlnet.nl/commonsfund/) as part of our [EVQI project](https://nlnet.nl/project/EVQI/).
+
+We also appreciate any additional funding and long-term support for the Chargy family, for example via [GitHub Sponsors](https://github.com/sponsors/GraphDefined), as it helps us keep the project sustainable, independent and useful for the entire e-mobility community.
+
+<center>
+  <img src="images/NGI0_tag.svg" height="30">
+</center>

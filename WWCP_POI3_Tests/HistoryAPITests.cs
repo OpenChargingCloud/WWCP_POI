@@ -181,14 +181,17 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
-        #region Post(ChangeSet, Query = "")
+        #region Commit(ChangeSet, Query = "")
 
-        private async Task<(HttpStatusCode StatusCode, JObject JSON)> Post(RoamingNetworkChangeSet  ChangeSet,
-                                                                         String                   Query   = "")
+        private static readonly HttpMethod COMMIT = new ("COMMIT");
+
+        private async Task<(HttpStatusCode StatusCode, JObject JSON)> Commit(RoamingNetworkChangeSet  ChangeSet,
+                                                                           String                   Query   = "")
         {
 
             using var content   = new StringContent(ChangeSet.ToJSON().ToString(), System.Text.Encoding.UTF8, "application/json");
-            using var response  = await httpClient!.PostAsync("changeSets" + Query, content);
+            using var request   = new HttpRequestMessage(COMMIT, "changeSets" + Query) { Content = content };
+            using var response  = await httpClient!.SendAsync(request);
 
             return (response.StatusCode, JObject.Parse(await response.Content.ReadAsStringAsync()));
 
@@ -210,13 +213,31 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         #endregion
 
 
+        #region Change_sets_are_committed_not_posted()
+
+        [Test]
+        public async Task Change_sets_are_committed_not_posted()
+        {
+
+            poiAPI!.AuthorizeChangeSetSubmission = (request, changeSet) => true;
+
+            using var content  = new StringContent(ChangeSet(leader!, "dataSource", "v1").ToJSON().ToString(), System.Text.Encoding.UTF8, "application/json");
+            using var response = await httpClient!.PostAsync("changeSets", content);
+
+            Assert.That(response.IsSuccessStatusCode,      Is.False);
+            Assert.That(leader!.Head.Commit.Revision,      Is.Zero);
+
+        }
+
+        #endregion
+
         #region Submitting_is_refused_unless_enabled()
 
         [Test]
         public async Task Submitting_is_refused_unless_enabled()
         {
 
-            var (statusCode, json) = await Post(ChangeSet(leader!, "dataSource", "v1"));
+            var (statusCode, json) = await Commit(ChangeSet(leader!, "dataSource", "v1"));
 
             Assert.That(statusCode,                               Is.EqualTo(HttpStatusCode.Forbidden));
             Assert.That(json["description"]!.Value<String>(),     Does.Contain("not enabled"));
@@ -238,8 +259,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             // The follower prepares a change set against its head and submits it to the leader...
             var changeSet  = ChangeSet(follower!, "dataSource", "from the follower");
-            var published  = await Post(changeSet, $"?expectedHead={follower!.Head.Commit.Id}");
-            var again      = await Post(changeSet);
+            var published  = await Commit(changeSet, $"?expectedHead={follower!.Head.Commit.Id}");
+            var again      = await Commit(changeSet);
 
             // ...and gets it back as a commit, as every other follower does.
             leader!.TryGetCommitsSince(follower.Head.Commit.Id, out var commits, out _);
@@ -280,11 +301,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var b          = ChangeSet(leader, "name",        new JObject(new JProperty("en", "B")));
             var c          = ChangeSet(leader, "dataSource",  "C");
 
-            var postA      = await Post(a);
-            var staleB     = await Post(b, $"?expectedHead={head0}");
-            var notFitB    = await Post(b);
-            var rebasedB   = await Post(b, "?rebase=true");
-            var conflictC  = await Post(c, "?rebase=true");
+            var postA      = await Commit(a);
+            var staleB     = await Commit(b, $"?expectedHead={head0}");
+            var notFitB    = await Commit(b);
+            var rebasedB   = await Commit(b, "?rebase=true");
+            var conflictC  = await Commit(c, "?rebase=true");
 
             using (Assert.EnterMultipleScope())
             {
@@ -323,17 +344,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var otherHistory  = RoamingNetworkHistory.Start(otherNetwork);
 
             using var garbage = new StringContent("{ \"no\": \"change set\" }", System.Text.Encoding.UTF8, "application/json");
-            using var invalid = await httpClient!.PostAsync("changeSets", garbage);
+            using var invalidRequest = new HttpRequestMessage(COMMIT, "changeSets") { Content = garbage };
+            using var invalid        = await httpClient!.SendAsync(invalidRequest);
 
-            var wrongNetwork  = await Post(ChangeSet(otherHistory, "dataSource", "x"));
-            var invalidRebase = await Post(ChangeSet(leader!, "dataSource", "x"), "?rebase=yes");
+            var wrongNetwork  = await Commit(ChangeSet(otherHistory, "dataSource", "x"));
+            var invalidRebase = await Commit(ChangeSet(leader!, "dataSource", "x"), "?rebase=yes");
 
-            var signed        = await Post(ChangeSet(leader!, "dataSource", "x").Sign(new Org.BouncyCastle.Crypto.Parameters.Ed25519PrivateKeyParameters(new Byte[32], 0),
+            var signed        = await Commit(ChangeSet(leader!, "dataSource", "x").Sign(new Org.BouncyCastle.Crypto.Parameters.Ed25519PrivateKeyParameters(new Byte[32], 0),
                                                                                     "alice",
                                                                                     COSEAlgorithm.Ed25519));
 
             allowed = false;
-            var forbidden     = await Post(ChangeSet(leader!, "dataSource", "x"));
+            var forbidden     = await Commit(ChangeSet(leader!, "dataSource", "x"));
 
             using (Assert.EnterMultipleScope())
             {
@@ -348,6 +370,87 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
                 Assert.That(forbidden.StatusCode,                             Is.EqualTo(HttpStatusCode.Forbidden));
                 Assert.That(leader!.Head.Commit.Revision,                     Is.Zero);
+
+            }
+
+        }
+
+        #endregion
+
+        #region GetCBOR(Path)
+
+        private async Task<(HttpStatusCode StatusCode, String? ContentType, CBORValue CBOR)> GetCBOR(String Path)
+        {
+
+            using var request  = new HttpRequestMessage(HttpMethod.Get, Path);
+            request.Headers.Accept.ParseAdd("application/cbor");
+
+            using var response = await httpClient!.SendAsync(request);
+
+            return (response.StatusCode,
+                    response.Content.Headers.ContentType?.MediaType,
+                    CBORValue.Parse(await response.Content.ReadAsByteArrayAsync()));
+
+        }
+
+        #endregion
+
+        #region A_follower_syncs_in_CBOR()
+
+        [Test]
+        public async Task A_follower_syncs_in_CBOR()
+        {
+
+            poiAPI!.AuthorizeChangeSetSubmission = (request, changeSet) => true;
+
+            Publish("v1", 1);
+
+            // The snapshot in CBOR.
+            var snapshot = await GetCBOR("snapshot");
+
+            Assert.That(snapshot.ContentType,  Is.EqualTo("application/cbor"));
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(snapshot.CBOR, out var follower, out var error1),  Is.True, error1);
+
+            // A change set submitted in CBOR, answered in CBOR.
+            using var post = new HttpRequestMessage(COMMIT, "changeSets") {
+                                 Content = new ByteArrayContent(follower!.Head.RoamingNetwork.CreateChangeSet(
+                                                                    [ RoamingNetworkChange.UpdateProperty(follower.Head.RoamingNetwork, "dataSource", null, "from CBOR") ],
+                                                                    CreatedAt: DateTimeOffset.Parse("2026-10-11T13:00:00Z")
+                                                                ).ToCBOR().ToByteArray(CBORWriterOptions.Canonical))
+                             };
+
+            post.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/cbor");
+            post.Headers.Accept.ParseAdd("application/cbor");
+
+            using var posted       = await httpClient!.SendAsync(post);
+            var postedCBOR         = CBORValue.Parse(await posted.Content.ReadAsByteArrayAsync());
+
+            // The commits in CBOR.
+            var commits = await GetCBOR($"commits?since={follower.Head.Commit.Id}");
+
+            var received = commits.CBOR.AsArray().Select(commit => RoamingNetworkCommit.TryParse(commit, out var parsed, out _) ? parsed : null).ToArray();
+
+            Assert.That(follower.TryAppend(received!, out _, out var error2),  Is.True, error2);
+
+            var notFound = await GetCBOR($"commits/{new String('0', 64)}");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(posted.StatusCode,                                    Is.EqualTo(HttpStatusCode.Created));
+                Assert.That(posted.Content.Headers.ContentType?.MediaType,        Is.EqualTo("application/cbor"));
+                Assert.That(postedCBOR.TryGetValue(CBORValue.FromText("status"), out var status) && status.AsText() == "Published",  Is.True);
+
+                Assert.That(follower.Head.Commit.Id,                              Is.EqualTo(leader!.Head.Commit.Id));
+                Assert.That(follower.Head.RoamingNetwork.DataSource,              Is.EqualTo("from CBOR"));
+
+                // Errors in CBOR as well.
+                Assert.That(notFound.StatusCode,                                  Is.EqualTo(HttpStatusCode.NotFound));
+                Assert.That(notFound.ContentType,                                 Is.EqualTo("application/cbor"));
+                Assert.That(notFound.CBOR.TryGetValue(CBORValue.FromText("description"), out _),  Is.True);
+
+                // Without an Accept header field: JSON.
+                Assert.That((await Get("head")).Text,                             Does.StartWith("{"));
 
             }
 

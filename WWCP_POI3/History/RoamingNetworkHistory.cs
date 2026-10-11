@@ -339,6 +339,79 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region ToSnapshotCBOR()
+
+        /// <summary>
+        /// A snapshot of the head in CBOR: its commit and the complete version of the roaming network,
+        /// with the keys of the JSON snapshot. Write it with CBORWriterOptions.Canonical for deterministic bytes.
+        /// </summary>
+        public CBORValue ToSnapshotCBOR()
+        {
+
+            var head = Head;
+
+            return CBORValue.FromMap([
+                       new (CBORValue.FromText("commit"),          head.Commit.ToCBOR()),
+                       new (CBORValue.FromText("roamingNetwork"),  head.RoamingNetwork.ToCBOR())
+                   ]);
+
+        }
+
+        #endregion
+
+        #region (static) TryFromSnapshot(CBOR,  out History, out ErrorResponse, Limits = null)
+
+        /// <summary>
+        /// Try to start a history from a CBOR snapshot of another history's head, e.g. of the leading server.
+        /// The roaming network must have the ETags of the commit.
+        /// </summary>
+        /// <param name="Snapshot">A CBOR snapshot, see ToSnapshotCBOR().</param>
+        /// <param name="History">The new history.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="Limits">Optional limits for the change set of the commit, the default ones otherwise.</param>
+        public static Boolean TryFromSnapshot(CBORValue                                        Snapshot,
+                                              [NotNullWhen(true)]  out RoamingNetworkHistory?  History,
+                                              [NotNullWhen(false)] out String?                 ErrorResponse,
+                                              RoamingNetworkChangeSetLimits?                   Limits   = null)
+        {
+
+            History = null;
+
+            try
+            {
+
+                if (Snapshot.Kind != CBORValueKind.Map ||
+                    !Snapshot.TryGetValue(CBORValue.FromText("commit"), out var commitCBOR) ||
+                    !RoamingNetworkCommit.TryParse(commitCBOR, out var commit, out var commitError, Limits))
+                {
+                    ErrorResponse = "Missing or invalid commit of the snapshot!";
+                    return false;
+                }
+
+                if (!Snapshot.TryGetValue(CBORValue.FromText("roamingNetwork"), out var roamingNetworkCBOR) ||
+                    !RoamingNetwork.TryParse(roamingNetworkCBOR, out var roamingNetwork, out var roamingNetworkError))
+                {
+                    ErrorResponse = "Missing or invalid roaming network of the snapshot!";
+                    return false;
+                }
+
+                return TryFromSnapshot(roamingNetwork,
+                                       commit,
+                                       out History,
+                                       out ErrorResponse);
+
+            }
+            catch (Exception e)
+            {
+                ErrorResponse = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+
         #region Publish  (ChangeSet, ExpectedHeadId = null, Rebase = false, VerifySignature = null)
 
         /// <summary>

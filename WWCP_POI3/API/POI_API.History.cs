@@ -24,6 +24,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 #endregion
@@ -46,12 +47,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// and to submit its change sets to the leading server.
     /// </summary>
     /// <remarks>
-    /// GET  ~/roamingNetworks/{roamingNetworkId}/history/head                                  the metadata of the head commit
-    /// GET  ~/roamingNetworks/{roamingNetworkId}/history/snapshot                              the head commit and the complete roaming network
-    /// GET  ~/roamingNetworks/{roamingNetworkId}/history/commitInfos?since={commitId}&amp;max={n}   the metadata of the commits since, without changes
-    /// GET  ~/roamingNetworks/{roamingNetworkId}/history/commits?since={commitId}&amp;max={n}       the complete commits since
-    /// GET  ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}                    one complete commit
-    /// POST ~/roamingNetworks/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&amp;rebase=true
+    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/head                                  the metadata of the head commit
+    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/snapshot                              the head commit and the complete roaming network
+    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/commitInfos?since={commitId}&amp;max={n}   the metadata of the commits since, without changes
+    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/commits?since={commitId}&amp;max={n}       the complete commits since
+    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}                    one complete commit
+    /// COMMIT ~/roamingNetworks/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&amp;rebase=true
     ///                                                                                         publish a change set as the new head commit
     /// Without "since", the commits since the root are returned. "max" is at most MaxCommitsPerRequest.
     /// </remarks>
@@ -64,6 +65,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The maximum number of commits returned by one request.
         /// </summary>
         public const Int32 MaxCommitsPerRequest = RoamingNetworkHistory.DefaultMaxCommits;
+
+        /// <summary>
+        /// Commit a change set to a history. Not safe, as it changes the history;
+        /// idempotent, as committing the same change set again returns the same commit.
+        /// </summary>
+        public static readonly HTTPMethod COMMIT = HTTPMethod.Register("COMMIT",
+                                                                       IsSafe:        false,
+                                                                       IsIdempotent:  true,
+                                                                       Description:   "Commit a change set to a history");
 
         private readonly ConcurrentDictionary<RoamingNetwork_Id, RoamingNetworkHistory> roamingNetworkHistories = [];
 
@@ -145,7 +155,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        HTTPDelegate:  request => Task.FromResult(
 
                            TryGetHistory(request, out var roamingNetworkHistory, out var errorResponse)
-                               ? JSONResponse(request, HTTPStatusCode.OK, roamingNetworkHistory.ToSnapshotJSON())
+                               ? JSONResponse(request, HTTPStatusCode.OK, roamingNetworkHistory.ToSnapshotJSON(), roamingNetworkHistory.ToSnapshotCBOR)
                                : errorResponse
 
                        ));
@@ -192,10 +202,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region POST ~/roamingNetworks/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&rebase=true
+            #region COMMIT ~/roamingNetworks/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&rebase=true
 
             AddHandler(history + "/changeSets",
-                       HTTPMethod:    HTTPMethod.POST,
+                       HTTPMethod:    COMMIT,
                        HTTPDelegate:  request => Task.FromResult(SubmitChangeSet(request)));
 
             #endregion
@@ -248,13 +258,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Parse the change set and the options
 
-            var text = Request.HTTPBodyAsUTF8String;
+            var body = Request.HTTPBody;
 
-            if (String.IsNullOrWhiteSpace(text))
+            if (body is null || body.Length == 0)
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, "The request must contain a change set!");
 
-            if (!RoamingNetworkChangeSet.TryParse(text, out var changeSet, out var changeSetError, ChangeSetLimits))
+            RoamingNetworkChangeSet? changeSet;
+            String?                  changeSetError;
+
+            if (Request.ContentType == HTTPContentType.Application.CBOR
+                    ? !RoamingNetworkChangeSet.TryParseCBOR(body,                          out changeSet, out changeSetError, ChangeSetLimits)
+                    : !RoamingNetworkChangeSet.TryParse    (Encoding.UTF8.GetString(body), out changeSet, out changeSetError, ChangeSetLimits))
+            {
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid change set: " + changeSetError);
+            }
 
             if (changeSet.RoamingNetworkId != history.RoamingNetworkId)
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, $"The change set is for the roaming network '{changeSet.RoamingNetworkId}', not for '{history.RoamingNetworkId}'!");
@@ -410,28 +427,55 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) JSONResponse (Request, StatusCode, JSON)
+        #region (private static) WantsCBOR    (Request)
 
         /// <summary>
-        /// An answer in JSON, never cached.
+        /// Whether the request prefers CBOR to JSON by its Accept header field.
         /// </summary>
-        private static HTTPResponse JSONResponse(HTTPRequest     Request,
-                                                 HTTPStatusCode  StatusCode,
-                                                 JToken          JSON)
+        private static Boolean WantsCBOR(HTTPRequest Request)
 
-            => new HTTPResponse.Builder(Request) {
-                   HTTPStatusCode  = StatusCode,
-                   ContentType     = HTTPContentType.Application.JSON_UTF8,
-                   Content         = Encoding.UTF8.GetBytes(JSON.ToString(Formatting.None)),
-                   CacheControl    = "no-store"
-               }.AsImmutable;
+            => Request.Accept.BestMatchingContentType(HTTPContentType.Application.JSON_UTF8,
+                                                      HTTPContentType.Application.CBOR) == HTTPContentType.Application.CBOR;
+
+        #endregion
+
+        #region (private static) JSONResponse (Request, StatusCode, JSON, CBOR = null)
+
+        /// <summary>
+        /// An answer in JSON, or in CBOR when the request prefers it, never cached.
+        /// The CBOR has the keys and values of the JSON, unless given.
+        /// </summary>
+        private static HTTPResponse JSONResponse(HTTPRequest        Request,
+                                                 HTTPStatusCode     StatusCode,
+                                                 JToken             JSON,
+                                                 Func<CBORValue>?   CBOR   = null)
+
+            => WantsCBOR(Request)
+
+                   ? new HTTPResponse.Builder(Request) {
+                         HTTPStatusCode  = StatusCode,
+                         ContentType     = HTTPContentType.Application.CBOR,
+                         Content         = (CBOR is not null
+                                                ? CBOR()
+                                                : CBORJSON.ToCBOR(JSON)).ToByteArray(CBORWriterOptions.Canonical),
+                         CacheControl    = "no-store",
+                         Vary            = "Accept"
+                     }.AsImmutable
+
+                   : new HTTPResponse.Builder(Request) {
+                         HTTPStatusCode  = StatusCode,
+                         ContentType     = HTTPContentType.Application.JSON_UTF8,
+                         Content         = Encoding.UTF8.GetBytes(JSON.ToString(Formatting.None)),
+                         CacheControl    = "no-store",
+                         Vary            = "Accept"
+                     }.AsImmutable;
 
         #endregion
 
         #region (private)        ErrorResponse(Request, StatusCode, Description)
 
         /// <summary>
-        /// An error in JSON: { "description": "…" }.
+        /// An error in JSON, or in CBOR when the request prefers it: { "description": "…" }.
         /// </summary>
         private HTTPResponse ErrorResponse(HTTPRequest     Request,
                                            HTTPStatusCode  StatusCode,

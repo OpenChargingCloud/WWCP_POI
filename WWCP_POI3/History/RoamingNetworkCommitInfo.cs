@@ -144,6 +144,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region ToCBOR()
+
+        /// <summary>
+        /// Return a CBOR representation of these commit metadata: the keys and values of the JSON representation.
+        /// </summary>
+        public CBORValue ToCBOR()
+
+            => CBORJSON.ToCBOR(ToJSON());
+
+        #endregion
+
     }
 
 }
