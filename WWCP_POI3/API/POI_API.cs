@@ -29,7 +29,7 @@ using org.GraphDefined.Vanaheimr.Styx.Arrows;
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
-    public class POI_API : HTTPExtAPI
+    public partial class POI_API : HTTPExtAPI
     {
 
         #region Properties
@@ -54,6 +54,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.roamingNetworkAddition  = new VotingNotificator<POI_API, RoamingNetwork, Boolean>(() => new VetoVote(), true);
             this.roamingNetworkRemoval   = new VotingNotificator<POI_API, RoamingNetwork, Boolean>(() => new VetoVote(), true);
+
+            RegisterHistoryURLTemplates();
 
         }
 

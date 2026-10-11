@@ -49,7 +49,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// A local counter only: neither part of the JSON/CBOR representation nor of the ETags.
         /// A change set fits a version by its before ETags.
         /// </summary>
-        public UInt64 Revision { get; private init; }
+        public UInt64 Revision { get; internal set; }
 
         #endregion
 
@@ -102,6 +102,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    );
 
         }
+
+        #endregion
+
+        #region Fits             (ChangeSet)
+
+        /// <summary>
+        /// Whether the given change set was prepared against this version:
+        /// for this roaming network, with before ETags matching this version.
+        /// </summary>
+        /// <param name="ChangeSet">A change set.</param>
+        public Boolean Fits(RoamingNetworkChangeSet ChangeSet)
+
+            => ChangeSet is not null              &&
+               ChangeSet.RoamingNetworkId == Id   &&
+               MatchETags(ChangeSet.BeforeETags, this, out _);
+
+        #endregion
+
+        #region MatchesETags     (ETags)
+
+        /// <summary>
+        /// Whether at least one ETag is given and every given ETag is one of this version,
+        /// calculated with its own format and hash algorithm.
+        /// </summary>
+        /// <param name="ETags">ETags.</param>
+        public Boolean MatchesETags(ImmutableArray<ETag> ETags)
+
+            => MatchETags(ETags, this, out _);
 
         #endregion
 
