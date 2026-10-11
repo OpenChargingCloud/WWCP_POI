@@ -19,9 +19,11 @@
 
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 
 using Microsoft.Extensions.Logging;
 
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -59,6 +61,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// in the format of the last subscribe request, and may arrive before its response.
     /// Subscriptions end with their connection. A client that does not keep up with its pushes,
     /// or whose push can not be sent, is disconnected: it catches up when it connects again.
+    ///
+    /// Messages of the same action aggregate: a request whose payload is { "batch": [ p1, p2, … ] }
+    /// is processed as one request per payload, in their order, and answered with { "batch": [ r1, r2, … ] },
+    /// where an error is { "error": { code, description, details } }. Pushes of the same action
+    /// waiting together are sent as one push with { "batch": [ … ] }, up to the maxBatchSize of the
+    /// subscribe request; PushCoalescingDelay lets more of them gather.
     /// </remarks>
     public class POIWebSocketServer : AWebSocketServer
     {
@@ -75,11 +83,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const Int32  DefaultMaxQueuedPushes       = 1000;
 
+        /// <summary>
+        /// The default maximum number of payloads of one batch.
+        /// </summary>
+        public const Int32  DefaultMaxBatchSize          = 1000;
+
+        /// <summary>
+        /// The default maximum size of the pushes waiting to be sent per connection, as JSON text: 64 MiB.
+        /// </summary>
+        public const Int64  DefaultMaxQueuedPushBytes    = 64 * 1024 * 1024;
+
         private readonly ConcurrentDictionary<String, POIWebSocketCommandDelegate>             commands  = new (StringComparer.Ordinal);
         private readonly ConcurrentDictionary<String, POIWebSocketTopic>                       topics    = new (StringComparer.Ordinal);
-        // By reference: a WebSocketServerConnection equals every other one with the same local socket,
-        // i.e. every connection of this server.
-        private readonly ConcurrentDictionary<WebSocketServerConnection, POIWebSocketSession>  sessions  = new (ReferenceEqualityComparer.Instance);
+        private readonly ConcurrentDictionary<WebSocketServerConnection, POIWebSocketSession>  sessions  = [];
 
         private AuthenticatePOIWebSocketClientDelegate? authenticateClient;
 
@@ -103,6 +119,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// A client with more is disconnected.
         /// </summary>
         public Int32                                    MaxQueuedPushes          { get; set; } = DefaultMaxQueuedPushes;
+
+        /// <summary>
+        /// The maximum size of the pushes waiting to be sent per connection, as JSON text.
+        /// A client with more is disconnected.
+        /// </summary>
+        public Int64                                    MaxQueuedPushBytes       { get; set; } = DefaultMaxQueuedPushBytes;
+
+        /// <summary>
+        /// The maximum number of payloads of one batch, of requests and of pushes.
+        /// </summary>
+        public Int32                                    MaxBatchSize             { get; set; } = DefaultMaxBatchSize;
+
+        /// <summary>
+        /// How long pushes wait for more of their kind before they are sent, to be sent as one batch.
+        /// By default not at all: only what is waiting anyway is aggregated.
+        /// </summary>
+        public TimeSpan                                 PushCoalescingDelay      { get; set; } = TimeSpan.Zero;
 
         /// <summary>
         /// Decides who the client asking for an upgrade is. Setting it requires authentication.
@@ -202,7 +235,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!TryGetTopics(request, out var topicNames, out var errorMessage))
                     return Task.FromResult(errorMessage);
 
-                request.Session.PushBinary = request.IsBinary;
+                var maxPushBatchSize = MaxBatchSize;
+
+                if (request.Payload.ParseOptional("maxBatchSize",
+                                                  "maximum batch size",
+                                                  out Int32? givenMaxBatchSize,
+                                                  out var errorResponse))
+                {
+
+                    if (errorResponse is not null || givenMaxBatchSize < 1)
+                        return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation,
+                                                             errorResponse ?? $"Invalid maximum batch size '{givenMaxBatchSize}'!"));
+
+                    maxPushBatchSize = Math.Min(givenMaxBatchSize!.Value, MaxBatchSize);
+
+                }
+
+                request.Session.PushBinary        = request.IsBinary;
+                request.Session.MaxPushBatchSize  = Math.Max(maxPushBatchSize, 1);
 
                 foreach (var topicName in topicNames)
                     request.Session.Subscribe(topicName);
@@ -274,23 +324,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Push(TopicName, Payload)
+        #region Push(TopicName, Payload, Action = null)
 
         /// <summary>
         /// Queue the given payload for every connection subscribed to the given topic, without waiting.
-        /// A connection whose queue is full is disconnected.
+        /// A connection with more than MaxQueuedPushes pushes or MaxQueuedPushBytes waiting is disconnected.
         /// </summary>
         /// <param name="TopicName">The name of a topic.</param>
         /// <param name="Payload">The payload of the push.</param>
+        /// <param name="Action">The action of the push, when not the one of the topic.</param>
         /// <returns>The number of connections it was queued for.</returns>
         public Int32 Push(String   TopicName,
-                          JObject  Payload)
+                          JObject  Payload,
+                          String?  Action   = null)
         {
 
             if (!topics.TryGetValue(TopicName, out var topic))
                 throw new ArgumentException($"The topic '{TopicName}' is unknown!", nameof(TopicName));
 
-            var queued = 0;
+            var action  = Action ?? topic.Action;
+            var size    = -1L;
+            var queued  = 0;
 
             foreach (var session in sessions.Values)
             {
@@ -298,13 +352,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!session.IsSubscribed(topic.Name))
                     continue;
 
-                if (session.Pushes.Writer.TryWrite(POIWebSocketMessage.Send(session.NextPushId(), topic.Action, Payload)))
+                // Measured once, and only when anybody listens.
+                if (size < 0)
+                    size = Encoding.UTF8.GetByteCount(Payload.ToString(Formatting.None));
+
+                String? overload = null;
+
+                if (session.AddQueuedPushBytes(size) > MaxQueuedPushBytes)
+                    overload = $"More than {MaxQueuedPushBytes} bytes of pushes are waiting!";
+
+                else if (session.Pushes.Writer.TryWrite((action, Payload, size)))
                     queued++;
+
+                else
+                    overload = $"More than {MaxQueuedPushes} pushes are waiting!";
 
                 // Off the books at once, so that nothing more is queued for it,
                 // and closed elsewhere: this may run while a history is locked.
-                else if (sessions.TryRemove(session.Connection, out _))
-                    _ = Task.Run(() => Disconnect(session, $"More than {MaxQueuedPushes} pushes are waiting!"));
+                if (overload is not null && sessions.TryRemove(session.Connection, out _))
+                    _ = Task.Run(() => Disconnect(session, overload));
 
             }
 
@@ -407,7 +473,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => sessions.GetOrAdd(Connection,
                                  connection => new POIWebSocketSession(connection,
                                                                        Math.Max(MaxConcurrentRequests, (UInt16) 1),
-                                                                       Math.Max(MaxQueuedPushes,       1)));
+                                                                       Math.Max(MaxQueuedPushes,       1),
+                                                                       Math.Max(MaxBatchSize,          1)));
 
         #endregion
 
@@ -462,7 +529,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Send the pushes of the given connection in their order, from its first subscription
-        /// until it is closed. A push that can not be sent disconnects the client.
+        /// until it is closed: pushes of the same action waiting together as one batch.
+        /// A push that can not be sent disconnects the client.
         /// </summary>
         private void StartPushing(POIWebSocketSession Session)
         {
@@ -479,11 +547,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     while (await reader.WaitToReadAsync(Session.Closed))
                     {
+
+                        if (PushCoalescingDelay > TimeSpan.Zero)
+                            await Task.Delay(PushCoalescingDelay, Session.Closed);
+
                         while (reader.TryRead(out var push))
                         {
 
+                            var payloads  = new List<JObject> { push.Payload };
+                            var size      = push.Size;
+
+                            while (payloads.Count < Session.MaxPushBatchSize &&
+                                   reader.TryPeek(out var next)               &&
+                                   next.Action == push.Action                 &&
+                                   reader.TryRead(out next))
+                            {
+                                payloads.Add(next.Payload);
+                                size += next.Size;
+                            }
+
+                            Session.AddQueuedPushBytes(-size);
+
                             var sentStatus = await SendMessage(Session,
-                                                               push,
+                                                               POIWebSocketMessage.Send(Session.NextPushId(),
+                                                                                        push.Action,
+                                                                                        payloads.Count == 1
+                                                                                            ? push.Payload
+                                                                                            : new JObject(new JProperty("batch", new JArray(payloads)))),
                                                                Session.PushBinary,
                                                                Session.Closed);
 
@@ -533,6 +623,100 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
         }
+
+        #endregion
+
+        #region (private) Process(Handler, Request)
+
+        /// <summary>
+        /// Process the given request with the given handler: a batch as one request per payload, in their order.
+        /// </summary>
+        private async Task<POIWebSocketMessage> Process(POIWebSocketCommandDelegate  Handler,
+                                                        POIWebSocketRequest          Request)
+        {
+
+            if (!(Request.Payload.Count == 1 && Request.Payload["batch"] is JArray batch))
+                return await Handler(Request);
+
+            if (batch.Count == 0 || batch.Count > MaxBatchSize)
+                return Request.Error(POIWebSocketErrorCodes.FormatViolation, $"A batch must have 1 to {MaxBatchSize} payloads!");
+
+            // The CBOR payloads too, as some handlers read them, e.g. a change set.
+            IReadOnlyList<CBORValue>? batchCBOR = null;
+
+            if (Request.Message.PayloadCBOR is CBORValue payloadCBOR &&
+                payloadCBOR.TryGetValue(CBORValue.FromText("batch"), out var batchValue) &&
+                batchValue.Kind == CBORValueKind.Array &&
+                batchValue.AsArray().Count == batch.Count)
+            {
+                batchCBOR = batchValue.AsArray();
+            }
+
+            var results = new JArray();
+
+            for (var index = 0; index < batch.Count; index++)
+            {
+
+                if (batch[index] is not JObject itemJSON)
+                {
+                    results.Add(BatchError(POIWebSocketErrorCodes.FormatViolation, "A payload of a batch must be an object!", null));
+                    continue;
+                }
+
+                var item = new POIWebSocketRequest(Request.Session,
+                                                   POIWebSocketMessage.Request(Request.MessageId,
+                                                                               Request.Action,
+                                                                               itemJSON,
+                                                                               batchCBOR?[index] is CBORValue itemCBOR && itemCBOR.Kind == CBORValueKind.Map
+                                                                                   ? itemCBOR
+                                                                                   : (CBORValue?) null),
+                                                   Request.IsBinary,
+                                                   Request.CancellationToken);
+
+                POIWebSocketMessage answer;
+
+                try
+                {
+                    answer = await Handler(item);
+                }
+                catch (OperationCanceledException) when (Request.CancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    Logger.LogError(e, "Exception while processing a batch of the POI WebSocket request '{Action}'.", Request.Action);
+                    answer = item.Error(POIWebSocketErrorCodes.InternalError, $"The request '{Request.Action}' could not be processed!");
+                }
+
+                results.Add(answer.IsError
+                                ? BatchError(answer.ErrorCode!, answer.ErrorDescription, answer.ErrorDetails)
+                                : answer.GetPayloadJSON() ?? []);
+
+            }
+
+            return Request.Respond(new JObject(new JProperty("batch", results)));
+
+        }
+
+        #endregion
+
+        #region (private static) BatchError(ErrorCode, ErrorDescription, ErrorDetails)
+
+        /// <summary>
+        /// The answer to one payload of a batch that failed: { "error": { code, description, details } }.
+        /// </summary>
+        private static JObject BatchError(String    ErrorCode,
+                                          String?   ErrorDescription,
+                                          JObject?  ErrorDetails)
+
+            => new (
+                   new JProperty("error", new JObject(
+                       new JProperty("code",         ErrorCode),
+                       new JProperty("description",  ErrorDescription ?? ""),
+                       new JProperty("details",      ErrorDetails     ?? [])
+                   ))
+               );
 
         #endregion
 
@@ -602,7 +786,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     try
                     {
-                        answer = await handler(request);
+                        answer = await Process(handler, request);
                     }
                     catch (OperationCanceledException) when (Session.Closed.IsCancellationRequested)
                     {

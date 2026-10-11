@@ -20,6 +20,8 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 
+using Newtonsoft.Json.Linq;
+
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 using org.GraphDefined.Vanaheimr.Hermod.WebSocket;
 
@@ -40,6 +42,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly ConcurrentDictionary<String, Byte>  subscriptions    = new (StringComparer.Ordinal);
         private readonly CancellationTokenSource             closed           = new ();
         private          Int64                               pushCounter;
+        private          Int64                               queuedPushBytes;
         private          Int32                               pushing;
 
         #endregion
@@ -93,10 +96,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean                    PushBinary           { get; internal set; }
 
         /// <summary>
-        /// The pushes waiting to be sent, in their order. When it is full, the client
-        /// does not keep up and its connection is closed.
+        /// The most pushes of the same action sent as one batch: as the last subscribe request asked,
+        /// at most the MaxBatchSize of the server; 1 sends every push on its own.
         /// </summary>
-        internal Channel<POIWebSocketMessage>  Pushes          { get; }
+        public Int32                      MaxPushBatchSize     { get; internal set; }
+
+        /// <summary>
+        /// The actions and payloads of the pushes waiting to be sent, in their order.
+        /// When it is full, the client does not keep up and its connection is closed.
+        /// </summary>
+        internal Channel<(String Action, JObject Payload, Int64 Size)>  Pushes  { get; }
+
+        /// <summary>
+        /// The size of the pushes waiting to be sent, as JSON text.
+        /// </summary>
+        public Int64                      QueuedPushBytes
+            => Interlocked.Read(ref queuedPushBytes);
 
         #endregion
 
@@ -104,12 +119,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         internal POIWebSocketSession(WebSocketServerConnection  Connection,
                                      UInt16                     MaxConcurrentRequests,
-                                     Int32                      MaxQueuedPushes)
+                                     Int32                      MaxQueuedPushes,
+                                     Int32                      MaxPushBatchSize)
         {
 
-            this.Connection    = Connection;
-            this.RequestSlots  = new SemaphoreSlim(MaxConcurrentRequests, MaxConcurrentRequests);
-            this.Pushes        = Channel.CreateBounded<POIWebSocketMessage>(new BoundedChannelOptions(MaxQueuedPushes) {
+            this.Connection        = Connection;
+            this.RequestSlots      = new SemaphoreSlim(MaxConcurrentRequests, MaxConcurrentRequests);
+            this.MaxPushBatchSize  = MaxPushBatchSize;
+            this.Pushes            = Channel.CreateBounded<(String, JObject, Int64)>(new BoundedChannelOptions(MaxQueuedPushes) {
                                      SingleReader  = true,
                                      FullMode      = BoundedChannelFullMode.Wait
                                  });
@@ -183,6 +200,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         internal String NextPushId()
 
             => "p" + Interlocked.Increment(ref pushCounter);
+
+        #endregion
+
+        #region (internal) AddQueuedPushBytes(Size)
+
+        /// <summary>
+        /// Count the given size as waiting to be sent (or as sent, when negative), and return the new total.
+        /// </summary>
+        internal Int64 AddQueuedPushBytes(Int64 Size)
+
+            => Interlocked.Add(ref queuedPushBytes, Size);
 
         #endregion
 

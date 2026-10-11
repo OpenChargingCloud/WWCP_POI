@@ -19,7 +19,9 @@
 
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -29,6 +31,17 @@ using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 namespace cloud.charging.open.protocols.WWCP.POI
 {
+
+    /// <summary>
+    /// A delegate deciding whether the client of the given WebSocket upgrade request may set the given status.
+    /// </summary>
+    /// <param name="Request">The HTTP request that asked for the upgrade, e.g. with the credentials of the client.</param>
+    /// <param name="Login">The login of the authenticated client, or null.</param>
+    /// <param name="StatusUpdate">The requested status update, without old values.</param>
+    public delegate Boolean AuthorizeStatusUpdateDelegate(HTTPRequest      Request,
+                                                          String?          Login,
+                                                          POIStatusUpdate  StatusUpdate);
+
 
     /// <summary>
     /// The histories of roaming networks over a WebSocket: the commands of the HTTP API,
@@ -46,14 +59,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// commitChangeSet   { changeSet, expectedHead?, rebase? }      { status, … }: Published or AlreadyPublished with the metadata of
     ///                                                              the commit and "rebased", HeadMoved with the head, Refused
     /// runtimeStatus     {}                                         { runtimeStatus: [ … ] }: the current admin status and status
+    /// setStatus         { kind, entityType, entityId, value,       { result, description?, current? }: Updated, Unchanged, Outdated
+    ///                     timestamp?, dataSource? }                or Refused, and the current status afterwards
     /// topics            {}                                         { topics: [ { name, action, description } ] }
     /// subscribe         { topics: [ … ] }                          { topics: [ … ] }: all topics subscribed now
     /// unsubscribe       { topics: [ … ] }                          { topics: [ … ] }
     /// Unknown commits are answered with the request error NotFound, invalid requests with FormatViolation,
     /// change sets nobody may submit with SecurityError.
+    /// Every action takes a batch, { batch: [ payload, … ] }, answered with { batch: [ response or { error }, … ] }.
     ///
     /// Topic                  Push
     /// commitAnnouncements    commitAnnouncement   { timestamp, commitId, parentIds, revision, description? }
+    /// commits                commit               the complete commit; one larger than MaxPushedCommitSize
+    ///                                             as a commitAnnouncement, to be fetched
     /// adminStatusUpdates     adminStatusUpdate    { kind, entityType, entityId, timestamp, value, oldTimestamp?, oldValue?, dataSource? }
     /// statusUpdates          statusUpdate         the same, for the status
     /// </remarks>
@@ -66,6 +84,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The topic of slim notices of new commits.
         /// </summary>
         public const String CommitAnnouncementsTopic  = "commitAnnouncements";
+
+        /// <summary>
+        /// The topic of complete commits.
+        /// </summary>
+        public const String CommitsTopic              = "commits";
+
+        /// <summary>
+        /// The default maximum size of a commit pushed completely, as JSON text: 1 MiB.
+        /// </summary>
+        public const Int32  DefaultMaxPushedCommitSize = 1024 * 1024;
 
         /// <summary>
         /// The topic of admin status updates.
@@ -89,7 +117,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Decides who the client opening the WebSocket of a history is; its upgrade request is refused
         /// when it returns no login. Without it, everybody may open it, as everybody may read a history over HTTP.
-        /// Change sets are submitted over it as decided by AuthorizeChangeSetSubmission, given the upgrade request.
+        /// Change sets are submitted over it as decided by AuthorizeChangeSetSubmission, given the upgrade request,
+        /// and status set as decided by AuthorizeStatusUpdate.
         /// </summary>
         public AuthenticatePOIWebSocketClientDelegate? AuthenticateWebSocketClient
         {
@@ -110,6 +139,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
         }
+
+        /// <summary>
+        /// Decides who may set which status over the WebSocket of a history. Without it, setting a status is refused:
+        /// a server has to decide on purpose whom it lets change the status of its roaming networks.
+        /// The status of a history is set at the server holding it; followers take it from their leader.
+        /// </summary>
+        public AuthorizeStatusUpdateDelegate? AuthorizeStatusUpdate { get; set; }
+
+        /// <summary>
+        /// The maximum size of a commit pushed completely to the subscribers of "commits", as JSON text.
+        /// A larger one is pushed there as a commitAnnouncement, and fetched by whoever wants it.
+        /// </summary>
+        public Int32 MaxPushedCommitSize { get; set; } = DefaultMaxPushedCommitSize;
 
         #endregion
 
@@ -282,11 +324,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region setStatus
+
+            webSocketServer.AddCommand("setStatus", request =>
+
+                Task.FromResult(
+                    SetStatus(request, History)
+                )
+
+            );
+
+            #endregion
+
             #region Topics
 
             webSocketServer.AddTopic(new POIWebSocketTopic(CommitAnnouncementsTopic,
                                                            "commitAnnouncement",
                                                            "A slim notice of every new commit: timestamp, commitId, parentIds, revision and description."));
+
+            webSocketServer.AddTopic(new POIWebSocketTopic(CommitsTopic,
+                                                           "commit",
+                                                           "Every new commit completely, as the command commit returns it; one larger than MaxPushedCommitSize as a commitAnnouncement."));
 
             webSocketServer.AddTopic(new POIWebSocketTopic(AdminStatusUpdatesTopic,
                                                            "adminStatusUpdate",
@@ -314,8 +372,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    POIWebSocketServer     WebSocketServer)
         {
 
-            OnRoamingNetworkCommitAnnouncementDelegate onCommitAnnouncement = announcement =>
-                WebSocketServer.Push(CommitAnnouncementsTopic, announcement.ToJSON());
+            OnRoamingNetworkCommitAnnouncementDelegate onCommitAnnouncement = announcement => {
+
+                var announcementJSON = announcement.ToJSON();
+
+                WebSocketServer.Push(CommitAnnouncementsTopic, announcementJSON);
+
+                if (WebSocketServer.Sessions.Any(session => session.IsSubscribed(CommitsTopic)))
+                {
+
+                    var commitJSON = announcement.Commit.ToJSON();
+
+                    if (Encoding.UTF8.GetByteCount(commitJSON.ToString(Formatting.None)) <= MaxPushedCommitSize)
+                        WebSocketServer.Push(CommitsTopic, commitJSON);
+
+                    else
+                        WebSocketServer.Push(CommitsTopic, announcementJSON, "commitAnnouncement");
+
+                }
+
+            };
 
             OnPOIStatusUpdateDelegate onStatusUpdate = statusUpdate =>
                 WebSocketServer.Push(statusUpdate.Kind == POIRuntimeStatusKind.AdminStatus
@@ -422,6 +498,83 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                         ))
 
                    };
+
+        }
+
+        #endregion
+
+        #region (private) SetStatus(Request, History)
+
+        /// <summary>
+        /// Set the admin status or the status of an entity of the head version, as asked by the request.
+        /// </summary>
+        private POIWebSocketMessage SetStatus(POIWebSocketRequest    Request,
+                                              RoamingNetworkHistory  History)
+        {
+
+            if (AuthorizeStatusUpdate is null)
+                return Request.Error(POIWebSocketErrorCodes.SecurityError, "Setting a status is not enabled here!");
+
+            if (Request.Session.UpgradeRequest is not HTTPRequest upgradeRequest)
+                return Request.Error(POIWebSocketErrorCodes.SecurityError, "The sender of the status is unknown!");
+
+            #region Parse the status update
+
+            if (!POIStatusUpdate.TryParseKind(Request.Payload["kind"]?.Type == JTokenType.String ? Request.Payload["kind"]!.Value<String>() : null, out var kind))
+                return Request.Error(POIWebSocketErrorCodes.FormatViolation, "The kind must be adminStatus or status!");
+
+            if (!Request.Payload.ParseMandatoryText("entityType", "entity type",           out String? entityType, out var errorResponse) ||
+                !Request.Payload.ParseMandatoryText("entityId",   "entity identification", out String? entityId,   out errorResponse) ||
+                !Request.Payload.ParseMandatoryText("value",      "status",                out String? value,      out errorResponse))
+            {
+                return Request.Error(POIWebSocketErrorCodes.FormatViolation, errorResponse);
+            }
+
+            var timestamp = TimeProvider.GetUtcNow();
+
+            if (Request.Payload.ParseOptional("timestamp", "timestamp", out DateTimeOffset? givenTimestamp, out errorResponse))
+            {
+
+                if (errorResponse is not null)
+                    return Request.Error(POIWebSocketErrorCodes.FormatViolation, errorResponse);
+
+                timestamp = givenTimestamp!.Value;
+
+            }
+
+            if (Request.Payload.ParseOptional("dataSource", "data source", out String? dataSource, out errorResponse))
+            {
+                if (errorResponse is not null)
+                    return Request.Error(POIWebSocketErrorCodes.FormatViolation, errorResponse);
+            }
+
+            #endregion
+
+            if (!AuthorizeStatusUpdate(upgradeRequest,
+                                       Request.Session.Login,
+                                       new POIStatusUpdate(kind, entityType, entityId, timestamp, value, DataSource: dataSource)))
+            {
+                return Request.Error(POIWebSocketErrorCodes.SecurityError, "The sender may not set this status!");
+            }
+
+            var result    = History.RuntimeStatus.TryUpdate(kind,
+                                                            entityType,
+                                                            entityId,
+                                                            value,
+                                                            timestamp,
+                                                            out _,
+                                                            out var description,
+                                                            dataSource);
+
+            var response  = new JObject(new JProperty("result", result.ToString()));
+
+            if (description is not null)
+                response.Add("description", description);
+
+            if (History.RuntimeStatus.TryGet(kind, entityType, entityId, out var current))
+                response.Add("current", current.ToJSON());
+
+            return Request.Respond(response);
 
         }
 

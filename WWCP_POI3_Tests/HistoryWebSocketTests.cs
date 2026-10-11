@@ -608,7 +608,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(topics.Payload!["topics"]!.Select(topic => topic["name"]!.Value<String>()),
-                            Is.EqualTo(new[] { "adminStatusUpdates", "commitAnnouncements", "statusUpdates" }));
+                            Is.EqualTo(new[] { "adminStatusUpdates", "commitAnnouncements", "commits", "statusUpdates" }));
                 Assert.That(topics.Payload["topics"]![1]!["action"]!.Value<String>(),  Is.EqualTo("commitAnnouncement"));
             }
 
@@ -775,6 +775,324 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
             {
                 Assert.That(webSocketServer.Sessions,                                                   Is.Empty);
                 Assert.That(await client.ClosedByServer.Task.WaitAsync(TimeSpan.FromSeconds(10)),        Is.EqualTo(WebSocketCloseStatus.PolicyViolation));
+            }
+
+        }
+
+        #endregion
+
+        #region SetStatus(Client, MessageId, Kind, Value, Timestamp = null, EntityId = "rn1")
+
+        private static Task<POIWebSocketMessage> SetStatus(TestClient  Client,
+                                                           String      MessageId,
+                                                           String      Kind,
+                                                           String      Value,
+                                                           String?     Timestamp   = null,
+                                                           String      EntityId    = "rn1")
+        {
+
+            var payload = new JObject(
+                              new JProperty("kind",        Kind),
+                              new JProperty("entityType",  nameof(RoamingNetwork)),
+                              new JProperty("entityId",    EntityId),
+                              new JProperty("value",       Value)
+                          );
+
+            if (Timestamp is not null)
+                payload.Add("timestamp", Timestamp);
+
+            return Client.Request(MessageId, "setStatus", payload);
+
+        }
+
+        #endregion
+
+        #region Clients_set_the_status()
+
+        [Test]
+        public async Task Clients_set_the_status()
+        {
+
+            await using var operatorClient  = await Connect();
+            await using var subscriber      = await Connect();
+
+            await subscriber.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("statusUpdates"))));
+
+            var notEnabled  = await SetStatus(operatorClient, "1", "status", "available", "2026-10-11T12:00:00Z");
+
+            poiAPI!.AuthorizeStatusUpdate = (request, login, statusUpdate) => statusUpdate.EntityType == nameof(RoamingNetwork);
+
+            var updated     = await SetStatus(operatorClient, "2", "status", "available", "2026-10-11T12:00:00Z");
+            var unchanged   = await SetStatus(operatorClient, "3", "status", "available", "2026-10-11T12:05:00Z");
+            var outdated    = await SetStatus(operatorClient, "4", "status", "offline",   "2026-10-11T11:00:00Z");
+            var unknown     = await SetStatus(operatorClient, "5", "status", "available", "2026-10-11T12:00:00Z", EntityId: "rn2");
+            var invalidKind = await SetStatus(operatorClient, "6", "energy", "available");
+            var noValue     = await operatorClient.Request("7", "setStatus", new JObject(new JProperty("kind", "status"), new JProperty("entityType", nameof(RoamingNetwork)), new JProperty("entityId", "rn1")));
+            var forbidden   = await operatorClient.Request("8", "setStatus", new JObject(new JProperty("kind",       "status"),
+                                                                                        new JProperty("entityType", nameof(ChargingStationOperator)),
+                                                                                        new JProperty("entityId",   "DE*GEF"),
+                                                                                        new JProperty("value",      "available")));
+            var now         = await SetStatus(operatorClient, "9", "adminStatus", "operational");
+
+            var (push, _)   = await subscriber.NextPush();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(notEnabled.ErrorCode,                                    Is.EqualTo(POIWebSocketErrorCodes.SecurityError));
+
+                Assert.That(updated.Payload!["result"]!.Value<String>(),             Is.EqualTo("Updated"));
+                Assert.That(updated.Payload["current"]!["value"]!.Value<String>(),   Is.EqualTo("available"));
+                Assert.That(unchanged.Payload!["result"]!.Value<String>(),           Is.EqualTo("Unchanged"));
+                Assert.That(outdated.Payload!["result"]!.Value<String>(),            Is.EqualTo("Outdated"));
+                Assert.That(outdated.Payload["current"]!["value"]!.Value<String>(),  Is.EqualTo("available"));
+                Assert.That(unknown.Payload!["result"]!.Value<String>(),             Is.EqualTo("Refused"));
+                Assert.That(unknown.Payload["current"],                              Is.Null);
+
+                Assert.That(invalidKind.ErrorCode,                                   Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+                Assert.That(noValue.ErrorCode,                                       Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+                Assert.That(forbidden.ErrorCode,                                     Is.EqualTo(POIWebSocketErrorCodes.SecurityError));
+
+                // Without a timestamp: now.
+                Assert.That(now.Payload!["result"]!.Value<String>(),                 Is.EqualTo("Updated"));
+
+                // One push for the one change of the status; the admin status is another topic.
+                Assert.That(push.Action,                                             Is.EqualTo("statusUpdate"));
+                Assert.That(push.Payload!["value"]!.Value<String>(),                 Is.EqualTo("available"));
+                Assert.That(subscriber.Pushes.Reader.Count,                          Is.Zero);
+
+                Assert.That(leader!.RuntimeStatus.All.Count,                         Is.EqualTo(2));
+
+            }
+
+        }
+
+        #endregion
+
+        #region StatusPayload(Kind, Value, Timestamp)
+
+        private static JObject StatusPayload(String  Kind,
+                                             String  Value,
+                                             String  Timestamp)
+
+            => new (
+                   new JProperty("kind",        Kind),
+                   new JProperty("entityType",  nameof(RoamingNetwork)),
+                   new JProperty("entityId",    "rn1"),
+                   new JProperty("value",       Value),
+                   new JProperty("timestamp",   Timestamp)
+               );
+
+        #endregion
+
+        #region Requests_of_the_same_action_aggregate()
+
+        [Test]
+        public async Task Requests_of_the_same_action_aggregate()
+        {
+
+            poiAPI!.AuthorizeStatusUpdate = (request, login, statusUpdate) => true;
+
+            await using var client = await Connect();
+
+            var statuses  = await client.Request("1", "setStatus", new JObject(new JProperty("batch", new JArray(
+                                                                       StatusPayload("status",      "available",   "2026-10-11T12:00:00Z"),
+                                                                       StatusPayload("energy",      "available",   "2026-10-11T12:00:00Z"),
+                                                                       "no object",
+                                                                       StatusPayload("adminStatus", "operational", "2026-10-11T12:00:00Z"),
+                                                                       StatusPayload("status",      "offline",     "2026-10-11T11:00:00Z")
+                                                                   ))));
+
+            var heads     = await client.Request("2", "head",      new JObject(new JProperty("batch", new JArray(new JObject(), new JObject()))));
+            var empty     = await client.Request("3", "head",      new JObject(new JProperty("batch", new JArray())));
+
+            var inCBOR    = await client.Request("4", "setStatus",
+                                                 Binary:       true,
+                                                 PayloadCBOR:  CBORJSON.ToCBOR(new JObject(new JProperty("batch", new JArray(
+                                                                                     StatusPayload("status", "offline", "2026-10-11T12:01:00Z")
+                                                                                 )))));
+
+            var results   = statuses.Payload!["batch"]!;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(statuses.MessageType,                                   Is.EqualTo(POIWebSocketMessageType.Response));
+                Assert.That(results.Count(),                                        Is.EqualTo(5));
+                Assert.That(results[0]!["result"]!.Value<String>(),                 Is.EqualTo("Updated"));
+                Assert.That(results[1]!["error"]!["code"]!.Value<String>(),         Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+                Assert.That(results[2]!["error"]!["code"]!.Value<String>(),         Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+                Assert.That(results[3]!["result"]!.Value<String>(),                 Is.EqualTo("Updated"));
+                Assert.That(results[4]!["result"]!.Value<String>(),                 Is.EqualTo("Outdated"));
+
+                Assert.That(heads.Payload!["batch"]!.Count(),                       Is.EqualTo(2));
+                Assert.That(heads.Payload["batch"]![1]!["revision"]!.Value<Int32>(), Is.Zero);
+                Assert.That(empty.ErrorCode,                                        Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+
+                Assert.That(inCBOR.GetPayloadJSON()!["batch"]![0]!["result"]!.Value<String>(),  Is.EqualTo("Updated"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Pushes_of_the_same_action_aggregate()
+
+        [Test]
+        public async Task Pushes_of_the_same_action_aggregate()
+        {
+
+            webSocketServer!.PushCoalescingDelay = TimeSpan.FromMilliseconds(300);
+
+            await using var everything  = await Connect();
+            await using var twoAtOnce   = await Connect();
+
+            await everything.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("statusUpdates", "adminStatusUpdates"))));
+            await twoAtOnce. Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("statusUpdates")),
+                                                                   new JProperty("maxBatchSize", 2)));
+
+            var t0 = DateTimeOffset.Parse("2026-10-11T12:00:00Z");
+
+            leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "available",   t0,               out _, out _);
+            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "offline",     t0.AddMinutes(1), out _, out _);
+            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), "rn1", "operational", t0.AddMinutes(1), out _, out _);
+            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "available",   t0.AddMinutes(2), out _, out _);
+
+            var first   = (await everything.NextPush()).Message;
+            var second  = (await everything.NextPush()).Message;
+            var third   = (await everything.NextPush()).Message;
+
+            var pair    = (await twoAtOnce.NextPush()).Message;
+            var single  = (await twoAtOnce.NextPush()).Message;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // Aggregated as long as the action stays the same, in their order.
+                Assert.That(first.Action,                                                         Is.EqualTo("statusUpdate"));
+                Assert.That(first.Payload!["batch"]!.Select(update => update["value"]!.Value<String>()),  Is.EqualTo(new[] { "available", "offline" }));
+                Assert.That(second.Action,                                                        Is.EqualTo("adminStatusUpdate"));
+                Assert.That(second.Payload!["value"]!.Value<String>(),                            Is.EqualTo("operational"));
+                Assert.That(third.Payload!["value"]!.Value<String>(),                             Is.EqualTo("available"));
+
+                // At most as many as asked for.
+                Assert.That(pair.Payload!["batch"]!.Count(),                                      Is.EqualTo(2));
+                Assert.That(single.Payload!["value"]!.Value<String>(),                            Is.EqualTo("available"));
+
+                Assert.That(new[] { first.MessageId, second.MessageId, third.MessageId },        Is.EqualTo(new[] { "p1", "p2", "p3" }));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Payloads(Push)
+
+        /// <summary>
+        /// The payloads of a push: one, or those of its batch.
+        /// </summary>
+        private static IEnumerable<JObject> Payloads(POIWebSocketMessage Push)
+
+            => Push.GetPayloadJSON()!["batch"] is JArray batch
+                   ? batch.Cast<JObject>()
+                   : [ Push.GetPayloadJSON()! ];
+
+        #endregion
+
+        #region A_follower_follows_the_pushed_commits()
+
+        [Test]
+        public async Task A_follower_follows_the_pushed_commits()
+        {
+
+            await using var client = await Connect();
+
+            var snapshot = await client.Request("1", "snapshot");
+            RoamingNetworkHistory.TryFromSnapshot(snapshot.Payload!, out var follower, out _);
+
+            await client.Request("2", "subscribe", new JObject(new JProperty("topics", new JArray("commits"))));
+
+            Publish("v1", 1);
+            Publish("v2", 2);
+
+            var commits = new List<RoamingNetworkCommit>();
+
+            while (commits.Count < 2)
+            {
+
+                var (push, _) = await client.NextPush();
+
+                Assert.That(push.Action, Is.EqualTo("commit"));
+
+                commits.AddRange(Payloads(push).Select(payload => RoamingNetworkCommit.Parse(payload.ToString())));
+
+            }
+
+            Assert.That(follower!.TryAppend(commits, out var appended, out var error),  Is.True, error);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(appended,                                 Is.EqualTo(2));
+                Assert.That(follower.Head.Commit.Id,                  Is.EqualTo(leader!.Head.Commit.Id));
+                Assert.That(follower.Head.RoamingNetwork.DataSource,  Is.EqualTo("v2"));
+            }
+
+        }
+
+        #endregion
+
+        #region Large_commits_are_only_announced()
+
+        [Test]
+        public async Task Large_commits_are_only_announced()
+        {
+
+            poiAPI!.MaxPushedCommitSize = 100;
+
+            await using var client = await Connect();
+
+            await client.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("commits"))));
+
+            Publish("v1", 1);
+
+            var (push, _) = await client.NextPush();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(push.Action,                                   Is.EqualTo("commitAnnouncement"));
+                Assert.That(push.Payload!["commitId"]!.Value<String>(),    Is.EqualTo(leader!.Head.Commit.Id.ToString()));
+                Assert.That(push.Payload["changeSet"],                     Is.Null);
+            }
+
+        }
+
+        #endregion
+
+        #region A_client_with_too_many_bytes_waiting_is_disconnected()
+
+        [Test]
+        public async Task A_client_with_too_many_bytes_waiting_is_disconnected()
+        {
+
+            webSocketServer!.MaxQueuedPushBytes   = 4096;
+            webSocketServer.PushCoalescingDelay  = TimeSpan.FromMilliseconds(500);
+
+            await using var client = await Connect();
+
+            await client.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("commitAnnouncements"))));
+
+            var payload = new JObject(new JProperty("filler", new String('x', 1024)));
+
+            var queued  = Enumerable.Range(0, 10).Select(_ => webSocketServer.Push(POI_API.CommitAnnouncementsTopic, payload)).ToArray();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(queued.Take(3),                                                            Is.All.EqualTo(1));
+                Assert.That(queued.Last(),                                                             Is.Zero);
+                Assert.That(await client.ClosedByServer.Task.WaitAsync(TimeSpan.FromSeconds(10)),      Is.EqualTo(WebSocketCloseStatus.PolicyViolation));
+                Assert.That(webSocketServer.Sessions,                                                  Is.Empty);
             }
 
         }

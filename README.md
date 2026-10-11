@@ -98,11 +98,18 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 - **Actions:** `head`, `snapshot`, `commitInfos`, `commits`, `commit {commitId}`,
   `commitChangeSet {changeSet, expectedHead?, rebase?}` → `{status, …}`, `runtimeStatus`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
-  `commitAnnouncements`, `adminStatusUpdates`, `statusUpdates`. Pushes are sends, `[6, "p1", action, payload]`,
+  `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced), `adminStatusUpdates`,
+  `statusUpdates`. Pushes are sends, `[6, "p1", action, payload]`,
   in the format of the last `subscribe`. They end with the connection; a client that falls more than
-  `MaxQueuedPushes` behind is disconnected and catches up after reconnecting.
+  `MaxQueuedPushes` pushes or `MaxQueuedPushBytes` behind is disconnected and catches up after reconnecting.
 - **Async:** requests are processed concurrently, up to `MaxConcurrentRequests` per connection;
   answers come when ready and are matched by their id. A connection's requests are cancelled when it closes.
+- **setStatus** `{kind, entityType, entityId, value, timestamp?, dataSource?}` → `{result, description?, current?}`,
+  allowed as `AuthorizeStatusUpdate` decides (refused without it); set it at the leader, followers take it from there.
+- **Batches:** messages of the same action aggregate. A request `{batch: [p1, p2, …]}` runs per payload,
+  in order, and is answered with `{batch: [r1, {error: {code, description, details}}, …]}`, up to `MaxBatchSize`.
+  Pushes of the same action that wait together go out as one `{batch: […]}`, up to the `maxBatchSize`
+  of `subscribe` (1 turns it off); `PushCoalescingDelay` lets more gather.
 - **Errors:** the codes of OCPP-J plus `NotFound`; an unreadable frame is answered on id `"-1"`.
 - **Access:** open like the HTTP reads, unless `AuthenticateWebSocketClient` is set;
   `commitChangeSet` asks `AuthorizeChangeSetSubmission` with the upgrade request.
@@ -110,7 +117,7 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 ## Open
 
 - Persistence and retention of histories
-- Status updates by clients (`setStatus`), finer subscription filters, energy status with EVSEs
+- Finer subscription filters, energy status with EVSEs
 - Commits signed by the leader
 - Further entities: charging pools, stations, EVSEs, e-mobility providers, …
 

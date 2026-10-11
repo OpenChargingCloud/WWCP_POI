@@ -38,6 +38,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
+        /// The complete commit, for whoever wants more than the notice. Not part of its JSON.
+        /// </summary>
+        public RoamingNetworkCommit                    Commit         { get; }
+
+        /// <summary>
         /// When this history took the commit, to the millisecond.
         /// </summary>
         public DateTimeOffset                          Timestamp      { get; }
@@ -75,6 +80,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 DateTimeOffset        Timestamp)
         {
 
+            this.Commit       = Commit;
             this.Timestamp    = DateTimeOffset.FromUnixTimeMilliseconds(Timestamp.ToUnixTimeMilliseconds());
             this.CommitId     = Commit.Id;
             this.ParentIds    = Commit.ParentId.HasValue ? [ Commit.ParentId.Value ] : [];
