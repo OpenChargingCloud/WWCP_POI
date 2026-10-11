@@ -109,11 +109,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             unchecked
             {
 
-                hashCode = EnergySources.       CalcHashCode() * 11 ^
-                           EnvironmentalImpacts.CalcHashCode() *  7 ^
-                           SupplierName.        GetHashCode()  *  5 ^
-                           ProductName.         GetHashCode()  *  3 ^
-                          (AdditionalRemarks?.  GetHashCode() ?? 0);
+                hashCode = this.EnergySources.       CalcHashCode() * 11 ^
+                           this.EnvironmentalImpacts.CalcHashCode() *  7 ^
+                           this.SupplierName.        GetHashCode()  *  5 ^
+                           this.ProductName.         GetHashCode()  *  3 ^
+                          (this.AdditionalRemarks?.  GetHashCode() ?? 0);
 
             }
 

@@ -133,7 +133,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 hashCode = Id.       GetHashCode() * 7 ^
                            Status.   GetHashCode() * 5 ^
-                           Timestamp.GetHashCode() * 3 ^
+                           Timestamp.ToUnixTimeMilliseconds().GetHashCode() * 3 ^
                           (Context?. GetHashCode() ?? 0);
 
             }
@@ -271,7 +271,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 c = Status.               CompareTo(EVSEAdminStatus.Status);
 
             if (c == 0)
-                c = Timestamp.ToISO8601().CompareTo(EVSEAdminStatus.Timestamp.ToISO8601());
+                c = Timestamp.ToUnixTimeMilliseconds().CompareTo(EVSEAdminStatus.Timestamp.ToUnixTimeMilliseconds());
 
             if (c == 0 && Context is not null && EVSEAdminStatus.Context is not null)
                 c = Context.              CompareTo(EVSEAdminStatus.Context);
@@ -309,7 +309,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Id.                   Equals(EVSEAdminStatus.Id)                    &&
                Status.               Equals(EVSEAdminStatus.Status)                &&
-               Timestamp.ToISO8601().Equals(EVSEAdminStatus.Timestamp.ToISO8601()) &&
+               Timestamp.ToUnixTimeMilliseconds().Equals(EVSEAdminStatus.Timestamp.ToUnixTimeMilliseconds()) &&
 
              ((Context is null     && EVSEAdminStatus.Context is null) ||
               (Context is not null && EVSEAdminStatus.Context is not null && Context.Equals(EVSEAdminStatus.Context)));

@@ -368,7 +368,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 c = Status.   CompareTo(EMobilityProviderStatus.Status);
 
             if (c == 0)
-                c = Timestamp.CompareTo(EMobilityProviderStatus.Timestamp);
+                c = Timestamp.ToUnixTimeMilliseconds().CompareTo(EMobilityProviderStatus.Timestamp.ToUnixTimeMilliseconds());
 
             return c;
 
@@ -406,7 +406,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => EMobilityProviderStatus is not null              &&
                Id.       Equals(EMobilityProviderStatus.Id)     &&
                Status.   Equals(EMobilityProviderStatus.Status) &&
-               Timestamp.Equals(EMobilityProviderStatus.Timestamp);
+               Timestamp.ToUnixTimeMilliseconds().Equals(EMobilityProviderStatus.Timestamp.ToUnixTimeMilliseconds());
 
         #endregion
 
@@ -424,7 +424,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 return Id.       GetHashCode() * 5 ^
                        Status.   GetHashCode() * 3 ^
-                       Timestamp.GetHashCode();
+                       Timestamp.ToUnixTimeMilliseconds().GetHashCode();
 
             }
         }

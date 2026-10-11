@@ -368,7 +368,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 c = AdminStatus.CompareTo(GridOperatorAdminStatus.AdminStatus);
 
             if (c == 0)
-                c = Timestamp.  CompareTo(GridOperatorAdminStatus.Timestamp);
+                c = Timestamp.  ToUnixTimeMilliseconds().CompareTo(GridOperatorAdminStatus.Timestamp.ToUnixTimeMilliseconds());
 
             return c;
 
@@ -406,7 +406,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => GridOperatorAdminStatus is not null                     &&
                Id.         Equals(GridOperatorAdminStatus.Id)          &&
                AdminStatus.Equals(GridOperatorAdminStatus.AdminStatus) &&
-               Timestamp.  Equals(GridOperatorAdminStatus.Timestamp);
+               Timestamp.  ToUnixTimeMilliseconds().Equals(GridOperatorAdminStatus.Timestamp.ToUnixTimeMilliseconds());
 
         #endregion
 
@@ -424,7 +424,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 return Id.         GetHashCode() * 5 ^
                        AdminStatus.GetHashCode() * 3 ^
-                       Timestamp.  GetHashCode();
+                       Timestamp.  ToUnixTimeMilliseconds().GetHashCode();
 
             }
         }

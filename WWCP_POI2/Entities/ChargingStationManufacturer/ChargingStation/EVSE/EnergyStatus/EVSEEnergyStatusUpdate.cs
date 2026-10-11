@@ -52,7 +52,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional data source or context for this EVSE energy information update.
         /// </summary>
-        public String?                   Context          { get; }
+        public Context?                  Context          { get; }
 
         #endregion
 
@@ -68,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public EVSEEnergyStatusUpdate(EVSE_Id                   Id,
                                       Timestamped<EnergyInfo>   NewEnergyInfo,
                                       Timestamped<EnergyInfo>?  OldEnergyInfo   = null,
-                                      String?                   Context         = null)
+                                      Context?                  Context         = null)
 
         {
 

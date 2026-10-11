@@ -39,10 +39,7 @@ internal static class ImmutablePOIValues
             Brand brand => brand,
             EnergyMix mix => mix,
             Timestamped<EnergyMix> mix => new Timestamped<EnergyMix>(mix.Timestamp, Copy(mix.Value)),
-            EnergyMixPrognosis forecast => new EnergyMixPrognosis(
-                forecast.EnergySources.ToImmutableArray(), forecast.EnvironmentalImpacts.ToImmutableArray(),
-                forecast.SupplierName.Clone(), forecast.ProductName.Clone(), forecast.Timestamp.UtcDateTime,
-                forecast.AdditionalRemarks?.Clone()),
+            EnergyMixPrognosis forecast => forecast,
             EnergyMeter meter => meter.Clone(),
             PublicKey key => new PublicKey(key.Value.ToArray(), key.Algorithm, key.Serialization, key.Encoding,
                                            key.CustomData is { } custom ? CustomData.Parse(custom.ToJSON()) : null),

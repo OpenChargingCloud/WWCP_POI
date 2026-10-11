@@ -17,6 +17,8 @@
 
 #region Usings
 
+using System.Diagnostics.CodeAnalysis;
+
 using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -53,11 +55,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var status in EVSEEnergyStatus)
             {
 
-                if (!filteredEnergyInfo.ContainsKey(status.Id))
-                    filteredEnergyInfo.Add(status.Id, status);
-
-                else if (filteredEnergyInfo[status.Id].Timestamp >= status.Timestamp)
+                if (!filteredEnergyInfo.TryGetValue(status.Id, out var known) ||
+                    known.Timestamp < status.Timestamp)
+                {
                     filteredEnergyInfo[status.Id] = status;
+                }
 
             }
 
@@ -69,7 +71,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                    Select(kvp => new JProperty(kvp.Key.ToString(),
                                                                new JArray(kvp.Value.Timestamp.  ToISO8601(),
-                                                                          kvp.Value.EnergyInfo.ToString())
+                                                                          kvp.Value.EnergyInfo.ToJSON(Embedded: true))
                                                               )));
 
         }
@@ -165,7 +167,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 hashCode = Id.        GetHashCode() * 7 ^
                            EnergyInfo.GetHashCode() * 5 ^
-                           Timestamp. GetHashCode() * 3 ^
+                           Timestamp. ToUnixTimeMilliseconds().GetHashCode() * 3 ^
                           (Context?.  GetHashCode() ?? 0);
 
             }
@@ -175,6 +177,133 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
         #endregion
+
+
+        #region Parse/TryParse
+
+        /// <summary>
+        /// Parse the given JSON representation of an EVSE energy status.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="CustomEVSEEnergyStatusParser">An optional delegate to parse custom EVSE energy status JSON objects.</param>
+        public static EVSEEnergyStatus Parse(JObject                                         JSON,
+                                             CustomJObjectParserDelegate<EVSEEnergyStatus>?  CustomEVSEEnergyStatusParser   = null)
+        {
+
+            if (TryParse(JSON, out var evseEnergyStatus, out var errorResponse, CustomEVSEEnergyStatusParser))
+                return evseEnergyStatus;
+
+            throw new ArgumentException("The given JSON representation of an EVSE energy status is invalid: " + errorResponse,
+                                        nameof(JSON));
+
+        }
+
+        /// <summary>
+        /// Try to parse the given JSON representation of an EVSE energy status.
+        /// The context is internal data and is not part of the JSON representation.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="EVSEEnergyStatus">The parsed EVSE energy status.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="CustomEVSEEnergyStatusParser">An optional delegate to parse custom EVSE energy status JSON objects.</param>
+        public static Boolean TryParse(JObject                                         JSON,
+                                       out EVSEEnergyStatus                            EVSEEnergyStatus,
+                                       [NotNullWhen(false)] out String?                ErrorResponse,
+                                       CustomJObjectParserDelegate<EVSEEnergyStatus>?  CustomEVSEEnergyStatusParser   = null)
+        {
+
+            EVSEEnergyStatus  = default;
+            ErrorResponse     = null;
+
+            try
+            {
+
+                if (JSON?.HasValues != true)
+                {
+                    ErrorResponse = "The given JSON object must not be null or empty!";
+                    return false;
+                }
+
+                #region Parse Id            [mandatory]
+
+                if (!JSON.ParseMandatory("id",
+                                         "EVSE identification",
+                                         EVSE_Id.TryParse,
+                                         out EVSE_Id id,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse EnergyInfo    [mandatory]
+
+                if (!JSON.ParseMandatoryJSON("energyInfo",
+                                             "energy information",
+                                             (JObject json, out EnergyInfo value, out String? error) => POI.EnergyInfo.TryParse(json, out value, out error),
+                                             out EnergyInfo energyInfo,
+                                             out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse Timestamp     [mandatory]
+
+                if (!JSON.ParseMandatory("timestamp",
+                                         "timestamp",
+                                         out DateTimeOffset timestamp,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+
+                EVSEEnergyStatus = new EVSEEnergyStatus(
+                                       id,
+                                       energyInfo,
+                                       timestamp
+                                   );
+
+
+                if (CustomEVSEEnergyStatusParser is not null)
+                    EVSEEnergyStatus = CustomEVSEEnergyStatusParser(JSON,
+                                                                    EVSEEnergyStatus);
+
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                EVSEEnergyStatus  = default;
+                ErrorResponse     = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region ToJSON()
+
+        /// <summary>
+        /// Return a JSON representation of this object.
+        /// The timestamp is written in UTC with millisecond precision.
+        /// </summary>
+        public JObject ToJSON()
+
+            => JSONObject.Create(
+                   new JProperty("id",           Id.        ToString()),
+                   new JProperty("energyInfo",   EnergyInfo.ToJSON(Embedded: true)),
+                   new JProperty("timestamp",    Timestamp. ToISO8601())
+               );
+
+        #endregion
+
 
 
         #region Operator overloading
@@ -297,16 +426,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Int32 CompareTo(EVSEEnergyStatus EVSEEnergyStatus)
         {
 
-            var c = Id.                   CompareTo(EVSEEnergyStatus.Id);
+            var c = Id.        CompareTo(EVSEEnergyStatus.Id);
 
             if (c == 0)
-                c = EnergyInfo.           CompareTo(EVSEEnergyStatus.EnergyInfo);
+                c = EnergyInfo.CompareTo(EVSEEnergyStatus.EnergyInfo);
 
             if (c == 0)
-                c = Timestamp.ToISO8601().CompareTo(EVSEEnergyStatus.Timestamp.ToISO8601());
+                c = Timestamp. ToUnixTimeMilliseconds().CompareTo(EVSEEnergyStatus.Timestamp.ToUnixTimeMilliseconds());
 
             if (c == 0 && Context is not null && EVSEEnergyStatus.Context is not null)
-                c = Context.              CompareTo(EVSEEnergyStatus.Context);
+                c = Context.   CompareTo(EVSEEnergyStatus.Context);
 
             return c;
 
@@ -339,9 +468,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EVSEEnergyStatus">An EVSE energy status to compare with.</param>
         public Boolean Equals(EVSEEnergyStatus EVSEEnergyStatus)
 
-            => Id.                   Equals(EVSEEnergyStatus.Id)                    &&
-               EnergyInfo.           Equals(EVSEEnergyStatus.EnergyInfo)            &&
-               Timestamp.ToISO8601().Equals(EVSEEnergyStatus.Timestamp.ToISO8601()) &&
+            => Id.        Equals(EVSEEnergyStatus.Id)         &&
+               EnergyInfo.Equals(EVSEEnergyStatus.EnergyInfo) &&
+               Timestamp. ToUnixTimeMilliseconds().Equals(EVSEEnergyStatus.Timestamp.ToUnixTimeMilliseconds())  &&
 
              ((Context is null     && EVSEEnergyStatus.Context is null) ||
               (Context is not null && EVSEEnergyStatus.Context is not null && Context.Equals(EVSEEnergyStatus.Context)));

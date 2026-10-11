@@ -368,7 +368,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 c = AdminStatus.CompareTo(EnergyMeterAdminStatus.AdminStatus);
 
             if (c == 0)
-                c = Timestamp.  CompareTo(EnergyMeterAdminStatus.Timestamp);
+                c = Timestamp.  ToUnixTimeMilliseconds().CompareTo(EnergyMeterAdminStatus.Timestamp.ToUnixTimeMilliseconds());
 
             return c;
 
@@ -406,7 +406,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => EnergyMeterAdminStatus is not null                     &&
                Id.         Equals(EnergyMeterAdminStatus.Id)          &&
                AdminStatus.Equals(EnergyMeterAdminStatus.AdminStatus) &&
-               Timestamp.  Equals(EnergyMeterAdminStatus.Timestamp);
+               Timestamp.  ToUnixTimeMilliseconds().Equals(EnergyMeterAdminStatus.Timestamp.ToUnixTimeMilliseconds());
 
         #endregion
 
@@ -424,7 +424,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 return Id.         GetHashCode() * 5 ^
                        AdminStatus.GetHashCode() * 3 ^
-                       Timestamp.  GetHashCode();
+                       Timestamp.  ToUnixTimeMilliseconds().GetHashCode();
 
             }
         }

@@ -17,6 +17,9 @@
 
 #region Usings
 
+using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
+
 using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -27,9 +30,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// An energy mix prognosis.
+    /// An energy mix prognosis: the expected composition of an energy product
+    /// over consecutive periods, for information only.
     /// </summary>
-    public class EnergyMixPrognosis : IEquatable<EnergyMixPrognosis>
+    public sealed class EnergyMixPrognosis : IEquatable<EnergyMixPrognosis>
     {
 
         #region Data
@@ -44,34 +48,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
-        /// The timestamp of this energy mix prognosis.
+        /// When this prognosis was issued.
         /// </summary>
-        public DateTimeOffset                                                  Timestamp               { get; }
-
-        /// <summary>
-        /// The timestamped energy sources.
-        /// </summary>
-        public IEnumerable<Timestamped<PercentageOf<EnergySourceCategory>>>  EnergySources           { get; }
-
-        /// <summary>
-        /// The timestamped environmental impacts.
-        /// </summary>
-        public IEnumerable<Timestamped<PercentageOf<EnvironmentalImpact>>>    EnvironmentalImpacts    { get; }
+        public DateTimeOffset                         Timestamp            { get; }
 
         /// <summary>
         /// The name or brand of the energy supplier.
         /// </summary>
-        public I18NString                                                      SupplierName            { get; }
+        public ImmutableI18NString                    SupplierName         { get; }
 
         /// <summary>
         /// The name or brand of the energy product.
         /// </summary>
-        public I18NString                                                      ProductName             { get; }
+        public ImmutableI18NString                    ProductName          { get; }
+
+        /// <summary>
+        /// The periods of this prognosis, ordered by their start and without overlaps.
+        /// </summary>
+        public IEnumerable<EnergyMixPrognosisPeriod>  Periods              { get; }
 
         /// <summary>
         /// Optional additional remarks.
         /// </summary>
-        public I18NString?                                                     AdditionalRemarks       { get; }
+        public ImmutableI18NString?                   AdditionalRemarks    { get; }
 
         #endregion
 
@@ -80,46 +79,247 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Create a new energy mix prognosis.
         /// </summary>
-        /// <param name="EnergySources">The timestamped energy sources.</param>
-        /// <param name="EnvironmentalImpacts">The timestamped environmental impacts.</param>
+        /// <param name="Timestamp">When this prognosis was issued.</param>
         /// <param name="SupplierName">The name or brand of the energy supplier.</param>
         /// <param name="ProductName">The name or brand of the energy product.</param>
-        /// <param name="Timestamp">The timestamp of this energy mix prognosis.</param>
+        /// <param name="Periods">The periods of this prognosis, ordered by their start and without overlaps.</param>
         /// <param name="AdditionalRemarks">Optional additional remarks.</param>
-        public EnergyMixPrognosis(IEnumerable<Timestamped<PercentageOf<EnergySourceCategory>>>  EnergySources,
-                                  IEnumerable<Timestamped<PercentageOf<EnvironmentalImpact>>>    EnvironmentalImpacts,
-                                  I18NString                                                      SupplierName,
-                                  I18NString                                                      ProductName,
-                                  DateTimeOffset?                                                 Timestamp           = null,
-                                  I18NString?                                                     AdditionalRemarks   = null)
+        public EnergyMixPrognosis(DateTimeOffset                         Timestamp,
+                                  ImmutableI18NString                    SupplierName,
+                                  ImmutableI18NString                    ProductName,
+                                  IEnumerable<EnergyMixPrognosisPeriod>  Periods,
+                                  ImmutableI18NString?                   AdditionalRemarks   = null)
         {
 
-            if (!EnergySources.Any())
-                throw new ArgumentException("The given energy sources must not be empty!",
-                                            nameof(EnergySources));
+            var periods = (Periods ?? []).ToImmutableArray();
 
-            if (!EnvironmentalImpacts.Any())
-                throw new ArgumentException("The given environmental impacts must not be empty!",
-                                            nameof(EnergySources));
+            if (periods.Any(period => period is null))
+                throw new ArgumentException("A period of an energy mix prognosis must not be null!", nameof(Periods));
 
-            this.EnergySources         = EnergySources;
-            this.EnvironmentalImpacts  = EnvironmentalImpacts;
-            this.SupplierName          = SupplierName;
-            this.ProductName           = ProductName;
-            this.Timestamp             = Timestamp ?? org.GraphDefined.Vanaheimr.Illias.Timestamp.Now;
-            this.AdditionalRemarks     = AdditionalRemarks;
+            for (var index = 1; index < periods.Length; index++)
+            {
+
+                var previous = periods[index - 1];
+
+                if (periods[index].Start <= previous.Start)
+                    throw new ArgumentException($"periods[{index}]: the periods must be ordered by their start!", nameof(Periods));
+
+                if (previous.End.HasValue && previous.End.Value > periods[index].Start)
+                    throw new ArgumentException($"periods[{index - 1}]: the period must end before the next one starts!", nameof(Periods));
+
+            }
+
+            this.Timestamp          = Timestamp;
+            this.SupplierName       = SupplierName ?? throw new ArgumentNullException(nameof(SupplierName));
+            this.ProductName        = ProductName  ?? throw new ArgumentNullException(nameof(ProductName));
+            this.Periods            = periods;
+            this.AdditionalRemarks  = AdditionalRemarks;
+
+            unchecked
+            {
+
+                hashCode = this.Timestamp.         GetHashCode()  * 11 ^
+                           this.SupplierName.      GetHashCode()  *  7 ^
+                           this.ProductName.       GetHashCode()  *  5 ^
+                           this.Periods.           CalcHashCode() *  3 ^
+                          (this.AdditionalRemarks?.GetHashCode() ?? 0);
+
+            }
 
         }
 
         #endregion
 
 
-        #region ToJSON(Embedded = false, ...)
+        #region (static) Parse   (JSON, CustomEnergyMixPrognosisParser = null)
+
+        /// <summary>
+        /// Parse the given JSON representation of an energy mix prognosis.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="CustomEnergyMixPrognosisParser">An optional delegate to parse custom energy mix prognosis JSON objects.</param>
+        public static EnergyMixPrognosis Parse(JObject                                           JSON,
+                                               CustomJObjectParserDelegate<EnergyMixPrognosis>?  CustomEnergyMixPrognosisParser   = null)
+        {
+
+            if (TryParse(JSON,
+                         out var energyMixPrognosis,
+                         out var errorResponse,
+                         CustomEnergyMixPrognosisParser))
+            {
+                return energyMixPrognosis;
+            }
+
+            throw new ArgumentException("The given JSON representation of an energy mix prognosis is invalid: " + errorResponse,
+                                        nameof(JSON));
+
+        }
+
+        #endregion
+
+        #region (static) TryParse(JSON, out EnergyMixPrognosis, out ErrorResponse, CustomEnergyMixPrognosisParser = null)
+
+        /// <summary>
+        /// Try to parse the given JSON representation of an energy mix prognosis.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="EnergyMixPrognosis">The parsed energy mix prognosis.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="CustomEnergyMixPrognosisParser">An optional delegate to parse custom energy mix prognosis JSON objects.</param>
+        public static Boolean TryParse(JObject                                           JSON,
+                                       [NotNullWhen(true)]  out EnergyMixPrognosis?      EnergyMixPrognosis,
+                                       [NotNullWhen(false)] out String?                  ErrorResponse,
+                                       CustomJObjectParserDelegate<EnergyMixPrognosis>?  CustomEnergyMixPrognosisParser   = null)
+        {
+
+            EnergyMixPrognosis  = null;
+            ErrorResponse       = null;
+
+            try
+            {
+
+                if (JSON?.HasValues != true)
+                {
+                    ErrorResponse = "The given JSON object must not be null or empty!";
+                    return false;
+                }
+
+                #region Parse Timestamp               [mandatory]
+
+                if (!JSON.ParseMandatory("timestamp",
+                                         "timestamp",
+                                         out DateTimeOffset timestamp,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse SupplierName            [mandatory]
+
+                if (!JSON.ParseMandatory("supplierName",
+                                         "supplier name",
+                                         out I18NString supplierName,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse ProductName             [mandatory]
+
+                if (!JSON.ParseMandatory("productName",
+                                         "product name",
+                                         out I18NString productName,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse Periods                 [mandatory]
+
+                if (JSON["periods"] is not JArray periodsJSON)
+                {
+                    ErrorResponse = "The 'periods' property must be an array!";
+                    return false;
+                }
+
+                var periods = new List<EnergyMixPrognosisPeriod>();
+
+                for (var index = 0; index < periodsJSON.Count; index++)
+                {
+
+                    if (periodsJSON[index] is not JObject periodJSON)
+                    {
+                        ErrorResponse = $"periods[{index}]: expected an object!";
+                        return false;
+                    }
+
+                    if (!EnergyMixPrognosisPeriod.TryParse(periodJSON,
+                                                           out var period,
+                                                           out var periodError))
+                    {
+                        ErrorResponse = $"periods[{index}]: {periodError}";
+                        return false;
+                    }
+
+                    if (periods.Count > 0)
+                    {
+
+                        var previous = periods[^1];
+
+                        if (period.Start <= previous.Start)
+                        {
+                            ErrorResponse = $"periods[{index}].start: the periods must be ordered by their start!";
+                            return false;
+                        }
+
+                        if (previous.End.HasValue && previous.End.Value > period.Start)
+                        {
+                            ErrorResponse = $"periods[{index - 1}].end: the period must end before the next one starts!";
+                            return false;
+                        }
+
+                    }
+
+                    periods.Add(period);
+
+                }
+
+                #endregion
+
+                #region Parse AdditionalRemarks       [optional]
+
+                if (JSON.ParseOptional("additionalRemarks",
+                                       "additional remarks",
+                                       I18NString.TryParse,
+                                       out I18NString? additionalRemarks,
+                                       out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+
+                EnergyMixPrognosis = new EnergyMixPrognosis(
+                                         timestamp,
+                                         supplierName,
+                                         productName,
+                                         periods,
+                                         additionalRemarks
+                                     );
+
+                if (CustomEnergyMixPrognosisParser is not null)
+                    EnergyMixPrognosis = CustomEnergyMixPrognosisParser(JSON,
+                                                                        EnergyMixPrognosis);
+
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                EnergyMixPrognosis  = null;
+                ErrorResponse       = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region ToJSON(Embedded = false, CustomEnergyMixPrognosisSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this object.
+        /// The timestamp is written in UTC with millisecond precision.
         /// </summary>
-        /// <param name="Embedded">Whether this data is embedded into another data structure, e.g. into a charging station.</param>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="CustomEnergyMixPrognosisSerializer">A delegate to serialize custom energy mix prognosis JSON objects.</param>
         public JObject ToJSON(Boolean                                               Embedded                             = false,
                               CustomJObjectSerializerDelegate<EnergyMixPrognosis>?  CustomEnergyMixPrognosisSerializer   = null)
@@ -131,23 +331,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                ? new JProperty("@context",            JSONLDContext)
                                : null,
 
-                           new JProperty("energySources",         new JArray(
-                               EnergySources.       Select(energysource        => new JObject(
-                                                                                      new JProperty("timestamp",   energysource.       Timestamp.  ToISO8601()),
-                                                                                      new JProperty("category",    energysource.       Value.Value.ToString()),
-                                                                                      new JProperty("percentage",  StrictJSON.Percent(energysource.Value.Percent))
-                                                                                  ))),
-
-                           new JProperty("environmentalImpacts",  new JArray(
-                               EnvironmentalImpacts.Select(environmentalImpact => new JObject(
-                                                                                      new JProperty("timestamp",   environmentalImpact.Timestamp.  ToISO8601()),
-                                                                                      new JProperty("impact",      environmentalImpact.Value.Value.ToString()),
-                                                                                      new JProperty("percentage",  StrictJSON.Percent(environmentalImpact.Value.Percent))
-                                                                                  )))
-                           )),
-
-                           new JProperty("supplierName",              SupplierName.ToJSON()),
-                           new JProperty("productName",               ProductName. ToJSON()),
+                                 new JProperty("timestamp",           Timestamp.   ToISO8601()),
+                                 new JProperty("supplierName",        SupplierName.ToJSON()),
+                                 new JProperty("productName",         ProductName. ToJSON()),
+                                 new JProperty("periods",             new JArray(Periods.Select(period => period.ToJSON()))),
 
                            AdditionalRemarks is not null
                                ? new JProperty("additionalRemarks",   AdditionalRemarks.ToJSON())
@@ -179,7 +366,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Equals(energyMixPrognosis)
+        #region Equals(EnergyMixPrognosis)
 
         /// <summary>
         /// Compares two energy mix prognoses for equality.
@@ -189,15 +376,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => EnergyMixPrognosis is not null &&
 
-               Timestamp.                   Equals(EnergyMixPrognosis.Timestamp)    &&
-               SupplierName.                Equals(EnergyMixPrognosis.SupplierName) &&
-               ProductName.                 Equals(EnergyMixPrognosis.ProductName)  &&
-
-               EnergySources.       Count().Equals(EnergyMixPrognosis.EnergySources.       Count()) &&
-               EnvironmentalImpacts.Count().Equals(EnergyMixPrognosis.EnvironmentalImpacts.Count()) &&
-
-               EnergySources.       All(energySource        => EnergyMixPrognosis.EnergySources.       Contains(energySource))        &&
-               EnvironmentalImpacts.All(environmentalImpact => EnergyMixPrognosis.EnvironmentalImpacts.Contains(environmentalImpact)) &&
+               Timestamp.   Equals       (EnergyMixPrognosis.Timestamp)    &&
+               SupplierName.Equals       (EnergyMixPrognosis.SupplierName) &&
+               ProductName. Equals       (EnergyMixPrognosis.ProductName)  &&
+               Periods.     SequenceEqual(EnergyMixPrognosis.Periods)      &&
 
                ((AdditionalRemarks is null     && EnergyMixPrognosis.AdditionalRemarks is null) ||
                 (AdditionalRemarks is not null && EnergyMixPrognosis.AdditionalRemarks is not null && AdditionalRemarks.Equals(EnergyMixPrognosis.AdditionalRemarks)));
@@ -208,22 +390,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region (override) GetHashCode()
 
+        private readonly Int32 hashCode;
+
         /// <summary>
         /// Return the hash code of this object.
         /// </summary>
         public override Int32 GetHashCode()
-        {
-            unchecked
-            {
-
-                // ToDo: Add EnergySources & EnvironmentalImpacts
-                return Timestamp.          GetHashCode() * 7 ^
-                       SupplierName.       GetHashCode() * 5 ^
-                       ProductName.        GetHashCode() * 3 ^
-                       (AdditionalRemarks?.GetHashCode() ?? 0);
-
-            }
-        }
+            => hashCode;
 
         #endregion
 
@@ -234,7 +407,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => String.Concat("'", ProductName.FirstText(), "' from '", SupplierName.FirstText(), "' @ ", Timestamp.ToISO8601());
+            => String.Concat("'", ProductName.FirstText(), "' from '", SupplierName.FirstText(), "', ",
+                             Periods.Count(), " period(s), issued ", Timestamp.ToISO8601());
 
         #endregion
 
