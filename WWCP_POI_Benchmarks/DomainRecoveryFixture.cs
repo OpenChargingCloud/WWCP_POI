@@ -244,9 +244,9 @@ internal sealed class DomainRecoveryFixture : IDisposable
     {
         CheckGraph(restored.Head.Network);
         Require(Describe(restored) == Inventory, "Domain or branch inventory changed.");
-        Require(restored.Head.Network.GridOperators.Single(value => value.Id.ToString() == "DE*GRD").Status.Value != GridOperatorStatusTypes.Offline,
+        Require(restored.Head.Network.GridOperators.Single(value => value.Id.ToString() == "DE*GRD").Status.Value != GridOperatorStatusType.Offline,
             "Local grid status leaked into recovery.");
-        Require(restored.Head.Network.ParkingOperators.Single().Status.Value != ParkingOperatorStatusTypes.Offline, "Local parking status leaked into recovery.");
+        Require(restored.Head.Network.ParkingOperators.Single().Status.Value != ParkingOperatorStatusType.Offline, "Local parking status leaked into recovery.");
         Require(restored.Head.Network.ChargingPools.First(pool => pool.Id.ToString() == "DE*ABC*P1").EnergyMeters[0].Status.Value.ToString() != "error", "Local meter status leaked into recovery.");
         Require(!ReferenceEquals(restored.Head.Network.GridOperators.First(), History.Head.Network.GridOperators.First()), "Independent runtime shared a grid object.");
     }

@@ -29,8 +29,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// A parking sensor.
     /// </summary>
     public sealed partial class ParkingSensor : AImmutableEMobilityEntity<ParkingSensor_Id,
-                                                  ParkingSensorAdminStatusTypes,
-                                                  ParkingSensorStatusTypes>,
+                                                  ParkingSensorAdminStatusType,
+                                                  ParkingSensorStatusType>,
                                  IEquatable<ParkingSensor>, IComparable<ParkingSensor>, IComparable
     {
 
@@ -134,7 +134,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ParkingSensor(ParkingSensor_Id Id, I18NString? Name = null, I18NString? Description = null,
                               String? OSM_WayId = null, IEnumerable<GeoCoordinate>? Geometry = null,
                               IEnumerable<ChargingStation>? ChargingStations = null)
-            : base(Id, Name ?? I18NString.Create(Id.ToString()), Description)
+            : base(Id,
+                   Name ?? I18NString.Create(Id.ToString()),
+                   Description,
+                   // Without a known status, the status is unspecified since the beginning of time.
+                   new Timestamped<ParkingSensorAdminStatusType>(default, ParkingSensorAdminStatusType.Unspecified),
+                   new Timestamped<ParkingSensorStatusType>     (default, ParkingSensorStatusType.Unspecified))
         {
             this._OSM_WayId = OSM_WayId;
             this._Geometry = ImmutablePOIValues.CopyItems(Geometry);

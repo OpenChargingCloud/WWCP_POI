@@ -217,27 +217,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                TransparencyJSON.OnlyProperties(JSON, "@id", "issuer", "chargingStationModel", "chargingStationModelVersion",
+                StrictJSON.OnlyProperties(JSON, "@id", "issuer", "chargingStationModel", "chargingStationModelVersion",
                                                       "chargingStationManufacturerId", "documentNumber", "documentURL",
                                                       "verifiedTransparencySoftwareIds", "compatibleTransparencySoftwareIds",
                                                       "notBefore", "notAfter");
 
                 Certificate = new TransparencySoftwareCertificate(
-                                  Id:                                 TransparencySoftwareCertificate_Id.Parse(TransparencyJSON.RequiredText(JSON, "@id")),
-                                  Issuer:                             TransparencyJSON.RequiredText(JSON, "issuer"),
-                                  ChargingStationModel:               TransparencyJSON.RequiredText(JSON, "chargingStationModel"),
-                                  ChargingStationModelVersion:        TransparencyJSON.RequiredText(JSON, "chargingStationModelVersion"),
-                                  VerifiedTransparencySoftwareIds:    TransparencyJSON.Array(JSON, "verifiedTransparencySoftwareIds",
-                                                                                             token => TransparencySoftware_Id.Parse(TransparencyJSON.Identifier(token))),
-                                  CompatibleTransparencySoftwareIds:  TransparencyJSON.Array(JSON, "compatibleTransparencySoftwareIds",
-                                                                                             token => TransparencySoftware_Id.Parse(TransparencyJSON.Identifier(token))),
-                                  ChargingStationManufacturerId:      TransparencyJSON.Text(JSON, "chargingStationManufacturerId") is { } manufacturerId
+                                  Id:                                 TransparencySoftwareCertificate_Id.Parse(StrictJSON.RequiredText(JSON, "@id")),
+                                  Issuer:                             StrictJSON.RequiredText(JSON, "issuer"),
+                                  ChargingStationModel:               StrictJSON.RequiredText(JSON, "chargingStationModel"),
+                                  ChargingStationModelVersion:        StrictJSON.RequiredText(JSON, "chargingStationModelVersion"),
+                                  VerifiedTransparencySoftwareIds:    StrictJSON.Array(JSON, "verifiedTransparencySoftwareIds",
+                                                                                             token => TransparencySoftware_Id.Parse(StrictJSON.Identifier(token))),
+                                  CompatibleTransparencySoftwareIds:  StrictJSON.Array(JSON, "compatibleTransparencySoftwareIds",
+                                                                                             token => TransparencySoftware_Id.Parse(StrictJSON.Identifier(token))),
+                                  ChargingStationManufacturerId:      StrictJSON.Text(JSON, "chargingStationManufacturerId") is { } manufacturerId
                                                                           ? ChargingStationManufacturer_Id.Parse(manufacturerId)
                                                                           : null,
-                                  DocumentNumber:                     TransparencyJSON.Text(JSON, "documentNumber"),
-                                  DocumentURL:                        TransparencyJSON.Link(JSON, "documentURL"),
-                                  NotBefore:                          TransparencyJSON.Date(JSON, "notBefore"),
-                                  NotAfter:                           TransparencyJSON.Date(JSON, "notAfter")
+                                  DocumentNumber:                     StrictJSON.Text(JSON, "documentNumber"),
+                                  DocumentURL:                        StrictJSON.Link(JSON, "documentURL"),
+                                  NotBefore:                          StrictJSON.Date(JSON, "notBefore"),
+                                  NotAfter:                           StrictJSON.Date(JSON, "notAfter")
                               );
 
                 return true;

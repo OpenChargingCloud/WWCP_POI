@@ -32,7 +32,6 @@ internal static class POIJSON
             GridConnectionPoint entity => GridPoint(entity),
             ChargingStationManufacturer entity => entity.ToJSON(),
             Brand entity => entity.ToJSON(ExpandDataLicenses: InfoStatus.Expanded),
-            EnergyMix entity => entity.ToJSON(),
             ChargingProduct entity => entity.ToJSON(),
             ChargingTariffRestriction entity => entity.ToJSON(),
             ChargingTariffElement entity => entity.ToJSON(),

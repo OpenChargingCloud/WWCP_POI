@@ -17,7 +17,6 @@
 
 #region Usings
 
-using System;
 using System.Text.RegularExpressions;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -28,21 +27,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// The unique identification of an Electric Vehicle Service Provider (EVSP Id).
+    /// Extension methods for grid operator identifications.
     /// </summary>
-    public sealed class GridOperator_Id : IId,
-                                        IEquatable <GridOperator_Id>,
-                                        IComparable<GridOperator_Id>
+    public static class GridOperatorIdExtensions
+    {
 
+    }
+
+
+    /// <summary>
+    /// The unique identification of a grid operator.
+    /// </summary>
+    public readonly struct GridOperator_Id : IId<GridOperator_Id>
     {
 
         #region Data
 
         /// <summary>
-        /// The regular expression for parsing a grid operator identification:
-        /// the ISO 15118 form "DE*ABC" or "DEABC"; the obsolete DIN "+49*822" is no POI identification.
+        /// The regular expression for parsing a grid operator identification.
         /// </summary>
-        public static readonly Regex  OperatorId_RegEx  = new (@"^([A-Z]{2})\*?([A-Z0-9]{3})$");
+        public static readonly Regex  GridOperatorId_RegEx = new (@"^([A-Z]{2})\*?([A-Z0-9]{3})$");
 
         #endregion
 
@@ -61,19 +65,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Indicates whether this identification is null or empty.
         /// </summary>
-        public Boolean IsNullOrEmpty
+        public Boolean  IsNullOrEmpty
             => Suffix.IsNullOrEmpty();
 
         /// <summary>
         /// Indicates whether this identification is NOT null or empty.
         /// </summary>
-        public Boolean IsNotNullOrEmpty
+        public Boolean  IsNotNullOrEmpty
             => Suffix.IsNotNullOrEmpty();
 
         /// <summary>
         /// Returns the length of the identification.
         /// </summary>
-        public UInt64 Length
+        public UInt64   Length
+
             => (UInt64) (CountryCode.Alpha2Code.Length + 1 + Suffix.Length);
 
         #endregion
@@ -86,15 +91,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="CountryCode">The country code.</param>
         /// <param name="Suffix">The suffix of the grid operator identification.</param>
         private GridOperator_Id(Country  CountryCode,
-                                String   Suffix)
+                                           String   Suffix)
         {
-
-            #region Initial checks
-
-            if (Suffix.IsNullOrEmpty())
-                throw new ArgumentNullException(nameof(Suffix),  "The grid operator identification suffix must not be null or empty!");
-
-            #endregion
 
             this.CountryCode  = CountryCode;
             this.Suffix       = Suffix;
@@ -104,7 +102,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region Parse(Text)
+        #region (static) Parse    (Text)
 
         /// <summary>
         /// Parse the given text representation of a grid operator identification.
@@ -113,85 +111,144 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static GridOperator_Id Parse(String Text)
         {
 
-            #region Initial checks
+            if (TryParse(Text, out var gridOperatorId))
+                return gridOperatorId;
 
-            if (Text.IsNullOrEmpty())
-                throw new ArgumentNullException(nameof(Text), "The given text representation of a grid operator identification must not be null or empty!");
-
-            #endregion
-
-            var MatchCollection = OperatorId_RegEx.Matches(Text.ToUpperInvariant());
-
-            if (MatchCollection.Count != 1)
-                throw new ArgumentException($"Illegal text representation of a grid operator identification: '{Text}'!",
-                                            nameof(Text));
-
-            if (Country.TryParseAlpha2Code(MatchCollection[0].Groups[1].Value, out var countryCode))
-                return new GridOperator_Id(countryCode,
-                                           MatchCollection[0].Groups[2].Value);
-
-            throw new ArgumentException($"Unknown country code in the grid operator identification: '{Text}'!",
+            throw new ArgumentException($"Invalid text representation of a grid operator identification: '{Text}'!",
                                         nameof(Text));
 
         }
 
         #endregion
 
-        #region Parse(CountryCode, Suffix)
+        #region (static) Parse    (CountryCode, Suffix)
 
         /// <summary>
-        /// Parse the given string as a grid operator identification.
+        /// Parse the given string as an grid operator identification.
         /// </summary>
         /// <param name="CountryCode">A country code.</param>
-        /// <param name="Suffix">The suffix of a grid operator identification.</param>
+        /// <param name="Suffix">The suffix of an grid operator identification.</param>
         public static GridOperator_Id Parse(Country  CountryCode,
-                                            String   Suffix)
+                                                       String   Suffix)
+
+            => Parse(
+                   String.Concat(
+                       CountryCode.Alpha2Code,
+                       "*",
+                       Suffix.Trim()
+                   )
+               );
+
+        #endregion
+
+        #region (static) TryParse (Text)
+
+        /// <summary>
+        /// Try to parse the given text representation of a grid operator identification.
+        /// </summary>
+        /// <param name="Text">A text representation of a grid operator identification.</param>
+        public static GridOperator_Id? TryParse(String Text)
         {
 
-            #region Initial checks
+            if (TryParse(Text, out var gridOperatorId))
+                return gridOperatorId;
 
-            if (CountryCode is null)
-                throw new ArgumentNullException(nameof(CountryCode),  "The given country must not be null!");
-
-            if (Suffix.IsNullOrEmpty())
-                throw new ArgumentNullException(nameof(Suffix),       "The given grid operator identification suffix must not be null or empty!");
-
-            #endregion
-
-            return Parse(CountryCode.Alpha2Code + "*" + Suffix);
+            return null;
 
         }
 
         #endregion
 
-        #region TryParse(Text, out GridOperatorId)
+        #region (static) TryParse (CountryCode, Suffix)
+
+        /// <summary>
+        /// Try to parse the given text representation of a grid operator identification.
+        /// </summary>
+        /// <param name="CountryCode">A country code.</param>
+        /// <param name="Suffix">The suffix of an grid operator identification.</param>
+        public static GridOperator_Id? TryParse(Country  CountryCode,
+                                                           String   Suffix)
+
+            => TryParse(String.Concat(CountryCode.Alpha2Code, "*", Suffix.Trim()));
+
+        #endregion
+
+        #region (static) TryParse (Text,                out GridOperatorId)
 
         /// <summary>
         /// Try to parse the given text representation of a grid operator identification.
         /// </summary>
         /// <param name="Text">A text representation of a grid operator identification.</param>
         /// <param name="GridOperatorId">The parsed grid operator identification.</param>
-        public static Boolean TryParse(String               Text,
+        public static Boolean TryParse(String                          Text,
                                        out GridOperator_Id  GridOperatorId)
         {
 
-            GridOperatorId = default!;
+            #region Initial checks
+
+            GridOperatorId = default;
+
+            if (Text is null)
+                return false;
+
+            Text = Text.Trim();
 
             if (Text.IsNullOrEmpty())
                 return false;
 
-            var MatchCollection = OperatorId_RegEx.Matches(Text.ToUpperInvariant());
+            #endregion
 
-            if (MatchCollection.Count != 1 ||
-                !Country.TryParseAlpha2Code(MatchCollection[0].Groups[1].Value, out var countryCode))
+            try
+            {
+
+                var matchCollection = GridOperatorId_RegEx.Matches(Text.ToUpperInvariant());
+
+                if (matchCollection.Count != 1)
+                    return false;
+
+                if (Country.TryParseAlpha2Code(matchCollection[0].Groups[1].Value, out var countryCode))
+                {
+
+                    GridOperatorId = new (countryCode,
+                                                     matchCollection[0].Groups[2].Value);
+
+                    return true;
+
+                }
+
                 return false;
 
-            GridOperatorId = new GridOperator_Id(countryCode,
-                                                 MatchCollection[0].Groups[2].Value);
+            }
 
-            return true;
+            catch
+            { }
+
+            return false;
 
         }
+
+        #endregion
+
+        #region (static) TryParse (CountryCode, Suffix, out GridOperatorId)
+
+        /// <summary>
+        /// Try to parse the given text representation of a grid operator identification.
+        /// </summary>
+        /// <param name="CountryCode">A country code.</param>
+        /// <param name="Suffix">The suffix of an grid operator identification.</param>
+        /// <param name="GridOperatorId">The parsed grid operator identification.</param>
+        public static Boolean TryParse(Country                         CountryCode,
+                                       String                          Suffix,
+                                       out GridOperator_Id  GridOperatorId)
+
+            => TryParse(
+                   String.Concat(
+                       CountryCode.Alpha2Code,
+                       "*",
+                       Suffix.Trim()
+                   ),
+                   out GridOperatorId
+               );
 
         #endregion
 
@@ -212,165 +269,132 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Operator overloading
 
-        #region Operator == (ChargingStationOperatorId1, ChargingStationOperatorId2)
+        #region Operator == (GridOperatorId1, GridOperatorId2)
 
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="ChargingStationOperatorId1">A charging station operator identification.</param>
-        /// <param name="ChargingStationOperatorId2">Another charging station operator identification.</param>
+        /// <param name="GridOperatorId1">A grid operator identification.</param>
+        /// <param name="GridOperatorId2">Another grid operator identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator == (GridOperator_Id ChargingStationOperatorId1, GridOperator_Id ChargingStationOperatorId2)
-        {
+        public static Boolean operator == (GridOperator_Id GridOperatorId1,
+                                           GridOperator_Id GridOperatorId2)
 
-            // If both are null, or both are same instance, return true.
-            if (ReferenceEquals(ChargingStationOperatorId1, ChargingStationOperatorId2))
-                return true;
-
-            // If one is null, but not both, return false.
-            if (((Object) ChargingStationOperatorId1 is null) || ((Object) ChargingStationOperatorId2 is null))
-                return false;
-
-            return ChargingStationOperatorId1.Equals(ChargingStationOperatorId2);
-
-        }
+            => GridOperatorId1.Equals(GridOperatorId2);
 
         #endregion
 
-        #region Operator != (ChargingStationOperatorId1, ChargingStationOperatorId2)
+        #region Operator != (GridOperatorId1, GridOperatorId2)
 
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="ChargingStationOperatorId1">A charging station operator identification.</param>
-        /// <param name="ChargingStationOperatorId2">Another charging station operator identification.</param>
+        /// <param name="GridOperatorId1">A grid operator identification.</param>
+        /// <param name="GridOperatorId2">Another grid operator identification.</param>
         /// <returns>False if both match; True otherwise.</returns>
-        public static Boolean operator != (GridOperator_Id ChargingStationOperatorId1, GridOperator_Id ChargingStationOperatorId2)
-        {
-            return !(ChargingStationOperatorId1 == ChargingStationOperatorId2);
-        }
+        public static Boolean operator != (GridOperator_Id GridOperatorId1,
+                                           GridOperator_Id GridOperatorId2)
+
+            => !GridOperatorId1.Equals(GridOperatorId2);
 
         #endregion
 
-        #region Operator <  (ChargingStationOperatorId1, ChargingStationOperatorId2)
+        #region Operator <  (GridOperatorId1, GridOperatorId2)
 
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="ChargingStationOperatorId1">A charging station operator identification.</param>
-        /// <param name="ChargingStationOperatorId2">Another charging station operator identification.</param>
+        /// <param name="GridOperatorId1">A grid operator identification.</param>
+        /// <param name="GridOperatorId2">Another grid operator identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator < (GridOperator_Id ChargingStationOperatorId1, GridOperator_Id ChargingStationOperatorId2)
-        {
+        public static Boolean operator < (GridOperator_Id GridOperatorId1,
+                                          GridOperator_Id GridOperatorId2)
 
-            if ((Object) ChargingStationOperatorId1 is null)
-                throw new ArgumentNullException("The given ChargingStationOperatorId1 must not be null!");
-
-            return ChargingStationOperatorId1.CompareTo(ChargingStationOperatorId2) < 0;
-
-        }
+            => GridOperatorId1.CompareTo(GridOperatorId2) < 0;
 
         #endregion
 
-        #region Operator <= (ChargingStationOperatorId1, ChargingStationOperatorId2)
+        #region Operator <= (GridOperatorId1, GridOperatorId2)
 
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="ChargingStationOperatorId1">A charging station operator identification.</param>
-        /// <param name="ChargingStationOperatorId2">Another charging station operator identification.</param>
+        /// <param name="GridOperatorId1">A grid operator identification.</param>
+        /// <param name="GridOperatorId2">Another grid operator identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <= (GridOperator_Id ChargingStationOperatorId1, GridOperator_Id ChargingStationOperatorId2)
-        {
-            return !(ChargingStationOperatorId1 > ChargingStationOperatorId2);
-        }
+        public static Boolean operator <= (GridOperator_Id GridOperatorId1,
+                                           GridOperator_Id GridOperatorId2)
+
+            => GridOperatorId1.CompareTo(GridOperatorId2) <= 0;
 
         #endregion
 
-        #region Operator >  (ChargingStationOperatorId1, ChargingStationOperatorId2)
+        #region Operator >  (GridOperatorId1, GridOperatorId2)
 
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="ChargingStationOperatorId1">A charging station operator identification.</param>
-        /// <param name="ChargingStationOperatorId2">Another charging station operator identification.</param>
+        /// <param name="GridOperatorId1">A grid operator identification.</param>
+        /// <param name="GridOperatorId2">Another grid operator identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator > (GridOperator_Id ChargingStationOperatorId1, GridOperator_Id ChargingStationOperatorId2)
-        {
+        public static Boolean operator > (GridOperator_Id GridOperatorId1,
+                                          GridOperator_Id GridOperatorId2)
 
-            if ((Object) ChargingStationOperatorId1 is null)
-                throw new ArgumentNullException("The given ChargingStationOperatorId1 must not be null!");
-
-            return ChargingStationOperatorId1.CompareTo(ChargingStationOperatorId2) > 0;
-
-        }
+            => GridOperatorId1.CompareTo(GridOperatorId2) > 0;
 
         #endregion
 
-        #region Operator >= (ChargingStationOperatorId1, ChargingStationOperatorId2)
+        #region Operator >= (GridOperatorId1, GridOperatorId2)
 
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="ChargingStationOperatorId1">A charging station operator identification.</param>
-        /// <param name="ChargingStationOperatorId2">Another charging station operator identification.</param>
+        /// <param name="GridOperatorId1">A grid operator identification.</param>
+        /// <param name="GridOperatorId2">Another grid operator identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >= (GridOperator_Id ChargingStationOperatorId1, GridOperator_Id ChargingStationOperatorId2)
-        {
-            return !(ChargingStationOperatorId1 < ChargingStationOperatorId2);
-        }
+        public static Boolean operator >= (GridOperator_Id GridOperatorId1,
+                                           GridOperator_Id GridOperatorId2)
+
+            => GridOperatorId1.CompareTo(GridOperatorId2) >= 0;
 
         #endregion
 
         #endregion
 
-        #region IComparable<ChargingStationOperatorId> Members
+        #region IComparable<GridOperatorId> Members
 
         #region CompareTo(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two grid operator identifications.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        public Int32 CompareTo(Object Object)
-        {
+        /// <param name="Object">A grid operator identification to compare with.</param>
+        public Int32 CompareTo(Object? Object)
 
-            if (Object is null)
-                throw new ArgumentNullException(nameof(Object), "The given object must not be null!");
-
-            if (!(Object is GridOperator_Id))
-                throw new ArgumentException("The given object is not a charging station operator identification!", nameof(Object));
-
-            return CompareTo((GridOperator_Id) Object);
-
-        }
+            => Object is GridOperator_Id gridOperatorId
+                   ? CompareTo(gridOperatorId)
+                   : throw new ArgumentException("The given object is not a grid operator identification!",
+                                                 nameof(Object));
 
         #endregion
 
-        #region CompareTo(ChargingStationOperatorId)
+        #region CompareTo(GridOperatorId)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two grid operator identifications.
         /// </summary>
-        /// <param name="ChargingStationOperatorId">An object to compare with.</param>
-        public Int32 CompareTo(GridOperator_Id ChargingStationOperatorId)
+        /// <param name="GridOperatorId">A grid operator identification to compare with.</param>
+        public Int32 CompareTo(GridOperator_Id GridOperatorId)
         {
 
-            if ((Object) ChargingStationOperatorId is null)
-                throw new ArgumentNullException(nameof(ChargingStationOperatorId), "The given charging station operator identification must not be null!");
+            var c = CountryCode.CompareTo(GridOperatorId.CountryCode);
 
-            // Compare the length of the ChargingStationOperatorIds
-            var _Result = Length.CompareTo(ChargingStationOperatorId.Length);
+            if (c == 0)
+                c = String.Compare(Suffix,
+                                   GridOperatorId.Suffix,
+                                   StringComparison.OrdinalIgnoreCase);
 
-            // If equal: Compare country codes
-            if (_Result == 0)
-                _Result = CountryCode.CompareTo(ChargingStationOperatorId.CountryCode);
-
-            // If equal: Compare operator ids
-            if (_Result == 0)
-                _Result = String.Compare(Suffix, ChargingStationOperatorId.Suffix, StringComparison.Ordinal);
-
-            return _Result;
+            return c;
 
         }
 
@@ -378,47 +402,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region IEquatable<ChargingStationOperatorId> Members
+        #region IEquatable<GridOperatorId> Members
 
         #region Equals(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two grid operator identifications for equality.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public override Boolean Equals(Object Object)
-        {
+        /// <param name="Object">A grid operator identification to compare with.</param>
+        public override Boolean Equals(Object? Object)
 
-            if (Object is null)
-                return false;
-
-            if (!(Object is GridOperator_Id))
-                return false;
-
-            return this.Equals((GridOperator_Id) Object);
-
-        }
+            => Object is GridOperator_Id gridOperatorId &&
+                   Equals(gridOperatorId);
 
         #endregion
 
-        #region Equals(ChargingStationOperatorId)
+        #region Equals(GridOperatorId)
 
         /// <summary>
-        /// Compares two ChargingStationOperatorIds for equality.
+        /// Compares two grid operator identifications for equality.
         /// </summary>
-        /// <param name="ChargingStationOperatorId">A ChargingStationOperatorId to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public Boolean Equals(GridOperator_Id ChargingStationOperatorId)
-        {
+        /// <param name="GridOperatorId">A grid operator identification to compare with.</param>
+        public Boolean Equals(GridOperator_Id GridOperatorId)
 
-            if ((Object) ChargingStationOperatorId is null)
-                return false;
+            => (CountryCode is null
+                    ? GridOperatorId.CountryCode is null
+                    : CountryCode.Equals(GridOperatorId.CountryCode)) &&
 
-            return CountryCode.Equals(ChargingStationOperatorId.CountryCode) &&
-                   Suffix.     Equals(ChargingStationOperatorId.Suffix);
-
-        }
+               String.Equals(Suffix,
+                             GridOperatorId.Suffix,
+                             StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -431,8 +444,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override Int32 GetHashCode()
 
-            => CountryCode.GetHashCode() ^
-               Suffix.     GetHashCode();
+            => (CountryCode?.GetHashCode() ?? 0) ^
+               (Suffix is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Suffix));
 
         #endregion
 
@@ -443,7 +456,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => String.Concat(CountryCode?.Alpha2Code, "*", Suffix ?? "");
+            => String.Concat(
+                   CountryCode?.Alpha2Code,
+                   "*",
+                   Suffix ?? ""
+               );
 
         #endregion
 

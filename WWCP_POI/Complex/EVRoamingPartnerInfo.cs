@@ -31,15 +31,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public EMobilityProvider_Id   EMPId        { get; }
         private readonly I18NString immutableName;
         public I18NString Name => immutableName.Clone();
-        public DateTime?              NotBefore    { get; }
-        public DateTime?              NotAfter     { get; }
+        public DateTimeOffset?        NotBefore    { get; }
+        public DateTimeOffset?        NotAfter     { get; }
         private readonly I18NString immutableComment;
         public I18NString Comment => immutableComment.Clone();
 
         public EVRoamingPartnerInfo(EMobilityProvider_Id  EMPId,
                                     I18NString?           Name,
-                                    DateTime?             NotBefore,
-                                    DateTime?             NotAfter,
+                                    DateTimeOffset?       NotBefore,
+                                    DateTimeOffset?       NotAfter,
                                     I18NString?           Comment     = null)
         {
 

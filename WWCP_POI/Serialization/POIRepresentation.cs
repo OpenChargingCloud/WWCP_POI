@@ -217,6 +217,12 @@ public static class POIRepresentation
                     !MetrologicalValue.TryParse(property.Value.Value<String>()!, out _, out var error))
                     throw new ArgumentException($"{path}/{property.Name}: cannot encode a Styx metrological value: {error}");
         });
+        VisitPairs(json, kind, (pair, path) =>
+        {
+            if (pair[1].Type == JTokenType.String &&
+                !MetrologicalValue.TryParse(pair[1].Value<String>()!, out _, out var error))
+                throw new ArgumentException($"{path}/1: cannot encode a Styx metrological value: {error}");
+        });
     }
 
     // Convert only schema-owned ETag arrays. Customer fields with the same name stay untouched.
@@ -261,10 +267,36 @@ public static class POIRepresentation
             nameof(ParkingProduct) => field is "minDuration" or "stopParkingAfterTime",
             nameof(ChargingTariffRestriction) => field is "minEnergy" or "maxEnergy" or "minPower" or "maxPower" or "minDuration" or "maxDuration",
             nameof(ChargingPriceComponent) => field == "stepSize",
-            "EnergySource" or "EnvironmentalImpact" => field == "percentage",
             "GeoLocation" or nameof(AdditionalGeoLocation) => field is "alt" or "altitude",
             _ => false
         };
+
+    /// <summary>
+    /// The shares of an energy mix are [category, percentage] pairs, e.g. ["solar", "42.5 %"]:
+    /// an array of them has its elements bound to the pair kind, whose second element is a reading.
+    /// </summary>
+    internal static String? PairKind(String kind)
+        => kind is "EnergySource" or "EnvironmentalImpact"
+               ? kind + "Pair"
+               : null;
+
+    /// <summary>
+    /// Whether the element at the given index of a pair is a reading.
+    /// </summary>
+    internal static Boolean IsPairReading(String kind, Int32 index)
+        => kind is "EnergySourcePair" or "EnvironmentalImpactPair" && index == 1;
+
+    /// <summary>
+    /// Visit the [category, percentage] pairs below the given document.
+    /// </summary>
+    internal static void VisitPairs(JObject json, String kind, Action<JArray, String> action)
+        => Visit(json, kind, "", (document, type, path) => {
+            foreach (var property in document.Properties())
+                if (ChildKind(type, property.Name) is { } childKind && PairKind(childKind) is not null && property.Value is JArray pairs)
+                    for (var index = 0; index < pairs.Count; index++)
+                        if (pairs[index] is JArray { Count: 2 } pair)
+                            action(pair, path + "/" + Escape(property.Name) + "/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        });
 
     private static readonly HashSet<String> RuntimeEntityKinds = new(StringComparer.Ordinal) {
         nameof(RoamingNetwork), nameof(ChargingStationOperator), nameof(EMobilityProvider), nameof(ChargingPool),

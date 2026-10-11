@@ -29,7 +29,7 @@ public partial class ParkingOperator
              ParkingSensors: InfrastructureJson.Array(json, "parkingSensors", token => ParkingSensor.Parse(InfrastructureJson.Entry(token), available)),
              ParkingSpaceGroups: InfrastructureJson.Array(json, "parkingSpaceGroups", token => ParkingSpaceGroup.Parse(InfrastructureJson.Entry(token), available)),
              ParkingProducts: InfrastructureJson.Array(json, "parkingProducts", token => ParkingProduct.Parse(InfrastructureJson.Entry(token))));
-        InfrastructureJson.RestoreMetadata(json, result, ParkingOperatorAdminStatusTypes.TryParse, ParkingOperatorStatusTypes.TryParse);
+        InfrastructureJson.RestoreMetadata(json, result, ParkingOperatorAdminStatusType.TryParse, ParkingOperatorStatusType.TryParse);
         return result;
     }
 

@@ -41,7 +41,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NewStatus">An optional enumeration of all new charging pool status.</param>
         /// <param name="ChangedStatus">An optional enumeration of all changed charging pool status.</param>
         /// <param name="RemovedIds">An optional enumeration of all removed charging pool status.</param>
-        public ChargingPoolStatusDiff(DateTime                                                              Timestamp,
+        public ChargingPoolStatusDiff(DateTimeOffset                                                        Timestamp,
                                       ChargingStationOperator_Id                                            ChargingStationOperatorId,
                                       I18NString?                                                           ChargingStationOperatorName   = null,
                                       IEnumerable<KeyValuePair<ChargingPool_Id, ChargingPoolStatusType>>?  NewStatus                     = null,

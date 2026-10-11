@@ -117,8 +117,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 InfrastructureJson.RestoreMetadata(JSON,
                                                    parsed,
-                                                   ChargingStationOperatorAdminStatusTypes.TryParse,
-                                                   ChargingStationOperatorStatusTypes.TryParse);
+                                                   ChargingStationOperatorAdminStatusType.TryParse,
+                                                   ChargingStationOperatorStatusType.TryParse);
 
                 result = CustomChargingStationOperatorParser is null
                              ? parsed

@@ -33,8 +33,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// A charging tariff for charging an electric vehicle.
     /// </summary>
     public sealed partial class ChargingTariff : AImmutableEMobilityEntity<ChargingTariff_Id,
-                                                   ChargingTariffAdminStatusTypes,
-                                                   ChargingTariffStatusTypes>
+                                                   ChargingTariffAdminStatusType,
+                                                   ChargingTariffStatusType>
     {
 
         #region Properties
@@ -130,6 +130,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             : base(Id,
                    Name,
                    Description,
+                   // Without a known status, the status is unspecified since the beginning of time.
+                   new Timestamped<ChargingTariffAdminStatusType>(default, ChargingTariffAdminStatusType.Unspecified),
+                   new Timestamped<ChargingTariffStatusType>     (default, ChargingTariffStatusType.Unspecified),
                    DataSource: DataSource,
                    LastChange: LastChange,
                    CustomData: CustomData,
@@ -228,7 +231,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              : null,
 
                          EnergyMix is not null
-                             ? new JProperty("energyMix", EnergyMix.ToJSON())
+                             ? new JProperty("energyMix", EnergyMix.ToJSON(Embedded: true))
                              : null
 
                         ));

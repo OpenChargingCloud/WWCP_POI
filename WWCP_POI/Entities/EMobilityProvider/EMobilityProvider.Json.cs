@@ -105,7 +105,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var license in InfrastructureJson.Licenses(JSON))
                     parsed.dataLicenses.TryAdd(license.Id, license);
 
-                InfrastructureJson.RestoreMetadata(JSON, parsed, EMobilityProviderAdminStatusTypes.TryParse, EMobilityProviderStatusTypes.TryParse);
+                InfrastructureJson.RestoreMetadata(JSON, parsed, EMobilityProviderAdminStatusType.TryParse, EMobilityProviderStatusType.TryParse);
 
                 provider = CustomEMobilityProviderParser is null
                                ? parsed

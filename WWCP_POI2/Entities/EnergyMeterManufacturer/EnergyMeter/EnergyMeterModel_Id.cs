@@ -48,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
-    /// The unique identification of a energy meter model.
+    /// The unique identification of an energy meter model.
     /// </summary>
     public readonly struct EnergyMeterModel_Id : IId<EnergyMeterModel_Id>
     {
@@ -80,7 +80,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The length of the energy meter model identification.
         /// </summary>
         public UInt64 Length
-            => (UInt64)(InternalId?.Length ?? 0);
+            => (UInt64) (InternalId?.Length ?? 0);
 
         #endregion
 
@@ -89,7 +89,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Create a new energy meter model identification based on the given text.
         /// </summary>
-        /// <param name="Text">The text representation of a energy meter model identification.</param>
+        /// <param name="Text">The text representation of an energy meter model identification.</param>
         private EnergyMeterModel_Id(String Text)
         {
             this.InternalId = Text;
@@ -113,16 +113,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) Parse   (Text)
 
         /// <summary>
-        /// Parse the given text as a energy meter model identification.
+        /// Parse the given text as an energy meter model identification.
         /// </summary>
-        /// <param name="Text">A text representation of a energy meter model identification.</param>
+        /// <param name="Text">A text representation of an energy meter model identification.</param>
         public static EnergyMeterModel_Id Parse(String Text)
         {
 
             if (TryParse(Text, out var energyMeterModelId))
                 return energyMeterModelId;
 
-            throw new ArgumentException($"Invalid text representation of a energy meter model identification: '{Text}'!",
+            throw new ArgumentException($"Invalid text representation of an energy meter model identification: '{Text}'!",
                                         nameof(Text));
 
         }
@@ -132,9 +132,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) TryParse(Text)
 
         /// <summary>
-        /// Try to parse the given text as a energy meter model identification.
+        /// Try to parse the given text as an energy meter model identification.
         /// </summary>
-        /// <param name="Text">A text representation of a energy meter model identification.</param>
+        /// <param name="Text">A text representation of an energy meter model identification.</param>
         public static EnergyMeterModel_Id? TryParse(String Text)
         {
 
@@ -150,9 +150,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) TryParse(Text, out EnergyMeterModelId)
 
         /// <summary>
-        /// Try to parse the given text as a energy meter model identification.
+        /// Try to parse the given text as an energy meter model identification.
         /// </summary>
-        /// <param name="Text">A text representation of a energy meter model identification.</param>
+        /// <param name="Text">A text representation of an energy meter model identification.</param>
         /// <param name="EnergyMeterModelId">The parsed energy meter model identification.</param>
         public static Boolean TryParse(String Text, out EnergyMeterModel_Id EnergyMeterModelId)
         {
@@ -184,7 +184,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public EnergyMeterModel_Id Clone()
 
-            => new(
+            => new (
                    InternalId.CloneString()
                );
 
@@ -201,7 +201,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EnergyMeterModelId1">A energy meter model identification.</param>
         /// <param name="EnergyMeterModelId2">Another energy meter model identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator ==(EnergyMeterModel_Id EnergyMeterModelId1,
+        public static Boolean operator == (EnergyMeterModel_Id EnergyMeterModelId1,
                                            EnergyMeterModel_Id EnergyMeterModelId2)
 
             => EnergyMeterModelId1.Equals(EnergyMeterModelId2);
@@ -216,7 +216,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EnergyMeterModelId1">A energy meter model identification.</param>
         /// <param name="EnergyMeterModelId2">Another energy meter model identification.</param>
         /// <returns>False if both match; True otherwise.</returns>
-        public static Boolean operator !=(EnergyMeterModel_Id EnergyMeterModelId1,
+        public static Boolean operator != (EnergyMeterModel_Id EnergyMeterModelId1,
                                            EnergyMeterModel_Id EnergyMeterModelId2)
 
             => !EnergyMeterModelId1.Equals(EnergyMeterModelId2);
@@ -231,7 +231,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EnergyMeterModelId1">A energy meter model identification.</param>
         /// <param name="EnergyMeterModelId2">Another energy meter model identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <(EnergyMeterModel_Id EnergyMeterModelId1,
+        public static Boolean operator < (EnergyMeterModel_Id EnergyMeterModelId1,
                                           EnergyMeterModel_Id EnergyMeterModelId2)
 
             => EnergyMeterModelId1.CompareTo(EnergyMeterModelId2) < 0;
@@ -246,7 +246,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EnergyMeterModelId1">A energy meter model identification.</param>
         /// <param name="EnergyMeterModelId2">Another energy meter model identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <=(EnergyMeterModel_Id EnergyMeterModelId1,
+        public static Boolean operator <= (EnergyMeterModel_Id EnergyMeterModelId1,
                                            EnergyMeterModel_Id EnergyMeterModelId2)
 
             => EnergyMeterModelId1.CompareTo(EnergyMeterModelId2) <= 0;
@@ -261,7 +261,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EnergyMeterModelId1">A energy meter model identification.</param>
         /// <param name="EnergyMeterModelId2">Another energy meter model identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >(EnergyMeterModel_Id EnergyMeterModelId1,
+        public static Boolean operator > (EnergyMeterModel_Id EnergyMeterModelId1,
                                           EnergyMeterModel_Id EnergyMeterModelId2)
 
             => EnergyMeterModelId1.CompareTo(EnergyMeterModelId2) > 0;
@@ -276,7 +276,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EnergyMeterModelId1">A energy meter model identification.</param>
         /// <param name="EnergyMeterModelId2">Another energy meter model identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >=(EnergyMeterModel_Id EnergyMeterModelId1,
+        public static Boolean operator >= (EnergyMeterModel_Id EnergyMeterModelId1,
                                            EnergyMeterModel_Id EnergyMeterModelId2)
 
             => EnergyMeterModelId1.CompareTo(EnergyMeterModelId2) >= 0;
@@ -297,7 +297,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Object is EnergyMeterModel_Id energyMeterModelId
                    ? CompareTo(energyMeterModelId)
-                   : throw new ArgumentException("The given object is not a energy meter model identification!",
+                   : throw new ArgumentException("The given object is not an energy meter model identification!",
                                                  nameof(Object));
 
         #endregion

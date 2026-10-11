@@ -31,7 +31,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="EnergyMeter">A energy meter.</param>
         public static EnergyMeterStatusReport GenerateStatusReport               (this EnergyMeter                       EnergyMeter,
-                                                                                      DateTime?                                   Timestamp   = null)
+                                                                                      DateTimeOffset?                             Timestamp   = null)
 
             => new (new[] { EnergyMeter },
                     Timestamp);
@@ -45,7 +45,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="EnergyMeters">An enumeration of energy meters.</param>
         public static EnergyMeterStatusReport GenerateStatusReport               (this IEnumerable<EnergyMeter>          EnergyMeters,
-                                                                                      DateTime?                                   Timestamp   = null)
+                                                                                      DateTimeOffset?                             Timestamp   = null)
 
             => new (EnergyMeters,
                     Timestamp);
@@ -59,7 +59,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="ChargingPool">A charging pool.</param>
         public static EnergyMeterStatusReport GenerateEnergyMeterStatusReport(this ChargingPool                          ChargingPool,
-                                                                              DateTime?                                   Timestamp   = null)
+                                                                              DateTimeOffset?                             Timestamp   = null)
 
             => new (ChargingPool.EnergyMeters,
                     Timestamp);
@@ -73,7 +73,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="ChargingPools">An enumeration of charging pools.</param>
         public static EnergyMeterStatusReport GenerateEnergyMeterStatusReport(this IEnumerable<ChargingPool>             ChargingPools,
-                                                                              DateTime?                                   Timestamp   = null)
+                                                                              DateTimeOffset?                             Timestamp   = null)
 
             => new (ChargingPools.SelectMany(chargingPool => chargingPool.EnergyMeters),
                     Timestamp);
@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ///// </summary>
         ///// <param name="EnergyMeterOperator">A energy meter operator.</param>
         //public static EnergyMeterStatusReport GenerateEnergyMeterStatusReport(this ChargingStationOperator               EnergyMeterOperator,
-        //                                                                      DateTime?                                   Timestamp   = null)
+        //                                                                      DateTimeOffset?                             Timestamp   = null)
 
         //    => new (EnergyMeterOperator.EnergyMeters,
         //            Timestamp);
@@ -101,7 +101,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ///// </summary>
         ///// <param name="EnergyMeterOperators">An enumeration of energy meter operators.</param>
         //public static EnergyMeterStatusReport GenerateEnergyMeterStatusReport(this IEnumerable<ChargingStationOperator>  EnergyMeterOperators,
-        //                                                                              DateTime?                                   Timestamp   = null)
+        //                                                                              DateTimeOffset?                             Timestamp   = null)
 
         //    => new (EnergyMeterOperators.SelectMany(energyMeterOperator => energyMeterOperator.EnergyMeters),
         //            Timestamp);
@@ -115,7 +115,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ///// </summary>
         ///// <param name="RoamingNetwork">A roaming network.</param>
         //public static EnergyMeterStatusReport GenerateEnergyMeterStatusReport(this RoamingNetwork                        RoamingNetwork,
-        //                                                                              DateTime?                                   Timestamp   = null)
+        //                                                                              DateTimeOffset?                             Timestamp   = null)
 
         //    => new (RoamingNetwork.EnergyMeters,
         //            Timestamp);
@@ -128,7 +128,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A energy meter status report.
     /// </summary>
-    public class EnergyMeterStatusReport : StatusReport<EnergyMeter, EnergyMeterStatusTypes>
+    public class EnergyMeterStatusReport : StatusReport<EnergyMeter, EnergyMeterStatusType>
     {
 
         /// <summary>
@@ -137,7 +137,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EnergyMeters">An enumeration of energy meters.</param>
         /// <param name="Timestamp">The optional timestamp of the status report generation.</param>
         public EnergyMeterStatusReport(IEnumerable<EnergyMeter>  EnergyMeters,
-                                       DateTime?                  Timestamp   = null)
+                                       DateTimeOffset?            Timestamp   = null)
 
             : base(EnergyMeters,
                    energyMeter => energyMeter.Status.Value,

@@ -76,10 +76,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of an electric vehicle charging station (EVCS).
     /// </summary>
-    public readonly struct ChargingStation_Id : IId,
-                                                IEquatable<ChargingStation_Id>,
-                                                IComparable<ChargingStation_Id>
-
+    public readonly struct ChargingStation_Id : IId<ChargingStation_Id>
     {
 
         #region Data
@@ -810,8 +807,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var c = OperatorId.CompareTo(ChargingStationId.OperatorId);
 
             if (c == 0)
-                c = String.Compare(Suffix,
-                                   ChargingStationId.Suffix,
+                c = String.Compare(Suffix.                  Replace("*", ""),
+                                   ChargingStationId.Suffix.Replace("*", ""),
                                    StringComparison.OrdinalIgnoreCase);
 
             return c;

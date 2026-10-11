@@ -56,7 +56,7 @@ internal static class POIAdditionalProperties
             {
                 if (value.PhotoURLs.Any()) json["photoURLs"] = new JArray(value.PhotoURLs.Select(item => item.ToString()));
                 if (value.MobilityRootCAs.Any()) json["mobilityRootCAs"] = new JArray(value.MobilityRootCAs.Select(item => POIJSON.Document(item)));
-                if (value.EnergyMix is { } EnergyMixValue) json["energyMix"] = JToken.FromObject(POIJSON.Document(EnergyMixValue));
+                if (value.EnergyMix is { } EnergyMixValue) json["energyMix"] = EnergyMixValue.ToJSON(Embedded: true);
                 if (value.CalibrationInfo is { } CalibrationInfoValue) json["calibrationInfo"] = JToken.FromObject(CalibrationInfoValue.ToString());
                 break;
             }

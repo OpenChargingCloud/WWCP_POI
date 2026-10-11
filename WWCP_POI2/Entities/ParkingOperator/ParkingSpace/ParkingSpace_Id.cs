@@ -25,13 +25,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
+    /// Extension methods for parking space identifications.
+    /// </summary>
+    public static class ParkingSpaceIdExtensions
+    {
+
+        /// <summary>
+        /// Indicates whether this parking space identification is null or empty.
+        /// </summary>
+        /// <param name="ParkingSpaceId">A parking space identification.</param>
+        public static Boolean IsNullOrEmpty(this ParkingSpace_Id? ParkingSpaceId)
+            => !ParkingSpaceId.HasValue || ParkingSpaceId.Value.IsNullOrEmpty;
+
+        /// <summary>
+        /// Indicates whether this parking space identification is NOT null or empty.
+        /// </summary>
+        /// <param name="ParkingSpaceId">A parking space identification.</param>
+        public static Boolean IsNotNullOrEmpty(this ParkingSpace_Id? ParkingSpaceId)
+            => ParkingSpaceId.HasValue && ParkingSpaceId.Value.IsNotNullOrEmpty;
+
+    }
+
+
+    /// <summary>
     /// The unique identification of a parking space.
     /// </summary>
-    public readonly struct ParkingSpace_Id : IId,
-                                             IEquatable <ParkingSpace_Id>,
-                                             IComparable<ParkingSpace_Id>
-
-{
+    public readonly struct ParkingSpace_Id : IId<ParkingSpace_Id>
+    {
 
         #region Data
 
@@ -45,19 +65,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
-        /// Indicates whether this identification is null or empty.
+        /// Indicates whether this parking space identification is null or empty.
         /// </summary>
         public Boolean IsNullOrEmpty
             => InternalId.IsNullOrEmpty();
 
         /// <summary>
-        /// Indicates whether this identification is NOT null or empty.
+        /// Indicates whether this parking space identification is NOT null or empty.
         /// </summary>
         public Boolean IsNotNullOrEmpty
             => InternalId.IsNotNullOrEmpty();
 
         /// <summary>
-        /// Returns the length of the identification.
+        /// The length of the parking space identification.
         /// </summary>
         public UInt64 Length
             => (UInt64) (InternalId?.Length ?? 0);
@@ -67,61 +87,103 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Constructor(s)
 
         /// <summary>
-        /// Create a new parking space identification.
-        /// based on the given string.
+        /// Create a new parking space identification based on the given text.
         /// </summary>
+        /// <param name="Text">The text representation of a parking space identification.</param>
         private ParkingSpace_Id(String Text)
         {
-            InternalId = Text;
+            this.InternalId = Text;
         }
 
         #endregion
 
 
-        #region New
+        #region (static) New
 
         /// <summary>
-        /// Returns a new parking space identification.
+        /// Create a new unique parking space identification (UUIDv7).
         /// </summary>
         public static ParkingSpace_Id New
-            => ParkingSpace_Id.Parse(UUIDv7.Generate().ToString());
+
+            => new (UUIDv7.Generate().ToString());
 
         #endregion
 
-        #region Parse(Text)
+        #region (static) NewRandom(Length = 50)
 
         /// <summary>
-        /// Parse the given string as a parking space identification.
+        /// Create a new random parking space identification.
+        /// </summary>
+        /// <param name="Length">The expected length of the parking space identification.</param>
+        public static ParkingSpace_Id NewRandom(Byte Length = 50)
+
+            => new(RandomExtensions.RandomString(Length));
+
+        #endregion
+
+        #region (static) Parse   (Text)
+
+        /// <summary>
+        /// Parse the given text as a parking space identification.
         /// </summary>
         /// <param name="Text">A text representation of a parking space identification.</param>
         public static ParkingSpace_Id Parse(String Text)
+        {
 
-            => new ParkingSpace_Id(Text);
+            if (TryParse(Text, out var parkingSpaceId))
+                return parkingSpaceId;
+
+            throw new ArgumentException($"Invalid text representation of a parking space identification: '{Text}'!",
+                                        nameof(Text));
+
+        }
 
         #endregion
 
-        #region TryParse(Text, out ParkingSpaceId)
+        #region (static) TryParse(Text)
 
         /// <summary>
-        /// Parse the given string as a parking space identification.
+        /// Try to parse the given text as a parking space identification.
+        /// </summary>
+        /// <param name="Text">A text representation of a parking space identification.</param>
+        public static ParkingSpace_Id? TryParse(String Text)
+        {
+
+            if (TryParse(Text, out var parkingSpaceId))
+                return parkingSpaceId;
+
+            return null;
+
+        }
+
+        #endregion
+
+        #region (static) TryParse(Text, out ParkingSpaceId)
+
+        /// <summary>
+        /// Try to parse the given text as a parking space identification.
         /// </summary>
         /// <param name="Text">A text representation of a parking space identification.</param>
         /// <param name="ParkingSpaceId">The parsed parking space identification.</param>
         public static Boolean TryParse(String Text, out ParkingSpace_Id ParkingSpaceId)
         {
-            try
+
+            Text = Text.Trim();
+
+            if (Text.IsNotNullOrEmpty())
             {
-
-                ParkingSpaceId = new ParkingSpace_Id(Text);
-
-                return true;
-
+                try
+                {
+                    ParkingSpaceId = new ParkingSpace_Id(Text);
+                    return true;
+                }
+                catch
+                { }
             }
-            catch
-            {
-                ParkingSpaceId = default(ParkingSpace_Id);
-                return false;
-            }
+
+            ParkingSpaceId = default;
+            return false;
+
         }
 
         #endregion
@@ -145,96 +207,90 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Operator == (ParkingSpaceId1, ParkingSpaceId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking space identifications for equality.
         /// </summary>
         /// <param name="ParkingSpaceId1">A parking space identification.</param>
         /// <param name="ParkingSpaceId2">Another parking space identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator == (ParkingSpace_Id ParkingSpaceId1, ParkingSpace_Id ParkingSpaceId2)
-        {
+        public static Boolean operator == (ParkingSpace_Id ParkingSpaceId1,
+                                           ParkingSpace_Id ParkingSpaceId2)
 
-            return ParkingSpaceId1.Equals(ParkingSpaceId2);
-
-        }
+            => ParkingSpaceId1.Equals(ParkingSpaceId2);
 
         #endregion
 
         #region Operator != (ParkingSpaceId1, ParkingSpaceId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking space identifications for inequality.
         /// </summary>
         /// <param name="ParkingSpaceId1">A parking space identification.</param>
         /// <param name="ParkingSpaceId2">Another parking space identification.</param>
         /// <returns>False if both match; True otherwise.</returns>
-        public static Boolean operator != (ParkingSpace_Id ParkingSpaceId1, ParkingSpace_Id ParkingSpaceId2)
-            => !(ParkingSpaceId1 == ParkingSpaceId2);
+        public static Boolean operator != (ParkingSpace_Id ParkingSpaceId1,
+                                           ParkingSpace_Id ParkingSpaceId2)
+
+            => !ParkingSpaceId1.Equals(ParkingSpaceId2);
 
         #endregion
 
         #region Operator <  (ParkingSpaceId1, ParkingSpaceId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking space identifications.
         /// </summary>
         /// <param name="ParkingSpaceId1">A parking space identification.</param>
         /// <param name="ParkingSpaceId2">Another parking space identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator < (ParkingSpace_Id ParkingSpaceId1, ParkingSpace_Id ParkingSpaceId2)
-        {
+        public static Boolean operator < (ParkingSpace_Id ParkingSpaceId1,
+                                          ParkingSpace_Id ParkingSpaceId2)
 
-            if ((Object) ParkingSpaceId1 is null)
-                throw new ArgumentNullException(nameof(ParkingSpaceId1), "The given ParkingSpaceId1 must not be null!");
-
-            return ParkingSpaceId1.CompareTo(ParkingSpaceId2) < 0;
-
-        }
+            => ParkingSpaceId1.CompareTo(ParkingSpaceId2) < 0;
 
         #endregion
 
         #region Operator <= (ParkingSpaceId1, ParkingSpaceId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking space identifications.
         /// </summary>
         /// <param name="ParkingSpaceId1">A parking space identification.</param>
         /// <param name="ParkingSpaceId2">Another parking space identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <= (ParkingSpace_Id ParkingSpaceId1, ParkingSpace_Id ParkingSpaceId2)
-            => !(ParkingSpaceId1 > ParkingSpaceId2);
+        public static Boolean operator <= (ParkingSpace_Id ParkingSpaceId1,
+                                           ParkingSpace_Id ParkingSpaceId2)
+
+            => ParkingSpaceId1.CompareTo(ParkingSpaceId2) <= 0;
 
         #endregion
 
         #region Operator >  (ParkingSpaceId1, ParkingSpaceId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking space identifications.
         /// </summary>
         /// <param name="ParkingSpaceId1">A parking space identification.</param>
         /// <param name="ParkingSpaceId2">Another parking space identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator > (ParkingSpace_Id ParkingSpaceId1, ParkingSpace_Id ParkingSpaceId2)
-        {
+        public static Boolean operator > (ParkingSpace_Id ParkingSpaceId1,
+                                          ParkingSpace_Id ParkingSpaceId2)
 
-            if ((Object) ParkingSpaceId1 is null)
-                throw new ArgumentNullException(nameof(ParkingSpaceId1), "The given ParkingSpaceId1 must not be null!");
-
-            return ParkingSpaceId1.CompareTo(ParkingSpaceId2) > 0;
-
-        }
+            => ParkingSpaceId1.CompareTo(ParkingSpaceId2) > 0;
 
         #endregion
 
         #region Operator >= (ParkingSpaceId1, ParkingSpaceId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking space identifications.
         /// </summary>
         /// <param name="ParkingSpaceId1">A parking space identification.</param>
         /// <param name="ParkingSpaceId2">Another parking space identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >= (ParkingSpace_Id ParkingSpaceId1, ParkingSpace_Id ParkingSpaceId2)
-            => !(ParkingSpaceId1 < ParkingSpaceId2);
+        public static Boolean operator >= (ParkingSpace_Id ParkingSpaceId1,
+                                           ParkingSpace_Id ParkingSpaceId2)
+
+            => ParkingSpaceId1.CompareTo(ParkingSpaceId2) >= 0;
 
         #endregion
 
@@ -245,46 +301,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region CompareTo(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking space identifications.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        public Int32 CompareTo(Object Object)
-        {
+        /// <param name="Object">A parking space identification to compare with.</param>
+        public Int32 CompareTo(Object? Object)
 
-            if (Object is null)
-                throw new ArgumentNullException(nameof(Object), "The given object must not be null!");
-
-            if (!(Object is ParkingSpace_Id))
-                throw new ArgumentException("The given object is not a parking space identification!",
-                                            nameof(Object));
-
-            return CompareTo((ParkingSpace_Id) Object);
-
-        }
+            => Object is ParkingSpace_Id parkingSpaceId
+                   ? CompareTo(parkingSpaceId)
+                   : throw new ArgumentException("The given object is not a parking space identification!",
+                                                 nameof(Object));
 
         #endregion
 
         #region CompareTo(ParkingSpaceId)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking space identifications.
         /// </summary>
-        /// <param name="ParkingSpaceId">An object to compare with.</param>
+        /// <param name="ParkingSpaceId">A parking space identification to compare with.</param>
         public Int32 CompareTo(ParkingSpace_Id ParkingSpaceId)
-        {
 
-            if ((Object) ParkingSpaceId is null)
-                throw new ArgumentNullException(nameof(ParkingSpaceId),  "The given parking space identification must not be null!");
-
-            // Compare the length of the ParkingSpaceIds
-            var _Result = this.Length.CompareTo(ParkingSpaceId.Length);
-
-            if (_Result == 0)
-                _Result = String.Compare(InternalId, ParkingSpaceId.InternalId, StringComparison.Ordinal);
-
-            return _Result;
-
-        }
+            => String.Compare(InternalId,
+                              ParkingSpaceId.InternalId,
+                              StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -295,41 +334,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Equals(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking space identifications for equality.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public override Boolean Equals(Object Object)
-        {
+        /// <param name="Object">A parking space identification to compare with.</param>
+        public override Boolean Equals(Object? Object)
 
-            if (Object is null)
-                return false;
-
-            if (!(Object is ParkingSpace_Id))
-                return false;
-
-            return Equals((ParkingSpace_Id) Object);
-
-        }
+            => Object is ParkingSpace_Id parkingSpaceId &&
+                   Equals(parkingSpaceId);
 
         #endregion
 
         #region Equals(ParkingSpaceId)
 
         /// <summary>
-        /// Compares two ParkingSpaceIds for equality.
+        /// Compares two parking space identifications for equality.
         /// </summary>
-        /// <param name="ParkingSpaceId">A ParkingSpaceId to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
+        /// <param name="ParkingSpaceId">A parking space identification to compare with.</param>
         public Boolean Equals(ParkingSpace_Id ParkingSpaceId)
-        {
 
-            if ((Object) ParkingSpaceId is null)
-                return false;
-
-            return String.Equals(InternalId, ParkingSpaceId.InternalId);
-
-        }
+            => String.Equals(InternalId,
+                             ParkingSpaceId.InternalId,
+                             StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -338,10 +363,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (override) GetHashCode()
 
         /// <summary>
-        /// Return the HashCode of this object.
+        /// Return the hash code of this object.
         /// </summary>
         public override Int32 GetHashCode()
-            => InternalId?.GetHashCode() ?? 0;
+
+            => InternalId is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(InternalId);
 
         #endregion
 
@@ -351,6 +377,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return a text representation of this object.
         /// </summary>
         public override String ToString()
+
             => InternalId ?? "";
 
         #endregion

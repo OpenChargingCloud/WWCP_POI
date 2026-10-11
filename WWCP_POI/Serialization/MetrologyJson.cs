@@ -170,7 +170,7 @@ internal static class MetrologyJson
                 ChargingTariffElement.Parse(InfrastructureJson.Entry(token)).ToJSON(), nameof(ChargingTariffElement))));
         }
         if (type is InfrastructureEntityType.ChargingTariff or InfrastructureEntityType.EVSE && field == "energyMix")
-            return PreserveQuantityShape(InfrastructureJson.Entry(value), EnergyMix.Parse(InfrastructureJson.Entry(value)).ToJSON(), nameof(EnergyMix));
+            return PreserveQuantityShape(InfrastructureJson.Entry(value), EnergyMix.Parse(InfrastructureJson.Entry(value)).ToJSON(Embedded: true), nameof(EnergyMix));
         if (type == InfrastructureEntityType.ChargingConnector && field == "cable")
             return PreserveQuantityShape(InfrastructureJson.Entry(value), ChargingCable.Parse(InfrastructureJson.Entry(value)).ToJSON(Embedded: true)!, nameof(ChargingCable));
         if (type == InfrastructureEntityType.ChargingPool && field == "gridConnectionPoint")
@@ -204,8 +204,15 @@ internal static class MetrologyJson
                     property.Value = PreserveQuantityShape(child, normalizedChild, childKind);
                 else if (property.Value is JArray children && normalized[property.Name] is JArray normalizedChildren)
                     for (var index = 0; index < children.Count; index++)
+                    {
                         if (children[index] is JObject item && index < normalizedChildren.Count && normalizedChildren[index] is JObject normalizedItem)
                             children[index] = PreserveQuantityShape(item, normalizedItem, childKind);
+                        // [category, percentage] pairs take their normalized reading.
+                        else if (POIRepresentation.PairKind(childKind) is not null &&
+                                 children[index] is JArray { Count: 2 } pair && pair[1].Type != JTokenType.Null &&
+                                 index < normalizedChildren.Count && normalizedChildren[index] is JArray { Count: 2 } normalizedPair)
+                            pair[1] = normalizedPair[1].DeepClone();
+                    }
             }
         }
         return copy;
@@ -238,6 +245,18 @@ internal static class MetrologyJson
     }
 
     internal static void NormalizeReadings(JObject json, String kind)
+    {
+        NormalizePairs(json, kind);
+        NormalizeDocumentReadings(json, kind);
+    }
+
+    private static void NormalizePairs(JObject json, String kind)
+        => POIRepresentation.VisitPairs(json, kind, (pair, _) => {
+            if (pair[1].Type == JTokenType.String)
+                pair[1] = Percent(ReadPercent(new JObject(new JProperty("percentage", pair[1].DeepClone())), "percentage"));
+        });
+
+    private static void NormalizeDocumentReadings(JObject json, String kind)
         => POIRepresentation.Visit(json, kind, "", (document, type, _) => {
             foreach (var property in document.Properties().ToArray())
             {
@@ -256,7 +275,6 @@ internal static class MetrologyJson
                     case "length": Normalize<Meter>(document, property.Name, Meter.TryParse); break;
                     case "resistance": Normalize<Ohm>(document, property.Name, Ohm.TryParse); break;
                     case "alt": case "altitude": document[property.Name] = AltitudeText(ReadAltitude(document, property.Name)!.Value); break;
-                    case "percentage": document[property.Name] = Percent(ReadPercent(document, property.Name)); break;
                     case "minDuration": case "maxDuration": case "stopChargingAfterTime": case "stopParkingAfterTime":
                         document[property.Name] = DurationText(ReadDuration(document, property.Name)!.Value); break;
                     case "stepSize":

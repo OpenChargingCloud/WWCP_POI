@@ -41,7 +41,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NewStatus">An optional enumeration of all new admin status.</param>
         /// <param name="ChangedStatus">An optional enumeration of all changed admin status.</param>
         /// <param name="RemovedIds">An optional enumeration of all removed admin status.</param>
-        public ChargingPoolAdminStatusDiff(DateTime                                                                  Timestamp,
+        public ChargingPoolAdminStatusDiff(DateTimeOffset                                                            Timestamp,
                                            ChargingStationOperator_Id                                                ChargingStationOperatorId,
                                            I18NString?                                                               ChargingStationOperatorName   = null,
                                            IEnumerable<KeyValuePair<ChargingPool_Id, ChargingPoolAdminStatusType>>?  NewStatus                     = null,

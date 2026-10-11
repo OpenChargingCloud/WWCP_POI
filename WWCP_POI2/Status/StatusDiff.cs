@@ -49,7 +49,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The timestamp of the status diff.
         /// </summary>
-        public DateTime                                     Timestamp     { get; }
+        public DateTimeOffset                               Timestamp     { get; }
 
         /// <summary>
         /// The unique identification of the charging station operator.
@@ -119,7 +119,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NewStatus">An optional enumeration of all new generic status.</param>
         /// <param name="ChangedStatus">An optional enumeration of all generic status.</param>
         /// <param name="RemovedIds">An optional enumeration of all removed generic status.</param>
-        public StatusDiff(DateTime                                      Timestamp,
+        public StatusDiff(DateTimeOffset                                Timestamp,
                           TParentId                                     ParentId,
                           I18NString?                                   ParentName      = null,
                           IEnumerable<KeyValuePair<TId, TStatusType>>?  NewStatus       = null,

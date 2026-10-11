@@ -72,7 +72,7 @@ public sealed class EventPropagationTests
         station.EVSEs.Single().SetStatus(EVSEStatusType.Charging);
         station.SetStatus(ChargingStationStatusType.Charging);
         pool.   SetStatus(ChargingPoolStatusType.Charging);
-        op.     SetStatus(ChargingStationOperatorStatusTypes.Offline);
+        op.     SetStatus(ChargingStationOperatorStatusType.Offline);
         network.SetStatus(RoamingNetworkStatusType.Offline);
     }
 

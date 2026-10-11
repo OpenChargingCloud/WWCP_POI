@@ -42,12 +42,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The new timestamped status of the grid operator.
         /// </summary>
-        public Timestamped<GridOperatorStatusTypes>   NewStatus     { get; }
+        public Timestamped<GridOperatorStatusType>    NewStatus     { get; }
 
         /// <summary>
         /// The old timestamped status of the grid operator.
         /// </summary>
-        public Timestamped<GridOperatorStatusTypes>?  OldStatus     { get; }
+        public Timestamped<GridOperatorStatusType>?   OldStatus     { get; }
 
         /// <summary>
         /// An optional data source or context for this grid operator status update.
@@ -66,8 +66,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="OldStatus">The optional old timestamped status of the grid operator.</param>
         /// <param name="DataSource">An optional data source or context for the grid operator status update.</param>
         public GridOperatorStatusUpdate(GridOperator_Id                        Id,
-                                                   Timestamped<GridOperatorStatusTypes>   NewStatus,
-                                                   Timestamped<GridOperatorStatusTypes>?  OldStatus    = null,
+                                                   Timestamped<GridOperatorStatusType>    NewStatus,
+                                                   Timestamped<GridOperatorStatusType>?   OldStatus    = null,
                                                    String?                                           DataSource   = null)
 
         {

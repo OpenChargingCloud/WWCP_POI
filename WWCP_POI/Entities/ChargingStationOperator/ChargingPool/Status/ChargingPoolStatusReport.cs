@@ -31,7 +31,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="ChargingPool">A charging pool.</param>
         public static ChargingPoolStatusReport GenerateStatusReport            (this ChargingPool                          ChargingPool,
-                                                                                DateTime?                                   Timestamp   = null)
+                                                                                DateTimeOffset?                             Timestamp   = null)
 
             => new (new ChargingPool[] { ChargingPool },
                     Timestamp);
@@ -45,7 +45,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="ChargingPools">An enumeration of charging pools.</param>
         public static ChargingPoolStatusReport GenerateStatusReport            (this IEnumerable<ChargingPool>             ChargingPools,
-                                                                                DateTime?                                   Timestamp   = null)
+                                                                                DateTimeOffset?                             Timestamp   = null)
 
             => new (ChargingPools,
                     Timestamp);
@@ -59,7 +59,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="ChargingStationOperator">A charging station operator.</param>
         public static ChargingPoolStatusReport GenerateChargingPoolStatusReport(this ChargingStationOperator               ChargingStationOperator,
-                                                                                DateTime?                                   Timestamp   = null)
+                                                                                DateTimeOffset?                             Timestamp   = null)
 
             => new (ChargingStationOperator.ChargingPools,
                     Timestamp);
@@ -73,7 +73,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="ChargingStationOperators">An enumeration of charging station operators.</param>
         public static ChargingPoolStatusReport GenerateChargingPoolStatusReport(this IEnumerable<ChargingStationOperator>  ChargingStationOperators,
-                                                                                DateTime?                                   Timestamp   = null)
+                                                                                DateTimeOffset?                             Timestamp   = null)
 
             => new (ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPools),
                     Timestamp);
@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="RoamingNetwork">A roaming network.</param>
         public static ChargingPoolStatusReport GenerateChargingPoolStatusReport(this RoamingNetwork                        RoamingNetwork,
-                                                                                DateTime?                                   Timestamp   = null)
+                                                                                DateTimeOffset?                             Timestamp   = null)
 
             => new (RoamingNetwork.ChargingPools,
                     Timestamp);
@@ -109,7 +109,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingPools">An enumeration of charging pools.</param>
         /// <param name="Timestamp">The optional timestamp of the status report generation.</param>
         public ChargingPoolStatusReport(IEnumerable<ChargingPool>  ChargingPools,
-                                        DateTime?                   Timestamp   = null)
+                                        DateTimeOffset?             Timestamp   = null)
 
             : base(ChargingPools,
                    pool => pool.Status.Value,

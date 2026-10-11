@@ -87,23 +87,6 @@ public partial class Brand
         => POIRepresentation.TryParseCBOR(data, json => Brand.Parse(json), out value, out error);
 }
 
-public partial class EnergyMix
-{
-    /// <summary>
-    /// Parse a CBOR POI representation, including its metrological values and content identifiers.
-    /// </summary>
-    public static EnergyMix ParseCBOR(ReadOnlySpan<Byte> data)
-        => POIRepresentation.ParseCBOR(data, json => EnergyMix.Parse(json));
-
-    /// <summary>
-    /// Try to parse a CBOR POI representation with the same parent context as JSON.
-    /// </summary>
-    public static Boolean TryParseCBOR(ReadOnlySpan<Byte> data,
-                                       [NotNullWhen(true)] out EnergyMix? value,
-                                       [NotNullWhen(false)] out String? error)
-        => POIRepresentation.TryParseCBOR(data, json => EnergyMix.Parse(json), out value, out error);
-}
-
 public partial class ChargingProduct
 {
     /// <summary>

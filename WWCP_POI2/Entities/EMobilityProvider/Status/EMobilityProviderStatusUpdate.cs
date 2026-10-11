@@ -41,12 +41,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The old timestamped status of the e-mobility provider.
         /// </summary>
-        public Timestamped<EMobilityProviderStatusTypes>  OldStatus    { get; }
+        public Timestamped<EMobilityProviderStatusType>   OldStatus    { get; }
 
         /// <summary>
         /// The new timestamped status of the e-mobility provider.
         /// </summary>
-        public Timestamped<EMobilityProviderStatusTypes>  NewStatus    { get; }
+        public Timestamped<EMobilityProviderStatusType>   NewStatus    { get; }
 
         #endregion
 
@@ -59,8 +59,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="OldStatus">The old timestamped status of the e-mobility provider.</param>
         /// <param name="NewStatus">The new timestamped status of the e-mobility provider.</param>
         public EMobilityProviderStatusUpdate(EMobilityProvider_Id                       Id,
-                                                   Timestamped<EMobilityProviderStatusTypes>  OldStatus,
-                                                   Timestamped<EMobilityProviderStatusTypes>  NewStatus)
+                                                   Timestamped<EMobilityProviderStatusType>   OldStatus,
+                                                   Timestamped<EMobilityProviderStatusType>   NewStatus)
 
         {
 

@@ -56,7 +56,7 @@ namespace WWCP_POI_Tests.Json
                 "counter": 42
               },
               "status": {
-                "value": "Operational",
+                "value": "active",
                 "timestamp": "2026-02-01T00:00:00Z"
               },
               "adminStatus": {
@@ -108,16 +108,10 @@ namespace WWCP_POI_Tests.Json
                   "de": "Test"
                 },
                 "energySources": [
-                  {
-                    "source": "solar",
-                    "percentage": "100 %"
-                  }
+                  [ "solar", "100 %" ]
                 ],
                 "environmentalImpacts": [
-                  {
-                    "impact": "CO2",
-                    "percentage": "0 %"
-                  }
+                  [ "CO2", "0 %" ]
                 ]
               }
             }
@@ -372,8 +366,8 @@ namespace WWCP_POI_Tests.Json
             Assert.That(tariff.DataSource, Is.EqualTo("tariff-feed"));
             Assert.That(tariff.Created, Is.EqualTo(DateTimeOffset.Parse("2026-01-01T00:00:00Z")));
             Assert.That(tariff.LastChangeDate, Is.EqualTo(DateTimeOffset.Parse("2026-02-01T00:00:00Z")));
-            Assert.That(tariff.Status.Value, Is.EqualTo(ChargingTariffStatusTypes.Operational));
-            Assert.That(tariff.AdminStatus.Value, Is.EqualTo(ChargingTariffAdminStatusTypes.Planned));
+            Assert.That(tariff.Status.Value, Is.EqualTo(ChargingTariffStatusType.Active));
+            Assert.That(tariff.AdminStatus.Value, Is.EqualTo(ChargingTariffAdminStatusType.Planned));
             Assert.That(tariff.CustomData.ToJObject()["counter"]!.Value<int>(), Is.EqualTo(42));
             Assert.That(restored.EVSEs.Single(evse => evse.Id.ToString() == "DE*ABC*E1").ChargingTariffs.Single(), Is.SameAs(tariff));
             Assert.That(JsonViews.EqualViews(snapshot, restored.ToJSONSnapshot()), Is.True);
@@ -580,7 +574,7 @@ namespace WWCP_POI_Tests.Json
 
             Assert.That(unknown.EnergySources, Is.Empty);
             Assert.That(unknown.EnvironmentalImpacts, Is.Empty);
-            Assert.That(EnergyMix.TryParse(JObject.Parse("""{"energySources":[{"source":"solar","percent":101}]}"""), out _, out _), Is.False);
+            Assert.That(EnergyMix.TryParse(JObject.Parse("""{"energySources":[["solar","101 %"]],"environmentalImpacts":[],"supplierName":{},"productName":{}}"""), out _, out _), Is.False);
 
         }
 

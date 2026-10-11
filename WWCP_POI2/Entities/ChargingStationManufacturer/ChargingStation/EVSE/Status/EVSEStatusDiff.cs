@@ -41,7 +41,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NewStatus">An optional enumeration of all new EVSE status.</param>
         /// <param name="ChangedStatus">An optional enumeration of all changed EVSE status.</param>
         /// <param name="RemovedIds">An optional enumeration of all removed EVSE status.</param>
-        public EVSEStatusDiff(DateTime                                              Timestamp,
+        public EVSEStatusDiff(DateTimeOffset                                        Timestamp,
                               ChargingStationOperator_Id                            ChargingStationOperatorId,
                               I18NString?                                           ChargingStationOperatorName   = null,
                               IEnumerable<KeyValuePair<EVSE_Id, EVSEStatusType>>?  NewStatus                     = null,

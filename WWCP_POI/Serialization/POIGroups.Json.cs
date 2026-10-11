@@ -20,7 +20,7 @@ public partial class EVSEGroup
              InfrastructureJson.Object(json, "brand") is { } brand ? Brand.Parse(brand) : null,
              POIReferenceJSON.Priority(json), POIReferenceJSON.Tariff(json, op),
              InfrastructureJson.Licenses(json), Members: members, MemberIds: allowed);
-        InfrastructureJson.RestoreMetadata(json, result, EVSEGroupAdminStatusTypes.TryParse, EVSEGroupStatusTypes.TryParse);
+        InfrastructureJson.RestoreMetadata(json, result, EVSEGroupAdminStatusType.TryParse, EVSEGroupStatusType.TryParse);
         return result;
     }
 
@@ -46,7 +46,7 @@ public partial class ChargingStationGroup
              InfrastructureJson.Object(json, "brand") is { } brand ? Brand.Parse(brand) : null,
              POIReferenceJSON.Priority(json), POIReferenceJSON.Tariff(json, op),
              InfrastructureJson.Licenses(json), Members: members, MemberIds: allowed);
-        InfrastructureJson.RestoreMetadata(json, result, ChargingStationGroupAdminStatusTypes.TryParse, ChargingStationGroupStatusTypes.TryParse);
+        InfrastructureJson.RestoreMetadata(json, result, ChargingStationGroupAdminStatusType.TryParse, ChargingStationGroupStatusType.TryParse);
         return result;
     }
 
@@ -72,7 +72,7 @@ public partial class ChargingPoolGroup
              InfrastructureJson.Object(json, "brand") is { } brand ? Brand.Parse(brand) : null,
              POIReferenceJSON.Priority(json), POIReferenceJSON.Tariff(json, op),
              InfrastructureJson.Licenses(json), Members: members, MemberIds: allowed);
-        InfrastructureJson.RestoreMetadata(json, result, ChargingPoolGroupAdminStatusTypes.TryParse, ChargingPoolGroupStatusTypes.TryParse);
+        InfrastructureJson.RestoreMetadata(json, result, ChargingPoolGroupAdminStatusType.TryParse, ChargingPoolGroupStatusType.TryParse);
         return result;
     }
 
@@ -94,7 +94,7 @@ public partial class ChargingTariffGroup
         var result = new ChargingTariffGroup(ChargingTariffGroup_Id.Parse(POIValueJSON.Required(json, "@id")), op,
             POIValueJSON.Text(json, "description"), POIReferenceJSON.Resolve(json, "chargingTariffIds", ChargingTariff_Id.Parse,
             op.ChargingTariffs, value => value.Id));
-        InfrastructureJson.RestoreMetadata(json, result, ChargingTariffGroupAdminStatusTypes.TryParse, ChargingTariffGroupStatusTypes.TryParse);
+        InfrastructureJson.RestoreMetadata(json, result, ChargingTariffGroupAdminStatusType.TryParse, ChargingTariffGroupStatusType.TryParse);
         return result;
     }
 
@@ -119,7 +119,7 @@ public partial class ParkingGarage
                  throw new ArgumentException("geometry: invalid coordinate.")),
              POIReferenceJSON.Resolve(json, "chargingStationIds", ChargingStation_Id.Parse, stations ?? [], value => value.Id),
              InfrastructureJson.Array(json, "parkingProductIds", token => ParkingProduct_Id.Parse(POIReferenceJSON.Id(token))));
-        InfrastructureJson.RestoreMetadata(json, result, ParkingGarageAdminStatusTypes.TryParse, ParkingGarageStatusTypes.TryParse);
+        InfrastructureJson.RestoreMetadata(json, result, ParkingGarageAdminStatusType.TryParse, ParkingGarageStatusType.TryParse);
         return result;
     }
 
@@ -151,7 +151,7 @@ public partial class ParkingSpace
              InfrastructureJson.Array(json, "sensors", POIReferenceJSON.Id),
              InfrastructureJson.Array(json, "parkingProductIds", token => ParkingProduct_Id.Parse(POIReferenceJSON.Id(token))),
              InfrastructureJson.Text(json, "parkingGarageId") is { } garage ? ParkingGarage_Id.Parse(garage) : null);
-        InfrastructureJson.RestoreMetadata(json, result, ParkingSpaceAdminStatusTypes.TryParse, ParkingSpaceStatusTypes.TryParse);
+        InfrastructureJson.RestoreMetadata(json, result, ParkingSpaceAdminStatusType.TryParse, ParkingSpaceStatusType.TryParse);
         return result;
     }
 
@@ -180,7 +180,7 @@ public partial class ParkingSensor
              InfrastructureJson.Array(json, "geometry", token => InfrastructureJson.Location(new JObject(new JProperty("geoLocation", token.DeepClone()))) ??
                  throw new ArgumentException("geometry: invalid coordinate.")),
              POIReferenceJSON.Resolve(json, "chargingStationIds", ChargingStation_Id.Parse, stations ?? [], value => value.Id));
-        InfrastructureJson.RestoreMetadata(json, result, ParkingSensorAdminStatusTypes.TryParse, ParkingSensorStatusTypes.TryParse);
+        InfrastructureJson.RestoreMetadata(json, result, ParkingSensorAdminStatusType.TryParse, ParkingSensorStatusType.TryParse);
         return result;
     }
 
@@ -212,7 +212,7 @@ public partial class ParkingSpaceGroup
              InfrastructureJson.Array(json, "sensors", POIReferenceJSON.Id),
              InfrastructureJson.Array(json, "parkingProductIds", token => ParkingProduct_Id.Parse(POIReferenceJSON.Id(token))),
              InfrastructureJson.Array(json, "parkingSpaceIds", token => ParkingSpace_Id.Parse(POIReferenceJSON.Id(token))));
-        InfrastructureJson.RestoreMetadata(json, result, ParkingSpaceGroupAdminStatusTypes.TryParse, ParkingSpaceGroupStatusTypes.TryParse);
+        InfrastructureJson.RestoreMetadata(json, result, ParkingSpaceGroupAdminStatusType.TryParse, ParkingSpaceGroupStatusType.TryParse);
         return result;
     }
 

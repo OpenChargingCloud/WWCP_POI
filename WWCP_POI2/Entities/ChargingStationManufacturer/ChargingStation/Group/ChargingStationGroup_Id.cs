@@ -30,10 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of of a group of electric vehicle charging stations.
     /// </summary>
-    public readonly struct ChargingStationGroup_Id : IId,
-                                                     IEquatable<ChargingStationGroup_Id>,
-                                                     IComparable<ChargingStationGroup_Id>
-
+    public readonly struct ChargingStationGroup_Id : IId<ChargingStationGroup_Id>
     {
 
         #region Data
@@ -253,12 +250,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingStationGroupId1">A charging station group identification.</param>
         /// <param name="ChargingStationGroupId2">Another charging station group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator == (ChargingStationGroup_Id ChargingStationGroupId1, ChargingStationGroup_Id ChargingStationGroupId2)
-        {
+        public static Boolean operator == (ChargingStationGroup_Id ChargingStationGroupId1,
+                                           ChargingStationGroup_Id ChargingStationGroupId2)
 
-            return ChargingStationGroupId1.Equals(ChargingStationGroupId2);
-
-        }
+            => ChargingStationGroupId1.Equals(ChargingStationGroupId2);
 
         #endregion
 
@@ -270,8 +265,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingStationGroupId1">A charging station group identification.</param>
         /// <param name="ChargingStationGroupId2">Another charging station group identification.</param>
         /// <returns>False if both match; True otherwise.</returns>
-        public static Boolean operator != (ChargingStationGroup_Id ChargingStationGroupId1, ChargingStationGroup_Id ChargingStationGroupId2)
-            => !(ChargingStationGroupId1 == ChargingStationGroupId2);
+        public static Boolean operator != (ChargingStationGroup_Id ChargingStationGroupId1,
+                                           ChargingStationGroup_Id ChargingStationGroupId2)
+
+            => !ChargingStationGroupId1.Equals(ChargingStationGroupId2);
 
         #endregion
 
@@ -283,15 +280,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingStationGroupId1">A charging station group identification.</param>
         /// <param name="ChargingStationGroupId2">Another charging station group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator < (ChargingStationGroup_Id ChargingStationGroupId1, ChargingStationGroup_Id ChargingStationGroupId2)
-        {
+        public static Boolean operator < (ChargingStationGroup_Id ChargingStationGroupId1,
+                                          ChargingStationGroup_Id ChargingStationGroupId2)
 
-            if ((Object) ChargingStationGroupId1 is null)
-                throw new ArgumentNullException(nameof(ChargingStationGroupId1), "The given ChargingStationGroupId1 must not be null!");
-
-            return ChargingStationGroupId1.CompareTo(ChargingStationGroupId2) < 0;
-
-        }
+            => ChargingStationGroupId1.CompareTo(ChargingStationGroupId2) < 0;
 
         #endregion
 
@@ -303,8 +295,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingStationGroupId1">A charging station group identification.</param>
         /// <param name="ChargingStationGroupId2">Another charging station group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <= (ChargingStationGroup_Id ChargingStationGroupId1, ChargingStationGroup_Id ChargingStationGroupId2)
-            => !(ChargingStationGroupId1 > ChargingStationGroupId2);
+        public static Boolean operator <= (ChargingStationGroup_Id ChargingStationGroupId1,
+                                           ChargingStationGroup_Id ChargingStationGroupId2)
+
+            => ChargingStationGroupId1.CompareTo(ChargingStationGroupId2) <= 0;
 
         #endregion
 
@@ -316,15 +310,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingStationGroupId1">A charging station group identification.</param>
         /// <param name="ChargingStationGroupId2">Another charging station group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator > (ChargingStationGroup_Id ChargingStationGroupId1, ChargingStationGroup_Id ChargingStationGroupId2)
-        {
+        public static Boolean operator > (ChargingStationGroup_Id ChargingStationGroupId1,
+                                          ChargingStationGroup_Id ChargingStationGroupId2)
 
-            if ((Object) ChargingStationGroupId1 is null)
-                throw new ArgumentNullException(nameof(ChargingStationGroupId1), "The given ChargingStationGroupId1 must not be null!");
-
-            return ChargingStationGroupId1.CompareTo(ChargingStationGroupId2) > 0;
-
-        }
+            => ChargingStationGroupId1.CompareTo(ChargingStationGroupId2) > 0;
 
         #endregion
 
@@ -336,60 +325,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingStationGroupId1">A charging station group identification.</param>
         /// <param name="ChargingStationGroupId2">Another charging station group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >= (ChargingStationGroup_Id ChargingStationGroupId1, ChargingStationGroup_Id ChargingStationGroupId2)
-            => !(ChargingStationGroupId1 < ChargingStationGroupId2);
+        public static Boolean operator >= (ChargingStationGroup_Id ChargingStationGroupId1,
+                                           ChargingStationGroup_Id ChargingStationGroupId2)
+
+            => ChargingStationGroupId1.CompareTo(ChargingStationGroupId2) >= 0;
 
         #endregion
 
         #endregion
 
-        #region IComparable<ChargingStationGroup_Id> Members
+        #region IComparable<ChargingStationGroupId> Members
 
         #region CompareTo(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two charging station group identifications.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        public Int32 CompareTo(Object Object)
-        {
+        /// <param name="Object">A charging station group identification to compare with.</param>
+        public Int32 CompareTo(Object? Object)
 
-            if (Object is null)
-                throw new ArgumentNullException(nameof(Object), "The given object must not be null!");
-
-            if (!(Object is ChargingStationGroup_Id))
-                throw new ArgumentException("The given object is not a charging station group identification!", nameof(Object));
-
-            return CompareTo((ChargingStationGroup_Id) Object);
-
-        }
+            => Object is ChargingStationGroup_Id chargingStationGroupId
+                   ? CompareTo(chargingStationGroupId)
+                   : throw new ArgumentException("The given object is not a charging station group identification!",
+                                                 nameof(Object));
 
         #endregion
 
-        #region CompareTo(ChargingStationId)
+        #region CompareTo(ChargingStationGroupId)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two charging station group identifications.
         /// </summary>
-        /// <param name="ChargingStationId">An object to compare with.</param>
-        public Int32 CompareTo(ChargingStationGroup_Id ChargingStationId)
+        /// <param name="ChargingStationGroupId">A charging station group identification to compare with.</param>
+        public Int32 CompareTo(ChargingStationGroup_Id ChargingStationGroupId)
         {
 
-            if ((Object) ChargingStationId is null)
-                throw new ArgumentNullException(nameof(ChargingStationId), "The given charging station group identification must not be null!");
+            var c = OperatorId.CompareTo(ChargingStationGroupId.OperatorId);
 
-            // Compare the length of the identifications
-            var _Result = Length.CompareTo(ChargingStationId.Length);
+            if (c == 0)
+                c = String.Compare(Suffix,
+                                   ChargingStationGroupId.Suffix,
+                                   StringComparison.OrdinalIgnoreCase);
 
-            // If equal: Compare charging operator identifications
-            if (_Result == 0)
-                _Result = OperatorId.CompareTo(ChargingStationId.OperatorId);
-
-            // If equal: Compare suffix
-            if (_Result == 0)
-                _Result = String.Compare(Suffix, ChargingStationId.Suffix, StringComparison.Ordinal);
-
-            return _Result;
+            return c;
 
         }
 
@@ -397,47 +375,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region IEquatable<ChargingStationGroup_Id> Members
+        #region IEquatable<ChargingStationGroupId> Members
 
         #region Equals(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two charging station group identifications for equality.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public override Boolean Equals(Object Object)
-        {
+        /// <param name="Object">A charging station group identification to compare with.</param>
+        public override Boolean Equals(Object? Object)
 
-            if (Object is null)
-                return false;
-
-            if (!(Object is ChargingStationGroup_Id))
-                return false;
-
-            return Equals((ChargingStationGroup_Id) Object);
-
-        }
+            => Object is ChargingStationGroup_Id chargingStationGroupId &&
+                   Equals(chargingStationGroupId);
 
         #endregion
 
-        #region Equals(ChargingStationId)
+        #region Equals(ChargingStationGroupId)
 
         /// <summary>
         /// Compares two charging station group identifications for equality.
         /// </summary>
-        /// <param name="ChargingStationId">A charging station group identification to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public Boolean Equals(ChargingStationGroup_Id ChargingStationId)
-        {
+        /// <param name="ChargingStationGroupId">A charging station group identification to compare with.</param>
+        public Boolean Equals(ChargingStationGroup_Id ChargingStationGroupId)
 
-            if ((Object) ChargingStationId is null)
-                return false;
+            => OperatorId.Equals(ChargingStationGroupId.OperatorId) &&
 
-            return OperatorId.Equals(ChargingStationId.OperatorId) &&
-                   String.Equals(Suffix, ChargingStationId.Suffix);
-
-        }
+               String.Equals(Suffix,
+                             ChargingStationGroupId.Suffix,
+                             StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -451,7 +416,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public override Int32 GetHashCode()
 
             => OperatorId.GetHashCode() ^
-              (Suffix?.GetHashCode() ?? 0);
+              (Suffix is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Suffix));
 
         #endregion
 

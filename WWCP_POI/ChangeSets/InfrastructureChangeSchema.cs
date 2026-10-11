@@ -118,7 +118,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 InfrastructureEntityType.ChargingPool             => PoolIdentity(ChargingPool_Id.Parse(text)),
                 InfrastructureEntityType.ChargingStation          => StationIdentity(ChargingStation_Id.Parse(text)),
                 InfrastructureEntityType.EVSE                     => EVSEIdentity(EVSE_Id.Parse(text)),
-                InfrastructureEntityType.ChargingConnector        => ChargingConnector_Id.Parse(text).ToString(),
+                InfrastructureEntityType.ChargingConnector        => ChargingConnector_Id.Parse(text).ToString().ToUpperInvariant(),
                 InfrastructureEntityType.ChargingTariff           => TariffIdentity(ChargingTariff_Id.Parse(text)),
                 InfrastructureEntityType.EVSEGroup                 => GroupIdentity(EVSEGroup_Id.Parse(text).OperatorId, EVSEGroup_Id.Parse(text).Suffix),
                 InfrastructureEntityType.ChargingStationGroup     => GroupIdentity(ChargingStationGroup_Id.Parse(text).OperatorId, ChargingStationGroup_Id.Parse(text).Suffix),
@@ -126,9 +126,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 InfrastructureEntityType.ChargingTariffGroup      => GroupIdentity(ChargingTariffGroup_Id.Parse(text).OperatorId, ChargingTariffGroup_Id.Parse(text).Suffix),
                 InfrastructureEntityType.ChargingStationManufacturer => Id(type, text).ToUpperInvariant(),
                 InfrastructureEntityType.GridOperator             => GridOperator_Id.Parse(text).CountryCode.Alpha2Code + ":" + GridOperator_Id.Parse(text).Suffix,
-                InfrastructureEntityType.ParkingOperator          => Id(type, text).ToUpperInvariant(),
+                InfrastructureEntityType.ParkingOperator or
                 InfrastructureEntityType.ParkingGarage or InfrastructureEntityType.ParkingSpace or
-                InfrastructureEntityType.ParkingSensor or InfrastructureEntityType.ParkingSpaceGroup or
+                InfrastructureEntityType.ParkingSensor or InfrastructureEntityType.ParkingSpaceGroup => Id(type, text).ToUpperInvariant(),
                 InfrastructureEntityType.ParkingProduct or InfrastructureEntityType.TransparencySoftware or
                 InfrastructureEntityType.TransparencySoftwareCertificate => Id(type, text),
                 _                                                => throw new ArgumentOutOfRangeException(nameof(type))
@@ -139,7 +139,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => id.CountryCode.Alpha2Code + ":" + id.Suffix;
 
         private static String GroupIdentity(ChargingStationOperator_Id operatorId, String suffix)
-            => operatorId.ToString().ToUpperInvariant() + ":" + suffix;
+            => operatorId.ToString().ToUpperInvariant() + ":" + suffix.ToUpperInvariant();
 
         internal static String IdField(InfrastructureEntityType type)
             => type is InfrastructureEntityType.GridOperator or InfrastructureEntityType.ParkingOperator ? "id" : "@id";

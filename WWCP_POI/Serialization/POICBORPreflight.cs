@@ -104,8 +104,24 @@ internal sealed class POICBORPreflight(Int32 remainingDepth, POICBORReadingCache
                 var index = 0;
                 foreach (var item in value.EnumerateArray())
                 {
-                    var child = item.ValueKind == JsonValueKind.Object ? kind : null;
-                    Visit(item, child, depth + 1, changeSetReadings is not null || child is not null ? path + "/" + index.ToString(CultureInfo.InvariantCulture) : "");
+                    var itemPath = path + "/" + index.ToString(CultureInfo.InvariantCulture);
+                    if (kind is not null && item.ValueKind == JsonValueKind.String && POIRepresentation.IsPairReading(kind, index))
+                    {
+                        var text = item.GetString()!;
+                        if (readings is not null) Leaf(readings.Read(text, itemPath), depth + 1);
+                        else
+                        {
+                            if (!MetrologicalValue.TryParse(text, out var reading, out var error))
+                                throw new ArgumentException($"{itemPath}: cannot encode a Styx metrological value: {error}");
+                            Leaf(reading.ToCBOR(), depth + 1);
+                        }
+                    }
+                    else
+                    {
+                        var child = item.ValueKind == JsonValueKind.Object ? kind :
+                                    item.ValueKind == JsonValueKind.Array && kind is not null ? POIRepresentation.PairKind(kind) : null;
+                        Visit(item, child, depth + 1, changeSetReadings is not null || child is not null ? itemPath : "");
+                    }
                     index++;
                 }
                 break;

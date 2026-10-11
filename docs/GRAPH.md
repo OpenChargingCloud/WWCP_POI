@@ -33,11 +33,12 @@ JSON/CBOR. Group membership, tariff assignments and parking links use identifier
 | ParkingOperator | `parkingProducts` | ParkingProduct | `@id` |
 
 The root uses `@id`. All other graph identities are unique per node type within a network,
-except connectors. Domain comparison rules apply: group suffixes and parking child IDs are
-case-sensitive, as are software/certificate/product IDs; manufacturer and parking operator IDs are case-insensitive. A group's embedded
+except connectors. Domain comparison rules apply: all IDs compare without case sensitivity, and
+the suffixes of pools, stations, EVSEs and tariffs also ignore stars; only the opaque software,
+certificate and parking product IDs are case-sensitive. A group's embedded
 operator identity must match its owner. Each group type has its own wire ID prefix: `*EG` for EVSE,
 `*SG` for charging station, `*PG` for charging pool and `*TG` for charging tariff groups: the entity's
-letter first, then `G`. WWCP Core still writes `*GE`, `*GS` and `*GP`.
+letter first, then `G`.
 
 Import grid operators, manufacturers, software and certificates before infrastructure. Import
 tariffs and infrastructure before groups, and charging infrastructure before parking operators. Network parsers perform this ordering themselves, regardless of JSON property order.

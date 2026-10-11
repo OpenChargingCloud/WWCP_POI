@@ -35,8 +35,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// A parking space.
     /// </summary>
     public sealed partial class ParkingSpaceGroup : AImmutableEMobilityEntity<ParkingSpaceGroup_Id,
-                                                 ParkingSpaceGroupAdminStatusTypes,
-                                                 ParkingSpaceGroupStatusTypes>,
+                                                 ParkingSpaceGroupAdminStatusType,
+                                                 ParkingSpaceGroupStatusType>,
                                 IEquatable<ParkingSpaceGroup>, IComparable<ParkingSpaceGroup>, IComparable
     {
 
@@ -174,7 +174,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               String? OSM_WayId = null, IEnumerable<GeoCoordinate>? Geometry = null,
                               IEnumerable<ChargingStation>? ChargingStations = null, IEnumerable<String>? Sensors = null,
                               IEnumerable<ParkingProduct_Id>? ParkingProductIds = null, IEnumerable<ParkingSpace_Id>? ParkingSpaceIds = null)
-            : base(Id, Name ?? I18NString.Create(Id.ToString()), Description)
+            : base(Id,
+                   Name ?? I18NString.Create(Id.ToString()),
+                   Description,
+                   // Without a known status, the status is unspecified since the beginning of time.
+                   new Timestamped<ParkingSpaceGroupAdminStatusType>(default, ParkingSpaceGroupAdminStatusType.Unspecified),
+                   new Timestamped<ParkingSpaceGroupStatusType>     (default, ParkingSpaceGroupStatusType.Unspecified))
         {
             this.ParkingProductIds = POIGraphJSON.ReferenceIds(ParkingProductIds ?? [], InfrastructureEntityType.ParkingProduct);
             this.ParkingSpaceIds = POIGraphJSON.ReferenceIds(ParkingSpaceIds ?? [], InfrastructureEntityType.ParkingSpace);

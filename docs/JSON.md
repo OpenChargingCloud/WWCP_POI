@@ -349,7 +349,7 @@ can lose decimal precision before the domain parser sees it; that loss cannot be
 | Tariff energy/current billing increments | Positive unit-bearing `stepSize`, e.g. `"1 kWh"` or `"0.5 A"` |
 | Cable length/resistance | Unit-bearing strings, e.g. `"5.25 m"`, `"1250.5 µΩ"` |
 | Geographic `alt`/`altitude` | Unit-bearing metre strings such as `"25.125 m"`; coordinates retain their geographic representation |
-| Energy-source/environmental-impact shares | Unit-bearing `percentage`, e.g. `"25 %"` |
+| Energy-source/environmental-impact shares | `[category, percentage]` pairs with a unit-bearing percentage, e.g. `["solar", "25 %"]` |
 | Product/tariff durations | Unit-bearing strings such as `"300 s"`, with TimeSpan tick precision |
 | Tariff billing duration increments | Positive unit-bearing strings such as `"0.5 s"` |
 | Flat tariff fees | No `stepSize` property |
@@ -357,8 +357,9 @@ can lose decimal precision before the domain parser sees it; that loss cannot be
 
 Formatting uses invariant decimal separators and selects SI prefixes while preserving the full
 stored decimal precision. Property names identify quantities, independent of their chosen unit:
-product `stopChargingAfterEnergy`, tariff restriction `minEnergy`/`maxEnergy` and energy-mix
-`percentage`. There are no field aliases or implicit scales. Each quantity must be a JSON
+product `stopChargingAfterEnergy` and tariff restriction `minEnergy`/`maxEnergy`; in the
+`[category, percentage]` pairs of an energy mix, the second element is the quantity. There are no
+field aliases or implicit scales. Each quantity must be a JSON
 string containing its numerical value and a supported SI unit or SI prefix. Numeric JSON values,
 unitless strings and quantities with the wrong dimension are rejected, including in ChangeSets.
 
@@ -390,7 +391,9 @@ coordinate, product and authentication details.
 
 - Charging modes require a flat array of enum names; nested arrays are rejected.
 - `currentType` remains an array of enum names.
-- Energy mixes require `energySources` and `environmentalImpacts` arrays; use `[]` for unknown composition.
+- Energy mixes require `energySources` and `environmentalImpacts` arrays of `[category, percentage]` pairs,
+  e.g. `[["solar", "60 %"], ["wind", "40 %"]]`; use `[]` for unknown composition. A category must not
+  be given twice, and percentages are written culture-invariant and round-trippable.
 - Software `name` is a multi-language object, and `openSourceLicenses` is a nonempty array of license
   objects with distinct `@id`s, written in a canonical order; string names, string licenses, a single
   `openSourceLicense` object and alternative field names are rejected. Optional descriptions and URLs

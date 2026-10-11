@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="AdminStatus">A charging station operator admin status.</param>
         public static Boolean Contains(this IEnumerable<ChargingStationOperatorAdminStatus>  ChargingStationOperatorAdminStatus,
                                        ChargingStationOperator_Id                            Id,
-                                       ChargingStationOperatorAdminStatusTypes               AdminStatus)
+                                       ChargingStationOperatorAdminStatusType               AdminStatus)
         {
 
             foreach (var status in ChargingStationOperatorAdminStatus)
@@ -126,7 +126,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The current admin status of the charging station operator.
         /// </summary>
-        public ChargingStationOperatorAdminStatusTypes  AdminStatus    { get; }
+        public ChargingStationOperatorAdminStatusType  AdminStatus    { get; }
 
         /// <summary>
         /// The timestamp of the current admin status of the charging station operator.
@@ -136,7 +136,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The timestamped admin status of the charging station operator.
         /// </summary>
-        public Timestamped<ChargingStationOperatorAdminStatusTypes> TimestampedAdminStatus
+        public Timestamped<ChargingStationOperatorAdminStatusType> TimestampedAdminStatus
             => new (Timestamp, AdminStatus);
 
         #endregion
@@ -152,7 +152,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="AdminStatus">The current timestamped adminstatus of the charging station operator.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public ChargingStationOperatorAdminStatus(ChargingStationOperator_Id                            Id,
-                                                  Timestamped<ChargingStationOperatorAdminStatusTypes>  AdminStatus,
+                                                  Timestamped<ChargingStationOperatorAdminStatusType>  AdminStatus,
                                                   CustomDataNew?                                        CustomData     = null,
                                                   UserDefinedDictionary?                                InternalData   = null)
 
@@ -180,8 +180,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Timestamp">The timestamp of the status change of the charging station operator.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public ChargingStationOperatorAdminStatus(ChargingStationOperator_Id               Id,
-                                                  ChargingStationOperatorAdminStatusTypes  AdminStatus,
-                                                  DateTime                                 Timestamp,
+                                                  ChargingStationOperatorAdminStatusType  AdminStatus,
+                                                  DateTimeOffset                           Timestamp,
                                                   CustomDataNew?                           CustomData     = null,
                                                   UserDefinedDictionary?                   InternalData   = null)
 

@@ -79,7 +79,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSONContext">The JSON context of this status report.</param>
         public StatusReport(IEnumerable<TEntity>    Entities,
                             Func<TEntity, TStatus>  GetStatusDelegate,
-                            DateTime?               Timestamp        = null,
+                            DateTimeOffset?         Timestamp        = null,
                             String?                 JSONContext      = null)
         {
 

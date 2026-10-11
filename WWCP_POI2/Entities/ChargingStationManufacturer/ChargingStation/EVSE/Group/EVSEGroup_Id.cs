@@ -30,16 +30,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of a group of Electric Vehicle Supply Equipments (EVSEs).
     /// </summary>
-    public readonly struct EVSEGroup_Id : IId,
-                                          IEquatable<EVSEGroup_Id>,
-                                          IComparable<EVSEGroup_Id>
-
+    public readonly struct EVSEGroup_Id : IId<EVSEGroup_Id>
     {
 
         #region Data
 
-        //ToDo: Replace with better randomness!
-        private static readonly Random _Random            = new Random();
+
 
         /// <summary>
         /// The regular expression for parsing an EVSE group identification.
@@ -259,15 +255,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="EVSEGroupId1">An EVSE group identification.</param>
+        /// <param name="EVSEGroupId1">A EVSE group identification.</param>
         /// <param name="EVSEGroupId2">Another EVSE group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator == (EVSEGroup_Id EVSEGroupId1, EVSEGroup_Id EVSEGroupId2)
-        {
+        public static Boolean operator == (EVSEGroup_Id EVSEGroupId1,
+                                           EVSEGroup_Id EVSEGroupId2)
 
-            return EVSEGroupId1.Equals(EVSEGroupId2);
-
-        }
+            => EVSEGroupId1.Equals(EVSEGroupId2);
 
         #endregion
 
@@ -276,11 +270,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="EVSEGroupId1">An EVSE group identification.</param>
+        /// <param name="EVSEGroupId1">A EVSE group identification.</param>
         /// <param name="EVSEGroupId2">Another EVSE group identification.</param>
         /// <returns>False if both match; True otherwise.</returns>
-        public static Boolean operator != (EVSEGroup_Id EVSEGroupId1, EVSEGroup_Id EVSEGroupId2)
-            => !(EVSEGroupId1 == EVSEGroupId2);
+        public static Boolean operator != (EVSEGroup_Id EVSEGroupId1,
+                                           EVSEGroup_Id EVSEGroupId2)
+
+            => !EVSEGroupId1.Equals(EVSEGroupId2);
 
         #endregion
 
@@ -289,18 +285,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="EVSEGroupId1">An EVSE group identification.</param>
+        /// <param name="EVSEGroupId1">A EVSE group identification.</param>
         /// <param name="EVSEGroupId2">Another EVSE group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator < (EVSEGroup_Id EVSEGroupId1, EVSEGroup_Id EVSEGroupId2)
-        {
+        public static Boolean operator < (EVSEGroup_Id EVSEGroupId1,
+                                          EVSEGroup_Id EVSEGroupId2)
 
-            if ((Object) EVSEGroupId1 is null)
-                throw new ArgumentNullException(nameof(EVSEGroupId1), "The given EVSEGroupId1 must not be null!");
-
-            return EVSEGroupId1.CompareTo(EVSEGroupId2) < 0;
-
-        }
+            => EVSEGroupId1.CompareTo(EVSEGroupId2) < 0;
 
         #endregion
 
@@ -309,11 +300,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="EVSEGroupId1">An EVSE group identification.</param>
+        /// <param name="EVSEGroupId1">A EVSE group identification.</param>
         /// <param name="EVSEGroupId2">Another EVSE group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <= (EVSEGroup_Id EVSEGroupId1, EVSEGroup_Id EVSEGroupId2)
-            => !(EVSEGroupId1 > EVSEGroupId2);
+        public static Boolean operator <= (EVSEGroup_Id EVSEGroupId1,
+                                           EVSEGroup_Id EVSEGroupId2)
+
+            => EVSEGroupId1.CompareTo(EVSEGroupId2) <= 0;
 
         #endregion
 
@@ -322,18 +315,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="EVSEGroupId1">An EVSE group identification.</param>
+        /// <param name="EVSEGroupId1">A EVSE group identification.</param>
         /// <param name="EVSEGroupId2">Another EVSE group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator > (EVSEGroup_Id EVSEGroupId1, EVSEGroup_Id EVSEGroupId2)
-        {
+        public static Boolean operator > (EVSEGroup_Id EVSEGroupId1,
+                                          EVSEGroup_Id EVSEGroupId2)
 
-            if ((Object) EVSEGroupId1 is null)
-                throw new ArgumentNullException(nameof(EVSEGroupId1), "The given EVSEGroupId1 must not be null!");
-
-            return EVSEGroupId1.CompareTo(EVSEGroupId2) > 0;
-
-        }
+            => EVSEGroupId1.CompareTo(EVSEGroupId2) > 0;
 
         #endregion
 
@@ -342,11 +330,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="EVSEGroupId1">An EVSE group identification.</param>
+        /// <param name="EVSEGroupId1">A EVSE group identification.</param>
         /// <param name="EVSEGroupId2">Another EVSE group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >= (EVSEGroup_Id EVSEGroupId1, EVSEGroup_Id EVSEGroupId2)
-            => !(EVSEGroupId1 < EVSEGroupId2);
+        public static Boolean operator >= (EVSEGroup_Id EVSEGroupId1,
+                                           EVSEGroup_Id EVSEGroupId2)
+
+            => EVSEGroupId1.CompareTo(EVSEGroupId2) >= 0;
 
         #endregion
 
@@ -357,48 +347,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region CompareTo(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two EVSE group identifications.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        public Int32 CompareTo(Object Object)
-        {
+        /// <param name="Object">A EVSE group identification to compare with.</param>
+        public Int32 CompareTo(Object? Object)
 
-            if (Object is null)
-                throw new ArgumentNullException(nameof(Object), "The given object must not be null!");
-
-            if (!(Object is EVSEGroup_Id))
-                throw new ArgumentException("The given object is not an EVSE group identification!");
-
-            return CompareTo((EVSEGroup_Id) Object);
-
-        }
+            => Object is EVSEGroup_Id evseGroupId
+                   ? CompareTo(evseGroupId)
+                   : throw new ArgumentException("The given object is not an EVSE group identification!",
+                                                 nameof(Object));
 
         #endregion
 
         #region CompareTo(EVSEGroupId)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two EVSE group identifications.
         /// </summary>
-        /// <param name="EVSEGroupId">An object to compare with.</param>
+        /// <param name="EVSEGroupId">A EVSE group identification to compare with.</param>
         public Int32 CompareTo(EVSEGroup_Id EVSEGroupId)
         {
 
-            if ((Object) EVSEGroupId is null)
-                throw new ArgumentNullException(nameof(EVSEGroupId),  "The given EVSE group identification must not be null!");
+            var c = OperatorId.CompareTo(EVSEGroupId.OperatorId);
 
-            // Compare the length of the identifications
-            var _Result = this.Length.CompareTo(EVSEGroupId.Length);
+            if (c == 0)
+                c = String.Compare(Suffix,
+                                   EVSEGroupId.Suffix,
+                                   StringComparison.OrdinalIgnoreCase);
 
-            // If equal: Compare charging operator identifications
-            if (_Result == 0)
-                _Result = OperatorId.CompareTo(EVSEGroupId.OperatorId);
-
-            // If equal: Compare suffix
-            if (_Result == 0)
-                _Result = String.Compare(Suffix, EVSEGroupId.Suffix, StringComparison.Ordinal);
-
-            return _Result;
+            return c;
 
         }
 
@@ -411,42 +388,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Equals(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two EVSE group identifications for equality.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public override Boolean Equals(Object Object)
-        {
+        /// <param name="Object">A EVSE group identification to compare with.</param>
+        public override Boolean Equals(Object? Object)
 
-            if (Object is null)
-                return false;
-
-            if (!(Object is EVSEGroup_Id))
-                return false;
-
-            return Equals((EVSEGroup_Id) Object);
-
-        }
+            => Object is EVSEGroup_Id evseGroupId &&
+                   Equals(evseGroupId);
 
         #endregion
 
         #region Equals(EVSEGroupId)
 
         /// <summary>
-        /// Compares two EVSE identifications for equality.
+        /// Compares two EVSE group identifications for equality.
         /// </summary>
-        /// <param name="EVSEGroupId">An EVSE group identification to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
+        /// <param name="EVSEGroupId">A EVSE group identification to compare with.</param>
         public Boolean Equals(EVSEGroup_Id EVSEGroupId)
-        {
 
-            if ((Object) EVSEGroupId is null)
-                return false;
+            => OperatorId.Equals(EVSEGroupId.OperatorId) &&
 
-            return OperatorId.Equals(EVSEGroupId.OperatorId) &&
-                   String.Equals(Suffix, EVSEGroupId.Suffix);
-
-        }
+               String.Equals(Suffix,
+                             EVSEGroupId.Suffix,
+                             StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -460,7 +424,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public override Int32 GetHashCode()
 
             => OperatorId.GetHashCode() ^
-              (Suffix?.GetHashCode() ?? 0);
+              (Suffix is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Suffix));
 
         #endregion
 

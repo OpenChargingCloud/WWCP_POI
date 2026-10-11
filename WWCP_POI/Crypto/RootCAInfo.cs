@@ -34,8 +34,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public I18NString Name => immutableName.Clone();
         public RootCAProtocol         Protocol     { get; }
         public ECPublicKeyParameters  PublicKey    { get; }
-        public DateTime               NotBefore    { get; }
-        public DateTime               NotAfter     { get; }
+        public DateTimeOffset         NotBefore    { get; }
+        public DateTimeOffset         NotAfter     { get; }
         public String                 Algorithm    { get; }
         private readonly I18NString immutableComment;
         public I18NString Comment => immutableComment.Clone();
@@ -43,8 +43,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RootCAInfo(I18NString             Name,
                           RootCAProtocol         Protocol,
                           ECPublicKeyParameters  PublicKey,
-                          DateTime               NotBefore,
-                          DateTime               NotAfter,
+                          DateTimeOffset         NotBefore,
+                          DateTimeOffset         NotAfter,
                           String                 Algorithm   = "P-256",
                           I18NString?            Comment     = null)
         {

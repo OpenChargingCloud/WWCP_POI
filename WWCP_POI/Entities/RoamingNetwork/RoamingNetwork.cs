@@ -1349,10 +1349,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Return the admin status of all grid operators registered within this roaming network.
         /// </summary>
-        public IEnumerable<KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorAdminStatusTypes>>>> GridOperatorsAdminStatus
+        public IEnumerable<KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorAdminStatusType>>>> GridOperatorsAdminStatus
 
             => ImmutablePOIValues.CopyItems(gridOperators.Values.
-                   Select(emp => new KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorAdminStatusTypes>>>(emp.Id, emp.AdminStatusSchedule())));
+                   Select(emp => new KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorAdminStatusType>>>(emp.Id, emp.AdminStatusSchedule())));
 
         #endregion
 
@@ -1361,10 +1361,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Return the status of all grid operators registered within this roaming network.
         /// </summary>
-        public IEnumerable<KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorStatusTypes>>>> GridOperatorsStatus
+        public IEnumerable<KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorStatusType>>>> GridOperatorsStatus
 
             => ImmutablePOIValues.CopyItems(gridOperators.Values.
-                   Select(emp => new KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorStatusTypes>>>(emp.Id, emp.StatusSchedule())));
+                   Select(emp => new KeyValuePair<GridOperator_Id, IEnumerable<Timestamped<GridOperatorStatusType>>>(emp.Id, emp.StatusSchedule())));
 
         #endregion
 
@@ -1440,10 +1440,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Return the admin status of all parking operators registered within this roaming network.
         /// </summary>
-        public IEnumerable<KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorAdminStatusTypes>>>> ParkingOperatorAdminStatus
+        public IEnumerable<KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorAdminStatusType>>>> ParkingOperatorAdminStatus
 
             => ImmutablePOIValues.CopyItems(parkingOperators.Values.
-                   Select(pop => new KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorAdminStatusTypes>>>(pop.Id,
+                   Select(pop => new KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorAdminStatusType>>>(pop.Id,
                                                                                                                                  pop.AdminStatusSchedule())));
 
         #endregion
@@ -1453,10 +1453,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Return the status of all parking operators registered within this roaming network.
         /// </summary>
-        public IEnumerable<KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorStatusTypes>>>> ParkingOperatorStatus
+        public IEnumerable<KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorStatusType>>>> ParkingOperatorStatus
 
             => ImmutablePOIValues.CopyItems(parkingOperators.Values.
-                   Select(pop => new KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorStatusTypes>>>(pop.Id,
+                   Select(pop => new KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorStatusType>>>(pop.Id,
                                                                                                                             pop.StatusSchedule())));
 
         #endregion

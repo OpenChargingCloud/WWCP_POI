@@ -37,8 +37,6 @@ public sealed class DirectPOICBORTests
     [TestCase("ParkingProduct", "stopParkingAfterTime", "600 s")]
     [TestCase("ChargingTariffRestriction", "minEnergy", "1 kWh")]
     [TestCase("ChargingPriceComponent", "stepSize", "0.10 kWh")]
-    [TestCase("EnergySource", "percentage", "50 %")]
-    [TestCase("EnvironmentalImpact", "percentage", "25 %")]
     [TestCase("GeoLocation", "alt", "150 m")]
     [TestCase("AdditionalGeoLocation", "altitude", "150 m")]
     [TestCase("EVSE", "maxVoltageRealTime", "(230.00 ±0.12) V, k=2, p=0.95, dist=normal")]
@@ -51,6 +49,26 @@ public sealed class DirectPOICBORTests
         var entries = CBORValue.Parse(bytes).AsMap();
         Assert.That(entries.Single(e => e.Key.AsText() == field).Value.Kind, Is.EqualTo(CBORValueKind.Tagged));
         Assert.That(entries.Single(e => e.Key.AsText() == "customData").Value.AsMap()[0].Value.Kind, Is.EqualTo(CBORValueKind.TextString));
+    }
+
+    [Test]
+    public void Native_metrological_percentages_of_energy_mix_pairs_match_tree()
+    {
+        var json = JObject.Parse("""
+            {
+              "energySources":        [ [ "solar", "50 %" ], [ "wind", "50 %" ] ],
+              "environmentalImpacts": [ [ "CO2",   "25 %" ] ],
+              "customData":           { "energySources": [ [ "solar", "50 %" ] ] }
+            }
+            """);
+        var bytes = Encode(json, nameof(EnergyMix), null);
+        Assert.That(bytes, Is.EqualTo(Reference(json, nameof(EnergyMix))));
+        var entries = CBORValue.Parse(bytes).AsMap();
+        var pair = entries.Single(e => e.Key.AsText() == "energySources").Value.AsArray()[0].AsArray();
+        Assert.That(pair[0].Kind, Is.EqualTo(CBORValueKind.TextString));
+        Assert.That(pair[1].Kind, Is.EqualTo(CBORValueKind.Tagged));
+        var custom = entries.Single(e => e.Key.AsText() == "customData").Value.AsMap()[0].Value.AsArray()[0].AsArray();
+        Assert.That(custom[1].Kind, Is.EqualTo(CBORValueKind.TextString));
     }
 
     [TestCase("-9223372036854775808")]
@@ -170,6 +188,10 @@ public sealed class DirectPOICBORTests
                         throw new ArgumentException($"{path}/{field.Name}: cannot encode a Styx metrological value: {error}");
                     paths.Add(path + "/" + field.Name.Replace("~", "~0").Replace("/", "~1"));
                 }
+        });
+        POIRepresentation.VisitPairs(json, kind, (pair, path) => {
+            if (pair[1].Type == JTokenType.String)
+                paths.Add(path + "/1");
         });
         var tree = CBORJSON.ToCBOR(CanonicalJSON.ToUTF8Bytes(json), new CBORJSONOptions {
             DetectMetrologicalValues = (path, _) => paths.Contains(path)

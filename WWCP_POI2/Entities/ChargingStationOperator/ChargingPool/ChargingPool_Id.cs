@@ -76,10 +76,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of an electric vehicle charging pool (EVCP).
     /// </summary>
-    public readonly struct ChargingPool_Id : IId,
-                                             IEquatable<ChargingPool_Id>,
-                                             IComparable<ChargingPool_Id>
-
+    public readonly struct ChargingPool_Id : IId<ChargingPool_Id>
     {
 
         #region Data
@@ -483,8 +480,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var c = OperatorId.CompareTo(ChargingPoolId.OperatorId);
 
             if (c == 0)
-                c = String.Compare(Suffix,
-                                   ChargingPoolId.Suffix,
+                c = String.Compare(Suffix.               Replace("*", ""),
+                                   ChargingPoolId.Suffix.Replace("*", ""),
                                    StringComparison.OrdinalIgnoreCase);
 
             return c;

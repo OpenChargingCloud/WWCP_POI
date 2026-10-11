@@ -27,7 +27,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// An e-mobility provider status report.
     /// </summary>
-    public class GridOperatorStatusReport : StatusReport<GridOperator, GridOperatorStatusTypes>
+    public class GridOperatorStatusReport : StatusReport<GridOperator, GridOperatorStatusType>
     {
 
         public GridOperatorStatusReport(IEnumerable<GridOperator> GridOperators)

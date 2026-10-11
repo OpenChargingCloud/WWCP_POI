@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="AdminStatus">A energy meter admin status.</param>
         public static Boolean Contains(this IEnumerable<EnergyMeterAdminStatus>  EnergyMeterAdminStatus,
                                        EnergyMeter_Id                            Id,
-                                       EnergyMeterAdminStatusTypes               AdminStatus)
+                                       EnergyMeterAdminStatusType               AdminStatus)
         {
 
             foreach (var status in EnergyMeterAdminStatus)
@@ -126,7 +126,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The current admin status of the energy meter.
         /// </summary>
-        public EnergyMeterAdminStatusTypes  AdminStatus    { get; }
+        public EnergyMeterAdminStatusType  AdminStatus    { get; }
 
         /// <summary>
         /// The timestamp of the current admin status of the energy meter.
@@ -136,7 +136,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The timestamped admin status of the energy meter.
         /// </summary>
-        public Timestamped<EnergyMeterAdminStatusTypes> TimestampedAdminStatus
+        public Timestamped<EnergyMeterAdminStatusType> TimestampedAdminStatus
             => new (Timestamp, AdminStatus);
 
         #endregion
@@ -152,7 +152,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="AdminStatus">The current timestamped adminstatus of the energy meter.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public EnergyMeterAdminStatus(EnergyMeter_Id                            Id,
-                                      Timestamped<EnergyMeterAdminStatusTypes>  AdminStatus,
+                                      Timestamped<EnergyMeterAdminStatusType>  AdminStatus,
                                       CustomDataNew?                            CustomData     = null,
                                       UserDefinedDictionary?                    InternalData   = null)
 
@@ -180,8 +180,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Timestamp">The timestamp of the status change of the energy meter.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public EnergyMeterAdminStatus(EnergyMeter_Id               Id,
-                                          EnergyMeterAdminStatusTypes  AdminStatus,
-                                          DateTime                         Timestamp,
+                                          EnergyMeterAdminStatusType  AdminStatus,
+                                          DateTimeOffset                   Timestamp,
                                           CustomDataNew?                   CustomData     = null,
                                           UserDefinedDictionary?           InternalData   = null)
 

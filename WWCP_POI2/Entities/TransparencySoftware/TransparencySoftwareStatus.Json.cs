@@ -91,11 +91,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ArgumentNullException.ThrowIfNull(TransparencySoftwareLookup);
                 ArgumentNullException.ThrowIfNull(CertificateLookup);
 
-                TransparencyJSON.OnlyProperties(JSON, "transparencySoftwareId", "legalStatus", "certificateId");
+                StrictJSON.OnlyProperties(JSON, "transparencySoftwareId", "legalStatus", "certificateId");
 
                 #region Parse TransparencySoftwareId    [mandatory]
 
-                var transparencySoftwareId  = TransparencySoftware_Id.Parse(TransparencyJSON.RequiredText(JSON, "transparencySoftwareId"));
+                var transparencySoftwareId  = TransparencySoftware_Id.Parse(StrictJSON.RequiredText(JSON, "transparencySoftwareId"));
                 var transparencySoftware    = TransparencySoftwareLookup(transparencySoftwareId) ??
                                                   throw new ArgumentException($"transparencySoftwareId: unresolved software '{transparencySoftwareId}'.");
 
@@ -103,14 +103,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse LegalStatus               [mandatory]
 
-                if (!LegalStatus.TryParse(TransparencyJSON.RequiredText(JSON, "legalStatus"), out var legalStatus))
+                if (!LegalStatus.TryParse(StrictJSON.RequiredText(JSON, "legalStatus"), out var legalStatus))
                     throw new ArgumentException("legalStatus: invalid legal status.");
 
                 #endregion
 
                 #region Parse CertificateId             [optional]
 
-                var certificate = TransparencyJSON.Text(JSON, "certificateId") is { } certificateId
+                var certificate = StrictJSON.Text(JSON, "certificateId") is { } certificateId
                                       ? CertificateLookup(TransparencySoftwareCertificate_Id.Parse(certificateId)) ??
                                             throw new ArgumentException($"certificateId: unresolved document '{certificateId}'.")
                                       : null;

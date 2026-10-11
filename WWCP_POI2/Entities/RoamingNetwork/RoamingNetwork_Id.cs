@@ -57,10 +57,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of a roaming network.
     /// </summary>
-    public readonly struct RoamingNetwork_Id : IId,
-                                               IEquatable <RoamingNetwork_Id>,
-                                               IComparable<RoamingNetwork_Id>
-
+    public readonly struct RoamingNetwork_Id : IId<RoamingNetwork_Id>
     {
 
         #region Data

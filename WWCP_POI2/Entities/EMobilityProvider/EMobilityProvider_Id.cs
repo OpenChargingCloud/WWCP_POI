@@ -65,9 +65,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of an e-mobility provider.
     /// </summary>
-    public readonly struct EMobilityProvider_Id : IId,
-                                                  IEquatable<EMobilityProvider_Id>,
-                                                  IComparable<EMobilityProvider_Id>
+    public readonly struct EMobilityProvider_Id : IId<EMobilityProvider_Id>
     {
 
         #region Data
@@ -228,7 +226,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            var match = eMobilityProviderId_RegEx.Match(Text);
+            var match = eMobilityProviderId_RegEx.Match(Text.ToUpperInvariant());
 
             if (!match.Success)
                 return false;
@@ -457,7 +455,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 c = String.Compare(
                         Suffix,
                         eMobilityProviderId.Suffix,
-                        StringComparison.Ordinal
+                        StringComparison.OrdinalIgnoreCase
                     );
 
             return c;
@@ -492,7 +490,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean Equals(EMobilityProvider_Id eMobilityProviderId)
 
             => CountryCode.Equals(eMobilityProviderId.CountryCode) &&
-               StringComparer.Ordinal.Equals(Suffix, eMobilityProviderId.Suffix);
+               StringComparer.OrdinalIgnoreCase.Equals(Suffix, eMobilityProviderId.Suffix);
 
         #endregion
 
@@ -504,7 +502,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => HashCode.Combine(
                    CountryCode,
-                   StringComparer.Ordinal.GetHashCode(Suffix ?? String.Empty)
+                   StringComparer.OrdinalIgnoreCase.GetHashCode(Suffix ?? String.Empty)
                );
 
         #endregion

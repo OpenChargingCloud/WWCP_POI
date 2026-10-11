@@ -116,7 +116,17 @@ public sealed partial record RoamingNetworkChangeSet
             if (element.ValueKind == JsonValueKind.Array)
             {
                 var index = 0;
-                foreach (var item in element.EnumerateArray()) Visit(item, kind, path + "/" + index++);
+                foreach (var item in element.EnumerateArray())
+                {
+                    var itemPath = path + "/" + index;
+                    if (item.ValueKind == JsonValueKind.String && POIRepresentation.IsPairReading(kind, index))
+                        paths.Add(itemPath);
+                    else if (item.ValueKind == JsonValueKind.Array && POIRepresentation.PairKind(kind) is { } pairKind)
+                        Visit(item, pairKind, itemPath);
+                    else
+                        Visit(item, kind, itemPath);
+                    index++;
+                }
             }
             else if (element.ValueKind == JsonValueKind.Object)
                 foreach (var property in element.EnumerateObject())

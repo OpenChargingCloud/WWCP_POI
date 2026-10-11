@@ -66,10 +66,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of a charging station operator (CSO).
     /// </summary>
-    public readonly struct ChargingStationOperator_Id : IId,
-                                                        IEquatable<ChargingStationOperator_Id>,
-                                                        IComparable<ChargingStationOperator_Id>
-
+    public readonly struct ChargingStationOperator_Id : IId<ChargingStationOperator_Id>
     {
 
         #region Data

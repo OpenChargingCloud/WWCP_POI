@@ -67,7 +67,7 @@ public sealed partial class GridOperator
                 Homepage: InfrastructureJson.Text(JSON, "homepage"),
                 HotlinePhoneNumber: InfrastructureJson.Text(JSON, "hotline"),
                 DataLicenses: InfrastructureJson.Licenses(JSON));
-            InfrastructureJson.RestoreMetadata(JSON, parsed, GridOperatorAdminStatusTypes.TryParse, GridOperatorStatusTypes.TryParse);
+            InfrastructureJson.RestoreMetadata(JSON, parsed, GridOperatorAdminStatusType.TryParse, GridOperatorStatusType.TryParse);
             GridOperator = parsed;
             return true;
         }

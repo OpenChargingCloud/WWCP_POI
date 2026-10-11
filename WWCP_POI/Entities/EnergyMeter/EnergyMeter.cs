@@ -43,8 +43,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// An energy meter.
     /// </summary>
     public sealed partial class EnergyMeter : AImmutableEMobilityEntity<EnergyMeter_Id,
-                                                EnergyMeterAdminStatusTypes,
-                                                EnergyMeterStatusTypes>,
+                                                EnergyMeterAdminStatusType,
+                                                EnergyMeterStatusType>,
                                IEquatable<EnergyMeter>,
                                IComparable<EnergyMeter>
     {
@@ -184,8 +184,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            CertificateChain?                          PublicKeyCertificateChain    = null,
                            IEnumerable<TransparencySoftwareStatus>?   TransparencySoftware         = null,
 
-                           Timestamped<EnergyMeterAdminStatusTypes>?  InitialAdminStatus           = null,
-                           Timestamped<EnergyMeterStatusTypes>?       InitialStatus                = null,
+                           Timestamped<EnergyMeterAdminStatusType>?  InitialAdminStatus           = null,
+                           Timestamped<EnergyMeterStatusType>?       InitialStatus                = null,
                            UInt16?                                    MaxAdminStatusScheduleSize   = null,
                            UInt16?                                    MaxStatusScheduleSize        = null,
 
@@ -200,8 +200,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             : base(Id,
                    Name,
                    Description,
-                   InitialAdminStatus         ?? EnergyMeterAdminStatusTypes.Operational,
-                   InitialStatus              ?? EnergyMeterStatusTypes.     Available,
+                   InitialAdminStatus         ?? EnergyMeterAdminStatusType.Operational,
+                   InitialStatus              ?? EnergyMeterStatusType.     Available,
                    MaxAdminStatusScheduleSize ?? DefaultMaxEnergyMeterAdminStatusScheduleSize,
                    MaxStatusScheduleSize      ?? DefaultMaxEnergyMeterStatusScheduleSize,
                    DataSource,
@@ -476,7 +476,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   Role: InfrastructureJson.Text(JSON, "role")
 
                               );
-                InfrastructureJson.RestoreMetadata(JSON, EnergyMeter, EnergyMeterAdminStatusTypes.TryParse, EnergyMeterStatusTypes.TryParse);
+                InfrastructureJson.RestoreMetadata(JSON, EnergyMeter, EnergyMeterAdminStatusType.TryParse, EnergyMeterStatusType.TryParse);
                 if (CustomEnergyMeterParser is not null)
                     EnergyMeter = CustomEnergyMeterParser(JSON, EnergyMeter) ?? throw new ArgumentException("The custom energy meter parser returned null.");
 

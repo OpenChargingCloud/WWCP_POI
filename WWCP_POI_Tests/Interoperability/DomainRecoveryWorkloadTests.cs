@@ -152,7 +152,7 @@ public sealed class DomainRecoveryWorkloadTests
         Assert.That(history.TryPublish(head.Id, bad, out var result), Is.False);
         Assert.That(history.Head, Is.SameAs(head)); Assert.That(history.ToCBOR(), Is.EqualTo(bytes));
         Assert.That(history.TryPublish(head.Id, good, out result), Is.True, result.Error); CheckGraph(history.Head.Network);
-        Assert.That(history.Head.Network.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.EqualTo(GridOperatorStatusTypes.Offline));
+        Assert.That(history.Head.Network.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.EqualTo(GridOperatorStatusType.Offline));
         using var restored = RoamingNetworkHistory.ParseCBOR(history.ToCBOR(), VerifyBatch, VerifyCommit, authorizeSnapshotBoundary: fixture.Boundary);
         CheckGraph(restored.Head.Network); Assert.That(restored.Head.Id, Is.EqualTo(good.Id));
     }

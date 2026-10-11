@@ -53,12 +53,12 @@ public sealed class RoamingNetworkArchiveFileState
     /// <summary>
     /// The observed UTC filesystem creation timestamp.
     /// </summary>
-    public DateTime CreatedAt { get; }
+    public DateTimeOffset CreatedAt { get; }
 
     /// <summary>
     /// The observed UTC filesystem last-write timestamp.
     /// </summary>
-    public DateTime LastWrite { get; }
+    public DateTimeOffset LastWrite { get; }
 
     /// <summary>
     /// The observed regular-file attributes, including read-only state.
@@ -71,7 +71,7 @@ public sealed class RoamingNetworkArchiveFileState
     public ImmutableArray<Byte> SHA256Digest { get; }
 
     internal RoamingNetworkArchiveFileState(String name, RoamingNetworkArchiveFileKind kind, Int64 length,
-        DateTime createdAt, DateTime lastWrite, FileAttributes attributes, Byte[] digest)
+        DateTimeOffset createdAt, DateTimeOffset lastWrite, FileAttributes attributes, Byte[] digest)
     {
         Name = name; Kind = kind; Length = length; CreatedAt = createdAt; LastWrite = lastWrite; Attributes = attributes;
         SHA256Digest = digest.ToImmutableArray();

@@ -50,10 +50,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of a parking operator.
     /// </summary>
-    public readonly struct ParkingOperator_Id : IId,
-                                                IEquatable <ParkingOperator_Id>,
-                                                IComparable<ParkingOperator_Id>
-
+    public readonly struct ParkingOperator_Id : IId<ParkingOperator_Id>
     {
 
         #region Data

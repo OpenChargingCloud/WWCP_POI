@@ -35,8 +35,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// A parking space.
     /// </summary>
     public sealed partial class ParkingSpace : AImmutableEMobilityEntity<ParkingSpace_Id,
-                                                 ParkingSpaceAdminStatusTypes,
-                                                 ParkingSpaceStatusTypes>,
+                                                 ParkingSpaceAdminStatusType,
+                                                 ParkingSpaceStatusType>,
                                 IEquatable<ParkingSpace>, IComparable<ParkingSpace>, IComparable
     {
 
@@ -174,7 +174,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               String? OSM_WayId = null, IEnumerable<GeoCoordinate>? Geometry = null,
                               IEnumerable<ChargingStation>? ChargingStations = null, IEnumerable<String>? Sensors = null,
                               IEnumerable<ParkingProduct_Id>? ParkingProductIds = null, ParkingGarage_Id? ParkingGarageId = null)
-            : base(Id, Name ?? I18NString.Create(Id.ToString()), Description)
+            : base(Id,
+                   Name ?? I18NString.Create(Id.ToString()),
+                   Description,
+                   // Without a known status, the status is unspecified since the beginning of time.
+                   new Timestamped<ParkingSpaceAdminStatusType>(default, ParkingSpaceAdminStatusType.Unspecified),
+                   new Timestamped<ParkingSpaceStatusType>     (default, ParkingSpaceStatusType.Unspecified))
         {
             this.ParkingProductIds = POIGraphJSON.ReferenceIds(ParkingProductIds ?? [], InfrastructureEntityType.ParkingProduct);
             if (ParkingGarageId is { } garage && garage.IsNullOrEmpty) throw new ArgumentException("Invalid garage identifier.");

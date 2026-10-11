@@ -447,7 +447,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (c == 0)
                 c = Name.Equals(TransparencySoftware.Name) ? 0 :
-                    StringComparer.Ordinal.Compare(TransparencyJSON.NameOrder(Name), TransparencyJSON.NameOrder(TransparencySoftware.Name));
+                    StringComparer.Ordinal.Compare(StrictJSON.NameOrder(Name), StrictJSON.NameOrder(TransparencySoftware.Name));
 
             if (c == 0)
                 c = Version.CompareTo(TransparencySoftware.Version);

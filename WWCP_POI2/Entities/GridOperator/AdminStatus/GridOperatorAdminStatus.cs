@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="AdminStatus">A grid operator admin status.</param>
         public static Boolean Contains(this IEnumerable<GridOperatorAdminStatus>  GridOperatorAdminStatus,
                                        GridOperator_Id                            Id,
-                                       GridOperatorAdminStatusTypes               AdminStatus)
+                                       GridOperatorAdminStatusType                AdminStatus)
         {
 
             foreach (var status in GridOperatorAdminStatus)
@@ -126,7 +126,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The current admin status of the grid operator.
         /// </summary>
-        public GridOperatorAdminStatusTypes  AdminStatus    { get; }
+        public GridOperatorAdminStatusType   AdminStatus    { get; }
 
         /// <summary>
         /// The timestamp of the current admin status of the grid operator.
@@ -136,7 +136,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The timestamped admin status of the grid operator.
         /// </summary>
-        public Timestamped<GridOperatorAdminStatusTypes> TimestampedAdminStatus
+        public Timestamped<GridOperatorAdminStatusType> TimestampedAdminStatus
             => new (Timestamp, AdminStatus);
 
         #endregion
@@ -152,7 +152,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="AdminStatus">The current timestamped adminstatus of the grid operator.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public GridOperatorAdminStatus(GridOperator_Id                            Id,
-                                       Timestamped<GridOperatorAdminStatusTypes>  AdminStatus,
+                                       Timestamped<GridOperatorAdminStatusType>   AdminStatus,
                                        CustomDataNew?                             CustomData     = null,
                                        UserDefinedDictionary?                     InternalData   = null)
 
@@ -180,8 +180,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Timestamp">The timestamp of the status change of the grid operator.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public GridOperatorAdminStatus(GridOperator_Id               Id,
-                                       GridOperatorAdminStatusTypes  AdminStatus,
-                                       DateTime                      Timestamp,
+                                       GridOperatorAdminStatusType   AdminStatus,
+                                       DateTimeOffset                Timestamp,
                                        CustomDataNew?                CustomData     = null,
                                        UserDefinedDictionary?        InternalData   = null)
 

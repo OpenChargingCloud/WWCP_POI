@@ -107,7 +107,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The timestamped admin status of the energy meter.
         /// </summary>
-        public StatusSchedule<EnergyMeterAdminStatusTypes>  StatusSchedule    { get; }
+        public StatusSchedule<EnergyMeterAdminStatusType>  StatusSchedule    { get; }
 
         #endregion
 
@@ -120,7 +120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="StatusSchedule">The timestamped admin status of the energy meter.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public EnergyMeterAdminStatusSchedule(EnergyMeter_Id                               Id,
-                                                  StatusSchedule<EnergyMeterAdminStatusTypes>  StatusSchedule,
+                                                  StatusSchedule<EnergyMeterAdminStatusType>  StatusSchedule,
                                                   CustomDataNew?                                   CustomData     = null,
                                                   UserDefinedDictionary?                           InternalData   = null)
 

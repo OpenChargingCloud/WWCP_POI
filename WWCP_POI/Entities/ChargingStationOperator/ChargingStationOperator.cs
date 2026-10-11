@@ -99,7 +99,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ToJSON(this ChargingStationOperatorAdminStatus, Skip = null, Take = null, HistorySize = 1)
 
-        public static JObject ToJSON(this IEnumerable<KeyValuePair<ChargingStationOperator_Id, IEnumerable<Timestamped<ChargingStationOperatorAdminStatusTypes>>>>  ChargingStationOperatorAdminStatus,
+        public static JObject ToJSON(this IEnumerable<KeyValuePair<ChargingStationOperator_Id, IEnumerable<Timestamped<ChargingStationOperatorAdminStatusType>>>>  ChargingStationOperatorAdminStatus,
                                      UInt64?                                                                                                                        Skip         = null,
                                      UInt64?                                                                                                                        Take         = null,
                                      UInt64?                                                                                                                        HistorySize  = 1)
@@ -111,7 +111,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingStationOperatorAdminStatus is null || !ChargingStationOperatorAdminStatus.Any())
                 return new JObject();
 
-            var _ChargingStationOperatorAdminStatus = new Dictionary<ChargingStationOperator_Id, IEnumerable<Timestamped<ChargingStationOperatorAdminStatusTypes>>>();
+            var _ChargingStationOperatorAdminStatus = new Dictionary<ChargingStationOperator_Id, IEnumerable<Timestamped<ChargingStationOperatorAdminStatusType>>>();
 
             #endregion
 
@@ -156,7 +156,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ToJSON(this ChargingStationOperatorStatus,      Skip = null, Take = null, HistorySize = 1)
 
-        public static JObject ToJSON(this IEnumerable<KeyValuePair<ChargingStationOperator_Id, IEnumerable<Timestamped<ChargingStationOperatorStatusTypes>>>>  ChargingStationOperatorStatus,
+        public static JObject ToJSON(this IEnumerable<KeyValuePair<ChargingStationOperator_Id, IEnumerable<Timestamped<ChargingStationOperatorStatusType>>>>  ChargingStationOperatorStatus,
                                      UInt64?                                                                                                                   Skip         = null,
                                      UInt64?                                                                                                                   Take         = null,
                                      UInt64?                                                                                                                   HistorySize  = 1)
@@ -168,7 +168,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingStationOperatorStatus is null || !ChargingStationOperatorStatus.Any())
                 return new JObject();
 
-            var _ChargingStationOperatorStatus = new Dictionary<ChargingStationOperator_Id, IEnumerable<Timestamped<ChargingStationOperatorStatusTypes>>>();
+            var _ChargingStationOperatorStatus = new Dictionary<ChargingStationOperator_Id, IEnumerable<Timestamped<ChargingStationOperatorStatusType>>>();
 
             #endregion
 
@@ -227,8 +227,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// information or part of B2B contracts.
     /// </summary>
     public sealed partial class ChargingStationOperator : AImmutableEMobilityEntity<ChargingStationOperator_Id,
-                                                            ChargingStationOperatorAdminStatusTypes,
-                                                            ChargingStationOperatorStatusTypes>
+                                                            ChargingStationOperatorAdminStatusType,
+                                                            ChargingStationOperatorStatusType>
     {
 
         #region Data
@@ -468,8 +468,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        I18NString?                                            Name                                   = null,
                                        I18NString?                                            Description                            = null,
 
-                                       Timestamped<ChargingStationOperatorAdminStatusTypes>?  InitialAdminStatus                     = null,
-                                       Timestamped<ChargingStationOperatorStatusTypes>?       InitialStatus                          = null,
+                                       Timestamped<ChargingStationOperatorAdminStatusType>?  InitialAdminStatus                     = null,
+                                       Timestamped<ChargingStationOperatorStatusType>?       InitialStatus                          = null,
                                        UInt16?                                                MaxAdminStatusScheduleSize             = DefaultMaxAdminStatusScheduleSize,
                                        UInt16?                                                MaxStatusScheduleSize                  = DefaultMaxStatusScheduleSize,
 
@@ -484,8 +484,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    Name ?? I18NString.Create("Charging Station Operator " + Id.ToString()),
                    Description,
 
-                   InitialAdminStatus         ?? ChargingStationOperatorAdminStatusTypes.Operational,
-                   InitialStatus              ?? ChargingStationOperatorStatusTypes.Available,
+                   InitialAdminStatus         ?? ChargingStationOperatorAdminStatusType.Operational,
+                   InitialStatus              ?? ChargingStationOperatorStatusType.Available,
                    MaxAdminStatusScheduleSize ?? DefaultMaxChargingStationOperatorAdminStatusScheduleSize,
                    MaxStatusScheduleSize      ?? DefaultMaxChargingStationOperatorStatusScheduleSize,
 
@@ -581,8 +581,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NewStatus">The new charging station admin status.</param>
         internal async Task UpdateAdminStatus(DateTimeOffset                                        Timestamp,
                                               EventTracking_Id                                      EventTrackingId,
-                                              Timestamped<ChargingStationOperatorAdminStatusTypes>  OldStatus,
-                                              Timestamped<ChargingStationOperatorAdminStatusTypes>  NewStatus)
+                                              Timestamped<ChargingStationOperatorAdminStatusType>  OldStatus,
+                                              Timestamped<ChargingStationOperatorAdminStatusType>  NewStatus)
         {
 
             var onAdminStatusChanged = OnAdminStatusChanged;
@@ -608,8 +608,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NewStatus">The new EVSE status.</param>
         internal async Task UpdateStatus(DateTimeOffset                                   Timestamp,
                                          EventTracking_Id                                 EventTrackingId,
-                                         Timestamped<ChargingStationOperatorStatusTypes>  OldStatus,
-                                         Timestamped<ChargingStationOperatorStatusTypes>  NewStatus)
+                                         Timestamped<ChargingStationOperatorStatusType>  OldStatus,
+                                         Timestamped<ChargingStationOperatorStatusType>  NewStatus)
         {
 
             var onStatusChanged = OnStatusChanged;

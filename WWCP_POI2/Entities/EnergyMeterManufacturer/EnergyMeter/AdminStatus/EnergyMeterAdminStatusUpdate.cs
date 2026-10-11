@@ -42,12 +42,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The new timestamped admin status of the energy meter.
         /// </summary>
-        public Timestamped<EnergyMeterAdminStatusTypes>   NewStatus     { get; }
+        public Timestamped<EnergyMeterAdminStatusType>   NewStatus     { get; }
 
         /// <summary>
         /// The optional old timestamped admin status of the energy meter.
         /// </summary>
-        public Timestamped<EnergyMeterAdminStatusTypes>?  OldStatus     { get; }
+        public Timestamped<EnergyMeterAdminStatusType>?  OldStatus     { get; }
 
         /// <summary>
         /// An optional data source or context for this energy meter status update.
@@ -66,8 +66,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="OldStatus">The optional old timestamped admin status of the energy meter.</param>
         /// <param name="DataSource">An optional data source or context for the energy meter status update.</param>
         public EnergyMeterAdminStatusUpdate(EnergyMeter_Id                             Id,
-                                            Timestamped<EnergyMeterAdminStatusTypes>   NewStatus,
-                                            Timestamped<EnergyMeterAdminStatusTypes>?  OldStatus    = null,
+                                            Timestamped<EnergyMeterAdminStatusType>   NewStatus,
+                                            Timestamped<EnergyMeterAdminStatusType>?  OldStatus    = null,
                                             Context?                                   DataSource   = null)
 
         {

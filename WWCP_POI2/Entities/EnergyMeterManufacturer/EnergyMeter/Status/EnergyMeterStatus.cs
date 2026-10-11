@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Status">A energy meter status.</param>
         public static Boolean Contains(this IEnumerable<EnergyMeterStatus>  EnergyMeterStatus,
                                        EnergyMeter_Id                       Id,
-                                       EnergyMeterStatusTypes               Status)
+                                       EnergyMeterStatusType               Status)
         {
 
             foreach (var status in EnergyMeterStatus)
@@ -126,7 +126,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The current status of the energy meter.
         /// </summary>
-        public EnergyMeterStatusTypes  Status       { get; }
+        public EnergyMeterStatusType  Status       { get; }
 
         /// <summary>
         /// The timestamp of the current status of the energy meter.
@@ -136,7 +136,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The timestamped status of the energy meter.
         /// </summary>
-        public Timestamped<EnergyMeterStatusTypes> TimestampedStatus
+        public Timestamped<EnergyMeterStatusType> TimestampedStatus
             => new (Timestamp, Status);
 
         #endregion
@@ -152,7 +152,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Status">The current timestamped status of the energy meter.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public EnergyMeterStatus(EnergyMeter_Id                       Id,
-                                 Timestamped<EnergyMeterStatusTypes>  Status,
+                                 Timestamped<EnergyMeterStatusType>  Status,
                                  CustomDataNew?                       CustomData     = null,
                                  UserDefinedDictionary?               InternalData   = null)
 
@@ -180,8 +180,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Timestamp">The timestamp of the status change of the energy meter.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public EnergyMeterStatus(EnergyMeter_Id          Id,
-                                     EnergyMeterStatusTypes  Status,
-                                     DateTime                    Timestamp,
+                                     EnergyMeterStatusType  Status,
+                                     DateTimeOffset              Timestamp,
                                      CustomDataNew?              CustomData     = null,
                                      UserDefinedDictionary?      InternalData   = null)
 

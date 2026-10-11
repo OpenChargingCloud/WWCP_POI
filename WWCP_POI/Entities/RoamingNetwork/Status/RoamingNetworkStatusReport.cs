@@ -31,7 +31,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="RoamingNetwork">A roaming network.</param>
         public static RoamingNetworkStatusReport GenerateStatusReport(this RoamingNetwork               RoamingNetwork,
-                                                                      DateTime?                          Timestamp   = null)
+                                                                      DateTimeOffset?                    Timestamp   = null)
 
             => new (new RoamingNetwork[] { RoamingNetwork },
                     Timestamp);
@@ -45,7 +45,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="RoamingNetworks">An enumeration of roaming networks.</param>
         public static RoamingNetworkStatusReport GenerateStatusReport(this IEnumerable<RoamingNetwork>  RoamingNetworks,
-                                                                      DateTime?                          Timestamp   = null)
+                                                                      DateTimeOffset?                    Timestamp   = null)
 
             => new (RoamingNetworks,
                     Timestamp);
@@ -67,7 +67,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="RoamingNetworks">An enumeration of roaming networks.</param>
         /// <param name="Timestamp">The optional timestamp of the status report generation.</param>
         public RoamingNetworkStatusReport(IEnumerable<RoamingNetwork>  RoamingNetworks,
-                                          DateTime?                     Timestamp   = null)
+                                          DateTimeOffset?               Timestamp   = null)
 
             : base(RoamingNetworks,
                    chargingStationOperator => chargingStationOperator.Status.Value,

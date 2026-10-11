@@ -30,9 +30,9 @@ public sealed partial class RoamingNetwork
                 case RoamingNetwork entity:
                     Apply(entity, update, RoamingNetworkAdminStatusType.TryParse, RoamingNetworkStatusType.TryParse); break;
                 case ChargingStationOperator entity:
-                    Apply(entity, update, ChargingStationOperatorAdminStatusTypes.TryParse, ChargingStationOperatorStatusTypes.TryParse); break;
+                    Apply(entity, update, ChargingStationOperatorAdminStatusType.TryParse, ChargingStationOperatorStatusType.TryParse); break;
                 case EMobilityProvider entity:
-                    Apply(entity, update, EMobilityProviderAdminStatusTypes.TryParse, EMobilityProviderStatusTypes.TryParse); break;
+                    Apply(entity, update, EMobilityProviderAdminStatusType.TryParse, EMobilityProviderStatusType.TryParse); break;
                 case ChargingPool entity:
                     Apply(entity, update, ChargingPoolAdminStatusType.TryParse, ChargingPoolStatusType.TryParse); break;
                 case ChargingStation entity:
@@ -40,29 +40,29 @@ public sealed partial class RoamingNetwork
                 case EVSE entity:
                     Apply(entity, update, EVSEAdminStatusType.TryParse, EVSEStatusType.TryParse); break;
                 case ChargingTariff entity:
-                    Apply(entity, update, ChargingTariffAdminStatusTypes.TryParse, ChargingTariffStatusTypes.TryParse); break;
+                    Apply(entity, update, ChargingTariffAdminStatusType.TryParse, ChargingTariffStatusType.TryParse); break;
                 case EnergyMeter entity:
-                    Apply(entity, update, EnergyMeterAdminStatusTypes.TryParse, EnergyMeterStatusTypes.TryParse); break;
+                    Apply(entity, update, EnergyMeterAdminStatusType.TryParse, EnergyMeterStatusType.TryParse); break;
                 case GridOperator entity:
-                    Apply(entity, update, GridOperatorAdminStatusTypes.TryParse, GridOperatorStatusTypes.TryParse); break;
+                    Apply(entity, update, GridOperatorAdminStatusType.TryParse, GridOperatorStatusType.TryParse); break;
                 case ParkingOperator entity:
-                    Apply(entity, update, ParkingOperatorAdminStatusTypes.TryParse, ParkingOperatorStatusTypes.TryParse); break;
+                    Apply(entity, update, ParkingOperatorAdminStatusType.TryParse, ParkingOperatorStatusType.TryParse); break;
                 case EVSEGroup entity:
-                    Apply(entity, update, EVSEGroupAdminStatusTypes.TryParse, EVSEGroupStatusTypes.TryParse); break;
+                    Apply(entity, update, EVSEGroupAdminStatusType.TryParse, EVSEGroupStatusType.TryParse); break;
                 case ChargingStationGroup entity:
-                    Apply(entity, update, ChargingStationGroupAdminStatusTypes.TryParse, ChargingStationGroupStatusTypes.TryParse); break;
+                    Apply(entity, update, ChargingStationGroupAdminStatusType.TryParse, ChargingStationGroupStatusType.TryParse); break;
                 case ChargingPoolGroup entity:
-                    Apply(entity, update, ChargingPoolGroupAdminStatusTypes.TryParse, ChargingPoolGroupStatusTypes.TryParse); break;
+                    Apply(entity, update, ChargingPoolGroupAdminStatusType.TryParse, ChargingPoolGroupStatusType.TryParse); break;
                 case ChargingTariffGroup entity:
-                    Apply(entity, update, ChargingTariffGroupAdminStatusTypes.TryParse, ChargingTariffGroupStatusTypes.TryParse); break;
+                    Apply(entity, update, ChargingTariffGroupAdminStatusType.TryParse, ChargingTariffGroupStatusType.TryParse); break;
                 case ParkingGarage entity:
-                    Apply(entity, update, ParkingGarageAdminStatusTypes.TryParse, ParkingGarageStatusTypes.TryParse); break;
+                    Apply(entity, update, ParkingGarageAdminStatusType.TryParse, ParkingGarageStatusType.TryParse); break;
                 case ParkingSpace entity:
-                    Apply(entity, update, ParkingSpaceAdminStatusTypes.TryParse, ParkingSpaceStatusTypes.TryParse); break;
+                    Apply(entity, update, ParkingSpaceAdminStatusType.TryParse, ParkingSpaceStatusType.TryParse); break;
                 case ParkingSensor entity:
-                    Apply(entity, update, ParkingSensorAdminStatusTypes.TryParse, ParkingSensorStatusTypes.TryParse); break;
+                    Apply(entity, update, ParkingSensorAdminStatusType.TryParse, ParkingSensorStatusType.TryParse); break;
                 case ParkingSpaceGroup entity:
-                    Apply(entity, update, ParkingSpaceGroupAdminStatusTypes.TryParse, ParkingSpaceGroupStatusTypes.TryParse); break;
+                    Apply(entity, update, ParkingSpaceGroupAdminStatusType.TryParse, ParkingSpaceGroupStatusType.TryParse); break;
                 default:
                     throw new ArgumentException("Unsupported runtime target.");
             }

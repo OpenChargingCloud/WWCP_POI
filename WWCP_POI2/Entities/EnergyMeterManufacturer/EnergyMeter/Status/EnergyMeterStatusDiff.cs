@@ -29,7 +29,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     public class EnergyMeterStatusDiff : StatusDiff<ChargingStationOperator_Id,
                                                     EnergyMeter_Id,
-                                                    EnergyMeterStatusTypes>
+                                                    EnergyMeterStatusType>
     {
 
         /// <summary>
@@ -41,11 +41,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NewStatus">An optional enumeration of all new energy meter status.</param>
         /// <param name="ChangedStatus">An optional enumeration of all changed energy meter status.</param>
         /// <param name="RemovedIds">An optional enumeration of all removed energy meter status.</param>
-        public EnergyMeterStatusDiff(DateTime                                                            Timestamp,
+        public EnergyMeterStatusDiff(DateTimeOffset                                                      Timestamp,
                                      ChargingStationOperator_Id                                          EnergyMeterOperatorId,
                                      I18NString?                                                         EnergyMeterOperatorName   = null,
-                                     IEnumerable<KeyValuePair<EnergyMeter_Id, EnergyMeterStatusTypes>>?  NewStatus                 = null,
-                                     IEnumerable<KeyValuePair<EnergyMeter_Id, EnergyMeterStatusTypes>>?  ChangedStatus             = null,
+                                     IEnumerable<KeyValuePair<EnergyMeter_Id, EnergyMeterStatusType>>?  NewStatus                 = null,
+                                     IEnumerable<KeyValuePair<EnergyMeter_Id, EnergyMeterStatusType>>?  ChangedStatus             = null,
                                      IEnumerable<EnergyMeter_Id>?                                        RemovedIds                = null)
 
             : base(Timestamp,

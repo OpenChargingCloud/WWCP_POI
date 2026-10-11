@@ -43,8 +43,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public delegate Task OnChargingPoolGroupAdminStatusChangedDelegate(DateTimeOffset                                   Timestamp,
                                                                        EventTracking_Id                                 EventTrackingId,
                                                                        ChargingPoolGroup                                ChargingPoolGroup,
-                                                                       Timestamped<ChargingPoolGroupAdminStatusTypes>   NewStatus,
-                                                                       Timestamped<ChargingPoolGroupAdminStatusTypes>?  OldStatus    = null,
+                                                                       Timestamped<ChargingPoolGroupAdminStatusType>    NewStatus,
+                                                                       Timestamped<ChargingPoolGroupAdminStatusType>?   OldStatus    = null,
                                                                        Context?                                         DataSource   = null);
 
     /// <summary>
@@ -57,8 +57,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public delegate Task OnChargingPoolGroupStatusChangedDelegate(DateTimeOffset                              Timestamp,
                                                                   EventTracking_Id                            EventTrackingId,
                                                                   ChargingPoolGroup                           ChargingPoolGroup,
-                                                                  Timestamped<ChargingPoolGroupStatusTypes>   NewStatus,
-                                                                  Timestamped<ChargingPoolGroupStatusTypes>?  OldStatus    = null,
+                                                                  Timestamped<ChargingPoolGroupStatusType>    NewStatus,
+                                                                  Timestamped<ChargingPoolGroupStatusType>?   OldStatus    = null,
                                                                   Context?                                    DataSource   = null);
 
 
@@ -263,8 +263,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// with the EVSE Operator backend.
     /// </summary>
     public sealed partial class ChargingPoolGroup : AImmutableEMobilityEntity<ChargingPoolGroup_Id,
-                                                      ChargingPoolGroupAdminStatusTypes,
-                                                      ChargingPoolGroupStatusTypes>,
+                                                      ChargingPoolGroupAdminStatusType,
+                                                      ChargingPoolGroupStatusType>,
                                      IEquatable<ChargingPoolGroup>, IComparable<ChargingPoolGroup>, IComparable,
                                      IEnumerable<ChargingPool>
     {
@@ -361,7 +361,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// A delegate called to aggregate the dynamic status of all subordinated charging stations.
         /// </summary>
-        public Func<ChargingStationStatusReport, ChargingPoolGroupStatusTypes>  StatusAggregationDelegate   { get; }
+        public Func<ChargingStationStatusReport, ChargingPoolGroupStatusType>   StatusAggregationDelegate   { get; }
 
         #endregion
 
@@ -481,11 +481,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       IEnumerable<ChargingPool_Id>                                     MemberIds                     = null,
                                       Func<ChargingPool, Boolean>                                     AutoIncludePools           = null,
 
-                                      Func<ChargingStationStatusReport, ChargingPoolGroupStatusTypes>  StatusAggregationDelegate     = null,
+                                      Func<ChargingStationStatusReport, ChargingPoolGroupStatusType>   StatusAggregationDelegate     = null,
                                       UInt16                                                              MaxGroupStatusListSize        = DefaultMaxGroupStatusListSize,
                                       UInt16                                                              MaxGroupAdminStatusListSize   = DefaultMaxGroupAdminStatusListSize)
 
-            : base(Id, Name, Description, MaxAdminStatusScheduleSize: MaxGroupAdminStatusListSize, MaxStatusScheduleSize: MaxGroupStatusListSize)
+            : base(Id,
+                   Name,
+                   Description,
+                   // Without a known status, the status is unspecified since the beginning of time.
+                   new Timestamped<ChargingPoolGroupAdminStatusType>(default, ChargingPoolGroupAdminStatusType.Unspecified),
+                   new Timestamped<ChargingPoolGroupStatusType>     (default, ChargingPoolGroupStatusType.Unspecified),
+                   MaxAdminStatusScheduleSize: MaxGroupAdminStatusListSize,
+                   MaxStatusScheduleSize:      MaxGroupStatusListSize)
 
         {
 
@@ -542,7 +549,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="PropertyName">The name of the changed property.</param>
         /// <param name="OldValue">The old value of the changed property.</param>
         /// <param name="NewValue">The new value of the changed property.</param>
-        internal void UpdateEVSEData(DateTime          Timestamp,
+        internal void UpdateEVSEData(DateTimeOffset    Timestamp,
                                      EventTracking_Id  EventTrackingId,
                                      EVSE              EVSE,
                                      String            PropertyName,
@@ -573,7 +580,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EVSE">The updated EVSE.</param>
         /// <param name="OldStatus">The old EVSE status.</param>
         /// <param name="NewStatus">The new EVSE status.</param>
-        internal async Task UpdateEVSEAdminStatus(DateTime                           Timestamp,
+        internal async Task UpdateEVSEAdminStatus(DateTimeOffset                     Timestamp,
                                                   EventTracking_Id                   EventTrackingId,
                                                   EVSE                               EVSE,
                                                   Timestamped<EVSEAdminStatusType>  OldStatus,
@@ -602,7 +609,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EVSE">The updated EVSE.</param>
         /// <param name="OldStatus">The old EVSE status.</param>
         /// <param name="NewStatus">The new EVSE status.</param>
-        internal async Task UpdateEVSEStatus(DateTime                      Timestamp,
+        internal async Task UpdateEVSEStatus(DateTimeOffset                Timestamp,
                                              EventTracking_Id              EventTrackingId,
                                              EVSE                          EVSE,
                                              Timestamped<EVSEStatusType>  OldStatus,
@@ -633,7 +640,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="PropertyName">The name of the changed property.</param>
         /// <param name="NewValue">The new value of the changed property.</param>
         /// <param name="OldValue">The old value of the changed property.</param>
-        internal void UpdateChargingStationData(DateTime          Timestamp,
+        internal void UpdateChargingStationData(DateTimeOffset    Timestamp,
                                                 EventTracking_Id  EventTrackingId,
                                                 ChargingStation   ChargingStation,
                                                 String            PropertyName,
@@ -666,7 +673,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingStation">The updated charging station.</param>
         /// <param name="OldStatus">The old charging station admin status.</param>
         /// <param name="NewStatus">The new charging station admin status.</param>
-        internal void UpdateChargingStationAdminStatus(DateTime                                       Timestamp,
+        internal void UpdateChargingStationAdminStatus(DateTimeOffset                                 Timestamp,
                                                        EventTracking_Id                               EventTrackingId,
                                                        ChargingStation                                ChargingStation,
                                                        Timestamped<ChargingStationAdminStatusType>   NewStatus,
@@ -697,7 +704,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingStation">The updated charging station.</param>
         /// <param name="OldStatus">The old charging station status.</param>
         /// <param name="NewStatus">The new charging station status.</param>
-        internal void UpdateChargingStationStatus(DateTime                                  Timestamp,
+        internal void UpdateChargingStationStatus(DateTimeOffset                            Timestamp,
                                                   EventTracking_Id                          EventTrackingId,
                                                   ChargingStation                           ChargingStation,
                                                   Timestamped<ChargingStationStatusType>   NewStatus,

@@ -48,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
-    /// The unique identification of a energy meter manufacturer.
+    /// The unique identification of an energy meter manufacturer.
     /// </summary>
     public readonly struct EnergyMeterManufacturer_Id : IId<EnergyMeterManufacturer_Id>
     {
@@ -89,7 +89,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Create a new energy meter manufacturer identification based on the given text.
         /// </summary>
-        /// <param name="Text">The text representation of a energy meter manufacturer identification.</param>
+        /// <param name="Text">The text representation of an energy meter manufacturer identification.</param>
         private EnergyMeterManufacturer_Id(String Text)
         {
             this.InternalId = Text;
@@ -113,16 +113,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) Parse   (Text)
 
         /// <summary>
-        /// Parse the given text as a energy meter manufacturer identification.
+        /// Parse the given text as an energy meter manufacturer identification.
         /// </summary>
-        /// <param name="Text">A text representation of a energy meter manufacturer identification.</param>
+        /// <param name="Text">A text representation of an energy meter manufacturer identification.</param>
         public static EnergyMeterManufacturer_Id Parse(String Text)
         {
 
             if (TryParse(Text, out var energyMeterManufacturerId))
                 return energyMeterManufacturerId;
 
-            throw new ArgumentException($"Invalid text representation of a energy meter manufacturer identification: '{Text}'!",
+            throw new ArgumentException($"Invalid text representation of an energy meter manufacturer identification: '{Text}'!",
                                         nameof(Text));
 
         }
@@ -132,9 +132,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) TryParse(Text)
 
         /// <summary>
-        /// Try to parse the given text as a energy meter manufacturer identification.
+        /// Try to parse the given text as an energy meter manufacturer identification.
         /// </summary>
-        /// <param name="Text">A text representation of a energy meter manufacturer identification.</param>
+        /// <param name="Text">A text representation of an energy meter manufacturer identification.</param>
         public static EnergyMeterManufacturer_Id? TryParse(String Text)
         {
 
@@ -150,9 +150,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) TryParse(Text, out EnergyMeterManufacturerId)
 
         /// <summary>
-        /// Try to parse the given text as a energy meter manufacturer identification.
+        /// Try to parse the given text as an energy meter manufacturer identification.
         /// </summary>
-        /// <param name="Text">A text representation of a energy meter manufacturer identification.</param>
+        /// <param name="Text">A text representation of an energy meter manufacturer identification.</param>
         /// <param name="EnergyMeterManufacturerId">The parsed energy meter manufacturer identification.</param>
         public static Boolean TryParse(String Text, out EnergyMeterManufacturer_Id EnergyMeterManufacturerId)
         {
@@ -297,7 +297,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Object is EnergyMeterManufacturer_Id energyMeterManufacturerId
                    ? CompareTo(energyMeterManufacturerId)
-                   : throw new ArgumentException("The given object is not a energy meter manufacturer identification!",
+                   : throw new ArgumentException("The given object is not an energy meter manufacturer identification!",
                                                  nameof(Object));
 
         #endregion

@@ -30,10 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of of a group of electric vehicle charging pools.
     /// </summary>
-    public readonly struct ChargingPoolGroup_Id : IId,
-                                                  IEquatable<ChargingPoolGroup_Id>,
-                                                  IComparable<ChargingPoolGroup_Id>
-
+    public readonly struct ChargingPoolGroup_Id : IId<ChargingPoolGroup_Id>
     {
 
         #region Data
@@ -253,12 +250,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingPoolGroupId1">A charging pool group identification.</param>
         /// <param name="ChargingPoolGroupId2">Another charging pool group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator == (ChargingPoolGroup_Id ChargingPoolGroupId1, ChargingPoolGroup_Id ChargingPoolGroupId2)
-        {
+        public static Boolean operator == (ChargingPoolGroup_Id ChargingPoolGroupId1,
+                                           ChargingPoolGroup_Id ChargingPoolGroupId2)
 
-            return ChargingPoolGroupId1.Equals(ChargingPoolGroupId2);
-
-        }
+            => ChargingPoolGroupId1.Equals(ChargingPoolGroupId2);
 
         #endregion
 
@@ -270,8 +265,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingPoolGroupId1">A charging pool group identification.</param>
         /// <param name="ChargingPoolGroupId2">Another charging pool group identification.</param>
         /// <returns>False if both match; True otherwise.</returns>
-        public static Boolean operator != (ChargingPoolGroup_Id ChargingPoolGroupId1, ChargingPoolGroup_Id ChargingPoolGroupId2)
-            => !(ChargingPoolGroupId1 == ChargingPoolGroupId2);
+        public static Boolean operator != (ChargingPoolGroup_Id ChargingPoolGroupId1,
+                                           ChargingPoolGroup_Id ChargingPoolGroupId2)
+
+            => !ChargingPoolGroupId1.Equals(ChargingPoolGroupId2);
 
         #endregion
 
@@ -283,15 +280,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingPoolGroupId1">A charging pool group identification.</param>
         /// <param name="ChargingPoolGroupId2">Another charging pool group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator < (ChargingPoolGroup_Id ChargingPoolGroupId1, ChargingPoolGroup_Id ChargingPoolGroupId2)
-        {
+        public static Boolean operator < (ChargingPoolGroup_Id ChargingPoolGroupId1,
+                                          ChargingPoolGroup_Id ChargingPoolGroupId2)
 
-            if ((Object) ChargingPoolGroupId1 is null)
-                throw new ArgumentNullException(nameof(ChargingPoolGroupId1), "The given ChargingPoolGroupId1 must not be null!");
-
-            return ChargingPoolGroupId1.CompareTo(ChargingPoolGroupId2) < 0;
-
-        }
+            => ChargingPoolGroupId1.CompareTo(ChargingPoolGroupId2) < 0;
 
         #endregion
 
@@ -303,8 +295,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingPoolGroupId1">A charging pool group identification.</param>
         /// <param name="ChargingPoolGroupId2">Another charging pool group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <= (ChargingPoolGroup_Id ChargingPoolGroupId1, ChargingPoolGroup_Id ChargingPoolGroupId2)
-            => !(ChargingPoolGroupId1 > ChargingPoolGroupId2);
+        public static Boolean operator <= (ChargingPoolGroup_Id ChargingPoolGroupId1,
+                                           ChargingPoolGroup_Id ChargingPoolGroupId2)
+
+            => ChargingPoolGroupId1.CompareTo(ChargingPoolGroupId2) <= 0;
 
         #endregion
 
@@ -316,15 +310,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingPoolGroupId1">A charging pool group identification.</param>
         /// <param name="ChargingPoolGroupId2">Another charging pool group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator > (ChargingPoolGroup_Id ChargingPoolGroupId1, ChargingPoolGroup_Id ChargingPoolGroupId2)
-        {
+        public static Boolean operator > (ChargingPoolGroup_Id ChargingPoolGroupId1,
+                                          ChargingPoolGroup_Id ChargingPoolGroupId2)
 
-            if ((Object) ChargingPoolGroupId1 is null)
-                throw new ArgumentNullException(nameof(ChargingPoolGroupId1), "The given ChargingPoolGroupId1 must not be null!");
-
-            return ChargingPoolGroupId1.CompareTo(ChargingPoolGroupId2) > 0;
-
-        }
+            => ChargingPoolGroupId1.CompareTo(ChargingPoolGroupId2) > 0;
 
         #endregion
 
@@ -336,60 +325,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingPoolGroupId1">A charging pool group identification.</param>
         /// <param name="ChargingPoolGroupId2">Another charging pool group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >= (ChargingPoolGroup_Id ChargingPoolGroupId1, ChargingPoolGroup_Id ChargingPoolGroupId2)
-            => !(ChargingPoolGroupId1 < ChargingPoolGroupId2);
+        public static Boolean operator >= (ChargingPoolGroup_Id ChargingPoolGroupId1,
+                                           ChargingPoolGroup_Id ChargingPoolGroupId2)
+
+            => ChargingPoolGroupId1.CompareTo(ChargingPoolGroupId2) >= 0;
 
         #endregion
 
         #endregion
 
-        #region IComparable<ChargingPoolGroup_Id> Members
+        #region IComparable<ChargingPoolGroupId> Members
 
         #region CompareTo(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two charging pool group identifications.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        public Int32 CompareTo(Object Object)
-        {
+        /// <param name="Object">A charging pool group identification to compare with.</param>
+        public Int32 CompareTo(Object? Object)
 
-            if (Object is null)
-                throw new ArgumentNullException(nameof(Object), "The given object must not be null!");
-
-            if (!(Object is ChargingPoolGroup_Id))
-                throw new ArgumentException("The given object is not a charging pool group identification!", nameof(Object));
-
-            return CompareTo((ChargingPoolGroup_Id) Object);
-
-        }
+            => Object is ChargingPoolGroup_Id chargingPoolGroupId
+                   ? CompareTo(chargingPoolGroupId)
+                   : throw new ArgumentException("The given object is not a charging pool group identification!",
+                                                 nameof(Object));
 
         #endregion
 
-        #region CompareTo(ChargingStationId)
+        #region CompareTo(ChargingPoolGroupId)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two charging pool group identifications.
         /// </summary>
-        /// <param name="ChargingStationId">An object to compare with.</param>
-        public Int32 CompareTo(ChargingPoolGroup_Id ChargingStationId)
+        /// <param name="ChargingPoolGroupId">A charging pool group identification to compare with.</param>
+        public Int32 CompareTo(ChargingPoolGroup_Id ChargingPoolGroupId)
         {
 
-            if ((Object) ChargingStationId is null)
-                throw new ArgumentNullException(nameof(ChargingStationId), "The given charging pool group identification must not be null!");
+            var c = OperatorId.CompareTo(ChargingPoolGroupId.OperatorId);
 
-            // Compare the length of the identifications
-            var _Result = Length.CompareTo(ChargingStationId.Length);
+            if (c == 0)
+                c = String.Compare(Suffix,
+                                   ChargingPoolGroupId.Suffix,
+                                   StringComparison.OrdinalIgnoreCase);
 
-            // If equal: Compare charging operator identifications
-            if (_Result == 0)
-                _Result = OperatorId.CompareTo(ChargingStationId.OperatorId);
-
-            // If equal: Compare suffix
-            if (_Result == 0)
-                _Result = String.Compare(Suffix, ChargingStationId.Suffix, StringComparison.Ordinal);
-
-            return _Result;
+            return c;
 
         }
 
@@ -397,47 +375,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region IEquatable<ChargingPoolGroup_Id> Members
+        #region IEquatable<ChargingPoolGroupId> Members
 
         #region Equals(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two charging pool group identifications for equality.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public override Boolean Equals(Object Object)
-        {
+        /// <param name="Object">A charging pool group identification to compare with.</param>
+        public override Boolean Equals(Object? Object)
 
-            if (Object is null)
-                return false;
-
-            if (!(Object is ChargingPoolGroup_Id))
-                return false;
-
-            return Equals((ChargingPoolGroup_Id) Object);
-
-        }
+            => Object is ChargingPoolGroup_Id chargingPoolGroupId &&
+                   Equals(chargingPoolGroupId);
 
         #endregion
 
-        #region Equals(ChargingStationId)
+        #region Equals(ChargingPoolGroupId)
 
         /// <summary>
         /// Compares two charging pool group identifications for equality.
         /// </summary>
-        /// <param name="ChargingStationId">A charging pool group identification to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public Boolean Equals(ChargingPoolGroup_Id ChargingStationId)
-        {
+        /// <param name="ChargingPoolGroupId">A charging pool group identification to compare with.</param>
+        public Boolean Equals(ChargingPoolGroup_Id ChargingPoolGroupId)
 
-            if ((Object) ChargingStationId is null)
-                return false;
+            => OperatorId.Equals(ChargingPoolGroupId.OperatorId) &&
 
-            return OperatorId.Equals(ChargingStationId.OperatorId) &&
-                   String.Equals(Suffix, ChargingStationId.Suffix);
-
-        }
+               String.Equals(Suffix,
+                             ChargingPoolGroupId.Suffix,
+                             StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -451,7 +416,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public override Int32 GetHashCode()
 
             => OperatorId.GetHashCode() ^
-              (Suffix?.GetHashCode() ?? 0);
+              (Suffix is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Suffix));
 
         #endregion
 

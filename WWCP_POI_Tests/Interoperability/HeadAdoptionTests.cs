@@ -201,7 +201,7 @@ public sealed class HeadAdoptionTests
         var current = history.Head.Network.ChargingPools.Single();
         Assert.That(current.EnergyMeters.Single().Status.Value.ToString(), Is.EqualTo("reserved"));
         Assert.That(current.GridConnectionPoint!.EnergyMeter!.Status.Value.ToString() == "error", Is.EqualTo(!replaceIdentity));
-        Assert.That(current.GridConnectionPoint.GridOperator.Status.Value, Is.EqualTo(GridOperatorStatusTypes.Offline));
+        Assert.That(current.GridConnectionPoint.GridOperator.Status.Value, Is.EqualTo(GridOperatorStatusType.Offline));
     }
 
     [Test]

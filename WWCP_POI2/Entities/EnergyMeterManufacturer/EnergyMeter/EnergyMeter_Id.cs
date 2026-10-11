@@ -50,10 +50,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of an energy meter.
     /// </summary>
-    public readonly struct EnergyMeter_Id : IId,
-                                            IEquatable <EnergyMeter_Id>,
-                                            IComparable<EnergyMeter_Id>
-
+    public readonly struct EnergyMeter_Id : IId<EnergyMeter_Id>
     {
 
         #region Data

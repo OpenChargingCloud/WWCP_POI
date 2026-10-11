@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Status">A grid operator status.</param>
         public static Boolean Contains(this IEnumerable<GridOperatorStatus>  GridOperatorStatus,
                                        GridOperator_Id                       Id,
-                                       GridOperatorStatusTypes               Status)
+                                       GridOperatorStatusType                Status)
         {
 
             foreach (var status in GridOperatorStatus)
@@ -126,7 +126,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The current status of the grid operator.
         /// </summary>
-        public GridOperatorStatusTypes  Status       { get; }
+        public GridOperatorStatusType   Status       { get; }
 
         /// <summary>
         /// The timestamp of the current status of the grid operator.
@@ -136,7 +136,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The timestamped status of the grid operator.
         /// </summary>
-        public Timestamped<GridOperatorStatusTypes> TimestampedStatus
+        public Timestamped<GridOperatorStatusType> TimestampedStatus
             => new (Timestamp, Status);
 
         #endregion
@@ -152,7 +152,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Status">The current timestamped status of the grid operator.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public GridOperatorStatus(GridOperator_Id                       Id,
-                                  Timestamped<GridOperatorStatusTypes>  Status,
+                                  Timestamped<GridOperatorStatusType>   Status,
                                   CustomDataNew?                        CustomData     = null,
                                   UserDefinedDictionary?                InternalData   = null)
 
@@ -180,8 +180,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Timestamp">The timestamp of the status change of the grid operator.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public GridOperatorStatus(GridOperator_Id          Id,
-                                             GridOperatorStatusTypes  Status,
-                                             DateTime                            Timestamp,
+                                             GridOperatorStatusType   Status,
+                                             DateTimeOffset                      Timestamp,
                                              CustomDataNew?                      CustomData     = null,
                                              UserDefinedDictionary?              InternalData   = null)
 

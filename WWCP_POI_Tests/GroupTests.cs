@@ -52,7 +52,7 @@ public sealed class GroupTests
 
         Assert.That(async () => await group.UpdateAdminStatus(Timestamp.Now,
                                                               EventTracking_Id.New,
-                                                              new Timestamped<EVSEGroupAdminStatusTypes>(EVSEGroupAdminStatusTypes.OutOfService)),
+                                                              new Timestamped<EVSEGroupAdminStatusType>(EVSEGroupAdminStatusType.OutOfService)),
                     Throws.Nothing);
     }
 

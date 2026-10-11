@@ -42,14 +42,6 @@ public partial class Brand : IImmutablePOI
     public ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
 }
 
-public partial class EnergyMix : IImmutablePOI
-{
-    /// <summary>
-    /// Content identifiers of the immutable POI data; runtime states are excluded.
-    /// </summary>
-    public ImmutableArray<ETag> ETags => POIRepresentation.GetETags(this);
-}
-
 public partial class ChargingProduct : IImmutablePOI
 {
     /// <summary>

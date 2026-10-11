@@ -25,12 +25,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
+    /// Extension methods for parking sensor identifications.
+    /// </summary>
+    public static class ParkingSensorIdExtensions
+    {
+
+        /// <summary>
+        /// Indicates whether this parking sensor identification is null or empty.
+        /// </summary>
+        /// <param name="ParkingSensorId">A parking sensor identification.</param>
+        public static Boolean IsNullOrEmpty(this ParkingSensor_Id? ParkingSensorId)
+            => !ParkingSensorId.HasValue || ParkingSensorId.Value.IsNullOrEmpty;
+
+        /// <summary>
+        /// Indicates whether this parking sensor identification is NOT null or empty.
+        /// </summary>
+        /// <param name="ParkingSensorId">A parking sensor identification.</param>
+        public static Boolean IsNotNullOrEmpty(this ParkingSensor_Id? ParkingSensorId)
+            => ParkingSensorId.HasValue && ParkingSensorId.Value.IsNotNullOrEmpty;
+
+    }
+
+
+    /// <summary>
     /// The unique identification of a parking sensor.
     /// </summary>
-    public sealed class ParkingSensor_Id : IId,
-                                    IEquatable<ParkingSensor_Id>,
-                                    IComparable<ParkingSensor_Id>
-
+    public readonly struct ParkingSensor_Id : IId<ParkingSensor_Id>
     {
 
         #region Data
@@ -38,26 +58,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The internal identification.
         /// </summary>
-        protected readonly String InternalId;
+        private readonly String InternalId;
 
         #endregion
 
         #region Properties
 
         /// <summary>
-        /// Indicates whether this identification is null or empty.
+        /// Indicates whether this parking sensor identification is null or empty.
         /// </summary>
         public Boolean IsNullOrEmpty
             => InternalId.IsNullOrEmpty();
 
         /// <summary>
-        /// Indicates whether this identification is NOT null or empty.
+        /// Indicates whether this parking sensor identification is NOT null or empty.
         /// </summary>
         public Boolean IsNotNullOrEmpty
             => InternalId.IsNotNullOrEmpty();
 
         /// <summary>
-        /// Returns the length of the identification.
+        /// The length of the parking sensor identification.
         /// </summary>
         public UInt64 Length
             => (UInt64) (InternalId?.Length ?? 0);
@@ -67,63 +87,103 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Constructor(s)
 
         /// <summary>
-        /// Generate a new parking sensor based on the given string.
+        /// Create a new parking sensor identification based on the given text.
         /// </summary>
-        private ParkingSensor_Id(String String)
+        /// <param name="Text">The text representation of a parking sensor identification.</param>
+        private ParkingSensor_Id(String Text)
         {
-            InternalId = String.Trim();
+            this.InternalId = Text;
         }
 
         #endregion
 
 
-        #region New
+        #region (static) New
 
         /// <summary>
-        /// Generate a new unique identification of an Electric Vehicle parking space (EVPS Id).
+        /// Create a new unique parking sensor identification (UUIDv7).
         /// </summary>
         public static ParkingSensor_Id New
-        {
-            get
-            {
-                return new ParkingSensor_Id(UUIDv7.Generate().ToString());
-            }
-        }
+
+            => new (UUIDv7.Generate().ToString());
 
         #endregion
 
-        #region Parse(Text)
+        #region (static) NewRandom(Length = 50)
 
         /// <summary>
-        /// Parse the given string as a parking sensor identification.
+        /// Create a new random parking sensor identification.
+        /// </summary>
+        /// <param name="Length">The expected length of the parking sensor identification.</param>
+        public static ParkingSensor_Id NewRandom(Byte Length = 50)
+
+            => new(RandomExtensions.RandomString(Length));
+
+        #endregion
+
+        #region (static) Parse   (Text)
+
+        /// <summary>
+        /// Parse the given text as a parking sensor identification.
         /// </summary>
         /// <param name="Text">A text representation of a parking sensor identification.</param>
         public static ParkingSensor_Id Parse(String Text)
         {
-            return new ParkingSensor_Id(Text);
+
+            if (TryParse(Text, out var parkingSensorId))
+                return parkingSensorId;
+
+            throw new ArgumentException($"Invalid text representation of a parking sensor identification: '{Text}'!",
+                                        nameof(Text));
+
         }
 
         #endregion
 
-        #region TryParse(Text, out ChargingPoolId)
+        #region (static) TryParse(Text)
 
         /// <summary>
-        /// Parse the given string as a parking sensor identification.
+        /// Try to parse the given text as a parking sensor identification.
         /// </summary>
         /// <param name="Text">A text representation of a parking sensor identification.</param>
-        /// <param name="ParkingSpaceId">The parsed parking sensor identification.</param>
-        public static Boolean TryParse(String Text, out ParkingSensor_Id ParkingSpaceId)
+        public static ParkingSensor_Id? TryParse(String Text)
         {
-            try
+
+            if (TryParse(Text, out var parkingSensorId))
+                return parkingSensorId;
+
+            return null;
+
+        }
+
+        #endregion
+
+        #region (static) TryParse(Text, out ParkingSensorId)
+
+        /// <summary>
+        /// Try to parse the given text as a parking sensor identification.
+        /// </summary>
+        /// <param name="Text">A text representation of a parking sensor identification.</param>
+        /// <param name="ParkingSensorId">The parsed parking sensor identification.</param>
+        public static Boolean TryParse(String Text, out ParkingSensor_Id ParkingSensorId)
+        {
+
+            Text = Text.Trim();
+
+            if (Text.IsNotNullOrEmpty())
             {
-                ParkingSpaceId = new ParkingSensor_Id(Text);
-                return true;
+                try
+                {
+                    ParkingSensorId = new ParkingSensor_Id(Text);
+                    return true;
+                }
+                catch
+                { }
             }
-            catch
-            {
-                ParkingSpaceId = null;
-                return false;
-            }
+
+            ParkingSensorId = default;
+            return false;
+
         }
 
         #endregion
@@ -144,212 +204,157 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Operator overloading
 
-        #region Operator == (EVPS_Id1, EVPS_Id2)
+        #region Operator == (ParkingSensorId1, ParkingSensorId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking sensor identifications for equality.
         /// </summary>
-        /// <param name="EVPS_Id1">A EVPS_Id.</param>
-        /// <param name="EVPS_Id2">Another EVPS_Id.</param>
+        /// <param name="ParkingSensorId1">A parking sensor identification.</param>
+        /// <param name="ParkingSensorId2">Another parking sensor identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator == (ParkingSensor_Id EVPS_Id1, ParkingSensor_Id EVPS_Id2)
-        {
+        public static Boolean operator == (ParkingSensor_Id ParkingSensorId1,
+                                           ParkingSensor_Id ParkingSensorId2)
 
-            // If both are null, or both are same instance, return true.
-            if (ReferenceEquals(EVPS_Id1, EVPS_Id2))
-                return true;
-
-            // If one is null, but not both, return false.
-            if (((Object) EVPS_Id1 is null) || ((Object) EVPS_Id2 is null))
-                return false;
-
-            return EVPS_Id1.Equals(EVPS_Id2);
-
-        }
+            => ParkingSensorId1.Equals(ParkingSensorId2);
 
         #endregion
 
-        #region Operator != (EVPS_Id1, EVPS_Id2)
+        #region Operator != (ParkingSensorId1, ParkingSensorId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking sensor identifications for inequality.
         /// </summary>
-        /// <param name="EVPS_Id1">A EVPS_Id.</param>
-        /// <param name="EVPS_Id2">Another EVPS_Id.</param>
+        /// <param name="ParkingSensorId1">A parking sensor identification.</param>
+        /// <param name="ParkingSensorId2">Another parking sensor identification.</param>
         /// <returns>False if both match; True otherwise.</returns>
-        public static Boolean operator != (ParkingSensor_Id EVPS_Id1, ParkingSensor_Id EVPS_Id2)
-        {
-            return !(EVPS_Id1 == EVPS_Id2);
-        }
+        public static Boolean operator != (ParkingSensor_Id ParkingSensorId1,
+                                           ParkingSensor_Id ParkingSensorId2)
+
+            => !ParkingSensorId1.Equals(ParkingSensorId2);
 
         #endregion
 
-        #region Operator <  (EVPS_Id1, EVPS_Id2)
+        #region Operator <  (ParkingSensorId1, ParkingSensorId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking sensor identifications.
         /// </summary>
-        /// <param name="EVPS_Id1">A EVPS_Id.</param>
-        /// <param name="EVPS_Id2">Another EVPS_Id.</param>
+        /// <param name="ParkingSensorId1">A parking sensor identification.</param>
+        /// <param name="ParkingSensorId2">Another parking sensor identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator < (ParkingSensor_Id EVPS_Id1, ParkingSensor_Id EVPS_Id2)
-        {
+        public static Boolean operator < (ParkingSensor_Id ParkingSensorId1,
+                                          ParkingSensor_Id ParkingSensorId2)
 
-            if ((Object) EVPS_Id1 is null)
-                throw new ArgumentNullException("The given EVPS_Id1 must not be null!");
-
-            return EVPS_Id1.CompareTo(EVPS_Id2) < 0;
-
-        }
+            => ParkingSensorId1.CompareTo(ParkingSensorId2) < 0;
 
         #endregion
 
-        #region Operator <= (EVPS_Id1, EVPS_Id2)
+        #region Operator <= (ParkingSensorId1, ParkingSensorId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking sensor identifications.
         /// </summary>
-        /// <param name="EVPS_Id1">A EVPS_Id.</param>
-        /// <param name="EVPS_Id2">Another EVPS_Id.</param>
+        /// <param name="ParkingSensorId1">A parking sensor identification.</param>
+        /// <param name="ParkingSensorId2">Another parking sensor identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <= (ParkingSensor_Id EVPS_Id1, ParkingSensor_Id EVPS_Id2)
-        {
-            return !(EVPS_Id1 > EVPS_Id2);
-        }
+        public static Boolean operator <= (ParkingSensor_Id ParkingSensorId1,
+                                           ParkingSensor_Id ParkingSensorId2)
+
+            => ParkingSensorId1.CompareTo(ParkingSensorId2) <= 0;
 
         #endregion
 
-        #region Operator >  (EVPS_Id1, EVPS_Id2)
+        #region Operator >  (ParkingSensorId1, ParkingSensorId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking sensor identifications.
         /// </summary>
-        /// <param name="EVPS_Id1">A EVPS_Id.</param>
-        /// <param name="EVPS_Id2">Another EVPS_Id.</param>
+        /// <param name="ParkingSensorId1">A parking sensor identification.</param>
+        /// <param name="ParkingSensorId2">Another parking sensor identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator > (ParkingSensor_Id EVPS_Id1, ParkingSensor_Id EVPS_Id2)
-        {
+        public static Boolean operator > (ParkingSensor_Id ParkingSensorId1,
+                                          ParkingSensor_Id ParkingSensorId2)
 
-            if ((Object) EVPS_Id1 is null)
-                throw new ArgumentNullException("The given EVPS_Id1 must not be null!");
-
-            return EVPS_Id1.CompareTo(EVPS_Id2) > 0;
-
-        }
+            => ParkingSensorId1.CompareTo(ParkingSensorId2) > 0;
 
         #endregion
 
-        #region Operator >= (EVPS_Id1, EVPS_Id2)
+        #region Operator >= (ParkingSensorId1, ParkingSensorId2)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking sensor identifications.
         /// </summary>
-        /// <param name="EVPS_Id1">A EVPS_Id.</param>
-        /// <param name="EVPS_Id2">Another EVPS_Id.</param>
+        /// <param name="ParkingSensorId1">A parking sensor identification.</param>
+        /// <param name="ParkingSensorId2">Another parking sensor identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >= (ParkingSensor_Id EVPS_Id1, ParkingSensor_Id EVPS_Id2)
-        {
-            return !(EVPS_Id1 < EVPS_Id2);
-        }
+        public static Boolean operator >= (ParkingSensor_Id ParkingSensorId1,
+                                           ParkingSensor_Id ParkingSensorId2)
+
+            => ParkingSensorId1.CompareTo(ParkingSensorId2) >= 0;
 
         #endregion
 
         #endregion
 
-        #region IComparable<EVPS_Id> Members
+        #region IComparable<ParkingSensorId> Members
 
         #region CompareTo(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking sensor identifications.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        public Int32 CompareTo(Object Object)
-        {
+        /// <param name="Object">A parking sensor identification to compare with.</param>
+        public Int32 CompareTo(Object? Object)
 
-            if (Object is null)
-                throw new ArgumentNullException("The given object must not be null!");
-
-            // Check if the given object is an EVPS_Id.
-            var EVPS_Id = Object as ParkingSensor_Id;
-            if ((Object) EVPS_Id is null)
-                throw new ArgumentException("The given object is not a EVPS_Id!");
-
-            return CompareTo(EVPS_Id);
-
-        }
+            => Object is ParkingSensor_Id parkingSensorId
+                   ? CompareTo(parkingSensorId)
+                   : throw new ArgumentException("The given object is not a parking sensor identification!",
+                                                 nameof(Object));
 
         #endregion
 
-        #region CompareTo(EVPS_Id)
+        #region CompareTo(ParkingSensorId)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking sensor identifications.
         /// </summary>
-        /// <param name="EVPS_Id">An object to compare with.</param>
-        public Int32 CompareTo(ParkingSensor_Id EVPS_Id)
-        {
+        /// <param name="ParkingSensorId">A parking sensor identification to compare with.</param>
+        public Int32 CompareTo(ParkingSensor_Id ParkingSensorId)
 
-            if ((Object) EVPS_Id is null)
-                throw new ArgumentNullException("The given EVPS_Id must not be null!");
-
-            // Compare the length of the EVP_Ids
-            var _Result = this.Length.CompareTo(EVPS_Id.Length);
-
-            // If equal: Compare Ids
-            if (_Result == 0)
-                _Result = InternalId.CompareTo(EVPS_Id.InternalId);
-
-            return _Result;
-
-        }
+            => String.Compare(InternalId,
+                              ParkingSensorId.InternalId,
+                              StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
         #endregion
 
-        #region IEquatable<EVPS_Id> Members
+        #region IEquatable<ParkingSensorId> Members
 
         #region Equals(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two parking sensor identifications for equality.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public override Boolean Equals(Object Object)
-        {
+        /// <param name="Object">A parking sensor identification to compare with.</param>
+        public override Boolean Equals(Object? Object)
 
-            if (Object is null)
-                return false;
-
-            // Check if the given object is an EVPS_Id.
-            var EVPS_Id = Object as ParkingSensor_Id;
-            if ((Object) EVPS_Id is null)
-                return false;
-
-            return this.Equals(EVPS_Id);
-
-        }
+            => Object is ParkingSensor_Id parkingSensorId &&
+                   Equals(parkingSensorId);
 
         #endregion
 
-        #region Equals(EVPS_Id)
+        #region Equals(ParkingSensorId)
 
         /// <summary>
-        /// Compares two electric vehicle charging service plan identifications for equality.
+        /// Compares two parking sensor identifications for equality.
         /// </summary>
-        /// <param name="EVPS_Id">An electric vehicle charging service plan identification to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public Boolean Equals(ParkingSensor_Id EVPS_Id)
-        {
+        /// <param name="ParkingSensorId">A parking sensor identification to compare with.</param>
+        public Boolean Equals(ParkingSensor_Id ParkingSensorId)
 
-            if ((Object) EVPS_Id is null)
-                return false;
-
-            return InternalId.Equals(EVPS_Id.InternalId);
-
-        }
+            => String.Equals(InternalId,
+                             ParkingSensorId.InternalId,
+                             StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -358,12 +363,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (override) GetHashCode()
 
         /// <summary>
-        /// Return the HashCode of this object.
+        /// Return the hash code of this object.
         /// </summary>
         public override Int32 GetHashCode()
-        {
-            return InternalId.GetHashCode();
-        }
+
+            => InternalId is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(InternalId);
 
         #endregion
 
@@ -373,9 +377,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return a text representation of this object.
         /// </summary>
         public override String ToString()
-        {
-            return InternalId.ToString();
-        }
+
+            => InternalId ?? "";
 
         #endregion
 

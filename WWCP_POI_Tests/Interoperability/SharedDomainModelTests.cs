@@ -124,7 +124,7 @@ public sealed class SharedDomainModelTests
             Assert.That(restored.TransparencySoftwareCertificates.Single().NotBefore!.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(1234567));
             Assert.That(restored.ParkingOperators.Single().GetAvailableParkingProducts(ParkingSpace_Id.Parse("space-1"))
                 .Select(product => product.Id.ToString()), Is.EqualTo(new[] { "long-stay", "short-stay" }));
-            Assert.That(restored.GridOperators.Single().Status.Value == GridOperatorStatusTypes.Offline, Is.EqualTo(runtime));
+            Assert.That(restored.GridOperators.Single().Status.Value == GridOperatorStatusType.Offline, Is.EqualTo(runtime));
             Assert.That(restored.GridOperators.Single(), Is.Not.SameAs(source.GridOperators.Single()));
             var json = restored.DataSnapshot.ToJSON();
             Assert.That(json["gridOperators"], Has.Count.EqualTo(1));
@@ -221,6 +221,21 @@ public sealed class SharedDomainModelTests
         Assert.That(certificate.ToJSON().ToString(), Is.EqualTo(json));
     }
 
+    [TestCase(InfrastructureEntityType.EVSEGroup,            "DE*ABC*EGabc", "DE*ABC*EGABC")]
+    [TestCase(InfrastructureEntityType.ChargingStationGroup, "DE*ABC*SGabc", "de*abc*SGABC")]
+    [TestCase(InfrastructureEntityType.ChargingPoolGroup,    "DE*ABC*PGabc", "DE*ABC*PGABC")]
+    [TestCase(InfrastructureEntityType.ChargingTariffGroup,  "DE*ABC*TGabc", "DE*ABC*TGABC")]
+    [TestCase(InfrastructureEntityType.ChargingConnector,    "c1",           "C1")]
+    [TestCase(InfrastructureEntityType.ParkingGarage,        "garage-1",     "GARAGE-1")]
+    [TestCase(InfrastructureEntityType.ParkingSpace,         "space-1",      "SPACE-1")]
+    [TestCase(InfrastructureEntityType.ParkingSensor,        "sensor-1",     "SENSOR-1")]
+    [TestCase(InfrastructureEntityType.ParkingSpaceGroup,    "group-1",      "GROUP-1")]
+    public void Graph_identities_ignore_case_like_their_identifiers(InfrastructureEntityType type, String left, String right)
+    {
+        Assert.That(InfrastructureChangeSchema.SameId(type, left, right), Is.True);
+        Assert.That(InfrastructureChangeSchema.SameId(type, left, right + "2"), Is.False);
+    }
+
     [Test]
     public void Registry_edits_rebind_constructors_and_preserve_independent_operator_runtime()
     {
@@ -235,7 +250,7 @@ public sealed class SharedDomainModelTests
         AssertShared(next);
         Assert.That(next.ETags, Is.Not.EqualTo(source.ETags));
         Assert.That(next.GridOperators.Single().Name.ToJSON()["en"]!.Value<String>(), Is.EqualTo("New grid name"));
-        Assert.That(next.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusTypes.Offline));
+        Assert.That(next.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusType.Offline));
         Assert.That(next.GridOperators.Single(), Is.Not.SameAs(source.GridOperators.Single()));
         Assert.That(next.ChargingPools.Select(pool => pool.GridConnectionPoint!.ETags), Is.EqualTo(points.Select(point => point.ETags)));
         var oldMeter = source.ChargingPools.First().EnergyMeters[0];
@@ -248,8 +263,8 @@ public sealed class SharedDomainModelTests
         Assert.That(oldMeter.TransparencySoftware.Single().TransparencySoftware.Vendor, Is.EqualTo("Example vendor"));
         next.ApplyRuntimeUpdate(new(next.Id.ToString(), POIRuntimeTarget.GridOperator("DE*GRD"),
             POIRuntimeStatusKind.Status, new("Available", InteropFixture.Time), mode: POIRuntimeUpdateMode.ReplaceHistory));
-        Assert.That(source.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusTypes.Offline));
-        Assert.That(next.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusTypes.Available));
+        Assert.That(source.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusType.Offline));
+        Assert.That(next.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusType.Available));
     }
 
     [TestCase("grid")]
@@ -507,11 +522,11 @@ public sealed class SharedDomainModelTests
         Publish(history, signed); AssertShared(history.Head.Network);
         var current = history.Head.Network;
         var continuity = type != InfrastructureEntityType.GridOperator || swapped;
-        Assert.That(current.GridOperators.Single().Status.Value == GridOperatorStatusTypes.Offline, Is.EqualTo(continuity));
+        Assert.That(current.GridOperators.Single().Status.Value == GridOperatorStatusType.Offline, Is.EqualTo(continuity));
         Assert.That(current.ChargingPools.Single(pool => pool.Id.ToString() == Pool1).GridConnectionPoint!.EnergyMeter!.Status.Value.ToString() == "error", Is.EqualTo(continuity));
         Assert.That(current.ChargingPools.Single(pool => pool.Id.ToString() == Pool1).EnergyMeters[0].Status.Value.ToString(), Is.EqualTo("error"));
         Assert.That(current.ChargingStations.Single().EnergyMeters[0].Status.Value.ToString(), Is.EqualTo("reserved"));
-        Assert.That(old.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusTypes.Offline));
+        Assert.That(old.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusType.Offline));
         Assert.That(history.Head.Network.ChargingStations.Single().Name.ToJSON()["en"]!.Value<String>(), Is.EqualTo("Unrelated station edit"));
         using var restored = RoamingNetworkHistory.ParseCBOR(history.ToCBOR(), VerifyBatch, VerifyCommit);
         Assert.That(restored.Head.Id, Is.EqualTo(signed.Id)); AssertShared(restored.Head.Network);
@@ -538,16 +553,16 @@ public sealed class SharedDomainModelTests
         Assert.That(receiver.TryAdoptHead(right.Id, merge.Id, out var adopted, adopt: true), Is.True, adopted.Error);
         var current = receiver.Head.Network;
         AssertShared(current);
-        Assert.That(current.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusTypes.Offline));
+        Assert.That(current.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusType.Offline));
         Assert.That(current.ChargingPools.Single(pool => pool.Id.ToString() == Pool1).EnergyMeters[0].Status.Value.ToString(), Is.EqualTo("error"));
         Assert.That(current.ChargingStations.Single().EnergyMeters[0].Status.Value.ToString(), Is.EqualTo("reserved"));
         Assert.That(current.GetTransparencySoftwareById(TransparencySoftware_Id.Parse(Software2))!.Vendor, Is.EqualTo("Adopted vendor"));
         Assert.That(current.ETags, Is.EqualTo(sender.Head.Network.ETags));
         Status(receiver, POIRuntimeTarget.GridOperator("DE*GRD"), "Available", 3);
-        Assert.That(old.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusTypes.Offline));
+        Assert.That(old.GridOperators.Single().Status.Value, Is.EqualTo(GridOperatorStatusType.Offline));
         using var restored = RoamingNetworkHistory.ParseCBOR(receiver.ToCBOR(), VerifyBatch, VerifyCommit);
         AssertShared(restored.Head.Network);
-        Assert.That(restored.Head.Network.GridOperators.Single().Status.Value, Is.Not.EqualTo(GridOperatorStatusTypes.Offline));
+        Assert.That(restored.Head.Network.GridOperators.Single().Status.Value, Is.Not.EqualTo(GridOperatorStatusType.Offline));
         Assert.That(restored.Head.Id, Is.EqualTo(merge.Id));
     }
 

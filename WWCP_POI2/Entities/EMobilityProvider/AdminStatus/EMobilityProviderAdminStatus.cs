@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="AdminStatus">A e-mobility provider admin status.</param>
         public static Boolean Contains(this IEnumerable<EMobilityProviderAdminStatus>  EMobilityProviderAdminStatus,
                                        EMobilityProvider_Id                            Id,
-                                       EMobilityProviderAdminStatusTypes               AdminStatus)
+                                       EMobilityProviderAdminStatusType                AdminStatus)
         {
 
             foreach (var status in EMobilityProviderAdminStatus)
@@ -126,7 +126,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The current admin status of the e-mobility provider.
         /// </summary>
-        public EMobilityProviderAdminStatusTypes  AdminStatus    { get; }
+        public EMobilityProviderAdminStatusType   AdminStatus    { get; }
 
         /// <summary>
         /// The timestamp of the current admin status of the e-mobility provider.
@@ -136,7 +136,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The timestamped admin status of the e-mobility provider.
         /// </summary>
-        public Timestamped<EMobilityProviderAdminStatusTypes> TimestampedAdminStatus
+        public Timestamped<EMobilityProviderAdminStatusType> TimestampedAdminStatus
             => new (Timestamp, AdminStatus);
 
         #endregion
@@ -152,7 +152,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="AdminStatus">The current timestamped admin status of the e-mobility provider.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public EMobilityProviderAdminStatus(EMobilityProvider_Id                            Id,
-                                            Timestamped<EMobilityProviderAdminStatusTypes>  AdminStatus,
+                                            Timestamped<EMobilityProviderAdminStatusType>   AdminStatus,
                                             CustomDataNew?                                  CustomData     = null,
                                             UserDefinedDictionary?                          InternalData   = null)
 
@@ -180,7 +180,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Timestamp">The timestamp of the status change of the e-mobility provider.</param>
         /// <param name="CustomData">An optional dictionary of customer-specific data.</param>
         public EMobilityProviderAdminStatus(EMobilityProvider_Id               Id,
-                                            EMobilityProviderAdminStatusTypes  AdminStatus,
+                                            EMobilityProviderAdminStatusType   AdminStatus,
                                             DateTimeOffset                     Timestamp,
                                             CustomDataNew?                     CustomData     = null,
                                             UserDefinedDictionary?             InternalData   = null)

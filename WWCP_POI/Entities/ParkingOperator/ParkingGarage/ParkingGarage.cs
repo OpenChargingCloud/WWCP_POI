@@ -36,8 +36,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// an underground garage providing parking spaces.
     /// </summary>
     public sealed partial class ParkingGarage : AImmutableEMobilityEntity<ParkingGarage_Id,
-                                                  ParkingGarageAdminStatusTypes,
-                                                  ParkingGarageStatusTypes>,
+                                                  ParkingGarageAdminStatusType,
+                                                  ParkingGarageStatusType>,
                                  IEquatable<ParkingGarage>, IComparable<ParkingGarage>, IComparable
     {
 
@@ -148,7 +148,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               String? OSM_WayId = null, IEnumerable<GeoCoordinate>? Geometry = null,
                               IEnumerable<ChargingStation>? ChargingStations = null,
                               IEnumerable<ParkingProduct_Id>? ParkingProductIds = null)
-            : base(Id, Name ?? I18NString.Create(Id.ToString()), Description)
+            : base(Id,
+                   Name ?? I18NString.Create(Id.ToString()),
+                   Description,
+                   // Without a known status, the status is unspecified since the beginning of time.
+                   new Timestamped<ParkingGarageAdminStatusType>(default, ParkingGarageAdminStatusType.Unspecified),
+                   new Timestamped<ParkingGarageStatusType>     (default, ParkingGarageStatusType.Unspecified))
         {
             this.ParkingProductIds = POIGraphJSON.ReferenceIds(ParkingProductIds ?? [], InfrastructureEntityType.ParkingProduct);
             this._OSM_WayId = OSM_WayId;

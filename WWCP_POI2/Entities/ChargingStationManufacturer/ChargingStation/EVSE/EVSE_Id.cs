@@ -59,10 +59,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of an Electric Vehicle Supply Equipment (EVSE).
     /// </summary>
-    public readonly struct EVSE_Id : IId,
-                                     IEquatable<EVSE_Id>,
-                                     IComparable<EVSE_Id>
-
+    public readonly struct EVSE_Id : IId<EVSE_Id>
     {
 
         #region Data

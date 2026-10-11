@@ -224,8 +224,8 @@ public sealed class ValidationProjectionTests
         first.ApplyRuntimeUpdate(new(first.Id.ToString(), POIRuntimeTarget.GridOperator("DE*GRD"), POIRuntimeStatusKind.Status,
             new("Offline", DomainRecoveryFixture.Epoch), mode: POIRuntimeUpdateMode.ReplaceHistory));
         var second = (RoamingNetwork)new Pass(map).Project(root);
-        Assert.That(second.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.Not.EqualTo(GridOperatorStatusTypes.Offline));
-        Assert.That(source.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.Not.EqualTo(GridOperatorStatusTypes.Offline));
+        Assert.That(second.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.Not.EqualTo(GridOperatorStatusType.Offline));
+        Assert.That(source.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.Not.EqualTo(GridOperatorStatusType.Offline));
         var software = Key(map, InfrastructureEntityType.TransparencySoftware); var before = new Pass(map);
         var original = (TransparencySoftware)before.Project(software); var updatedMap = Edit(map, software, "vendor", "\"new vendor\"");
         var updated = (TransparencySoftware)new Pass(updatedMap).Project(software);
@@ -306,9 +306,9 @@ public sealed class ValidationProjectionTests
         }
         var left = Task.Run(() => Run("Offline")); var right = Task.Run(() => Run("Available")); Task.WaitAll(left, right);
         Assert.That(left.Result, Is.Not.SameAs(right.Result));
-        Assert.That(left.Result.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.EqualTo(GridOperatorStatusTypes.Offline));
-        Assert.That(right.Result.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.EqualTo(GridOperatorStatusTypes.Available));
-        Assert.That(source.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.Not.EqualTo(GridOperatorStatusTypes.Offline));
+        Assert.That(left.Result.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.EqualTo(GridOperatorStatusType.Offline));
+        Assert.That(right.Result.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.EqualTo(GridOperatorStatusType.Available));
+        Assert.That(source.GridOperators.Single(grid => grid.Id.ToString() == "DE*GRD").Status.Value, Is.Not.EqualTo(GridOperatorStatusType.Offline));
         Assert.That(source.DataSnapshot, Is.SameAs(snapshot));
     }
 }

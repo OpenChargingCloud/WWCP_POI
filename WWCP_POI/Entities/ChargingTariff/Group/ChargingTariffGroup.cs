@@ -34,8 +34,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// A charging tariff group.
     /// </summary>
     public sealed partial class ChargingTariffGroup : AImmutableEMobilityEntity<ChargingTariffGroup_Id,
-                                                        ChargingTariffGroupAdminStatusTypes,
-                                                        ChargingTariffGroupStatusTypes>,
+                                                        ChargingTariffGroupAdminStatusType,
+                                                        ChargingTariffGroupStatusType>,
                                        IEquatable<ChargingTariffGroup>, IComparable<ChargingTariffGroup>, IComparable,
                                        IEnumerable<ChargingTariff>
     {
@@ -162,7 +162,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ChargingStationOperator  Operator,
                                      I18NString? Description = null, IEnumerable<ChargingTariff>? Members = null)
 
-            : base(Id, Description: Description)
+            : base(Id,
+                   Description:        Description,
+                   // Without a known status, the status is unspecified since the beginning of time.
+                   InitialAdminStatus: new Timestamped<ChargingTariffGroupAdminStatusType>(default, ChargingTariffGroupAdminStatusType.Unspecified),
+                   InitialStatus:      new Timestamped<ChargingTariffGroupStatusType>     (default, ChargingTariffGroupStatusType.Unspecified))
 
         {
 

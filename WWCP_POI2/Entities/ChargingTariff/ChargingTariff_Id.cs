@@ -58,10 +58,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of a charging tariff.
     /// </summary>
-    public readonly struct ChargingTariff_Id : IId,
-                                               IEquatable<ChargingTariff_Id>,
-                                               IComparable<ChargingTariff_Id>
-
+    public readonly struct ChargingTariff_Id : IId<ChargingTariff_Id>
     {
 
         #region Data
@@ -520,15 +517,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return the HashCode of this object.
         /// </summary>
         public override Int32 GetHashCode()
-        {
-            unchecked
-            {
 
-                return (OperatorId.IsNullOrEmpty ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(OperatorId.ToString())) ^
-                       (Suffix is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Suffix.Replace("*", "")));
-
-            }
-        }
+            => OperatorId.GetHashCode() ^
+              (Suffix is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Suffix.Replace("*", "")));
 
         #endregion
 

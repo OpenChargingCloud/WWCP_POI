@@ -350,8 +350,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     : [];
 
                     if (parts.Length != 2 ||
-                        !DateTime.TryParse(parts[0], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var begin) ||
-                        !DateTime.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var end) ||
+                        !DateTimeOffset.TryParse(parts[0], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var begin) ||
+                        !DateTimeOffset.TryParse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var end) ||
                         begin >= end)
                     {
                         throw new ArgumentException($"Invalid {field} interval.");

@@ -214,11 +214,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Parse tariff statuses
 
-        private static Boolean ParseAdminStatus(String Text, out ChargingTariffAdminStatusTypes Value)
-            => TariffJson.EnumValue(Text, out Value);
+        private static Boolean ParseAdminStatus(String Text, out ChargingTariffAdminStatusType Value)
+            => ChargingTariffAdminStatusType.TryParse(Text, out Value);
 
-        private static Boolean ParseStatus(String Text, out ChargingTariffStatusTypes Value)
-            => TariffJson.EnumValue(Text, out Value);
+        private static Boolean ParseStatus(String Text, out ChargingTariffStatusType Value)
+            => ChargingTariffStatusType.TryParse(Text, out Value);
 
         #endregion
 

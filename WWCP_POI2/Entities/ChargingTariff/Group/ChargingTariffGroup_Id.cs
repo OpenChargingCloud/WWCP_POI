@@ -30,9 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of of a group of electric vehicle charging tariff group.
     /// </summary>
-    public readonly struct ChargingTariffGroup_Id : IId,
-                                                    IEquatable<ChargingTariffGroup_Id>,
-                                                    IComparable<ChargingTariffGroup_Id>
+    public readonly struct ChargingTariffGroup_Id : IId<ChargingTariffGroup_Id>
     {
 
         #region Data
@@ -241,12 +239,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingTariffGroupId1">A charging tariff group identification.</param>
         /// <param name="ChargingTariffGroupId2">Another charging tariff group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator == (ChargingTariffGroup_Id ChargingTariffGroupId1, ChargingTariffGroup_Id ChargingTariffGroupId2)
-        {
+        public static Boolean operator == (ChargingTariffGroup_Id ChargingTariffGroupId1,
+                                           ChargingTariffGroup_Id ChargingTariffGroupId2)
 
-            return ChargingTariffGroupId1.Equals(ChargingTariffGroupId2);
-
-        }
+            => ChargingTariffGroupId1.Equals(ChargingTariffGroupId2);
 
         #endregion
 
@@ -258,8 +254,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingTariffGroupId1">A charging tariff group identification.</param>
         /// <param name="ChargingTariffGroupId2">Another charging tariff group identification.</param>
         /// <returns>False if both match; True otherwise.</returns>
-        public static Boolean operator != (ChargingTariffGroup_Id ChargingTariffGroupId1, ChargingTariffGroup_Id ChargingTariffGroupId2)
-            => !(ChargingTariffGroupId1 == ChargingTariffGroupId2);
+        public static Boolean operator != (ChargingTariffGroup_Id ChargingTariffGroupId1,
+                                           ChargingTariffGroup_Id ChargingTariffGroupId2)
+
+            => !ChargingTariffGroupId1.Equals(ChargingTariffGroupId2);
 
         #endregion
 
@@ -271,15 +269,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingTariffGroupId1">A charging tariff group identification.</param>
         /// <param name="ChargingTariffGroupId2">Another charging tariff group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator < (ChargingTariffGroup_Id ChargingTariffGroupId1, ChargingTariffGroup_Id ChargingTariffGroupId2)
-        {
+        public static Boolean operator < (ChargingTariffGroup_Id ChargingTariffGroupId1,
+                                          ChargingTariffGroup_Id ChargingTariffGroupId2)
 
-            if ((Object) ChargingTariffGroupId1 is null)
-                throw new ArgumentNullException(nameof(ChargingTariffGroupId1), "The given ChargingTariffGroupId1 must not be null!");
-
-            return ChargingTariffGroupId1.CompareTo(ChargingTariffGroupId2) < 0;
-
-        }
+            => ChargingTariffGroupId1.CompareTo(ChargingTariffGroupId2) < 0;
 
         #endregion
 
@@ -291,8 +284,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingTariffGroupId1">A charging tariff group identification.</param>
         /// <param name="ChargingTariffGroupId2">Another charging tariff group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <= (ChargingTariffGroup_Id ChargingTariffGroupId1, ChargingTariffGroup_Id ChargingTariffGroupId2)
-            => !(ChargingTariffGroupId1 > ChargingTariffGroupId2);
+        public static Boolean operator <= (ChargingTariffGroup_Id ChargingTariffGroupId1,
+                                           ChargingTariffGroup_Id ChargingTariffGroupId2)
+
+            => ChargingTariffGroupId1.CompareTo(ChargingTariffGroupId2) <= 0;
 
         #endregion
 
@@ -304,15 +299,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingTariffGroupId1">A charging tariff group identification.</param>
         /// <param name="ChargingTariffGroupId2">Another charging tariff group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator > (ChargingTariffGroup_Id ChargingTariffGroupId1, ChargingTariffGroup_Id ChargingTariffGroupId2)
-        {
+        public static Boolean operator > (ChargingTariffGroup_Id ChargingTariffGroupId1,
+                                          ChargingTariffGroup_Id ChargingTariffGroupId2)
 
-            if ((Object) ChargingTariffGroupId1 is null)
-                throw new ArgumentNullException(nameof(ChargingTariffGroupId1), "The given ChargingTariffGroupId1 must not be null!");
-
-            return ChargingTariffGroupId1.CompareTo(ChargingTariffGroupId2) > 0;
-
-        }
+            => ChargingTariffGroupId1.CompareTo(ChargingTariffGroupId2) > 0;
 
         #endregion
 
@@ -324,61 +314,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingTariffGroupId1">A charging tariff group identification.</param>
         /// <param name="ChargingTariffGroupId2">Another charging tariff group identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >= (ChargingTariffGroup_Id ChargingTariffGroupId1, ChargingTariffGroup_Id ChargingTariffGroupId2)
-            => !(ChargingTariffGroupId1 < ChargingTariffGroupId2);
+        public static Boolean operator >= (ChargingTariffGroup_Id ChargingTariffGroupId1,
+                                           ChargingTariffGroup_Id ChargingTariffGroupId2)
+
+            => ChargingTariffGroupId1.CompareTo(ChargingTariffGroupId2) >= 0;
 
         #endregion
 
         #endregion
 
-        #region IComparable<ChargingTariffGroup_Id> Members
+        #region IComparable<ChargingTariffGroupId> Members
 
         #region CompareTo(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two charging tariff group identifications.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        public Int32 CompareTo(Object Object)
-        {
+        /// <param name="Object">A charging tariff group identification to compare with.</param>
+        public Int32 CompareTo(Object? Object)
 
-            if (Object is null)
-                throw new ArgumentNullException(nameof(Object), "The given object must not be null!");
-
-            if (!(Object is ChargingTariffGroup_Id))
-                throw new ArgumentException("The given object is not a charging tariff group identification!", nameof(Object));
-
-            return CompareTo((ChargingTariffGroup_Id) Object);
-
-        }
+            => Object is ChargingTariffGroup_Id chargingTariffGroupId
+                   ? CompareTo(chargingTariffGroupId)
+                   : throw new ArgumentException("The given object is not a charging tariff group identification!",
+                                                 nameof(Object));
 
         #endregion
 
-        #region CompareTo(ChargingStationId)
+        #region CompareTo(ChargingTariffGroupId)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two charging tariff group identifications.
         /// </summary>
-        /// <param name="ChargingStationId">An object to compare with.</param>
-        public Int32 CompareTo(ChargingTariffGroup_Id ChargingStationId)
+        /// <param name="ChargingTariffGroupId">A charging tariff group identification to compare with.</param>
+        public Int32 CompareTo(ChargingTariffGroup_Id ChargingTariffGroupId)
         {
 
-            if ((Object) ChargingStationId is null)
-                throw new ArgumentNullException(nameof(ChargingStationId), "The given charging tariff group identification must not be null!");
+            var c = OperatorId.CompareTo(ChargingTariffGroupId.OperatorId);
 
-            // Compare normalized lengths so equal operator IDs keep equal ordering across text formats.
-            var _Result = (OperatorId.ToString().Length + Suffix.Length).
-                          CompareTo(ChargingStationId.OperatorId.ToString().Length + ChargingStationId.Suffix.Length);
+            if (c == 0)
+                c = String.Compare(Suffix,
+                                   ChargingTariffGroupId.Suffix,
+                                   StringComparison.OrdinalIgnoreCase);
 
-            // If equal: Compare charging operator identifications
-            if (_Result == 0)
-                _Result = OperatorId.CompareTo(ChargingStationId.OperatorId);
-
-            // If equal: Compare suffix
-            if (_Result == 0)
-                _Result = String.Compare(Suffix, ChargingStationId.Suffix, StringComparison.Ordinal);
-
-            return _Result;
+            return c;
 
         }
 
@@ -386,47 +364,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region IEquatable<ChargingTariffGroup_Id> Members
+        #region IEquatable<ChargingTariffGroupId> Members
 
         #region Equals(Object)
 
         /// <summary>
-        /// Compares two instances of this object.
+        /// Compares two charging tariff group identifications for equality.
         /// </summary>
-        /// <param name="Object">An object to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public override Boolean Equals(Object Object)
-        {
+        /// <param name="Object">A charging tariff group identification to compare with.</param>
+        public override Boolean Equals(Object? Object)
 
-            if (Object is null)
-                return false;
-
-            if (!(Object is ChargingTariffGroup_Id))
-                return false;
-
-            return Equals((ChargingTariffGroup_Id) Object);
-
-        }
+            => Object is ChargingTariffGroup_Id chargingTariffGroupId &&
+                   Equals(chargingTariffGroupId);
 
         #endregion
 
-        #region Equals(ChargingStationId)
+        #region Equals(ChargingTariffGroupId)
 
         /// <summary>
         /// Compares two charging tariff group identifications for equality.
         /// </summary>
-        /// <param name="ChargingStationId">A charging tariff group identification to compare with.</param>
-        /// <returns>True if both match; False otherwise.</returns>
-        public Boolean Equals(ChargingTariffGroup_Id ChargingStationId)
-        {
+        /// <param name="ChargingTariffGroupId">A charging tariff group identification to compare with.</param>
+        public Boolean Equals(ChargingTariffGroup_Id ChargingTariffGroupId)
 
-            if ((Object) ChargingStationId is null)
-                return false;
+            => OperatorId.Equals(ChargingTariffGroupId.OperatorId) &&
 
-            return OperatorId.Equals(ChargingStationId.OperatorId) &&
-                   String.Equals(Suffix, ChargingStationId.Suffix);
-
-        }
+               String.Equals(Suffix,
+                             ChargingTariffGroupId.Suffix,
+                             StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -440,7 +405,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public override Int32 GetHashCode()
 
             => OperatorId.GetHashCode() ^
-              (Suffix?.GetHashCode() ?? 0);
+              (Suffix is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Suffix));
 
         #endregion
 

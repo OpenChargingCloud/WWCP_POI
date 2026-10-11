@@ -70,8 +70,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public delegate Task OnChargingStationOperatorAdminStatusChangedDelegate(DateTimeOffset                                        Timestamp,
                                                                              EventTracking_Id                                      EventTrackingId,
                                                                              ChargingStationOperator                              ChargingStationOperator,
-                                                                             Timestamped<ChargingStationOperatorAdminStatusTypes>  OldStatus,
-                                                                             Timestamped<ChargingStationOperatorAdminStatusTypes>  NewStatus);
+                                                                             Timestamped<ChargingStationOperatorAdminStatusType>  OldStatus,
+                                                                             Timestamped<ChargingStationOperatorAdminStatusType>  NewStatus);
 
     /// <summary>
     /// A delegate called whenever the dynamic status of the charging station operator changed.
@@ -84,8 +84,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public delegate Task OnChargingStationOperatorStatusChangedDelegate(DateTimeOffset                                   Timestamp,
                                                                         EventTracking_Id                                 EventTrackingId,
                                                                         ChargingStationOperator                         ChargingStationOperator,
-                                                                        Timestamped<ChargingStationOperatorStatusTypes>  OldStatus,
-                                                                        Timestamped<ChargingStationOperatorStatusTypes>  NewStatus);
+                                                                        Timestamped<ChargingStationOperatorStatusType>  OldStatus,
+                                                                        Timestamped<ChargingStationOperatorStatusType>  NewStatus);
 
 
 

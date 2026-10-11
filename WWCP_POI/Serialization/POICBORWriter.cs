@@ -97,9 +97,25 @@ internal sealed class POICBORWriter
                 var index = 0;
                 foreach (var item in value.EnumerateArray())
                 {
-                    // The schema visitor binds immediate object elements only, not nested arrays.
-                    var child = item.ValueKind == JsonValueKind.Object ? kind : null;
-                    WriteValue(item, child, changeSetReadings is not null || child is not null ? path + "/" + index.ToString(CultureInfo.InvariantCulture) : "");
+                    var itemPath = path + "/" + index.ToString(CultureInfo.InvariantCulture);
+                    if (kind is not null && item.ValueKind == JsonValueKind.String && POIRepresentation.IsPairReading(kind, index))
+                    {
+                        var text = item.GetString()!;
+                        if (readings is not null) WriteLeaf(readings.Read(text, itemPath));
+                        else
+                        {
+                            if (!MetrologicalValue.TryParse(text, out var reading, out var error))
+                                throw new ArgumentException($"{itemPath}: cannot encode a Styx metrological value: {error}");
+                            WriteLeaf(reading.ToCBOR());
+                        }
+                    }
+                    else
+                    {
+                        // The schema visitor binds immediate object elements, and the [category, reading] pairs of a pair kind.
+                        var child = item.ValueKind == JsonValueKind.Object ? kind :
+                                    item.ValueKind == JsonValueKind.Array && kind is not null ? POIRepresentation.PairKind(kind) : null;
+                        WriteValue(item, child, changeSetReadings is not null || child is not null ? itemPath : "");
+                    }
                     index++;
                 }
                 writer.WriteEndArray();

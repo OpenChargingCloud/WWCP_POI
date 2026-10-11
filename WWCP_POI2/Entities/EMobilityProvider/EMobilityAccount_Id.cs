@@ -53,9 +53,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of an electric mobility account (eMAId) or electric vehicle contract.
     /// </summary>
-    public readonly struct EMobilityAccount_Id : IId,
-                                                 IEquatable<EMobilityAccount_Id>,
-                                                 IComparable<EMobilityAccount_Id>
+    public readonly struct EMobilityAccount_Id : IId<EMobilityAccount_Id>
     {
 
         #region Data

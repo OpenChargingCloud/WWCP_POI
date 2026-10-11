@@ -33,8 +33,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// A grid operator.
     /// </summary>
     public sealed partial class GridOperator : AImmutableEMobilityEntity<GridOperator_Id,
-                                                 GridOperatorAdminStatusTypes,
-                                                 GridOperatorStatusTypes>,
+                                                 GridOperatorAdminStatusType,
+                                                 GridOperatorStatusType>,
                                 IEquatable <GridOperator>,
                                 IComparable<GridOperator>,
                                 IComparable
@@ -284,14 +284,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             I18NString?                         Name                         = null,
                             I18NString?                         Description                  = null,
                             GridOperatorPriority?               Priority                     = null,
-                            GridOperatorAdminStatusTypes?       InitialAdminStatus           = null,
-                            GridOperatorStatusTypes?            InitialStatus                = null,
+                            GridOperatorAdminStatusType?        InitialAdminStatus           = null,
+                            GridOperatorStatusType?             InitialStatus                = null,
                             UInt16?                             MaxAdminStatusScheduleSize   = DefaultMaxAdminStatusScheduleSize,
                             UInt16?                             MaxStatusScheduleSize        = DefaultMaxStatusScheduleSize,
 
                             String?                             DataSource                   = null,
-                            DateTime?                           Created                      = null,
-                            DateTime?                           LastChange                   = null,
+                            DateTimeOffset?                     Created                      = null,
+                            DateTimeOffset?                     LastChange                   = null,
 
                             CustomDataNew?                      CustomData                   = null,
                             UserDefinedDictionary?              InternalData                 = null,
@@ -304,8 +304,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    Name,
                    Description,
 
-                   InitialAdminStatus         ?? GridOperatorAdminStatusTypes.Available,
-                   InitialStatus              ?? GridOperatorStatusTypes.Available,
+                   InitialAdminStatus         ?? GridOperatorAdminStatusType.Operational,
+                   InitialStatus              ?? GridOperatorStatusType.Available,
                    MaxAdminStatusScheduleSize ?? DefaultMaxAdminStatusScheduleSize,
                    MaxStatusScheduleSize      ?? DefaultMaxStatusScheduleSize,
 

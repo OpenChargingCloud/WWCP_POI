@@ -184,7 +184,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ToJSON(this ParkingOperatorAdminStatus, Skip = null, Take = null, HistorySize = 1)
 
-        public static JObject ToJSON(this IEnumerable<Timestamped<ParkingOperatorAdminStatusTypes>>  ParkingOperatorAdminStatus,
+        public static JObject ToJSON(this IEnumerable<Timestamped<ParkingOperatorAdminStatusType>>   ParkingOperatorAdminStatus,
                                      UInt64?                                                        Skip         = null,
                                      UInt64?                                                        Take         = null,
                                      UInt64?                                                        HistorySize  = 1)
@@ -222,7 +222,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ToJSON(this ParkingOperatorAdminStatus, Skip = null, Take = null, HistorySize = 1)
 
-        public static JObject ToJSON(this IEnumerable<KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorAdminStatusTypes>>>>  ParkingOperatorAdminStatus,
+        public static JObject ToJSON(this IEnumerable<KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorAdminStatusType>>>>  ParkingOperatorAdminStatus,
                                      UInt64?                                                                                                       Skip         = null,
                                      UInt64?                                                                                                       Take         = null,
                                      UInt64?                                                                                                       HistorySize  = 1)
@@ -264,7 +264,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ToJSON(this ParkingOperatorStatus,      Skip = null, Take = null, HistorySize = 1)
 
-        public static JObject ToJSON(this IEnumerable<Timestamped<ParkingOperatorStatusTypes>>  ParkingOperatorStatus,
+        public static JObject ToJSON(this IEnumerable<Timestamped<ParkingOperatorStatusType>>   ParkingOperatorStatus,
                                      UInt64?                                                   Skip         = null,
                                      UInt64?                                                   Take         = null,
                                      UInt64?                                                   HistorySize  = 1)
@@ -302,7 +302,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ToJSON(this ParkingOperatorStatus,      Skip = null, Take = null, HistorySize = 1)
 
-        public static JObject ToJSON(this IEnumerable<KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorStatusTypes>>>>  ParkingOperatorStatus,
+        public static JObject ToJSON(this IEnumerable<KeyValuePair<ParkingOperator_Id, IEnumerable<Timestamped<ParkingOperatorStatusType>>>>  ParkingOperatorStatus,
                                      UInt64?                                                                                                  Skip         = null,
                                      UInt64?                                                                                                  Take         = null,
                                      UInt64?                                                                                                  HistorySize  = 1)
@@ -349,8 +349,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// The parking operator is responsible for operating parking spaces.
     /// </summary>
     public sealed partial class ParkingOperator : AImmutableEMobilityEntity<ParkingOperator_Id,
-                                                    ParkingOperatorAdminStatusTypes,
-                                                    ParkingOperatorStatusTypes>,
+                                                    ParkingOperatorAdminStatusType,
+                                                    ParkingOperatorStatusType>,
                                    IEquatable<ParkingOperator>, IComparable<ParkingOperator>, IComparable,
                                    IEnumerable<ParkingGarage>
     {
@@ -596,8 +596,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                RoamingNetwork                    RoamingNetwork,
                                I18NString?                       Name                         = null,
                                I18NString?                       Description                  = null,
-                               ParkingOperatorAdminStatusTypes?  InitialAdminStatus           = ParkingOperatorAdminStatusTypes.Operational,
-                               ParkingOperatorStatusTypes?       InitialStatus                = ParkingOperatorStatusTypes.Available,
+                               ParkingOperatorAdminStatusType?   InitialAdminStatus           = null,
+                               ParkingOperatorStatusType?        InitialStatus                = null,
                                UInt16?                           MaxAdminStatusScheduleSize   = DefaultMaxAdminStatusScheduleSize,
                                UInt16?                           MaxStatusScheduleSize        = DefaultMaxStatusScheduleSize,
 
@@ -623,8 +623,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    Name,
                    Description,
 
-                   InitialAdminStatus         ?? ParkingOperatorAdminStatusTypes.Operational,
-                   InitialStatus              ?? ParkingOperatorStatusTypes.Available,
+                   InitialAdminStatus         ?? ParkingOperatorAdminStatusType.Operational,
+                   InitialStatus              ?? ParkingOperatorStatusType.Available,
                    MaxAdminStatusScheduleSize ?? DefaultMaxAdminStatusScheduleSize,
                    MaxStatusScheduleSize      ?? DefaultMaxStatusScheduleSize,
 
