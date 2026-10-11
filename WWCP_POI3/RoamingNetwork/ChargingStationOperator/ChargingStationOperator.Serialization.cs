@@ -254,21 +254,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Parse CustomData               [optional]
+                #region Parse Created, LastChange, CustomData [optional]
 
-                CustomDataNew? customData = null;
-
-                if (JSON["customData"] is JToken customDataJSON)
+                if (!POIEntityMetadata.TryParse(JSON,
+                                                out var created,
+                                                out var lastChange,
+                                                out var customData,
+                                                out ErrorResponse))
                 {
-
-                    if (customDataJSON is not JObject customDataObject)
-                    {
-                        ErrorResponse = "The custom data must be a JSON object!";
-                        return false;
-                    }
-
-                    customData = CustomDataNew.ParseJObject(customDataObject);
-
+                    return false;
                 }
 
                 #endregion
@@ -288,6 +282,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               termsAndConditionsURL,
                                               dataLicenses,
                                               DataSource:  dataSource,
+                                              Created:     created,
+                                              LastChange:  lastChange,
                                               CustomData:  customData
                                           );
 

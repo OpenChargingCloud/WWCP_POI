@@ -420,6 +420,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var description           = Description;
             var dataSource            = DataSource;
             var licenses              = DataLicenses.ToImmutableArray();
+            var customData            = CustomData;
             var operators             = new Dictionary<ChargingStationOperator_Id, ChargingStationOperator>(chargingStationOperators);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
 
@@ -509,6 +510,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             else
                                 currentOperatorJSON![propertyName] = change.NewValue;
 
+                            // The change set's timestamp is the last change, so that its after ETags are deterministic.
+                            currentOperatorJSON!["lastChange"] = ChangeSet.CreatedAt.ToISO8601();
+
                             // The changed operator must still be a valid one.
                             if (!ChargingStationOperator.TryParse(currentOperatorJSON, out var changedOperator, out var changedOperatorError))
                             {
@@ -530,7 +534,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 return false;
                             }
 
-                            if (!ChargingStationOperator.TryParse((JObject) change.NewValue!, out var newOperator, out var newOperatorError))
+                            // The change set's timestamp is the last change and, unless given, the creation,
+                            // so that its after ETags are deterministic.
+                            var newOperatorJSON = (JObject) change.NewValue!;
+                            newOperatorJSON["created"]    ??= ChangeSet.CreatedAt.ToISO8601();
+                            newOperatorJSON["lastChange"]   = ChangeSet.CreatedAt.ToISO8601();
+
+                            if (!ChargingStationOperator.TryParse(newOperatorJSON, out var newOperator, out var newOperatorError))
                             {
                                 ErrorResponse = $"Change {index}: {newOperatorError}";
                                 return false;
@@ -574,7 +584,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
 
                     var propertyName  = change.PropertyName ?? "";
-                    currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses);
+                    currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses, customData);
 
                     if (change.OldValue is JToken oldValue &&
                         !OldValueMatches(oldValue, currentValue))
@@ -631,6 +641,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     licenses = newLicenses;
                                     break;
 
+                                case "customData":
+                                    if (newValue is not JObject newCustomData)
+                                    {
+                                        ErrorResponse = $"Change {index}: the custom data must be a JSON object!";
+                                        return false;
+                                    }
+                                    customData = CustomDataNew.ParseJObject(newCustomData);
+                                    break;
+
                                 default:
                                     ErrorResponse = $"Change {index}: the property '{propertyName}' of a roaming network can not be changed!";
                                     return false;
@@ -668,6 +687,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                 case "dataLicenses":
                                     licenses     = [];
+                                    break;
+
+                                case "customData":
+                                    customData   = CustomDataNew.Empty;
                                     break;
 
                                 default:
@@ -731,7 +754,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  dataSource,
                                  Created,
                                  ChangeSet.CreatedAt,
-                                 CustomData,
+                                 customData,
                                  InternalData,
                                  licenses,
                                  operators.Values
@@ -795,13 +818,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             ImmutableI18NString        Name,
                                             ImmutableI18NString        Description,
                                             String?                    DataSource,
-                                            ImmutableArray<DataLicense>  DataLicenses)
+                                            ImmutableArray<DataLicense>  DataLicenses,
+                                            CustomDataNew              CustomData)
 
             => PropertyName switch {
                    "name"          => Name.       IsNotNullOrEmpty()       ? Name.       ToJSON()      : null,
                    "description"   => Description.IsNotNullOrEmpty()       ? Description.ToJSON()      : null,
                    "dataSource"    => DataSource.IsNeitherNullNorEmpty()   ? DataSource                : null,
                    "dataLicenses"  => DataLicenses.Length > 0              ? DataLicenses.ToPOIJSON()  : null,
+                   "customData"    => CustomData.HasValues                 ? CustomData.ToJObject()    : null,
                    _               => null
                };
 

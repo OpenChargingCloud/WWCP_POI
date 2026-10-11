@@ -70,7 +70,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                    HotlinePhoneNumber:     PhoneNumber.Parse("+49 800 123456"),
                    TermsAndConditionsURL:  URL.Parse("https://example.org/terms"),
                    DataLicenses:           [ OwnLicense, DataLicense.OpenDatabaseLicense ],
-                   DataSource:             "test"
+                   DataSource:             "test",
+                   Created:                DateTimeOffset.Parse("2026-01-01T00:00:00Z")
                );
 
         private static RoamingNetwork NewNetwork()
@@ -690,6 +691,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                                 Name:                      rn1.Name,
                                 Description:               rn1.Description,
                                 DataSource:                rn1.DataSource,
+                                Created:                   rn1.Created,
+                                LastChange:                rn1.LastChangeDate,
                                 DataLicenses:              rn1.DataLicenses.Reverse(),
                                 ChargingStationOperators:  rn1.ChargingStationOperators.Reverse()
                             );
@@ -700,6 +703,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                                 Name:                      rn1.Name,
                                 Description:               rn1.Description,
                                 DataSource:                rn1.DataSource,
+                                Created:                   rn1.Created,
+                                LastChange:                rn1.LastChangeDate,
                                 DataLicenses:              rn1.DataLicenses,
                                 ChargingStationOperators:  [ NewOperator("DE*GEF", "GraphDefined"), NewOperator("DE*BDO", "Another name") ]
                             );
@@ -755,6 +760,126 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(RoamingNetwork.Parse(knownOnly.ToJSON(ExpandDataLicenses: InfoStatus.ShowIdOnly)).CalcETags(),
                             Is.EqualTo(knownOnly.CalcETags()));
 
+            }
+
+        }
+
+        #endregion
+
+        #region Timestamps_and_custom_data_are_content()
+
+        [Test]
+        public void Timestamps_and_custom_data_are_content()
+        {
+
+            var customData  = CustomDataNew.ParseJObject(new JObject(new JProperty("vendor", new JObject(new JProperty("tier", 2)))));
+
+            RoamingNetwork network(DateTimeOffset Created)
+
+                => new (
+                       Id:          RoamingNetwork_Id.Parse("rn1"),
+                       Created:     Created,
+                       LastChange:  DateTimeOffset.Parse("2026-02-02T02:02:02.123Z"),
+                       CustomData:  customData
+                   );
+
+            var rn1         = network(DateTimeOffset.Parse("2026-01-01T00:00:00.4567891Z"));
+            var json        = rn1.ToJSON(IncludeETags: false);
+
+            var viaJSON     = RoamingNetwork.Parse(JObject.Parse(json.ToString()));
+            var viaCBOR     = RoamingNetwork.Parse(CBORValue.Parse(rn1.ToCBOR().ToByteArray(CBORWriterOptions.Canonical)));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(json["created"]!.   Value<String>(),          Is.EqualTo("2026-01-01T00:00:00.456Z"));
+                Assert.That(json["lastChange"]!.Value<String>(),          Is.EqualTo("2026-02-02T02:02:02.123Z"));
+                Assert.That(json["customData"]!["vendor"]!["tier"]!.Value<Int32>(),  Is.EqualTo(2));
+
+                Assert.That(viaJSON.Created,                              Is.EqualTo(DateTimeOffset.Parse("2026-01-01T00:00:00.456Z")));
+                Assert.That(viaJSON.LastChangeDate,                       Is.EqualTo(rn1.LastChangeDate));
+                Assert.That(viaJSON.CalcETags(),                          Is.EqualTo(rn1.CalcETags()));
+                Assert.That(viaCBOR.CalcETags(),                          Is.EqualTo(rn1.CalcETags()));
+                Assert.That(viaCBOR.CustomData.ToJObject(),               Is.EqualTo(customData.ToJObject()).Using<JToken>(JToken.DeepEquals));
+
+                Assert.That(network(DateTimeOffset.Parse("2026-01-01T00:00:01Z")).CalcETags(),
+                            Is.Not.EqualTo(rn1.CalcETags()));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Change_sets_set_the_last_change()
+
+        [Test]
+        public void Change_sets_set_the_last_change()
+        {
+
+            var rn1          = NewNetwork();
+            var gef          = rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*GEF"))!;
+            var bdo          = rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*BDO"))!;
+
+            // A new operator given without timestamps.
+            var newOperator  = NewOperator("DE*NEW", "New").ToEmbeddedJSON();
+            newOperator.Remove("created");
+            newOperator.Remove("lastChange");
+
+            var cs1          = rn1.CreateChangeSet([
+                                   RoamingNetworkChange.UpdateProperty(gef, "telephone", null, "+49 30 7654321"),
+                                   RoamingNetworkChange.Add("ChargingStationOperator", "DE*NEW", newOperator)
+                               ],
+                               CreatedAt: CommitTime);
+
+            var rn2          = rn1.ApplyChangeSet(cs1);
+            var gef2         = rn2.GetChargingStationOperatorById(gef.Id)!;
+            var new2         = rn2.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*NEW"))!;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn2. LastChangeDate,  Is.EqualTo(CommitTime));
+                Assert.That(rn2. Created,         Is.EqualTo(rn1.Created));
+
+                Assert.That(gef2.LastChangeDate,  Is.EqualTo(CommitTime));
+                Assert.That(gef2.Created,         Is.EqualTo(gef.Created));
+
+                Assert.That(new2.Created,         Is.EqualTo(CommitTime));
+                Assert.That(new2.LastChangeDate,  Is.EqualTo(CommitTime));
+
+                // An operator not changed keeps its last change.
+                Assert.That(rn2.GetChargingStationOperatorById(bdo.Id)!.LastChangeDate,  Is.EqualTo(bdo.LastChangeDate));
+
+                // Timestamps are managed by change sets, not changed by them.
+                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "lastChange", null, "2030-01-01T00:00:00.000Z") ]),
+                            Throws.ArgumentException.With.Message.Contains("'lastChange' of a charging station operator can not be changed"));
+
+                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "created", null, "2030-01-01T00:00:00.000Z") ]),
+                            Throws.ArgumentException.With.Message.Contains("'created' of a roaming network can not be changed"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Network_custom_data_is_updated_and_removed()
+
+        [Test]
+        public void Network_custom_data_is_updated_and_removed()
+        {
+
+            var rn1  = NewNetwork();
+            var rn2  = rn1.ApplyChangeSet(rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "customData", null, new JObject(new JProperty("a", 1))) ]));
+            var cs3  = rn2.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(rn2, "customData") ]);
+            var rn3  = rn2.ApplyChangeSet(cs3);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(rn2.ToJSON()["customData"]!["a"]!.Value<Int32>(),  Is.EqualTo(1));
+                Assert.That(cs3.Changes[0].OldValue,                          Is.EqualTo(new JObject(new JProperty("a", 1))).Using<JToken>(JToken.DeepEquals));
+                Assert.That(rn3.ToJSON().ContainsKey("customData"),           Is.False);
             }
 
         }

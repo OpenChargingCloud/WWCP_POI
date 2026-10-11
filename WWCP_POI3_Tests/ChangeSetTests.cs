@@ -216,6 +216,96 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
         #endregion
 
+        #region A_signed_change_set_reads_back_its_CBOR()
+
+        [Test]
+        public void A_signed_change_set_reads_back_its_CBOR()
+        {
+
+            var rn1     = NewNetwork();
+            var eTags   = rn1.CalcETags();
+
+            // Integers, floats, texts that look like dates, empty values and an expected absent value.
+            var cs1     = new RoamingNetworkChangeSet(
+                              Id:                ChangeSet_Id.Parse("cs-cbor"),
+                              RoamingNetworkId:  rn1.Id,
+                              CreatedAt:         DateTimeOffset.Parse("2026-10-11T12:34:56.789Z"),
+                              Changes:           [
+                                                     RoamingNetworkChange.UpdateProperty("ChargingStationOperator", "DE*GEF", "geoLocation",
+                                                                                         JValue.CreateNull(),
+                                                                                         new JObject(new JProperty("lat", 50.9271), new JProperty("lng", 11.5892))),
+                                                     RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray()),
+                                                     RoamingNetworkChange.UpdateProperty(rn1, "customData",   null, new JObject(new JProperty("count", 42), new JProperty("since", "2026-01-01T00:00:00Z")))
+                                                 ],
+                              BeforeETags:       eTags,
+                              AfterETags:        eTags,
+                              Description:       I18NString.Create(Languages.en, "Hello CBOR!"),
+                              Metadata:          new JObject(new JProperty("validFrom", "2026-01-01T00:00:00Z"))
+                          ).Sign(Alice, "alice", COSEAlgorithm.Ed25519);
+
+            var bytes   = cs1.ToCBOR().ToByteArray(CBORWriterOptions.Canonical);
+            var cs2     = RoamingNetworkChangeSet.ParseCBOR(bytes);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(CanonicalJSON.Serialize(cs2.ToJSON()),  Is.EqualTo(CanonicalJSON.Serialize(cs1.ToJSON())));
+                Assert.That(cs2.Changes,                            Is.EqualTo(cs1.Changes));
+                Assert.That(cs2.Changes[0].OldValue!.Type,          Is.EqualTo(JTokenType.Null));
+                Assert.That(cs2.Metadata["validFrom"]!.Type,        Is.EqualTo(JTokenType.String));
+
+                Assert.That(cs2.VerifySignature(cs2.Signatures[0], Alice.GeneratePublicKey(), "alice", out var error),  Is.True, error);
+
+                // CBOR is smaller than JSON text.
+                Assert.That(bytes.Length,  Is.LessThan(System.Text.Encoding.UTF8.GetByteCount(cs1.ToJSON().ToString(Newtonsoft.Json.Formatting.None))));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Limits_are_checked_while_reading()
+
+        [Test]
+        public void Limits_are_checked_while_reading()
+        {
+
+            var cs1    = NewChangeSet().Sign(Alice, "alice", COSEAlgorithm.Ed25519).Sign(Alice, "alice2", COSEAlgorithm.Ed25519);
+            var text   = cs1.ToJSON().ToString();
+            var bytes  = cs1.ToCBOR().ToByteArray(CBORWriterOptions.Canonical);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // Within the default limits.
+                Assert.That(RoamingNetworkChangeSet.TryParse    (text,  out _, out var error0),                                                        Is.True, error0);
+                Assert.That(RoamingNetworkChangeSet.TryParseCBOR(bytes, out _, out var error1),                                                        Is.True, error1);
+
+                Assert.That(RoamingNetworkChangeSet.TryParse    (text,  out _, out var error2, new RoamingNetworkChangeSetLimits { MaxBytes = 100 }),  Is.False);
+                Assert.That(error2,                                                                                                                    Does.Contain("limit of 100 bytes"));
+
+                Assert.That(RoamingNetworkChangeSet.TryParseCBOR(bytes, out _, out var error3, new RoamingNetworkChangeSetLimits { MaxBytes = 100 }),  Is.False);
+                Assert.That(error3,                                                                                                                    Does.Contain("limit of 100 bytes"));
+
+                Assert.That(RoamingNetworkChangeSet.TryParse    (text,  out _, out var error4, new RoamingNetworkChangeSetLimits { MaxChanges = 2 }),  Is.False);
+                Assert.That(error4,                                                                                                                    Does.Contain("limit of 2 changes"));
+
+                Assert.That(RoamingNetworkChangeSet.TryParseCBOR(bytes, out _, out var error5, new RoamingNetworkChangeSetLimits { MaxSignatures = 1 }),  Is.False);
+                Assert.That(error5,                                                                                                                    Does.Contain("limit of 1 signatures"));
+
+                // The changes are 3 levels deep: change set, changes array, change, its value.
+                Assert.That(RoamingNetworkChangeSet.TryParse    (text,  out _, out _,          new RoamingNetworkChangeSetLimits { MaxDepth = 3 }),    Is.False);
+                Assert.That(RoamingNetworkChangeSet.TryParseCBOR(bytes, out _, out _,          new RoamingNetworkChangeSetLimits { MaxDepth = 3 }),    Is.False);
+                Assert.That(RoamingNetworkChangeSet.TryParse    (cs1.ToJSON(), out _, out var error6, new RoamingNetworkChangeSetLimits { MaxDepth = 3 }),  Is.False);
+                Assert.That(error6,                                                                                                                    Does.Contain("nesting depth of 3"));
+
+            }
+
+        }
+
+        #endregion
+
         #region A_signature_survives_the_JSON_text()
 
         [Test]

@@ -864,11 +864,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                //                                                                         ExpandDataLicenses:               InfoStatus.ShowIdOnly))))
                                //    : null,
 
-                               CustomData.HasValues
-                                   ? new JProperty("customData",            CustomData.ToJObject())
-                                   : null
+                               // created, lastChange and customData: see below
+                               null
 
                                );
+
+                // Always part of the content.
+                POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
                 //json["EVSEGroups"] = POIJSON.Children(EVSEGroups);
                 //json["chargingStationGroups"] = POIJSON.Children(ChargingStationGroups);

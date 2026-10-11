@@ -378,6 +378,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse Created, LastChange, CustomData [optional]
+
+                if (!POIEntityMetadata.TryParse(JSON,
+                                                out var created,
+                                                out var lastChange,
+                                                out var customData,
+                                                out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse DataLicenses   [optional]
 
                 if (!POIDataLicenses.TryParse(JSON["dataLicenses"],
@@ -440,6 +453,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      name,
                                      description,
                                      DataSource:                dataSource,
+                                     Created:                   created,
+                                     LastChange:                lastChange,
+                                     CustomData:                customData,
                                      DataLicenses:              dataLicenses,
                                      ChargingStationOperators:  chargingStationOperators
                                  );
@@ -635,6 +651,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                              );
 
+            // Always part of the content.
+            POIEntityMetadata.AddTo(JSON, Created, LastChangeDate, CustomData);
+
             // The ETags describe the content without them, irrespective of the view options.
             if (IncludeETags && ETags.Length > 0)
                 JSON.Add("eTags",  new JArray(ETags.Select(eTag => eTag.ToJSON(ETagDigestEncoding ?? POI.ETagDigestEncoding.HEX))));
@@ -750,6 +769,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse Created, LastChange, CustomData [optional]
+
+                var metadataJSON = new JObject();
+
+                foreach (var key in new[] { "created", "lastChange", "customData" })
+                    if (CBOR.TryGetValue(CBORValue.FromText(key), out var metadataCBOR))
+                        metadataJSON.Add(key, CBORJSON.ToJSON(metadataCBOR));
+
+                if (!POIEntityMetadata.TryParse(metadataJSON,
+                                                out var created,
+                                                out var lastChange,
+                                                out var customData,
+                                                out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse DataLicenses   [optional]
 
                 JToken? dataLicensesJSON    = null;
@@ -815,6 +853,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      name,
                                      description,
                                      DataSource:                dataSource,
+                                     Created:                   created,
+                                     LastChange:                lastChange,
+                                     CustomData:                customData,
                                      DataLicenses:              dataLicenses,
                                      ChargingStationOperators:  chargingStationOperators
                                  );
@@ -873,6 +914,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 CBOR.Add(CBORValue.FromText("chargingStationOperators"),
                          CBORValue.FromArray(OrderedChargingStationOperators.
                                                  Select(chargingStationOperator => chargingStationOperator.ToCBOR(Embedded: true))));
+
+            // Always part of the content, with the keys and values of the JSON representation.
+            foreach (var metadata in POIEntityMetadata.AddTo([], Created, LastChangeDate, CustomData).Properties())
+                CBOR.Add(CBORValue.FromText(metadata.Name),           CBORJSON.ToCBOR(metadata.Value));
 
             // The ETags describe the content without them, irrespective of the view options.
             if (IncludeETags && ETags.Length > 0)

@@ -19,6 +19,7 @@
 
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -189,19 +190,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region Parse    (Text)
+
+        #region Parse    (Text, Limits = null)
 
         /// <summary>
         /// Parse the given JSON text of a change set.
         /// Dates stay text, so signed values keep their exact representation.
         /// </summary>
         /// <param name="Text">The JSON text to parse.</param>
-        public static RoamingNetworkChangeSet Parse(String Text)
+        /// <param name="Limits">Optional limits, the default ones otherwise.</param>
+        public static RoamingNetworkChangeSet Parse(String                          Text,
+                                                    RoamingNetworkChangeSetLimits?  Limits   = null)
         {
 
             if (TryParse(Text,
                          out var changeSet,
-                         out var errorResponse))
+                         out var errorResponse,
+                         Limits))
             {
                 return changeSet;
             }
@@ -213,7 +218,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryParse (Text, out ChangeSet, out ErrorResponse)
+        #region TryParse (Text, out ChangeSet, out ErrorResponse, Limits = null)
 
         /// <summary>
         /// Try to parse the given JSON text of a change set.
@@ -222,19 +227,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Text">The JSON text to parse.</param>
         /// <param name="ChangeSet">The parsed change set.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="Limits">Optional limits, the default ones otherwise.</param>
         public static Boolean TryParse(String                                             Text,
                                        [NotNullWhen(true)]  out RoamingNetworkChangeSet?  ChangeSet,
-                                       [NotNullWhen(false)] out String?                   ErrorResponse)
+                                       [NotNullWhen(false)] out String?                   ErrorResponse,
+                                       RoamingNetworkChangeSetLimits?                     Limits   = null)
         {
 
-            ChangeSet = null;
+            ChangeSet  = null;
+            Limits   ??= RoamingNetworkChangeSetLimits.Default;
 
             try
             {
 
+                if (Text is null)
+                {
+                    ErrorResponse = "The given JSON text must not be null!";
+                    return false;
+                }
+
+                // Checked before parsing: a character takes at least one UTF-8 byte.
+                if (Text.Length > Limits.MaxBytes || Encoding.UTF8.GetByteCount(Text) > Limits.MaxBytes)
+                {
+                    ErrorResponse = $"The change set exceeds the limit of {Limits.MaxBytes} bytes!";
+                    return false;
+                }
+
                 using var reader = new JsonTextReader(new StringReader(Text)) {
                                        DateParseHandling   = DateParseHandling.None,
-                                       FloatParseHandling  = FloatParseHandling.Decimal
+                                       FloatParseHandling  = FloatParseHandling.Decimal,
+                                       MaxDepth            = Limits.MaxDepth
                                    };
 
                 if (JToken.ReadFrom(reader) is not JObject json)
@@ -245,7 +267,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 return TryParse(json,
                                 out ChangeSet,
-                                out ErrorResponse);
+                                out ErrorResponse,
+                                Limits);
 
             }
             catch (Exception e)
@@ -258,18 +281,140 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Parse    (JSON)
+        #region ParseCBOR    (CBOR, Limits = null)
+
+        /// <summary>
+        /// Parse the given CBOR bytes of a change set.
+        /// </summary>
+        /// <param name="CBOR">The CBOR bytes to parse.</param>
+        /// <param name="Limits">Optional limits, the default ones otherwise.</param>
+        public static RoamingNetworkChangeSet ParseCBOR(ReadOnlySpan<Byte>              CBOR,
+                                                        RoamingNetworkChangeSetLimits?  Limits   = null)
+        {
+
+            if (TryParseCBOR(CBOR,
+                             out var changeSet,
+                             out var errorResponse,
+                             Limits))
+            {
+                return changeSet;
+            }
+
+            throw new ArgumentException("The given CBOR representation of a change set is invalid: " + errorResponse,
+                                        nameof(CBOR));
+
+        }
+
+        #endregion
+
+        #region TryParseCBOR (CBOR, out ChangeSet, out ErrorResponse, Limits = null)
+
+        /// <summary>
+        /// Try to parse the given CBOR bytes of a change set.
+        /// It has the keys and values of the JSON representation, and the same signatures.
+        /// </summary>
+        /// <param name="CBOR">The CBOR bytes to parse.</param>
+        /// <param name="ChangeSet">The parsed change set.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="Limits">Optional limits, the default ones otherwise.</param>
+        public static Boolean TryParseCBOR(ReadOnlySpan<Byte>                                 CBOR,
+                                           [NotNullWhen(true)]  out RoamingNetworkChangeSet?  ChangeSet,
+                                           [NotNullWhen(false)] out String?                   ErrorResponse,
+                                           RoamingNetworkChangeSetLimits?                     Limits   = null)
+        {
+
+            ChangeSet  = null;
+            Limits   ??= RoamingNetworkChangeSetLimits.Default;
+
+            if (CBOR.Length > Limits.MaxBytes)
+            {
+                ErrorResponse = $"The change set exceeds the limit of {Limits.MaxBytes} bytes!";
+                return false;
+            }
+
+            if (!CBORValue.TryParse(CBOR,
+                                    out var cbor,
+                                    out var cborError,
+                                    new CBORReaderOptions { MaxDepth = Limits.MaxDepth }))
+            {
+                ErrorResponse = "Invalid CBOR: " + cborError;
+                return false;
+            }
+
+            return TryParse(cbor,
+                            out ChangeSet,
+                            out ErrorResponse,
+                            Limits);
+
+        }
+
+        #endregion
+
+        #region TryParse     (CBOR, out ChangeSet, out ErrorResponse, Limits = null)
+
+        /// <summary>
+        /// Try to parse the given CBOR representation of a change set.
+        /// It has the keys and values of the JSON representation, and the same signatures.
+        /// </summary>
+        /// <param name="CBOR">The CBOR to parse.</param>
+        /// <param name="ChangeSet">The parsed change set.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="Limits">Optional limits, the default ones otherwise.</param>
+        public static Boolean TryParse(CBORValue                                          CBOR,
+                                       [NotNullWhen(true)]  out RoamingNetworkChangeSet?  ChangeSet,
+                                       [NotNullWhen(false)] out String?                   ErrorResponse,
+                                       RoamingNetworkChangeSetLimits?                     Limits   = null)
+        {
+
+            ChangeSet  = null;
+            Limits   ??= RoamingNetworkChangeSetLimits.Default;
+
+            try
+            {
+
+                if (CBOR.Kind != CBORValueKind.Map)
+                {
+                    ErrorResponse = "The CBOR representation of a change set must be a map!";
+                    return false;
+                }
+
+                if (CBORJSON.ToJSON(CBOR, new CBORJSONOptions { MaxDepth = Limits.MaxDepth }) is not JObject json)
+                {
+                    ErrorResponse = "The CBOR representation of a change set must be a map with text keys!";
+                    return false;
+                }
+
+                return TryParse(json,
+                                out ChangeSet,
+                                out ErrorResponse,
+                                Limits);
+
+            }
+            catch (Exception e)
+            {
+                ErrorResponse = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region Parse    (JSON, Limits = null)
 
         /// <summary>
         /// Parse the given JSON representation of a change set.
         /// </summary>
         /// <param name="JSON">The JSON to parse.</param>
-        public static RoamingNetworkChangeSet Parse(JObject JSON)
+        /// <param name="Limits">Optional limits, the default ones otherwise.</param>
+        public static RoamingNetworkChangeSet Parse(JObject                         JSON,
+                                                    RoamingNetworkChangeSetLimits?  Limits   = null)
         {
 
             if (TryParse(JSON,
                          out var changeSet,
-                         out var errorResponse))
+                         out var errorResponse,
+                         Limits))
             {
                 return changeSet;
             }
@@ -281,7 +426,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryParse (JSON, out ChangeSet, out ErrorResponse)
+        #region TryParse (JSON, out ChangeSet, out ErrorResponse, Limits = null)
 
         /// <summary>
         /// Try to parse the given JSON representation of a change set.
@@ -291,12 +436,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="ChangeSet">The parsed change set.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="Limits">Optional limits, the default ones otherwise.</param>
         public static Boolean TryParse(JObject                                            JSON,
                                        [NotNullWhen(true)]  out RoamingNetworkChangeSet?  ChangeSet,
-                                       [NotNullWhen(false)] out String?                   ErrorResponse)
+                                       [NotNullWhen(false)] out String?                   ErrorResponse,
+                                       RoamingNetworkChangeSetLimits?                     Limits   = null)
         {
 
-            ChangeSet = null;
+            ChangeSet  = null;
+            Limits   ??= RoamingNetworkChangeSetLimits.Default;
 
             try
             {
@@ -306,6 +454,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     ErrorResponse = "The given JSON object must not be null!";
                     return false;
                 }
+
+                #region Limits
+
+                if (Depth(JSON) > Limits.MaxDepth)
+                {
+                    ErrorResponse = $"The change set exceeds the limit of a nesting depth of {Limits.MaxDepth}!";
+                    return false;
+                }
+
+                if (JSON["changes"] is JArray changesToCount && changesToCount.Count > Limits.MaxChanges)
+                {
+                    ErrorResponse = $"The change set exceeds the limit of {Limits.MaxChanges} changes!";
+                    return false;
+                }
+
+                if (JSON["signatures"] is JArray signaturesToCount && signaturesToCount.Count > Limits.MaxSignatures)
+                {
+                    ErrorResponse = $"The change set exceeds the limit of {Limits.MaxSignatures} signatures!";
+                    return false;
+                }
+
+                #endregion
 
                 #region Parse Id                  [mandatory]
 
@@ -472,6 +642,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
         }
+
+        #endregion
+
+        #region ToCBOR   (IncludeSignatures = true)
+
+        /// <summary>
+        /// Return the CBOR representation of this change set: the keys and values of its JSON representation.
+        /// Its signatures stay valid, as they sign the JSON representation, which the CBOR one reads back exactly.
+        /// Write it with CBORWriterOptions.Canonical for deterministic bytes.
+        /// </summary>
+        /// <param name="IncludeSignatures">Whether to include the signatures.</param>
+        public CBORValue ToCBOR(Boolean IncludeSignatures = true)
+
+            => CBORJSON.ToCBOR(ToJSON(IncludeSignatures));
+
+        #endregion
+
+        #region (private static) Depth(JSON)
+
+        /// <summary>
+        /// The nesting depth of the given JSON value: 0 for a primitive value, 1 for an object or array of them.
+        /// </summary>
+        private static Int32 Depth(JToken JSON)
+
+            => JSON switch {
+                   JObject json  => 1 + json.Properties().Select(property => Depth(property.Value)).DefaultIfEmpty(0).Max(),
+                   JArray  json  => 1 + json.             Select(Depth).                            DefaultIfEmpty(0).Max(),
+                   _             => 0
+               };
 
         #endregion
 
