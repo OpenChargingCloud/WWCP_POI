@@ -1,0 +1,860 @@
+/*
+ * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
+ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
+ *
+ * Licensed under the Affero GPL license, Version 3.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.gnu.org/licenses/agpl.html
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#region Usings
+
+using System.Collections.Concurrent;
+using System.Net.WebSockets;
+using System.Text;
+using System.Threading.Channels;
+
+using Newtonsoft.Json.Linq;
+
+using org.GraphDefined.Vanaheimr.Illias;
+
+#endregion
+
+namespace cloud.charging.open.protocols.WWCP.POI
+{
+
+    /// <summary>
+    /// The follower has caught up with its leader, after connecting.
+    /// </summary>
+    /// <param name="Follower">The follower.</param>
+    /// <param name="History">Its history.</param>
+    public delegate void OnRoamingNetworkFollowerSynchronizedDelegate(RoamingNetworkFollower  Follower,
+                                                                      RoamingNetworkHistory   History);
+
+    /// <summary>
+    /// The follower started its history from a snapshot of its leader: at first, or because the leader
+    /// did not know its head any more.
+    /// </summary>
+    /// <param name="Follower">The follower.</param>
+    /// <param name="OldHistory">The history before, if any.</param>
+    /// <param name="NewHistory">The new history.</param>
+    public delegate void OnRoamingNetworkFollowerHistoryReplacedDelegate(RoamingNetworkFollower   Follower,
+                                                                         RoamingNetworkHistory?   OldHistory,
+                                                                         RoamingNetworkHistory    NewHistory);
+
+    /// <summary>
+    /// Something went wrong; the follower connects again.
+    /// </summary>
+    /// <param name="Follower">The follower.</param>
+    /// <param name="Description">What went wrong.</param>
+    /// <param name="Exception">The exception, if any.</param>
+    public delegate void OnRoamingNetworkFollowerErrorDelegate(RoamingNetworkFollower  Follower,
+                                                               String                  Description,
+                                                               Exception?              Exception);
+
+
+    /// <summary>
+    /// Keeps the history of a roaming network in sync with its leading server, over the WebSocket of the leader's history.
+    /// </summary>
+    /// <remarks>
+    /// After connecting it subscribes first, so that nothing gets lost, then starts from a snapshot when it has
+    /// no history yet, catches up with the commits since its head, and takes the current runtime status.
+    /// Afterwards it appends the pushed commits; a commit that does not follow its head, or one only announced,
+    /// makes it catch up again. A head the leader does not know makes it start again from a snapshot.
+    /// When the connection breaks it connects again, waiting longer after every failure, and catches up.
+    /// Change sets and status updates are sent to the leader, which pushes them back as commits and status updates.
+    /// </remarks>
+    public sealed class RoamingNetworkFollower : IAsyncDisposable
+    {
+
+        #region Data
+
+        private readonly RoamingNetworkFollowerOptions  options;
+        private readonly TaskCompletionSource           firstSynchronization  = new (TaskCreationOptions.RunContinuationsAsynchronously);
+        private          RoamingNetworkHistory?         history;
+        private          Connection?                    connection;
+        private          CancellationTokenSource?       stop;
+        private          Task?                          runner;
+        private          Int64                          reconnects;
+
+        #endregion
+
+        #region Properties
+
+        /// <summary>
+        /// The URL of the WebSocket of the leader's history, e.g. ws://leader/roamingNetworks/rn1/history/ws.
+        /// </summary>
+        public Uri                     LeaderURL      { get; }
+
+        /// <summary>
+        /// The history kept in sync; null until the first snapshot. It is replaced when the leader does not know its head.
+        /// </summary>
+        public RoamingNetworkHistory?  History
+            => Volatile.Read(ref history);
+
+        /// <summary>
+        /// Whether the follower is connected to its leader right now.
+        /// </summary>
+        public Boolean                 IsConnected
+            => Volatile.Read(ref connection)?.IsOpen == true;
+
+        /// <summary>
+        /// How often the follower connected again.
+        /// </summary>
+        public Int64                   Reconnects
+            => Interlocked.Read(ref reconnects);
+
+        #endregion
+
+        #region Events
+
+        /// <summary>
+        /// The follower has caught up with its leader, after connecting.
+        /// </summary>
+        public event OnRoamingNetworkFollowerSynchronizedDelegate?     OnSynchronized;
+
+        /// <summary>
+        /// The follower started its history from a snapshot.
+        /// </summary>
+        public event OnRoamingNetworkFollowerHistoryReplacedDelegate?  OnHistoryReplaced;
+
+        /// <summary>
+        /// Something went wrong; the follower connects again.
+        /// </summary>
+        public event OnRoamingNetworkFollowerErrorDelegate?            OnError;
+
+        #endregion
+
+        #region Constructor(s)
+
+        /// <summary>
+        /// Create a follower of the history behind the given WebSocket URL.
+        /// </summary>
+        /// <param name="LeaderURL">The URL of the WebSocket of the leader's history.</param>
+        /// <param name="History">An optional history to continue, e.g. one persisted before; a snapshot otherwise.</param>
+        /// <param name="Options">Optional options.</param>
+        public RoamingNetworkFollower(Uri                             LeaderURL,
+                                      RoamingNetworkHistory?          History   = null,
+                                      RoamingNetworkFollowerOptions?  Options   = null)
+        {
+
+            this.LeaderURL  = LeaderURL;
+            this.history    = History;
+            this.options    = Options ?? new RoamingNetworkFollowerOptions();
+
+        }
+
+        #endregion
+
+
+        #region StartAsync(CancellationToken = default)
+
+        /// <summary>
+        /// Start following, and return once the follower caught up for the first time.
+        /// It keeps trying until then; cancel the token to stop waiting, not following.
+        /// </summary>
+        public async Task StartAsync(CancellationToken CancellationToken = default)
+        {
+
+            if (runner is not null)
+                throw new InvalidOperationException("The follower has been started already!");
+
+            stop    = new CancellationTokenSource();
+            runner  = Task.Run(() => RunAsync(stop.Token));
+
+            await firstSynchronization.Task.WaitAsync(CancellationToken);
+
+        }
+
+        #endregion
+
+        #region StopAsync()
+
+        /// <summary>
+        /// Stop following and close the connection.
+        /// </summary>
+        public async Task StopAsync()
+        {
+
+            stop?.Cancel();
+
+            if (runner is not null)
+            {
+                try
+                {
+                    await runner;
+                }
+                catch
+                { }
+            }
+
+        }
+
+        #endregion
+
+        #region DisposeAsync()
+
+        /// <summary>
+        /// Stop following.
+        /// </summary>
+        public async ValueTask DisposeAsync()
+        {
+            await StopAsync();
+            stop?.Dispose();
+        }
+
+        #endregion
+
+
+        #region RequestAsync(Action, Payload = null, CancellationToken = default)
+
+        /// <summary>
+        /// Send a request to the leader and return its response; a request error is thrown as a POIWebSocketRequestException.
+        /// </summary>
+        /// <param name="Action">The action.</param>
+        /// <param name="Payload">The optional payload.</param>
+        /// <param name="CancellationToken">An optional cancellation token.</param>
+        public async Task<JObject> RequestAsync(String             Action,
+                                                JObject?           Payload             = null,
+                                                CancellationToken  CancellationToken   = default)
+        {
+
+            var currentConnection = Volatile.Read(ref connection)
+                                        ?? throw new InvalidOperationException("The follower is not connected to its leader!");
+
+            var answer = await currentConnection.RequestAsync(Action, Payload ?? [], CancellationToken);
+
+            return answer.IsError
+                       ? throw new POIWebSocketRequestException(Action, answer)
+                       : answer.GetPayloadJSON() ?? [];
+
+        }
+
+        #endregion
+
+        #region CommitChangeSetAsync(ChangeSet, ExpectedHeadId = null, Rebase = false, CancellationToken = default)
+
+        /// <summary>
+        /// Submit the given change set to the leader; it comes back as a commit.
+        /// </summary>
+        /// <param name="ChangeSet">A change set, e.g. made against the head of this follower.</param>
+        /// <param name="ExpectedHeadId">The optional head the leader is expected to have.</param>
+        /// <param name="Rebase">Whether the leader may rebase it.</param>
+        /// <param name="CancellationToken">An optional cancellation token.</param>
+        /// <returns>The answer of the leader: { status, … }.</returns>
+        public Task<JObject> CommitChangeSetAsync(RoamingNetworkChangeSet   ChangeSet,
+                                                  RoamingNetworkCommit_Id?  ExpectedHeadId      = null,
+                                                  Boolean                   Rebase              = false,
+                                                  CancellationToken         CancellationToken   = default)
+        {
+
+            var payload = new JObject(
+                              new JProperty("changeSet",  ChangeSet.ToJSON()),
+                              new JProperty("rebase",     Rebase)
+                          );
+
+            if (ExpectedHeadId.HasValue)
+                payload.Add("expectedHead", ExpectedHeadId.Value.ToString());
+
+            return RequestAsync("commitChangeSet", payload, CancellationToken);
+
+        }
+
+        #endregion
+
+        #region SetStatusAsync(Kind, EntityType, EntityId, Value, Timestamp = null, DataSource = null, CancellationToken = default)
+
+        /// <summary>
+        /// Set a status at the leader; it comes back as a status update.
+        /// </summary>
+        /// <returns>The answer of the leader: { result, description?, current? }.</returns>
+        public Task<JObject> SetStatusAsync(POIRuntimeStatusKind  Kind,
+                                            String                EntityType,
+                                            String                EntityId,
+                                            String                Value,
+                                            DateTimeOffset?       Timestamp           = null,
+                                            String?               DataSource          = null,
+                                            CancellationToken     CancellationToken   = default)
+        {
+
+            var payload = new JObject(
+                              new JProperty("kind",        POIStatusUpdate.KindText(Kind)),
+                              new JProperty("entityType",  EntityType),
+                              new JProperty("entityId",    EntityId),
+                              new JProperty("value",       Value)
+                          );
+
+            if (Timestamp.HasValue)
+                payload.Add("timestamp",   Timestamp.Value.ToISO8601());
+
+            if (DataSource is not null)
+                payload.Add("dataSource",  DataSource);
+
+            return RequestAsync("setStatus", payload, CancellationToken);
+
+        }
+
+        #endregion
+
+
+        #region (private) RunAsync(CancellationToken)
+
+        /// <summary>
+        /// Connect, catch up and follow, again and again, until stopped.
+        /// </summary>
+        private async Task RunAsync(CancellationToken CancellationToken)
+        {
+
+            var delay = options.MinReconnectDelay;
+
+            while (!CancellationToken.IsCancellationRequested)
+            {
+
+                try
+                {
+
+                    await using var currentConnection = await Connection.ConnectAsync(this, CancellationToken);
+
+                    Volatile.Write(ref connection, currentConnection);
+
+                    await SynchronizeAsync(currentConnection, CancellationToken);
+
+                    delay = options.MinReconnectDelay;
+                    firstSynchronization.TrySetResult();
+                    OnSynchronized?.Invoke(this, History!);
+
+                    await FollowAsync(currentConnection, CancellationToken);
+
+                }
+                catch (OperationCanceledException) when (CancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception e)
+                {
+                    RaiseError($"Following '{LeaderURL}' failed: {e.Message}", e);
+                }
+                finally
+                {
+                    Volatile.Write(ref connection, null);
+                }
+
+                if (CancellationToken.IsCancellationRequested)
+                    break;
+
+                Interlocked.Increment(ref reconnects);
+
+                try
+                {
+                    await Task.Delay(delay, CancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                delay = TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, options.MaxReconnectDelay.Ticks));
+
+            }
+
+            firstSynchronization.TrySetCanceled();
+
+        }
+
+        #endregion
+
+        #region (private) SynchronizeAsync(Connection, CancellationToken)
+
+        /// <summary>
+        /// Subscribe, start from a snapshot if needed, catch up, and take the current runtime status.
+        /// </summary>
+        private async Task SynchronizeAsync(Connection         Connection,
+                                            CancellationToken  CancellationToken)
+        {
+
+            // First, so that nothing published from now on gets lost:
+            // pushes wait in the connection until they are taken below.
+            var topics = new JArray(options.PushCompleteCommits
+                                        ? POI_API.CommitsTopic
+                                        : POI_API.CommitAnnouncementsTopic);
+
+            if (options.FollowStatus)
+            {
+                topics.Add(POI_API.AdminStatusUpdatesTopic);
+                topics.Add(POI_API.StatusUpdatesTopic);
+            }
+
+            await Expect(Connection, "subscribe", new JObject(new JProperty("topics", topics)), CancellationToken);
+
+            if (History is null)
+                await StartFromSnapshotAsync(Connection, CancellationToken);
+
+            await CatchUpAsync(Connection, CancellationToken);
+
+            if (options.FollowStatus)
+            {
+
+                var runtimeStatus = await Expect(Connection, "runtimeStatus", [], CancellationToken);
+
+                foreach (var statusJSON in runtimeStatus["runtimeStatus"]?.OfType<JObject>() ?? [])
+                    TakeStatusUpdate(statusJSON);
+
+            }
+
+        }
+
+        #endregion
+
+        #region (private) FollowAsync(Connection, CancellationToken)
+
+        /// <summary>
+        /// Take the pushes of the leader, in their order, until the connection ends.
+        /// </summary>
+        private async Task FollowAsync(Connection         Connection,
+                                       CancellationToken  CancellationToken)
+        {
+
+            await foreach (var push in Connection.Pushes.Reader.ReadAllAsync(CancellationToken))
+            {
+
+                var payloads = push.GetPayloadJSON()?["batch"] is JArray batch
+                                   ? batch.OfType<JObject>().ToArray()
+                                   : [ push.GetPayloadJSON() ?? [] ];
+
+                foreach (var payload in payloads)
+                {
+                    switch (push.Action)
+                    {
+
+                        case "commit":
+                            await TakeCommitAsync(Connection, payload, CancellationToken);
+                            break;
+
+                        case "commitAnnouncement":
+                            if (payload["commitId"]?.Value<String>() is not String commitIdText ||
+                                !RoamingNetworkCommit_Id.TryParse(commitIdText, out var commitId) ||
+                                !History!.Contains(commitId))
+                            {
+                                await CatchUpAsync(Connection, CancellationToken);
+                            }
+                            break;
+
+                        case "statusUpdate":
+                        case "adminStatusUpdate":
+                            TakeStatusUpdate(payload);
+                            break;
+
+                    }
+                }
+
+            }
+
+        }
+
+        #endregion
+
+        #region (private) TakeCommitAsync(Connection, CommitJSON, CancellationToken)
+
+        /// <summary>
+        /// Append a pushed commit, or catch up when it does not follow the head.
+        /// </summary>
+        private async Task TakeCommitAsync(Connection         Connection,
+                                           JObject            CommitJSON,
+                                           CancellationToken  CancellationToken)
+        {
+
+            var currentHistory = History!;
+
+            if (RoamingNetworkCommit.TryParse(CommitJSON, out var commit, out _, options.ChangeSetLimits))
+            {
+
+                if (currentHistory.Contains(commit.Id))
+                    return;
+
+                if (commit.ParentId == currentHistory.Head.Commit.Id &&
+                    currentHistory.TryAppend(commit, out _, options.VerifyChangeSetSignature))
+                {
+                    return;
+                }
+
+            }
+
+            // Missed, unreadable or not appendable: ask the leader for everything since the head.
+            await CatchUpAsync(Connection, CancellationToken);
+
+        }
+
+        #endregion
+
+        #region (private) TakeStatusUpdate(StatusJSON)
+
+        private void TakeStatusUpdate(JObject StatusJSON)
+        {
+
+            if (POIStatusUpdate.TryParse(StatusJSON, out var statusUpdate, out var errorResponse))
+                History!.RuntimeStatus.TryUpdate(statusUpdate, out _);
+
+            else
+                RaiseError("Invalid status update: " + errorResponse, null);
+
+        }
+
+        #endregion
+
+        #region (private) CatchUpAsync(Connection, CancellationToken)
+
+        /// <summary>
+        /// Append all commits of the leader since the head, page by page, until there are no more.
+        /// A head the leader does not know makes the follower start again from a snapshot.
+        /// </summary>
+        private async Task CatchUpAsync(Connection         Connection,
+                                        CancellationToken  CancellationToken)
+        {
+
+            while (true)
+            {
+
+                var currentHistory  = History!;
+                var answer          = await Connection.RequestAsync("commits",
+                                                                    new JObject(
+                                                                        new JProperty("since",  currentHistory.Head.Commit.Id.ToString()),
+                                                                        new JProperty("max",    options.MaxCommitsPerRequest)
+                                                                    ),
+                                                                    CancellationToken);
+
+                if (answer.IsError)
+                {
+
+                    if (answer.ErrorCode == POIWebSocketErrorCodes.NotFound)
+                    {
+                        await StartFromSnapshotAsync(Connection, CancellationToken);
+                        continue;
+                    }
+
+                    throw new POIWebSocketRequestException("commits", answer);
+
+                }
+
+                var commits = new List<RoamingNetworkCommit>();
+
+                foreach (var commitJSON in answer.GetPayloadJSON()?["commits"]?.OfType<JObject>() ?? [])
+                {
+
+                    if (!RoamingNetworkCommit.TryParse(commitJSON, out var commit, out var commitError, options.ChangeSetLimits))
+                        throw new InvalidOperationException("Invalid commit of the leader: " + commitError);
+
+                    commits.Add(commit);
+
+                }
+
+                // Until an empty page: the leader may send fewer than asked for.
+                if (commits.Count == 0)
+                    return;
+
+                if (!currentHistory.TryAppend(commits, out _, out var appendError, options.VerifyChangeSetSignature))
+                    throw new InvalidOperationException("The commits of the leader can not be appended: " + appendError);
+
+            }
+
+        }
+
+        #endregion
+
+        #region (private) StartFromSnapshotAsync(Connection, CancellationToken)
+
+        private async Task StartFromSnapshotAsync(Connection         Connection,
+                                                  CancellationToken  CancellationToken)
+        {
+
+            var snapshot = await Expect(Connection, "snapshot", [], CancellationToken);
+
+            if (!RoamingNetworkHistory.TryFromSnapshot(snapshot, out var newHistory, out var errorResponse, options.ChangeSetLimits))
+                throw new InvalidOperationException("Invalid snapshot of the leader: " + errorResponse);
+
+            var oldHistory = Interlocked.Exchange(ref history, newHistory);
+
+            OnHistoryReplaced?.Invoke(this, oldHistory, newHistory);
+
+        }
+
+        #endregion
+
+        #region (private static) Expect(Connection, Action, Payload, CancellationToken)
+
+        /// <summary>
+        /// The payload of the response, or a POIWebSocketRequestException.
+        /// </summary>
+        private static async Task<JObject> Expect(Connection         Connection,
+                                                  String             Action,
+                                                  JObject            Payload,
+                                                  CancellationToken  CancellationToken)
+        {
+
+            var answer = await Connection.RequestAsync(Action, Payload, CancellationToken);
+
+            return answer.IsError
+                       ? throw new POIWebSocketRequestException(Action, answer)
+                       : answer.GetPayloadJSON() ?? [];
+
+        }
+
+        #endregion
+
+        #region (private) RaiseError(Description, Exception)
+
+        private void RaiseError(String      Description,
+                                Exception?  Exception)
+        {
+            try
+            {
+                OnError?.Invoke(this, Description, Exception);
+            }
+            catch
+            { }
+        }
+
+        #endregion
+
+
+        #region (private class) Connection
+
+        /// <summary>
+        /// One WebSocket connection to the leader: requests matched to their answers, pushes in their order.
+        /// </summary>
+        private sealed class Connection : IAsyncDisposable
+        {
+
+            #region Data
+
+            private readonly RoamingNetworkFollower                                                   follower;
+            private readonly ClientWebSocket                                                          webSocket    = new ();
+            private readonly SemaphoreSlim                                                            sendLock     = new (1, 1);
+            private readonly ConcurrentDictionary<String, TaskCompletionSource<POIWebSocketMessage>>  pending      = new (StringComparer.Ordinal);
+            private readonly CancellationTokenSource                                                  closed       = new ();
+            private          Task?                                                                    receiver;
+            private          Int64                                                                    messageCounter;
+
+            #endregion
+
+            #region Properties
+
+            /// <summary>
+            /// The pushes of the leader, in their order; completed when the connection ends.
+            /// </summary>
+            public Channel<POIWebSocketMessage>  Pushes  { get; } = Channel.CreateUnbounded<POIWebSocketMessage>(new UnboundedChannelOptions { SingleReader = true });
+
+            public Boolean                       IsOpen
+                => webSocket.State == WebSocketState.Open && !closed.IsCancellationRequested;
+
+            #endregion
+
+            private Connection(RoamingNetworkFollower Follower)
+            {
+                this.follower = Follower;
+            }
+
+            #region (static) ConnectAsync(Follower, CancellationToken)
+
+            public static async Task<Connection> ConnectAsync(RoamingNetworkFollower  Follower,
+                                                              CancellationToken       CancellationToken)
+            {
+
+                var connection = new Connection(Follower);
+
+                try
+                {
+
+                    Follower.options.ConfigureWebSocket?.Invoke(connection.webSocket.Options);
+
+                    await connection.webSocket.ConnectAsync(Follower.LeaderURL, CancellationToken);
+
+                    connection.receiver = Task.Run(connection.ReceiveAsync);
+
+                    return connection;
+
+                }
+                catch
+                {
+                    await connection.DisposeAsync();
+                    throw;
+                }
+
+            }
+
+            #endregion
+
+            #region RequestAsync(Action, Payload, CancellationToken)
+
+            /// <summary>
+            /// Send a request and wait for its response or request error.
+            /// </summary>
+            public async Task<POIWebSocketMessage> RequestAsync(String             Action,
+                                                                JObject            Payload,
+                                                                CancellationToken  CancellationToken)
+            {
+
+                var messageId  = "f" + Interlocked.Increment(ref messageCounter);
+                var answer     = new TaskCompletionSource<POIWebSocketMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                pending[messageId] = answer;
+
+                try
+                {
+
+                    using var linked = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken, closed.Token);
+
+                    await sendLock.WaitAsync(linked.Token);
+
+                    try
+                    {
+                        await webSocket.SendAsync(Encoding.UTF8.GetBytes(POIWebSocketMessage.Request(messageId, Action, Payload).ToJSONText()),
+                                                  WebSocketMessageType.Text,
+                                                  true,
+                                                  linked.Token);
+                    }
+                    finally
+                    {
+                        sendLock.Release();
+                    }
+
+                    return await answer.Task.WaitAsync(follower.options.RequestTimeout, linked.Token);
+
+                }
+                catch (OperationCanceledException) when (closed.IsCancellationRequested && !CancellationToken.IsCancellationRequested)
+                {
+                    throw new WebSocketException($"The connection closed before the request '{Action}' was answered!");
+                }
+                finally
+                {
+                    pending.TryRemove(messageId, out _);
+                }
+
+            }
+
+            #endregion
+
+            #region (private) ReceiveAsync()
+
+            /// <summary>
+            /// Read the messages of the leader until the connection ends: answers to their requests, pushes into the channel.
+            /// </summary>
+            private async Task ReceiveAsync()
+            {
+
+                var buffer = new Byte[64 * 1024];
+
+                try
+                {
+
+                    while (webSocket.State == WebSocketState.Open)
+                    {
+
+                        using var message = new MemoryStream();
+                        WebSocketReceiveResult result;
+
+                        do
+                        {
+
+                            result = await webSocket.ReceiveAsync(buffer, closed.Token);
+
+                            if (message.Length + result.Count > follower.options.MaxMessageBytes)
+                            {
+                                await webSocket.CloseOutputAsync(WebSocketCloseStatus.MessageTooBig, "Too large", CancellationToken.None);
+                                return;
+                            }
+
+                            message.Write(buffer, 0, result.Count);
+
+                        }
+                        while (!result.EndOfMessage);
+
+                        if (result.MessageType == WebSocketMessageType.Close)
+                        {
+                            try
+                            {
+                                await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+                            }
+                            catch
+                            { }
+                            return;
+                        }
+
+                        var parsed = result.MessageType == WebSocketMessageType.Binary
+                                         ? POIWebSocketMessage.TryParse(message.ToArray(),                          out var received, out _)
+                                         : POIWebSocketMessage.TryParse(Encoding.UTF8.GetString(message.ToArray()), out received,     out _);
+
+                        if (!parsed)
+                            continue;
+
+                        if (received!.MessageType == POIWebSocketMessageType.Send)
+                            Pushes.Writer.TryWrite(received);
+
+                        else if (pending.TryRemove(received.MessageId, out var answer))
+                            answer.TrySetResult(received);
+
+                    }
+
+                }
+                catch (Exception e) when (e is WebSocketException or OperationCanceledException or ObjectDisposedException)
+                { }
+                finally
+                {
+                    Pushes.Writer.TryComplete();
+                    closed.Cancel();
+                }
+
+            }
+
+            #endregion
+
+            #region DisposeAsync()
+
+            public async ValueTask DisposeAsync()
+            {
+
+                // Only the close frame: the receiver is still reading, and a socket reads in one place at a time.
+                if (webSocket.State == WebSocketState.Open)
+                {
+                    try
+                    {
+                        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+                        await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", timeout.Token);
+                    }
+                    catch
+                    { }
+                }
+
+                closed.Cancel();
+                webSocket.Abort();
+
+                if (receiver is not null)
+                {
+                    try
+                    {
+                        await receiver;
+                    }
+                    catch
+                    { }
+                }
+
+                webSocket.Dispose();
+
+            }
+
+            #endregion
+
+        }
+
+        #endregion
+
+    }
+
+}

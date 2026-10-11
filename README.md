@@ -114,10 +114,30 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 - **Access:** open like the HTTP reads, unless `AuthenticateWebSocketClient` is set;
   `commitChangeSet` asks `AuthorizeChangeSetSubmission` with the upgrade request.
 
+### Follower
+
+`RoamingNetworkFollower` keeps a history in sync with the leader over its WebSocket:
+
+```csharp
+await using var follower = new RoamingNetworkFollower(new Uri("wss://leader/roamingNetworks/rn1/history/ws"));
+await follower.StartAsync();                     // returns once caught up for the first time
+
+follower.History!.Head.RoamingNetwork;           // the current version
+await follower.CommitChangeSetAsync(changeSet);  // to the leader; it comes back as a commit
+```
+
+- **Sync:** subscribe first, then a snapshot (when it has no history yet), the commits since its head,
+  and the runtime status. Pushed commits are appended; an announced, missed or too large one makes it catch up.
+- **Reconnect:** a broken connection is opened again with growing delays, and it catches up.
+  A head the leader does not know starts it again from a snapshot (`OnHistoryReplaced`).
+- **Options:** complete commits or announcements, status or not, credentials via `ConfigureWebSocket`,
+  signature verifier, limits.
+
 ## Open
 
 - Persistence and retention of histories
 - Finer subscription filters, energy status with EVSEs
+- A WebSocket endpoint in Hermod without a TCP server behind it
 - Commits signed by the leader
 - Further entities: charging pools, stations, EVSEs, e-mobility providers, …
 
