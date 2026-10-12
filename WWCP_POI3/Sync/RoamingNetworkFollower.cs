@@ -291,7 +291,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               new JProperty("kind",        POIStatusUpdate.KindText(Kind)),
                               new JProperty("entityType",  EntityType),
                               new JProperty("entityId",    EntityId),
-                              new JProperty("value",       Value)
+                              new JProperty("value",       POIStatusUpdate.ValueToJSON(Kind, Value))
                           );
 
             if (Timestamp.HasValue)
@@ -303,6 +303,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return RequestAsync("setStatus", payload, CancellationToken);
 
         }
+
+        #endregion
+
+
+        #region SetEnergyStatusAsync(EntityType, EntityId, EnergyStatus, Timestamp = null, DataSource = null, CancellationToken = default)
+
+        /// <summary>
+        /// Set the energy status of an EVSE or a charging station at the leader; it comes back as an energy status update.
+        /// </summary>
+        /// <returns>The answer of the leader: { result, description?, current? }.</returns>
+        public Task<JObject> SetEnergyStatusAsync(String             EntityType,
+                                                  String             EntityId,
+                                                  EnergyInfo         EnergyStatus,
+                                                  DateTimeOffset?    Timestamp           = null,
+                                                  String?            DataSource          = null,
+                                                  CancellationToken  CancellationToken   = default)
+
+            => SetStatusAsync(POIRuntimeStatusKind.EnergyStatus,
+                              EntityType,
+                              EntityId,
+                              POIEnergyStatus.ToText(EnergyStatus),
+                              Timestamp,
+                              DataSource,
+                              CancellationToken);
 
         #endregion
 
@@ -392,6 +416,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 topics.Add(POI_API.AdminStatusUpdatesTopic);
                 topics.Add(POI_API.StatusUpdatesTopic);
+                topics.Add(POI_API.EnergyStatusUpdatesTopic);
             }
 
             await Expect(Connection, "subscribe", new JObject(new JProperty("topics", topics)), CancellationToken);
@@ -454,6 +479,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         case "statusUpdate":
                         case "adminStatusUpdate":
+                        case "energyStatusUpdate":
                             TakeStatusUpdate(payload);
                             break;
 

@@ -275,23 +275,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         public JObject ToJSON(Boolean Embedded = false)
+        {
 
-            => JSONObject.Create(
+            var json = new JObject();
 
-                   !Embedded
-                       ? new JProperty("@context",               JSONLDContext)
-                       : null,
+            if (!Embedded)
+                json.Add("@context",              JSONLDContext);
 
-                         new JProperty("energySources",          EnergySources.       ToJSON()),
-                         new JProperty("environmentalImpacts",   EnvironmentalImpacts.ToJSON()),
-                         new JProperty("supplierName",           SupplierName.        ToJSON()),
-                         new JProperty("productName",            ProductName.         ToJSON()),
+            // Mandatory, even when empty: [] stands for an unknown composition.
+            json.Add("energySources",             EnergySources.       ToJSON());
+            json.Add("environmentalImpacts",      EnvironmentalImpacts.ToJSON());
+            json.Add("supplierName",              SupplierName.        ToJSON());
+            json.Add("productName",               ProductName.         ToJSON());
 
-                   AdditionalRemarks is not null
-                       ? new JProperty("additionalRemarks",      AdditionalRemarks.ToJSON())
-                       : null
+            if (AdditionalRemarks is not null && AdditionalRemarks.IsNotNullOrEmpty())
+                json.Add("additionalRemarks",     AdditionalRemarks.ToJSON());
 
-               );
+            return json;
+
+        }
 
         #endregion
 

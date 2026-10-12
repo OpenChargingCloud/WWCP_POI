@@ -373,6 +373,124 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TryParseObjects<T>  (JSON, PropertyName, PropertyDescription, Parser, out Values, out ErrorResponse)
+
+        /// <summary>
+        /// Optional embedded values without identifications, given as an array, in their given order, e.g. images.
+        /// </summary>
+        public static Boolean TryParseObjects<T>(JObject                           JSON,
+                                                 String                            PropertyName,
+                                                 String                            PropertyDescription,
+                                                 POIObjectParser<T>                Parser,
+                                                 out ImmutableArray<T>             Values,
+                                                 [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Values = [];
+
+            if (JSON[PropertyName] is not JToken token)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            if (token is not JArray array)
+            {
+                ErrorResponse = $"The {PropertyDescription} must be a JSON array!";
+                return false;
+            }
+
+            var values = ImmutableArray.CreateBuilder<T>(array.Count);
+
+            foreach (var item in array)
+            {
+
+                if (item is not JObject itemJSON || !Parser(itemJSON, out var value, out var error))
+                {
+                    ErrorResponse = $"Invalid {PropertyDescription} '{item.ToString(Newtonsoft.Json.Formatting.None)}'!";
+                    return false;
+                }
+
+                values.Add(value);
+
+            }
+
+            Values         = values.MoveToImmutable();
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region Distinct<T>         (Values, Key, Description)
+
+        /// <summary>
+        /// The given values in their given order, without null entries and without one given twice by its key.
+        /// </summary>
+        public static ImmutableArray<T> Distinct<T>(IEnumerable<T>?  Values,
+                                                    Func<T, String>  Key,
+                                                    String           Description)
+        {
+
+            var values = (Values ?? []).ToArray();
+
+            if (values.Any(value => value is null))
+                throw new ArgumentException($"An {Description} must not be null!");
+
+            if (values.Select(Key).Distinct(StringComparer.Ordinal).Count() != values.Length)
+                throw new ArgumentException($"An {Description} must not be given twice!");
+
+            return [.. values];
+
+        }
+
+        #endregion
+
+        #region TryParseObject<T>   (JSON, PropertyName, PropertyDescription, Parser, out Value, out ErrorResponse)
+
+        /// <summary>
+        /// An optional embedded value, e.g. the opening times of a charging pool.
+        /// </summary>
+        public static Boolean TryParseObject<T>(JObject                           JSON,
+                                                String                            PropertyName,
+                                                String                            PropertyDescription,
+                                                POIObjectParser<T>                Parser,
+                                                out T?                            Value,
+                                                [NotNullWhen(false)] out String?  ErrorResponse)
+
+            where T : class
+
+        {
+
+            Value = null;
+
+            if (JSON[PropertyName] is not JToken token)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            if (token is not JObject json)
+            {
+                ErrorResponse = $"The {PropertyDescription} must be a JSON object!";
+                return false;
+            }
+
+            if (!Parser(json, out var value, out var error))
+            {
+                ErrorResponse = $"Invalid {PropertyDescription}: {error}";
+                return false;
+            }
+
+            Value          = value;
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
         #region TryParseIds<T>      (JSON, PropertyName, PropertyDescription, Parser, out Values, out ErrorResponse)
 
         /// <summary>

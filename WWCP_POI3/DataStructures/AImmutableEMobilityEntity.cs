@@ -97,9 +97,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            ShareFurtherRuntimeOf(Previous);
             ShareInternalDataOf(Previous);
 
         }
+
+        /// <summary>
+        /// Take further runtime data of the given previous version of this entity, e.g. its energy status.
+        /// </summary>
+        /// <param name="Previous">The previous version of this entity.</param>
+        protected virtual void ShareFurtherRuntimeOf(AImmutableEMobilityEntity<TId, TAdminStatus, TStatus> Previous)
+        { }
 
         /// <summary>
         /// Raise the admin status events of this version while Listen is true.

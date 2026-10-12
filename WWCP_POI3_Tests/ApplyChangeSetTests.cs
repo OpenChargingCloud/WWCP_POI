@@ -271,8 +271,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(() => rn0.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(rn0, "description") ]),
                             Throws.ArgumentException.With.Message.Contains("does not exist"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.Remove("Brand", "B1") ]),
-                            Throws.ArgumentException.With.Message.Contains("changes of Brand 'B1' are not supported yet"));
+                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.Remove("Unicorn", "U1") ]),
+                            Throws.ArgumentException.With.Message.Contains("changes of Unicorn 'U1' are not supported yet"));
 
                 Assert.That(() => new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn2")).ApplyChangeSet(
                                       rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ])),

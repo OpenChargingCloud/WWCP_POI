@@ -126,6 +126,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             (changed, previous) => changed.ShareRuntimeOfAll(previous)
         );
 
+        private static readonly Registry<Brand_Id, Brand> BrandRegistry = new (
+            "brand",
+            "a",
+            [ "name", "description", "logo", "homepage", "customData" ],
+            Brand_Id.TryParse,
+            POI.Brand.TryParse,
+            brand => brand.Id,
+            brand => brand.ToJSON(),
+            // Brands have no runtime status and no timestamps.
+            (changed, previous) => { },
+            Timestamps: false
+        );
+
         private static readonly Registry<TransparencySoftware_Id, TransparencySoftware> TransparencySoftwareRegistry = new (
             "transparency software release",
             "a",

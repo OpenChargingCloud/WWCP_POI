@@ -130,6 +130,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    Concat(GridConnectionPoint?.EnergyMeter is EnergyMeter gridMeter ? [ gridMeter ] : []).
                    Concat(ChargingStations.SelectMany(chargingStation => chargingStation.AllEnergyMeters));
 
+
+        /// <summary>
+        /// The brands it is offered under, of the roaming network, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<Brand_Id>  BrandIds  { get; }
+
+        /// <summary>
+        /// When it is open; always, unless given.
+        /// </summary>
+        public ImmutableOpeningTimes?  OpeningTimes  { get; }
+
+        /// <summary>
+        /// The mix of the energy it delivers.
+        /// </summary>
+        public EnergyMix?  EnergyMix  { get; }
+
+
+        /// <summary>
+        /// Its images, in their given order.
+        /// </summary>
+        public ImmutableArray<Image>  Images  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -149,6 +171,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<ChargingStation>?                ChargingStations             = null,
                             GridConnectionPoint?                         GridConnectionPoint          = null,
                             IEnumerable<EnergyMeter>?                    EnergyMeters                 = null,
+                            IEnumerable<Brand_Id>?                       BrandIds                     = null,
+                            ImmutableOpeningTimes?                       OpeningTimes                 = null,
+                            EnergyMix?                                   EnergyMix                    = null,
+                            IEnumerable<Image>?                          Images                       = null,
 
                             Timestamped<ChargingPoolAdminStatusType>?    InitialAdminStatus           = null,
                             Timestamped<ChargingPoolStatusType>?         InitialStatus                = null,
@@ -210,6 +236,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.chargingStationIndex  = this.ChargingStations.ToImmutableDictionary(chargingStation => chargingStation.Id);
             this.GridConnectionPoint   = GridConnectionPoint;
             this.EnergyMeters          = EnergyMeter.Ordered(EnergyMeters, $"the charging pool '{Id}'");
+            this.BrandIds              = POIJSON.OrderedIds(BrandIds, $"brand of the charging pool '{Id}'");
+            this.OpeningTimes          = OpeningTimes;
+            this.EnergyMix             = EnergyMix;
+            this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the charging pool '{Id}'");
 
         }
 
@@ -329,6 +359,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingStations.Length > 0)
                 json.Add("chargingStations",  new JArray(ChargingStations.Select(chargingStation => chargingStation.ToJSON())));
 
+            if (BrandIds.Length > 0)
+                json.Add("brandIds",      POIJSON.IdsToJSON(BrandIds));
+
+            if (OpeningTimes is not null)
+                json.Add("openingTimes",  OpeningTimes.ToJSON());
+
+            if (EnergyMix is not null)
+                json.Add("energyMix",     EnergyMix.ToJSON(Embedded: true));
+
+            if (Images.Length > 0)
+                json.Add("images",  new JArray(Images.Select(image => image.ToJSON())));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -409,6 +451,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIJSON.TryParseIds(JSON, "brandIds", "brand identification", Brand_Id.TryParse, out ImmutableArray<Brand_Id> brandIds, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, "openingTimes", "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseObject<EnergyMix>(JSON, "energyMix", "energy mix", (JObject json, out EnergyMix? energyMix, out String? error) => POI.EnergyMix.TryParse(json, out energyMix, out error), out var energyMix, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -430,6 +484,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 chargingStations,
                                                 gridConnectionPoint,
                                                 energyMeters,
+                                                brandIds,
+                                                openingTimes,
+                                                energyMix,
+                                                images,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,

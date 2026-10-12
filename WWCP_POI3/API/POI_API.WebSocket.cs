@@ -75,6 +75,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///                                             as a commitAnnouncement, to be fetched
     /// adminStatusUpdates     adminStatusUpdate    { kind, entityType, entityId, timestamp, value, oldTimestamp?, oldValue?, dataSource? }
     /// statusUpdates          statusUpdate         the same, for the status
+    /// energyStatusUpdates    energyStatusUpdate   the same, for the energy status of EVSEs and charging stations,
+    ///                                             its value { used, available, storedEnergy? } in W, W and Wh
     /// </remarks>
     public partial class POI_API : IAsyncDisposable
     {
@@ -105,6 +107,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The topic of status updates.
         /// </summary>
         public const String StatusUpdatesTopic        = "statusUpdates";
+
+        /// <summary>
+        /// The topic of energy status updates.
+        /// </summary>
+        public const String EnergyStatusUpdatesTopic  = "energyStatusUpdates";
 
         private readonly ConcurrentDictionary<RoamingNetwork_Id, POIWebSocketServer>  historyWebSocketServers  = [];
         private readonly ConcurrentDictionary<RoamingNetwork_Id, Action>              historyDisconnects       = [];
@@ -364,11 +371,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             webSocketServer.AddTopic(new POIWebSocketTopic(AdminStatusUpdatesTopic,
                                                            "adminStatusUpdate",
-                                                           "Every change of the admin status of the roaming network and of its manufacturers, operators, pools, stations and EVSEs."));
+                                                           "Every change of the admin status of the roaming network and of the entities it embeds."));
 
             webSocketServer.AddTopic(new POIWebSocketTopic(StatusUpdatesTopic,
                                                            "statusUpdate",
-                                                           "Every change of the status of the roaming network and of its manufacturers, operators, pools, stations and EVSEs."));
+                                                           "Every change of the status of the roaming network and of the entities it embeds."));
+
+            webSocketServer.AddTopic(new POIWebSocketTopic(EnergyStatusUpdatesTopic,
+                                                           "energyStatusUpdate",
+                                                           "Every change of the energy status of EVSEs and charging stations: the power used and available, and the energy stored."));
 
             #endregion
 
@@ -410,9 +421,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             };
 
             OnPOIStatusUpdateDelegate onStatusUpdate = statusUpdate =>
-                WebSocketServer.Push(statusUpdate.Kind == POIRuntimeStatusKind.AdminStatus
-                                         ? AdminStatusUpdatesTopic
-                                         : StatusUpdatesTopic,
+                WebSocketServer.Push(statusUpdate.Kind switch {
+                                         POIRuntimeStatusKind.AdminStatus   => AdminStatusUpdatesTopic,
+                                         POIRuntimeStatusKind.EnergyStatus  => EnergyStatusUpdatesTopic,
+                                         _                                  => StatusUpdatesTopic
+                                     },
                                      statusUpdate.ToJSON());
 
             History.OnCommitAnnouncement          += onCommitAnnouncement;
@@ -537,11 +550,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region Parse the status update
 
             if (!POIStatusUpdate.TryParseKind(Request.Payload["kind"]?.Type == JTokenType.String ? Request.Payload["kind"]!.Value<String>() : null, out var kind))
-                return Request.Error(POIWebSocketErrorCodes.FormatViolation, "The kind must be adminStatus or status!");
+                return Request.Error(POIWebSocketErrorCodes.FormatViolation, "The kind must be adminStatus, status or energyStatus!");
 
+            // The value of an energy status is an object { used, available, storedEnergy? }.
             if (!Request.Payload.ParseMandatoryText("entityType", "entity type",           out String? entityType, out var errorResponse) ||
                 !Request.Payload.ParseMandatoryText("entityId",   "entity identification", out String? entityId,   out errorResponse) ||
-                !Request.Payload.ParseMandatoryText("value",      "status",                out String? value,      out errorResponse))
+                !POIStatusUpdate.TryParseValue(kind, Request.Payload["value"], "status",  out String? value,      out errorResponse))
             {
                 return Request.Error(POIWebSocketErrorCodes.FormatViolation, errorResponse);
             }

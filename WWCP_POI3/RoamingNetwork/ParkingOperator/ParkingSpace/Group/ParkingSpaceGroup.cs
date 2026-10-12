@@ -67,6 +67,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ParkingSpace_Id>  ParkingSpaceIds  { get; }
 
+
+        /// <summary>
+        /// The parking products of its parking operator offered here, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<ParkingProduct_Id>  ParkingProductIds  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -78,6 +84,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  I18NString?                                      Name                         = null,
                                  I18NString?                                      Description                  = null,
                                  IEnumerable<ParkingSpace_Id>?                    ParkingSpaceIds              = null,
+                                 IEnumerable<ParkingProduct_Id>?                  ParkingProductIds            = null,
 
                                  Timestamped<ParkingSpaceGroupAdminStatusType>?   InitialAdminStatus           = null,
                                  Timestamped<ParkingSpaceGroupStatusType>?        InitialStatus                = null,
@@ -111,6 +118,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.ParkingSpaceIds  = POIJSON.OrderedIds(ParkingSpaceIds, $"member of the parking space group '{Id}'");
+            this.ParkingProductIds = POIJSON.OrderedIds(ParkingProductIds, $"parking product of the parking space group '{Id}'");
 
         }
 
@@ -192,6 +200,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ParkingSpaceIds.Length > 0)
                 json.Add("parkingSpaceIds",  POIJSON.IdsToJSON(ParkingSpaceIds));
 
+            if (ParkingProductIds.Length > 0)
+                json.Add("parkingProductIds",  POIJSON.IdsToJSON(ParkingProductIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -235,6 +246,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIJSON.TryParseIds(JSON, "parkingProductIds", "parking product identification", ParkingProduct_Id.TryParse, out ImmutableArray<ParkingProduct_Id> parkingProductIds, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -248,6 +262,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           name,
                                                           description,
                                                           members,
+                                                          parkingProductIds,
                                                           DataSource:  dataSource,
                                                           Created:     created,
                                                           LastChange:  lastChange,

@@ -79,6 +79,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ChargingStation_Id>  ChargingStationIds    { get; }
 
+
+        /// <summary>
+        /// When it is open; always, unless given.
+        /// </summary>
+        public ImmutableOpeningTimes?  OpeningTimes  { get; }
+
+
+        /// <summary>
+        /// Its images, in their given order.
+        /// </summary>
+        public ImmutableArray<Image>  Images  { get; }
+
+        /// <summary>
+        /// The parking products of its parking operator offered here, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<ParkingProduct_Id>  ParkingProductIds  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -92,6 +109,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              Address?                                      Address                      = null,
                              GeoCoordinate?                                GeoLocation                  = null,
                              IEnumerable<ChargingStation_Id>?              ChargingStationIds           = null,
+                             ImmutableOpeningTimes?                        OpeningTimes                 = null,
+                             IEnumerable<Image>?                           Images                       = null,
+                             IEnumerable<ParkingProduct_Id>?               ParkingProductIds            = null,
 
                              Timestamped<ParkingGarageAdminStatusType>?    InitialAdminStatus           = null,
                              Timestamped<ParkingGarageStatusType>?         InitialStatus                = null,
@@ -127,6 +147,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Address             = Address;
             this.GeoLocation         = GeoLocation;
             this.ChargingStationIds  = POIJSON.OrderedIds(ChargingStationIds, $"charging station of the parking garage '{Id}'");
+            this.OpeningTimes        = OpeningTimes;
+            this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the parking garage '{Id}'");
+            this.ParkingProductIds = POIJSON.OrderedIds(ParkingProductIds, $"parking product of the parking garage '{Id}'");
 
         }
 
@@ -214,6 +237,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingStationIds.Length > 0)
                 json.Add("chargingStationIds",  POIJSON.IdsToJSON(ChargingStationIds));
 
+            if (OpeningTimes is not null)
+                json.Add("openingTimes",  OpeningTimes.ToJSON());
+
+            if (Images.Length > 0)
+                json.Add("images",  new JArray(Images.Select(image => image.ToJSON())));
+            if (ParkingProductIds.Length > 0)
+                json.Add("parkingProductIds",  POIJSON.IdsToJSON(ParkingProductIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -259,6 +290,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, "openingTimes", "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseIds(JSON, "parkingProductIds", "parking product identification", ParkingProduct_Id.TryParse, out ImmutableArray<ParkingProduct_Id> parkingProductIds, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -274,6 +314,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   address,
                                                   geoLocation,
                                                   chargingStationIds,
+                                                  openingTimes,
+                                                  images,
+                                                  parkingProductIds,
                                                   DataSource:  dataSource,
                                                   Created:     created,
                                                   LastChange:  lastChange,

@@ -379,6 +379,46 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
         #endregion
 
+        #region A_follower_sets_and_follows_energy_statuses()
+
+        [Test]
+        public async Task A_follower_sets_and_follows_energy_statuses()
+        {
+
+            var e1 = EVSE_Id.Parse("DE*GEF*E1*1");
+
+            leader!.Publish(leader.Head.RoamingNetwork.CreateChangeSet([
+                                RoamingNetworkChange.Add(new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
+                                                                          ChargingStations: [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
+                                                                                                                  EVSEs: [ new EVSE(e1) ]) ]))
+                            ], CreatedAt: T0));
+
+            poiAPI!.AuthorizeStatusUpdate = (request, login, statusUpdate) => true;
+
+            var follower  = await StartFollower();
+
+            var answer    = await follower.SetEnergyStatusAsync(nameof(EVSE),
+                                                                e1.ToString(),
+                                                                new EnergyInfo(Watt.FromW(11000), Watt.FromW(22000)),
+                                                                T0.AddMinutes(1));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(answer["result"]!.ToString(),  Is.EqualTo("Updated"));
+
+                // Back from the leader as a pushed energy status update.
+                Assert.That(await Eventually(() => follower.History!.RuntimeStatus.TryGet(POIRuntimeStatusKind.EnergyStatus, nameof(EVSE), e1.ToString(), out var energyStatus) &&
+                                                   energyStatus.Value == POIEnergyStatus.ToText(new EnergyInfo(Watt.FromW(11000), Watt.FromW(22000)))),
+                            Is.True);
+
+            }
+
+        }
+
+        #endregion
+
+
     }
 
 }

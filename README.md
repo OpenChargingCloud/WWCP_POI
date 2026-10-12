@@ -5,7 +5,7 @@ e-mobility as immutable, versioned data sets between servers and servers and (sm
 
 - **Static data is immutable.** A roaming network with everything it embeds is one version,
   named by its ETags. A change set leads from one version to the next; nothing is changed in place.
-- **Dynamic data is kept strictly apart.** Admin status, status and, later, energy status are
+- **Dynamic data is kept strictly apart.** Admin status, status and energy status are
   not content: they have no ETags, change without a new version and are shared by all versions
   of their entity.
 - **WebSocket first.** Followers subscribe to commits and status updates over one WebSocket
@@ -23,11 +23,13 @@ flowchart TD
     RoamingNetwork --> GridOperator
     RoamingNetwork --> ParkingOperator
     RoamingNetwork --> TransparencySoftware
+    RoamingNetwork --> Brand
     RoamingNetwork --> TransparencySoftwareCertificate
     ParkingOperator --> ParkingGarage
     ParkingOperator --> ParkingSpace
     ParkingOperator --> ParkingSensor
     ParkingOperator --> ParkingSpaceGroup
+    ParkingOperator --> ParkingProduct
     ChargingStationOperator --> ChargingTariff
     ChargingStationOperator --> Groups["EVSEGroup, ChargingStationGroup,<br/>ChargingPoolGroup, ChargingTariffGroup"]
     ChargingStationOperator --> ChargingPool
@@ -44,7 +46,9 @@ flowchart TD
     ParkingSpace -. parkingGarageId .-> ParkingGarage
     ParkingSpace -. parkingSensorIds .-> ParkingSensor
     ParkingGarage -. chargingStationIds .-> ChargingStation
+    ParkingSpace -. parkingProductIds .-> ParkingProduct
     EVSE -. chargingTariffIds .-> ChargingTariff
+    ChargingPool -. brandIds .-> Brand
     EnergyMeter -. transparencySoftwareStatus .-> TransparencySoftware
     TransparencySoftwareCertificate -. verified/compatible .-> TransparencySoftware
     RoamingNetwork -. dataLicenses .-> DataLicense
@@ -53,13 +57,15 @@ flowchart TD
 ```
 
 Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`,
-`gridOperators`, `parkingOperators`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
+`gridOperators`, `parkingOperators`, `brands`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
 `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `chargingPools`, `chargingStations`,
-`EVSEs`, `chargingConnectors`, `energyMeters`, `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups`), each 0..n
+`EVSEs`, `chargingConnectors`, `energyMeters`, `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups`,
+`parkingProducts`), each 0..n
 in the order of their ids; a pool has 0..1 `gridConnectionPoint`, a grid connection point and an EVSE each 0..1 `energyMeter`.
 Dotted lines are references, which must exist in the network.
 A pool, station, EVSE, tariff or group belongs to the operator its id names; ids are unique within the operator.
-Energy meter, parking garage, space, sensor and space group ids are unique within the network.
+Energy meter, parking garage, space, sensor, space group and product ids are unique within the network;
+parking product ids compare case-sensitively.
 
 - **Content:** everything in the JSON and CBOR representations, completely, in a fixed order:
   children and licenses embedded, `created`, `lastChange` and `customData` included,
@@ -75,13 +81,24 @@ Energy meter, parking garage, space, sensor and space group ids are unique withi
   `serialNumber`, `hardwareVersion`, `firmwareVersion`; with admin status and status.
 - **Parking:** a parking operator owns its garages, spaces and sensors directly. A space may name a
   `parkingGarageId` and `parkingSensorIds` of the same operator; garages, spaces and sensors may name
-  `chargingStationIds` of the network. All have admin status and status.
+  `chargingStationIds` of the network. All have admin status and status. Parking products (`minDuration`,
+  `stopParkingAfterTime` in s, without status and timestamps) are named by `parkingProductIds` of garages,
+  spaces and space groups of the same operator; they offer, they do not calculate prices.
 - **Charging tariff:** as in OCPI: `currency` (ISO 4217), `tariffURL` and `elements`, each with
   `priceComponents` (`{type, price, vat?, stepSize?}`, `type` one of `ENERGY`, `FLAT`, `MAX_CURRENT`,
   `MIN_CURRENT`, `PARKING_TIME`, `TIME`; `stepSize` in Wh, A or s) and optional `restrictions`
   (`startTime`/`endTime` as `HH:mm`, `startDate`/`endDate` as `yyyy-MM-dd`, `min/maxEnergy` (Wh),
   `min/maxCurrent` (A), `min/maxPower` (W), `min/maxDuration` (s), `daysOfWeek`). EVSEs name
   `chargingTariffIds` of their operator.
+- **Brands:** embedded in the network, so that operators can share them, without status and timestamps:
+  `name`, `description`, `logo`, `homepage`. Charging pools, stations and EVSEs name `brandIds`.
+- **Opening times:** `openingTimes` of charging pools, charging stations and parking garages, as Styx's
+  `OpeningTimes` write them: `24/7`, `regularOpenings` (`[{ "monday": [{ "begin": "07:00", "end": "21:00" }] }]`),
+  `exceptionalOpenings`/`exceptionalClosings` (`["begin -> end"]`), `freeText`. Without regular openings it is 24/7.
+- **Energy mix:** `energyMix` of charging pools and charging tariffs: `energySources` and `environmentalImpacts`
+  (`[]` means unknown), `supplierName`, `productName`, `additionalRemarks`.
+- **Images:** `images` of charging pools, stations, EVSEs and parking garages, in their given order:
+  `url`, `category` (e.g. `LOCATION`, `CHARGER`), `type`, `width`, `height`, `thumbnail`; a URL only once.
 - **Groups:** EVSE, charging station, charging pool and charging tariff groups name members of their
   operator (`EVSEIds`, `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`), the first three
   optionally a `chargingTariffId`; parking space groups name `parkingSpaceIds`. Groups may overlap and
@@ -96,6 +113,8 @@ Energy meter, parking garage, space, sensor and space group ids are unique withi
   typed in its status schedules (history and planned status), shared by all its versions:
   a change set takes them along, with the internal data. New entities are operational and
   available since their creation.
+- **Energy status:** EVSEs and charging stations also have an energy status, `{used, available, storedEnergy?}`
+  in W, W and Wh, kept the same way; there is none until one is reported. Its schedule keeps the last ten.
 
 ## Change sets
 
@@ -122,7 +141,7 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 ```
 
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
-  `Add`/`Remove` of operators, manufacturers, e-mobility providers, grid operators, parking operators,
+  `Add`/`Remove` of operators, manufacturers, e-mobility providers, grid operators, parking operators, brands,
   transparency software releases and certificates, pools, tariffs, groups, stations (`Add(station, poolId)`),
   EVSEs (`Add(evse, stationId)`) and parking garages, spaces, sensors and space groups
   (`Add(space, parkingOperatorId)`). Grid connection points and energy meters
@@ -194,13 +213,15 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   `commitChangeSet {changeSet, expectedHead?, rebase?}` → `{status, …}`, `runtimeStatus`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
   `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced), `adminStatusUpdates`,
-  `statusUpdates`. Pushes are sends, `[6, "p1", action, payload]`,
+  `statusUpdates`, `energyStatusUpdates`. Pushes are sends, `[6, "p1", action, payload]`,
   in the format of the last `subscribe`. They end with the connection; a client that falls more than
   `MaxQueuedPushes` pushes or `MaxQueuedPushBytes` behind is disconnected and catches up after reconnecting.
 - **Async:** requests are processed concurrently, up to `MaxConcurrentRequests` per connection;
   answers come when ready and are matched by their id. A connection's requests are cancelled when it closes.
 - **setStatus** `{kind, entityType, entityId, value, timestamp?, dataSource?}` → `{result, description?, current?}`,
   allowed as `AuthorizeStatusUpdate` decides (refused without it); set it at the leader, followers take it from there.
+  `kind` is `adminStatus`, `status` or `energyStatus`, whose `value` is an object `{used, available, storedEnergy?}`.
+  Status updates come often, e.g. within a minute as the AFIR asks: send them as one batch.
 - **Batches:** messages of the same action aggregate. A request `{batch: [p1, p2, …]}` runs per payload,
   in order, and is answered with `{batch: [r1, {error: {code, description, details}}, …]}`, up to `MaxBatchSize`.
   Pushes of the same action that wait together go out as one `{batch: […]}`, up to the `maxBatchSize`
@@ -243,10 +264,10 @@ await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader;
 ## Open
 
 - Persistence and retention of histories
-- Finer subscription filters, energy status with EVSEs
+- Finer subscription filters
 - A WebSocket endpoint in Hermod without a TCP server behind it
 - Commits signed by the leader
-- Further entities: brands, opening times, energy mix, images, parking products, …
+- Further entities: as the use cases need them
 
 ## Tests
 

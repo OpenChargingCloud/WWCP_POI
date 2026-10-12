@@ -78,6 +78,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ChargingTariffElement>  Elements     { get; }
 
+
+        /// <summary>
+        /// The mix of the energy it delivers.
+        /// </summary>
+        public EnergyMix?  EnergyMix  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -91,6 +97,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               I18NString?                                    Name                         = null,
                               I18NString?                                    Description                  = null,
                               URL?                                           TariffURL                    = null,
+                              EnergyMix?                                     EnergyMix                    = null,
 
                               Timestamped<ChargingTariffAdminStatusType>?    InitialAdminStatus           = null,
                               Timestamped<ChargingTariffStatusType>?         InitialStatus                = null,
@@ -132,6 +139,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.Currency   = Currency;
             this.TariffURL  = TariffURL;
+            this.EnergyMix  = EnergyMix;
             this.Elements   = [.. elements];
 
         }
@@ -218,6 +226,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             json.Add("elements",         new JArray(Elements.Select(element => element.ToJSON())));
 
+            if (EnergyMix is not null)
+                json.Add("energyMix",    EnergyMix.ToJSON(Embedded: true));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -292,6 +303,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
+                if (!POIJSON.TryParseObject<EnergyMix>(JSON, "energyMix", "energy mix", (JObject json, out EnergyMix? energyMix, out String? error) => POI.EnergyMix.TryParse(json, out energyMix, out error), out var energyMix, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -307,6 +321,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     name,
                                                     description,
                                                     tariffURL,
+                                                    energyMix,
                                                     DataSource:  dataSource,
                                                     Created:     created,
                                                     LastChange:  lastChange,

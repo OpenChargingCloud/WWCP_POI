@@ -221,6 +221,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             DateTimeOffset?        oldTimestamp;
             String?                oldValue;
 
+            if (Kind == POIRuntimeStatusKind.EnergyStatus &&
+                EntityType is not (nameof(EVSE) or nameof(ChargingStation)))
+            {
+                ErrorResponse = $"The entity type '{EntityType}' has no energy status!";
+                return POIStatusUpdateResult.Refused;
+            }
+
             switch (EntityType)
             {
 
@@ -622,6 +629,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return Unknown(EntityType, EntityId, out ErrorResponse);
                     }
 
+                    if (Kind == POIRuntimeStatusKind.EnergyStatus)
+                    {
+                        result = Set<EnergyInfo>(Value, POIEnergyStatus.TryParseText,
+                                                 () => chargingStation.EnergyStatus,
+                                                 (energyStatus, timestamp) => chargingStation.SetEnergyStatus (energyStatus, timestamp, context),
+                                                 (energyStatus, timestamp) => chargingStation.TakeEnergyStatus(energyStatus, timestamp, context),
+                                                 Authoritative, at, out normalized, out oldTimestamp, out oldValue,
+                                                 POIEnergyStatus.ToText);
+                        break;
+                    }
+
                     result = Kind == POIRuntimeStatusKind.AdminStatus
 
                                  ? Set<ChargingStationAdminStatusType>(Value, ChargingStationAdminStatusType.TryParse,
@@ -644,6 +662,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         !evseOperator.TryGetEVSE(evseId, out var evse))
                     {
                         return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    if (Kind == POIRuntimeStatusKind.EnergyStatus)
+                    {
+                        result = Set<EnergyInfo>(Value, POIEnergyStatus.TryParseText,
+                                                 () => evse.EnergyStatus,
+                                                 (energyStatus, timestamp) => evse.SetEnergyStatus (energyStatus, timestamp, context),
+                                                 (energyStatus, timestamp) => evse.TakeEnergyStatus(energyStatus, timestamp, context),
+                                                 Authoritative, at, out normalized, out oldTimestamp, out oldValue,
+                                                 POIEnergyStatus.ToText);
+                        break;
                     }
 
                     result = Kind == POIRuntimeStatusKind.AdminStatus
@@ -850,12 +879,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     {
                         Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingStation), chargingStation.Id.ToString(), chargingStation.CurrentAdminStatus);
                         Add(statuses, POIRuntimeStatusKind.Status,      nameof(ChargingStation), chargingStation.Id.ToString(), chargingStation.CurrentStatus);
+                        Add(statuses, POIRuntimeStatusKind.EnergyStatus, nameof(ChargingStation), chargingStation.Id.ToString(), chargingStation.EnergyStatus, POIEnergyStatus.ToText);
                     }
 
                     foreach (var evse in chargingStationOperator.EVSEs)
                     {
                         Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(EVSE),            evse.Id.ToString(),            evse.CurrentAdminStatus);
                         Add(statuses, POIRuntimeStatusKind.Status,      nameof(EVSE),            evse.Id.ToString(),            evse.CurrentStatus);
+                        Add(statuses, POIRuntimeStatusKind.EnergyStatus, nameof(EVSE),           evse.Id.ToString(),            evse.EnergyStatus, POIEnergyStatus.ToText);
                     }
 
                 }
@@ -872,10 +903,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    POIRuntimeStatusKind   Kind,
                                    String                 EntityType,
                                    String                 EntityId,
-                                   Timestamped<T>?        Current)
+                                   Timestamped<T>?        Current,
+                                   Func<T, String>?       Format   = null)
         {
             if (Current.HasValue)
-                Statuses.Add(new POIStatusUpdate(Kind, EntityType, EntityId, Truncate(Current.Value.Timestamp), Current.Value.Value!.ToString()!));
+                Statuses.Add(new POIStatusUpdate(Kind, EntityType, EntityId, Truncate(Current.Value.Timestamp), Format?.Invoke(Current.Value.Value) ?? Current.Value.Value!.ToString()!));
         }
 
         #endregion
@@ -1485,12 +1517,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return Task.CompletedTask;
             };
 
-            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
-            Entity.OnStatusChanged       += onStatusChanged;
+            OnChargingStationEnergyStatusChangedDelegate onEnergyStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.EnergyStatus, nameof(ChargingStation), entity.Id.ToString(), newStatus, oldStatus, dataSource, POIEnergyStatus.ToText);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged   += onAdminStatusChanged;
+            Entity.OnStatusChanged        += onStatusChanged;
+            Entity.OnEnergyStatusChanged  += onEnergyStatusChanged;
 
             return () => {
-                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
-                Entity.OnStatusChanged       -= onStatusChanged;
+                Entity.OnAdminStatusChanged   -= onAdminStatusChanged;
+                Entity.OnStatusChanged        -= onStatusChanged;
+                Entity.OnEnergyStatusChanged  -= onEnergyStatusChanged;
             };
 
         }
@@ -1512,12 +1551,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return Task.CompletedTask;
             };
 
-            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
-            Entity.OnStatusChanged       += onStatusChanged;
+            OnEVSEEnergyStatusChangedDelegate onEnergyStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.EnergyStatus, nameof(EVSE), entity.Id.ToString(), newStatus, oldStatus, dataSource, POIEnergyStatus.ToText);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged   += onAdminStatusChanged;
+            Entity.OnStatusChanged        += onStatusChanged;
+            Entity.OnEnergyStatusChanged  += onEnergyStatusChanged;
 
             return () => {
-                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
-                Entity.OnStatusChanged       -= onStatusChanged;
+                Entity.OnAdminStatusChanged   -= onAdminStatusChanged;
+                Entity.OnStatusChanged        -= onStatusChanged;
+                Entity.OnEnergyStatusChanged  -= onEnergyStatusChanged;
             };
 
         }
@@ -1558,7 +1604,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               String                EntityId,
                               Timestamped<T>        NewStatus,
                               Timestamped<T>?       OldStatus,
-                              Context?              DataSource)
+                              Context?              DataSource,
+                              Func<T, String>?      Format   = null)
         {
 
             // A schedule without any status before has a default one.
@@ -1568,9 +1615,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    EntityType,
                                                    EntityId,
                                                    Truncate(NewStatus.Timestamp),
-                                                   NewStatus.Value!.ToString()!,
+                                                   Format?.Invoke(NewStatus.Value) ?? NewStatus.Value!.ToString()!,
                                                    hasOldStatus ? Truncate(OldStatus!.Value.Timestamp) : null,
-                                                   hasOldStatus ? OldStatus!.Value.Value?.ToString()   : null,
+                                                   hasOldStatus ? (Format is not null ? Format(OldStatus!.Value.Value) : OldStatus!.Value.Value?.ToString()) : null,
                                                    (DataSource as POIStatusContext)?.Text);
 
             // One failing subscriber must neither fail the update nor keep it from the others.
@@ -1608,8 +1655,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                chargingStationOperator.NextStatus?.     Timestamp
                            }.
                            Concat(chargingStationOperator.ChargingPools.   SelectMany(chargingPool    => new[] { chargingPool.   NextAdminStatus?.Timestamp, chargingPool.   NextStatus?.Timestamp })).
-                           Concat(chargingStationOperator.ChargingStations.SelectMany(chargingStation => new[] { chargingStation.NextAdminStatus?.Timestamp, chargingStation.NextStatus?.Timestamp })).
-                           Concat(chargingStationOperator.EVSEs.           SelectMany(evse            => new[] { evse.           NextAdminStatus?.Timestamp, evse.           NextStatus?.Timestamp })))).
+                           Concat(chargingStationOperator.ChargingStations.SelectMany(chargingStation => new[] { chargingStation.NextAdminStatus?.Timestamp, chargingStation.NextStatus?.Timestamp, chargingStation.NextEnergyStatus?.Timestamp })).
+                           Concat(chargingStationOperator.EVSEs.           SelectMany(evse            => new[] { evse.           NextAdminStatus?.Timestamp, evse.           NextStatus?.Timestamp, evse.           NextEnergyStatus?.Timestamp })))).
                            Concat(network.EMobilityProviders.SelectMany(eMobilityProvider => new[] { eMobilityProvider.NextAdminStatus?.Timestamp, eMobilityProvider.NextStatus?.Timestamp })).
                            Concat(network.GridOperators.SelectMany(gridOperator => new[] { gridOperator.NextAdminStatus?.Timestamp, gridOperator.NextStatus?.Timestamp })).
                            Concat(network.EnergyMeters.SelectMany(energyMeter => new[] { energyMeter.NextAdminStatus?.Timestamp, energyMeter.NextStatus?.Timestamp })).
@@ -1770,12 +1817,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     {
                         _ = chargingStation.AdminStatus;
                         _ = chargingStation.Status;
+                        _ = chargingStation.EnergyStatus;
                     }
 
                     foreach (var evse in chargingStationOperator.EVSEs)
                     {
                         _ = evse.AdminStatus;
                         _ = evse.Status;
+                        _ = evse.EnergyStatus;
                     }
 
                 }
@@ -1802,7 +1851,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     DateTimeOffset                       At,
                                                     out String?                          Normalized,
                                                     out DateTimeOffset?                  OldTimestamp,
-                                                    out String?                          OldValue)
+                                                    out String?                          OldValue,
+                                                    Func<T, String>?                     Format   = null)
         {
 
             Normalized    = null;
@@ -1812,7 +1862,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (String.IsNullOrWhiteSpace(Text) || !Parse(Text, out var status))
                 return POIStatusUpdateResult.Refused;
 
-            Normalized = status!.ToString();
+            Normalized = Format?.Invoke(status) ?? status!.ToString();
 
             // As it is, or into the schedule, which ignores a status repeating the one in effect before it.
             var Set = Authoritative ? Take : Insert;
@@ -1822,7 +1872,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (current.HasValue)
             {
                 OldTimestamp  = Truncate(current.Value.Timestamp);
-                OldValue      = current.Value.Value?.ToString();
+                OldValue      = Format is not null ? Format(current.Value.Value) : current.Value.Value?.ToString();
             }
 
             if (At > Timestamp.Now)

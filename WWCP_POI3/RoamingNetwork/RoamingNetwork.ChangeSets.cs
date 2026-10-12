@@ -456,6 +456,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var parkingOps            = new Dictionary<ParkingOperator_Id, ParkingOperator>(parkingOperators);
             var softwares             = new Dictionary<TransparencySoftware_Id, TransparencySoftware>(transparencySoftware);
             var certificates          = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(transparencySoftwareCertificates);
+            var brandRegistry         = new Dictionary<Brand_Id, Brand>(brands);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
@@ -789,6 +790,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Brands
+
+                else if (change.EntityType == nameof(Brand))
+                {
+                    if (!TryApplyRegistryChange(BrandRegistry, change, index, ChangeSet.CreatedAt, brandRegistry, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                #endregion
+
                 #region Transparency software releases and certificates
 
                 else if (change.EntityType == nameof(TransparencySoftware))
@@ -852,7 +863,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  DuplicateEnergyMeter(operators.Values)                ??
                  DuplicateParking    (parkingOps.Values)               ??
                  UnknownChargingStation(parkingOps.Values, operators)  ??
-                 UnknownTransparencyReference(operators.Values, softwares, certificates, manufacturers)) is String referenceError)
+                 UnknownTransparencyReference(operators.Values, softwares, certificates, manufacturers) ??
+                 UnknownBrand(operators.Values, brandRegistry)) is String referenceError)
             {
                 ErrorResponse = referenceError;
                 return false;
@@ -878,7 +890,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  gridOps.Values,
                                  parkingOps.Values,
                                  softwares.Values,
-                                 certificates.Values
+                                 certificates.Values,
+                                 brandRegistry.Values
                              ) {
                                  Revision = Revision + 1
                              };

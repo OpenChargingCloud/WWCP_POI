@@ -60,6 +60,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "hotline",
             "gridConnectionPoint",
             "energyMeters",
+            "brandIds",
+            "openingTimes",
+            "energyMix",
+            "images",
             "customData"
         ];
 
@@ -77,6 +81,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "manufacturerId",
             "modelId",
             "energyMeters",
+            "brandIds",
+            "openingTimes",
+            "images",
             "customData"
         ];
 
@@ -96,6 +103,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "chargingConnectors",
             "energyMeter",
             "chargingTariffIds",
+            "brandIds",
+            "images",
             "customData"
         ];
 
@@ -130,6 +139,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "currency",
             "tariffURL",
             "elements",
+            "energyMix",
             "customData"
         ];
 

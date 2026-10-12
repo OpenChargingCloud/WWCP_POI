@@ -25,18 +25,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// The unique identification of a brand.
+    /// Extension methods for brand identifications.
     /// </summary>
-    public readonly struct Brand_Id : IId,
-                                      IEquatable <Brand_Id>,
-                                      IComparable<Brand_Id>
+    public static class BrandIdExtensions
+    {
 
+        /// <summary>
+        /// Indicates whether this brand identification is null or empty.
+        /// </summary>
+        /// <param name="BrandId">An brand identification.</param>
+        public static Boolean IsNullOrEmpty(this Brand_Id? BrandId)
+            => !BrandId.HasValue || BrandId.Value.IsNullOrEmpty;
+
+        /// <summary>
+        /// Indicates whether this brand identification is null or empty.
+        /// </summary>
+        /// <param name="BrandId">An brand identification.</param>
+        public static Boolean IsNotNullOrEmpty(this Brand_Id? BrandId)
+            => BrandId.HasValue && BrandId.Value.IsNotNullOrEmpty;
+
+    }
+
+
+    /// <summary>
+    /// The unique identification of an brand.
+    /// </summary>
+    public readonly struct Brand_Id : IId<Brand_Id>
     {
 
         #region Data
 
         /// <summary>
-        /// The internal identification.
+        /// The internal brand identification.
         /// </summary>
         private readonly String InternalId;
 
@@ -45,19 +65,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
-        /// Indicates whether this identification is null or empty.
+        /// Indicates whether this brand identification is null or empty.
         /// </summary>
         public Boolean IsNullOrEmpty
             => InternalId.IsNullOrEmpty();
 
         /// <summary>
-        /// Indicates whether this identification is NOT null or empty.
+        /// Indicates whether this brand identification is NOT null or empty.
         /// </summary>
         public Boolean IsNotNullOrEmpty
             => InternalId.IsNotNullOrEmpty();
 
         /// <summary>
-        /// Returns the length of the identification.
+        /// The length of the brand identifier.
         /// </summary>
         public UInt64 Length
             => (UInt64) (InternalId?.Length ?? 0);
@@ -67,8 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Constructor(s)
 
         /// <summary>
-        /// Create a new brand identification.
-        /// based on the given string.
+        /// Create a new brand identification based on the given string.
         /// </summary>
         private Brand_Id(String Text)
         {
@@ -78,59 +97,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region New
+        #region (static) NewRandom  (Length = 15)
 
         /// <summary>
-        /// Returns a new brand identification.
+        /// Create a new random brand identification.
         /// </summary>
-        public static Brand_Id New
-            => Parse(UUIDv7.Generate().ToString());
+        /// <param name="Length">The expected length of the random brand identification.</param>
+        public static Brand_Id NewRandom(Byte Length = 15)
+
+            => new (RandomExtensions.RandomString(Length).ToUpper());
 
         #endregion
 
-        #region Parse(Text)
+        #region (static) Parse   (Text)
 
         /// <summary>
-        /// Parse the given string as a brand identification.
+        /// Parse the given string as an brand identification.
         /// </summary>
-        /// <param name="Text">A text representation of a brand identification.</param>
+        /// <param name="Text">A text representation of an brand identification.</param>
         public static Brand_Id Parse(String Text)
         {
 
-            if (Text is null || Text.Trim().IsNullOrEmpty())
-                throw new ArgumentNullException(nameof(Text), "The given brand identification must not be null or empty!");
+            if (TryParse(Text, out Brand_Id brandId))
+                return brandId;
 
-            return new Brand_Id(Text);
+            throw new ArgumentException($"Invalid text representation of an brand identification: '{Text}'!",
+                                        nameof(Text));
 
         }
 
         #endregion
 
-        #region TryParse(Text)
+        #region (static) TryParse(Text)
 
         /// <summary>
-        /// Parse the given string as a brand identification.
+        /// Try to parse the given string as an brand identification.
         /// </summary>
-        /// <param name="Text">A text representation of a brand identification.</param>
-        public static Brand_Id? TryParse(String Text)
+        /// <param name="Text">A text representation of an brand identification.</param>
+        public static Brand_Id? TryParse(String? Text)
         {
 
-            if (Text is not null &&
-                Text.Trim().IsNotNullOrEmpty())
-            {
-
-                try
-                {
-
-                    return new Brand_Id(Text);
-
-                }
-#pragma warning disable RCS1075 // Avoid empty catch clause that catches System.Exception.
-                catch
-#pragma warning restore RCS1075 // Avoid empty catch clause that catches System.Exception.
-                { }
-
-            }
+            if (Text is not null && TryParse(Text, out Brand_Id brandId))
+                return brandId;
 
             return null;
 
@@ -138,36 +146,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryParse(Text, out BrandId)
+        #region (static) TryParse(Text, out BrandId)
 
         /// <summary>
-        /// Parse the given string as a brand identification.
+        /// Try to parse the given string as an brand identification.
         /// </summary>
-        /// <param name="Text">A text representation of a brand identification.</param>
+        /// <param name="Text">A text representation of an brand identification.</param>
         /// <param name="BrandId">The parsed brand identification.</param>
         public static Boolean TryParse(String Text, out Brand_Id BrandId)
         {
 
-            if (Text is not null &&
-                Text.Trim().IsNotNullOrEmpty())
-            {
+            Text = Text.Trim();
 
+            if (Text.IsNotNullOrEmpty())
+            {
                 try
                 {
-
                     BrandId = new Brand_Id(Text);
-
                     return true;
-
                 }
-#pragma warning disable RCS1075 // Avoid empty catch clause that catches System.Exception.
                 catch
-#pragma warning restore RCS1075 // Avoid empty catch clause that catches System.Exception.
                 { }
-
             }
 
-            BrandId = default(Brand_Id);
+            BrandId = default;
             return false;
 
         }
@@ -195,15 +197,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="BrandId1">A brand identification.</param>
+        /// <param name="BrandId1">An brand identification.</param>
         /// <param name="BrandId2">Another brand identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator == (Brand_Id BrandId1, Brand_Id BrandId2)
-        {
+        public static Boolean operator == (Brand_Id BrandId1,
+                                           Brand_Id BrandId2)
 
-            return BrandId1.Equals(BrandId2);
-
-        }
+            => BrandId1.Equals(BrandId2);
 
         #endregion
 
@@ -212,11 +212,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="BrandId1">A brand identification.</param>
+        /// <param name="BrandId1">An brand identification.</param>
         /// <param name="BrandId2">Another brand identification.</param>
         /// <returns>False if both match; True otherwise.</returns>
-        public static Boolean operator != (Brand_Id BrandId1, Brand_Id BrandId2)
-            => !(BrandId1 == BrandId2);
+        public static Boolean operator != (Brand_Id BrandId1,
+                                           Brand_Id BrandId2)
+
+            => !BrandId1.Equals(BrandId2);
 
         #endregion
 
@@ -225,18 +227,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="BrandId1">A brand identification.</param>
+        /// <param name="BrandId1">An brand identification.</param>
         /// <param name="BrandId2">Another brand identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator < (Brand_Id BrandId1, Brand_Id BrandId2)
-        {
+        public static Boolean operator < (Brand_Id BrandId1,
+                                          Brand_Id BrandId2)
 
-            if ((Object) BrandId1 is null)
-                throw new ArgumentNullException(nameof(BrandId1), "The given BrandId1 must not be null!");
-
-            return BrandId1.CompareTo(BrandId2) < 0;
-
-        }
+            => BrandId1.CompareTo(BrandId2) < 0;
 
         #endregion
 
@@ -245,11 +242,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="BrandId1">A brand identification.</param>
+        /// <param name="BrandId1">An brand identification.</param>
         /// <param name="BrandId2">Another brand identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator <= (Brand_Id BrandId1, Brand_Id BrandId2)
-            => !(BrandId1 > BrandId2);
+        public static Boolean operator <= (Brand_Id BrandId1,
+                                           Brand_Id BrandId2)
+
+            => BrandId1.CompareTo(BrandId2) <= 0;
 
         #endregion
 
@@ -258,18 +257,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="BrandId1">A brand identification.</param>
+        /// <param name="BrandId1">An brand identification.</param>
         /// <param name="BrandId2">Another brand identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator > (Brand_Id BrandId1, Brand_Id BrandId2)
-        {
+        public static Boolean operator > (Brand_Id BrandId1,
+                                          Brand_Id BrandId2)
 
-            if ((Object) BrandId1 is null)
-                throw new ArgumentNullException(nameof(BrandId1), "The given BrandId1 must not be null!");
-
-            return BrandId1.CompareTo(BrandId2) > 0;
-
-        }
+            => BrandId1.CompareTo(BrandId2) > 0;
 
         #endregion
 
@@ -278,17 +272,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Compares two instances of this object.
         /// </summary>
-        /// <param name="BrandId1">A brand identification.</param>
+        /// <param name="BrandId1">An brand identification.</param>
         /// <param name="BrandId2">Another brand identification.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public static Boolean operator >= (Brand_Id BrandId1, Brand_Id BrandId2)
-            => !(BrandId1 < BrandId2);
+        public static Boolean operator >= (Brand_Id BrandId1,
+                                           Brand_Id BrandId2)
+
+            => BrandId1.CompareTo(BrandId2) >= 0;
 
         #endregion
 
         #endregion
 
-        #region IComparable<BrandId> Members
+        #region IComparable<Brand_Id> Members
 
         #region CompareTo(Object)
 
@@ -296,19 +292,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Compares two instances of this object.
         /// </summary>
         /// <param name="Object">An object to compare with.</param>
-        public Int32 CompareTo(Object Object)
-        {
+        public Int32 CompareTo(Object? Object)
 
-            if (Object is null)
-                throw new ArgumentNullException(nameof(Object), "The given object must not be null!");
-
-            if (!(Object is Brand_Id))
-                throw new ArgumentException("The given object is not a brand identification!",
-                                            nameof(Object));
-
-            return CompareTo((Brand_Id) Object);
-
-        }
+            => Object is Brand_Id brandId
+                   ? CompareTo(brandId)
+                   : throw new ArgumentException("The given object is not an brand identification!",
+                                                 nameof(Object));
 
         #endregion
 
@@ -319,26 +308,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="BrandId">An object to compare with.</param>
         public Int32 CompareTo(Brand_Id BrandId)
-        {
 
-            if ((Object) BrandId is null)
-                throw new ArgumentNullException(nameof(BrandId),  "The given brand identification must not be null!");
-
-            // Compare the length of the BrandIds
-            var _Result = this.Length.CompareTo(BrandId.Length);
-
-            if (_Result == 0)
-                _Result = String.Compare(InternalId, BrandId.InternalId, StringComparison.Ordinal);
-
-            return _Result;
-
-        }
+            => String.Compare(InternalId,
+                              BrandId.InternalId,
+                              StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
         #endregion
 
-        #region IEquatable<BrandId> Members
+        #region IEquatable<Brand_Id> Members
 
         #region Equals(Object)
 
@@ -347,37 +326,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Object">An object to compare with.</param>
         /// <returns>True if both match; False otherwise.</returns>
-        public override Boolean Equals(Object Object)
-        {
+        public override Boolean Equals(Object? Object)
 
-            if (Object is null)
-                return false;
-
-            if (!(Object is Brand_Id))
-                return false;
-
-            return Equals((Brand_Id) Object);
-
-        }
+            => Object is Brand_Id brandId &&
+                   Equals(brandId);
 
         #endregion
 
         #region Equals(BrandId)
 
         /// <summary>
-        /// Compares two BrandIds for equality.
+        /// Compares two brand identifications for equality.
         /// </summary>
-        /// <param name="BrandId">A BrandId to compare with.</param>
+        /// <param name="BrandId">An brand identification to compare with.</param>
         /// <returns>True if both match; False otherwise.</returns>
         public Boolean Equals(Brand_Id BrandId)
-        {
 
-            if ((Object) BrandId is null)
-                return false;
-
-            return String.Equals(InternalId, BrandId.InternalId);
-
-        }
+            => String.Equals(InternalId,
+                             BrandId.InternalId,
+                             StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -386,10 +353,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (override) GetHashCode()
 
         /// <summary>
-        /// Return the HashCode of this object.
+        /// Return the hash code of this object.
         /// </summary>
         public override Int32 GetHashCode()
-            => InternalId?.GetHashCode() ?? 0;
+
+            => InternalId is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(InternalId);
 
         #endregion
 
@@ -399,6 +367,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return a text representation of this object.
         /// </summary>
         public override String ToString()
+
             => InternalId ?? "";
 
         #endregion

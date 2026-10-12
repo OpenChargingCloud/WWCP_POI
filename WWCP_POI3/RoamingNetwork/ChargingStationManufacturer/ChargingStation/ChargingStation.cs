@@ -51,6 +51,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
+    /// The energy status of a charging station changed.
+    /// </summary>
+    public delegate Task OnChargingStationEnergyStatusChangedDelegate(DateTimeOffset            Timestamp,
+                                                                   EventTracking_Id          EventTrackingId,
+                                                                   ChargingStation           ChargingStation,
+                                                                   Timestamped<EnergyInfo>   OldEnergyStatus,
+                                                                   Timestamped<EnergyInfo>   NewEnergyStatus,
+                                                                   Context?                  DataSource);
+
+
+    /// <summary>
     /// A charging station: one device with its EVSEs, embedded completely in its charging pool.
     /// </summary>
     public sealed class ChargingStation : AImmutableEMobilityEntity<ChargingStation_Id,
@@ -114,6 +125,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IEnumerable<EnergyMeter>     AllEnergyMeters
             => EnergyMeters.Concat(EVSEs.SelectMany(evse => evse.AllEnergyMeters));
 
+
+        /// <summary>
+        /// The brands it is offered under, of the roaming network, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<Brand_Id>  BrandIds  { get; }
+
+        /// <summary>
+        /// When it is open; always, unless given.
+        /// </summary>
+        public ImmutableOpeningTimes?  OpeningTimes  { get; }
+
+
+        /// <summary>
+        /// Its images, in their given order.
+        /// </summary>
+        public ImmutableArray<Image>  Images  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -132,6 +160,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                ChargingStationModel_Id?                        ModelId                      = null,
                                IEnumerable<EVSE>?                              EVSEs                        = null,
                                IEnumerable<EnergyMeter>?                       EnergyMeters                 = null,
+                               IEnumerable<Brand_Id>?                          BrandIds                     = null,
+                               ImmutableOpeningTimes?                          OpeningTimes                 = null,
+                               IEnumerable<Image>?                             Images                       = null,
 
                                Timestamped<ChargingStationAdminStatusType>?    InitialAdminStatus           = null,
                                Timestamped<ChargingStationStatusType>?         InitialStatus                = null,
@@ -185,6 +216,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.EVSEs               = [.. evses.OrderBy(evse => evse.Id.ToString(), StringComparer.Ordinal)];
             this.evseIndex           = this.EVSEs.ToImmutableDictionary(evse => evse.Id);
             this.EnergyMeters        = EnergyMeter.Ordered(EnergyMeters, $"the charging station '{Id}'");
+            this.BrandIds            = POIJSON.OrderedIds(BrandIds, $"brand of the charging station '{Id}'");
+            this.OpeningTimes        = OpeningTimes;
+            this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the charging station '{Id}'");
+            this.energyStatus        = new EnergyStatusRuntime(RaiseEnergyStatusChanged);
 
         }
 
@@ -255,6 +290,75 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region Energy status
+
+        private readonly EnergyStatusRuntime                energyStatus;
+        private          OnChargingStationEnergyStatusChangedDelegate?  onEnergyStatusChanged;
+
+        /// <summary>
+        /// The current energy status: the power used and available, and the energy stored;
+        /// runtime data like the admin status and the status, unless none was reported yet.
+        /// </summary>
+        public Timestamped<EnergyInfo>?  EnergyStatus
+            => energyStatus.Current;
+
+        /// <summary>
+        /// The next planned energy status.
+        /// </summary>
+        internal Timestamped<EnergyInfo>?  NextEnergyStatus
+            => energyStatus.Next;
+
+        /// <summary>
+        /// Set the energy status, since the given timestamp or now; a later timestamp plans it.
+        /// </summary>
+        /// <param name="EnergyStatus">The power used and available, and the energy stored.</param>
+        /// <param name="Timestamp">Since when; now, unless given.</param>
+        /// <param name="DataSource">An optional source.</param>
+        public void SetEnergyStatus(EnergyInfo       EnergyStatus,
+                                    DateTimeOffset?  Timestamp    = null,
+                                    Context?         DataSource   = null)
+
+            => energyStatus.Set(EnergyStatus, Timestamp ?? org.GraphDefined.Vanaheimr.Illias.Timestamp.Now, DataSource);
+
+        /// <summary>
+        /// Take the given energy status as it is, also when it repeats the one before.
+        /// </summary>
+        internal void TakeEnergyStatus(EnergyInfo      EnergyStatus,
+                                       DateTimeOffset  Timestamp,
+                                       Context?        DataSource)
+
+            => energyStatus.Take(EnergyStatus, Timestamp, DataSource);
+
+        /// <summary>
+        /// An event fired whenever the energy status changed.
+        /// </summary>
+        public event OnChargingStationEnergyStatusChangedDelegate? OnEnergyStatusChanged
+        {
+            add    { lock (statusEventsLock) { onEnergyStatusChanged += value; energyStatus.Listen(onEnergyStatusChanged is not null); } }
+            remove { lock (statusEventsLock) { onEnergyStatusChanged -= value; energyStatus.Listen(onEnergyStatusChanged is not null); } }
+        }
+
+        private async Task RaiseEnergyStatusChanged(DateTimeOffset           Timestamp,
+                                                    EventTracking_Id         EventTrackingId,
+                                                    Timestamped<EnergyInfo>  NewEnergyStatus,
+                                                    Timestamped<EnergyInfo>  OldEnergyStatus,
+                                                    Context?                 DataSource)
+        {
+            var onEnergyStatusChanged = this.onEnergyStatusChanged;
+            if (onEnergyStatusChanged is not null)
+                await onEnergyStatusChanged(Timestamp, EventTrackingId, this, OldEnergyStatus, NewEnergyStatus, DataSource);
+        }
+
+        /// <inheritdoc/>
+        protected override void ShareFurtherRuntimeOf(AImmutableEMobilityEntity<ChargingStation_Id, ChargingStationAdminStatusType, ChargingStationStatusType> Previous)
+        {
+            if (Previous is ChargingStation previousChargingStation)
+                energyStatus.ShareOf(previousChargingStation.energyStatus);
+        }
+
+        #endregion
+
+
         #region ToJSON()
 
         /// <summary>
@@ -299,6 +403,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (EVSEs.Length > 0)
                 json.Add("EVSEs",              new JArray(EVSEs.Select(evse => evse.ToJSON())));
+
+            if (BrandIds.Length > 0)
+                json.Add("brandIds",      POIJSON.IdsToJSON(BrandIds));
+
+            if (OpeningTimes is not null)
+                json.Add("openingTimes",  OpeningTimes.ToJSON());
+
+            if (Images.Length > 0)
+                json.Add("images",  new JArray(Images.Select(image => image.ToJSON())));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
@@ -370,6 +483,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIJSON.TryParseIds(JSON, "brandIds", "brand identification", Brand_Id.TryParse, out ImmutableArray<Brand_Id> brandIds, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, "openingTimes", "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -390,6 +512,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       modelId,
                                                       evses,
                                                       energyMeters,
+                                                      brandIds,
+                                                      openingTimes,
+                                                      images,
                                                       DataSource:  dataSource,
                                                       Created:     created,
                                                       LastChange:  lastChange,

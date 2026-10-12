@@ -608,7 +608,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(topics.Payload!["topics"]!.Select(topic => topic["name"]!.Value<String>()),
-                            Is.EqualTo(new[] { "adminStatusUpdates", "commitAnnouncements", "commits", "statusUpdates" }));
+                            Is.EqualTo(new[] { "adminStatusUpdates", "commitAnnouncements", "commits", "energyStatusUpdates", "statusUpdates" }));
                 Assert.That(topics.Payload["topics"]![1]!["action"]!.Value<String>(),  Is.EqualTo("commitAnnouncement"));
             }
 
@@ -981,6 +981,67 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
                 Assert.That(single.Payload!["value"]!.Value<String>(),                            Is.EqualTo("offline"));
 
                 Assert.That(new[] { first.MessageId, second.MessageId, third.MessageId },        Is.EqualTo(new[] { "p1", "p2", "p3" }));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Energy_statuses_are_set_in_batches_and_pushed()
+
+        /// <summary>
+        /// A charging station operator sends several energy statuses as one batch; subscribers get them aggregated,
+        /// their values as objects in W, W and Wh.
+        /// </summary>
+        [Test]
+        public async Task Energy_statuses_are_set_in_batches_and_pushed()
+        {
+
+            poiAPI!.AuthorizeStatusUpdate = (request, login, statusUpdate) => true;
+            webSocketServer!.PushCoalescingDelay = TimeSpan.FromMilliseconds(300);
+
+            leader!.Publish(leader.Head.RoamingNetwork.CreateChangeSet([
+                                RoamingNetworkChange.Add(new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"),
+                                                                                     ChargingPools: [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
+                                                                                                                       ChargingStations: [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
+                                                                                                                                                               EVSEs: [ new EVSE(EVSE_Id.Parse("DE*GEF*E1*1")),
+                                                                                                                                                                        new EVSE(EVSE_Id.Parse("DE*GEF*E1*2")) ]) ]) ]))
+                            ], CreatedAt: DateTimeOffset.Parse("2026-10-11T11:00:00Z")));
+
+            await using var subscriber  = await Connect();
+            await using var cso         = await Connect();
+
+            await subscriber.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("energyStatusUpdates"))));
+
+            static JObject EnergyPayload(String EVSEId, Decimal Used, String Timestamp)
+                => new (new JProperty("kind",        "energyStatus"),
+                        new JProperty("entityType",  "EVSE"),
+                        new JProperty("entityId",    EVSEId),
+                        new JProperty("value",       new JObject(new JProperty("used", Used), new JProperty("available", 22000))),
+                        new JProperty("timestamp",   Timestamp));
+
+            var results  = await cso.Request("1", "setStatus", new JObject(new JProperty("batch", new JArray(
+                                                                   EnergyPayload("DE*GEF*E1*1", 11000, "2026-10-11T12:00:00Z"),
+                                                                   EnergyPayload("DE*GEF*E1*2",  7400, "2026-10-11T12:00:00Z"),
+                                                                   new JObject(new JProperty("kind",       "energyStatus"),
+                                                                               new JProperty("entityType", "EVSE"),
+                                                                               new JProperty("entityId",   "DE*GEF*E1*1"),
+                                                                               new JProperty("value",      "11 kW"))
+                                                               ))));
+
+            var push     = (await subscriber.NextPush()).Message;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(results.Payload!["batch"]![0]!["result"]!.Value<String>(),              Is.EqualTo("Updated"));
+                Assert.That(results.Payload["batch"]![1]!["result"]!.Value<String>(),               Is.EqualTo("Updated"));
+                Assert.That(results.Payload["batch"]![1]!["current"]!["value"]!["used"]!.Value<Decimal>(),  Is.EqualTo(7400));
+                Assert.That(results.Payload["batch"]![2]!["error"]!["code"]!.Value<String>(),       Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+
+                Assert.That(push.Action,                                                             Is.EqualTo("energyStatusUpdate"));
+                Assert.That(Payloads(push).Select(update => update["value"]!["used"]!.Value<Decimal>()),  Is.EqualTo(new[] { 11000m, 7400m }));
 
             }
 

@@ -63,14 +63,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            new JProperty("entityType",  EntityType),
                            new JProperty("entityId",    EntityId),
                            new JProperty("timestamp",   Timestamp.ToISO8601()),
-                           new JProperty("value",       Value)
+                           new JProperty("value",       ValueToJSON(Kind, Value))
                        );
 
             if (OldTimestamp.HasValue)
                 json.Add("oldTimestamp",  OldTimestamp.Value.ToISO8601());
 
             if (OldValue is not null)
-                json.Add("oldValue",      OldValue);
+                json.Add("oldValue",      ValueToJSON(Kind, OldValue));
 
             if (DataSource is not null)
                 json.Add("dataSource",    DataSource);
@@ -104,7 +104,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (!JSON.ParseMandatoryText("entityType", "entity type",           out String? entityType, out ErrorResponse) ||
                 !JSON.ParseMandatoryText("entityId",   "entity identification", out String? entityId,   out ErrorResponse) ||
-                !JSON.ParseMandatoryText("value",      "status",                out String? value,      out ErrorResponse))
+                !TryParseValue(kind, JSON["value"], "status", out String? value, out ErrorResponse))
             {
                 return false;
             }
@@ -118,10 +118,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
             }
 
-            if (JSON.ParseOptional("oldValue", "old status", out String? oldValue, out ErrorResponse))
+            String? oldValue = null;
+
+            if (JSON["oldValue"] is JToken oldValueJSON &&
+                !TryParseValue(kind, oldValueJSON, "old status", out oldValue, out ErrorResponse))
             {
-                if (ErrorResponse is not null)
-                    return false;
+                return false;
             }
 
             if (JSON.ParseOptional("dataSource", "data source", out String? dataSource, out ErrorResponse))
@@ -145,6 +147,64 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (static) ValueToJSON(Kind, Value)
+
+        /// <summary>
+        /// The JSON of the given status value: a text, or the object of an energy status.
+        /// </summary>
+        public static JToken ValueToJSON(POIRuntimeStatusKind  Kind,
+                                         String                Value)
+        {
+
+            if (Kind == POIRuntimeStatusKind.EnergyStatus && POIEnergyStatus.TryParseText(Value, out var energyStatus))
+                return POIEnergyStatus.ToJSON(energyStatus);
+
+            return Value;
+
+        }
+
+        #endregion
+
+        #region (static) TryParseValue(Kind, JSON, Description, out Value, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given JSON of a status value: a text, or the object of an energy status,
+        /// which is kept as its compact JSON text.
+        /// </summary>
+        public static Boolean TryParseValue(POIRuntimeStatusKind              Kind,
+                                            JToken?                           JSON,
+                                            String                            Description,
+                                            [NotNullWhen(true)]  out String?  Value,
+                                            [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Value = null;
+
+            if (Kind == POIRuntimeStatusKind.EnergyStatus)
+            {
+
+                if (!POIEnergyStatus.TryParse(JSON, out var energyStatus, out ErrorResponse))
+                    return false;
+
+                Value = POIEnergyStatus.ToText(energyStatus);
+                return true;
+
+            }
+
+            if (JSON?.Type != JTokenType.String || String.IsNullOrWhiteSpace(JSON.Value<String>()))
+            {
+                ErrorResponse = $"Missing or invalid {Description}!";
+                return false;
+            }
+
+            Value          = JSON.Value<String>()!;
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
         #region (static) KindText(Kind)
 
         /// <summary>
@@ -152,9 +212,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public static String KindText(POIRuntimeStatusKind Kind)
 
-            => Kind == POIRuntimeStatusKind.AdminStatus
-                   ? "adminStatus"
-                   : "status";
+            => Kind switch {
+                   POIRuntimeStatusKind.AdminStatus   => "adminStatus",
+                   POIRuntimeStatusKind.EnergyStatus  => "energyStatus",
+                   _                                  => "status"
+               };
 
         #endregion
 
@@ -172,6 +234,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 case "adminStatus":
                     Kind = POIRuntimeStatusKind.AdminStatus;
+                    return true;
+
+                case "energyStatus":
+                    Kind = POIRuntimeStatusKind.EnergyStatus;
                     return true;
 
                 case "status":

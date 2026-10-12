@@ -54,6 +54,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "address",
             "geoLocation",
             "chargingStationIds",
+            "openingTimes",
+            "images",
+            "parkingProductIds",
             "customData"
         ];
 
@@ -68,6 +71,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "parkingGarageId",
             "parkingSensorIds",
             "chargingStationIds",
+            "parkingProductIds",
+            "customData"
+        ];
+
+        /// <summary>
+        /// The properties of a parking product a change set can update or remove.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> ChangeableParkingProductProperties = [
+            "name",
+            "description",
+            "minDuration",
+            "stopParkingAfterTime",
             "customData"
         ];
 
@@ -79,6 +94,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "description",
             "dataSource",
             "parkingSpaceIds",
+            "parkingProductIds",
             "customData"
         ];
 
@@ -107,7 +123,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => EntityType is nameof(ParkingGarage)
                           or nameof(ParkingSpace)
                           or nameof(ParkingSensor)
-                          or nameof(ParkingSpaceGroup);
+                          or nameof(ParkingSpaceGroup)
+                          or nameof(ParkingProduct);
 
         #endregion
 
@@ -130,10 +147,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 nameof(ParkingGarage)  => ("parking garage", "parkingGarages", ChangeableParkingGarageProperties),
                 nameof(ParkingSpace)   => ("parking space",  "parkingSpaces",  ChangeableParkingSpaceProperties),
                 nameof(ParkingSpaceGroup) => ("parking space group", "parkingSpaceGroups", ChangeableParkingSpaceGroupProperties),
+                nameof(ParkingProduct)    => ("parking product",     "parkingProducts",    ChangeableParkingProductProperties),
                 _                      => ("parking sensor", "parkingSensors", ChangeableParkingSensorProperties)
             };
 
-            var entityId = Change.EntityId;
+            var entityId    = Change.EntityId;
+
+            // Parking products have no timestamps.
+            var timestamps  = Change.EntityType != nameof(ParkingProduct);
 
             #region The parking operator: the one having it, or the parent of a new one
 
@@ -141,6 +162,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 nameof(ParkingGarage)  => ParkingGarage_Id.TryParse(entityId, out var garageId) ? parkingOperator => parkingOperator.TryGetParkingGarage(garageId, out _) : null,
                 nameof(ParkingSpace)   => ParkingSpace_Id. TryParse(entityId, out var spaceId)  ? parkingOperator => parkingOperator.TryGetParkingSpace (spaceId,  out _) : null,
                 nameof(ParkingSpaceGroup) => ParkingSpaceGroup_Id.TryParse(entityId, out var groupId) ? parkingOperator => parkingOperator.TryGetParkingSpaceGroup(groupId, out _) : null,
+                nameof(ParkingProduct)    => ParkingProduct_Id.   TryParse(entityId, out var productId) ? parkingOperator => parkingOperator.TryGetParkingProduct(productId, out _) : null,
                 _                      => ParkingSensor_Id.TryParse(entityId, out var sensorId) ? parkingOperator => parkingOperator.TryGetParkingSensor(sensorId, out _) : null
             };
 
@@ -246,7 +268,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         entityJSON![propertyName] = Change.NewValue;
 
                     // The change set's timestamp is the last change, so that its after ETags are deterministic.
-                    entityJSON["lastChange"] = CreatedAt.ToISO8601();
+                    if (timestamps)
+                        entityJSON["lastChange"] = CreatedAt.ToISO8601();
+
                     break;
 
                 #endregion
@@ -272,8 +296,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     // The change set's timestamp is the last change and, unless given, the creation,
                     // so that its after ETags are deterministic.
                     var added = (JObject) newEntity.DeepClone();
-                    added["created"]    ??= CreatedAt.ToISO8601();
-                    added["lastChange"]   = CreatedAt.ToISO8601();
+
+                    if (timestamps)
+                    {
+                        added["created"]    ??= CreatedAt.ToISO8601();
+                        added["lastChange"]   = CreatedAt.ToISO8601();
+                    }
 
                     children.Add(added);
                     break;

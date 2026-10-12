@@ -67,6 +67,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly ImmutableDictionary<ParkingSpace_Id,  ParkingSpace>   parkingSpaceIndex;
         private readonly ImmutableDictionary<ParkingSensor_Id, ParkingSensor>  parkingSensorIndex;
         private readonly ImmutableDictionary<ParkingSpaceGroup_Id, ParkingSpaceGroup>  parkingSpaceGroupIndex;
+        private readonly ImmutableDictionary<ParkingProduct_Id, ParkingProduct>  parkingProductIndex;
 
         #endregion
 
@@ -107,6 +108,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ParkingSpaceGroup>  ParkingSpaceGroups  { get; }
 
+        /// <summary>
+        /// The parking products, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<ParkingProduct>  ParkingProducts  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -124,6 +130,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                IEnumerable<ParkingSpace>?                      ParkingSpaces                = null,
                                IEnumerable<ParkingSensor>?                     ParkingSensors               = null,
                                IEnumerable<ParkingSpaceGroup>?                 ParkingSpaceGroups           = null,
+                               IEnumerable<ParkingProduct>?                    ParkingProducts              = null,
 
                                Timestamped<ParkingOperatorAdminStatusType>?    InitialAdminStatus           = null,
                                Timestamped<ParkingOperatorStatusType>?         InitialStatus                = null,
@@ -170,6 +177,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.ParkingSpaceGroups      = Ordered(ParkingSpaceGroups, group => group.Id.ToString(), "parking space group");
             this.parkingSpaceGroupIndex  = this.ParkingSpaceGroups.ToImmutableDictionary(group => group.Id);
+
+            // Parking product identifications compare case-sensitively.
+            this.ParkingProducts      = [.. (ParkingProducts ?? []).Select(product => product ?? throw new ArgumentException("Parking products must not contain null entries!")).
+                                                                    OrderBy(product => product.Id.ToString(), StringComparer.Ordinal)];
+
+            if (this.ParkingProducts.Select(product => product.Id).Distinct().Count() != this.ParkingProducts.Length)
+                throw new ArgumentException($"A parking product of the parking operator '{Id}' must not be given twice!", nameof(ParkingProducts));
+
+            this.parkingProductIndex  = this.ParkingProducts.ToImmutableDictionary(product => product.Id);
+
+            foreach (var (kind, ownerId, productIds) in this.ParkingGarages.    Select(garage => ("parking garage",      garage.Id.ToString(), garage.ParkingProductIds)).
+                                                   Concat(this.ParkingSpaces.     Select(space  => ("parking space",       space. Id.ToString(), space. ParkingProductIds))).
+                                                   Concat(this.ParkingSpaceGroups.Select(group  => ("parking space group", group. Id.ToString(), group. ParkingProductIds))))
+                foreach (var productId in productIds)
+                    if (!parkingProductIndex.ContainsKey(productId))
+                        throw new ArgumentException($"The parking product '{productId}' of the {kind} '{ownerId}' is unknown at the parking operator '{Id}'!", nameof(ParkingProducts));
 
             foreach (var parkingSpaceGroup in this.ParkingSpaceGroups)
                 foreach (var parkingSpaceId in parkingSpaceGroup.ParkingSpaceIds)
@@ -242,6 +265,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                [NotNullWhen(true)] out ParkingSpaceGroup?  ParkingSpaceGroup)
 
             => parkingSpaceGroupIndex.TryGetValue(ParkingSpaceGroupId, out ParkingSpaceGroup);
+
+        #endregion
+
+        #region TryGetParkingProduct(ParkingProductId, out ParkingProduct)
+
+        /// <summary>
+        /// Try to return the parking product with the given identification.
+        /// </summary>
+        public Boolean TryGetParkingProduct(ParkingProduct_Id                        ParkingProductId,
+                                            [NotNullWhen(true)] out ParkingProduct?  ParkingProduct)
+
+            => parkingProductIndex.TryGetValue(ParkingProductId, out ParkingProduct);
 
         #endregion
 
@@ -371,6 +406,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ParkingSpaceGroups.Length > 0)
                 json.Add("parkingSpaceGroups", new JArray(ParkingSpaceGroups.Select(parkingSpaceGroup => parkingSpaceGroup.ToJSON())));
 
+            if (ParkingProducts.Length > 0)
+                json.Add("parkingProducts", new JArray(ParkingProducts.Select(parkingProduct => parkingProduct.ToJSON())));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -431,7 +469,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseChildren<ParkingGarage>(JSON, "parkingGarages", "parkingGarageIds", "parking garages", ParkingGarage.TryParse, out var parkingGarages, out ErrorResponse) ||
                     !POIJSON.TryParseChildren<ParkingSpace> (JSON, "parkingSpaces",  "parkingSpaceIds",  "parking spaces",  ParkingSpace. TryParse, out var parkingSpaces,  out ErrorResponse) ||
                     !POIJSON.TryParseChildren<ParkingSensor>(JSON, "parkingSensors", "parkingSensorIds", "parking sensors", ParkingSensor.TryParse, out var parkingSensors, out ErrorResponse) ||
-                    !POIJSON.TryParseChildren<ParkingSpaceGroup>(JSON, "parkingSpaceGroups", "parkingSpaceGroupIds", "parking space groups", ParkingSpaceGroup.TryParse, out var parkingSpaceGroups, out ErrorResponse))
+                    !POIJSON.TryParseChildren<ParkingSpaceGroup>(JSON, "parkingSpaceGroups", "parkingSpaceGroupIds", "parking space groups", ParkingSpaceGroup.TryParse, out var parkingSpaceGroups, out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ParkingProduct>(JSON, "parkingProducts", "parkingProductIds", "parking products", ParkingProduct.TryParse, out var parkingProducts, out ErrorResponse))
                 {
                     return false;
                 }
@@ -455,6 +494,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       parkingSpaces,
                                                       parkingSensors,
                                                       parkingSpaceGroups,
+                                                      parkingProducts,
                                                       DataSource:  dataSource,
                                                       Created:     created,
                                                       LastChange:  lastChange,

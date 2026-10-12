@@ -84,6 +84,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ChargingStation_Id>  ChargingStationIds    { get; }
 
+
+        /// <summary>
+        /// The parking products of its parking operator offered here, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<ParkingProduct_Id>  ParkingProductIds  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -98,6 +104,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             ParkingGarage_Id?                            ParkingGarageId              = null,
                             IEnumerable<ParkingSensor_Id>?               ParkingSensorIds             = null,
                             IEnumerable<ChargingStation_Id>?             ChargingStationIds           = null,
+                            IEnumerable<ParkingProduct_Id>?              ParkingProductIds            = null,
 
                             Timestamped<ParkingSpaceAdminStatusType>?    InitialAdminStatus           = null,
                             Timestamped<ParkingSpaceStatusType>?         InitialStatus                = null,
@@ -134,6 +141,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ParkingGarageId     = ParkingGarageId;
             this.ParkingSensorIds    = POIJSON.OrderedIds(ParkingSensorIds,   $"parking sensor of the parking space '{Id}'");
             this.ChargingStationIds  = POIJSON.OrderedIds(ChargingStationIds, $"charging station of the parking space '{Id}'");
+            this.ParkingProductIds = POIJSON.OrderedIds(ParkingProductIds, $"parking product of the parking space '{Id}'");
 
         }
 
@@ -224,6 +232,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingStationIds.Length > 0)
                 json.Add("chargingStationIds",  POIJSON.IdsToJSON(ChargingStationIds));
 
+            if (ParkingProductIds.Length > 0)
+                json.Add("parkingProductIds",  POIJSON.IdsToJSON(ParkingProductIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -270,6 +281,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIJSON.TryParseIds(JSON, "parkingProductIds", "parking product identification", ParkingProduct_Id.TryParse, out ImmutableArray<ParkingProduct_Id> parkingProductIds, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -286,6 +300,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 parkingGarageId,
                                                 parkingSensorIds,
                                                 chargingStationIds,
+                                                parkingProductIds,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,
