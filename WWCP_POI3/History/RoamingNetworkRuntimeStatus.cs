@@ -337,11 +337,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The current admin status and status of all entities of the head version, without old values.
         /// </summary>
         public IReadOnlyList<POIStatusUpdate> All
-        {
-            get
-            {
 
-                var network   = history.Head.RoamingNetwork;
+            => Of(history.Head.RoamingNetwork);
+
+        #endregion
+
+        #region (internal static) Of(RoamingNetwork)
+
+        /// <summary>
+        /// The current admin status and status of all entities of the given version, without old values.
+        /// </summary>
+        internal static IReadOnlyList<POIStatusUpdate> Of(RoamingNetwork RoamingNetwork)
+        {
+
+                var network   = RoamingNetwork;
                 var statuses  = new List<POIStatusUpdate>();
 
                 Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), network.Id.ToString(), network.CurrentAdminStatus);
@@ -359,7 +368,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            ThenBy (status => status.Kind).
                            ToArray();
 
-            }
         }
 
         private static void Add<T>(List<POIStatusUpdate>  Statuses,
@@ -374,6 +382,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (internal) TryTake(StatusUpdates, out ErrorResponse)
+
+        /// <summary>
+        /// Take the given statuses of the leading server as they are, e.g. those of a snapshot.
+        /// A status of an unknown entity or an invalid one refuses all after it.
+        /// </summary>
+        internal Boolean TryTake(IEnumerable<POIStatusUpdate>      StatusUpdates,
+                                 [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            foreach (var statusUpdate in StatusUpdates)
+            {
+                if (TryUpdate(statusUpdate, out var error) == POIStatusUpdateResult.Refused)
+                {
+                    ErrorResponse = error ?? "Invalid runtime status!";
+                    return false;
+                }
+            }
+
+            ErrorResponse = null;
+            return true;
+
+        }
+
+        #endregion
 
         #region (internal) Attach(RoamingNetwork)
 

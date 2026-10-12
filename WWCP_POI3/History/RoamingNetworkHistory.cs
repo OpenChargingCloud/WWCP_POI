@@ -244,7 +244,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return TryFromSnapshot(roamingNetwork,
                                        commit,
                                        out History,
-                                       out ErrorResponse);
+                                       out ErrorResponse) &&
+
+                       TryTakeRuntimeStatus(ref History,
+                                            Snapshot["runtimeStatus"],
+                                            out ErrorResponse);
 
             }
             catch (Exception e)
@@ -344,42 +348,58 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToSnapshotJSON()
+        #region ToSnapshotJSON(IncludeRuntimeStatus = true)
 
         /// <summary>
-        /// A snapshot of the head: its commit and the complete version of the roaming network,
-        /// from which another server starts its history.
+        /// A snapshot of the head, now and complete: its commit, the complete version of the roaming network,
+        /// and the current admin status and status of its entities, from which another server starts its history.
+        /// The commit and the network can be verified by the ETags of the commit; the runtime status is not content.
         /// </summary>
-        public JObject ToSnapshotJSON()
+        /// <param name="IncludeRuntimeStatus">Whether to include the runtime status.</param>
+        public JObject ToSnapshotJSON(Boolean IncludeRuntimeStatus = true)
         {
 
             var head = Head;
 
-            return new JObject(
-                       new JProperty("commit",          head.Commit.ToJSON()),
-                       new JProperty("roamingNetwork",  head.RoamingNetwork.ToJSON())
-                   );
+            var json = new JObject(
+                           new JProperty("timestamp",       Timestamp.Now.ToISO8601()),
+                           new JProperty("commit",          head.Commit.ToJSON()),
+                           new JProperty("roamingNetwork",  head.RoamingNetwork.ToJSON())
+                       );
+
+            if (IncludeRuntimeStatus)
+                json.Add("runtimeStatus", new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON())));
+
+            return json;
 
         }
 
         #endregion
 
 
-        #region ToSnapshotCBOR()
+        #region ToSnapshotCBOR(IncludeRuntimeStatus = true)
 
         /// <summary>
-        /// A snapshot of the head in CBOR: its commit and the complete version of the roaming network,
-        /// with the keys of the JSON snapshot. Write it with CBORWriterOptions.Canonical for deterministic bytes.
+        /// A snapshot of the head in CBOR, see ToSnapshotJSON(), with the keys of the JSON snapshot.
+        /// Write it with CBORWriterOptions.Canonical for deterministic bytes.
         /// </summary>
-        public CBORValue ToSnapshotCBOR()
+        /// <param name="IncludeRuntimeStatus">Whether to include the runtime status.</param>
+        public CBORValue ToSnapshotCBOR(Boolean IncludeRuntimeStatus = true)
         {
 
-            var head = Head;
+            var head     = Head;
 
-            return CBORValue.FromMap([
-                       new (CBORValue.FromText("commit"),          head.Commit.ToCBOR()),
-                       new (CBORValue.FromText("roamingNetwork"),  head.RoamingNetwork.ToCBOR())
-                   ]);
+            var entries  = new List<KeyValuePair<CBORValue, CBORValue>> {
+                               new (CBORValue.FromText("timestamp"),       CBORValue.FromText(Timestamp.Now.ToISO8601())),
+                               new (CBORValue.FromText("commit"),          head.Commit.ToCBOR()),
+                               new (CBORValue.FromText("roamingNetwork"),  head.RoamingNetwork.ToCBOR())
+                           };
+
+            if (IncludeRuntimeStatus)
+                entries.Add(new (CBORValue.FromText("runtimeStatus"),
+                                 CBORJSON.ToCBOR(new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON())))));
+
+            return CBORValue.FromMap(entries);
 
         }
 
@@ -424,7 +444,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return TryFromSnapshot(roamingNetwork,
                                        commit,
                                        out History,
-                                       out ErrorResponse);
+                                       out ErrorResponse) &&
+
+                       TryTakeRuntimeStatus(ref History,
+                                            Snapshot.TryGetValue(CBORValue.FromText("runtimeStatus"), out var runtimeStatusCBOR)
+                                                ? CBORJSON.ToJSON(runtimeStatusCBOR)
+                                                : null,
+                                            out ErrorResponse);
 
             }
             catch (Exception e)
@@ -432,6 +458,60 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ErrorResponse = e.Message;
                 return false;
             }
+
+        }
+
+        #endregion
+
+
+        #region (private static) TryTakeRuntimeStatus(ref History, RuntimeStatus, out ErrorResponse)
+
+        /// <summary>
+        /// Take the runtime status of a snapshot, if it has one, as it is: the leader's.
+        /// An invalid one refuses the snapshot.
+        /// </summary>
+        private static Boolean TryTakeRuntimeStatus([NotNullWhen(true)] ref RoamingNetworkHistory?  History,
+                                                    JToken?                                         RuntimeStatus,
+                                                    [NotNullWhen(false)] out String?                ErrorResponse)
+        {
+
+            ErrorResponse = null;
+
+            if (RuntimeStatus is null || RuntimeStatus.Type == JTokenType.Null)
+                return History is not null;
+
+            if (RuntimeStatus is not JArray runtimeStatusJSON)
+            {
+                History        = null;
+                ErrorResponse  = "The runtime status of the snapshot must be an array!";
+                return false;
+            }
+
+            var statusUpdates = new List<POIStatusUpdate>();
+
+            foreach (var statusJSON in runtimeStatusJSON)
+            {
+
+                if (statusJSON is not JObject statusObject ||
+                    !POIStatusUpdate.TryParse(statusObject, out var statusUpdate, out var statusError))
+                {
+                    History        = null;
+                    ErrorResponse  = "Invalid runtime status of the snapshot!";
+                    return false;
+                }
+
+                statusUpdates.Add(statusUpdate);
+
+            }
+
+            if (!History!.RuntimeStatus.TryTake(statusUpdates, out var takeError))
+            {
+                History        = null;
+                ErrorResponse  = "Invalid runtime status of the snapshot: " + takeError;
+                return false;
+            }
+
+            return true;
 
         }
 

@@ -461,6 +461,40 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region The_snapshot_brings_the_runtime_status()
+
+        [Test]
+        public async Task The_snapshot_brings_the_runtime_status()
+        {
+
+            leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, nameof(RoamingNetwork), "rn1", "offline", DateTimeOffset.Parse("2026-10-11T12:00:00Z"), out _, out _);
+
+            var withStatus     = await Get("snapshot");
+            var withoutStatus  = await Get("snapshot?runtimeStatus=false");
+            var invalid        = await Get("snapshot?runtimeStatus=maybe");
+            var inCBOR         = await GetCBOR("snapshot");
+
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(withStatus.Text, out var follower, out var error),  Is.True, error);
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(inCBOR.CBOR,     out var followerCBOR, out var errorCBOR),  Is.True, errorCBOR);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(JObject.Parse(withStatus.Text)["runtimeStatus"]!.Count(),  Is.EqualTo(2));
+                Assert.That(JObject.Parse(withoutStatus.Text)["runtimeStatus"],        Is.Null);
+                Assert.That(invalid.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
+
+                Assert.That(follower!.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, nameof(RoamingNetwork), "rn1", out var status),  Is.True);
+                Assert.That(status!.Value,                                             Is.EqualTo("offline"));
+                Assert.That(followerCBOR!.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, nameof(RoamingNetwork), "rn1", out var statusCBOR),  Is.True);
+                Assert.That(statusCBOR!.Value,                                         Is.EqualTo("offline"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Errors_are_answered_in_JSON()
 
         [Test]

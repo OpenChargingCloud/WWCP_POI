@@ -48,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     /// <remarks>
     /// GET    ~/roamingNetworks/{roamingNetworkId}/history/head                                  the metadata of the head commit
-    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/snapshot                              the head commit and the complete roaming network
+    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/snapshot?runtimeStatus=false          the head commit, the complete roaming network and its runtime status
     /// GET    ~/roamingNetworks/{roamingNetworkId}/history/commitInfos?since={commitId}&amp;max={n}   the metadata of the commits since, without changes
     /// GET    ~/roamingNetworks/{roamingNetworkId}/history/commits?since={commitId}&amp;max={n}       the complete commits since
     /// GET    ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}                    one complete commit
@@ -174,9 +174,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        HTTPMethod:    HTTPMethod.GET,
                        HTTPDelegate:  request => Task.FromResult(
 
-                           TryGetHistory(request, out var roamingNetworkHistory, out var errorResponse)
-                               ? JSONResponse(request, HTTPStatusCode.OK, roamingNetworkHistory.ToSnapshotJSON(), roamingNetworkHistory.ToSnapshotCBOR)
-                               : errorResponse
+                           !TryGetHistory(request, out var roamingNetworkHistory, out var errorResponse)
+                               ? errorResponse
+
+                               : request.QueryString.GetString("runtimeStatus") is String runtimeStatusText &&
+                                 runtimeStatusText is not ("true" or "false")
+                                     ? ErrorResponse(request, HTTPStatusCode.BadRequest, $"Invalid runtimeStatus option '{runtimeStatusText}'; use true or false!")
+
+                                     : SnapshotResponse(request, roamingNetworkHistory, request.QueryString.GetString("runtimeStatus") != "false")
 
                        ));
 
@@ -347,6 +352,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    };
 
         }
+
+        #endregion
+
+        #region (private static) SnapshotResponse(Request, History, IncludeRuntimeStatus)
+
+        /// <summary>
+        /// A snapshot of the head of the given history, in JSON or in CBOR as the request prefers.
+        /// </summary>
+        private static HTTPResponse SnapshotResponse(HTTPRequest            Request,
+                                                     RoamingNetworkHistory  History,
+                                                     Boolean                IncludeRuntimeStatus)
+
+            => WantsCBOR(Request)
+                   ? JSONResponse(Request, HTTPStatusCode.OK, new JObject(), () => History.ToSnapshotCBOR(IncludeRuntimeStatus))
+                   : JSONResponse(Request, HTTPStatusCode.OK, History.ToSnapshotJSON(IncludeRuntimeStatus));
 
         #endregion
 

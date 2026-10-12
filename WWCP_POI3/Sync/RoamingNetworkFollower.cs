@@ -66,7 +66,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     /// <remarks>
     /// After connecting it subscribes first, so that nothing gets lost, then starts from a snapshot when it has
-    /// no history yet, catches up with the commits since its head, and takes the current runtime status.
+    /// no history yet, catches up with the commits since its head, and takes the current runtime status:
+    /// from the snapshot, or asked for when it continued its history.
     /// Afterwards it appends the pushed commits; a commit that does not follow its head, or one only announced,
     /// makes it catch up again. A head the leader does not know makes it start again from a snapshot.
     /// When the connection breaks it connects again, waiting longer after every failure, and catches up.
@@ -84,6 +85,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private          CancellationTokenSource?       stop;
         private          Task?                          runner;
         private          Int64                          reconnects;
+        private          Boolean                        statusFromSnapshot;
 
         #endregion
 
@@ -394,12 +396,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             await Expect(Connection, "subscribe", new JObject(new JProperty("topics", topics)), CancellationToken);
 
+            statusFromSnapshot = false;
+
             if (History is null)
                 await StartFromSnapshotAsync(Connection, CancellationToken);
 
             await CatchUpAsync(Connection, CancellationToken);
 
-            if (options.FollowStatus)
+            // A snapshot brought the runtime status of its moment; what changed since was pushed.
+            if (options.FollowStatus && !statusFromSnapshot)
             {
 
                 var runtimeStatus = await Expect(Connection, "runtimeStatus", [], CancellationToken);
@@ -574,12 +579,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   CancellationToken  CancellationToken)
         {
 
-            var snapshot = await Expect(Connection, "snapshot", [], CancellationToken);
+            var snapshot = await Expect(Connection,
+                                        "snapshot",
+                                        new JObject(new JProperty("runtimeStatus", options.FollowStatus)),
+                                        CancellationToken);
 
             if (!RoamingNetworkHistory.TryFromSnapshot(snapshot, out var newHistory, out var errorResponse, options.ChangeSetLimits))
                 throw new InvalidOperationException("Invalid snapshot of the leader: " + errorResponse);
 
             var oldHistory = Interlocked.Exchange(ref history, newHistory);
+
+            statusFromSnapshot = options.FollowStatus;
 
             OnHistoryReplaced?.Invoke(this, oldHistory, newHistory);
 

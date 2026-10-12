@@ -305,6 +305,86 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region Describe(Statuses)
+
+        private static String[] Describe(IEnumerable<POIStatusUpdate> Statuses)
+
+            => Statuses.Select(status => $"{status.EntityType} {status.EntityId} {status.Kind} {status.Value} {status.Timestamp:O}").ToArray();
+
+        #endregion
+
+        #region A_snapshot_brings_the_runtime_status_of_its_moment()
+
+        [Test]
+        public void A_snapshot_brings_the_runtime_status_of_its_moment()
+        {
+
+            var leader = NewHistory();
+
+            leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      Operator,               "DE*GEF", "offline",      T0, out _, out _);
+            leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), "rn1",    "outOfService", T0, out _, out _);
+
+            var snapshotJSON    = leader.ToSnapshotJSON();
+            var withoutStatus   = leader.ToSnapshotJSON(IncludeRuntimeStatus: false);
+
+            var fromJSON        = RoamingNetworkHistory.TryFromSnapshot(snapshotJSON.ToString(),  out var followerJSON,  out var errorJSON);
+            var fromCBOR        = RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotCBOR(),  out var followerCBOR,  out var errorCBOR);
+            var fromNoStatus    = RoamingNetworkHistory.TryFromSnapshot(withoutStatus,            out var followerPlain, out var errorPlain);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(fromJSON,                                         Is.True, errorJSON);
+                Assert.That(fromCBOR,                                         Is.True, errorCBOR);
+                Assert.That(fromNoStatus,                                     Is.True, errorPlain);
+
+                Assert.That(snapshotJSON["timestamp"],                        Is.Not.Null);
+                Assert.That(snapshotJSON["runtimeStatus"]!.Count(),           Is.EqualTo(4));
+                Assert.That(withoutStatus["runtimeStatus"],                   Is.Null);
+
+                // The leader's status, with the leader's timestamps.
+                Assert.That(Describe(followerJSON!.RuntimeStatus.All),        Is.EqualTo(Describe(leader.RuntimeStatus.All)));
+                Assert.That(Describe(followerCBOR!.RuntimeStatus.All),        Is.EqualTo(Describe(leader.RuntimeStatus.All)));
+
+                // Without it: as new, since the creation.
+                Assert.That(followerPlain!.RuntimeStatus.All.Select(status => status.Timestamp),  Is.All.EqualTo(Created));
+
+            }
+
+        }
+
+        #endregion
+
+        #region An_invalid_runtime_status_refuses_the_snapshot()
+
+        [Test]
+        public void An_invalid_runtime_status_refuses_the_snapshot()
+        {
+
+            var leader            = NewHistory();
+
+            var unknownEntity     = leader.ToSnapshotJSON();
+            unknownEntity["runtimeStatus"]![0]!["entityId"] = "DE*XYZ";
+
+            var invalidStatus     = leader.ToSnapshotJSON();
+            invalidStatus["runtimeStatus"]![0]!["value"] = " ";
+
+            var noArray           = leader.ToSnapshotJSON();
+            noArray["runtimeStatus"] = "all fine";
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(RoamingNetworkHistory.TryFromSnapshot(unknownEntity, out var history1, out var error1),  Is.False);
+                Assert.That(error1,                                                                                Does.Contain("runtime status"));
+                Assert.That(history1,                                                                              Is.Null);
+                Assert.That(RoamingNetworkHistory.TryFromSnapshot(invalidStatus, out _,            out _),           Is.False);
+                Assert.That(RoamingNetworkHistory.TryFromSnapshot(noArray,       out _,            out _),           Is.False);
+            }
+
+        }
+
+        #endregion
+
         #region A_follower_takes_the_status_updates_of_the_leader()
 
         [Test]

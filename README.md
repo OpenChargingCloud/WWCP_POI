@@ -30,17 +30,28 @@ A change set is an ordered list of changes against one version, named by its bef
 leading to the version named by its after ETags.
 
 ```csharp
+var gef = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"),
+                                      I18NString.Create(Languages.en, "GraphDefined"));
+
+var rn1 = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
+                             DataSource:                "v1",
+                             ChargingStationOperators:  [ gef ]);
+
+var bdo = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*BDO"));
+
 var cs  = rn1.CreateChangeSet([
-              RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "v2"),
-              RoamingNetworkChange.Add           (newOperator),
-              RoamingNetworkChange.UpdateProperty(gef, "telephone", null, "+49 30 7654321")
+              RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "v2"),             // the network
+              RoamingNetworkChange.Add           (bdo),                                       // a new operator
+              RoamingNetworkChange.UpdateProperty(gef, "telephone",  null, "+49 30 7654321")  // the operator DE*GEF
           ]);
 
 var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 ```
 
 - **Changes:** `UpdateProperty`/`RemoveProperty` of the network (`name`, `description`, `dataSource`,
-  `dataLicenses`, `customData`) and of operators; `Add`/`Remove` of operators.
+  `dataLicenses`, `customData`) and of operators; `Add`/`Remove` of operators. The overload by the entity's
+  type names it: a change is data, `{entityType, entityId, propertyName, oldValue, newValue}`, applied
+  to the entity with that id in the version it is applied to.
 - **Old values:** `CreateChangeSet` gives every change the value it finds; JSON `null` means
   "expected absent". A change finding another value conflicts.
 - **Timestamps:** a change set sets `lastChange` to its `CreatedAt`, so its after ETags are deterministic.
@@ -64,8 +75,10 @@ follower.TryAppend(commits!, out _, out _);
 
 - **Commits:** a change set, its parent, its revision and the ETags of the result.
   The id is the SHA-256 of the commit's canonical JSON without signatures; it is checked when read.
-- **Followers** start from a snapshot (head commit and complete network) and append commits;
-  each must follow the head and lead to its ETags.
+- **Followers** start from a snapshot and append commits; each must follow the head and lead to its ETags.
+- **Snapshot:** now and complete, for the first sync: `{timestamp, commit, roamingNetwork, runtimeStatus}`.
+  `TryFromSnapshot` checks the commit id, recomputes the ETags of the network and takes the runtime status
+  as the leader's; changes follow as commits since. `runtimeStatus=false` leaves the status out.
 - **Announcements:** `OnCommitAnnouncement` tells of every commit a history takes, in order:
   timestamp, commit id, parent ids, revision, description.
 - **Runtime status:** `history.RuntimeStatus` sets and reads the status of the head's entities by name,
@@ -79,7 +92,7 @@ follower.TryAppend(commits!, out _, out _);
 | Request | Returns |
 |---|---|
 | `GET ~/roamingNetworks/{id}/history/head` | metadata of the head commit |
-| `GET ~/roamingNetworks/{id}/history/snapshot` | head commit and complete network |
+| `GET ~/roamingNetworks/{id}/history/snapshot?runtimeStatus=false` | head commit, complete network and its runtime status |
 | `GET ~/roamingNetworks/{id}/history/commitInfos?since={commitId}&max={n}` | metadata of the commits since |
 | `GET ~/roamingNetworks/{id}/history/commits?since={commitId}&max={n}` | complete commits since |
 | `GET ~/roamingNetworks/{id}/history/commits/{commitId}` | one commit |
@@ -126,8 +139,11 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 await using var follower = new RoamingNetworkFollower(new Uri("wss://leader/roamingNetworks/rn1/history/ws"));
 await follower.StartAsync();                     // returns once caught up for the first time
 
-follower.History!.Head.RoamingNetwork;           // the current version
-await follower.CommitChangeSetAsync(changeSet);  // to the leader; it comes back as a commit
+var current = follower.History!.Head.RoamingNetwork;         // the current version
+
+await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader; it comes back as a commit
+          RoamingNetworkChange.UpdateProperty(current, "dataSource", null, "v3")
+      ]));
 ```
 
 - **Sync:** subscribe first, then a snapshot (when it has no history yet), the commits since its head,

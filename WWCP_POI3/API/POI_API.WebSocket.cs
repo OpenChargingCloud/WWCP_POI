@@ -52,7 +52,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///
     /// Action            Request payload                            Response payload
     /// head              {}                                         the metadata of the head commit
-    /// snapshot          {}                                         the head commit and the complete roaming network
+    /// snapshot          { runtimeStatus? }                         the head commit, the complete roaming network and, unless
+    ///                                                              runtimeStatus is false, its runtime status
     /// commitInfos       { since?, max? }                           { commitInfos: [ … ] }
     /// commits           { since?, max? }                           { commits:     [ … ] }
     /// commit            { commitId }                               the complete commit
@@ -228,14 +229,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region snapshot
 
-            webSocketServer.AddCommand("snapshot", request =>
+            webSocketServer.AddCommand("snapshot", request => {
 
-                Task.FromResult(
-                    request.Respond(History.ToSnapshotJSON,
-                                    History.ToSnapshotCBOR)
-                )
+                var includeRuntimeStatus = true;
 
-            );
+                if (request.Payload.ParseOptional("runtimeStatus",
+                                                  "include runtime status",
+                                                  out Boolean? runtimeStatus,
+                                                  out var errorResponse))
+                {
+
+                    if (errorResponse is not null)
+                        return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, errorResponse));
+
+                    includeRuntimeStatus = runtimeStatus!.Value;
+
+                }
+
+                return Task.FromResult(
+                           request.Respond(() => History.ToSnapshotJSON(includeRuntimeStatus),
+                                           () => History.ToSnapshotCBOR(includeRuntimeStatus))
+                       );
+
+            });
 
             #endregion
 
