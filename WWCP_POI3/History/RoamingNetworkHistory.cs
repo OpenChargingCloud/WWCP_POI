@@ -184,6 +184,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.head              = new RoamingNetworkHead(Root, RoamingNetwork);
             this.RuntimeStatus     = new RoamingNetworkRuntimeStatus(this);
 
+            RuntimeStatus.Attach(RoamingNetwork);
+
             Remember(Root);
 
         }
@@ -620,7 +622,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Take the commit of the given new head, while the history is locked:
-        /// remember it, move the head, drop the runtime status of removed entities, and announce it.
+        /// remember it, move the head, follow the status of its entities, and announce it.
         /// </summary>
         private void Advance(RoamingNetworkHead NewHead)
         {
@@ -628,7 +630,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Remember(NewHead.Commit);
             Volatile.Write(ref head, NewHead);
 
-            RuntimeStatus.Prune(NewHead.RoamingNetwork);
+            RuntimeStatus.Attach(NewHead.RoamingNetwork);
 
             var announcement = new RoamingNetworkCommitAnnouncement(NewHead.Commit, Timestamp.Now);
 

@@ -198,8 +198,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             : base(Id,
                    Name,
                    Description,
-                   InitialAdminStatus         ?? RoamingNetworkAdminStatusType.Operational,
-                   InitialStatus              ?? RoamingNetworkStatusType.Available,
+                   // Since its creation, unless told otherwise.
+                   new Timestamped<RoamingNetworkAdminStatusType>(Created ?? Timestamp.Now, InitialAdminStatus ?? RoamingNetworkAdminStatusType.Operational),
+                   new Timestamped<RoamingNetworkStatusType>     (Created ?? Timestamp.Now, InitialStatus      ?? RoamingNetworkStatusType.Available),
                    MaxAdminStatusScheduleSize ?? DefaultMaxAdminStatusScheduleSize,
                    MaxStatusScheduleSize      ?? DefaultMaxStatusScheduleSize,
                    DataSource,
@@ -234,22 +235,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region Link events
-
-            this.adminStatusSchedule.OnStatusChanged += async (timestamp, eventTrackingId, statusSchedule, newStatus, oldStatus, dataSource) => {
-                var onAdminStatusChanged = OnAdminStatusChanged;
-                if (onAdminStatusChanged is not null)
-                    await onAdminStatusChanged(timestamp, eventTrackingId, this, newStatus, oldStatus, dataSource);
-            };
-
-            this.statusSchedule.     OnStatusChanged += async (timestamp, eventTrackingId, statusSchedule, newStatus, oldStatus, dataSource) => {
-                var onStatusChanged = OnStatusChanged;
-                if (onStatusChanged is not null)
-                    await onStatusChanged(timestamp, eventTrackingId, this, newStatus, oldStatus, dataSource);
-            };
-
-            #endregion
-
         }
 
         #endregion
@@ -257,15 +242,91 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data/(Admin-)Status management
 
+        private readonly Lock                                     statusEventsLock  = new ();
+        private          OnRoamingNetworkStatusChangedDelegate?       onStatusChanged;
+        private          OnRoamingNetworkAdminStatusChangedDelegate?  onAdminStatusChanged;
+
         /// <summary>
         /// An event fired whenever the dynamic status changed.
         /// </summary>
-        public event OnRoamingNetworkStatusChangedDelegate?       OnStatusChanged;
+        public event OnRoamingNetworkStatusChangedDelegate?       OnStatusChanged
+        {
+
+            add
+            {
+                lock (statusEventsLock)
+                {
+                    onStatusChanged += value;
+                    ListenToStatus(onStatusChanged is not null);
+                }
+            }
+
+            remove
+            {
+                lock (statusEventsLock)
+                {
+                    onStatusChanged -= value;
+                    ListenToStatus(onStatusChanged is not null);
+                }
+            }
+
+        }
 
         /// <summary>
         /// An event fired whenever the admin status changed.
         /// </summary>
-        public event OnRoamingNetworkAdminStatusChangedDelegate?  OnAdminStatusChanged;
+        public event OnRoamingNetworkAdminStatusChangedDelegate?  OnAdminStatusChanged
+        {
+
+            add
+            {
+                lock (statusEventsLock)
+                {
+                    onAdminStatusChanged += value;
+                    ListenToAdminStatus(onAdminStatusChanged is not null);
+                }
+            }
+
+            remove
+            {
+                lock (statusEventsLock)
+                {
+                    onAdminStatusChanged -= value;
+                    ListenToAdminStatus(onAdminStatusChanged is not null);
+                }
+            }
+
+        }
+
+        /// <inheritdoc/>
+        protected override async Task OnAdminStatusScheduleChanged(DateTimeOffset                              Timestamp,
+                                                                   EventTracking_Id                            EventTrackingId,
+                                                                   Timestamped<RoamingNetworkAdminStatusType>  NewStatus,
+                                                                   Timestamped<RoamingNetworkAdminStatusType>  OldStatus,
+                                                                   Context?                                    DataSource)
+        {
+
+            var onAdminStatusChanged = this.onAdminStatusChanged;
+
+            if (onAdminStatusChanged is not null)
+                await onAdminStatusChanged(Timestamp, EventTrackingId, this, NewStatus, OldStatus, DataSource);
+
+        }
+
+        /// <inheritdoc/>
+        protected override async Task OnStatusScheduleChanged(DateTimeOffset                         Timestamp,
+                                                              EventTracking_Id                       EventTrackingId,
+                                                              Timestamped<RoamingNetworkStatusType>  NewStatus,
+                                                              Timestamped<RoamingNetworkStatusType>  OldStatus,
+                                                              Context?                               DataSource)
+        {
+
+            var onStatusChanged = this.onStatusChanged;
+
+            if (onStatusChanged is not null)
+                await onStatusChanged(Timestamp, EventTrackingId, this, NewStatus, OldStatus, DataSource);
+
+        }
 
         #endregion
 

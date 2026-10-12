@@ -59,8 +59,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// commitChangeSet   { changeSet, expectedHead?, rebase? }      { status, … }: Published or AlreadyPublished with the metadata of
     ///                                                              the commit and "rebased", HeadMoved with the head, Refused
     /// runtimeStatus     {}                                         { runtimeStatus: [ … ] }: the current admin status and status
-    /// setStatus         { kind, entityType, entityId, value,       { result, description?, current? }: Updated, Unchanged, Outdated
-    ///                     timestamp?, dataSource? }                or Refused, and the current status afterwards
+    /// setStatus         { kind, entityType, entityId, value,       { result, description?, current? }: Updated, Unchanged, Outdated,
+    ///                     timestamp?, dataSource? }                Scheduled or Refused, and the current status afterwards
     /// topics            {}                                         { topics: [ { name, action, description } ] }
     /// subscribe         { topics: [ … ] }                          { topics: [ … ] }: all topics subscribed now
     /// unsubscribe       { topics: [ … ] }                          { topics: [ … ] }

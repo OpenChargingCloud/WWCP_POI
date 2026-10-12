@@ -19,8 +19,10 @@ Charging pools, stations, EVSEs and e-mobility providers follow.
   timestamps to the millisecond. CBOR uses the keys and values of JSON.
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
   They identify a version; `CalcETags()` and `ValidateETags(…)`.
-- **Runtime:** admin status and status are not content and have no ETags,
-  see `RuntimeStatus` of a history below.
+- **Runtime:** admin status and status are not content and have no ETags. Each entity keeps them
+  typed in its status schedules (history and planned status), shared by all its versions:
+  a change set takes them along, with the internal data. New entities are operational and
+  available since their creation.
 
 ## Change sets
 
@@ -66,9 +68,11 @@ follower.TryAppend(commits!, out _, out _);
   each must follow the head and lead to its ETags.
 - **Announcements:** `OnCommitAnnouncement` tells of every commit a history takes, in order:
   timestamp, commit id, parent ids, revision, description.
-- **Runtime status:** `history.RuntimeStatus.TryUpdate(kind, entityType, entityId, value, timestamp, …)`
-  for the network and its operators; kept across versions, dropped with its entity.
-  An older timestamp is `Outdated`, the same value `Unchanged`; `OnStatusUpdate` tells of the rest.
+- **Runtime status:** `history.RuntimeStatus` sets and reads the status of the head's entities by name,
+  `TryUpdate(kind, entityType, entityId, value, timestamp, …)`: an older timestamp is `Outdated`,
+  the same value `Unchanged`, a later one than now `Scheduled`. `OnStatusUpdate` tells of every change,
+  also of one set at the entity, and of a planned status when it is due. A status update of the leader,
+  `TryUpdate(statusUpdate, …)`, is taken with its timestamp.
 
 `POI_API` serves a history in JSON, or in CBOR for `Accept: application/cbor` (also as request body):
 

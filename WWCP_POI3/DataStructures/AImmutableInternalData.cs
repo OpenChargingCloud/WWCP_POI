@@ -28,7 +28,7 @@ public abstract class AImmutableInternalData : IImmutableInternalData
 {
     private readonly CustomDataNew customData;
     public CustomDataNew CustomData => customData.Clone();
-    public UserDefinedDictionary InternalData { get; }
+    public UserDefinedDictionary InternalData { get; private set; }
     public DateTimeOffset Created { get; private set; }
     public DateTimeOffset LastChangeDate { get; private set; }
     public Boolean IsEmpty => InternalData.IsEmpty;
@@ -44,6 +44,12 @@ public abstract class AImmutableInternalData : IImmutableInternalData
         this.customData = (customData ?? CustomDataNew.Empty).Clone();
         InternalData = internalData ?? new UserDefinedDictionary();
     }
+
+    /// <summary>
+    /// Take the internal data of the given previous version of this entity: runtime context, not content.
+    /// </summary>
+    protected void ShareInternalDataOf(AImmutableInternalData Previous)
+        => InternalData = Previous.InternalData;
 
     protected void RestoreTimestamps(DateTimeOffset created, DateTimeOffset lastChange)
     {

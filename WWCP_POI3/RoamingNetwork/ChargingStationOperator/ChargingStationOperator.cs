@@ -507,8 +507,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    Name ?? I18NString.Create("Charging Station Operator " + Id.ToString()),
                    Description,
 
-                   InitialAdminStatus         ?? ChargingStationOperatorAdminStatusType.Operational,
-                   InitialStatus              ?? ChargingStationOperatorStatusType.Available,
+                   // Since its creation, unless told otherwise.
+                   InitialAdminStatus         ?? new Timestamped<ChargingStationOperatorAdminStatusType>(Created ?? Timestamp.Now, ChargingStationOperatorAdminStatusType.Operational),
+                   InitialStatus              ?? new Timestamped<ChargingStationOperatorStatusType>     (Created ?? Timestamp.Now, ChargingStationOperatorStatusType.Available),
                    MaxAdminStatusScheduleSize ?? DefaultMaxChargingStationOperatorAdminStatusScheduleSize,
                    MaxStatusScheduleSize      ?? DefaultMaxChargingStationOperatorStatusScheduleSize,
 
@@ -543,16 +544,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.immutableDataLicenses  = [.. dataLicenses.Ordered()];
 
-            #region Link events
-
-            this.adminStatusSchedule.OnStatusChanged += (timestamp, eventTrackingId, statusSchedule, newStatus, oldStatus, dataSource)
-                                                          => UpdateAdminStatus(timestamp, eventTrackingId, oldStatus, newStatus);
-
-            this.statusSchedule.     OnStatusChanged += (timestamp, eventTrackingId, statusSchedule, newStatus, oldStatus, dataSource)
-                                                          => UpdateStatus     (timestamp, eventTrackingId, oldStatus, newStatus);
-
-            #endregion
-
         }
 
         #endregion
@@ -567,15 +558,79 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public event OnChargingStationOperatorDataChangedDelegate?         OnDataChanged;
 
+        private readonly Lock                                                statusEventsLock  = new ();
+        private          OnChargingStationOperatorAdminStatusChangedDelegate?  onAdminStatusChanged;
+        private          OnChargingStationOperatorStatusChangedDelegate?       onStatusChanged;
+
         /// <summary>
         /// An event fired whenever the admin status changed.
         /// </summary>
-        public event OnChargingStationOperatorAdminStatusChangedDelegate?  OnAdminStatusChanged;
+        public event OnChargingStationOperatorAdminStatusChangedDelegate?  OnAdminStatusChanged
+        {
+
+            add
+            {
+                lock (statusEventsLock)
+                {
+                    onAdminStatusChanged += value;
+                    ListenToAdminStatus(onAdminStatusChanged is not null);
+                }
+            }
+
+            remove
+            {
+                lock (statusEventsLock)
+                {
+                    onAdminStatusChanged -= value;
+                    ListenToAdminStatus(onAdminStatusChanged is not null);
+                }
+            }
+
+        }
 
         /// <summary>
         /// An event fired whenever the dynamic status changed.
         /// </summary>
-        public event OnChargingStationOperatorStatusChangedDelegate?       OnStatusChanged;
+        public event OnChargingStationOperatorStatusChangedDelegate?       OnStatusChanged
+        {
+
+            add
+            {
+                lock (statusEventsLock)
+                {
+                    onStatusChanged += value;
+                    ListenToStatus(onStatusChanged is not null);
+                }
+            }
+
+            remove
+            {
+                lock (statusEventsLock)
+                {
+                    onStatusChanged -= value;
+                    ListenToStatus(onStatusChanged is not null);
+                }
+            }
+
+        }
+
+        /// <inheritdoc/>
+        protected override Task OnAdminStatusScheduleChanged(DateTimeOffset                                       Timestamp,
+                                                             EventTracking_Id                                     EventTrackingId,
+                                                             Timestamped<ChargingStationOperatorAdminStatusType>  NewStatus,
+                                                             Timestamped<ChargingStationOperatorAdminStatusType>  OldStatus,
+                                                             Context?                                             DataSource)
+
+            => UpdateAdminStatus(Timestamp, EventTrackingId, OldStatus, NewStatus);
+
+        /// <inheritdoc/>
+        protected override Task OnStatusScheduleChanged(DateTimeOffset                                  Timestamp,
+                                                        EventTracking_Id                                EventTrackingId,
+                                                        Timestamped<ChargingStationOperatorStatusType>  NewStatus,
+                                                        Timestamped<ChargingStationOperatorStatusType>  OldStatus,
+                                                        Context?                                        DataSource)
+
+            => UpdateStatus(Timestamp, EventTrackingId, OldStatus, NewStatus);
 
         #endregion
 
@@ -627,7 +682,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               Timestamped<ChargingStationOperatorAdminStatusType>  NewStatus)
         {
 
-            var onAdminStatusChanged = OnAdminStatusChanged;
+            var onAdminStatusChanged = this.onAdminStatusChanged;
             if (onAdminStatusChanged is not null)
                 await onAdminStatusChanged(Timestamp,
                                            EventTrackingId,
@@ -654,7 +709,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          Timestamped<ChargingStationOperatorStatusType>  NewStatus)
         {
 
-            var onStatusChanged = OnStatusChanged;
+            var onStatusChanged = this.onStatusChanged;
             if (onStatusChanged is not null)
                 await onStatusChanged(Timestamp,
                                       EventTrackingId,

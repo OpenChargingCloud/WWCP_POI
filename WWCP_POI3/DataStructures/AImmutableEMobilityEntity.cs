@@ -63,6 +63,158 @@ namespace cloud.charging.open.protocols.WWCP.POI
             statusSchedule.MaxStatusHistorySize = sizes.Status;
         }
 
+        #region Runtime status shared by all versions
+
+        // The admin status and the status belong to the entity, not to one of its versions:
+        // a new version takes the schedules of the one before (ShareRuntimeOf), so all versions
+        // of an entity show the same, current status. A version raises its status events only while
+        // somebody listens to them, so that the versions nobody looks at any more are not kept alive
+        // by the schedules they share.
+
+        private readonly Lock  runtimeLock           = new ();
+        private          Boolean  listensToAdminStatus;
+        private          Boolean  listensToStatus;
+
+        /// <summary>
+        /// Take the admin status schedule, the status schedule and the internal data of the given
+        /// previous version of this entity. Only for a new version nobody listens to yet.
+        /// </summary>
+        /// <param name="Previous">The previous version of this entity.</param>
+        internal void ShareRuntimeOf(AImmutableEMobilityEntity<TId, TAdminStatus, TStatus> Previous)
+        {
+
+            if (ReferenceEquals(Previous, this))
+                return;
+
+            lock (runtimeLock)
+            {
+
+                if (listensToAdminStatus || listensToStatus)
+                    throw new InvalidOperationException("Only a new version nobody listens to yet can take the runtime status of the one before!");
+
+                adminStatusSchedule  = Previous.adminStatusSchedule;
+                statusSchedule       = Previous.statusSchedule;
+
+            }
+
+            ShareInternalDataOf(Previous);
+
+        }
+
+        /// <summary>
+        /// Raise the admin status events of this version while Listen is true.
+        /// Called by the events of a subclass when they get their first handler, or lose their last one.
+        /// </summary>
+        protected void ListenToAdminStatus(Boolean Listen)
+        {
+            lock (runtimeLock)
+            {
+
+                if (Listen == listensToAdminStatus)
+                    return;
+
+                if (Listen)
+                    adminStatusSchedule.OnStatusChanged += AdminStatusScheduleChanged;
+                else
+                    adminStatusSchedule.OnStatusChanged -= AdminStatusScheduleChanged;
+
+                listensToAdminStatus = Listen;
+
+            }
+        }
+
+        /// <summary>
+        /// Raise the status events of this version while Listen is true.
+        /// Called by the events of a subclass when they get their first handler, or lose their last one.
+        /// </summary>
+        protected void ListenToStatus(Boolean Listen)
+        {
+            lock (runtimeLock)
+            {
+
+                if (Listen == listensToStatus)
+                    return;
+
+                if (Listen)
+                    statusSchedule.OnStatusChanged += StatusScheduleChanged;
+                else
+                    statusSchedule.OnStatusChanged -= StatusScheduleChanged;
+
+                listensToStatus = Listen;
+
+            }
+        }
+
+        private Task AdminStatusScheduleChanged(DateTimeOffset                          Timestamp,
+                                                EventTracking_Id                        EventTrackingId,
+                                                RuntimeStatusSchedule<TAdminStatus>     Schedule,
+                                                Timestamped<TAdminStatus>               NewStatus,
+                                                Timestamped<TAdminStatus>               OldStatus,
+                                                Context?                                DataSource)
+
+            => OnAdminStatusScheduleChanged(Timestamp, EventTrackingId, NewStatus, OldStatus, DataSource);
+
+        private Task StatusScheduleChanged(DateTimeOffset                Timestamp,
+                                           EventTracking_Id              EventTrackingId,
+                                           RuntimeStatusSchedule<TStatus>  Schedule,
+                                           Timestamped<TStatus>          NewStatus,
+                                           Timestamped<TStatus>          OldStatus,
+                                           Context?                      DataSource)
+
+            => OnStatusScheduleChanged(Timestamp, EventTrackingId, NewStatus, OldStatus, DataSource);
+
+        /// <summary>
+        /// The current admin status changed: raise the admin status events of the subclass.
+        /// </summary>
+        protected virtual Task OnAdminStatusScheduleChanged(DateTimeOffset             Timestamp,
+                                                            EventTracking_Id           EventTrackingId,
+                                                            Timestamped<TAdminStatus>  NewStatus,
+                                                            Timestamped<TAdminStatus>  OldStatus,
+                                                            Context?                   DataSource)
+
+            => Task.CompletedTask;
+
+        /// <summary>
+        /// The current status changed: raise the status events of the subclass.
+        /// </summary>
+        protected virtual Task OnStatusScheduleChanged(DateTimeOffset        Timestamp,
+                                                       EventTracking_Id      EventTrackingId,
+                                                       Timestamped<TStatus>  NewStatus,
+                                                       Timestamped<TStatus>  OldStatus,
+                                                       Context?              DataSource)
+
+            => Task.CompletedTask;
+
+        /// <summary>
+        /// The current admin status, if there is one already.
+        /// </summary>
+        internal Timestamped<TAdminStatus>? CurrentAdminStatus
+            => adminStatusSchedule.Any(status => status.Timestamp <= Timestamp.Now)
+                   ? adminStatusSchedule.CurrentStatus
+                   : null;
+
+        /// <summary>
+        /// The current status, if there is one already.
+        /// </summary>
+        internal Timestamped<TStatus>? CurrentStatus
+            => statusSchedule.Any(status => status.Timestamp <= Timestamp.Now)
+                   ? statusSchedule.CurrentStatus
+                   : null;
+
+        /// <summary>
+        /// The next planned admin status, if any.
+        /// </summary>
+        internal Timestamped<TAdminStatus>? NextAdminStatus
+            => adminStatusSchedule.NextStatus;
+
+        /// <summary>
+        /// The next planned status, if any.
+        /// </summary>
+        internal Timestamped<TStatus>? NextStatus
+            => statusSchedule.NextStatus;
+
+        #endregion
+
         //internal void ApplyRuntimeStatus(Timestamped<TStatus> value, Timestamped<TStatus>? expected, POIRuntimeUpdateMode mode)
         //    => statusSchedule.ApplyRuntimeUpdate(value, expected, mode);
 
@@ -140,7 +292,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region AdminStatusSchedule
 
-        protected readonly RuntimeStatusSchedule<TAdminStatus> adminStatusSchedule;
+        protected RuntimeStatusSchedule<TAdminStatus> adminStatusSchedule;
 
         /// <summary>
         /// The charging station admin status schedule.
@@ -197,7 +349,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region StatusSchedule
 
-        protected readonly RuntimeStatusSchedule<TStatus> statusSchedule;
+        protected RuntimeStatusSchedule<TStatus> statusSchedule;
 
         /// <summary>
         /// The charging station status schedule.

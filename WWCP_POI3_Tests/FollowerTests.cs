@@ -39,7 +39,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
         #region Data
 
         private const           String          Operator  = nameof(ChargingStationOperator);
-        private static readonly DateTimeOffset  T0        = DateTimeOffset.Parse("2026-10-12T12:00:00Z");
+        private static readonly DateTimeOffset  T0        = DateTimeOffset.Parse("2026-10-11T12:00:00Z");
 
         private HTTPServer?              httpServer;
         private POI_API?                 poiAPI;
@@ -181,7 +181,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
             Publish("v1");
 
-            leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "available", T0, out _, out _);
+            leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "offline", T0, out _, out _);
 
             var replaced  = 0;
             var follower  = new RoamingNetworkFollower(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"));
@@ -195,20 +195,21 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             var initialStatus    = follower.History!.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, Operator, "DE*GEF", out var status) ? status.Value : null;
 
             Publish("v2");
-            leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, Operator, "DE*GEF", "operational", T0, out _, out _);
+            leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, Operator, "DE*GEF", "outOfService", T0, out _, out _);
 
             using (Assert.EnterMultipleScope())
             {
 
                 Assert.That(initiallyInSync,                Is.True);
                 Assert.That(replaced,                       Is.EqualTo(1));
-                Assert.That(initialStatus,                  Is.EqualTo("available"));
+                Assert.That(initialStatus,                  Is.EqualTo("offline"));
                 Assert.That(follower.IsConnected,           Is.True);
 
                 Assert.That(await Eventually(InSync),       Is.True, "The follower did not take the pushed commit.");
                 Assert.That(follower.History.Head.RoamingNetwork.DataSource,  Is.EqualTo("v2"));
 
-                Assert.That(await Eventually(() => follower.History.RuntimeStatus.TryGet(POIRuntimeStatusKind.AdminStatus, Operator, "DE*GEF", out _)),
+                Assert.That(await Eventually(() => follower.History.RuntimeStatus.TryGet(POIRuntimeStatusKind.AdminStatus, Operator, "DE*GEF", out var adminStatus) &&
+                                                   adminStatus.Value == "outOfService"),
                             Is.True,
                             "The follower did not take the pushed admin status.");
 
@@ -356,7 +357,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             poiAPI.AuthorizeStatusUpdate          = (request, login, statusUpdate)  => true;
 
             var published  = await follower.CommitChangeSetAsync(changeSet, ExpectedHeadId: head.Commit.Id);
-            var status     = await follower.SetStatusAsync(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "available", T0);
+            var status     = await follower.SetStatusAsync(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "offline", T0);
 
             using (Assert.EnterMultipleScope())
             {
@@ -368,7 +369,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                 // Back from the leader, as for every other follower.
                 Assert.That(await Eventually(InSync),                Is.True);
                 Assert.That(follower.History.Head.RoamingNetwork.DataSource,  Is.EqualTo("from the follower"));
-                Assert.That(await Eventually(() => follower.History.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, Operator, "DE*GEF", out _)),  Is.True);
+                Assert.That(await Eventually(() => follower.History.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, Operator, "DE*GEF", out var operatorStatus) &&
+                                                   operatorStatus.Value == "offline"),
+                            Is.True);
 
             }
 

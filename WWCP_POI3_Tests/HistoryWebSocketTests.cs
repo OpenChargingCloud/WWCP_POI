@@ -666,16 +666,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
             await client.Request("1", "subscribe", new JObject(new JProperty("topics", new JArray("statusUpdates", "adminStatusUpdates"))), Binary: true);
 
-            leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "available",    DateTimeOffset.Parse("2026-10-11T12:00:00Z"), out _, out _);
-            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), "rn1", "operational",  DateTimeOffset.Parse("2026-10-11T12:00:00Z"), out _, out _);
+            leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "offline",      DateTimeOffset.Parse("2026-10-11T12:00:00Z"), out _, out _);
+            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), "rn1", "outOfService", DateTimeOffset.Parse("2026-10-11T12:00:00Z"), out _, out _);
 
             var (status, statusBinary)  = await client.NextPush();
             var (admin,  _)             = await client.NextPush();
 
             var unsubscribed            = await client.Request("2", "unsubscribe", new JObject(new JProperty("topics", new JArray("statusUpdates"))));
 
-            leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "offline",      DateTimeOffset.Parse("2026-10-11T12:01:00Z"), out _, out _);
-            leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), "rn1", "outOfService", DateTimeOffset.Parse("2026-10-11T12:01:00Z"), out _, out _);
+            leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "available",    DateTimeOffset.Parse("2026-10-11T12:01:00Z"), out _, out _);
+            leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), "rn1", "operational",  DateTimeOffset.Parse("2026-10-11T12:01:00Z"), out _, out _);
 
             var (lastAdmin, _)          = await client.NextPush();
             var runtimeStatus           = await client.Request("3", "runtimeStatus");
@@ -685,14 +685,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
                 Assert.That(statusBinary,                                                       Is.True);
                 Assert.That(status.Action,                                                      Is.EqualTo("statusUpdate"));
-                Assert.That(status.GetPayloadJSON()!["value"]!.Value<String>(),                 Is.EqualTo("available"));
+                Assert.That(status.GetPayloadJSON()!["value"]!.Value<String>(),                 Is.EqualTo("offline"));
                 Assert.That(admin.Action,                                                       Is.EqualTo("adminStatusUpdate"));
 
                 Assert.That(unsubscribed.GetPayloadJSON()!["topics"]!.Values<String>(),         Is.EqualTo(new[] { "adminStatusUpdates" }));
 
                 // The status update after unsubscribing never came.
                 Assert.That(lastAdmin.Action,                                                   Is.EqualTo("adminStatusUpdate"));
-                Assert.That(lastAdmin.GetPayloadJSON()!["oldValue"]!.Value<String>(),           Is.EqualTo("operational"));
+                Assert.That(lastAdmin.GetPayloadJSON()!["oldValue"]!.Value<String>(),           Is.EqualTo("outOfService"));
                 Assert.That(client.Pushes.Reader.Count,                                         Is.Zero);
 
                 Assert.That(runtimeStatus.Payload!["runtimeStatus"]!.Count(),                   Is.EqualTo(2));
@@ -822,9 +822,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
             poiAPI!.AuthorizeStatusUpdate = (request, login, statusUpdate) => statusUpdate.EntityType == nameof(RoamingNetwork);
 
-            var updated     = await SetStatus(operatorClient, "2", "status", "available", "2026-10-11T12:00:00Z");
-            var unchanged   = await SetStatus(operatorClient, "3", "status", "available", "2026-10-11T12:05:00Z");
-            var outdated    = await SetStatus(operatorClient, "4", "status", "offline",   "2026-10-11T11:00:00Z");
+            var updated     = await SetStatus(operatorClient, "2", "status", "offline",   "2026-10-11T12:00:00Z");
+            var unchanged   = await SetStatus(operatorClient, "3", "status", "offline",   "2026-10-11T12:05:00Z");
+            var outdated    = await SetStatus(operatorClient, "4", "status", "available", "2026-10-11T11:00:00Z");
             var unknown     = await SetStatus(operatorClient, "5", "status", "available", "2026-10-11T12:00:00Z", EntityId: "rn2");
             var invalidKind = await SetStatus(operatorClient, "6", "energy", "available");
             var noValue     = await operatorClient.Request("7", "setStatus", new JObject(new JProperty("kind", "status"), new JProperty("entityType", nameof(RoamingNetwork)), new JProperty("entityId", "rn1")));
@@ -832,7 +832,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
                                                                                         new JProperty("entityType", nameof(ChargingStationOperator)),
                                                                                         new JProperty("entityId",   "DE*GEF"),
                                                                                         new JProperty("value",      "available")));
-            var now         = await SetStatus(operatorClient, "9", "adminStatus", "operational");
+            var now         = await SetStatus(operatorClient, "9", "adminStatus", "outOfService");
 
             var (push, _)   = await subscriber.NextPush();
 
@@ -842,10 +842,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
                 Assert.That(notEnabled.ErrorCode,                                    Is.EqualTo(POIWebSocketErrorCodes.SecurityError));
 
                 Assert.That(updated.Payload!["result"]!.Value<String>(),             Is.EqualTo("Updated"));
-                Assert.That(updated.Payload["current"]!["value"]!.Value<String>(),   Is.EqualTo("available"));
+                Assert.That(updated.Payload["current"]!["value"]!.Value<String>(),   Is.EqualTo("offline"));
                 Assert.That(unchanged.Payload!["result"]!.Value<String>(),           Is.EqualTo("Unchanged"));
                 Assert.That(outdated.Payload!["result"]!.Value<String>(),            Is.EqualTo("Outdated"));
-                Assert.That(outdated.Payload["current"]!["value"]!.Value<String>(),  Is.EqualTo("available"));
+                Assert.That(outdated.Payload["current"]!["value"]!.Value<String>(),  Is.EqualTo("offline"));
                 Assert.That(unknown.Payload!["result"]!.Value<String>(),             Is.EqualTo("Refused"));
                 Assert.That(unknown.Payload["current"],                              Is.Null);
 
@@ -858,7 +858,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
                 // One push for the one change of the status; the admin status is another topic.
                 Assert.That(push.Action,                                             Is.EqualTo("statusUpdate"));
-                Assert.That(push.Payload!["value"]!.Value<String>(),                 Is.EqualTo("available"));
+                Assert.That(push.Payload!["value"]!.Value<String>(),                 Is.EqualTo("offline"));
                 Assert.That(subscriber.Pushes.Reader.Count,                          Is.Zero);
 
                 Assert.That(leader!.RuntimeStatus.All.Count,                         Is.EqualTo(2));
@@ -896,10 +896,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
             await using var client = await Connect();
 
             var statuses  = await client.Request("1", "setStatus", new JObject(new JProperty("batch", new JArray(
-                                                                       StatusPayload("status",      "available",   "2026-10-11T12:00:00Z"),
+                                                                       StatusPayload("status",      "offline",      "2026-10-11T12:00:00Z"),
                                                                        StatusPayload("energy",      "available",   "2026-10-11T12:00:00Z"),
                                                                        "no object",
-                                                                       StatusPayload("adminStatus", "operational", "2026-10-11T12:00:00Z"),
+                                                                       StatusPayload("adminStatus", "outOfService", "2026-10-11T12:00:00Z"),
                                                                        StatusPayload("status",      "offline",     "2026-10-11T11:00:00Z")
                                                                    ))));
 
@@ -909,7 +909,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
             var inCBOR    = await client.Request("4", "setStatus",
                                                  Binary:       true,
                                                  PayloadCBOR:  CBORJSON.ToCBOR(new JObject(new JProperty("batch", new JArray(
-                                                                                     StatusPayload("status", "offline", "2026-10-11T12:01:00Z")
+                                                                                     StatusPayload("status", "available", "2026-10-11T12:01:00Z")
                                                                                  )))));
 
             var results   = statuses.Payload!["batch"]!;
@@ -954,10 +954,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
             var t0 = DateTimeOffset.Parse("2026-10-11T12:00:00Z");
 
-            leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "available",   t0,               out _, out _);
-            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "offline",     t0.AddMinutes(1), out _, out _);
-            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), "rn1", "operational", t0.AddMinutes(1), out _, out _);
-            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "available",   t0.AddMinutes(2), out _, out _);
+            leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "offline",      t0,               out _, out _);
+            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "available",    t0.AddMinutes(1), out _, out _);
+            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), "rn1", "outOfService", t0.AddMinutes(1), out _, out _);
+            leader.RuntimeStatus. TryUpdate(POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), "rn1", "offline",      t0.AddMinutes(2), out _, out _);
 
             var first   = (await everything.NextPush()).Message;
             var second  = (await everything.NextPush()).Message;
@@ -971,14 +971,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
                 // Aggregated as long as the action stays the same, in their order.
                 Assert.That(first.Action,                                                         Is.EqualTo("statusUpdate"));
-                Assert.That(first.Payload!["batch"]!.Select(update => update["value"]!.Value<String>()),  Is.EqualTo(new[] { "available", "offline" }));
+                Assert.That(first.Payload!["batch"]!.Select(update => update["value"]!.Value<String>()),  Is.EqualTo(new[] { "offline", "available" }));
                 Assert.That(second.Action,                                                        Is.EqualTo("adminStatusUpdate"));
-                Assert.That(second.Payload!["value"]!.Value<String>(),                            Is.EqualTo("operational"));
-                Assert.That(third.Payload!["value"]!.Value<String>(),                             Is.EqualTo("available"));
+                Assert.That(second.Payload!["value"]!.Value<String>(),                            Is.EqualTo("outOfService"));
+                Assert.That(third.Payload!["value"]!.Value<String>(),                             Is.EqualTo("offline"));
 
                 // At most as many as asked for.
                 Assert.That(pair.Payload!["batch"]!.Count(),                                      Is.EqualTo(2));
-                Assert.That(single.Payload!["value"]!.Value<String>(),                            Is.EqualTo("available"));
+                Assert.That(single.Payload!["value"]!.Value<String>(),                            Is.EqualTo("offline"));
 
                 Assert.That(new[] { first.MessageId, second.MessageId, third.MessageId },        Is.EqualTo(new[] { "p1", "p2", "p3" }));
 

@@ -548,6 +548,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 return false;
                             }
 
+                            // Its admin status, status and internal data are not content: they go along.
+                            changedOperator.ShareRuntimeOf(currentOperator!);
+
                             operators[operatorId] = changedOperator;
                             break;
 
@@ -789,6 +792,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              ) {
                                  Revision = Revision + 1
                              };
+
+            // Its admin status, status and internal data are not content: they go along.
+            RoamingNetwork.ShareRuntimeOf(this);
 
             ChangesWithOldValues  = changesWithOldValues.MoveToImmutable();
             ErrorResponse         = null;
