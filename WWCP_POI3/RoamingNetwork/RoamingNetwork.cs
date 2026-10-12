@@ -311,9 +311,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // Parking garages, spaces and sensors are unique within the network;
-            // the charging stations they name are ones of this network.
+            // the charging stations they name are ones of this network, and so are the parking spaces charging stations name.
             if ((DuplicateParking      (parkingOperators.Values) ??
-                 UnknownChargingStation(parkingOperators.Values, chargingStationOperators)) is String parkingError)
+                 UnknownChargingStation(parkingOperators.Values, chargingStationOperators) ??
+                 UnknownParkingSpace   (chargingStationOperators.Values, parkingOperators.Values)) is String parkingError)
             {
                 throw new ArgumentException(parkingError, nameof(ParkingOperators));
             }
@@ -1653,6 +1654,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
+        /// <summary>
+        /// The error, when a charging station names a parking space the given parking operators do not have.
+        /// </summary>
+        internal static String? UnknownParkingSpace(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
+                                                    IEnumerable<ParkingOperator>          ParkingOperators)
+        {
+
+            var parkingSpaceIds = ParkingOperators.SelectMany(parkingOperator => parkingOperator.ParkingSpaces).
+                                                   Select    (parkingSpace    => parkingSpace.Id).
+                                                   ToHashSet();
+
+            foreach (var chargingStation in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStations))
+                foreach (var parkingSpaceId in chargingStation.ParkingSpaceIds)
+                    if (!parkingSpaceIds.Contains(parkingSpaceId))
+                        return $"The parking space '{parkingSpaceId}' of the charging station '{chargingStation.Id}' is unknown in the roaming network!";
+
+            return null;
+
+        }
+
         #endregion
 
 
@@ -1689,7 +1710,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var named = chargingStationOperator.ChargingPools.   SelectMany(chargingPool    => chargingPool.   BrandIds.Select(brandId => (Kind: "charging pool",    Id: chargingPool.   Id.ToString(), BrandId: brandId))).
                             Concat(chargingStationOperator.ChargingStations.SelectMany(chargingStation => chargingStation.BrandIds.Select(brandId => (Kind: "charging station", Id: chargingStation.Id.ToString(), BrandId: brandId)))).
-                            Concat(chargingStationOperator.EVSEs.           SelectMany(evse            => evse.           BrandIds.Select(brandId => (Kind: "EVSE",             Id: evse.           Id.ToString(), BrandId: brandId))));
+                            Concat(chargingStationOperator.EVSEs.           SelectMany(evse            => evse.           BrandIds.Select(brandId => (Kind: "EVSE",             Id: evse.           Id.ToString(), BrandId: brandId)))).
+                            Concat(chargingStationOperator.ChargingPools.   SelectMany(chargingPool    => chargingPool.   AuthenticationModes.SelectMany(authenticationMode => authenticationMode.BrandIds).
+                                                                                                                                       Select(brandId => (Kind: "RFID authentication of the charging pool", Id: chargingPool.Id.ToString(), BrandId: brandId))));
 
                 foreach (var (kind, id, brandId) in named)
                     if (!Brands.ContainsKey(brandId))

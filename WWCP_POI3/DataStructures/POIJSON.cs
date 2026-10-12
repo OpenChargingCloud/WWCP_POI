@@ -162,11 +162,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static Boolean TryParseAddress(JObject                           JSON,
                                               out Address?                      Address,
                                               [NotNullWhen(false)] out String?  ErrorResponse)
+
+            => TryParseAddress(JSON, "address", "address", out Address, out ErrorResponse);
+
+
+        /// <summary>
+        /// An optional address, e.g. of an entrance.
+        /// </summary>
+        public static Boolean TryParseAddress(JObject                           JSON,
+                                              String                            PropertyName,
+                                              String                            PropertyDescription,
+                                              out Address?                      Address,
+                                              [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Address = null;
 
-            if (JSON["address"] is not JToken addressJSON)
+            if (JSON[PropertyName] is not JToken addressJSON)
             {
                 ErrorResponse = null;
                 return true;
@@ -174,13 +186,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (addressJSON is not JObject addressObject)
             {
-                ErrorResponse = "The address must be a JSON object!";
+                ErrorResponse = $"The {PropertyDescription} must be a JSON object!";
                 return false;
             }
 
             if (!Address.TryParse(addressObject, out Address, out var addressError))
             {
-                ErrorResponse = "Invalid address: " + addressError;
+                ErrorResponse = $"Invalid {PropertyDescription}: " + addressError;
                 return false;
             }
 
@@ -199,11 +211,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static Boolean TryParseGeoLocation(JObject                           JSON,
                                                   out GeoCoordinate?                GeoLocation,
                                                   [NotNullWhen(false)] out String?  ErrorResponse)
+
+            => TryParseGeoLocation(JSON, "geoLocation", "geo location", out GeoLocation, out ErrorResponse);
+
+
+        /// <summary>
+        /// An optional geographical location, e.g. of an entrance.
+        /// </summary>
+        public static Boolean TryParseGeoLocation(JObject                           JSON,
+                                                  String                            PropertyName,
+                                                  String                            PropertyDescription,
+                                                  out GeoCoordinate?                GeoLocation,
+                                                  [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             GeoLocation = null;
 
-            if (JSON["geoLocation"] is not JToken geoLocationJSON)
+            if (JSON[PropertyName] is not JToken geoLocationJSON)
             {
                 ErrorResponse = null;
                 return true;
@@ -211,13 +235,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (geoLocationJSON is not JObject geoLocationObject)
             {
-                ErrorResponse = "The geo location must be a JSON object!";
+                ErrorResponse = $"The {PropertyDescription} must be a JSON object!";
                 return false;
             }
 
             if (!GeoCoordinate.TryParse(geoLocationObject, out var geoLocation, out var geoLocationError))
             {
-                ErrorResponse = "Invalid geo location: " + geoLocationError;
+                ErrorResponse = $"Invalid {PropertyDescription}: " + geoLocationError;
                 return false;
             }
 
@@ -226,6 +250,78 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return true;
 
         }
+
+        #endregion
+
+        #region TryParseSeconds     (JSON, PropertyName, PropertyDescription, out Value, out ErrorResponse)
+
+        /// <summary>
+        /// An optional, not negative duration, given in seconds.
+        /// </summary>
+        public static Boolean TryParseSeconds(JObject                           JSON,
+                                              String                            PropertyName,
+                                              String                            PropertyDescription,
+                                              out TimeSpan?                     Value,
+                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Value = null;
+
+            if (JSON.ParseOptional(PropertyName, PropertyDescription, out Decimal? seconds, out ErrorResponse) &&
+                ErrorResponse is not null)
+            {
+                return false;
+            }
+
+            if (seconds < 0)
+            {
+                ErrorResponse = $"The {PropertyDescription} must not be negative!";
+                return false;
+            }
+
+            Value          = seconds.HasValue ? FromSeconds(seconds.Value) : null;
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region Seconds             (Duration)
+
+        /// <summary>
+        /// The given duration in seconds.
+        /// </summary>
+        public static Decimal Seconds(TimeSpan Duration)
+
+            => (Decimal) Duration.Ticks / TimeSpan.TicksPerSecond;
+
+        #endregion
+
+        #region FromSeconds         (Seconds)
+
+        /// <summary>
+        /// The duration of the given seconds.
+        /// </summary>
+        public static TimeSpan FromSeconds(Decimal Seconds)
+
+            => TimeSpan.FromTicks((Int64) (Seconds * TimeSpan.TicksPerSecond));
+
+        #endregion
+
+        #region TryParseName<TEnum> (Text, out Value)
+
+        /// <summary>
+        /// A value of the given enumeration by its exact name, e.g. a payment option; not by its number.
+        /// </summary>
+        public static Boolean TryParseName<TEnum>(String     Text,
+                                                  out TEnum  Value)
+
+            where TEnum : struct, Enum
+
+            => Enum.TryParse(Text, ignoreCase: false, out Value) &&
+               Enum.IsDefined(Value) &&
+               Value.ToString() == Text;
 
         #endregion
 
@@ -405,9 +501,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var item in array)
             {
 
-                if (item is not JObject itemJSON || !Parser(itemJSON, out var value, out var error))
+                if (item is not JObject itemJSON)
                 {
                     ErrorResponse = $"Invalid {PropertyDescription} '{item.ToString(Newtonsoft.Json.Formatting.None)}'!";
+                    return false;
+                }
+
+                if (!Parser(itemJSON, out var value, out var error))
+                {
+                    ErrorResponse = $"Invalid {PropertyDescription} '{item.ToString(Newtonsoft.Json.Formatting.None)}': {error}";
                     return false;
                 }
 
@@ -562,6 +664,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException($"A {Description} must not be given twice!");
 
             return [.. ids.OrderBy(id => id.ToString(), StringComparer.Ordinal)];
+
+        }
+
+        #endregion
+
+        #region UniqueIds<T>        (Ids, Description)
+
+        /// <summary>
+        /// The given values in their given order, e.g. languages by preference, without one given twice.
+        /// </summary>
+        public static ImmutableArray<T> UniqueIds<T>(IEnumerable<T>?  Ids,
+                                                     String           Description)
+
+            where T : struct
+        {
+
+            var ids = (Ids ?? []).ToArray();
+
+            if (ids.Distinct().Count() != ids.Length)
+                throw new ArgumentException($"A {Description} must not be given twice!");
+
+            return [.. ids];
 
         }
 

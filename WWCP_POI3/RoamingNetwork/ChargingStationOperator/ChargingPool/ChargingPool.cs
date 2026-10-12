@@ -152,6 +152,82 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<Image>  Images  { get; }
 
+
+        /// <summary>
+        /// Its time zone, e.g. Europe/Berlin.
+        /// </summary>
+        public Time_Zone?                                TimeZone               { get; }
+
+        /// <summary>
+        /// The facilities nearby, e.g. a restaurant, in the order of their names.
+        /// </summary>
+        public ImmutableArray<Facility>                  Facilities             { get; }
+
+        /// <summary>
+        /// How charging can be paid, in the order of their names.
+        /// </summary>
+        public ImmutableArray<PaymentOptions>            PaymentOptions         { get; }
+
+        /// <summary>
+        /// How drivers authenticate, in the order of their types; a type only once.
+        /// </summary>
+        public ImmutableArray<AuthenticationMode>        AuthenticationModes    { get; }
+
+        /// <summary>
+        /// The features of its user interfaces, in the order of their names.
+        /// </summary>
+        public ImmutableArray<UIFeatures>                UIFeatures             { get; }
+
+        /// <summary>
+        /// Its features, in the order of their names.
+        /// </summary>
+        public ImmutableArray<ChargingPoolFeature>       Features               { get; }
+
+        /// <summary>
+        /// The languages spoken or shown there, in their given order.
+        /// </summary>
+        public ImmutableArray<Languages>                 LocationLanguages      { get; }
+
+        /// <summary>
+        /// The address of its entrance, when it differs from its address.
+        /// </summary>
+        public Address?                                  EntranceAddress        { get; }
+
+        /// <summary>
+        /// The geographical location of its entrance.
+        /// </summary>
+        public GeoCoordinate?                            EntranceLocation       { get; }
+
+        /// <summary>
+        /// The address of its exit, when it differs from its address.
+        /// </summary>
+        public Address?                                  ExitAddress            { get; }
+
+        /// <summary>
+        /// The geographical location of its exit.
+        /// </summary>
+        public GeoCoordinate?                            ExitLocation           { get; }
+
+        /// <summary>
+        /// How to get there, e.g. "Second floor of the car park".
+        /// </summary>
+        public ImmutableI18NString                       ArrivalInstructions    { get; }
+
+        /// <summary>
+        /// Whether a vehicle may go on charging while it is closed, unless unknown.
+        /// </summary>
+        public Boolean?                                  ChargingWhenClosed     { get; }
+
+        /// <summary>
+        /// Who may park there, e.g. disabled persons only, in the order of their names.
+        /// </summary>
+        public ImmutableArray<ParkingRestrictionGroup>   ParkingRestrictions    { get; }
+
+        /// <summary>
+        /// Further geographical locations related to it, e.g. walkways, in their given order.
+        /// </summary>
+        public ImmutableArray<AdditionalGeoLocation>     RelatedLocations       { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -175,6 +251,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             ImmutableOpeningTimes?                       OpeningTimes                 = null,
                             EnergyMix?                                   EnergyMix                    = null,
                             IEnumerable<Image>?                          Images                       = null,
+                            Time_Zone?                                   TimeZone                     = null,
+                            IEnumerable<Facility>?                       Facilities                   = null,
+                            IEnumerable<PaymentOptions>?                 PaymentOptions               = null,
+                            IEnumerable<AuthenticationMode>?             AuthenticationModes          = null,
+                            IEnumerable<UIFeatures>?                     UIFeatures                   = null,
+                            IEnumerable<ChargingPoolFeature>?            Features                     = null,
+                            IEnumerable<Languages>?                      LocationLanguages            = null,
+                            Address?                                     EntranceAddress              = null,
+                            GeoCoordinate?                               EntranceLocation             = null,
+                            Address?                                     ExitAddress                  = null,
+                            GeoCoordinate?                               ExitLocation                 = null,
+                            I18NString?                                  ArrivalInstructions          = null,
+                            Boolean?                                     ChargingWhenClosed           = null,
+                            IEnumerable<ParkingRestrictionGroup>?        ParkingRestrictions          = null,
+                            IEnumerable<AdditionalGeoLocation>?          RelatedLocations             = null,
 
                             Timestamped<ChargingPoolAdminStatusType>?    InitialAdminStatus           = null,
                             Timestamped<ChargingPoolStatusType>?         InitialStatus                = null,
@@ -240,6 +331,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.OpeningTimes          = OpeningTimes;
             this.EnergyMix             = EnergyMix;
             this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the charging pool '{Id}'");
+
+            this.TimeZone             = TimeZone;
+            this.Facilities           = POIJSON.OrderedIds(Facilities,          $"facility of the charging pool '{Id}'");
+            this.PaymentOptions       = POIJSON.OrderedIds(PaymentOptions,      $"payment option of the charging pool '{Id}'");
+            this.AuthenticationModes  = [.. POIJSON.Distinct(AuthenticationModes, authenticationMode => authenticationMode.Type, $"authentication mode of the charging pool '{Id}'").
+                                                OrderBy(authenticationMode => authenticationMode.Type, StringComparer.Ordinal)];
+            this.UIFeatures           = POIJSON.OrderedIds(UIFeatures,          $"user interface feature of the charging pool '{Id}'");
+            this.Features             = POIJSON.OrderedIds(Features,            $"feature of the charging pool '{Id}'");
+            this.LocationLanguages    = POIJSON.UniqueIds (LocationLanguages,   $"language of the charging pool '{Id}'");
+            this.EntranceAddress      = EntranceAddress;
+            this.EntranceLocation     = EntranceLocation;
+            this.ExitAddress          = ExitAddress;
+            this.ExitLocation         = ExitLocation;
+            this.ArrivalInstructions  = ArrivalInstructions ?? ImmutableI18NString.Empty;
+            this.ChargingWhenClosed   = ChargingWhenClosed;
+            this.ParkingRestrictions  = POIJSON.OrderedIds(ParkingRestrictions, $"parking restriction of the charging pool '{Id}'");
+            this.RelatedLocations     = POIJSON.Distinct  (RelatedLocations,    relatedLocation => relatedLocation.ToJSON().ToString(Newtonsoft.Json.Formatting.None), $"related location of the charging pool '{Id}'");
 
         }
 
@@ -371,6 +479,51 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Images.Length > 0)
                 json.Add("images",  new JArray(Images.Select(image => image.ToJSON())));
 
+            if (TimeZone.HasValue)
+                json.Add("timeZone",             TimeZone.Value.ToString());
+
+            if (Facilities.Length > 0)
+                json.Add("facilities",           POIJSON.IdsToJSON(Facilities));
+
+            if (PaymentOptions.Length > 0)
+                json.Add("paymentOptions",       POIJSON.IdsToJSON(PaymentOptions));
+
+            if (AuthenticationModes.Length > 0)
+                json.Add("authenticationModes",  new JArray(AuthenticationModes.Select(authenticationMode => authenticationMode.ToJSON())));
+
+            if (UIFeatures.Length > 0)
+                json.Add("uiFeatures",           POIJSON.IdsToJSON(UIFeatures));
+
+            if (Features.Length > 0)
+                json.Add("features",             POIJSON.IdsToJSON(Features));
+
+            if (LocationLanguages.Length > 0)
+                json.Add("locationLanguages",    POIJSON.IdsToJSON(LocationLanguages));
+
+            if (EntranceAddress is not null)
+                json.Add("entranceAddress",      EntranceAddress.ToJSON(Embedded: true));
+
+            if (EntranceLocation.HasValue)
+                json.Add("entranceLocation",     EntranceLocation.Value.ToJSON(Embedded: true));
+
+            if (ExitAddress is not null)
+                json.Add("exitAddress",          ExitAddress.ToJSON(Embedded: true));
+
+            if (ExitLocation.HasValue)
+                json.Add("exitLocation",         ExitLocation.Value.ToJSON(Embedded: true));
+
+            if (ArrivalInstructions.IsNotNullOrEmpty())
+                json.Add("arrivalInstructions",  ArrivalInstructions.ToJSON());
+
+            if (ChargingWhenClosed.HasValue)
+                json.Add("chargingWhenClosed",   ChargingWhenClosed.Value);
+
+            if (ParkingRestrictions.Length > 0)
+                json.Add("parkingRestrictions",  POIJSON.IdsToJSON(ParkingRestrictions));
+
+            if (RelatedLocations.Length > 0)
+                json.Add("relatedLocations",     new JArray(RelatedLocations.Select(relatedLocation => relatedLocation.ToJSON())));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -463,6 +616,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseText       (JSON, "timeZone",             "time zone",               Time_Zone.TryParse,                       out Time_Zone? timeZone,                                        out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "facilities",           "facility",                Facility.TryParse,                        out ImmutableArray<Facility>                facilities,           out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "paymentOptions",       "payment option",          POIJSON.TryParseName<POI.PaymentOptions>, out ImmutableArray<POI.PaymentOptions>      paymentOptions,       out ErrorResponse) ||
+                    !POIJSON.TryParseObjects    (JSON, "authenticationModes",  "authentication mode",     AuthenticationMode.TryParse,              out ImmutableArray<AuthenticationMode>      authenticationModes,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "uiFeatures",           "user interface feature",  POI.UIFeatures.TryParse,                  out ImmutableArray<POI.UIFeatures>          uiFeatures,           out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "features",             "charging pool feature",   ChargingPoolFeature.TryParse,             out ImmutableArray<ChargingPoolFeature>     features,             out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "locationLanguages",    "location language",       POIJSON.TryParseName<Languages>,          out ImmutableArray<Languages>               locationLanguages,    out ErrorResponse) ||
+                    !POIJSON.TryParseAddress    (JSON, "entranceAddress",      "entrance address",                                                  out var entranceAddress,                                        out ErrorResponse) ||
+                    !POIJSON.TryParseGeoLocation(JSON, "entranceLocation",     "entrance location",                                                 out var entranceLocation,                                       out ErrorResponse) ||
+                    !POIJSON.TryParseAddress    (JSON, "exitAddress",          "exit address",                                                      out var exitAddress,                                            out ErrorResponse) ||
+                    !POIJSON.TryParseGeoLocation(JSON, "exitLocation",         "exit location",                                                     out var exitLocation,                                           out ErrorResponse) ||
+                    !POIJSON.TryParseI18N       (JSON, "arrivalInstructions",  "arrival instructions",                                              out var arrivalInstructions,                                    out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "parkingRestrictions",  "parking restriction",     ParkingRestrictionGroup.TryParse,         out ImmutableArray<ParkingRestrictionGroup> parkingRestrictions,  out ErrorResponse) ||
+                    !POIJSON.TryParseObjects    (JSON, "relatedLocations",     "related location",        AdditionalGeoLocation.TryParse,           out ImmutableArray<AdditionalGeoLocation>   relatedLocations,     out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (JSON.ParseOptional("chargingWhenClosed", "charging when closed", out Boolean? chargingWhenClosed, out ErrorResponse))
+                    if (ErrorResponse is not null) return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -488,6 +662,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 openingTimes,
                                                 energyMix,
                                                 images,
+                                                timeZone,
+                                                facilities,
+                                                paymentOptions,
+                                                authenticationModes,
+                                                uiFeatures,
+                                                features,
+                                                locationLanguages,
+                                                entranceAddress,
+                                                entranceLocation,
+                                                exitAddress,
+                                                exitLocation,
+                                                arrivalInstructions,
+                                                chargingWhenClosed,
+                                                parkingRestrictions,
+                                                relatedLocations,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,

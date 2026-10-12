@@ -923,6 +923,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  DuplicateEnergyMeter(operators.Values)                ??
                  DuplicateParking    (parkingOps.Values)               ??
                  UnknownChargingStation(parkingOps.Values, operators)  ??
+                 UnknownParkingSpace(operators.Values, parkingOps.Values) ??
                  UnknownTransparencyReference(operators.Values, softwares, certificates, manufacturers) ??
                  UnknownBrand(operators.Values, brandRegistry) ??
                  UnknownEnergyMeterManufacturer(operators.Values, meterManufacturers)) is String referenceError)

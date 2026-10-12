@@ -22,6 +22,7 @@ using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Aegir;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
 
@@ -139,6 +140,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<Image>  Images  { get; }
 
+
+        /// <summary>
+        /// The geographical location, when it differs from the one of its charging station.
+        /// </summary>
+        public GeoCoordinate?  GeoLocation               { get; }
+
+        /// <summary>
+        /// How long it can be reserved at most.
+        /// </summary>
+        public TimeSpan?       MaxReservationDuration    { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -160,6 +172,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     IEnumerable<ChargingTariff_Id>?      ChargingTariffIds            = null,
                     IEnumerable<Brand_Id>?               BrandIds                     = null,
                     IEnumerable<Image>?                  Images                       = null,
+                    GeoCoordinate?                       GeoLocation                  = null,
+                    TimeSpan?                            MaxReservationDuration       = null,
 
                     Timestamped<EVSEAdminStatusType>?    InitialAdminStatus           = null,
                     Timestamped<EVSEStatusType>?         InitialStatus                = null,
@@ -195,6 +209,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (MaxVoltage?.Value < 0 || MaxCurrent?.Value < 0 || MaxPower?.Value < 0)
                 throw new ArgumentException($"The electrical limits of the EVSE '{Id}' must not be negative!");
 
+            if (MaxReservationDuration < TimeSpan.Zero)
+                throw new ArgumentException($"The maximum reservation duration of the EVSE '{Id}' must not be negative!", nameof(MaxReservationDuration));
+
             var chargingConnectors = (ChargingConnectors ?? []).ToArray();
 
             if (chargingConnectors.Any(chargingConnector => chargingConnector is null))
@@ -214,6 +231,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ChargingTariffIds   = POIJSON.OrderedIds(ChargingTariffIds, $"charging tariff of the EVSE '{Id}'");
             this.BrandIds            = POIJSON.OrderedIds(BrandIds, $"brand of the EVSE '{Id}'");
             this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the EVSE '{Id}'");
+            this.GeoLocation             = GeoLocation;
+            this.MaxReservationDuration  = MaxReservationDuration;
             this.energyStatus        = new EnergyStatusRuntime(RaiseEnergyStatusChanged);
 
         }
@@ -395,6 +414,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Images.Length > 0)
                 json.Add("images",  new JArray(Images.Select(image => image.ToJSON())));
 
+            if (GeoLocation.HasValue)
+                json.Add("geoLocation",             GeoLocation.Value.ToJSON(Embedded: true));
+
+            if (MaxReservationDuration.HasValue)
+                json.Add("maxReservationDuration",  POIJSON.Seconds(MaxReservationDuration.Value));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -472,6 +497,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseGeoLocation(JSON,                            out var geoLocation,             out ErrorResponse) ||
+                    !POIJSON.TryParseSeconds    (JSON, "maxReservationDuration",
+                                                       "maximum reservation duration", out var maxReservationDuration,  out ErrorResponse))
+                {
+                    return false;
+                }
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -495,6 +527,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 chargingTariffIds,
                                 brandIds,
                                 images,
+                                geoLocation,
+                                maxReservationDuration,
                                 DataSource:  dataSource,
                                 Created:     created,
                                 LastChange:  lastChange,

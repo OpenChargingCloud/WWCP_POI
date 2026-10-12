@@ -64,6 +64,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "openingTimes",
             "energyMix",
             "images",
+            "timeZone",
+            "facilities",
+            "paymentOptions",
+            "authenticationModes",
+            "uiFeatures",
+            "features",
+            "locationLanguages",
+            "entranceAddress",
+            "entranceLocation",
+            "exitAddress",
+            "exitLocation",
+            "arrivalInstructions",
+            "chargingWhenClosed",
+            "parkingRestrictions",
+            "relatedLocations",
             "customData"
         ];
 
@@ -84,6 +99,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "brandIds",
             "openingTimes",
             "images",
+            "vehicleTypes",
+            "accessibility",
+            "features",
+            "calibrationInfo",
+            "certificationInfo",
+            "maxPower",
+            "parkingSpaceIds",
             "customData"
         ];
 
@@ -105,6 +127,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "chargingTariffIds",
             "brandIds",
             "images",
+            "geoLocation",
+            "maxReservationDuration",
             "customData"
         ];
 

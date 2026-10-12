@@ -125,10 +125,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add("description",           Description.ToJSON());
 
             if (MinDuration.HasValue)
-                json.Add("minDuration",           Seconds(MinDuration.Value));
+                json.Add("minDuration",           POIJSON.Seconds(MinDuration.Value));
 
             if (StopParkingAfterTime.HasValue)
-                json.Add("stopParkingAfterTime",  Seconds(StopParkingAfterTime.Value));
+                json.Add("stopParkingAfterTime",  POIJSON.Seconds(StopParkingAfterTime.Value));
 
             if (CustomData is not null && CustomData.HasValues)
                 json.Add("customData",            CustomData.ToJObject());
@@ -190,8 +190,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ParkingProduct  = new ParkingProduct(id,
                                                      name,
                                                      description,
-                                                     minDuration.         HasValue ? FromSeconds(minDuration.Value)          : null,
-                                                     stopParkingAfterTime.HasValue ? FromSeconds(stopParkingAfterTime.Value) : null,
+                                                     minDuration.         HasValue ? POIJSON.FromSeconds(minDuration.Value)          : null,
+                                                     stopParkingAfterTime.HasValue ? POIJSON.FromSeconds(stopParkingAfterTime.Value) : null,
                                                      customData);
 
                 ErrorResponse   = null;
@@ -206,23 +206,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
         }
-
-        #endregion
-
-
-        #region (private static) Seconds    (Duration)
-
-        private static Decimal Seconds(TimeSpan Duration)
-
-            => (Decimal) Duration.Ticks / TimeSpan.TicksPerSecond;
-
-        #endregion
-
-        #region (private static) FromSeconds(Seconds)
-
-        private static TimeSpan FromSeconds(Decimal Seconds)
-
-            => TimeSpan.FromTicks((Int64) (Seconds * TimeSpan.TicksPerSecond));
 
         #endregion
 

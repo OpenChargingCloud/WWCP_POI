@@ -48,6 +48,7 @@ flowchart TD
     ParkingSpace -. parkingSensorIds .-> ParkingSensor
     ParkingGarage -. chargingStationIds .-> ChargingStation
     ParkingSpace -. parkingProductIds .-> ParkingProduct
+    ChargingStation -. parkingSpaceIds .-> ParkingSpace
     EVSE -. chargingTariffIds .-> ChargingTariff
     ChargingPool -. brandIds .-> Brand
     EnergyMeter -. manufacturerId .-> EnergyMeterManufacturer
@@ -72,8 +73,19 @@ parking product ids compare case-sensitively.
 - **Content:** everything in the JSON and CBOR representations, completely, in a fixed order:
   children and licenses embedded, `created`, `lastChange` and `customData` included,
   timestamps to the millisecond. CBOR uses the keys and values of JSON.
+- **Charging pool:** `address`, `geoLocation`, `timeZone` (e.g. `Europe/Berlin`), `parkingType`, `accessibility`,
+  `entranceAddress`/`entranceLocation`, `exitAddress`/`exitLocation`, `arrivalInstructions`, `chargingWhenClosed`,
+  `facilities`, `paymentOptions`, `uiFeatures`, `features` and `parkingRestrictions` (sets of names, in their order),
+  `locationLanguages` (in their given order), `relatedLocations` (`{geoLocation, name?}`, in their given order) and
+  `authenticationModes` (`{type, cardTypes?, brandIds?, number?, stationCode?}` with the types of WWCP, e.g. `RFID`,
+  `CreditCard`, `SMS`; a type only once, in the order of the types). RFID may name card types and brands
+  of the network; SMS and PhoneCall need their `number`.
+- **Charging station:** `address` and `geoLocation` when they differ from its pool's, `accessibility`, `vehicleTypes`
+  and `features` (sets of names), `calibrationInfo`/`certificationInfo` (URLs), `maxPower` (W) of all its EVSEs,
+  `manufacturerId`/`modelId`, and the `parkingSpaceIds` of the network it charges at.
 - **EVSE:** `currentTypes`, `chargingModes` (arrays of names), `maxVoltage` (V), `maxCurrent` (A),
-  `maxPower` (W), `physicalReference` and `chargingConnectors` (`{@id, type, lockable?}`).
+  `maxPower` (W), `geoLocation` when it differs from its station's, `maxReservationDuration` (s),
+  `physicalReference` and `chargingConnectors` (`{@id, type, lockable?}`).
 - **Grid connection point:** a description without status: `gridOperatorId`, `voltageLevel`, `connectionType`,
   `nominalVoltage` (V), `nominalFrequency` (Hz), `contractedImport/ExportPower` (W),
   `contractedImport/ExportApparentPower` (VA), `connectionAgreementId`, `networkLocationId`,

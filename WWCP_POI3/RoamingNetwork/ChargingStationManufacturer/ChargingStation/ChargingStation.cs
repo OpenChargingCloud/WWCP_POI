@@ -25,6 +25,7 @@ using Newtonsoft.Json.Linq;
 using org.GraphDefined.Vanaheimr.Aegir;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 #endregion
 
@@ -142,6 +143,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<Image>  Images  { get; }
 
+
+        /// <summary>
+        /// The types of vehicles it charges, e.g. motorcycles, in the order of their names.
+        /// </summary>
+        public ImmutableArray<VehicleType>             VehicleTypes          { get; }
+
+        /// <summary>
+        /// Who may use it, when it differs from its charging pool, e.g. FreePubliclyAccessible.
+        /// </summary>
+        public AccessibilityType?                      Accessibility         { get; }
+
+        /// <summary>
+        /// Its features, in the order of their names.
+        /// </summary>
+        public ImmutableArray<ChargingStationFeature>  Features              { get; }
+
+        /// <summary>
+        /// Where to find information on the calibration of its energy meters.
+        /// </summary>
+        public URL?                                    CalibrationInfo       { get; }
+
+        /// <summary>
+        /// Where to find information on its certification, e.g. its conformity with calibration law.
+        /// </summary>
+        public URL?                                    CertificationInfo     { get; }
+
+        /// <summary>
+        /// The maximum power of all its EVSEs together.
+        /// </summary>
+        public Watt?                                   MaxPower              { get; }
+
+        /// <summary>
+        /// The parking spaces of the roaming network it charges at, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<ParkingSpace_Id>         ParkingSpaceIds       { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -163,6 +200,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                IEnumerable<Brand_Id>?                          BrandIds                     = null,
                                ImmutableOpeningTimes?                          OpeningTimes                 = null,
                                IEnumerable<Image>?                             Images                       = null,
+                               IEnumerable<VehicleType>?                       VehicleTypes                 = null,
+                               AccessibilityType?                              Accessibility                = null,
+                               IEnumerable<ChargingStationFeature>?            Features                     = null,
+                               URL?                                            CalibrationInfo              = null,
+                               URL?                                            CertificationInfo            = null,
+                               Watt?                                           MaxPower                     = null,
+                               IEnumerable<ParkingSpace_Id>?                   ParkingSpaceIds              = null,
 
                                Timestamped<ChargingStationAdminStatusType>?    InitialAdminStatus           = null,
                                Timestamped<ChargingStationStatusType>?         InitialStatus                = null,
@@ -195,6 +239,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
+            if (MaxPower?.Value < 0)
+                throw new ArgumentException($"The maximum power of the charging station '{Id}' must not be negative!", nameof(MaxPower));
+
             var evses = (EVSEs ?? []).ToArray();
 
             if (evses.Any(evse => evse is null))
@@ -219,6 +266,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.BrandIds            = POIJSON.OrderedIds(BrandIds, $"brand of the charging station '{Id}'");
             this.OpeningTimes        = OpeningTimes;
             this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the charging station '{Id}'");
+            this.VehicleTypes        = POIJSON.OrderedIds(VehicleTypes,    $"vehicle type of the charging station '{Id}'");
+            this.Accessibility       = Accessibility;
+            this.Features            = POIJSON.OrderedIds(Features,        $"feature of the charging station '{Id}'");
+            this.CalibrationInfo     = CalibrationInfo;
+            this.CertificationInfo   = CertificationInfo;
+            this.MaxPower            = MaxPower;
+            this.ParkingSpaceIds     = POIJSON.OrderedIds(ParkingSpaceIds, $"parking space of the charging station '{Id}'");
             this.energyStatus        = new EnergyStatusRuntime(RaiseEnergyStatusChanged);
 
         }
@@ -413,6 +467,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Images.Length > 0)
                 json.Add("images",  new JArray(Images.Select(image => image.ToJSON())));
 
+            if (VehicleTypes.Length > 0)
+                json.Add("vehicleTypes",       POIJSON.IdsToJSON(VehicleTypes));
+
+            if (Accessibility.HasValue)
+                json.Add("accessibility",      Accessibility.Value.ToString());
+
+            if (Features.Length > 0)
+                json.Add("features",           POIJSON.IdsToJSON(Features));
+
+            if (CalibrationInfo.HasValue)
+                json.Add("calibrationInfo",    CalibrationInfo.Value.ToString());
+
+            if (CertificationInfo.HasValue)
+                json.Add("certificationInfo",  CertificationInfo.Value.ToString());
+
+            if (MaxPower.HasValue)
+                json.Add("maxPower",           MaxPower.Value.Value);
+
+            if (ParkingSpaceIds.Length > 0)
+                json.Add("parkingSpaceIds",    POIJSON.IdsToJSON(ParkingSpaceIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -492,6 +567,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseIds (JSON, "vehicleTypes",       "vehicle type",               VehicleType.           TryParse, out ImmutableArray<VehicleType>             vehicleTypes,       out ErrorResponse) ||
+                    !POIJSON.TryParseText(JSON, "accessibility",      "accessibility",              AccessibilityType.     TryParse, out AccessibilityType?                      accessibility,      out ErrorResponse) ||
+                    !POIJSON.TryParseIds (JSON, "features",           "charging station feature",   ChargingStationFeature.TryParse, out ImmutableArray<ChargingStationFeature>  features,           out ErrorResponse) ||
+                    !POIJSON.TryParseText(JSON, "calibrationInfo",    "calibration information",    URL.                   TryParse, out URL?                                    calibrationInfo,    out ErrorResponse) ||
+                    !POIJSON.TryParseText(JSON, "certificationInfo",  "certification information",  URL.                   TryParse, out URL?                                    certificationInfo,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds (JSON, "parkingSpaceIds",    "parking space identification", ParkingSpace_Id.     TryParse, out ImmutableArray<ParkingSpace_Id>         parkingSpaceIds,    out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (JSON.ParseOptional("maxPower", "maximum power", out Watt? maxPower, out ErrorResponse))
+                    if (ErrorResponse is not null) return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -515,6 +603,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       brandIds,
                                                       openingTimes,
                                                       images,
+                                                      vehicleTypes,
+                                                      accessibility,
+                                                      features,
+                                                      calibrationInfo,
+                                                      certificationInfo,
+                                                      maxPower,
+                                                      parkingSpaceIds,
                                                       DataSource:  dataSource,
                                                       Created:     created,
                                                       LastChange:  lastChange,
