@@ -13,12 +13,6 @@ e-mobility as immutable, versioned data sets between servers and servers and (sm
 - **JSON and CBOR.** Every representation exists in both, with the same keys and values;
   ETags exist for canonical JSON and canonical CBOR.
 
-| Directory | What it is |
-|---|---|
-| `WWCP_POI2` | Shared lower layer: identifications, status values, predefined strings, energy information, transparency software |
-| `WWCP_POI3` | Roaming networks with their operators, pools, stations, EVSEs, manufacturers, e-mobility providers, grid operators and energy meters; change sets, history, sync |
-| `old` | The earlier implementation, for reference only; not developed further |
-
 ## Data
 
 ```mermaid
@@ -200,6 +194,15 @@ await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader;
   A head the leader does not know starts it again from a snapshot (`OnHistoryReplaced`).
 - **Options:** complete commits or announcements, status or not, credentials via `ConfigureWebSocket`,
   signature verifier, limits.
+
+## Submodules
+
+| Directory | What it is |
+|---|---|
+| `WWCP_POI2` | Shared lower layer: identifications, status values, predefined strings, energy information, transparency software |
+| `WWCP_POI3` | Roaming networks with their operators, pools, stations, EVSEs, manufacturers, e-mobility providers, grid operators and energy meters; change sets, history, sync |
+| `old` | The earlier implementation, for reference only; not developed further |
+
 
 ## Open
 
