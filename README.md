@@ -1,7 +1,7 @@
 # WWCP POI
 
-Points of interest of e-mobility as immutable, versioned data, synchronized between servers.
-A .NET 10 library of the Open Charging Cloud.
+WWCP/POI is the *"git of EV infrastructure information sharing"*. It synchronizes points of interest data within
+e-mobility as immutable, versioned data sets between servers and servers and (smartphone) clients.
 
 - **Static data is immutable.** A roaming network with everything it embeds is one version,
   named by its ETags. A change set leads from one version to the next; nothing is changed in place.
