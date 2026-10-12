@@ -454,6 +454,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly System.Collections.Immutable.ImmutableDictionary<ChargingPool_Id,    ChargingPool>     chargingPoolIndex;
         private readonly System.Collections.Immutable.ImmutableDictionary<ChargingStation_Id, ChargingStation>  chargingStationIndex;
         private readonly System.Collections.Immutable.ImmutableDictionary<EVSE_Id,            EVSE>             evseIndex;
+        private readonly System.Collections.Immutable.ImmutableDictionary<EnergyMeter_Id,     EnergyMeter>      energyMeterIndex;
 
         /// <summary>
         /// The charging pools, embedded completely with their charging stations and EVSEs, in the order of their identifications.
@@ -471,6 +472,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IEnumerable<EVSE>                                          EVSEs
             => ChargingPools.SelectMany(chargingPool => chargingPool.EVSEs);
+
+        /// <summary>
+        /// The energy meters of all its charging pools, their grid connection points, charging stations and EVSEs.
+        /// </summary>
+        public IEnumerable<EnergyMeter>                                   EnergyMeters
+            => ChargingPools.SelectMany(chargingPool => chargingPool.AllEnergyMeters);
 
         /// <summary>
         /// Try to return the charging pool with the given identification.
@@ -497,8 +504,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => evseIndex.TryGetValue(EVSEId, out EVSE);
 
         /// <summary>
+        /// Try to return the energy meter with the given identification, anywhere in its charging pools.
+        /// </summary>
+        public Boolean TryGetEnergyMeter(EnergyMeter_Id                                                    EnergyMeterId,
+                                         [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EnergyMeter?  EnergyMeter)
+
+            => energyMeterIndex.TryGetValue(EnergyMeterId, out EnergyMeter);
+
+        /// <summary>
         /// Take the runtime status and internal data of the given previous version of this operator,
-        /// and of every charging pool, charging station and EVSE it had, by their identifications.
+        /// and of every charging pool, charging station, EVSE and energy meter it had, by their identifications.
         /// </summary>
         internal void ShareRuntimeOfAll(ChargingStationOperator Previous)
         {
@@ -516,6 +531,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var evse in EVSEs)
                 if (Previous.TryGetEVSE(evse.Id, out var previousEVSE))
                     evse.ShareRuntimeOf(previousEVSE);
+
+            foreach (var energyMeter in EnergyMeters)
+                if (Previous.TryGetEnergyMeter(energyMeter.Id, out var previousEnergyMeter))
+                    energyMeter.ShareRuntimeOf(previousEnergyMeter);
 
         }
 
@@ -639,6 +658,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             catch (ArgumentException)
             {
                 throw new ArgumentException($"A charging pool, charging station or EVSE of the operator '{Id}' must not be given twice!", nameof(ChargingPools));
+            }
+
+            try
+            {
+                this.energyMeterIndex      = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.EnergyMeters.    Select(energyMeter     => new KeyValuePair<EnergyMeter_Id,     EnergyMeter>    (energyMeter.Id,     energyMeter)));
+            }
+            catch (ArgumentException)
+            {
+                throw new ArgumentException($"An energy meter of the operator '{Id}' must not be given twice!", nameof(ChargingPools));
             }
 
             #endregion

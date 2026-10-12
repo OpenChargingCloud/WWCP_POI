@@ -3,10 +3,20 @@
 Points of interest of e-mobility as immutable, versioned data, synchronized between servers.
 A .NET 10 library of the Open Charging Cloud.
 
+- **Static data is immutable.** A roaming network with everything it embeds is one version,
+  named by its ETags. A change set leads from one version to the next; nothing is changed in place.
+- **Dynamic data is kept strictly apart.** Admin status, status and, later, energy status are
+  not content: they have no ETags, change without a new version and are shared by all versions
+  of their entity.
+- **WebSocket first.** Followers subscribe to commits and status updates over one WebSocket
+  for fast, low-latency sync; HTTP serves the same reads.
+- **JSON and CBOR.** Every representation exists in both, with the same keys and values;
+  ETags exist for canonical JSON and canonical CBOR.
+
 | Directory | What it is |
 |---|---|
 | `WWCP_POI2` | Shared lower layer: identifications, status values, predefined strings, energy information, transparency software |
-| `WWCP_POI3` | Roaming networks with their manufacturers, operators, pools, stations and EVSEs; change sets, history, sync |
+| `WWCP_POI3` | Roaming networks with their operators, pools, stations, EVSEs, manufacturers, e-mobility providers, grid operators and energy meters; change sets, history, sync |
 | `old` | The earlier implementation, for reference only; not developed further |
 
 ## Data
@@ -15,26 +25,43 @@ A .NET 10 library of the Open Charging Cloud.
 flowchart TD
     RoamingNetwork --> ChargingStationOperator
     RoamingNetwork --> ChargingStationManufacturer
+    RoamingNetwork --> EMobilityProvider
+    RoamingNetwork --> GridOperator
     ChargingStationOperator --> ChargingPool
     ChargingPool --> ChargingStation
+    ChargingPool --> GridConnectionPoint
     ChargingStation --> EVSE
     EVSE --> ChargingConnector
+    ChargingPool --> EnergyMeter
+    GridConnectionPoint --> EnergyMeter
+    ChargingStation --> EnergyMeter
+    EVSE --> EnergyMeter
     ChargingStation -. manufacturerId .-> ChargingStationManufacturer
+    GridConnectionPoint -. gridOperatorId .-> GridOperator
     RoamingNetwork -. dataLicenses .-> DataLicense
     ChargingStationOperator -. dataLicenses .-> DataLicense
     ChargingPool -. dataLicenses .-> DataLicense
 ```
 
-Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `chargingPools`,
-`chargingStations`, `EVSEs`, `chargingConnectors`), each 0..n in the order of their ids; dotted lines are references.
+Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`,
+`gridOperators`, `chargingPools`, `chargingStations`, `EVSEs`, `chargingConnectors`, `energyMeters`), each 0..n
+in the order of their ids; a pool has 0..1 `gridConnectionPoint`, a grid connection point and an EVSE each 0..1 `energyMeter`.
+Dotted lines are references, which must exist in the network.
 A pool, station or EVSE belongs to the operator its id names; ids are unique within the operator.
-E-mobility providers, tariffs and more follow.
+Energy meter ids are unique within the network. Tariffs, parking and more follow.
 
 - **Content:** everything in the JSON and CBOR representations, completely, in a fixed order:
   children and licenses embedded, `created`, `lastChange` and `customData` included,
   timestamps to the millisecond. CBOR uses the keys and values of JSON.
 - **EVSE:** `currentTypes`, `chargingModes` (arrays of names), `maxVoltage` (V), `maxCurrent` (A),
   `maxPower` (W), `physicalReference` and `chargingConnectors` (`{@id, type, lockable?}`).
+- **Grid connection point:** a description without status: `gridOperatorId`, `voltageLevel`, `connectionType`,
+  `nominalVoltage` (V), `nominalFrequency` (Hz), `contractedImport/ExportPower` (W),
+  `contractedImport/ExportApparentPower` (VA), `connectionAgreementId`, `networkLocationId`,
+  `marketLocationIds`, `meteringLocationIds`. Missing values are unknown; active power must not
+  exceed apparent power.
+- **Energy meter:** `role` (e.g. `grid`, `pv`, `battery`), `manufacturer`, `model`, their URLs,
+  `serialNumber`, `hardwareVersion`, `firmwareVersion`; with admin status and status.
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
   They identify a version; `CalcETags()` and `ValidateETags(…)`.
 - **Runtime:** admin status and status are not content and have no ETags. Each entity keeps them
@@ -67,8 +94,10 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 ```
 
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
-  `Add`/`Remove` of manufacturers, operators, pools, stations (`Add(station, poolId)`) and EVSEs
-  (`Add(evse, stationId)`). A station's manufacturer must exist. The overload by the entity's
+  `Add`/`Remove` of operators, manufacturers, e-mobility providers, grid operators, pools, stations
+  (`Add(station, poolId)`) and EVSEs (`Add(evse, stationId)`). Grid connection points and energy meters
+  are properties of what embeds them (`gridConnectionPoint`, `energyMeters`, `energyMeter`).
+  A referenced manufacturer or grid operator must exist. The overload by the entity's
   type names it: a change is data, `{entityType, entityId, propertyName, oldValue, newValue}`, applied
   to the entity with that id in the version it is applied to.
 - **Old values:** `CreateChangeSet` gives every change the value it finds; JSON `null` means
@@ -178,7 +207,7 @@ await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader;
 - Finer subscription filters, energy status with EVSEs
 - A WebSocket endpoint in Hermod without a TCP server behind it
 - Commits signed by the leader
-- Further entities: charging pools, stations, EVSEs, e-mobility providers, …
+- Further entities: parking, tariffs, transparency software, groups of entities, …
 
 ## Tests
 

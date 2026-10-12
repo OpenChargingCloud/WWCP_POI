@@ -299,6 +299,80 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TryParseEnum<TEnum> (JSON, PropertyName, PropertyDescription, out Value, out ErrorResponse)
+
+        /// <summary>
+        /// An optional value given by its name, e.g. a voltage level.
+        /// </summary>
+        public static Boolean TryParseEnum<TEnum>(JObject                           JSON,
+                                                  String                            PropertyName,
+                                                  String                            PropertyDescription,
+                                                  out TEnum?                        Value,
+                                                  [NotNullWhen(false)] out String?  ErrorResponse)
+
+            where TEnum : struct, Enum
+
+        {
+
+            Value = null;
+
+            if (JSON[PropertyName] is not JToken token)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            if (token.Type != JTokenType.String ||
+                !Enum.TryParse<TEnum>(token.Value<String>(), ignoreCase: false, out var value) ||
+                !Enum.IsDefined(value) ||
+                value.ToString() != token.Value<String>())
+            {
+                ErrorResponse = $"Invalid {PropertyDescription} '{token}'!";
+                return false;
+            }
+
+            Value          = value;
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region TryParseStrings     (JSON, PropertyName, PropertyDescription, out Values, out ErrorResponse)
+
+        /// <summary>
+        /// Optional texts, given as an array, in their given order.
+        /// </summary>
+        public static Boolean TryParseStrings(JObject                           JSON,
+                                              String                            PropertyName,
+                                              String                            PropertyDescription,
+                                              out ImmutableArray<String>        Values,
+                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Values = [];
+
+            if (JSON[PropertyName] is not JToken token)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            if (token is not JArray array || array.Any(item => item.Type != JTokenType.String))
+            {
+                ErrorResponse = $"The {PropertyDescription} must be a JSON array of texts!";
+                return false;
+            }
+
+            Values         = [.. array.Select(item => item.Value<String>()!)];
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
         #region TryParseChildren<T> (JSON, PropertyName, IdsPropertyName, Description, Parser, out Children, out ErrorResponse)
 
         /// <summary>

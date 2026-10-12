@@ -100,6 +100,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ChargingConnector>  ChargingConnectors    { get; }
 
+        /// <summary>
+        /// The energy meter.
+        /// </summary>
+        public EnergyMeter?                       EnergyMeter           { get; }
+
+        /// <summary>
+        /// Its energy meter, if any.
+        /// </summary>
+        public IEnumerable<EnergyMeter>           AllEnergyMeters
+            => EnergyMeter is not null ? [ EnergyMeter ] : [];
+
         #endregion
 
         #region Constructor(s)
@@ -117,6 +128,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     Ampere?                              MaxCurrent                   = null,
                     Watt?                                MaxPower                     = null,
                     IEnumerable<ChargingConnector>?      ChargingConnectors           = null,
+                    EnergyMeter?                         EnergyMeter                  = null,
 
                     Timestamped<EVSEAdminStatusType>?    InitialAdminStatus           = null,
                     Timestamped<EVSEStatusType>?         InitialStatus                = null,
@@ -167,6 +179,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.MaxCurrent          = MaxCurrent;
             this.MaxPower            = MaxPower;
             this.ChargingConnectors  = [.. chargingConnectors.OrderBy(chargingConnector => chargingConnector.Id.ToString(), StringComparer.Ordinal)];
+            this.EnergyMeter         = EnergyMeter;
 
         }
 
@@ -266,6 +279,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingConnectors.Length > 0)
                 json.Add("chargingConnectors", new JArray(ChargingConnectors.Select(chargingConnector => chargingConnector.ToJSON())));
 
+            if (EnergyMeter is not null)
+                json.Add("energyMeter",        EnergyMeter.ToJSON());
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -331,6 +347,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POI.EnergyMeter.TryParseOne(JSON, "energyMeter", out var energyMeter, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -350,6 +369,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 maxCurrent,
                                 maxPower,
                                 chargingConnectors,
+                                energyMeter,
                                 DataSource:  dataSource,
                                 Created:     created,
                                 LastChange:  lastChange,

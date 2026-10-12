@@ -290,6 +290,75 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     Authoritative, at, out normalized, out oldTimestamp, out oldValue);
                     break;
 
+                case nameof(EMobilityProvider):
+
+                    if (!EMobilityProvider_Id.TryParse(EntityId, out var eMobilityProviderId) ||
+                        !network.TryGetEMobilityProviderById(eMobilityProviderId, out var eMobilityProvider))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<EMobilityProviderAdminStatusType>(Value, EMobilityProviderAdminStatusType.TryParse,
+                                                    () => eMobilityProvider.CurrentAdminStatus,
+                                                    (status, timestamp) => eMobilityProvider.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => eMobilityProvider.SetAdminStatus([ new Timestamped<EMobilityProviderAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<EMobilityProviderStatusType>(Value, EMobilityProviderStatusType.TryParse,
+                                                    () => eMobilityProvider.CurrentStatus,
+                                                    (status, timestamp) => eMobilityProvider.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => eMobilityProvider.SetStatus([ new Timestamped<EMobilityProviderStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(GridOperator):
+
+                    if (!GridOperator_Id.TryParse(EntityId, out var gridOperatorId) ||
+                        !network.TryGetGridOperatorById(gridOperatorId, out var gridOperator))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<GridOperatorAdminStatusType>(Value, GridOperatorAdminStatusType.TryParse,
+                                                    () => gridOperator.CurrentAdminStatus,
+                                                    (status, timestamp) => gridOperator.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => gridOperator.SetAdminStatus([ new Timestamped<GridOperatorAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<GridOperatorStatusType>(Value, GridOperatorStatusType.TryParse,
+                                                    () => gridOperator.CurrentStatus,
+                                                    (status, timestamp) => gridOperator.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => gridOperator.SetStatus([ new Timestamped<GridOperatorStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(EnergyMeter):
+
+                    if (!EnergyMeter_Id.TryParse(EntityId, out var energyMeterId) ||
+                        !network.TryGetEnergyMeterById(energyMeterId, out var energyMeter))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<EnergyMeterAdminStatusType>(Value, EnergyMeterAdminStatusType.TryParse,
+                                                    () => energyMeter.CurrentAdminStatus,
+                                                    (status, timestamp) => energyMeter.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => energyMeter.SetAdminStatus([ new Timestamped<EnergyMeterAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<EnergyMeterStatusType>(Value, EnergyMeterStatusType.TryParse,
+                                                    () => energyMeter.CurrentStatus,
+                                                    (status, timestamp) => energyMeter.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => energyMeter.SetStatus([ new Timestamped<EnergyMeterStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
                 case nameof(ChargingPool):
 
                     if (!ChargingPool_Id.TryParse(EntityId, out var chargingPoolId) ||
@@ -451,6 +520,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), network.Id.ToString(), network.CurrentAdminStatus);
                 Add(statuses, POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), network.Id.ToString(), network.CurrentStatus);
 
+                foreach (var eMobilityProvider in network.EMobilityProviders)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(EMobilityProvider), eMobilityProvider.Id.ToString(), eMobilityProvider.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(EMobilityProvider), eMobilityProvider.Id.ToString(), eMobilityProvider.CurrentStatus);
+                }
+
+                foreach (var gridOperator in network.GridOperators)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(GridOperator), gridOperator.Id.ToString(), gridOperator.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(GridOperator), gridOperator.Id.ToString(), gridOperator.CurrentStatus);
+                }
+
+                foreach (var energyMeter in network.EnergyMeters)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(EnergyMeter), energyMeter.Id.ToString(), energyMeter.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(EnergyMeter), energyMeter.Id.ToString(), energyMeter.CurrentStatus);
+                }
+
                 foreach (var manufacturer in network.ChargingStationManufacturers)
                 {
                     Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingStationManufacturer), manufacturer.Id.ToString(), manufacturer.CurrentAdminStatus);
@@ -546,6 +633,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var entities = new HashSet<Object>(ReferenceEqualityComparer.Instance) { RoamingNetwork };
 
                 entities.UnionWith(RoamingNetwork.ChargingStationManufacturers);
+                entities.UnionWith(RoamingNetwork.EMobilityProviders);
+                entities.UnionWith(RoamingNetwork.GridOperators);
+                entities.UnionWith(RoamingNetwork.EnergyMeters);
 
                 foreach (var chargingStationOperator in RoamingNetwork.ChargingStationOperators)
                 {
@@ -563,6 +653,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!listeners.ContainsKey(RoamingNetwork))
                     listeners[RoamingNetwork] = ListenTo(RoamingNetwork);
+
+                foreach (var eMobilityProvider in RoamingNetwork.EMobilityProviders)
+                    if (!listeners.ContainsKey(eMobilityProvider))
+                        listeners[eMobilityProvider] = ListenTo(eMobilityProvider);
+
+                foreach (var gridOperator in RoamingNetwork.GridOperators)
+                    if (!listeners.ContainsKey(gridOperator))
+                        listeners[gridOperator] = ListenTo(gridOperator);
+
+                foreach (var energyMeter in RoamingNetwork.EnergyMeters)
+                    if (!listeners.ContainsKey(energyMeter))
+                        listeners[energyMeter] = ListenTo(energyMeter);
 
                 foreach (var manufacturer in RoamingNetwork.ChargingStationManufacturers)
                     if (!listeners.ContainsKey(manufacturer))
@@ -635,6 +737,87 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             OnChargingStationManufacturerStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
                 Raise(POIRuntimeStatusKind.Status, nameof(ChargingStationManufacturer), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(EMobilityProvider)
+
+        private Action ListenTo(EMobilityProvider Entity)
+        {
+
+            OnEMobilityProviderAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(EMobilityProvider), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnEMobilityProviderStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(EMobilityProvider), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(GridOperator)
+
+        private Action ListenTo(GridOperator Entity)
+        {
+
+            OnGridOperatorAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(GridOperator), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnGridOperatorStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(GridOperator), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(EnergyMeter)
+
+        private Action ListenTo(EnergyMeter Entity)
+        {
+
+            OnEnergyMeterAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(EnergyMeter), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnEnergyMeterStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(EnergyMeter), entity.Id.ToString(), newStatus, oldStatus, null);
                 return Task.CompletedTask;
             };
 
@@ -817,6 +1000,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            Concat(chargingStationOperator.ChargingPools.   SelectMany(chargingPool    => new[] { chargingPool.   NextAdminStatus?.Timestamp, chargingPool.   NextStatus?.Timestamp })).
                            Concat(chargingStationOperator.ChargingStations.SelectMany(chargingStation => new[] { chargingStation.NextAdminStatus?.Timestamp, chargingStation.NextStatus?.Timestamp })).
                            Concat(chargingStationOperator.EVSEs.           SelectMany(evse            => new[] { evse.           NextAdminStatus?.Timestamp, evse.           NextStatus?.Timestamp })))).
+                           Concat(network.EMobilityProviders.SelectMany(eMobilityProvider => new[] { eMobilityProvider.NextAdminStatus?.Timestamp, eMobilityProvider.NextStatus?.Timestamp })).
+                           Concat(network.GridOperators.SelectMany(gridOperator => new[] { gridOperator.NextAdminStatus?.Timestamp, gridOperator.NextStatus?.Timestamp })).
+                           Concat(network.EnergyMeters.SelectMany(energyMeter => new[] { energyMeter.NextAdminStatus?.Timestamp, energyMeter.NextStatus?.Timestamp })).
                            Concat(network.ChargingStationManufacturers.SelectMany(manufacturer => new[] { manufacturer.NextAdminStatus?.Timestamp, manufacturer.NextStatus?.Timestamp })).
                            Where(timestamp => timestamp.HasValue).
                            Min();
@@ -863,6 +1049,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 _ = network.AdminStatus;
                 _ = network.Status;
+
+                foreach (var eMobilityProvider in network.EMobilityProviders)
+                {
+                    _ = eMobilityProvider.AdminStatus;
+                    _ = eMobilityProvider.Status;
+                }
+
+                foreach (var gridOperator in network.GridOperators)
+                {
+                    _ = gridOperator.AdminStatus;
+                    _ = gridOperator.Status;
+                }
+
+                foreach (var energyMeter in network.EnergyMeters)
+                {
+                    _ = energyMeter.AdminStatus;
+                    _ = energyMeter.Status;
+                }
 
                 foreach (var manufacturer in network.ChargingStationManufacturers)
                 {

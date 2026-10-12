@@ -451,6 +451,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var customData            = CustomData;
             var operators             = new Dictionary<ChargingStationOperator_Id, ChargingStationOperator>(chargingStationOperators);
             var manufacturers         = new Dictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>(chargingStationManufacturers);
+            var providers             = new Dictionary<EMobilityProvider_Id, EMobilityProvider>(eMobilityProviders);
+            var gridOps               = new Dictionary<GridOperator_Id, GridOperator>(gridOperators);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
@@ -746,11 +748,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Charging station manufacturers
+                #region Charging station manufacturers, e-mobility providers, grid operators
 
                 else if (change.EntityType == nameof(ChargingStationManufacturer))
                 {
-                    if (!TryApplyManufacturerChange(change, index, ChangeSet.CreatedAt, manufacturers, out currentValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(ManufacturerRegistry,      change, index, ChangeSet.CreatedAt, manufacturers, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                else if (change.EntityType == nameof(EMobilityProvider))
+                {
+                    if (!TryApplyRegistryChange(EMobilityProviderRegistry, change, index, ChangeSet.CreatedAt, providers,     out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                else if (change.EntityType == nameof(GridOperator))
+                {
+                    if (!TryApplyRegistryChange(GridOperatorRegistry,      change, index, ChangeSet.CreatedAt, gridOps,       out currentValue, out ErrorResponse))
                         return false;
                 }
 
@@ -796,10 +810,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            // Every manufacturer a charging station names must still be one of the network.
-            if (UnknownManufacturer(operators.Values, manufacturers) is String unknownManufacturer)
+            // Every manufacturer a charging station names, and every grid operator a grid connection point names,
+            // must still be one of the network; energy meters must be unique within the network.
+            if ((UnknownManufacturer (operators.Values, manufacturers) ??
+                 UnknownGridOperator (operators.Values, gridOps)       ??
+                 DuplicateEnergyMeter(operators.Values)) is String referenceError)
             {
-                ErrorResponse = unknownManufacturer;
+                ErrorResponse = referenceError;
                 return false;
             }
 
@@ -818,7 +835,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  InternalData,
                                  licenses,
                                  operators.Values,
-                                 manufacturers.Values
+                                 manufacturers.Values,
+                                 providers.Values,
+                                 gridOps.Values
                              ) {
                                  Revision = Revision + 1
                              };

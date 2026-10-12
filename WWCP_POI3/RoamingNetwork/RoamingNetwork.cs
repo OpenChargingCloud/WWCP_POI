@@ -194,7 +194,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                               IEnumerable<DataLicense>?              DataLicenses               = null,
                               IEnumerable<ChargingStationOperator>?  ChargingStationOperators   = null,
-                              IEnumerable<ChargingStationManufacturer>?  ChargingStationManufacturers   = null)
+                              IEnumerable<ChargingStationManufacturer>?  ChargingStationManufacturers   = null,
+                              IEnumerable<EMobilityProvider>?            EMobilityProviders             = null,
+                              IEnumerable<GridOperator>?                 GridOperators                  = null)
 
             : base(Id,
                    Name,
@@ -247,6 +249,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // Every manufacturer a charging station names is one of this network.
             if (UnknownManufacturer(chargingStationOperators.Values, chargingStationManufacturers) is String unknownManufacturer)
                 throw new ArgumentException(unknownManufacturer, nameof(ChargingStationManufacturers));
+
+            foreach (var eMobilityProvider in EMobilityProviders ?? [])
+            {
+
+                ArgumentNullException.ThrowIfNull(eMobilityProvider, nameof(EMobilityProviders));
+
+                if (!eMobilityProviders.TryAdd(eMobilityProvider.Id, eMobilityProvider))
+                    throw new ArgumentException($"The e-mobility provider '{eMobilityProvider.Id}' must not be given twice!", nameof(EMobilityProviders));
+
+            }
+
+            foreach (var gridOperator in GridOperators ?? [])
+            {
+
+                ArgumentNullException.ThrowIfNull(gridOperator, nameof(GridOperators));
+
+                if (!gridOperators.TryAdd(gridOperator.Id, gridOperator))
+                    throw new ArgumentException($"The grid operator '{gridOperator.Id}' must not be given twice!", nameof(GridOperators));
+
+            }
+
+            // Every grid operator a grid connection point names is one of this network.
+            if (UnknownGridOperator(chargingStationOperators.Values, gridOperators) is String unknownGridOperator)
+                throw new ArgumentException(unknownGridOperator, nameof(GridOperators));
+
+            // Energy meters are unique within the network, not only within their operator.
+            if (DuplicateEnergyMeter(chargingStationOperators.Values) is String duplicateEnergyMeter)
+                throw new ArgumentException(duplicateEnergyMeter, nameof(ChargingStationOperators));
+
+            foreach (var energyMeter in chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters))
+                energyMeters.TryAdd(energyMeter.Id, energyMeter);
 
             #endregion
 
@@ -494,6 +527,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse EMobilityProviders, GridOperators [optional]
+
+                if (!POIJSON.TryParseChildren<EMobilityProvider>(JSON,
+                                                                 "eMobilityProviders",
+                                                                 "eMobilityProviderIds",
+                                                                 "e-mobility providers",
+                                                                 EMobilityProvider.TryParse,
+                                                                 out var eMobilityProviders,
+                                                                 out ErrorResponse) ||
+
+                    !POIJSON.TryParseChildren<GridOperator>     (JSON,
+                                                                 "gridOperators",
+                                                                 "gridOperatorIds",
+                                                                 "grid operators",
+                                                                 GridOperator.TryParse,
+                                                                 out var gridOperators,
+                                                                 out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse ChargingStationOperators [optional]
 
                 if (JSON.ContainsKey("chargingStationOperatorIds"))
@@ -549,7 +605,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      CustomData:                customData,
                                      DataLicenses:              dataLicenses,
                                      ChargingStationOperators:  chargingStationOperators,
-                                     ChargingStationManufacturers:  chargingStationManufacturers
+                                     ChargingStationManufacturers:  chargingStationManufacturers,
+                                     EMobilityProviders:        eMobilityProviders,
+                                     GridOperators:             gridOperators
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -747,6 +805,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!chargingStationManufacturers.IsEmpty)
                 JSON.Add("chargingStationManufacturers", new JArray(OrderedChargingStationManufacturers.Select(chargingStationManufacturer => chargingStationManufacturer.ToJSON())));
 
+            if (!eMobilityProviders.IsEmpty)
+                JSON.Add("eMobilityProviders",           new JArray(OrderedEMobilityProviders.Select(eMobilityProvider => eMobilityProvider.ToJSON())));
+
+            if (!gridOperators.IsEmpty)
+                JSON.Add("gridOperators",                new JArray(OrderedGridOperators.Select(gridOperator => gridOperator.ToJSON())));
+
             POIEntityMetadata.AddTo(JSON, Created, LastChangeDate, CustomData);
 
             // The ETags describe the content without them, irrespective of the view options.
@@ -904,24 +968,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Parse ChargingStationManufacturers [optional]
+                #region Parse ChargingStationManufacturers, EMobilityProviders, GridOperators [optional]
 
-                // With the keys and values of the JSON representation.
-                var manufacturersJSON = new JObject();
+                if (!TryParseCBORChildren<ChargingStationManufacturer>(CBOR,
+                                                                       "chargingStationManufacturers",
+                                                                       "chargingStationManufacturerIds",
+                                                                       "charging station manufacturers",
+                                                                       ChargingStationManufacturer.TryParse,
+                                                                       out var chargingStationManufacturers,
+                                                                       out ErrorResponse) ||
 
-                if (CBOR.TryGetValue(CBORValue.FromText("chargingStationManufacturers"),   out var manufacturersCBOR))
-                    manufacturersJSON.Add("chargingStationManufacturers",   CBORJSON.ToJSON(manufacturersCBOR));
+                    !TryParseCBORChildren<EMobilityProvider>          (CBOR,
+                                                                       "eMobilityProviders",
+                                                                       "eMobilityProviderIds",
+                                                                       "e-mobility providers",
+                                                                       EMobilityProvider.TryParse,
+                                                                       out var eMobilityProviders,
+                                                                       out ErrorResponse) ||
 
-                if (CBOR.TryGetValue(CBORValue.FromText("chargingStationManufacturerIds"), out var manufacturerIdsCBOR))
-                    manufacturersJSON.Add("chargingStationManufacturerIds", CBORJSON.ToJSON(manufacturerIdsCBOR));
-
-                if (!POIJSON.TryParseChildren<ChargingStationManufacturer>(manufacturersJSON,
-                                                                           "chargingStationManufacturers",
-                                                                           "chargingStationManufacturerIds",
-                                                                           "charging station manufacturers",
-                                                                           ChargingStationManufacturer.TryParse,
-                                                                           out var chargingStationManufacturers,
-                                                                           out ErrorResponse))
+                    !TryParseCBORChildren<GridOperator>               (CBOR,
+                                                                       "gridOperators",
+                                                                       "gridOperatorIds",
+                                                                       "grid operators",
+                                                                       GridOperator.TryParse,
+                                                                       out var gridOperators,
+                                                                       out ErrorResponse))
                 {
                     return false;
                 }
@@ -977,7 +1048,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      CustomData:                customData,
                                      DataLicenses:              dataLicenses,
                                      ChargingStationOperators:  chargingStationOperators,
-                                     ChargingStationManufacturers:  chargingStationManufacturers
+                                     ChargingStationManufacturers:  chargingStationManufacturers,
+                                     EMobilityProviders:        eMobilityProviders,
+                                     GridOperators:             gridOperators
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -1040,6 +1113,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          CBORValue.FromArray(OrderedChargingStationManufacturers.
                                                  Select(chargingStationManufacturer => chargingStationManufacturer.ToCBOR())));
 
+            if (!eMobilityProviders.IsEmpty)
+                CBOR.Add(CBORValue.FromText("eMobilityProviders"),
+                         CBORValue.FromArray(OrderedEMobilityProviders.
+                                                 Select(eMobilityProvider => eMobilityProvider.ToCBOR())));
+
+            if (!gridOperators.IsEmpty)
+                CBOR.Add(CBORValue.FromText("gridOperators"),
+                         CBORValue.FromArray(OrderedGridOperators.
+                                                 Select(gridOperator => gridOperator.ToCBOR())));
+
             // Always part of the content, with the keys and values of the JSON representation.
             foreach (var metadata in POIEntityMetadata.AddTo([], Created, LastChangeDate, CustomData).Properties())
                 CBOR.Add(CBORValue.FromText(metadata.Name),           CBORJSON.ToCBOR(metadata.Value));
@@ -1074,6 +1157,156 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
 
+
+
+        #region (private static) TryParseCBORChildren<T>(CBOR, PropertyName, IdsPropertyName, Description, Parser, out Children, out ErrorResponse)
+
+        /// <summary>
+        /// The optional embedded children of the given CBOR representation, read with the keys and values of the JSON representation.
+        /// </summary>
+        private static Boolean TryParseCBORChildren<T>(CBORValue                         CBOR,
+                                                       String                            PropertyName,
+                                                       String                            IdsPropertyName,
+                                                       String                            Description,
+                                                       POIObjectParser<T>                Parser,
+                                                       out ImmutableArray<T>             Children,
+                                                       [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            var json = new JObject();
+
+            if (CBOR.TryGetValue(CBORValue.FromText(PropertyName),    out var childrenCBOR))
+                json.Add(PropertyName,    CBORJSON.ToJSON(childrenCBOR));
+
+            if (CBOR.TryGetValue(CBORValue.FromText(IdsPropertyName), out var childIdsCBOR))
+                json.Add(IdsPropertyName, CBORJSON.ToJSON(childIdsCBOR));
+
+            return POIJSON.TryParseChildren(json,
+                                            PropertyName,
+                                            IdsPropertyName,
+                                            Description,
+                                            Parser,
+                                            out Children,
+                                            out ErrorResponse);
+
+        }
+
+        #endregion
+
+
+        #region E-mobility providers
+
+        private readonly ConcurrentDictionary<EMobilityProvider_Id, EMobilityProvider> eMobilityProviders = [];
+
+        /// <summary>
+        /// The e-mobility providers in this immutable network version.
+        /// </summary>
+        public IEnumerable<EMobilityProvider> EMobilityProviders
+            => eMobilityProviders.Values;
+
+        /// <summary>
+        /// The e-mobility providers ordered by their identification (ordinal), as in the JSON and CBOR representations.
+        /// </summary>
+        private IEnumerable<EMobilityProvider> OrderedEMobilityProviders
+            => eMobilityProviders.Values.OrderBy(eMobilityProvider => eMobilityProvider.Id.ToString(), StringComparer.Ordinal);
+
+        /// <summary>
+        /// Try to get the e-mobility provider having the given identification.
+        /// </summary>
+        /// <param name="EMobilityProviderId">The identification of an e-mobility provider.</param>
+        /// <param name="EMobilityProvider">The e-mobility provider.</param>
+        public Boolean TryGetEMobilityProviderById(EMobilityProvider_Id                        EMobilityProviderId,
+                                                   [NotNullWhen(true)] out EMobilityProvider?  EMobilityProvider)
+
+            => eMobilityProviders.TryGetValue(EMobilityProviderId, out EMobilityProvider);
+
+        #endregion
+
+
+        #region Grid operators
+
+        private readonly ConcurrentDictionary<GridOperator_Id, GridOperator> gridOperators = [];
+
+        /// <summary>
+        /// The grid operators in this immutable network version.
+        /// </summary>
+        public IEnumerable<GridOperator> GridOperators
+            => gridOperators.Values;
+
+        /// <summary>
+        /// The grid operators ordered by their identification (ordinal), as in the JSON and CBOR representations.
+        /// </summary>
+        private IEnumerable<GridOperator> OrderedGridOperators
+            => gridOperators.Values.OrderBy(gridOperator => gridOperator.Id.ToString(), StringComparer.Ordinal);
+
+        /// <summary>
+        /// Try to get the grid operator having the given identification.
+        /// </summary>
+        /// <param name="GridOperatorId">The identification of a grid operator.</param>
+        /// <param name="GridOperator">The grid operator.</param>
+        public Boolean TryGetGridOperatorById(GridOperator_Id                        GridOperatorId,
+                                              [NotNullWhen(true)] out GridOperator?  GridOperator)
+
+            => gridOperators.TryGetValue(GridOperatorId, out GridOperator);
+
+        /// <summary>
+        /// The error, when a grid connection point names a grid operator the given ones do not have.
+        /// </summary>
+        internal static String? UnknownGridOperator(IEnumerable<ChargingStationOperator>                ChargingStationOperators,
+                                                    IReadOnlyDictionary<GridOperator_Id, GridOperator>  GridOperators)
+        {
+
+            foreach (var chargingPool in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPools))
+                if (chargingPool.GridConnectionPoint is GridConnectionPoint gridConnectionPoint &&
+                    !GridOperators.ContainsKey(gridConnectionPoint.GridOperatorId))
+                {
+                    return $"The grid operator '{gridConnectionPoint.GridOperatorId}' of the grid connection point '{gridConnectionPoint.Id}' of the charging pool '{chargingPool.Id}' is unknown in the roaming network!";
+                }
+
+            return null;
+
+        }
+
+        #endregion
+
+
+        #region Energy meters
+
+        private readonly ConcurrentDictionary<EnergyMeter_Id, EnergyMeter> energyMeters = [];
+
+        /// <summary>
+        /// The energy meters of all charging pools, their grid connection points, charging stations and EVSEs.
+        /// </summary>
+        public IEnumerable<EnergyMeter> EnergyMeters
+            => energyMeters.Values;
+
+        /// <summary>
+        /// Try to get the energy meter having the given identification, anywhere in the network.
+        /// </summary>
+        /// <param name="EnergyMeterId">The identification of an energy meter.</param>
+        /// <param name="EnergyMeter">The energy meter.</param>
+        public Boolean TryGetEnergyMeterById(EnergyMeter_Id                        EnergyMeterId,
+                                             [NotNullWhen(true)] out EnergyMeter?  EnergyMeter)
+
+            => energyMeters.TryGetValue(EnergyMeterId, out EnergyMeter);
+
+        /// <summary>
+        /// The error, when two of the given operators have an energy meter with the same identification.
+        /// </summary>
+        internal static String? DuplicateEnergyMeter(IEnumerable<ChargingStationOperator> ChargingStationOperators)
+        {
+
+            var seen = new HashSet<EnergyMeter_Id>();
+
+            foreach (var energyMeter in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters))
+                if (!seen.Add(energyMeter.Id))
+                    return $"The energy meter '{energyMeter.Id}' must not be given twice in the roaming network!";
+
+            return null;
+
+        }
+
+        #endregion
 
 
         #region Charging station manufacturers

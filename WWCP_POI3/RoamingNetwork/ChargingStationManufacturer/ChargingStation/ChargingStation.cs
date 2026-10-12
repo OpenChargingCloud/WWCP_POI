@@ -103,6 +103,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<EVSE>  EVSEs                 { get; }
 
+        /// <summary>
+        /// Its own energy meters, in the order of their identifications; not those of its EVSEs.
+        /// </summary>
+        public ImmutableArray<EnergyMeter>  EnergyMeters  { get; }
+
+        /// <summary>
+        /// Its own energy meters and those of its EVSEs.
+        /// </summary>
+        public IEnumerable<EnergyMeter>     AllEnergyMeters
+            => EnergyMeters.Concat(EVSEs.SelectMany(evse => evse.AllEnergyMeters));
+
         #endregion
 
         #region Constructor(s)
@@ -120,6 +131,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                ChargingStationManufacturer_Id?                 ManufacturerId               = null,
                                ChargingStationModel_Id?                        ModelId                      = null,
                                IEnumerable<EVSE>?                              EVSEs                        = null,
+                               IEnumerable<EnergyMeter>?                       EnergyMeters                 = null,
 
                                Timestamped<ChargingStationAdminStatusType>?    InitialAdminStatus           = null,
                                Timestamped<ChargingStationStatusType>?         InitialStatus                = null,
@@ -172,6 +184,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ModelId             = ModelId;
             this.EVSEs               = [.. evses.OrderBy(evse => evse.Id.ToString(), StringComparer.Ordinal)];
             this.evseIndex           = this.EVSEs.ToImmutableDictionary(evse => evse.Id);
+            this.EnergyMeters        = EnergyMeter.Ordered(EnergyMeters, $"the charging station '{Id}'");
 
         }
 
@@ -281,6 +294,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ModelId.HasValue)
                 json.Add("modelId",            ModelId.Value.ToString());
 
+            if (EnergyMeters.Length > 0)
+                json.Add("energyMeters",       new JArray(EnergyMeters.Select(energyMeter => energyMeter.ToJSON())));
+
             if (EVSEs.Length > 0)
                 json.Add("EVSEs",              new JArray(EVSEs.Select(evse => evse.ToJSON())));
 
@@ -343,6 +359,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIJSON.TryParseChildren<EnergyMeter>(JSON,
+                                                           "energyMeters",
+                                                           "energyMeterIds",
+                                                           "energy meters",
+                                                           EnergyMeter.TryParse,
+                                                           out var energyMeters,
+                                                           out ErrorResponse))
+                {
+                    return false;
+                }
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -362,6 +389,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       manufacturerId,
                                                       modelId,
                                                       evses,
+                                                      energyMeters,
                                                       DataSource:  dataSource,
                                                       Created:     created,
                                                       LastChange:  lastChange,

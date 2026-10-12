@@ -110,6 +110,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IEnumerable<EVSE>                EVSEs
             => ChargingStations.SelectMany(chargingStation => chargingStation.EVSEs);
 
+        /// <summary>
+        /// Where it is connected to the public grid.
+        /// </summary>
+        public GridConnectionPoint?             GridConnectionPoint   { get; }
+
+        /// <summary>
+        /// Its own energy meters, in the order of their identifications;
+        /// not that of its grid connection point, not those of its charging stations.
+        /// </summary>
+        public ImmutableArray<EnergyMeter>      EnergyMeters          { get; }
+
+        /// <summary>
+        /// Its own energy meters, that of its grid connection point,
+        /// and those of its charging stations and their EVSEs.
+        /// </summary>
+        public IEnumerable<EnergyMeter>         AllEnergyMeters
+            => EnergyMeters.
+                   Concat(GridConnectionPoint?.EnergyMeter is EnergyMeter gridMeter ? [ gridMeter ] : []).
+                   Concat(ChargingStations.SelectMany(chargingStation => chargingStation.AllEnergyMeters));
+
         #endregion
 
         #region Constructor(s)
@@ -127,6 +147,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             PhoneNumber?                                 HotlinePhoneNumber           = null,
                             IEnumerable<DataLicense>?                    DataLicenses                 = null,
                             IEnumerable<ChargingStation>?                ChargingStations             = null,
+                            GridConnectionPoint?                         GridConnectionPoint          = null,
+                            IEnumerable<EnergyMeter>?                    EnergyMeters                 = null,
 
                             Timestamped<ChargingPoolAdminStatusType>?    InitialAdminStatus           = null,
                             Timestamped<ChargingPoolStatusType>?         InitialStatus                = null,
@@ -186,6 +208,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.DataLicenses          = [.. dataLicenses.Ordered()];
             this.ChargingStations      = [.. chargingStations.OrderBy(chargingStation => chargingStation.Id.ToString(), StringComparer.Ordinal)];
             this.chargingStationIndex  = this.ChargingStations.ToImmutableDictionary(chargingStation => chargingStation.Id);
+            this.GridConnectionPoint   = GridConnectionPoint;
+            this.EnergyMeters          = EnergyMeter.Ordered(EnergyMeters, $"the charging pool '{Id}'");
 
         }
 
@@ -296,6 +320,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (HotlinePhoneNumber.HasValue)
                 json.Add("hotline",           HotlinePhoneNumber.Value.ToString());
 
+            if (GridConnectionPoint is not null)
+                json.Add("gridConnectionPoint",  GridConnectionPoint.ToJSON());
+
+            if (EnergyMeters.Length > 0)
+                json.Add("energyMeters",      new JArray(EnergyMeters.Select(energyMeter => energyMeter.ToJSON())));
+
             if (ChargingStations.Length > 0)
                 json.Add("chargingStations",  new JArray(ChargingStations.Select(chargingStation => chargingStation.ToJSON())));
 
@@ -365,6 +395,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POI.GridConnectionPoint.TryParseOne(JSON, "gridConnectionPoint", out var gridConnectionPoint, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseChildren<EnergyMeter>(JSON,
+                                                           "energyMeters",
+                                                           "energyMeterIds",
+                                                           "energy meters",
+                                                           EnergyMeter.TryParse,
+                                                           out var energyMeters,
+                                                           out ErrorResponse))
+                {
+                    return false;
+                }
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -384,6 +428,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 hotline,
                                                 dataLicenses,
                                                 chargingStations,
+                                                gridConnectionPoint,
+                                                energyMeters,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,

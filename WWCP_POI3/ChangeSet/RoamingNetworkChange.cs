@@ -465,6 +465,92 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Add                   (EMobilityProvider)
+
+        /// <summary>
+        /// Add the given e-mobility provider to its roaming network.
+        /// </summary>
+        /// <param name="EMobilityProvider">The new e-mobility provider.</param>
+        public static RoamingNetworkChange Add(EMobilityProvider EMobilityProvider)
+
+            => Add(nameof(POI.EMobilityProvider),
+                   EMobilityProvider.Id.ToString(),
+                   EMobilityProvider.ToJSON());
+
+        /// <summary>
+        /// Remove the given e-mobility provider, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(EMobilityProvider_Id  EMobilityProviderId,
+                                                  JToken?               OldValue              = null)
+
+            => Remove(nameof(POI.EMobilityProvider),
+                      EMobilityProviderId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given e-mobility provider, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(EMobilityProvider  EMobilityProvider,
+                                                          String             PropertyName,
+                                                          JToken?            OldValue,
+                                                          JToken             NewValue)
+
+            => UpdateProperty(nameof(POI.EMobilityProvider), EMobilityProvider.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given e-mobility provider, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(EMobilityProvider  EMobilityProvider,
+                                                          String             PropertyName,
+                                                          JToken?            OldValue   = null)
+
+            => RemoveProperty(nameof(POI.EMobilityProvider), EMobilityProvider.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (GridOperator)
+
+        /// <summary>
+        /// Add the given grid operator to its roaming network.
+        /// </summary>
+        /// <param name="GridOperator">The new grid operator.</param>
+        public static RoamingNetworkChange Add(GridOperator GridOperator)
+
+            => Add(nameof(POI.GridOperator),
+                   GridOperator.Id.ToString(),
+                   GridOperator.ToJSON());
+
+        /// <summary>
+        /// Remove the given grid operator, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(GridOperator_Id  GridOperatorId,
+                                                  JToken?          OldValue         = null)
+
+            => Remove(nameof(POI.GridOperator),
+                      GridOperatorId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given grid operator, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(GridOperator  GridOperator,
+                                                          String        PropertyName,
+                                                          JToken?       OldValue,
+                                                          JToken        NewValue)
+
+            => UpdateProperty(nameof(POI.GridOperator), GridOperator.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given grid operator, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(GridOperator  GridOperator,
+                                                          String        PropertyName,
+                                                          JToken?       OldValue   = null)
+
+            => RemoveProperty(nameof(POI.GridOperator), GridOperator.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
         #region Add                   (ChargingPool)
 
         /// <summary>

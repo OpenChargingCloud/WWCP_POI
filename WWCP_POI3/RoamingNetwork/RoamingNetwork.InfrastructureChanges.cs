@@ -58,6 +58,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "parkingType",
             "accessibility",
             "hotline",
+            "gridConnectionPoint",
+            "energyMeters",
             "customData"
         ];
 
@@ -74,6 +76,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "hotline",
             "manufacturerId",
             "modelId",
+            "energyMeters",
             "customData"
         ];
 
@@ -91,6 +94,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "maxCurrent",
             "maxPower",
             "chargingConnectors",
+            "energyMeter",
             "customData"
         ];
 
