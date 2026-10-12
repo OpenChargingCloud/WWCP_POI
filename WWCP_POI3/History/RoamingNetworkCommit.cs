@@ -38,7 +38,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// Its identification is the SHA-256 digest of its canonical JSON content without signatures,
     /// so it names its whole ancestry, and signatures added later do not change it.
     /// </summary>
-    public sealed class RoamingNetworkCommit
+    public sealed partial class RoamingNetworkCommit
     {
 
         #region Data
@@ -83,6 +83,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RoamingNetworkChangeSet?   ChangeSet           { get; }
 
         /// <summary>
+        /// The signatures of this commit, e.g. of the leader and of a roaming network operator.
+        /// They are not part of the content the identification is calculated over.
+        /// </summary>
+        public ImmutableArray<RoamingNetworkCommitSignature>  Signatures  { get; }
+
+        /// <summary>
         /// Whether this commit starts a history.
         /// </summary>
         public Boolean                    IsGenesis
@@ -96,7 +102,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      RoamingNetwork_Id         RoamingNetworkId,
                                      UInt64                    Revision,
                                      ImmutableArray<ETag>      ETags,
-                                     RoamingNetworkChangeSet?  ChangeSet)
+                                     RoamingNetworkChangeSet?  ChangeSet,
+                                     ImmutableArray<RoamingNetworkCommitSignature>  Signatures   = default)
         {
 
             if (ETags.IsDefaultOrEmpty || ETags.Any(eTag => !eTag.IsValid))
@@ -113,6 +120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Revision          = Revision;
             this.ETags             = ETags;
             this.ChangeSet         = ChangeSet;
+            this.Signatures        = Signatures.IsDefault ? [] : Signatures;
             this.Id                = CalcId();
 
         }
@@ -349,13 +357,50 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse Signatures          [optional]
+
+                var signatures = ImmutableArray.CreateBuilder<RoamingNetworkCommitSignature>();
+
+                if (JSON["signatures"] is JToken signaturesJSON)
+                {
+
+                    if (signaturesJSON is not JArray signaturesArray)
+                    {
+                        ErrorResponse = "The signatures must be a JSON array!";
+                        return false;
+                    }
+
+                    foreach (var signatureJSON in signaturesArray)
+                    {
+
+                        if (signatureJSON is not JObject signatureObject)
+                        {
+                            ErrorResponse = $"Invalid signature {signatures.Count}: it must be a JSON object!";
+                            return false;
+                        }
+
+                        if (!RoamingNetworkCommitSignature.TryParse(signatureObject, out var signature, out var signatureError))
+                        {
+                            ErrorResponse = $"Invalid signature {signatures.Count}: " + signatureError;
+                            return false;
+                        }
+
+                        signatures.Add(signature);
+
+                    }
+
+                }
+
+                #endregion
+
 
                 var commit = new RoamingNetworkCommit(
                                  parentId,
                                  roamingNetworkId,
                                  revision,
                                  eTags.MoveToImmutable(),
-                                 changeSet
+                                 changeSet,
+                                 [ .. signatures.Distinct() ]
                              );
 
                 if (commit.Id != id)
@@ -422,18 +467,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(IncludeSignatures = true)
 
         /// <summary>
-        /// Return the JSON representation of this commit, its change set with its signatures.
+        /// Return the JSON representation of this commit, its change set with its signatures,
+        /// and, unless excluded, with the signatures of this commit.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="IncludeSignatures">Whether to include the signatures of this commit.</param>
+        public JObject ToJSON(Boolean IncludeSignatures = true)
         {
 
             var json = Content(IncludeSignatures: true);
 
             json.Remove("profile");
             json.AddFirst(new JProperty("@id", Id.ToString()));
+
+            if (IncludeSignatures && !Signatures.IsEmpty)
+                json.Add("signatures", new JArray(Signatures.Select(signature => signature.ToJSON())));
 
             return json;
 

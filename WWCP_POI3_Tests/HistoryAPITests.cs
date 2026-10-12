@@ -216,6 +216,68 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         #endregion
 
 
+        #region Signatures_are_added_to_commits_over_HTTP()
+
+        [Test]
+        public async Task Signatures_are_added_to_commits_over_HTTP()
+        {
+
+            var commit     = Publish("v1", 1).Commit!;
+            var signature  = commit.CreateSignature(CommitSignatureTests.RNOKey,
+                                                    "rno",
+                                                    COSEAlgorithm.Ed25519,
+                                                    RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator,
+                                                    "DE*RNO");
+
+            var forged     = commit.CreateSignature(CommitSignatureTests.LeaderKey,
+                                                    "rno",
+                                                    COSEAlgorithm.Ed25519,
+                                                    RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator);
+
+            async Task<(HttpStatusCode StatusCode, JObject JSON)> Post(String CommitId, String Body)
+            {
+                using var content   = new StringContent(Body, System.Text.Encoding.UTF8, "application/json");
+                using var response  = await httpClient!.PostAsync($"commits/{CommitId}/signatures", content);
+                return (response.StatusCode, JObject.Parse(await response.Content.ReadAsStringAsync()));
+            }
+
+            String Body(params RoamingNetworkCommitSignature[] Signatures)
+                => new JObject(new JProperty("signatures", new JArray(Signatures.Select(signature => signature.ToJSON())))).ToString();
+
+            var notEnabled  = await Post(commit.Id.ToString(), Body(signature));
+
+            poiAPI!.AuthorizeCommitSignature  = (request, commit, signature) => true;
+            poiAPI.VerifyCommitSignature      = CommitSignatureTests.VerifyCommit;
+
+            var garbage     = await Post(commit.Id.ToString(), "{ \"signatures\": [] }");
+            var unknown     = await Post(new String('0', 64),  Body(signature));
+            var invalid     = await Post(commit.Id.ToString(), Body(forged));
+            var added       = await Post(commit.Id.ToString(), Body(signature));
+            var known       = await Post(commit.Id.ToString(), Body(signature));
+
+            var (_, text)   = await Get($"commits/{commit.Id}");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(notEnabled.StatusCode,                        Is.EqualTo(HttpStatusCode.Forbidden));
+                Assert.That(garbage.StatusCode,                           Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(unknown.StatusCode,                           Is.EqualTo(HttpStatusCode.NotFound));
+                Assert.That(invalid.StatusCode,                           Is.EqualTo((HttpStatusCode) 422));
+                Assert.That(added.StatusCode,                             Is.EqualTo(HttpStatusCode.Created));
+                Assert.That(added.JSON["added"]!.Value<Int32>(),          Is.EqualTo(1));
+                Assert.That(known.StatusCode,                             Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(known.JSON["added"]!.Value<Int32>(),          Is.Zero);
+
+                Assert.That(RoamingNetworkCommit.TryParse(text, out var fetched, out var error),  Is.True, error);
+                Assert.That(fetched!.Signatures,                          Is.EqualTo(new[] { signature }));
+
+            }
+
+        }
+
+        #endregion
+
         #region Change_sets_are_committed_not_posted()
 
         [Test]

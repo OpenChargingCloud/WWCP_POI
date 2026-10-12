@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json;
@@ -99,6 +100,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <param name="Announcement">A slim notice of the commit.</param>
     public delegate void OnRoamingNetworkCommitAnnouncementDelegate(RoamingNetworkCommitAnnouncement Announcement);
 
+    /// <summary>
+    /// Called for every commit a history takes new signatures of, while the history is locked:
+    /// return quickly and do not change the history from here.
+    /// </summary>
+    /// <param name="Commit">The commit with all its signatures.</param>
+    /// <param name="NewSignatures">The signatures taken now.</param>
+    public delegate void OnRoamingNetworkCommitSignaturesDelegate(RoamingNetworkCommit                          Commit,
+                                                                  IReadOnlyList<RoamingNetworkCommitSignature>  NewSignatures);
+
 
     /// <summary>
     /// The history of a roaming network as a chain of commits, held in memory.
@@ -134,7 +144,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The first commit this history holds: a genesis commit, or the head of the snapshot it started from.
         /// </summary>
-        public RoamingNetworkCommit  Root                { get; }
+        public RoamingNetworkCommit  Root
+        {
+            get
+            {
+                lock (historyLock)
+                {
+                    return commits[0];
+                }
+            }
+        }
 
         /// <summary>
         /// The latest commit and the version it leads to.
@@ -146,6 +165,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The current admin status and status of the entities of the head version, kept across versions.
         /// </summary>
         public RoamingNetworkRuntimeStatus  RuntimeStatus    { get; }
+
+        /// <summary>
+        /// The keys that sign every commit published here, e.g. the one of the leading server.
+        /// </summary>
+        public ImmutableArray<RoamingNetworkCommitSigner>  Signers  { get; set; } = [];
 
         /// <summary>
         /// The number of commits this history holds, including its root.
@@ -171,6 +195,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public event OnRoamingNetworkCommitAnnouncementDelegate? OnCommitAnnouncement;
 
+        /// <summary>
+        /// Called for every commit this history takes new signatures of, e.g. of a roaming network operator,
+        /// while the history is locked: return quickly and do not change the history from there.
+        /// </summary>
+        public event OnRoamingNetworkCommitSignaturesDelegate?   OnCommitSignatures;
+
         #endregion
 
         #region Constructor(s)
@@ -180,7 +210,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.RoamingNetworkId  = RoamingNetwork.Id;
-            this.Root              = Root;
             this.head              = new RoamingNetworkHead(Root, RoamingNetwork);
             this.RuntimeStatus     = new RoamingNetworkRuntimeStatus(this);
 
@@ -193,16 +222,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) Start        (RoamingNetwork)
+        #region (static) Start        (RoamingNetwork, Signers = null)
 
         /// <summary>
         /// Start the history of the given first version of a roaming network with its genesis commit.
         /// </summary>
         /// <param name="RoamingNetwork">The first version of a roaming network.</param>
-        public static RoamingNetworkHistory Start(RoamingNetwork RoamingNetwork)
+        /// <param name="Signers">The optional keys that sign the genesis commit and every commit published here.</param>
+        public static RoamingNetworkHistory Start(RoamingNetwork                            RoamingNetwork,
+                                                  IEnumerable<RoamingNetworkCommitSigner>?  Signers   = null)
+        {
 
-            => new (RoamingNetworkCommit.Genesis(RoamingNetwork),
-                    RoamingNetwork);
+            var signers = Signers?.ToImmutableArray() ?? [];
+
+            return new (SignedBy(signers, RoamingNetworkCommit.Genesis(RoamingNetwork)),
+                        RoamingNetwork) {
+                       Signers = signers
+                   };
+
+        }
 
         #endregion
 
@@ -336,10 +374,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            RoamingNetwork.Revision  = Commit.Revision;
-            RoamingNetwork.CalcETags();
+            // A copy, when it needs another revision: the given version stays as it is.
+            var roamingNetwork = RoamingNetwork.WithRevision(Commit.Revision);
+            roamingNetwork.CalcETags();
 
-            History        = new RoamingNetworkHistory(Commit, RoamingNetwork);
+            History        = new RoamingNetworkHistory(Commit, roamingNetwork);
             ErrorResponse  = null;
             return true;
 
@@ -574,7 +613,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!head.RoamingNetwork.TryApplyChangeSet(changeSet, out var roamingNetwork, out var applyError, VerifySignature))
                     return new (RoamingNetworkPublishStatus.Refused, head, ErrorResponse: applyError);
 
-                var commit  = RoamingNetworkCommit.Next(head.Commit, changeSet, roamingNetwork);
+                var commit  = SignedBy(Signers, RoamingNetworkCommit.Next(head.Commit, changeSet, roamingNetwork));
                 var newHead = new RoamingNetworkHead(commit, roamingNetwork);
 
                 Advance(newHead);
@@ -587,19 +626,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryAppend(Commit,  out ErrorResponse, VerifySignature = null)
+        #region TryAppend(Commit,  out ErrorResponse, VerifySignature = null, VerifyCommitSignature = null, RequiredSignatureRoles = null)
 
         /// <summary>
         /// Append the given commit of the leading server to this history: on the other servers.
         /// It must follow the head, have the next revision, and its change set must lead
-        /// to a version with its ETags. A commit this history holds already is accepted without a change.
+        /// to a version with its ETags. Its signatures must all be valid, and it must be signed in every required role.
+        /// A commit this history holds already is accepted, taking the signatures it has in addition.
         /// </summary>
         /// <param name="Commit">The commit.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="VerifySignature">A verifier of signatures using trusted keys, required for signed change sets.</param>
+        /// <param name="VerifyCommitSignature">A verifier of commit signatures using trusted keys, required for signed commits.</param>
+        /// <param name="RequiredSignatureRoles">The roles a commit must be signed in, e.g. leader.</param>
         public Boolean TryAppend(RoamingNetworkCommit                Commit,
                                  [NotNullWhen(false)] out String?    ErrorResponse,
-                                 VerifyChangeSetSignatureDelegate?   VerifySignature   = null)
+                                 VerifyChangeSetSignatureDelegate?   VerifySignature          = null,
+                                 VerifyCommitSignatureDelegate?      VerifyCommitSignature    = null,
+                                 IReadOnlyCollection<String>?        RequiredSignatureRoles   = null)
         {
 
             lock (historyLock)
@@ -614,10 +658,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 if (commitIndex.ContainsKey(Commit.Id))
-                {
-                    ErrorResponse = null;
-                    return true;
-                }
+                    return TryAddSignatures(Commit.Id, Commit.Signatures, VerifyCommitSignature, out _, out _, out ErrorResponse);
+
+                if (!CheckSignatures(Commit, VerifyCommitSignature, RequiredSignatureRoles, out ErrorResponse))
+                    return false;
 
                 if (Commit.RoamingNetworkId != RoamingNetworkId)
                 {
@@ -660,7 +704,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryAppend(Commits, out Appended, out ErrorResponse, VerifySignature = null)
+        #region TryAppend(Commits, out Appended, out ErrorResponse, VerifySignature = null, VerifyCommitSignature = null, RequiredSignatureRoles = null)
 
         /// <summary>
         /// Append the given commits of the leading server in their order, until the first one that can not be appended.
@@ -669,10 +713,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Appended">The number of commits appended or held already.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="VerifySignature">A verifier of signatures using trusted keys, required for signed change sets.</param>
+        /// <param name="VerifyCommitSignature">A verifier of commit signatures using trusted keys, required for signed commits.</param>
+        /// <param name="RequiredSignatureRoles">The roles a commit must be signed in, e.g. leader.</param>
         public Boolean TryAppend(IEnumerable<RoamingNetworkCommit>  Commits,
                                  out Int32                          Appended,
                                  [NotNullWhen(false)] out String?   ErrorResponse,
-                                 VerifyChangeSetSignatureDelegate?  VerifySignature   = null)
+                                 VerifyChangeSetSignatureDelegate?  VerifySignature          = null,
+                                 VerifyCommitSignatureDelegate?     VerifyCommitSignature    = null,
+                                 IReadOnlyCollection<String>?       RequiredSignatureRoles   = null)
         {
 
             Appended = 0;
@@ -680,7 +728,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var commit in Commits)
             {
 
-                if (!TryAppend(commit, out ErrorResponse, VerifySignature))
+                if (!TryAppend(commit, out ErrorResponse, VerifySignature, VerifyCommitSignature, RequiredSignatureRoles))
                 {
                     ErrorResponse = $"Commit {Appended}: {ErrorResponse}";
                     return false;
@@ -694,6 +742,159 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return true;
 
         }
+
+        #endregion
+
+        #region TryAddSignatures(CommitId, Signatures, VerifyCommitSignature, out Commit, out NewSignatures, out ErrorResponse)
+
+        /// <summary>
+        /// Add the given signatures to a commit of this history, e.g. the one of a roaming network operator
+        /// that received the data of a charging station operator and checked it, or ones the leading server took.
+        /// Every new signature must be valid; signatures the commit has already are skipped.
+        /// The identification of the commit stays the same.
+        /// </summary>
+        /// <param name="CommitId">The identification of the commit.</param>
+        /// <param name="Signatures">Signatures of the commit.</param>
+        /// <param name="VerifyCommitSignature">A verifier of commit signatures using trusted keys, required for new signatures.</param>
+        /// <param name="Commit">The commit with all its signatures afterwards.</param>
+        /// <param name="NewSignatures">The signatures added now.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public Boolean TryAddSignatures(RoamingNetworkCommit_Id                                   CommitId,
+                                        IEnumerable<RoamingNetworkCommitSignature>                Signatures,
+                                        VerifyCommitSignatureDelegate?                            VerifyCommitSignature,
+                                        [NotNullWhen(true)]  out RoamingNetworkCommit?            Commit,
+                                        out IReadOnlyList<RoamingNetworkCommitSignature>          NewSignatures,
+                                        [NotNullWhen(false)] out String?                          ErrorResponse)
+        {
+
+            lock (historyLock)
+            {
+
+                Commit         = null;
+                NewSignatures  = [];
+
+                if (!commitIndex.TryGetValue(CommitId, out var index))
+                {
+                    ErrorResponse = $"The commit '{CommitId}' is unknown here!";
+                    return false;
+                }
+
+                var commit         = commits[index];
+                var newSignatures  = Signatures.Where(signature => !commit.Signatures.Contains(signature)).Distinct().ToArray();
+
+                if (newSignatures.Length == 0)
+                {
+                    Commit         = commit;
+                    ErrorResponse  = null;
+                    return true;
+                }
+
+                foreach (var signature in newSignatures)
+                    if (!CheckSignature(commit, signature, VerifyCommitSignature, out ErrorResponse))
+                        return false;
+
+                commit          = commit.WithSignatures(newSignatures);
+                commits[index]  = commit;
+
+                var head = Head;
+
+                if (head.Commit.Id == CommitId)
+                    Volatile.Write(ref this.head, head with { Commit = commit });
+
+                // One failing subscriber must neither fail the signatures nor keep them from the others.
+                foreach (var subscriber in OnCommitSignatures?.GetInvocationList().Cast<OnRoamingNetworkCommitSignaturesDelegate>() ?? [])
+                {
+                    try
+                    {
+                        subscriber(commit, newSignatures);
+                    }
+                    catch
+                    { }
+                }
+
+                Commit         = commit;
+                NewSignatures  = newSignatures;
+                ErrorResponse  = null;
+                return true;
+
+            }
+
+        }
+
+        #endregion
+
+        #region (static) CheckSignatures(Commit, VerifyCommitSignature, RequiredSignatureRoles, out ErrorResponse)
+
+        /// <summary>
+        /// Check that every signature of the given commit is valid, and that it is signed in every required role,
+        /// e.g. a commit taken from a snapshot.
+        /// </summary>
+        /// <param name="Commit">A commit.</param>
+        /// <param name="VerifyCommitSignature">A verifier of commit signatures using trusted keys, required for signed commits.</param>
+        /// <param name="RequiredSignatureRoles">The roles the commit must be signed in, e.g. leader.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public static Boolean CheckSignatures(RoamingNetworkCommit              Commit,
+                                              VerifyCommitSignatureDelegate?    VerifyCommitSignature,
+                                              IReadOnlyCollection<String>?      RequiredSignatureRoles,
+                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            foreach (var signature in Commit.Signatures)
+                if (!CheckSignature(Commit, signature, VerifyCommitSignature, out ErrorResponse))
+                    return false;
+
+            foreach (var role in RequiredSignatureRoles ?? [])
+                if (!Commit.Signatures.Any(signature => signature.Role == role))
+                {
+                    ErrorResponse = $"The commit '{Commit.Id}' is not signed in the role '{role}'!";
+                    return false;
+                }
+
+            ErrorResponse = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region (private static) CheckSignature(Commit, Signature, VerifyCommitSignature, out ErrorResponse)
+
+        private static Boolean CheckSignature(RoamingNetworkCommit              Commit,
+                                              RoamingNetworkCommitSignature     Signature,
+                                              VerifyCommitSignatureDelegate?    VerifyCommitSignature,
+                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            if (VerifyCommitSignature is null)
+            {
+                ErrorResponse = $"The commit '{Commit.Id}' is signed, but there is no verifier of commit signatures!";
+                return false;
+            }
+
+            if (!VerifyCommitSignature(Commit, Signature))
+            {
+                ErrorResponse = $"The signature of the commit '{Commit.Id}' by {Signature} is invalid, or its key is not trusted!";
+                return false;
+            }
+
+            ErrorResponse = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region (private static) SignedBy(Signers, Commit)
+
+        /// <summary>
+        /// The given commit signed by all the given signers.
+        /// </summary>
+        private static RoamingNetworkCommit SignedBy(ImmutableArray<RoamingNetworkCommitSigner>  Signers,
+                                                     RoamingNetworkCommit                        Commit)
+
+            => Signers.IsDefaultOrEmpty
+                   ? Commit
+                   : Commit.WithSignatures(Signers.Select(signer => signer.Sign(Commit)));
 
         #endregion
 

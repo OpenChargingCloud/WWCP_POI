@@ -18,6 +18,7 @@
 #region Usings
 
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
@@ -272,6 +273,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region SignCommitAsync(CommitId, Signatures, CancellationToken = default)
+
+        /// <summary>
+        /// Send signatures of a commit to the leader, e.g. the one of a roaming network operator
+        /// that checked the data of the commit; they come back as commit signatures.
+        /// </summary>
+        /// <param name="CommitId">The identification of the commit.</param>
+        /// <param name="Signatures">Signatures of the commit, e.g. made by its CreateSignature().</param>
+        /// <param name="CancellationToken">An optional cancellation token.</param>
+        /// <returns>The answer of the leader: { commitId, signatures, added }.</returns>
+        public Task<JObject> SignCommitAsync(RoamingNetworkCommit_Id                     CommitId,
+                                             IEnumerable<RoamingNetworkCommitSignature>  Signatures,
+                                             CancellationToken                           CancellationToken   = default)
+
+            => RequestAsync("signCommit",
+                            new JObject(
+                                new JProperty("commitId",    CommitId.ToString()),
+                                new JProperty("signatures",  new JArray(Signatures.Select(signature => signature.ToJSON())))
+                            ),
+                            CancellationToken);
+
+        #endregion
+
         #region SetStatusAsync(Kind, EntityType, EntityId, Value, Timestamp = null, DataSource = null, CancellationToken = default)
 
         /// <summary>
@@ -410,7 +434,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // pushes wait in the connection until they are taken below.
             var topics = new JArray(options.PushCompleteCommits
                                         ? POI_API.CommitsTopic
-                                        : POI_API.CommitAnnouncementsTopic);
+                                        : POI_API.CommitAnnouncementsTopic,
+                                    POI_API.CommitSignaturesTopic);
 
             if (options.FollowStatus)
             {
@@ -468,6 +493,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             await TakeCommitAsync(Connection, payload, CancellationToken);
                             break;
 
+                        case "commitSignatures":
+                            TakeCommitSignatures(payload);
+                            break;
+
                         case "commitAnnouncement":
                             if (payload["commitId"]?.Value<String>() is not String commitIdText ||
                                 !RoamingNetworkCommit_Id.TryParse(commitIdText, out var commitId) ||
@@ -507,11 +536,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (RoamingNetworkCommit.TryParse(CommitJSON, out var commit, out _, options.ChangeSetLimits))
             {
 
-                if (currentHistory.Contains(commit.Id))
-                    return;
-
-                if (commit.ParentId == currentHistory.Head.Commit.Id &&
-                    currentHistory.TryAppend(commit, out _, options.VerifyChangeSetSignature))
+                // A commit held already only brings signatures in addition.
+                if ((currentHistory.Contains(commit.Id) || commit.ParentId == currentHistory.Head.Commit.Id) &&
+                    currentHistory.TryAppend(commit, out _, options.VerifyChangeSetSignature, options.VerifyCommitSignature, options.RequiredSignatureRoles))
                 {
                     return;
                 }
@@ -520,6 +547,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Missed, unreadable or not appendable: ask the leader for everything since the head.
             await CatchUpAsync(Connection, CancellationToken);
+
+        }
+
+        #endregion
+
+        #region (private) TakeCommitSignatures(SignaturesJSON)
+
+        /// <summary>
+        /// Take the new signatures of a commit, e.g. of a roaming network operator.
+        /// A commit not held yet brings them along when it is fetched.
+        /// </summary>
+        private void TakeCommitSignatures(JObject SignaturesJSON)
+        {
+
+            if (!RoamingNetworkCommitSignature.TryParseCommitSignatures(SignaturesJSON, out var commitId, out var signatures, out var errorResponse))
+            {
+                RaiseError("Invalid commit signatures: " + errorResponse, null);
+                return;
+            }
+
+            var currentHistory = History!;
+
+            if (currentHistory.Contains(commitId) &&
+                !currentHistory.TryAddSignatures(commitId, signatures, options.VerifyCommitSignature, out _, out _, out errorResponse))
+            {
+                RaiseError("The commit signatures of the leader can not be taken: " + errorResponse, null);
+            }
 
         }
 
@@ -590,7 +644,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (commits.Count == 0)
                     return;
 
-                if (!currentHistory.TryAppend(commits, out _, out var appendError, options.VerifyChangeSetSignature))
+                if (!currentHistory.TryAppend(commits, out _, out var appendError, options.VerifyChangeSetSignature, options.VerifyCommitSignature, options.RequiredSignatureRoles))
                     throw new InvalidOperationException("The commits of the leader can not be appended: " + appendError);
 
             }
@@ -612,6 +666,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (!RoamingNetworkHistory.TryFromSnapshot(snapshot, out var newHistory, out var errorResponse, options.ChangeSetLimits))
                 throw new InvalidOperationException("Invalid snapshot of the leader: " + errorResponse);
+
+            if (!RoamingNetworkHistory.CheckSignatures(newHistory.Head.Commit, options.VerifyCommitSignature, options.RequiredSignatureRoles, out var signatureError))
+                throw new InvalidOperationException("The snapshot of the leader is not signed as required: " + signatureError);
 
             var oldHistory = Interlocked.Exchange(ref history, newHistory);
 

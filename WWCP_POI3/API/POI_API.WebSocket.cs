@@ -62,6 +62,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// runtimeStatus     {}                                         { runtimeStatus: [ … ] }: the current admin status and status
     /// setStatus         { kind, entityType, entityId, value,       { result, description?, current? }: Updated, Unchanged, Outdated,
     ///                     timestamp?, dataSource? }                Scheduled or Refused, and the current status afterwards
+    /// signCommit        { commitId, signatures: [ … ] }            { commitId, signatures, added }: all signatures of the commit afterwards,
+    ///                                                              and how many were added
     /// topics            {}                                         { topics: [ { name, action, description } ] }
     /// subscribe         { topics: [ … ] }                          { topics: [ … ] }: all topics subscribed now
     /// unsubscribe       { topics: [ … ] }                          { topics: [ … ] }
@@ -73,6 +75,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// commitAnnouncements    commitAnnouncement   { timestamp, commitId, parentIds, revision, description? }
     /// commits                commit               the complete commit; one larger than MaxPushedCommitSize
     ///                                             as a commitAnnouncement, to be fetched
+    /// commitSignatures       commitSignatures     { commitId, signatures: [ … ] }: signatures added to a commit later
     /// adminStatusUpdates     adminStatusUpdate    { kind, entityType, entityId, timestamp, value, oldTimestamp?, oldValue?, dataSource? }
     /// statusUpdates          statusUpdate         the same, for the status
     /// energyStatusUpdates    energyStatusUpdate   the same, for the energy status of EVSEs and charging stations,
@@ -92,6 +95,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The topic of complete commits.
         /// </summary>
         public const String CommitsTopic              = "commits";
+
+        /// <summary>
+        /// The topic of signatures added to commits later, e.g. by a roaming network operator.
+        /// </summary>
+        public const String CommitSignaturesTopic     = "commitSignatures";
 
         /// <summary>
         /// The default maximum size of a commit pushed completely, as JSON text: 1 MiB.
@@ -335,6 +343,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region signCommit
+
+            webSocketServer.AddCommand("signCommit", request =>
+
+                Task.FromResult(
+                    SignCommit(request, History)
+                )
+
+            );
+
+            #endregion
+
             #region runtimeStatus
 
             webSocketServer.AddCommand("runtimeStatus", request =>
@@ -368,6 +388,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             webSocketServer.AddTopic(new POIWebSocketTopic(CommitsTopic,
                                                            "commit",
                                                            "Every new commit completely, as the command commit returns it; one larger than MaxPushedCommitSize as a commitAnnouncement."));
+
+            webSocketServer.AddTopic(new POIWebSocketTopic(CommitSignaturesTopic,
+                                                           "commitSignatures",
+                                                           "The signatures added to a commit later, e.g. by a roaming network operator that checked its data."));
 
             webSocketServer.AddTopic(new POIWebSocketTopic(AdminStatusUpdatesTopic,
                                                            "adminStatusUpdate",
@@ -420,6 +444,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             };
 
+            OnRoamingNetworkCommitSignaturesDelegate onCommitSignatures = (commit, newSignatures) =>
+                WebSocketServer.Push(CommitSignaturesTopic,
+                                     new JObject(
+                                         new JProperty("commitId",    commit.Id.ToString()),
+                                         new JProperty("signatures",  new JArray(newSignatures.Select(signature => signature.ToJSON())))
+                                     ));
+
             OnPOIStatusUpdateDelegate onStatusUpdate = statusUpdate =>
                 WebSocketServer.Push(statusUpdate.Kind switch {
                                          POIRuntimeStatusKind.AdminStatus   => AdminStatusUpdatesTopic,
@@ -429,12 +460,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      statusUpdate.ToJSON());
 
             History.OnCommitAnnouncement          += onCommitAnnouncement;
+            History.OnCommitSignatures            += onCommitSignatures;
             History.RuntimeStatus.OnStatusUpdate  += onStatusUpdate;
 
             historyDisconnects[History.RoamingNetworkId] = () => {
                 History.OnCommitAnnouncement          -= onCommitAnnouncement;
+                History.OnCommitSignatures            -= onCommitSignatures;
                 History.RuntimeStatus.OnStatusUpdate  -= onStatusUpdate;
             };
+
+        }
+
+        #endregion
+
+        #region (private) SignCommit(Request, History)
+
+        /// <summary>
+        /// Add the signatures of the request to a commit, as AddCommitSignatures() does for an HTTP request.
+        /// </summary>
+        private POIWebSocketMessage SignCommit(POIWebSocketRequest    Request,
+                                               RoamingNetworkHistory  History)
+        {
+
+            if (Request.Session.UpgradeRequest is not HTTPRequest upgradeRequest)
+                return Request.Error(POIWebSocketErrorCodes.SecurityError, "The signer is unknown!");
+
+            if (!RoamingNetworkCommitSignature.TryParseCommitSignatures(Request.Payload, out var commitId, out var signatures, out var errorResponse))
+                return Request.Error(POIWebSocketErrorCodes.FormatViolation, errorResponse);
+
+            var result = AddCommitSignatures(upgradeRequest, History, commitId, signatures);
+
+            return result.Status switch {
+                       CommitSignaturesStatus.Added or
+                       CommitSignaturesStatus.Known      => Request.Respond(result.ToJSON()),
+                       CommitSignaturesStatus.NotFound   => Request.Error(POIWebSocketErrorCodes.NotFound,       result.ErrorResponse),
+                       CommitSignaturesStatus.Forbidden  => Request.Error(POIWebSocketErrorCodes.SecurityError,  result.ErrorResponse),
+                       _                                 => Request.Error(POIWebSocketErrorCodes.SecurityError,  result.ErrorResponse)
+                   };
 
         }
 

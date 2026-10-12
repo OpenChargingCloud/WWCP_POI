@@ -25,6 +25,7 @@ flowchart TD
     RoamingNetwork --> TransparencySoftware
     RoamingNetwork --> Brand
     RoamingNetwork --> TransparencySoftwareCertificate
+    RoamingNetwork --> EnergyMeterManufacturer
     ParkingOperator --> ParkingGarage
     ParkingOperator --> ParkingSpace
     ParkingOperator --> ParkingSensor
@@ -49,6 +50,7 @@ flowchart TD
     ParkingSpace -. parkingProductIds .-> ParkingProduct
     EVSE -. chargingTariffIds .-> ChargingTariff
     ChargingPool -. brandIds .-> Brand
+    EnergyMeter -. manufacturerId .-> EnergyMeterManufacturer
     EnergyMeter -. transparencySoftwareStatus .-> TransparencySoftware
     TransparencySoftwareCertificate -. verified/compatible .-> TransparencySoftware
     RoamingNetwork -. dataLicenses .-> DataLicense
@@ -57,7 +59,7 @@ flowchart TD
 ```
 
 Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`,
-`gridOperators`, `parkingOperators`, `brands`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
+`gridOperators`, `parkingOperators`, `brands`, `energyMeterManufacturers`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
 `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `chargingPools`, `chargingStations`,
 `EVSEs`, `chargingConnectors`, `energyMeters`, `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups`,
 `parkingProducts`), each 0..n
@@ -77,8 +79,10 @@ parking product ids compare case-sensitively.
   `contractedImport/ExportApparentPower` (VA), `connectionAgreementId`, `networkLocationId`,
   `marketLocationIds`, `meteringLocationIds`. Missing values are unknown; active power must not
   exceed apparent power.
-- **Energy meter:** `role` (e.g. `grid`, `pv`, `battery`), `manufacturer`, `model`, their URLs,
+- **Energy meter:** `role` (e.g. `grid`, `pv`, `battery`), `manufacturerId`, `modelId`, `modelURL`,
   `serialNumber`, `hardwareVersion`, `firmwareVersion`; with admin status and status.
+  Its manufacturer is an energy meter manufacturer of the network (`name`, `description`, `address`,
+  `homepage`, `hotline`, timestamps, without status).
 - **Parking:** a parking operator owns its garages, spaces and sensors directly. A space may name a
   `parkingGarageId` and `parkingSensorIds` of the same operator; garages, spaces and sensors may name
   `chargingStationIds` of the network. All have admin status and status. Parking products (`minDuration`,
@@ -108,7 +112,8 @@ parking product ids compare case-sensitively.
   verifies or finds compatible, and optionally a manufacturer. An energy meter's `transparencySoftwareStatus`
   assigns releases with their `legalStatus`, at most one entry per release; a given `certificateId` must cover it.
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
-  They identify a version; `CalcETags()` and `ValidateETags(…)`.
+  They identify a version; `CalcETags()` and `ValidateETags(…)`. Which bytes are hashed and signed
+  is specified, with examples, in [SPECIFICATION.md](SPECIFICATION.md).
 - **Runtime:** admin status and status are not content and have no ETags. Each entity keeps them
   typed in its status schedules (history and planned status), shared by all its versions:
   a change set takes them along, with the internal data. New entities are operational and
@@ -141,7 +146,7 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 ```
 
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
-  `Add`/`Remove` of operators, manufacturers, e-mobility providers, grid operators, parking operators, brands,
+  `Add`/`Remove` of operators, manufacturers, energy meter manufacturers, e-mobility providers, grid operators, parking operators, brands,
   transparency software releases and certificates, pools, tariffs, groups, stations (`Add(station, poolId)`),
   EVSEs (`Add(evse, stationId)`) and parking garages, spaces, sensors and space groups
   (`Add(space, parkingOperatorId)`). Grid connection points and energy meters
@@ -172,6 +177,13 @@ follower.TryAppend(commits!, out _, out _);
 
 - **Commits:** a change set, its parent, its revision and the ETags of the result.
   The id is the SHA-256 of the commit's canonical JSON without signatures; it is checked when read.
+- **Commit signatures:** several parties sign a commit, each on its own and in any order, with a `role`
+  (`leader`, `roamingNetworkOperator`, `chargingStationOperator`, …), an optional `signer` and `signedAt`:
+  the leader through `Start(network, Signers: […])` or `history.Signers`, a roaming network operator that
+  checked the data of a charging station operator later through `commit.CreateSignature(…)` and
+  `TryAddSignatures(…)`. A signature covers the commit and the signatures of its change set; adding one
+  does not change the commit id. `TryAppend` verifies every signature (`VerifyCommitSignature`) and
+  may require roles (`RequiredSignatureRoles`); `OnCommitSignatures` tells of new ones.
 - **Followers** start from a snapshot and append commits; each must follow the head and lead to its ETags.
 - **Snapshot:** now and complete, for the first sync: `{timestamp, commit, roamingNetwork, runtimeStatus}`.
   `TryFromSnapshot` checks the commit id, recomputes the ETags of the network and takes the runtime status
@@ -194,9 +206,11 @@ follower.TryAppend(commits!, out _, out _);
 | `GET ~/roamingNetworks/{id}/history/commits?since={commitId}&max={n}` | complete commits since |
 | `GET ~/roamingNetworks/{id}/history/commits/{commitId}` | one commit |
 | `COMMIT ~/roamingNetworks/{id}/history/changeSets?expectedHead={commitId}&rebase=true` | 201 published, 200 already published, 409 head moved, 422 refused |
+| `POST ~/roamingNetworks/{id}/history/commits/{commitId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403, 404, 422 invalid |
 
 Submitting is refused unless `AuthorizeChangeSetSubmission` decides who may submit what;
-signed change sets need `VerifyChangeSetSignature`.
+signed change sets need `VerifyChangeSetSignature`. Adding commit signatures likewise needs
+`AuthorizeCommitSignature` (e.g. whether the sender has the role it signs in) and `VerifyCommitSignature`.
 
 ### WebSocket
 
@@ -210,9 +224,11 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 ```
 
 - **Actions:** `head`, `snapshot`, `commitInfos`, `commits`, `commit {commitId}`,
-  `commitChangeSet {changeSet, expectedHead?, rebase?}` → `{status, …}`, `runtimeStatus`.
+  `commitChangeSet {changeSet, expectedHead?, rebase?}` → `{status, …}`, `runtimeStatus`,
+  `signCommit {commitId, signatures}` → `{commitId, signatures, added}`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
-  `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced), `adminStatusUpdates`,
+  `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced),
+  `commitSignatures` (`{commitId, signatures}` added later), `adminStatusUpdates`,
   `statusUpdates`, `energyStatusUpdates`. Pushes are sends, `[6, "p1", action, payload]`,
   in the format of the last `subscribe`. They end with the connection; a client that falls more than
   `MaxQueuedPushes` pushes or `MaxQueuedPushBytes` behind is disconnected and catches up after reconnecting.
@@ -250,7 +266,9 @@ await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader;
 - **Reconnect:** a broken connection is opened again with growing delays, and it catches up.
   A head the leader does not know starts it again from a snapshot (`OnHistoryReplaced`).
 - **Options:** complete commits or announcements, status or not, credentials via `ConfigureWebSocket`,
-  signature verifier, limits.
+  verifiers of change set and commit signatures, the roles every commit must be signed in, limits.
+- **Signing:** `SignCommitAsync(commitId, signatures)` sends the signatures of, e.g., a roaming network
+  operator to the leader; every follower takes them from the `commitSignatures` topic.
 
 ## Submodules
 
@@ -266,7 +284,6 @@ await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader;
 - Persistence and retention of histories
 - Finer subscription filters
 - A WebSocket endpoint in Hermod without a TCP server behind it
-- Commits signed by the leader
 - Further entities: as the use cases need them
 
 ## Tests
@@ -274,6 +291,10 @@ await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader;
 ```bash
 dotnet test WWCP_POI3_Tests/WWCP_POI3_Tests.csproj
 ```
+
+## License
+
+Affero GPL 3.0, see `LICENSE`. Contributions under the `Contributor License Agreement.txt`.
 
 ## Funding
 

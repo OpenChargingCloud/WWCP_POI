@@ -40,6 +40,80 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public delegate Boolean AuthorizeChangeSetSubmissionDelegate(HTTPRequest              Request,
                                                                  RoamingNetworkChangeSet  ChangeSet);
 
+    /// <summary>
+    /// A delegate deciding whether the sender of the given HTTP request may add the given signature to the given commit,
+    /// e.g. whether its role is the one of the sender.
+    /// </summary>
+    /// <param name="Request">The HTTP request, or the WebSocket upgrade request of the sender.</param>
+    /// <param name="Commit">The commit.</param>
+    /// <param name="Signature">The signature to add.</param>
+    public delegate Boolean AuthorizeCommitSignatureDelegate(HTTPRequest                    Request,
+                                                             RoamingNetworkCommit           Commit,
+                                                             RoamingNetworkCommitSignature  Signature);
+
+
+    /// <summary>
+    /// The outcome of adding signatures to a commit.
+    /// </summary>
+    public enum CommitSignaturesStatus
+    {
+
+        /// <summary>
+        /// At least one signature was added.
+        /// </summary>
+        Added,
+
+        /// <summary>
+        /// The commit had all signatures already: nothing changed.
+        /// </summary>
+        Known,
+
+        /// <summary>
+        /// The commit is unknown here.
+        /// </summary>
+        NotFound,
+
+        /// <summary>
+        /// Adding signatures is not enabled, or not allowed for the sender.
+        /// </summary>
+        Forbidden,
+
+        /// <summary>
+        /// A signature is invalid, or its key is not trusted: nothing changed.
+        /// </summary>
+        Invalid
+
+    }
+
+
+    /// <summary>
+    /// The result of adding signatures to a commit.
+    /// </summary>
+    /// <param name="Status">The outcome.</param>
+    /// <param name="CommitId">The identification of the commit.</param>
+    /// <param name="Commit">The commit with all its signatures afterwards, unless unknown.</param>
+    /// <param name="Added">The number of signatures added.</param>
+    /// <param name="ErrorResponse">Why nothing was added.</param>
+    public sealed record CommitSignaturesResult(CommitSignaturesStatus    Status,
+                                                RoamingNetworkCommit_Id   CommitId,
+                                                RoamingNetworkCommit?     Commit          = null,
+                                                Int32                     Added           = 0,
+                                                String?                   ErrorResponse   = null)
+    {
+
+        /// <summary>
+        /// { commitId, signatures, added }: all signatures of the commit, and how many were added.
+        /// </summary>
+        public JObject ToJSON()
+
+            => new (
+                   new JProperty("commitId",    CommitId.ToString()),
+                   new JProperty("signatures",  new JArray(Commit?.Signatures.Select(signature => signature.ToJSON()) ?? [])),
+                   new JProperty("added",       Added)
+               );
+
+    }
+
 
     /// <summary>
     /// The histories of roaming networks over HTTP, as JSON:
@@ -54,6 +128,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET    ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}                    one complete commit
     /// COMMIT ~/roamingNetworks/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&amp;rebase=true
     ///                                                                                         publish a change set as the new head commit
+    /// POST   ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}/signatures      add signatures to a commit: { signatures: [ … ] }
     /// Without "since", the commits since the root are returned. "max" is at most MaxCommitsPerRequest.
     /// </remarks>
     public partial class POI_API
@@ -91,6 +166,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Verifies the signatures of submitted change sets with trusted keys; without it, signed change sets are refused.
         /// </summary>
         public VerifyChangeSetSignatureDelegate?      VerifyChangeSetSignature        { get; set; }
+
+        /// <summary>
+        /// Decides who may add which signatures to commits, e.g. a roaming network operator that checked the data.
+        /// Without it, adding signatures is refused.
+        /// </summary>
+        public AuthorizeCommitSignatureDelegate?      AuthorizeCommitSignature        { get; set; }
+
+        /// <summary>
+        /// Verifies the signatures of commits with trusted keys; without it, signatures are refused.
+        /// </summary>
+        public VerifyCommitSignatureDelegate?         VerifyCommitSignature           { get; set; }
 
         /// <summary>
         /// The limits for reading submitted change sets.
@@ -235,6 +321,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region POST ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}/signatures
+
+            AddHandler(history + "/commits/{commitId}/signatures",
+                       HTTPMethod:    HTTPMethod.POST,
+                       HTTPDelegate:  request => Task.FromResult(SubmitCommitSignatures(request)));
+
+            #endregion
+
             #region GET ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}
 
             AddHandler(history + "/commits/{commitId}",
@@ -260,6 +354,110 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (private) SubmitCommitSignatures(Request)
+
+        /// <summary>
+        /// Add the signatures in the body of the request, { signatures: [ … ] }, to a commit.
+        /// 201 Created:          at least one signature added; { commitId, signatures, added }
+        /// 200 OK:               the commit had all of them already
+        /// 400 Bad Request:      no valid signatures, or an invalid commit identification
+        /// 403 Forbidden:        adding signatures is not enabled, or not allowed for the sender
+        /// 404 Not Found:        the commit is unknown here
+        /// 422 Unprocessable:    a signature is invalid, or its key is not trusted
+        /// </summary>
+        private HTTPResponse SubmitCommitSignatures(HTTPRequest Request)
+        {
+
+            if (!TryGetHistory(Request, out var history, out var errorResponse))
+                return errorResponse;
+
+            if (Request.ParsedURLParameters.Length < 2 ||
+                !RoamingNetworkCommit_Id.TryParse(Request.ParsedURLParameters[1], out var commitId))
+            {
+                return ErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid commit identification!");
+            }
+
+            JObject? json = null;
+
+            try
+            {
+                json = Request.HTTPBody is { Length: > 0 } body
+                           ? Request.ContentType == HTTPContentType.Application.CBOR
+                                 ? CBORJSON.ToJSON(CBORValue.Parse(body)) as JObject
+                                 : JToken.ReadFrom(new JsonTextReader(new StringReader(Encoding.UTF8.GetString(body))) {
+                                       // signedAt is signed as the text it is.
+                                       DateParseHandling   = DateParseHandling.None,
+                                       FloatParseHandling  = FloatParseHandling.Decimal
+                                   }) as JObject
+                           : null;
+            }
+            catch
+            { }
+
+            if (json is null)
+                return ErrorResponse(Request, HTTPStatusCode.BadRequest, "The request must contain { signatures: [ … ] }!");
+
+            json["commitId"] = commitId.ToString();
+
+            if (!RoamingNetworkCommitSignature.TryParseCommitSignatures(json, out _, out var signatures, out var signaturesError))
+                return ErrorResponse(Request, HTTPStatusCode.BadRequest, signaturesError);
+
+            var result = AddCommitSignatures(Request, history, commitId, signatures);
+
+            return result.Status switch {
+                       CommitSignaturesStatus.Added      => JSONResponse (Request, HTTPStatusCode.Created,              result.ToJSON()),
+                       CommitSignaturesStatus.Known      => JSONResponse (Request, HTTPStatusCode.OK,                   result.ToJSON()),
+                       CommitSignaturesStatus.NotFound   => ErrorResponse(Request, HTTPStatusCode.NotFound,             result.ErrorResponse),
+                       CommitSignaturesStatus.Forbidden  => ErrorResponse(Request, HTTPStatusCode.Forbidden,            result.ErrorResponse),
+                       _                                 => ErrorResponse(Request, HTTPStatusCode.UnprocessableEntity,  result.ErrorResponse)
+                   };
+
+        }
+
+        #endregion
+
+        #region AddCommitSignatures(Request, History, CommitId, Signatures)
+
+        /// <summary>
+        /// Add the given signatures of the sender of the given request to a commit of the given history,
+        /// when allowed for the sender and verified with trusted keys.
+        /// </summary>
+        /// <param name="Request">The HTTP request, or the WebSocket upgrade request of the sender.</param>
+        /// <param name="History">The history.</param>
+        /// <param name="CommitId">The identification of the commit.</param>
+        /// <param name="Signatures">The signatures to add.</param>
+        public CommitSignaturesResult AddCommitSignatures(HTTPRequest                                 Request,
+                                                          RoamingNetworkHistory                       History,
+                                                          RoamingNetworkCommit_Id                     CommitId,
+                                                          IEnumerable<RoamingNetworkCommitSignature>  Signatures)
+        {
+
+            if (AuthorizeCommitSignature is null)
+                return new (CommitSignaturesStatus.Forbidden, CommitId, ErrorResponse: "Adding signatures to commits is not enabled here!");
+
+            if (!History.TryGetCommit(CommitId, out var commit))
+                return new (CommitSignaturesStatus.NotFound,  CommitId, ErrorResponse: $"The commit '{CommitId}' is unknown here!");
+
+            var signatures = Signatures.ToArray();
+
+            foreach (var signature in signatures)
+                if (!AuthorizeCommitSignature(Request, commit, signature))
+                    return new (CommitSignaturesStatus.Forbidden, CommitId, commit, ErrorResponse: $"The sender may not add the signature by {signature}!");
+
+            if (!History.TryAddSignatures(CommitId, signatures, VerifyCommitSignature, out var signedCommit, out var newSignatures, out var errorResponse))
+                return new (CommitSignaturesStatus.Invalid,   CommitId, commit, ErrorResponse: errorResponse);
+
+            return new (newSignatures.Count > 0
+                            ? CommitSignaturesStatus.Added
+                            : CommitSignaturesStatus.Known,
+                        CommitId,
+                        signedCommit,
+                        newSignatures.Count);
+
+        }
+
+        #endregion
 
         #region (private) SubmitChangeSet(Request)
 

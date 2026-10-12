@@ -200,7 +200,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               IEnumerable<ParkingOperator>?              ParkingOperators               = null,
                               IEnumerable<TransparencySoftware>?         TransparencySoftware           = null,
                               IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates  = null,
-                              IEnumerable<Brand>?                        Brands                         = null)
+                              IEnumerable<Brand>?                        Brands                         = null,
+                              IEnumerable<EnergyMeterManufacturer>?      EnergyMeterManufacturers       = null)
 
             : base(Id,
                    Name,
@@ -284,6 +285,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var energyMeter in chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters))
                 energyMeters.TryAdd(energyMeter.Id, energyMeter);
+
+            foreach (var energyMeterManufacturer in EnergyMeterManufacturers ?? [])
+            {
+
+                ArgumentNullException.ThrowIfNull(energyMeterManufacturer, nameof(EnergyMeterManufacturers));
+
+                if (!energyMeterManufacturers.TryAdd(energyMeterManufacturer.Id, energyMeterManufacturer))
+                    throw new ArgumentException($"The energy meter manufacturer '{energyMeterManufacturer.Id}' must not be given twice!", nameof(EnergyMeterManufacturers));
+
+            }
+
+            // Every manufacturer an energy meter names is one of this network.
+            if (UnknownEnergyMeterManufacturer(chargingStationOperators.Values, energyMeterManufacturers) is String unknownEnergyMeterManufacturer)
+                throw new ArgumentException(unknownEnergyMeterManufacturer, nameof(EnergyMeterManufacturers));
 
             foreach (var parkingOperator in ParkingOperators ?? [])
             {
@@ -652,6 +667,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                  "brands",
                                                                  POI.Brand.TryParse,
                                                                  out var brands,
+                                                                 out ErrorResponse) ||
+
+                    !POIJSON.TryParseChildren<EnergyMeterManufacturer>(JSON,
+                                                                 "energyMeterManufacturers",
+                                                                 "energyMeterManufacturerIds",
+                                                                 "energy meter manufacturers",
+                                                                 EnergyMeterManufacturer.TryParse,
+                                                                 out var energyMeterManufacturers,
                                                                  out ErrorResponse))
                 {
                     return false;
@@ -720,7 +743,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ParkingOperators:          parkingOperators,
                                      TransparencySoftware:      transparencySoftware,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
-                                     Brands:                    brands
+                                     Brands:                    brands,
+                                     EnergyMeterManufacturers:  energyMeterManufacturers
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -929,6 +953,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (!brands.IsEmpty)
                 JSON.Add("brands",                       new JArray(OrderedBrands.Select(brand => brand.ToJSON())));
+
+            if (!energyMeterManufacturers.IsEmpty)
+                JSON.Add("energyMeterManufacturers",     new JArray(OrderedEnergyMeterManufacturers.Select(energyMeterManufacturer => energyMeterManufacturer.ToJSON())));
 
             if (!transparencySoftware.IsEmpty)
                 JSON.Add("transparencySoftware",         new JArray(OrderedTransparencySoftware.Select(release => release.ToJSON())));
@@ -1149,6 +1176,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                        "brands",
                                                                        POI.Brand.TryParse,
                                                                        out var brands,
+                                                                       out ErrorResponse) ||
+
+                    !TryParseCBORChildren<EnergyMeterManufacturer>    (CBOR,
+                                                                       "energyMeterManufacturers",
+                                                                       "energyMeterManufacturerIds",
+                                                                       "energy meter manufacturers",
+                                                                       EnergyMeterManufacturer.TryParse,
+                                                                       out var energyMeterManufacturers,
                                                                        out ErrorResponse))
                 {
                     return false;
@@ -1211,7 +1246,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ParkingOperators:          parkingOperators,
                                      TransparencySoftware:      transparencySoftware,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
-                                     Brands:                    brands
+                                     Brands:                    brands,
+                                     EnergyMeterManufacturers:  energyMeterManufacturers
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -1293,6 +1329,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 CBOR.Add(CBORValue.FromText("brands"),
                          CBORValue.FromArray(OrderedBrands.
                                                  Select(brand => CBORJSON.ToCBOR(brand.ToJSON()))));
+
+            if (!energyMeterManufacturers.IsEmpty)
+                CBOR.Add(CBORValue.FromText("energyMeterManufacturers"),
+                         CBORValue.FromArray(OrderedEnergyMeterManufacturers.
+                                                 Select(energyMeterManufacturer => energyMeterManufacturer.ToCBOR())));
 
             if (!transparencySoftware.IsEmpty)
                 CBOR.Add(CBORValue.FromText("transparencySoftware"),
@@ -1881,6 +1922,50 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ChargingTariff = null;
             return false;
+
+        }
+
+        #endregion
+
+
+        #region Energy meter manufacturers
+
+        private readonly ConcurrentDictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer> energyMeterManufacturers = [];
+
+        /// <summary>
+        /// The energy meter manufacturers in this immutable network version.
+        /// </summary>
+        public IEnumerable<EnergyMeterManufacturer> EnergyMeterManufacturers
+            => energyMeterManufacturers.Values;
+
+        private IEnumerable<EnergyMeterManufacturer> OrderedEnergyMeterManufacturers
+            => energyMeterManufacturers.Values.OrderBy(energyMeterManufacturer => energyMeterManufacturer.Id.ToString(), StringComparer.Ordinal);
+
+        /// <summary>
+        /// Try to get the energy meter manufacturer having the given identification.
+        /// </summary>
+        /// <param name="EnergyMeterManufacturerId">The identification of an energy meter manufacturer.</param>
+        /// <param name="EnergyMeterManufacturer">The energy meter manufacturer.</param>
+        public Boolean TryGetEnergyMeterManufacturerById(EnergyMeterManufacturer_Id                        EnergyMeterManufacturerId,
+                                                         [NotNullWhen(true)] out EnergyMeterManufacturer?  EnergyMeterManufacturer)
+
+            => energyMeterManufacturers.TryGetValue(EnergyMeterManufacturerId, out EnergyMeterManufacturer);
+
+        /// <summary>
+        /// The error, when an energy meter of the given operators names a manufacturer not among the given ones.
+        /// </summary>
+        internal static String? UnknownEnergyMeterManufacturer(IEnumerable<ChargingStationOperator>                                      ChargingStationOperators,
+                                                               IReadOnlyDictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>  EnergyMeterManufacturers)
+        {
+
+            foreach (var energyMeter in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters))
+                if (energyMeter.ManufacturerId.HasValue &&
+                    !EnergyMeterManufacturers.ContainsKey(energyMeter.ManufacturerId.Value))
+                {
+                    return $"The energy meter '{energyMeter.Id}' names the unknown energy meter manufacturer '{energyMeter.ManufacturerId}'!";
+                }
+
+            return null;
 
         }
 

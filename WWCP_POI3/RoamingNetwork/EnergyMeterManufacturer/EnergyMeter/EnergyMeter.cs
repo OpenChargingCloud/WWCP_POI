@@ -69,19 +69,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public String?  Role               { get; }
 
         /// <summary>
-        /// The name of its manufacturer.
+        /// Its manufacturer, one of its roaming network.
         /// </summary>
-        public String?  Manufacturer       { get; }
+        public EnergyMeterManufacturer_Id?  ManufacturerId  { get; }
 
         /// <summary>
-        /// The homepage of its manufacturer.
+        /// Its model, as its manufacturer names it.
         /// </summary>
-        public URL?     ManufacturerURL    { get; }
-
-        /// <summary>
-        /// The name of its model.
-        /// </summary>
-        public String?  Model              { get; }
+        public EnergyMeterModel_Id?         ModelId         { get; }
 
         /// <summary>
         /// The homepage of its model, e.g. with its data sheet.
@@ -119,9 +114,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            I18NString?                                 Name                         = null,
                            I18NString?                                 Description                  = null,
                            String?                                     Role                         = null,
-                           String?                                     Manufacturer                 = null,
-                           URL?                                        ManufacturerURL              = null,
-                           String?                                     Model                        = null,
+                           EnergyMeterManufacturer_Id?                 ManufacturerId               = null,
+                           EnergyMeterModel_Id?                        ModelId                      = null,
                            URL?                                        ModelURL                     = null,
                            String?                                     SerialNumber                 = null,
                            String?                                     HardwareVersion              = null,
@@ -160,9 +154,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.Role             = Role;
-            this.Manufacturer     = Manufacturer;
-            this.ManufacturerURL  = ManufacturerURL;
-            this.Model            = Model;
+            this.ManufacturerId   = ManufacturerId;
+            this.ModelId          = ModelId;
             this.ModelURL         = ModelURL;
             this.SerialNumber     = SerialNumber;
             this.HardwareVersion  = HardwareVersion;
@@ -249,14 +242,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Role is not null)
                 json.Add("role",             Role);
 
-            if (Manufacturer is not null)
-                json.Add("manufacturer",     Manufacturer);
+            if (ManufacturerId.HasValue)
+                json.Add("manufacturerId",   ManufacturerId.Value.ToString());
 
-            if (ManufacturerURL.HasValue)
-                json.Add("manufacturerURL",  ManufacturerURL.Value.ToString());
-
-            if (Model is not null)
-                json.Add("model",            Model);
+            if (ModelId.HasValue)
+                json.Add("modelId",          ModelId.Value.ToString());
 
             if (ModelURL.HasValue)
                 json.Add("modelURL",         ModelURL.Value.ToString());
@@ -312,9 +302,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseI18N  (JSON, "description",      "energy meter description",  out var description,      out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, "dataSource",       "data source",               out var dataSource,       out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, "role",             "energy meter role",         out var role,             out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "manufacturer",     "manufacturer",              out var manufacturer,     out ErrorResponse) ||
-                    !POIJSON.TryParseText  (JSON, "manufacturerURL",  "manufacturer URL",          URL.TryParse, out URL? manufacturerURL, out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "model",            "model",                     out var model,            out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, "manufacturerId",   "manufacturer identification", EnergyMeterManufacturer_Id.TryParse, out EnergyMeterManufacturer_Id? manufacturerId, out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, "modelId",          "model identification",        EnergyMeterModel_Id.       TryParse, out EnergyMeterModel_Id?        modelId,        out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, "modelURL",         "model URL",                 URL.TryParse, out URL? modelURL,        out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, "serialNumber",     "serial number",             out var serialNumber,     out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, "hardwareVersion",  "hardware version",          out var hardwareVersion,  out ErrorResponse) ||
@@ -365,9 +354,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               name,
                                               description,
                                               role,
-                                              manufacturer,
-                                              manufacturerURL,
-                                              model,
+                                              manufacturerId,
+                                              modelId,
                                               modelURL,
                                               serialNumber,
                                               hardwareVersion,

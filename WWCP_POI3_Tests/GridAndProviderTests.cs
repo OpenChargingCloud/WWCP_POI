@@ -22,6 +22,7 @@ using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 
 using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 #endregion
 
@@ -51,6 +52,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly EnergyMeter_Id          GridMeter = EnergyMeter_Id.         Parse("grid-meter");
         private static readonly EnergyMeter_Id          PVMeter   = EnergyMeter_Id.         Parse("pv-meter");
         private static readonly EnergyMeter_Id          EVSEMeter = EnergyMeter_Id.         Parse("evse-meter");
+        private static readonly EnergyMeterManufacturer_Id  ACME  = EnergyMeterManufacturer_Id.Parse("ACME");
+        private static readonly EnergyMeterModel_Id     ACME3000  = EnergyMeterModel_Id.    Parse("ACME-3000");
 
         #endregion
 
@@ -63,6 +66,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     EMobilityProviders:        [ new EMobilityProvider(EMP,
                                                                        I18NString.Create(Languages.en, "Example Mobility"),
                                                                        Created: Created) ],
+                    EnergyMeterManufacturers:  [ new EnergyMeterManufacturer(ACME,
+                                                                             new ImmutableI18NString(I18NString.Create(Languages.en, "ACME Meters")),
+                                                                             Homepage:  URL.Parse("https://meters.example.org"),
+                                                                             Created:   Created) ],
                     GridOperators:             [ new GridOperator(NET,
                                                                   I18NString.Create(Languages.en, "Example Netz"),
                                                                   Created: Created) ],
@@ -86,7 +93,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                 ChargingStations:     [ new ChargingStation(S1,
                                                                                                                                                             Created:  Created,
                                                                                                                                                             EVSEs:    [ new EVSE(E1,
-                                                                                                                                                                                 EnergyMeter:  new EnergyMeter(EVSEMeter, Manufacturer: "ACME Meters", Created: Created),
+                                                                                                                                                                                 EnergyMeter:  new EnergyMeter(EVSEMeter, ManufacturerId: ACME, ModelId: ACME3000, Created: Created),
                                                                                                                                                                                  Created:      Created) ]) ]) ]) ]);
 
         #endregion
@@ -138,7 +145,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(fromJSON.EnergyMeters.Select(meter => meter.Id.ToString()).Order(),
                             Is.EqualTo(new[] { "evse-meter", "grid-meter", "pv-meter" }));
                 Assert.That(fromJSON.TryGetEnergyMeterById(EVSEMeter, out var evseMeter),  Is.True);
-                Assert.That(evseMeter!.Manufacturer,                                 Is.EqualTo("ACME Meters"));
+                Assert.That(evseMeter!.ManufacturerId,                               Is.EqualTo(ACME));
+                Assert.That(evseMeter.ModelId,                                       Is.EqualTo(ACME3000));
+                Assert.That(fromCBOR.TryGetEnergyMeterManufacturerById(ACME, out var acme),  Is.True);
+                Assert.That(acme!.Homepage.ToString(),                               Is.EqualTo("https://meters.example.org"));
+                Assert.That(json["energyMeterManufacturers"]![0]!["name"]!["en"]!.ToString(),  Is.EqualTo("ACME Meters"));
 
             }
 
@@ -259,6 +270,54 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 // A meter given twice by a change is refused.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(pool2, "energyMeters", null, new JArray(new EnergyMeter(GridMeter).ToJSON()))),
                             Throws.ArgumentException.With.Message.Contains("energy meter"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Energy_meter_manufacturers_are_named_and_changed()
+
+        [Test]
+        public void Energy_meter_manufacturers_are_named_and_changed()
+        {
+
+            var rn1   = NewNetwork();
+            var acme  = rn1.EnergyMeterManufacturers.Single();
+            var e1    = rn1.GetChargingStationOperatorById(GEF)!.ChargingPools.Single().EVSEs.Single();
+            var zap   = EnergyMeterManufacturer_Id.Parse("ZAP");
+
+            var rn2   = Apply(rn1,
+                              RoamingNetworkChange.Add           (new EnergyMeterManufacturer(zap)),
+                              RoamingNetworkChange.UpdateProperty(acme, "hotline",     null, "+49 30 1234567"),
+                              RoamingNetworkChange.UpdateProperty(e1,   "energyMeter", null, new EnergyMeter(EVSEMeter, ManufacturerId: zap).ToJSON()));
+
+            var rn3   = Apply(rn2, RoamingNetworkChange.Remove(ACME));
+
+            rn2.TryGetEnergyMeterManufacturerById(ACME, out var changedAcme);
+            rn2.TryGetEnergyMeterById(EVSEMeter, out var changedMeter);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(changedAcme!.HotlinePhoneNumber?.ToString(),                         Is.EqualTo("+49 30 1234567"));
+                Assert.That(changedAcme.LastChangeDate,                                          Is.EqualTo(T0));
+                Assert.That(changedMeter!.ManufacturerId,                                        Is.EqualTo(zap));
+                Assert.That(rn3.EnergyMeterManufacturers.Select(manufacturer => manufacturer.Id), Is.EqualTo(new[] { zap }));
+
+                // A manufacturer still named by an energy meter can not be removed...
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Remove(ACME)),
+                            Throws.ArgumentException.With.Message.Contains("unknown energy meter manufacturer 'ACME'"));
+
+                // ...and an energy meter names only manufacturers of its network.
+                Assert.That(() => Apply(rn3, RoamingNetworkChange.UpdateProperty(e1, "energyMeter", null, new EnergyMeter(EVSEMeter, ManufacturerId: ACME).ToJSON())),
+                            Throws.ArgumentException.With.Message.Contains("unknown energy meter manufacturer 'ACME'"));
+
+                Assert.That(() => new RoamingNetwork(RoamingNetwork_Id.Parse("rn2"),
+                                                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
+                                                                                                              ChargingPools: [ new ChargingPool(P1, EnergyMeters: [ new EnergyMeter(PVMeter, ManufacturerId: ACME) ]) ]) ]),
+                            Throws.ArgumentException.With.Message.Contains("names the unknown energy meter manufacturer 'ACME'"));
 
             }
 

@@ -49,7 +49,56 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// A local counter only: neither part of the JSON/CBOR representation nor of the ETags.
         /// A change set fits a version by its before ETags.
         /// </summary>
-        public UInt64 Revision { get; internal set; }
+        public UInt64 Revision { get; private init; }
+
+        #endregion
+
+
+        #region (internal) WithRevision(Revision)
+
+        /// <summary>
+        /// This version with the given revision: itself, when it has it already,
+        /// otherwise a copy sharing its entities and its runtime status, e.g. for the head of a snapshot.
+        /// </summary>
+        /// <param name="Revision">The revision.</param>
+        internal RoamingNetwork WithRevision(UInt64 Revision)
+        {
+
+            if (Revision == this.Revision)
+                return this;
+
+            var roamingNetwork = new RoamingNetwork(
+                                     Id,
+                                     Name,
+                                     Description,
+                                     AdminStatus.Value,
+                                     Status.Value,
+                                     adminStatusSchedule.MaxStatusHistorySize,
+                                     statusSchedule.     MaxStatusHistorySize,
+                                     DataSource,
+                                     Created,
+                                     LastChangeDate,
+                                     CustomData,
+                                     InternalData,
+                                     DataLicenses,
+                                     chargingStationOperators.Values,
+                                     chargingStationManufacturers.Values,
+                                     eMobilityProviders.Values,
+                                     gridOperators.Values,
+                                     parkingOperators.Values,
+                                     transparencySoftware.Values,
+                                     transparencySoftwareCertificates.Values,
+                                     brands.Values,
+                                     energyMeterManufacturers.Values
+                                 ) {
+                                     Revision = Revision
+                                 };
+
+            roamingNetwork.ShareRuntimeOf(this);
+
+            return roamingNetwork;
+
+        }
 
         #endregion
 
@@ -457,6 +506,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var softwares             = new Dictionary<TransparencySoftware_Id, TransparencySoftware>(transparencySoftware);
             var certificates          = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(transparencySoftwareCertificates);
             var brandRegistry         = new Dictionary<Brand_Id, Brand>(brands);
+            var meterManufacturers    = new Dictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>(energyMeterManufacturers);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
@@ -800,6 +850,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Energy meter manufacturers
+
+                else if (change.EntityType == nameof(EnergyMeterManufacturer))
+                {
+                    if (!TryApplyRegistryChange(EnergyMeterManufacturerRegistry, change, index, ChangeSet.CreatedAt, meterManufacturers, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                #endregion
+
                 #region Transparency software releases and certificates
 
                 else if (change.EntityType == nameof(TransparencySoftware))
@@ -864,7 +924,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  DuplicateParking    (parkingOps.Values)               ??
                  UnknownChargingStation(parkingOps.Values, operators)  ??
                  UnknownTransparencyReference(operators.Values, softwares, certificates, manufacturers) ??
-                 UnknownBrand(operators.Values, brandRegistry)) is String referenceError)
+                 UnknownBrand(operators.Values, brandRegistry) ??
+                 UnknownEnergyMeterManufacturer(operators.Values, meterManufacturers)) is String referenceError)
             {
                 ErrorResponse = referenceError;
                 return false;
@@ -891,7 +952,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  parkingOps.Values,
                                  softwares.Values,
                                  certificates.Values,
-                                 brandRegistry.Values
+                                 brandRegistry.Values,
+                                 meterManufacturers.Values
                              ) {
                                  Revision = Revision + 1
                              };

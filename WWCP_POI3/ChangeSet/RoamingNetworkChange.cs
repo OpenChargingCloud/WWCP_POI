@@ -1055,6 +1055,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Add                   (EnergyMeterManufacturer)
+
+        /// <summary>
+        /// Add the given energy meter manufacturer to its roaming network.
+        /// </summary>
+        /// <param name="EnergyMeterManufacturer">The new energy meter manufacturer.</param>
+        public static RoamingNetworkChange Add(EnergyMeterManufacturer EnergyMeterManufacturer)
+
+            => Add(nameof(POI.EnergyMeterManufacturer),
+                   EnergyMeterManufacturer.Id.ToString(),
+                   EnergyMeterManufacturer.ToJSON());
+
+        /// <summary>
+        /// Remove the given energy meter manufacturer, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(EnergyMeterManufacturer_Id  EnergyMeterManufacturerId,
+                                                  JToken?                     OldValue   = null)
+
+            => Remove(nameof(POI.EnergyMeterManufacturer),
+                      EnergyMeterManufacturerId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given energy meter manufacturer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(EnergyMeterManufacturer  EnergyMeterManufacturer,
+                                                          String                   PropertyName,
+                                                          JToken?                  OldValue,
+                                                          JToken                   NewValue)
+
+            => UpdateProperty(nameof(POI.EnergyMeterManufacturer), EnergyMeterManufacturer.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given energy meter manufacturer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(EnergyMeterManufacturer  EnergyMeterManufacturer,
+                                                          String                   PropertyName,
+                                                          JToken?                  OldValue   = null)
+
+            => RemoveProperty(nameof(POI.EnergyMeterManufacturer), EnergyMeterManufacturer.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
         #region Add                   (Brand)
 
         /// <summary>

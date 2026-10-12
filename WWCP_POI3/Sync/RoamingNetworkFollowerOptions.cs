@@ -77,6 +77,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public VerifyChangeSetSignatureDelegate?   VerifyChangeSetSignature    { get; init; }
 
         /// <summary>
+        /// Verifies the signatures of signed commits with trusted keys; without it, signed commits are not taken.
+        /// </summary>
+        public VerifyCommitSignatureDelegate?      VerifyCommitSignature       { get; init; }
+
+        /// <summary>
+        /// The roles every commit must be signed in, e.g. leader; none by default.
+        /// </summary>
+        public IReadOnlyCollection<String>?        RequiredSignatureRoles      { get; init; }
+
+        /// <summary>
         /// The limits for reading change sets, the default ones otherwise.
         /// </summary>
         public RoamingNetworkChangeSetLimits?      ChangeSetLimits             { get; init; }

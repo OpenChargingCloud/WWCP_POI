@@ -17,6 +17,8 @@
 
 #region Usings
 
+using Newtonsoft.Json.Linq;
+
 using NUnit.Framework;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -372,6 +374,78 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                 Assert.That(await Eventually(() => follower.History.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, Operator, "DE*GEF", out var operatorStatus) &&
                                                    operatorStatus.Value == "offline"),
                             Is.True);
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_follower_checks_commit_signatures_and_signs_commits()
+
+        [Test]
+        public async Task A_follower_checks_commit_signatures_and_signs_commits()
+        {
+
+            var verify = History.CommitSignatureTests.VerifyCommit;
+
+            leader!.Signers = [ History.CommitSignatureTests.LeaderSigner ];
+
+            // Only a roaming network operator may sign later, and only its signatures are told to the followers.
+            poiAPI!.AuthorizeCommitSignature  = (request, commit, signature) => signature.Role == RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator;
+            poiAPI.VerifyCommitSignature      = verify;
+
+            Publish("v1");
+
+            var follower   = await StartFollower(Options: new RoamingNetworkFollowerOptions {
+                                                               VerifyCommitSignature   = verify,
+                                                               RequiredSignatureRoles  = [ RoamingNetworkCommitSignatureRoles.Leader ],
+                                                               MinReconnectDelay       = TimeSpan.FromMilliseconds(50),
+                                                               MaxReconnectDelay       = TimeSpan.FromMilliseconds(200)
+                                                           });
+
+            Publish("v2");
+
+            var inSync     = await Eventually(InSync);
+            var commit     = follower.History!.Head.Commit;
+
+            // The follower is run by the roaming network operator, which checked the data of the commit.
+            var signature  = commit.CreateSignature(History.CommitSignatureTests.RNOKey,
+                                                    "rno",
+                                                    COSEAlgorithm.Ed25519,
+                                                    RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator,
+                                                    "DE*RNO");
+
+            var answer     = await follower.SignCommitAsync(commit.Id, [ signature ]);
+
+            POIWebSocketRequestException? refused = null;
+
+            try
+            {
+                await follower.SignCommitAsync(commit.Id, [ commit.CreateSignature(History.CommitSignatureTests.RNOKey,
+                                                                                   "rno",
+                                                                                   COSEAlgorithm.Ed25519,
+                                                                                   RoamingNetworkCommitSignatureRoles.Leader) ]);
+            }
+            catch (POIWebSocketRequestException e)
+            {
+                refused = e;
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(inSync,                                                   Is.True, "The follower did not take the signed commit.");
+                Assert.That(commit.Signatures.Select(signature => signature.Role),    Is.EqualTo(new[] { "leader" }));
+
+                Assert.That(answer["added"]!.Value<Int32>(),                          Is.EqualTo(1));
+                Assert.That(answer["signatures"]!.Count(),                            Is.EqualTo(2));
+                Assert.That(refused?.ErrorCode,                                       Is.EqualTo(POIWebSocketErrorCodes.SecurityError));
+
+                Assert.That(leader.Head.Commit.Signatures,                            Has.Length.EqualTo(2));
+                Assert.That(await Eventually(() => follower.History.Head.Commit.Signatures.Length == 2),
+                            Is.True,
+                            "The follower did not take the pushed commit signature.");
 
             }
 

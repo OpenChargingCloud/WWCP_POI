@@ -139,6 +139,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Timestamps: false
         );
 
+        private static readonly Registry<EnergyMeterManufacturer_Id, EnergyMeterManufacturer> EnergyMeterManufacturerRegistry = new (
+            "energy meter manufacturer",
+            "an",
+            ChangeableRegistryProperties,
+            EnergyMeterManufacturer_Id.TryParse,
+            EnergyMeterManufacturer.TryParse,
+            energyMeterManufacturer => energyMeterManufacturer.Id,
+            energyMeterManufacturer => energyMeterManufacturer.ToJSON(),
+            // Energy meter manufacturers have no runtime status.
+            (changed, previous) => { }
+        );
+
         private static readonly Registry<TransparencySoftware_Id, TransparencySoftware> TransparencySoftwareRegistry = new (
             "transparency software release",
             "a",
