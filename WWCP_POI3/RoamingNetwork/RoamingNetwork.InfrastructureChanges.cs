@@ -95,6 +95,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "maxPower",
             "chargingConnectors",
             "energyMeter",
+            "chargingTariffIds",
+            "customData"
+        ];
+
+        /// <summary>
+        /// The direct children of an operator besides its charging pools, by their JSON keys.
+        /// </summary>
+        private static readonly ImmutableDictionary<String, String> OperatorChildArrays = new Dictionary<String, String> {
+            { nameof(ChargingTariff),       "chargingTariffs"       },
+            { nameof(EVSEGroup),            "EVSEGroups"            },
+            { nameof(ChargingStationGroup), "chargingStationGroups" },
+            { nameof(ChargingPoolGroup),    "chargingPoolGroups"    },
+            { nameof(ChargingTariffGroup),  "chargingTariffGroups"  }
+        }.ToImmutableDictionary();
+
+        /// <summary>
+        /// The properties of a group a change set can update or remove, by the group type.
+        /// </summary>
+        private static readonly ImmutableDictionary<String, ImmutableHashSet<String>> ChangeableGroupProperties = new Dictionary<String, ImmutableHashSet<String>> {
+            { nameof(EVSEGroup),            [ "name", "description", "dataSource", "EVSEIds",            "chargingTariffId", "customData" ] },
+            { nameof(ChargingStationGroup), [ "name", "description", "dataSource", "chargingStationIds", "chargingTariffId", "customData" ] },
+            { nameof(ChargingPoolGroup),    [ "name", "description", "dataSource", "chargingPoolIds",    "chargingTariffId", "customData" ] },
+            { nameof(ChargingTariffGroup),  [ "name", "description", "dataSource", "chargingTariffIds",                      "customData" ] }
+        }.ToImmutableDictionary();
+
+        /// <summary>
+        /// The properties of a charging tariff a change set can update or remove.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> ChangeableChargingTariffProperties = [
+            "name",
+            "description",
+            "dataSource",
+            "currency",
+            "tariffURL",
+            "elements",
             "customData"
         ];
 
@@ -110,7 +145,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => EntityType is nameof(ChargingPool)
                           or nameof(ChargingStation)
-                          or nameof(EVSE);
+                          or nameof(EVSE)
+                          or nameof(ChargingTariff)
+                          or nameof(EVSEGroup)
+                          or nameof(ChargingStationGroup)
+                          or nameof(ChargingPoolGroup)
+                          or nameof(ChargingTariffGroup);
 
         #endregion
 
@@ -138,6 +178,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 nameof(ChargingPool)     => ChargingPool_Id.   TryParse(entityId, out var chargingPoolId)    ? chargingPoolId.   OperatorId : null,
                 nameof(ChargingStation)  => ChargingStation_Id.TryParse(entityId, out var chargingStationId) ? chargingStationId.OperatorId : null,
+                nameof(ChargingTariff)   => ChargingTariff_Id. TryParse(entityId, out var chargingTariffId)  ? chargingTariffId. OperatorId : null,
+                nameof(EVSEGroup)            => EVSEGroup_Id.           TryParse(entityId, out var evseGroupId)            ? evseGroupId.           OperatorId : null,
+                nameof(ChargingStationGroup) => ChargingStationGroup_Id.TryParse(entityId, out var chargingStationGroupId) ? chargingStationGroupId.OperatorId : null,
+                nameof(ChargingPoolGroup)    => ChargingPoolGroup_Id.   TryParse(entityId, out var chargingPoolGroupId)    ? chargingPoolGroupId.   OperatorId : null,
+                nameof(ChargingTariffGroup)  => ChargingTariffGroup_Id. TryParse(entityId, out var chargingTariffGroupId)  ? chargingTariffGroupId. OperatorId : null,
                 _                        => EVSE_Id.           TryParse(entityId, out var evseId)            ? evseId.           OperatorId : null
 
             };
@@ -208,6 +253,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     var changeable   = Change.EntityType switch {
                                            nameof(ChargingPool)     => ChangeableChargingPoolProperties,
                                            nameof(ChargingStation)  => ChangeableChargingStationProperties,
+                                           nameof(ChargingTariff)   => ChangeableChargingTariffProperties,
+                                           _ when ChangeableGroupProperties.TryGetValue(Change.EntityType, out var groupProperties)
+                                                                    => groupProperties,
                                            _                        => ChangeableEVSEProperties
                                        };
 
@@ -326,6 +374,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var operatorId = OperatorJSON["@id"]?.Value<String>();
 
+            // Charging tariffs and groups are children of the operator itself.
+            if (OperatorChildArrays.TryGetValue(EntityType, out var childArray))
+            {
+
+                if (OperatorJSON[childArray] is JArray operatorChildren)
+                    foreach (var operatorChild in operatorChildren.OfType<JObject>())
+                        if (operatorChild["@id"]?.Value<String>() == EntityId)
+                            return (operatorChild, operatorChildren, nameof(ChargingStationOperator), operatorId);
+
+                return (null, null, null, null);
+
+            }
+
             if (OperatorJSON["chargingPools"] is not JArray chargingPools)
                 return (null, null, null, null);
 
@@ -395,16 +456,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 case nameof(ChargingPool):
+                case nameof(ChargingTariff):
+                case nameof(EVSEGroup):
+                case nameof(ChargingStationGroup):
+                case nameof(ChargingPoolGroup):
+                case nameof(ChargingTariffGroup):
 
                     if (Change.ParentEntityType is not null &&
                        (Change.ParentEntityType != nameof(ChargingStationOperator) || Change.ParentEntityId != OperatorId.ToString()))
                     {
-                        ErrorResponse = $"a charging pool '{Change.EntityId}' belongs to ChargingStationOperator '{OperatorId}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
+                        ErrorResponse = $"a {Describe(Change.EntityType)} '{Change.EntityId}' belongs to ChargingStationOperator '{OperatorId}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
                         return false;
                     }
 
                     parent        = OperatorJSON;
-                    childrenName  = "chargingPools";
+                    childrenName  = Change.EntityType == nameof(ChargingPool) ? "chargingPools" : OperatorChildArrays[Change.EntityType];
                     break;
 
                 case nameof(ChargingStation):
@@ -466,6 +532,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => EntityType switch {
                    nameof(ChargingPool)     => "charging pool",
                    nameof(ChargingStation)  => "charging station",
+                   nameof(ChargingTariff)   => "charging tariff",
+                   nameof(EVSEGroup)            => "EVSE group",
+                   nameof(ChargingStationGroup) => "charging station group",
+                   nameof(ChargingPoolGroup)    => "charging pool group",
+                   nameof(ChargingTariffGroup)  => "charging tariff group",
                    _                        => "EVSE"
                };
 

@@ -1,0 +1,290 @@
+/*
+ * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
+ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
+ *
+ * Licensed under the Affero GPL license, Version 3.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.gnu.org/licenses/agpl.html
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#region Usings
+
+using Newtonsoft.Json.Linq;
+
+using NUnit.Framework;
+
+using org.GraphDefined.Vanaheimr.Illias;
+
+#endregion
+
+namespace cloud.charging.open.protocols.WWCP.POI.tests
+{
+
+    /// <summary>
+    /// Charging tariffs embedded in their operators, named by its EVSEs.
+    /// </summary>
+    [TestFixture]
+    public class TariffTests
+    {
+
+        #region Data
+
+        private static readonly DateTimeOffset              Created  = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        private static readonly DateTimeOffset              T0       = DateTimeOffset.Parse("2026-10-11T12:00:00Z");
+
+        private static readonly ChargingStationOperator_Id  GEF      = ChargingStationOperator_Id.Parse("DE*GEF");
+        private static readonly EVSE_Id                     E1       = EVSE_Id.                   Parse("DE*GEF*E1*1");
+        private static readonly ChargingTariff_Id           T1       = ChargingTariff_Id.         Parse("DE*GEF*T1");
+        private static readonly ChargingTariff_Id           T2       = ChargingTariff_Id.         Parse("DE*GEF*T2");
+
+        #endregion
+
+        #region NewTariff(Id, Price = 0.39)
+
+        private static ChargingTariff NewTariff(ChargingTariff_Id Id, Decimal Price = 0.39m)
+
+            => new (Id,
+                    Currency.NOK,
+                    [
+                        new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, Price, VAT: 25, StepSize: 1) ]),
+                        new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.PARKING_TIME, 6, StepSize: 60),
+                                                    new ChargingPriceComponent(ChargingDimensionTypes.FLAT,         1) ],
+                                                  new ChargingTariffRestrictions(StartTime:   new TimeOnly(22, 0),
+                                                                                 EndTime:     new TimeOnly(6, 30),
+                                                                                 StartDate:   new DateOnly(2026, 1, 1),
+                                                                                 EndDate:     new DateOnly(2027, 1, 1),
+                                                                                 MinPower:    3700,
+                                                                                 MaxPower:    22000,
+                                                                                 MaxDuration: 3600,
+                                                                                 DaysOfWeek:  [ DayOfWeek.Sunday, DayOfWeek.Monday ]))
+                    ],
+                    I18NString.Create(Languages.en, "Standard"),
+                    Created: Created);
+
+        #endregion
+
+        #region NewNetwork()
+
+        private static RoamingNetwork NewNetwork()
+
+            => new (RoamingNetwork_Id.Parse("rn1"),
+                    Created:                   Created,
+                    ChargingStationOperators:  [ new ChargingStationOperator(GEF,
+                                                                             Created:          Created,
+                                                                             ChargingTariffs:  [ NewTariff(T1), NewTariff(T2, 0.49m) ],
+                                                                             ChargingPools:    [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
+                                                                                                                  Created:           Created,
+                                                                                                                  ChargingStations:  [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
+                                                                                                                                                           Created:  Created,
+                                                                                                                                                           EVSEs:    [ new EVSE(E1,
+                                                                                                                                                                                ChargingTariffIds:  [ T2, T1 ],
+                                                                                                                                                                                Created:            Created) ]) ]) ]) ]);
+
+        #endregion
+
+        #region Apply(Network, Changes)
+
+        private static RoamingNetwork Apply(RoamingNetwork                  Network,
+                                            params RoamingNetworkChange[]   Changes)
+
+            => Network.ApplyChangeSet(Network.CreateChangeSet(Changes, CreatedAt: T0));
+
+        #endregion
+
+
+        #region Tariffs_survive_JSON_JSON_text_and_CBOR()
+
+        [Test]
+        public void Tariffs_survive_JSON_JSON_text_and_CBOR()
+        {
+
+            var rn1   = NewNetwork();
+            var json  = rn1.ToJSON();
+
+            Assert.That(RoamingNetwork.TryParse(json,                             out var fromJSON, out var errorJSON),  Is.True, errorJSON);
+            // Read as text, dates become date tokens.
+            Assert.That(RoamingNetwork.TryParse(JObject.Parse(json.ToString()),   out var fromText, out var errorText),  Is.True, errorText);
+            Assert.That(RoamingNetwork.TryParse(rn1.ToCBOR(),                     out var fromCBOR, out var errorCBOR),  Is.True, errorCBOR);
+
+            var tariff       = json["chargingStationOperators"]![0]!["chargingTariffs"]![0]!;
+            var restrictions = tariff["elements"]![1]!["restrictions"]!;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(fromJSON!.ToJSON().ToString(),                                Is.EqualTo(json.ToString()));
+                Assert.That(fromText!.ToJSON().ToString(),                                Is.EqualTo(json.ToString()));
+                Assert.That(fromCBOR!.ToJSON().ToString(),                                Is.EqualTo(json.ToString()));
+                Assert.That(fromText.CalcETags(),                                         Is.EqualTo(rn1.CalcETags()));
+
+                Assert.That(tariff["currency"]!.ToString(),                               Is.EqualTo("NOK"));
+                Assert.That(tariff["elements"]![0]!["priceComponents"]![0]!["type"]!.ToString(),  Is.EqualTo("ENERGY"));
+                Assert.That(restrictions["startTime"]!.ToString(),                        Is.EqualTo("22:00"));
+                Assert.That(restrictions["endTime"]!.ToString(),                          Is.EqualTo("06:30"));
+                Assert.That(restrictions["daysOfWeek"]!.Values<String>(),                 Is.EqualTo(new[] { "MONDAY", "SUNDAY" }));
+
+                Assert.That(fromJSON.TryGetChargingTariffById(T2, out var t2),            Is.True);
+                Assert.That(t2!.Elements[0].PriceComponents[0].Price,                     Is.EqualTo(0.49m));
+                Assert.That(fromJSON.GetChargingStationOperatorById(GEF)!.EVSEs.Single().ChargingTariffIds,
+                            Is.EqualTo(new[] { T1, T2 }));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Invalid_tariffs_are_refused()
+
+        [Test]
+        public void Invalid_tariffs_are_refused()
+        {
+
+            var json = NewNetwork().ToJSON();
+
+            JObject Changed(Action<JObject> Change)
+            {
+                var changed = (JObject) json.DeepClone();
+                Change(changed);
+                return changed;
+            }
+
+            JObject Tariff(JObject Network)
+                => (JObject) Network["chargingStationOperators"]![0]!["chargingTariffs"]![0]!;
+
+            JObject Restrictions(JObject Network)
+                => (JObject) Tariff(Network)["elements"]![1]!["restrictions"]!;
+
+            var cases = new (String Name, JObject JSON, String Error)[] {
+                ("unknown currency",     Changed(network => Tariff(network)["currency"] = "XXX"),                                                  "ISO 4217"),
+                ("no elements",          Changed(network => Tariff(network)["elements"] = new JArray()),                                           "at least one element"),
+                ("flat with step",       Changed(network => Tariff(network)["elements"]![1]!["priceComponents"]![1]!["stepSize"] = 1),             "FLAT price component has no step size"),
+                ("energy without step",  Changed(network => ((JObject) Tariff(network)["elements"]![0]!["priceComponents"]![0]!).Remove("stepSize")), "needs a positive step size"),
+                ("min above max",        Changed(network => Restrictions(network)["minPower"] = 50000),                                           "must not exceed its maximum"),
+                ("invalid time",         Changed(network => Restrictions(network)["startTime"] = "25:00"),                                         "expected HH:mm"),
+                ("lower case day",       Changed(network => Restrictions(network)["daysOfWeek"] = new JArray("monday")),                          "day of the week"),
+                ("foreign tariff",       Changed(network => Tariff(network)["@id"] = "DE*XYZ*T1"),                                                 "does not belong to the operator"),
+                ("unknown tariff",       Changed(network => network["chargingStationOperators"]![0]!["chargingPools"]![0]!["chargingStations"]![0]!["EVSEs"]![0]!["chargingTariffIds"] = new JArray("DE*GEF*T9")),
+                                                                                                                                                   "charging tariff 'DE*GEF*T9' of the EVSE")
+            };
+
+            using (Assert.EnterMultipleScope())
+            {
+                foreach (var (name, invalid, error) in cases)
+                {
+                    Assert.That(RoamingNetwork.TryParse(invalid, out _, out var errorResponse),  Is.False, name);
+                    Assert.That(errorResponse,                                                   Does.Contain(error), name);
+                }
+            }
+
+        }
+
+        #endregion
+
+        #region Tariffs_are_changed_by_change_sets()
+
+        [Test]
+        public void Tariffs_are_changed_by_change_sets()
+        {
+
+            var history  = RoamingNetworkHistory.Start(NewNetwork());
+            var rn1      = history.Head.RoamingNetwork;
+            var gef      = rn1.GetChargingStationOperatorById(GEF)!;
+            var e1       = gef.EVSEs.Single();
+            rn1.TryGetChargingTariffById(T1, out var t1);
+
+            history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, nameof(ChargingTariff), T1.ToString(), "expired", T0, out _, out _);
+
+            var t3       = ChargingTariff_Id.Parse("DE*GEF*T3");
+            var elements = new JArray(new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.59m, StepSize: 1000) ]).ToJSON());
+
+            var cs       = rn1.CreateChangeSet([
+                               RoamingNetworkChange.Add           (NewTariff(t3, 0.29m)),
+                               RoamingNetworkChange.UpdateProperty(t1!, "elements",          null, elements),
+                               RoamingNetworkChange.UpdateProperty(e1,  "chargingTariffIds", null, new JArray(t3.ToString())),
+                               RoamingNetworkChange.Remove        (T2)
+                           ], CreatedAt: T0.AddMinutes(1));
+
+            history.Publish(cs);
+
+            var rn2      = history.Head.RoamingNetwork;
+            var gef2     = rn2.GetChargingStationOperatorById(GEF)!;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(gef2.ChargingTariffs.Select(tariff => tariff.Id.ToString()),          Is.EqualTo(new[] { "DE*GEF*T1", "DE*GEF*T3" }));
+                Assert.That(rn2.TryGetChargingTariffById(T1, out var changedT1),                  Is.True);
+                Assert.That(changedT1!.Elements.Single().PriceComponents.Single().StepSize,      Is.EqualTo(1000));
+                Assert.That(changedT1.LastChangeDate,                                            Is.EqualTo(T0.AddMinutes(1)));
+                Assert.That(gef2.EVSEs.Single().ChargingTariffIds,                                Is.EqualTo(new[] { t3 }));
+
+                // Old values for a later check.
+                Assert.That(cs.Changes[3].OldValue!["@id"]!.ToString(),                           Is.EqualTo("DE*GEF*T2"));
+
+                // The status of the tariff survived its change.
+                Assert.That(history.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, nameof(ChargingTariff), T1.ToString(), out var tariffStatus),  Is.True);
+                Assert.That(tariffStatus!.Value,                                                                                                      Is.EqualTo("expired"));
+
+                // A tariff an EVSE names can not be removed, nor can an invalid one be set.
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(t3)),
+                            Throws.ArgumentException.With.Message.Contains("charging tariff 'DE*GEF*T3' of the EVSE"));
+
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(changedT1, "currency", null, "XXX")),
+                            Throws.ArgumentException.With.Message.Contains("ISO 4217"));
+
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.Add(NewTariff(t3))),
+                            Throws.ArgumentException.With.Message.Contains("already exists"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region The_runtime_status_reaches_tariffs()
+
+        [Test]
+        public void The_runtime_status_reaches_tariffs()
+        {
+
+            var leader   = RoamingNetworkHistory.Start(NewNetwork());
+            var updates  = new List<POIStatusUpdate>();
+
+            leader.RuntimeStatus.OnStatusUpdate += updates.Add;
+
+            var admin    = leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(ChargingTariff), T1.ToString(),  "outOfService", T0, out _, out _);
+            var status   = leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(ChargingTariff), T2.ToString(),  "planned",      T0, out _, out _);
+            var unknown  = leader.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(ChargingTariff), "DE*GEF*T9",    "planned",      T0, out _, out _);
+
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotCBOR(), out var follower, out var error),  Is.True, error);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(new[] { admin, status },  Is.All.EqualTo(POIStatusUpdateResult.Updated));
+                Assert.That(unknown,                  Is.EqualTo(POIStatusUpdateResult.Refused));
+
+                Assert.That(updates.Select(update => $"{update.EntityType} {update.Value}"),
+                            Is.EqualTo(new[] { "ChargingTariff outOfService", "ChargingTariff planned" }));
+
+                Assert.That(follower!.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, nameof(ChargingTariff), T2.ToString(), out var tariffStatus),  Is.True);
+                Assert.That(tariffStatus!.Value,                                                                                                        Is.EqualTo("planned"));
+
+            }
+
+        }
+
+        #endregion
+
+    }
+
+}

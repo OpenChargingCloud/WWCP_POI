@@ -373,6 +373,95 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TryParseIds<T>      (JSON, PropertyName, PropertyDescription, Parser, out Values, out ErrorResponse)
+
+        /// <summary>
+        /// Optional references, given as an array of identifications, in their given order.
+        /// </summary>
+        public static Boolean TryParseIds<T>(JObject                           JSON,
+                                             String                            PropertyName,
+                                             String                            PropertyDescription,
+                                             POITextParser<T>                  Parser,
+                                             out ImmutableArray<T>             Values,
+                                             [NotNullWhen(false)] out String?  ErrorResponse)
+
+            where T : struct
+
+        {
+
+            Values = [];
+
+            if (JSON[PropertyName] is not JToken token)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            if (token is not JArray array)
+            {
+                ErrorResponse = $"The {PropertyDescription} must be a JSON array!";
+                return false;
+            }
+
+            var values = ImmutableArray.CreateBuilder<T>(array.Count);
+
+            foreach (var item in array)
+            {
+
+                if (item.Type != JTokenType.String || !Parser(item.Value<String>() ?? "", out var value))
+                {
+                    ErrorResponse = $"Invalid {PropertyDescription} '{item}'!";
+                    return false;
+                }
+
+                values.Add(value);
+
+            }
+
+            Values         = values.MoveToImmutable();
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region OrderedIds<T>       (Ids, Description)
+
+        /// <summary>
+        /// The given references in the order of their identifications (ordinal), without one given twice.
+        /// </summary>
+        public static ImmutableArray<T> OrderedIds<T>(IEnumerable<T>?  Ids,
+                                                      String           Description)
+
+            where T : struct
+
+        {
+
+            var ids = (Ids ?? []).ToArray();
+
+            if (ids.Distinct().Count() != ids.Length)
+                throw new ArgumentException($"A {Description} must not be given twice!");
+
+            return [.. ids.OrderBy(id => id.ToString(), StringComparer.Ordinal)];
+
+        }
+
+        #endregion
+
+        #region IdsToJSON<T>        (Ids)
+
+        /// <summary>
+        /// The given references as a JSON array of their identifications.
+        /// </summary>
+        public static JArray IdsToJSON<T>(IEnumerable<T> Ids)
+
+            where T : struct
+
+            => new (Ids.Select(id => id.ToString()));
+
+        #endregion
+
         #region TryParseChildren<T> (JSON, PropertyName, IdsPropertyName, Description, Parser, out Children, out ErrorResponse)
 
         /// <summary>

@@ -196,7 +196,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               IEnumerable<ChargingStationOperator>?  ChargingStationOperators   = null,
                               IEnumerable<ChargingStationManufacturer>?  ChargingStationManufacturers   = null,
                               IEnumerable<EMobilityProvider>?            EMobilityProviders             = null,
-                              IEnumerable<GridOperator>?                 GridOperators                  = null)
+                              IEnumerable<GridOperator>?                 GridOperators                  = null,
+                              IEnumerable<ParkingOperator>?              ParkingOperators               = null,
+                              IEnumerable<TransparencySoftware>?         TransparencySoftware           = null,
+                              IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates  = null)
 
             : base(Id,
                    Name,
@@ -280,6 +283,65 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var energyMeter in chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters))
                 energyMeters.TryAdd(energyMeter.Id, energyMeter);
+
+            foreach (var parkingOperator in ParkingOperators ?? [])
+            {
+
+                ArgumentNullException.ThrowIfNull(parkingOperator, nameof(ParkingOperators));
+
+                if (!parkingOperators.TryAdd(parkingOperator.Id, parkingOperator))
+                    throw new ArgumentException($"The parking operator '{parkingOperator.Id}' must not be given twice!", nameof(ParkingOperators));
+
+            }
+
+            // Parking garages, spaces and sensors are unique within the network;
+            // the charging stations they name are ones of this network.
+            if ((DuplicateParking      (parkingOperators.Values) ??
+                 UnknownChargingStation(parkingOperators.Values, chargingStationOperators)) is String parkingError)
+            {
+                throw new ArgumentException(parkingError, nameof(ParkingOperators));
+            }
+
+            foreach (var release in TransparencySoftware ?? [])
+            {
+
+                ArgumentNullException.ThrowIfNull(release, nameof(TransparencySoftware));
+
+                if (!transparencySoftware.TryAdd(release.Id, release))
+                    throw new ArgumentException($"The transparency software release '{release.Id}' must not be given twice!", nameof(TransparencySoftware));
+
+            }
+
+            foreach (var certificate in TransparencySoftwareCertificates ?? [])
+            {
+
+                ArgumentNullException.ThrowIfNull(certificate, nameof(TransparencySoftwareCertificates));
+
+                if (!transparencySoftwareCertificates.TryAdd(certificate.Id, certificate))
+                    throw new ArgumentException($"The transparency software certificate '{certificate.Id}' must not be given twice!", nameof(TransparencySoftwareCertificates));
+
+            }
+
+            // Certificates name releases and manufacturers of this network; energy meters name releases and certificates.
+            if (UnknownTransparencyReference(chargingStationOperators.Values, transparencySoftware, transparencySoftwareCertificates, chargingStationManufacturers) is String transparencyError)
+                throw new ArgumentException(transparencyError, nameof(TransparencySoftware));
+
+            foreach (var parkingOperator in parkingOperators.Values)
+            {
+
+                foreach (var parkingGarage in parkingOperator.ParkingGarages)
+                    parkingGarages.TryAdd(parkingGarage.Id, parkingGarage);
+
+                foreach (var parkingSpace in parkingOperator.ParkingSpaces)
+                    parkingSpaces. TryAdd(parkingSpace. Id, parkingSpace);
+
+                foreach (var parkingSensor in parkingOperator.ParkingSensors)
+                    parkingSensors.TryAdd(parkingSensor.Id, parkingSensor);
+
+                foreach (var parkingSpaceGroup in parkingOperator.ParkingSpaceGroups)
+                    parkingSpaceGroups.TryAdd(parkingSpaceGroup.Id, parkingSpaceGroup);
+
+            }
 
             #endregion
 
@@ -543,6 +605,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                  "grid operators",
                                                                  GridOperator.TryParse,
                                                                  out var gridOperators,
+                                                                 out ErrorResponse) ||
+
+                    !POIJSON.TryParseChildren<ParkingOperator>  (JSON,
+                                                                 "parkingOperators",
+                                                                 "parkingOperatorIds",
+                                                                 "parking operators",
+                                                                 ParkingOperator.TryParse,
+                                                                 out var parkingOperators,
+                                                                 out ErrorResponse) ||
+
+                    !POIJSON.TryParseChildren<TransparencySoftware>(JSON,
+                                                                 "transparencySoftware",
+                                                                 "transparencySoftwareIds",
+                                                                 "transparency software releases",
+                                                                 POI.TransparencySoftware.TryParse,
+                                                                 out var transparencySoftware,
+                                                                 out ErrorResponse) ||
+
+                    !POIJSON.TryParseChildren<TransparencySoftwareCertificate>(JSON,
+                                                                 "transparencySoftwareCertificates",
+                                                                 "transparencySoftwareCertificateIds",
+                                                                 "transparency software certificates",
+                                                                 TransparencySoftwareCertificate.TryParse,
+                                                                 out var transparencySoftwareCertificates,
                                                                  out ErrorResponse))
                 {
                     return false;
@@ -607,7 +693,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ChargingStationOperators:  chargingStationOperators,
                                      ChargingStationManufacturers:  chargingStationManufacturers,
                                      EMobilityProviders:        eMobilityProviders,
-                                     GridOperators:             gridOperators
+                                     GridOperators:             gridOperators,
+                                     ParkingOperators:          parkingOperators,
+                                     TransparencySoftware:      transparencySoftware,
+                                     TransparencySoftwareCertificates:  transparencySoftwareCertificates
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -811,6 +900,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!gridOperators.IsEmpty)
                 JSON.Add("gridOperators",                new JArray(OrderedGridOperators.Select(gridOperator => gridOperator.ToJSON())));
 
+            if (!parkingOperators.IsEmpty)
+                JSON.Add("parkingOperators",             new JArray(OrderedParkingOperators.Select(parkingOperator => parkingOperator.ToJSON())));
+
+            if (!transparencySoftware.IsEmpty)
+                JSON.Add("transparencySoftware",         new JArray(OrderedTransparencySoftware.Select(release => release.ToJSON())));
+
+            if (!transparencySoftwareCertificates.IsEmpty)
+                JSON.Add("transparencySoftwareCertificates", new JArray(OrderedTransparencySoftwareCertificates.Select(certificate => certificate.ToJSON())));
+
             POIEntityMetadata.AddTo(JSON, Created, LastChangeDate, CustomData);
 
             // The ETags describe the content without them, irrespective of the view options.
@@ -992,6 +1090,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                        "grid operators",
                                                                        GridOperator.TryParse,
                                                                        out var gridOperators,
+                                                                       out ErrorResponse) ||
+
+                    !TryParseCBORChildren<ParkingOperator>            (CBOR,
+                                                                       "parkingOperators",
+                                                                       "parkingOperatorIds",
+                                                                       "parking operators",
+                                                                       ParkingOperator.TryParse,
+                                                                       out var parkingOperators,
+                                                                       out ErrorResponse) ||
+
+                    !TryParseCBORChildren<TransparencySoftware>       (CBOR,
+                                                                       "transparencySoftware",
+                                                                       "transparencySoftwareIds",
+                                                                       "transparency software releases",
+                                                                       POI.TransparencySoftware.TryParse,
+                                                                       out var transparencySoftware,
+                                                                       out ErrorResponse) ||
+
+                    !TryParseCBORChildren<TransparencySoftwareCertificate>(CBOR,
+                                                                       "transparencySoftwareCertificates",
+                                                                       "transparencySoftwareCertificateIds",
+                                                                       "transparency software certificates",
+                                                                       TransparencySoftwareCertificate.TryParse,
+                                                                       out var transparencySoftwareCertificates,
                                                                        out ErrorResponse))
                 {
                     return false;
@@ -1050,7 +1172,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ChargingStationOperators:  chargingStationOperators,
                                      ChargingStationManufacturers:  chargingStationManufacturers,
                                      EMobilityProviders:        eMobilityProviders,
-                                     GridOperators:             gridOperators
+                                     GridOperators:             gridOperators,
+                                     ParkingOperators:          parkingOperators,
+                                     TransparencySoftware:      transparencySoftware,
+                                     TransparencySoftwareCertificates:  transparencySoftwareCertificates
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -1122,6 +1247,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 CBOR.Add(CBORValue.FromText("gridOperators"),
                          CBORValue.FromArray(OrderedGridOperators.
                                                  Select(gridOperator => gridOperator.ToCBOR())));
+
+            if (!parkingOperators.IsEmpty)
+                CBOR.Add(CBORValue.FromText("parkingOperators"),
+                         CBORValue.FromArray(OrderedParkingOperators.
+                                                 Select(parkingOperator => parkingOperator.ToCBOR())));
+
+            if (!transparencySoftware.IsEmpty)
+                CBOR.Add(CBORValue.FromText("transparencySoftware"),
+                         CBORValue.FromArray(OrderedTransparencySoftware.
+                                                 Select(release => CBORJSON.ToCBOR(release.ToJSON()))));
+
+            if (!transparencySoftwareCertificates.IsEmpty)
+                CBOR.Add(CBORValue.FromText("transparencySoftwareCertificates"),
+                         CBORValue.FromArray(OrderedTransparencySoftwareCertificates.
+                                                 Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON()))));
 
             // Always part of the content, with the keys and values of the JSON representation.
             foreach (var metadata in POIEntityMetadata.AddTo([], Created, LastChangeDate, CustomData).Properties())
@@ -1264,6 +1404,367 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
             return null;
+
+        }
+
+        #endregion
+
+
+        #region Parking operators, parking garages, parking spaces, parking sensors
+
+        private readonly ConcurrentDictionary<ParkingOperator_Id, ParkingOperator>  parkingOperators  = [];
+        private readonly ConcurrentDictionary<ParkingGarage_Id,   ParkingGarage>    parkingGarages    = [];
+        private readonly ConcurrentDictionary<ParkingSpace_Id,    ParkingSpace>     parkingSpaces     = [];
+        private readonly ConcurrentDictionary<ParkingSensor_Id,   ParkingSensor>    parkingSensors    = [];
+
+        /// <summary>
+        /// The parking operators in this immutable network version.
+        /// </summary>
+        public IEnumerable<ParkingOperator> ParkingOperators
+            => parkingOperators.Values;
+
+        /// <summary>
+        /// The parking garages of all parking operators.
+        /// </summary>
+        public IEnumerable<ParkingGarage>   ParkingGarages
+            => parkingGarages.Values;
+
+        /// <summary>
+        /// The parking spaces of all parking operators.
+        /// </summary>
+        public IEnumerable<ParkingSpace>    ParkingSpaces
+            => parkingSpaces.Values;
+
+        /// <summary>
+        /// The parking sensors of all parking operators.
+        /// </summary>
+        public IEnumerable<ParkingSensor>   ParkingSensors
+            => parkingSensors.Values;
+
+        /// <summary>
+        /// The parking operators ordered by their identification (ordinal), as in the JSON and CBOR representations.
+        /// </summary>
+        private IEnumerable<ParkingOperator> OrderedParkingOperators
+            => parkingOperators.Values.OrderBy(parkingOperator => parkingOperator.Id.ToString(), StringComparer.Ordinal);
+
+        /// <summary>
+        /// Try to get the parking operator having the given identification.
+        /// </summary>
+        public Boolean TryGetParkingOperatorById(ParkingOperator_Id                        ParkingOperatorId,
+                                                 [NotNullWhen(true)] out ParkingOperator?  ParkingOperator)
+
+            => parkingOperators.TryGetValue(ParkingOperatorId, out ParkingOperator);
+
+        /// <summary>
+        /// Try to get the parking garage having the given identification, of any parking operator.
+        /// </summary>
+        public Boolean TryGetParkingGarageById(ParkingGarage_Id                        ParkingGarageId,
+                                               [NotNullWhen(true)] out ParkingGarage?  ParkingGarage)
+
+            => parkingGarages.TryGetValue(ParkingGarageId, out ParkingGarage);
+
+        /// <summary>
+        /// Try to get the parking space having the given identification, of any parking operator.
+        /// </summary>
+        public Boolean TryGetParkingSpaceById(ParkingSpace_Id                        ParkingSpaceId,
+                                              [NotNullWhen(true)] out ParkingSpace?  ParkingSpace)
+
+            => parkingSpaces.TryGetValue(ParkingSpaceId, out ParkingSpace);
+
+        /// <summary>
+        /// Try to get the parking sensor having the given identification, of any parking operator.
+        /// </summary>
+        public Boolean TryGetParkingSensorById(ParkingSensor_Id                        ParkingSensorId,
+                                               [NotNullWhen(true)] out ParkingSensor?  ParkingSensor)
+
+            => parkingSensors.TryGetValue(ParkingSensorId, out ParkingSensor);
+
+        /// <summary>
+        /// The error, when two of the given parking operators have a parking garage, space or sensor with the same identification.
+        /// </summary>
+        internal static String? DuplicateParking(IEnumerable<ParkingOperator> ParkingOperators)
+        {
+
+            var garages = new HashSet<ParkingGarage_Id>();
+            var spaces  = new HashSet<ParkingSpace_Id>();
+            var sensors = new HashSet<ParkingSensor_Id>();
+            var groups  = new HashSet<ParkingSpaceGroup_Id>();
+
+            foreach (var parkingOperator in ParkingOperators)
+            {
+
+                foreach (var parkingGarage in parkingOperator.ParkingGarages)
+                    if (!garages.Add(parkingGarage.Id))
+                        return $"The parking garage '{parkingGarage.Id}' must not be given twice in the roaming network!";
+
+                foreach (var parkingSpace in parkingOperator.ParkingSpaces)
+                    if (!spaces.Add(parkingSpace.Id))
+                        return $"The parking space '{parkingSpace.Id}' must not be given twice in the roaming network!";
+
+                foreach (var parkingSensor in parkingOperator.ParkingSensors)
+                    if (!sensors.Add(parkingSensor.Id))
+                        return $"The parking sensor '{parkingSensor.Id}' must not be given twice in the roaming network!";
+
+                foreach (var parkingSpaceGroup in parkingOperator.ParkingSpaceGroups)
+                    if (!groups.Add(parkingSpaceGroup.Id))
+                        return $"The parking space group '{parkingSpaceGroup.Id}' must not be given twice in the roaming network!";
+
+            }
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when a parking garage, space or sensor names a charging station the given operators do not have.
+        /// </summary>
+        internal static String? UnknownChargingStation(IEnumerable<ParkingOperator>                                              ParkingOperators,
+                                                       IReadOnlyDictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators)
+        {
+
+            Boolean Exists(ChargingStation_Id ChargingStationId)
+
+                => ChargingStationOperators.TryGetValue(ChargingStationId.OperatorId, out var chargingStationOperator) &&
+                   chargingStationOperator.TryGetChargingStation(ChargingStationId, out _);
+
+            foreach (var parkingOperator in ParkingOperators)
+            {
+
+                var named = parkingOperator.ParkingGarages.SelectMany(parkingGarage => parkingGarage.ChargingStationIds.Select(id => (Kind: "parking garage", Id: parkingGarage.Id.ToString(), ChargingStationId: id))).
+                            Concat(parkingOperator.ParkingSpaces. SelectMany(parkingSpace  => parkingSpace. ChargingStationIds.Select(id => (Kind: "parking space",  Id: parkingSpace. Id.ToString(), ChargingStationId: id)))).
+                            Concat(parkingOperator.ParkingSensors.SelectMany(parkingSensor => parkingSensor.ChargingStationIds.Select(id => (Kind: "parking sensor", Id: parkingSensor.Id.ToString(), ChargingStationId: id))));
+
+                foreach (var (kind, id, chargingStationId) in named)
+                    if (!Exists(chargingStationId))
+                        return $"The charging station '{chargingStationId}' of the {kind} '{id}' is unknown in the roaming network!";
+
+            }
+
+            return null;
+
+        }
+
+        #endregion
+
+
+        #region Transparency software releases and certificates
+
+        private readonly ConcurrentDictionary<TransparencySoftware_Id,             TransparencySoftware>             transparencySoftware              = [];
+        private readonly ConcurrentDictionary<TransparencySoftwareCertificate_Id,  TransparencySoftwareCertificate>  transparencySoftwareCertificates  = [];
+
+        /// <summary>
+        /// The transparency software releases in this immutable network version: one per version of a software.
+        /// </summary>
+        public IEnumerable<TransparencySoftware>             TransparencySoftware
+            => transparencySoftware.Values;
+
+        /// <summary>
+        /// The certificates of transparency software releases in this immutable network version.
+        /// </summary>
+        public IEnumerable<TransparencySoftwareCertificate>  TransparencySoftwareCertificates
+            => transparencySoftwareCertificates.Values;
+
+        private IEnumerable<TransparencySoftware>             OrderedTransparencySoftware
+            => transparencySoftware.Values.OrderBy(release => release.Id.ToString(), StringComparer.Ordinal);
+
+        private IEnumerable<TransparencySoftwareCertificate>  OrderedTransparencySoftwareCertificates
+            => transparencySoftwareCertificates.Values.OrderBy(certificate => certificate.Id.ToString(), StringComparer.Ordinal);
+
+        /// <summary>
+        /// Try to get the transparency software release having the given identification.
+        /// </summary>
+        public Boolean TryGetTransparencySoftwareById(TransparencySoftware_Id                        TransparencySoftwareId,
+                                                      [NotNullWhen(true)] out TransparencySoftware?  TransparencySoftware)
+
+            => transparencySoftware.TryGetValue(TransparencySoftwareId, out TransparencySoftware);
+
+        /// <summary>
+        /// Try to get the transparency software certificate having the given identification.
+        /// </summary>
+        public Boolean TryGetTransparencySoftwareCertificateById(TransparencySoftwareCertificate_Id                        CertificateId,
+                                                                 [NotNullWhen(true)] out TransparencySoftwareCertificate?  Certificate)
+
+            => transparencySoftwareCertificates.TryGetValue(CertificateId, out Certificate);
+
+        /// <summary>
+        /// The error, when a certificate names an unknown release or manufacturer,
+        /// or an energy meter an unknown release, an unknown certificate, or a certificate not covering its release.
+        /// </summary>
+        internal static String? UnknownTransparencyReference(IEnumerable<ChargingStationOperator>                                                    ChargingStationOperators,
+                                                             IReadOnlyDictionary<TransparencySoftware_Id,            TransparencySoftware>             TransparencySoftware,
+                                                             IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  Certificates,
+                                                             IReadOnlyDictionary<ChargingStationManufacturer_Id,     ChargingStationManufacturer>      ChargingStationManufacturers)
+        {
+
+            foreach (var certificate in Certificates.Values)
+            {
+
+                foreach (var releaseId in certificate.VerifiedTransparencySoftwareIds.Concat(certificate.CompatibleTransparencySoftwareIds))
+                    if (!TransparencySoftware.ContainsKey(releaseId))
+                        return $"The transparency software release '{releaseId}' of the certificate '{certificate.Id}' is unknown in the roaming network!";
+
+                if (certificate.ChargingStationManufacturerId.HasValue &&
+                    !ChargingStationManufacturers.ContainsKey(certificate.ChargingStationManufacturerId.Value))
+                {
+                    return $"The manufacturer '{certificate.ChargingStationManufacturerId}' of the certificate '{certificate.Id}' is unknown in the roaming network!";
+                }
+
+            }
+
+            foreach (var energyMeter in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters))
+                foreach (var assignment in energyMeter.TransparencySoftwareStatus)
+                {
+
+                    if (!TransparencySoftware.ContainsKey(assignment.TransparencySoftwareId))
+                        return $"The transparency software release '{assignment.TransparencySoftwareId}' of the energy meter '{energyMeter.Id}' is unknown in the roaming network!";
+
+                    if (assignment.CertificateId.HasValue)
+                    {
+
+                        if (!Certificates.TryGetValue(assignment.CertificateId.Value, out var certificate))
+                            return $"The certificate '{assignment.CertificateId}' of the energy meter '{energyMeter.Id}' is unknown in the roaming network!";
+
+                        if (!certificate.Covers(assignment.TransparencySoftwareId))
+                            return $"The certificate '{certificate.Id}' of the energy meter '{energyMeter.Id}' does not cover the transparency software release '{assignment.TransparencySoftwareId}'!";
+
+                    }
+
+                }
+
+            return null;
+
+        }
+
+        #endregion
+
+
+        #region Groups
+
+        /// <summary>
+        /// The EVSEGroups of all charging station operators.
+        /// </summary>
+        public IEnumerable<EVSEGroup> EVSEGroups
+            => chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.EVSEGroups);
+
+        /// <summary>
+        /// Try to get the EVSEGroup having the given identification, of the operator it names.
+        /// </summary>
+        public Boolean TryGetEVSEGroupById(EVSEGroup_Id  EVSEGroupId,
+                                     [NotNullWhen(true)] out EVSEGroup?  EVSEGroup)
+        {
+
+            if (chargingStationOperators.TryGetValue(EVSEGroupId.OperatorId, out var chargingStationOperator))
+                return chargingStationOperator.TryGetEVSEGroup(EVSEGroupId, out EVSEGroup);
+
+            EVSEGroup = null;
+            return false;
+
+        }
+
+        /// <summary>
+        /// The ChargingStationGroups of all charging station operators.
+        /// </summary>
+        public IEnumerable<ChargingStationGroup> ChargingStationGroups
+            => chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationGroups);
+
+        /// <summary>
+        /// Try to get the ChargingStationGroup having the given identification, of the operator it names.
+        /// </summary>
+        public Boolean TryGetChargingStationGroupById(ChargingStationGroup_Id  ChargingStationGroupId,
+                                     [NotNullWhen(true)] out ChargingStationGroup?  ChargingStationGroup)
+        {
+
+            if (chargingStationOperators.TryGetValue(ChargingStationGroupId.OperatorId, out var chargingStationOperator))
+                return chargingStationOperator.TryGetChargingStationGroup(ChargingStationGroupId, out ChargingStationGroup);
+
+            ChargingStationGroup = null;
+            return false;
+
+        }
+
+        /// <summary>
+        /// The ChargingPoolGroups of all charging station operators.
+        /// </summary>
+        public IEnumerable<ChargingPoolGroup> ChargingPoolGroups
+            => chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPoolGroups);
+
+        /// <summary>
+        /// Try to get the ChargingPoolGroup having the given identification, of the operator it names.
+        /// </summary>
+        public Boolean TryGetChargingPoolGroupById(ChargingPoolGroup_Id  ChargingPoolGroupId,
+                                     [NotNullWhen(true)] out ChargingPoolGroup?  ChargingPoolGroup)
+        {
+
+            if (chargingStationOperators.TryGetValue(ChargingPoolGroupId.OperatorId, out var chargingStationOperator))
+                return chargingStationOperator.TryGetChargingPoolGroup(ChargingPoolGroupId, out ChargingPoolGroup);
+
+            ChargingPoolGroup = null;
+            return false;
+
+        }
+
+        /// <summary>
+        /// The ChargingTariffGroups of all charging station operators.
+        /// </summary>
+        public IEnumerable<ChargingTariffGroup> ChargingTariffGroups
+            => chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.ChargingTariffGroups);
+
+        /// <summary>
+        /// Try to get the ChargingTariffGroup having the given identification, of the operator it names.
+        /// </summary>
+        public Boolean TryGetChargingTariffGroupById(ChargingTariffGroup_Id  ChargingTariffGroupId,
+                                     [NotNullWhen(true)] out ChargingTariffGroup?  ChargingTariffGroup)
+        {
+
+            if (chargingStationOperators.TryGetValue(ChargingTariffGroupId.OperatorId, out var chargingStationOperator))
+                return chargingStationOperator.TryGetChargingTariffGroup(ChargingTariffGroupId, out ChargingTariffGroup);
+
+            ChargingTariffGroup = null;
+            return false;
+
+        }
+
+        private readonly ConcurrentDictionary<ParkingSpaceGroup_Id, ParkingSpaceGroup> parkingSpaceGroups = [];
+
+        /// <summary>
+        /// The parking space groups of all parking operators.
+        /// </summary>
+        public IEnumerable<ParkingSpaceGroup> ParkingSpaceGroups
+            => parkingSpaceGroups.Values;
+
+        /// <summary>
+        /// Try to get the parking space group having the given identification, of any parking operator.
+        /// </summary>
+        public Boolean TryGetParkingSpaceGroupById(ParkingSpaceGroup_Id                        ParkingSpaceGroupId,
+                                                   [NotNullWhen(true)] out ParkingSpaceGroup?  ParkingSpaceGroup)
+
+            => parkingSpaceGroups.TryGetValue(ParkingSpaceGroupId, out ParkingSpaceGroup);
+
+        #endregion
+
+
+        #region Charging tariffs
+
+        /// <summary>
+        /// The charging tariffs of all charging station operators.
+        /// </summary>
+        public IEnumerable<ChargingTariff> ChargingTariffs
+            => chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.ChargingTariffs);
+
+        /// <summary>
+        /// Try to get the charging tariff having the given identification, of the operator it names.
+        /// </summary>
+        /// <param name="ChargingTariffId">The identification of a charging tariff.</param>
+        /// <param name="ChargingTariff">The charging tariff.</param>
+        public Boolean TryGetChargingTariffById(ChargingTariff_Id                        ChargingTariffId,
+                                                [NotNullWhen(true)] out ChargingTariff?  ChargingTariff)
+        {
+
+            if (chargingStationOperators.TryGetValue(ChargingTariffId.OperatorId, out var chargingStationOperator))
+                return chargingStationOperator.TryGetChargingTariff(ChargingTariffId, out ChargingTariff);
+
+            ChargingTariff = null;
+            return false;
 
         }
 

@@ -21,6 +21,15 @@ flowchart TD
     RoamingNetwork --> ChargingStationManufacturer
     RoamingNetwork --> EMobilityProvider
     RoamingNetwork --> GridOperator
+    RoamingNetwork --> ParkingOperator
+    RoamingNetwork --> TransparencySoftware
+    RoamingNetwork --> TransparencySoftwareCertificate
+    ParkingOperator --> ParkingGarage
+    ParkingOperator --> ParkingSpace
+    ParkingOperator --> ParkingSensor
+    ParkingOperator --> ParkingSpaceGroup
+    ChargingStationOperator --> ChargingTariff
+    ChargingStationOperator --> Groups["EVSEGroup, ChargingStationGroup,<br/>ChargingPoolGroup, ChargingTariffGroup"]
     ChargingStationOperator --> ChargingPool
     ChargingPool --> ChargingStation
     ChargingPool --> GridConnectionPoint
@@ -32,17 +41,25 @@ flowchart TD
     EVSE --> EnergyMeter
     ChargingStation -. manufacturerId .-> ChargingStationManufacturer
     GridConnectionPoint -. gridOperatorId .-> GridOperator
+    ParkingSpace -. parkingGarageId .-> ParkingGarage
+    ParkingSpace -. parkingSensorIds .-> ParkingSensor
+    ParkingGarage -. chargingStationIds .-> ChargingStation
+    EVSE -. chargingTariffIds .-> ChargingTariff
+    EnergyMeter -. transparencySoftwareStatus .-> TransparencySoftware
+    TransparencySoftwareCertificate -. verified/compatible .-> TransparencySoftware
     RoamingNetwork -. dataLicenses .-> DataLicense
     ChargingStationOperator -. dataLicenses .-> DataLicense
     ChargingPool -. dataLicenses .-> DataLicense
 ```
 
 Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`,
-`gridOperators`, `chargingPools`, `chargingStations`, `EVSEs`, `chargingConnectors`, `energyMeters`), each 0..n
+`gridOperators`, `parkingOperators`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
+`EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `chargingPools`, `chargingStations`,
+`EVSEs`, `chargingConnectors`, `energyMeters`, `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups`), each 0..n
 in the order of their ids; a pool has 0..1 `gridConnectionPoint`, a grid connection point and an EVSE each 0..1 `energyMeter`.
 Dotted lines are references, which must exist in the network.
-A pool, station or EVSE belongs to the operator its id names; ids are unique within the operator.
-Energy meter ids are unique within the network. Tariffs, parking and more follow.
+A pool, station, EVSE, tariff or group belongs to the operator its id names; ids are unique within the operator.
+Energy meter, parking garage, space, sensor and space group ids are unique within the network.
 
 - **Content:** everything in the JSON and CBOR representations, completely, in a fixed order:
   children and licenses embedded, `created`, `lastChange` and `customData` included,
@@ -56,6 +73,23 @@ Energy meter ids are unique within the network. Tariffs, parking and more follow
   exceed apparent power.
 - **Energy meter:** `role` (e.g. `grid`, `pv`, `battery`), `manufacturer`, `model`, their URLs,
   `serialNumber`, `hardwareVersion`, `firmwareVersion`; with admin status and status.
+- **Parking:** a parking operator owns its garages, spaces and sensors directly. A space may name a
+  `parkingGarageId` and `parkingSensorIds` of the same operator; garages, spaces and sensors may name
+  `chargingStationIds` of the network. All have admin status and status.
+- **Charging tariff:** as in OCPI: `currency` (ISO 4217), `tariffURL` and `elements`, each with
+  `priceComponents` (`{type, price, vat?, stepSize?}`, `type` one of `ENERGY`, `FLAT`, `MAX_CURRENT`,
+  `MIN_CURRENT`, `PARKING_TIME`, `TIME`; `stepSize` in Wh, A or s) and optional `restrictions`
+  (`startTime`/`endTime` as `HH:mm`, `startDate`/`endDate` as `yyyy-MM-dd`, `min/maxEnergy` (Wh),
+  `min/maxCurrent` (A), `min/maxPower` (W), `min/maxDuration` (s), `daysOfWeek`). EVSEs name
+  `chargingTariffIds` of their operator.
+- **Groups:** EVSE, charging station, charging pool and charging tariff groups name members of their
+  operator (`EVSEIds`, `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`), the first three
+  optionally a `chargingTariffId`; parking space groups name `parkingSpaceIds`. Groups may overlap and
+  have admin status and status.
+- **Transparency software:** releases (`TransparencySoftware`, one per version) and their certificates
+  are embedded in the network, without status and timestamps. A certificate names the releases it
+  verifies or finds compatible, and optionally a manufacturer. An energy meter's `transparencySoftwareStatus`
+  assigns releases with their `legalStatus`, at most one entry per release; a given `certificateId` must cover it.
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
   They identify a version; `CalcETags()` and `ValidateETags(…)`.
 - **Runtime:** admin status and status are not content and have no ETags. Each entity keeps them
@@ -88,10 +122,12 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 ```
 
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
-  `Add`/`Remove` of operators, manufacturers, e-mobility providers, grid operators, pools, stations
-  (`Add(station, poolId)`) and EVSEs (`Add(evse, stationId)`). Grid connection points and energy meters
+  `Add`/`Remove` of operators, manufacturers, e-mobility providers, grid operators, parking operators,
+  transparency software releases and certificates, pools, tariffs, groups, stations (`Add(station, poolId)`),
+  EVSEs (`Add(evse, stationId)`) and parking garages, spaces, sensors and space groups
+  (`Add(space, parkingOperatorId)`). Grid connection points and energy meters
   are properties of what embeds them (`gridConnectionPoint`, `energyMeters`, `energyMeter`).
-  A referenced manufacturer or grid operator must exist. The overload by the entity's
+  Every reference must exist; a referenced entity can not be removed. The overload by the entity's
   type names it: a change is data, `{entityType, entityId, propertyName, oldValue, newValue}`, applied
   to the entity with that id in the version it is applied to.
 - **Old values:** `CreateChangeSet` gives every change the value it finds; JSON `null` means
@@ -200,7 +236,7 @@ await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader;
 | Directory | What it is |
 |---|---|
 | `WWCP_POI2` | Shared lower layer: identifications, status values, predefined strings, energy information, transparency software |
-| `WWCP_POI3` | Roaming networks with their operators, pools, stations, EVSEs, manufacturers, e-mobility providers, grid operators and energy meters; change sets, history, sync |
+| `WWCP_POI3` | Roaming networks with their operators, pools, stations, EVSEs, tariffs, groups, manufacturers, e-mobility providers, grid operators, energy meters, transparency software and parking; change sets, history, sync |
 | `old` | The earlier implementation, for reference only; not developed further |
 
 
@@ -210,7 +246,7 @@ await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader;
 - Finer subscription filters, energy status with EVSEs
 - A WebSocket endpoint in Hermod without a TCP server behind it
 - Commits signed by the leader
-- Further entities: parking, tariffs, transparency software, groups of entities, …
+- Further entities: brands, opening times, energy mix, images, parking products, …
 
 ## Tests
 

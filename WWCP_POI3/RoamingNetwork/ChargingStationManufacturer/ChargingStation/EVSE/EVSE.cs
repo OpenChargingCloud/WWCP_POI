@@ -106,6 +106,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public EnergyMeter?                       EnergyMeter           { get; }
 
         /// <summary>
+        /// The charging tariffs of its operator that apply, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<ChargingTariff_Id>  ChargingTariffIds     { get; }
+
+        /// <summary>
         /// Its energy meter, if any.
         /// </summary>
         public IEnumerable<EnergyMeter>           AllEnergyMeters
@@ -129,6 +134,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     Watt?                                MaxPower                     = null,
                     IEnumerable<ChargingConnector>?      ChargingConnectors           = null,
                     EnergyMeter?                         EnergyMeter                  = null,
+                    IEnumerable<ChargingTariff_Id>?      ChargingTariffIds            = null,
 
                     Timestamped<EVSEAdminStatusType>?    InitialAdminStatus           = null,
                     Timestamped<EVSEStatusType>?         InitialStatus                = null,
@@ -180,6 +186,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.MaxPower            = MaxPower;
             this.ChargingConnectors  = [.. chargingConnectors.OrderBy(chargingConnector => chargingConnector.Id.ToString(), StringComparer.Ordinal)];
             this.EnergyMeter         = EnergyMeter;
+            this.ChargingTariffIds   = POIJSON.OrderedIds(ChargingTariffIds, $"charging tariff of the EVSE '{Id}'");
 
         }
 
@@ -282,6 +289,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (EnergyMeter is not null)
                 json.Add("energyMeter",        EnergyMeter.ToJSON());
 
+            if (ChargingTariffIds.Length > 0)
+                json.Add("chargingTariffIds",  POIJSON.IdsToJSON(ChargingTariffIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -350,6 +360,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POI.EnergyMeter.TryParseOne(JSON, "energyMeter", out var energyMeter, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseIds(JSON, "chargingTariffIds", "charging tariff identification", ChargingTariff_Id.TryParse, out ImmutableArray<ChargingTariff_Id> chargingTariffIds, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -370,6 +383,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 maxPower,
                                 chargingConnectors,
                                 energyMeter,
+                                chargingTariffIds,
                                 DataSource:  dataSource,
                                 Created:     created,
                                 LastChange:  lastChange,

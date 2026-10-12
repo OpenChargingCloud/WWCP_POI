@@ -551,6 +551,510 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Add                   (ParkingOperator)
+
+        /// <summary>
+        /// Add the given parking operator to its roaming network.
+        /// </summary>
+        /// <param name="ParkingOperator">The new parking operator.</param>
+        public static RoamingNetworkChange Add(ParkingOperator ParkingOperator)
+
+            => Add(nameof(POI.ParkingOperator),
+                   ParkingOperator.Id.ToString(),
+                   ParkingOperator.ToJSON());
+
+        /// <summary>
+        /// Remove the given parking operator, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ParkingOperator_Id  ParkingOperatorId,
+                                                  JToken?             OldValue            = null)
+
+            => Remove(nameof(POI.ParkingOperator),
+                      ParkingOperatorId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given parking operator, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ParkingOperator  ParkingOperator,
+                                                          String           PropertyName,
+                                                          JToken?          OldValue,
+                                                          JToken           NewValue)
+
+            => UpdateProperty(nameof(POI.ParkingOperator), ParkingOperator.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given parking operator, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ParkingOperator  ParkingOperator,
+                                                          String           PropertyName,
+                                                          JToken?          OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ParkingOperator), ParkingOperator.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ParkingGarage | ParkingSpace | ParkingSensor, ParkingOperatorId)
+
+        /// <summary>
+        /// Add the given parking garage to the given parking operator.
+        /// </summary>
+        public static RoamingNetworkChange Add(ParkingGarage       ParkingGarage,
+                                               ParkingOperator_Id  ParkingOperatorId)
+
+            => Add(nameof(POI.ParkingGarage), ParkingGarage.Id.ToString(), ParkingGarage.ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+
+        /// <summary>
+        /// Add the given parking space to the given parking operator.
+        /// </summary>
+        public static RoamingNetworkChange Add(ParkingSpace        ParkingSpace,
+                                               ParkingOperator_Id  ParkingOperatorId)
+
+            => Add(nameof(POI.ParkingSpace),  ParkingSpace. Id.ToString(), ParkingSpace. ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+
+        /// <summary>
+        /// Add the given parking sensor to the given parking operator.
+        /// </summary>
+        public static RoamingNetworkChange Add(ParkingSensor       ParkingSensor,
+                                               ParkingOperator_Id  ParkingOperatorId)
+
+            => Add(nameof(POI.ParkingSensor), ParkingSensor.Id.ToString(), ParkingSensor.ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+
+        #endregion
+
+        #region Remove                (ParkingGarageId | ParkingSpaceId | ParkingSensorId, OldValue = null)
+
+        /// <summary>
+        /// Remove the given parking garage, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ParkingGarage_Id  ParkingGarageId,
+                                                  JToken?           OldValue   = null)
+
+            => Remove(nameof(POI.ParkingGarage), ParkingGarageId.ToString(), OldValue);
+
+        /// <summary>
+        /// Remove the given parking space, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ParkingSpace_Id   ParkingSpaceId,
+                                                  JToken?           OldValue   = null)
+
+            => Remove(nameof(POI.ParkingSpace),  ParkingSpaceId. ToString(), OldValue);
+
+        /// <summary>
+        /// Remove the given parking sensor, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ParkingSensor_Id  ParkingSensorId,
+                                                  JToken?           OldValue   = null)
+
+            => Remove(nameof(POI.ParkingSensor), ParkingSensorId.ToString(), OldValue);
+
+        #endregion
+
+        #region UpdateProperty        (ParkingGarage | ParkingSpace | ParkingSensor, PropertyName, OldValue, NewValue)
+
+        /// <summary>
+        /// Update one property of the given parking garage, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ParkingGarage  ParkingGarage,
+                                                          String         PropertyName,
+                                                          JToken?        OldValue,
+                                                          JToken         NewValue)
+
+            => UpdateProperty(nameof(POI.ParkingGarage), ParkingGarage.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Update one property of the given parking space, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ParkingSpace   ParkingSpace,
+                                                          String         PropertyName,
+                                                          JToken?        OldValue,
+                                                          JToken         NewValue)
+
+            => UpdateProperty(nameof(POI.ParkingSpace),  ParkingSpace. Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Update one property of the given parking sensor, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ParkingSensor  ParkingSensor,
+                                                          String         PropertyName,
+                                                          JToken?        OldValue,
+                                                          JToken         NewValue)
+
+            => UpdateProperty(nameof(POI.ParkingSensor), ParkingSensor.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        #endregion
+
+        #region RemoveProperty        (ParkingGarage | ParkingSpace | ParkingSensor, PropertyName, OldValue = null)
+
+        /// <summary>
+        /// Remove one property of the given parking garage, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ParkingGarage  ParkingGarage,
+                                                          String         PropertyName,
+                                                          JToken?        OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ParkingGarage), ParkingGarage.Id.ToString(), PropertyName, OldValue);
+
+        /// <summary>
+        /// Remove one property of the given parking space, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ParkingSpace   ParkingSpace,
+                                                          String         PropertyName,
+                                                          JToken?        OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ParkingSpace),  ParkingSpace. Id.ToString(), PropertyName, OldValue);
+
+        /// <summary>
+        /// Remove one property of the given parking sensor, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ParkingSensor  ParkingSensor,
+                                                          String         PropertyName,
+                                                          JToken?        OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ParkingSensor), ParkingSensor.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ChargingTariff)
+
+        /// <summary>
+        /// Add the given charging tariff to its operator.
+        /// </summary>
+        /// <param name="ChargingTariff">The new charging tariff.</param>
+        public static RoamingNetworkChange Add(ChargingTariff ChargingTariff)
+
+            => Add(nameof(POI.ChargingTariff),
+                   ChargingTariff.Id.ToString(),
+                   ChargingTariff.ToJSON());
+
+        /// <summary>
+        /// Remove the given charging tariff, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingTariff_Id  ChargingTariffId,
+                                                  JToken?            OldValue           = null)
+
+            => Remove(nameof(POI.ChargingTariff),
+                      ChargingTariffId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given charging tariff, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingTariff  ChargingTariff,
+                                                          String          PropertyName,
+                                                          JToken?         OldValue,
+                                                          JToken          NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingTariff), ChargingTariff.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given charging tariff, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingTariff  ChargingTariff,
+                                                          String          PropertyName,
+                                                          JToken?         OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingTariff), ChargingTariff.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (TransparencySoftware)
+
+        /// <summary>
+        /// Add the given transparency software release to its roaming network.
+        /// </summary>
+        /// <param name="TransparencySoftware">The new transparency software release.</param>
+        public static RoamingNetworkChange Add(TransparencySoftware TransparencySoftware)
+
+            => Add(nameof(POI.TransparencySoftware),
+                   TransparencySoftware.Id.ToString(),
+                   TransparencySoftware.ToJSON());
+
+        /// <summary>
+        /// Remove the given transparency software release, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(TransparencySoftware_Id  TransparencySoftwareId,
+                                                  JToken?                  OldValue                 = null)
+
+            => Remove(nameof(POI.TransparencySoftware),
+                      TransparencySoftwareId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given transparency software release, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(TransparencySoftware  TransparencySoftware,
+                                                          String                PropertyName,
+                                                          JToken?               OldValue,
+                                                          JToken                NewValue)
+
+            => UpdateProperty(nameof(POI.TransparencySoftware), TransparencySoftware.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given transparency software release, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(TransparencySoftware  TransparencySoftware,
+                                                          String                PropertyName,
+                                                          JToken?               OldValue   = null)
+
+            => RemoveProperty(nameof(POI.TransparencySoftware), TransparencySoftware.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (TransparencySoftwareCertificate)
+
+        /// <summary>
+        /// Add the given transparency software certificate to its roaming network.
+        /// </summary>
+        /// <param name="TransparencySoftwareCertificate">The new transparency software certificate.</param>
+        public static RoamingNetworkChange Add(TransparencySoftwareCertificate TransparencySoftwareCertificate)
+
+            => Add(nameof(POI.TransparencySoftwareCertificate),
+                   TransparencySoftwareCertificate.Id.ToString(),
+                   TransparencySoftwareCertificate.ToJSON());
+
+        /// <summary>
+        /// Remove the given transparency software certificate, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(TransparencySoftwareCertificate_Id  TransparencySoftwareCertificateId,
+                                                  JToken?                             OldValue                            = null)
+
+            => Remove(nameof(POI.TransparencySoftwareCertificate),
+                      TransparencySoftwareCertificateId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given transparency software certificate, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(TransparencySoftwareCertificate  TransparencySoftwareCertificate,
+                                                          String                           PropertyName,
+                                                          JToken?                          OldValue,
+                                                          JToken                           NewValue)
+
+            => UpdateProperty(nameof(POI.TransparencySoftwareCertificate), TransparencySoftwareCertificate.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given transparency software certificate, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(TransparencySoftwareCertificate  TransparencySoftwareCertificate,
+                                                          String                           PropertyName,
+                                                          JToken?                          OldValue   = null)
+
+            => RemoveProperty(nameof(POI.TransparencySoftwareCertificate), TransparencySoftwareCertificate.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (EVSEGroup)
+
+        /// <summary>
+        /// Add the given EVSE group to its operator.
+        /// </summary>
+        /// <param name="EVSEGroup">The new EVSE group.</param>
+        public static RoamingNetworkChange Add(EVSEGroup EVSEGroup)
+
+            => Add(nameof(POI.EVSEGroup),
+                   EVSEGroup.Id.ToString(),
+                   EVSEGroup.ToJSON());
+
+        /// <summary>
+        /// Remove the given EVSE group, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(EVSEGroup_Id  EVSEGroupId,
+                                                  JToken?       OldValue      = null)
+
+            => Remove(nameof(POI.EVSEGroup),
+                      EVSEGroupId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given EVSE group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(EVSEGroup  EVSEGroup,
+                                                          String     PropertyName,
+                                                          JToken?    OldValue,
+                                                          JToken     NewValue)
+
+            => UpdateProperty(nameof(POI.EVSEGroup), EVSEGroup.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given EVSE group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(EVSEGroup  EVSEGroup,
+                                                          String     PropertyName,
+                                                          JToken?    OldValue   = null)
+
+            => RemoveProperty(nameof(POI.EVSEGroup), EVSEGroup.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ChargingStationGroup)
+
+        /// <summary>
+        /// Add the given charging station group to its operator.
+        /// </summary>
+        /// <param name="ChargingStationGroup">The new charging station group.</param>
+        public static RoamingNetworkChange Add(ChargingStationGroup ChargingStationGroup)
+
+            => Add(nameof(POI.ChargingStationGroup),
+                   ChargingStationGroup.Id.ToString(),
+                   ChargingStationGroup.ToJSON());
+
+        /// <summary>
+        /// Remove the given charging station group, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingStationGroup_Id  ChargingStationGroupId,
+                                                  JToken?                  OldValue                 = null)
+
+            => Remove(nameof(POI.ChargingStationGroup),
+                      ChargingStationGroupId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given charging station group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingStationGroup  ChargingStationGroup,
+                                                          String                PropertyName,
+                                                          JToken?               OldValue,
+                                                          JToken                NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingStationGroup), ChargingStationGroup.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given charging station group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingStationGroup  ChargingStationGroup,
+                                                          String                PropertyName,
+                                                          JToken?               OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingStationGroup), ChargingStationGroup.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ChargingPoolGroup)
+
+        /// <summary>
+        /// Add the given charging pool group to its operator.
+        /// </summary>
+        /// <param name="ChargingPoolGroup">The new charging pool group.</param>
+        public static RoamingNetworkChange Add(ChargingPoolGroup ChargingPoolGroup)
+
+            => Add(nameof(POI.ChargingPoolGroup),
+                   ChargingPoolGroup.Id.ToString(),
+                   ChargingPoolGroup.ToJSON());
+
+        /// <summary>
+        /// Remove the given charging pool group, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingPoolGroup_Id  ChargingPoolGroupId,
+                                                  JToken?               OldValue              = null)
+
+            => Remove(nameof(POI.ChargingPoolGroup),
+                      ChargingPoolGroupId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given charging pool group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingPoolGroup  ChargingPoolGroup,
+                                                          String             PropertyName,
+                                                          JToken?            OldValue,
+                                                          JToken             NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingPoolGroup), ChargingPoolGroup.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given charging pool group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingPoolGroup  ChargingPoolGroup,
+                                                          String             PropertyName,
+                                                          JToken?            OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingPoolGroup), ChargingPoolGroup.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ChargingTariffGroup)
+
+        /// <summary>
+        /// Add the given charging tariff group to its operator.
+        /// </summary>
+        /// <param name="ChargingTariffGroup">The new charging tariff group.</param>
+        public static RoamingNetworkChange Add(ChargingTariffGroup ChargingTariffGroup)
+
+            => Add(nameof(POI.ChargingTariffGroup),
+                   ChargingTariffGroup.Id.ToString(),
+                   ChargingTariffGroup.ToJSON());
+
+        /// <summary>
+        /// Remove the given charging tariff group, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingTariffGroup_Id  ChargingTariffGroupId,
+                                                  JToken?                 OldValue                = null)
+
+            => Remove(nameof(POI.ChargingTariffGroup),
+                      ChargingTariffGroupId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given charging tariff group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingTariffGroup  ChargingTariffGroup,
+                                                          String               PropertyName,
+                                                          JToken?              OldValue,
+                                                          JToken               NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingTariffGroup), ChargingTariffGroup.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given charging tariff group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingTariffGroup  ChargingTariffGroup,
+                                                          String               PropertyName,
+                                                          JToken?              OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingTariffGroup), ChargingTariffGroup.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ParkingSpaceGroup, ParkingOperatorId)
+
+        /// <summary>
+        /// Add the given parking space group to the given parking operator.
+        /// </summary>
+        public static RoamingNetworkChange Add(ParkingSpaceGroup   ParkingSpaceGroup,
+                                               ParkingOperator_Id  ParkingOperatorId)
+
+            => Add(nameof(POI.ParkingSpaceGroup), ParkingSpaceGroup.Id.ToString(), ParkingSpaceGroup.ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+
+        /// <summary>
+        /// Remove the given parking space group, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ParkingSpaceGroup_Id  ParkingSpaceGroupId,
+                                                  JToken?               OldValue   = null)
+
+            => Remove(nameof(POI.ParkingSpaceGroup), ParkingSpaceGroupId.ToString(), OldValue);
+
+        /// <summary>
+        /// Update one property of the given parking space group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ParkingSpaceGroup  ParkingSpaceGroup,
+                                                          String             PropertyName,
+                                                          JToken?            OldValue,
+                                                          JToken             NewValue)
+
+            => UpdateProperty(nameof(POI.ParkingSpaceGroup), ParkingSpaceGroup.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given parking space group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ParkingSpaceGroup  ParkingSpaceGroup,
+                                                          String             PropertyName,
+                                                          JToken?            OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ParkingSpaceGroup), ParkingSpaceGroup.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
         #region Add                   (ChargingPool)
 
         /// <summary>

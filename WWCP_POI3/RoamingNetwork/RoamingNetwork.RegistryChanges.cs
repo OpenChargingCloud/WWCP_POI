@@ -49,6 +49,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="GetId">The identification of an entity.</param>
         /// <param name="ToJSON">The JSON representation of an entity.</param>
         /// <param name="ShareRuntimeOf">Lets a changed entity take the runtime status and internal data of its previous version.</param>
+        /// <param name="Timestamps">Whether its entities have created and lastChange timestamps.</param>
         private sealed record Registry<TId, TEntity>(String                      Description,
                                                      String                      Article,
                                                      ImmutableHashSet<String>    ChangeableProperties,
@@ -56,7 +57,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                      POIObjectParser<TEntity>    TryParse,
                                                      Func<TEntity, TId>          GetId,
                                                      Func<TEntity, JObject>      ToJSON,
-                                                     Action<TEntity, TEntity>    ShareRuntimeOf)
+                                                     Action<TEntity, TEntity>    ShareRuntimeOf,
+                                                     Boolean                     Timestamps   = true)
 
             where TId     : notnull
             where TEntity : class;
@@ -109,6 +111,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
             gridOperator => gridOperator.Id,
             gridOperator => gridOperator.ToJSON(),
             (changed, previous) => changed.ShareRuntimeOf(previous)
+        );
+
+        // In this file, after ChangeableRegistryProperties: static fields are initialized in their textual order only within one file.
+        private static readonly Registry<ParkingOperator_Id, ParkingOperator> ParkingOperatorRegistry = new (
+            "parking operator",
+            "a",
+            ChangeableRegistryProperties,
+            ParkingOperator_Id.TryParse,
+            ParkingOperator.TryParse,
+            parkingOperator => parkingOperator.Id,
+            parkingOperator => parkingOperator.ToJSON(),
+            // Its garages, spaces and sensors are embedded: theirs go along too.
+            (changed, previous) => changed.ShareRuntimeOfAll(previous)
+        );
+
+        private static readonly Registry<TransparencySoftware_Id, TransparencySoftware> TransparencySoftwareRegistry = new (
+            "transparency software release",
+            "a",
+            [ "name", "version", "openSourceLicenses", "vendor", "logo", "howToUse", "moreInformation", "sourceCodeRepository" ],
+            TransparencySoftware_Id.TryParse,
+            POI.TransparencySoftware.TryParse,
+            transparencySoftware => transparencySoftware.Id,
+            transparencySoftware => transparencySoftware.ToJSON(),
+            // Releases have no runtime status and no timestamps.
+            (changed, previous) => { },
+            Timestamps: false
+        );
+
+        private static readonly Registry<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate> TransparencySoftwareCertificateRegistry = new (
+            "transparency software certificate",
+            "a",
+            [ "issuer", "chargingStationModel", "chargingStationModelVersion", "chargingStationManufacturerId", "documentNumber", "documentURL",
+              "verifiedTransparencySoftwareIds", "compatibleTransparencySoftwareIds", "notBefore", "notAfter" ],
+            TransparencySoftwareCertificate_Id.TryParse,
+            TransparencySoftwareCertificate.TryParse,
+            certificate => certificate.Id,
+            certificate => certificate.ToJSON(),
+            // Certificates have no runtime status and no timestamps.
+            (changed, previous) => { },
+            Timestamps: false
         );
 
         #endregion
@@ -204,7 +246,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     else
                         currentJSON![propertyName] = Change.NewValue;
 
-                    currentJSON["lastChange"] = CreatedAt.ToISO8601();
+                    if (Registry.Timestamps)
+                        currentJSON["lastChange"] = CreatedAt.ToISO8601();
 
                     if (!Registry.TryParse(currentJSON, out var changedEntity, out var changedError))
                     {
@@ -233,8 +276,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     var added = (JObject) newJSON.DeepClone();
-                    added["created"]    ??= CreatedAt.ToISO8601();
-                    added["lastChange"]   = CreatedAt.ToISO8601();
+
+                    if (Registry.Timestamps)
+                    {
+                        added["created"]    ??= CreatedAt.ToISO8601();
+                        added["lastChange"]   = CreatedAt.ToISO8601();
+                    }
 
                     if (!Registry.TryParse(added, out var newEntity, out var newError))
                     {

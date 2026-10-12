@@ -455,6 +455,80 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly System.Collections.Immutable.ImmutableDictionary<ChargingStation_Id, ChargingStation>  chargingStationIndex;
         private readonly System.Collections.Immutable.ImmutableDictionary<EVSE_Id,            EVSE>             evseIndex;
         private readonly System.Collections.Immutable.ImmutableDictionary<EnergyMeter_Id,     EnergyMeter>      energyMeterIndex;
+        private readonly System.Collections.Immutable.ImmutableDictionary<ChargingTariff_Id,  ChargingTariff>   chargingTariffIndex;
+
+        private readonly System.Collections.Immutable.ImmutableDictionary<EVSEGroup_Id, EVSEGroup> evseGroupIndex;
+
+        /// <summary>
+        /// The EVSEGroup groups, embedded completely, in the order of their identifications.
+        /// </summary>
+        public System.Collections.Immutable.ImmutableArray<EVSEGroup>  EVSEGroups  { get; } = [];
+
+        /// <summary>
+        /// Try to return the EVSEGroup with the given identification.
+        /// </summary>
+        public Boolean TryGetEVSEGroup(EVSEGroup_Id  EVSEGroupId,
+                                 [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EVSEGroup?  EVSEGroup)
+
+            => evseGroupIndex.TryGetValue(EVSEGroupId, out EVSEGroup);
+
+        private readonly System.Collections.Immutable.ImmutableDictionary<ChargingStationGroup_Id, ChargingStationGroup> chargingStationGroupIndex;
+
+        /// <summary>
+        /// The ChargingStationGroup groups, embedded completely, in the order of their identifications.
+        /// </summary>
+        public System.Collections.Immutable.ImmutableArray<ChargingStationGroup>  ChargingStationGroups  { get; } = [];
+
+        /// <summary>
+        /// Try to return the ChargingStationGroup with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingStationGroup(ChargingStationGroup_Id  ChargingStationGroupId,
+                                 [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ChargingStationGroup?  ChargingStationGroup)
+
+            => chargingStationGroupIndex.TryGetValue(ChargingStationGroupId, out ChargingStationGroup);
+
+        private readonly System.Collections.Immutable.ImmutableDictionary<ChargingPoolGroup_Id, ChargingPoolGroup> chargingPoolGroupIndex;
+
+        /// <summary>
+        /// The ChargingPoolGroup groups, embedded completely, in the order of their identifications.
+        /// </summary>
+        public System.Collections.Immutable.ImmutableArray<ChargingPoolGroup>  ChargingPoolGroups  { get; } = [];
+
+        /// <summary>
+        /// Try to return the ChargingPoolGroup with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingPoolGroup(ChargingPoolGroup_Id  ChargingPoolGroupId,
+                                 [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ChargingPoolGroup?  ChargingPoolGroup)
+
+            => chargingPoolGroupIndex.TryGetValue(ChargingPoolGroupId, out ChargingPoolGroup);
+
+        private readonly System.Collections.Immutable.ImmutableDictionary<ChargingTariffGroup_Id, ChargingTariffGroup> chargingTariffGroupIndex;
+
+        /// <summary>
+        /// The ChargingTariffGroup groups, embedded completely, in the order of their identifications.
+        /// </summary>
+        public System.Collections.Immutable.ImmutableArray<ChargingTariffGroup>  ChargingTariffGroups  { get; } = [];
+
+        /// <summary>
+        /// Try to return the ChargingTariffGroup with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingTariffGroup(ChargingTariffGroup_Id  ChargingTariffGroupId,
+                                 [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ChargingTariffGroup?  ChargingTariffGroup)
+
+            => chargingTariffGroupIndex.TryGetValue(ChargingTariffGroupId, out ChargingTariffGroup);
+
+        /// <summary>
+        /// The charging tariffs, embedded completely, in the order of their identifications.
+        /// </summary>
+        public System.Collections.Immutable.ImmutableArray<ChargingTariff>  ChargingTariffs  { get; } = [];
+
+        /// <summary>
+        /// Try to return the charging tariff with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingTariff(ChargingTariff_Id                                                    ChargingTariffId,
+                                            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ChargingTariff?  ChargingTariff)
+
+            => chargingTariffIndex.TryGetValue(ChargingTariffId, out ChargingTariff);
 
         /// <summary>
         /// The charging pools, embedded completely with their charging stations and EVSEs, in the order of their identifications.
@@ -513,7 +587,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Take the runtime status and internal data of the given previous version of this operator,
-        /// and of every charging pool, charging station, EVSE and energy meter it had, by their identifications.
+        /// and of every charging pool, charging station, EVSE, energy meter, charging tariff and group it had, by their identifications.
         /// </summary>
         internal void ShareRuntimeOfAll(ChargingStationOperator Previous)
         {
@@ -535,6 +609,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var energyMeter in EnergyMeters)
                 if (Previous.TryGetEnergyMeter(energyMeter.Id, out var previousEnergyMeter))
                     energyMeter.ShareRuntimeOf(previousEnergyMeter);
+
+            foreach (var chargingTariff in ChargingTariffs)
+                if (Previous.TryGetChargingTariff(chargingTariff.Id, out var previousChargingTariff))
+                    chargingTariff.ShareRuntimeOf(previousChargingTariff);
+
+            foreach (var evseGroup in EVSEGroups)
+                if (Previous.TryGetEVSEGroup(evseGroup.Id, out var previousEVSEGroup))
+                    evseGroup.ShareRuntimeOf(previousEVSEGroup);
+
+            foreach (var chargingStationGroup in ChargingStationGroups)
+                if (Previous.TryGetChargingStationGroup(chargingStationGroup.Id, out var previousChargingStationGroup))
+                    chargingStationGroup.ShareRuntimeOf(previousChargingStationGroup);
+
+            foreach (var chargingPoolGroup in ChargingPoolGroups)
+                if (Previous.TryGetChargingPoolGroup(chargingPoolGroup.Id, out var previousChargingPoolGroup))
+                    chargingPoolGroup.ShareRuntimeOf(previousChargingPoolGroup);
+
+            foreach (var chargingTariffGroup in ChargingTariffGroups)
+                if (Previous.TryGetChargingTariffGroup(chargingTariffGroup.Id, out var previousChargingTariffGroup))
+                    chargingTariffGroup.ShareRuntimeOf(previousChargingTariffGroup);
 
         }
 
@@ -582,6 +676,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        URL?                                                  TermsAndConditionsURL                  = null,
                                        IEnumerable<DataLicense>?                             DataLicenses                           = null,
                                        IEnumerable<ChargingPool>?                            ChargingPools                          = null,
+                                       IEnumerable<ChargingTariff>?                          ChargingTariffs                        = null,
+                                       IEnumerable<EVSEGroup>?                               EVSEGroups                              = null,
+                                       IEnumerable<ChargingStationGroup>?                    ChargingStationGroups                   = null,
+                                       IEnumerable<ChargingPoolGroup>?                       ChargingPoolGroups                      = null,
+                                       IEnumerable<ChargingTariffGroup>?                     ChargingTariffGroups                    = null,
 
                                        Timestamped<ChargingStationOperatorAdminStatusType>?  InitialAdminStatus                     = null,
                                        Timestamped<ChargingStationOperatorStatusType>?       InitialStatus                          = null,
@@ -667,6 +766,177 @@ namespace cloud.charging.open.protocols.WWCP.POI
             catch (ArgumentException)
             {
                 throw new ArgumentException($"An energy meter of the operator '{Id}' must not be given twice!", nameof(ChargingPools));
+            }
+
+            #endregion
+
+            #region Charging tariffs, of this operator, and the ones its EVSEs name
+
+            var chargingTariffs = (ChargingTariffs ?? []).ToArray();
+
+            if (chargingTariffs.Any(chargingTariff => chargingTariff is null))
+                throw new ArgumentException("Charging tariffs must not contain null entries!", nameof(ChargingTariffs));
+
+            foreach (var chargingTariff in chargingTariffs)
+                if (chargingTariff.Id.OperatorId != Id)
+                    throw new ArgumentException($"The charging tariff '{chargingTariff.Id}' does not belong to the operator '{Id}'!", nameof(ChargingTariffs));
+
+            this.ChargingTariffs = [.. chargingTariffs.OrderBy(chargingTariff => chargingTariff.Id.ToString(), StringComparer.Ordinal)];
+
+            try
+            {
+                this.chargingTariffIndex   = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.ChargingTariffs. Select(chargingTariff  => new KeyValuePair<ChargingTariff_Id,  ChargingTariff> (chargingTariff.Id,  chargingTariff)));
+            }
+            catch (ArgumentException)
+            {
+                throw new ArgumentException($"A charging tariff of the operator '{Id}' must not be given twice!", nameof(ChargingTariffs));
+            }
+
+            foreach (var evse in EVSEs)
+                foreach (var chargingTariffId in evse.ChargingTariffIds)
+                    if (!chargingTariffIndex.ContainsKey(chargingTariffId))
+                        throw new ArgumentException($"The charging tariff '{chargingTariffId}' of the EVSE '{evse.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffs));
+
+            #endregion
+
+            #region Groups, of this operator, of its members
+
+
+            {
+
+                var evseGroups = (EVSEGroups ?? []).ToArray();
+
+                if (evseGroups.Any(group => group is null))
+                    throw new ArgumentException("Groups must not contain null entries!", nameof(EVSEGroups));
+
+                this.EVSEGroups = [.. evseGroups.OrderBy(group => group.Id.ToString(), StringComparer.Ordinal)];
+
+                try
+                {
+                    this.evseGroupIndex = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.EVSEGroups.Select(group => new KeyValuePair<EVSEGroup_Id, EVSEGroup>(group.Id, group)));
+                }
+                catch (ArgumentException)
+                {
+                    throw new ArgumentException($"A group of the operator '{Id}' must not be given twice!", nameof(EVSEGroups));
+                }
+
+                foreach (var evseGroup in this.EVSEGroups)
+                {
+
+                    if (evseGroup.Id.OperatorId != Id)
+                        throw new ArgumentException($"The group '{evseGroup.Id}' does not belong to the operator '{Id}'!", nameof(EVSEGroups));
+
+                    foreach (var memberId in evseGroup.EVSEIds)
+                        if (!evseIndex.ContainsKey(memberId))
+                            throw new ArgumentException($"The member '{memberId}' of the group '{evseGroup.Id}' is unknown at the operator '{Id}'!", nameof(EVSEGroups));
+
+                if (evseGroup.ChargingTariffId.HasValue && !chargingTariffIndex.ContainsKey(evseGroup.ChargingTariffId.Value))
+                    throw new ArgumentException($"The charging tariff '{evseGroup.ChargingTariffId}' of the group '{evseGroup.Id}' is unknown at the operator '{Id}'!", nameof(EVSEGroups));
+
+                }
+
+            }
+
+            {
+
+                var chargingStationGroups = (ChargingStationGroups ?? []).ToArray();
+
+                if (chargingStationGroups.Any(group => group is null))
+                    throw new ArgumentException("Groups must not contain null entries!", nameof(ChargingStationGroups));
+
+                this.ChargingStationGroups = [.. chargingStationGroups.OrderBy(group => group.Id.ToString(), StringComparer.Ordinal)];
+
+                try
+                {
+                    this.chargingStationGroupIndex = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.ChargingStationGroups.Select(group => new KeyValuePair<ChargingStationGroup_Id, ChargingStationGroup>(group.Id, group)));
+                }
+                catch (ArgumentException)
+                {
+                    throw new ArgumentException($"A group of the operator '{Id}' must not be given twice!", nameof(ChargingStationGroups));
+                }
+
+                foreach (var chargingStationGroup in this.ChargingStationGroups)
+                {
+
+                    if (chargingStationGroup.Id.OperatorId != Id)
+                        throw new ArgumentException($"The group '{chargingStationGroup.Id}' does not belong to the operator '{Id}'!", nameof(ChargingStationGroups));
+
+                    foreach (var memberId in chargingStationGroup.ChargingStationIds)
+                        if (!chargingStationIndex.ContainsKey(memberId))
+                            throw new ArgumentException($"The member '{memberId}' of the group '{chargingStationGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingStationGroups));
+
+                if (chargingStationGroup.ChargingTariffId.HasValue && !chargingTariffIndex.ContainsKey(chargingStationGroup.ChargingTariffId.Value))
+                    throw new ArgumentException($"The charging tariff '{chargingStationGroup.ChargingTariffId}' of the group '{chargingStationGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingStationGroups));
+
+                }
+
+            }
+
+            {
+
+                var chargingPoolGroups = (ChargingPoolGroups ?? []).ToArray();
+
+                if (chargingPoolGroups.Any(group => group is null))
+                    throw new ArgumentException("Groups must not contain null entries!", nameof(ChargingPoolGroups));
+
+                this.ChargingPoolGroups = [.. chargingPoolGroups.OrderBy(group => group.Id.ToString(), StringComparer.Ordinal)];
+
+                try
+                {
+                    this.chargingPoolGroupIndex = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.ChargingPoolGroups.Select(group => new KeyValuePair<ChargingPoolGroup_Id, ChargingPoolGroup>(group.Id, group)));
+                }
+                catch (ArgumentException)
+                {
+                    throw new ArgumentException($"A group of the operator '{Id}' must not be given twice!", nameof(ChargingPoolGroups));
+                }
+
+                foreach (var chargingPoolGroup in this.ChargingPoolGroups)
+                {
+
+                    if (chargingPoolGroup.Id.OperatorId != Id)
+                        throw new ArgumentException($"The group '{chargingPoolGroup.Id}' does not belong to the operator '{Id}'!", nameof(ChargingPoolGroups));
+
+                    foreach (var memberId in chargingPoolGroup.ChargingPoolIds)
+                        if (!chargingPoolIndex.ContainsKey(memberId))
+                            throw new ArgumentException($"The member '{memberId}' of the group '{chargingPoolGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingPoolGroups));
+
+                if (chargingPoolGroup.ChargingTariffId.HasValue && !chargingTariffIndex.ContainsKey(chargingPoolGroup.ChargingTariffId.Value))
+                    throw new ArgumentException($"The charging tariff '{chargingPoolGroup.ChargingTariffId}' of the group '{chargingPoolGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingPoolGroups));
+
+                }
+
+            }
+
+            {
+
+                var chargingTariffGroups = (ChargingTariffGroups ?? []).ToArray();
+
+                if (chargingTariffGroups.Any(group => group is null))
+                    throw new ArgumentException("Groups must not contain null entries!", nameof(ChargingTariffGroups));
+
+                this.ChargingTariffGroups = [.. chargingTariffGroups.OrderBy(group => group.Id.ToString(), StringComparer.Ordinal)];
+
+                try
+                {
+                    this.chargingTariffGroupIndex = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.ChargingTariffGroups.Select(group => new KeyValuePair<ChargingTariffGroup_Id, ChargingTariffGroup>(group.Id, group)));
+                }
+                catch (ArgumentException)
+                {
+                    throw new ArgumentException($"A group of the operator '{Id}' must not be given twice!", nameof(ChargingTariffGroups));
+                }
+
+                foreach (var chargingTariffGroup in this.ChargingTariffGroups)
+                {
+
+                    if (chargingTariffGroup.Id.OperatorId != Id)
+                        throw new ArgumentException($"The group '{chargingTariffGroup.Id}' does not belong to the operator '{Id}'!", nameof(ChargingTariffGroups));
+
+                    foreach (var memberId in chargingTariffGroup.ChargingTariffIds)
+                        if (!chargingTariffIndex.ContainsKey(memberId))
+                            throw new ArgumentException($"The member '{memberId}' of the group '{chargingTariffGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffGroups));
+
+                }
+
             }
 
             #endregion
@@ -1052,8 +1322,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                );
 
                 // Embedded completely, as content.
+                if (ChargingTariffs.Length > 0)
+                    json.Add("chargingTariffs", new JArray(ChargingTariffs.Select(chargingTariff => chargingTariff.ToJSON())));
+
                 if (ChargingPools.Length > 0)
                     json.Add("chargingPools", new JArray(ChargingPools.Select(chargingPool => chargingPool.ToJSON())));
+
+                if (EVSEGroups.Length > 0)
+                    json.Add("EVSEGroups", new JArray(EVSEGroups.Select(group => group.ToJSON())));
+
+                if (ChargingStationGroups.Length > 0)
+                    json.Add("chargingStationGroups", new JArray(ChargingStationGroups.Select(group => group.ToJSON())));
+
+                if (ChargingPoolGroups.Length > 0)
+                    json.Add("chargingPoolGroups", new JArray(ChargingPoolGroups.Select(group => group.ToJSON())));
+
+                if (ChargingTariffGroups.Length > 0)
+                    json.Add("chargingTariffGroups", new JArray(ChargingTariffGroups.Select(group => group.ToJSON())));
 
                 // Always part of the content.
                 POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);

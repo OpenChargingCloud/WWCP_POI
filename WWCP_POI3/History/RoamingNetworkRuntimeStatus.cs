@@ -359,6 +359,236 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     Authoritative, at, out normalized, out oldTimestamp, out oldValue);
                     break;
 
+                case nameof(ParkingOperator):
+
+                    if (!ParkingOperator_Id.TryParse(EntityId, out var parkingOperatorId) ||
+                        !network.TryGetParkingOperatorById(parkingOperatorId, out var parkingOperator))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ParkingOperatorAdminStatusType>(Value, ParkingOperatorAdminStatusType.TryParse,
+                                                    () => parkingOperator.CurrentAdminStatus,
+                                                    (status, timestamp) => parkingOperator.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => parkingOperator.SetAdminStatus([ new Timestamped<ParkingOperatorAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ParkingOperatorStatusType>(Value, ParkingOperatorStatusType.TryParse,
+                                                    () => parkingOperator.CurrentStatus,
+                                                    (status, timestamp) => parkingOperator.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => parkingOperator.SetStatus([ new Timestamped<ParkingOperatorStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(ParkingGarage):
+
+                    if (!ParkingGarage_Id.TryParse(EntityId, out var parkingGarageId) ||
+                        !network.TryGetParkingGarageById(parkingGarageId, out var parkingGarage))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ParkingGarageAdminStatusType>(Value, ParkingGarageAdminStatusType.TryParse,
+                                                    () => parkingGarage.CurrentAdminStatus,
+                                                    (status, timestamp) => parkingGarage.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => parkingGarage.SetAdminStatus([ new Timestamped<ParkingGarageAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ParkingGarageStatusType>(Value, ParkingGarageStatusType.TryParse,
+                                                    () => parkingGarage.CurrentStatus,
+                                                    (status, timestamp) => parkingGarage.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => parkingGarage.SetStatus([ new Timestamped<ParkingGarageStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(ParkingSpace):
+
+                    if (!ParkingSpace_Id.TryParse(EntityId, out var parkingSpaceId) ||
+                        !network.TryGetParkingSpaceById(parkingSpaceId, out var parkingSpace))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ParkingSpaceAdminStatusType>(Value, ParkingSpaceAdminStatusType.TryParse,
+                                                    () => parkingSpace.CurrentAdminStatus,
+                                                    (status, timestamp) => parkingSpace.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => parkingSpace.SetAdminStatus([ new Timestamped<ParkingSpaceAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ParkingSpaceStatusType>(Value, ParkingSpaceStatusType.TryParse,
+                                                    () => parkingSpace.CurrentStatus,
+                                                    (status, timestamp) => parkingSpace.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => parkingSpace.SetStatus([ new Timestamped<ParkingSpaceStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(ParkingSensor):
+
+                    if (!ParkingSensor_Id.TryParse(EntityId, out var parkingSensorId) ||
+                        !network.TryGetParkingSensorById(parkingSensorId, out var parkingSensor))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ParkingSensorAdminStatusType>(Value, ParkingSensorAdminStatusType.TryParse,
+                                                    () => parkingSensor.CurrentAdminStatus,
+                                                    (status, timestamp) => parkingSensor.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => parkingSensor.SetAdminStatus([ new Timestamped<ParkingSensorAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ParkingSensorStatusType>(Value, ParkingSensorStatusType.TryParse,
+                                                    () => parkingSensor.CurrentStatus,
+                                                    (status, timestamp) => parkingSensor.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => parkingSensor.SetStatus([ new Timestamped<ParkingSensorStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(ChargingTariff):
+
+                    if (!ChargingTariff_Id.TryParse(EntityId, out var chargingTariffId) ||
+                        !network.TryGetChargingTariffById(chargingTariffId, out var chargingTariff))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ChargingTariffAdminStatusType>(Value, ChargingTariffAdminStatusType.TryParse,
+                                                    () => chargingTariff.CurrentAdminStatus,
+                                                    (status, timestamp) => chargingTariff.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => chargingTariff.SetAdminStatus([ new Timestamped<ChargingTariffAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ChargingTariffStatusType>(Value, ChargingTariffStatusType.TryParse,
+                                                    () => chargingTariff.CurrentStatus,
+                                                    (status, timestamp) => chargingTariff.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => chargingTariff.SetStatus([ new Timestamped<ChargingTariffStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(EVSEGroup):
+
+                    if (!EVSEGroup_Id.TryParse(EntityId, out var evseGroupId) ||
+                        !network.TryGetEVSEGroupById(evseGroupId, out var evseGroup))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<EVSEGroupAdminStatusType>(Value, EVSEGroupAdminStatusType.TryParse,
+                                                    () => evseGroup.CurrentAdminStatus,
+                                                    (status, timestamp) => evseGroup.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => evseGroup.SetAdminStatus([ new Timestamped<EVSEGroupAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<EVSEGroupStatusType>(Value, EVSEGroupStatusType.TryParse,
+                                                    () => evseGroup.CurrentStatus,
+                                                    (status, timestamp) => evseGroup.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => evseGroup.SetStatus([ new Timestamped<EVSEGroupStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(ChargingStationGroup):
+
+                    if (!ChargingStationGroup_Id.TryParse(EntityId, out var chargingStationGroupId) ||
+                        !network.TryGetChargingStationGroupById(chargingStationGroupId, out var chargingStationGroup))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ChargingStationGroupAdminStatusType>(Value, ChargingStationGroupAdminStatusType.TryParse,
+                                                    () => chargingStationGroup.CurrentAdminStatus,
+                                                    (status, timestamp) => chargingStationGroup.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => chargingStationGroup.SetAdminStatus([ new Timestamped<ChargingStationGroupAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ChargingStationGroupStatusType>(Value, ChargingStationGroupStatusType.TryParse,
+                                                    () => chargingStationGroup.CurrentStatus,
+                                                    (status, timestamp) => chargingStationGroup.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => chargingStationGroup.SetStatus([ new Timestamped<ChargingStationGroupStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(ChargingPoolGroup):
+
+                    if (!ChargingPoolGroup_Id.TryParse(EntityId, out var chargingPoolGroupId) ||
+                        !network.TryGetChargingPoolGroupById(chargingPoolGroupId, out var chargingPoolGroup))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ChargingPoolGroupAdminStatusType>(Value, ChargingPoolGroupAdminStatusType.TryParse,
+                                                    () => chargingPoolGroup.CurrentAdminStatus,
+                                                    (status, timestamp) => chargingPoolGroup.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => chargingPoolGroup.SetAdminStatus([ new Timestamped<ChargingPoolGroupAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ChargingPoolGroupStatusType>(Value, ChargingPoolGroupStatusType.TryParse,
+                                                    () => chargingPoolGroup.CurrentStatus,
+                                                    (status, timestamp) => chargingPoolGroup.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => chargingPoolGroup.SetStatus([ new Timestamped<ChargingPoolGroupStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(ChargingTariffGroup):
+
+                    if (!ChargingTariffGroup_Id.TryParse(EntityId, out var chargingTariffGroupId) ||
+                        !network.TryGetChargingTariffGroupById(chargingTariffGroupId, out var chargingTariffGroup))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ChargingTariffGroupAdminStatusType>(Value, ChargingTariffGroupAdminStatusType.TryParse,
+                                                    () => chargingTariffGroup.CurrentAdminStatus,
+                                                    (status, timestamp) => chargingTariffGroup.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => chargingTariffGroup.SetAdminStatus([ new Timestamped<ChargingTariffGroupAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ChargingTariffGroupStatusType>(Value, ChargingTariffGroupStatusType.TryParse,
+                                                    () => chargingTariffGroup.CurrentStatus,
+                                                    (status, timestamp) => chargingTariffGroup.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => chargingTariffGroup.SetStatus([ new Timestamped<ChargingTariffGroupStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
+                case nameof(ParkingSpaceGroup):
+
+                    if (!ParkingSpaceGroup_Id.TryParse(EntityId, out var parkingSpaceGroupId) ||
+                        !network.TryGetParkingSpaceGroupById(parkingSpaceGroupId, out var parkingSpaceGroup))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ParkingSpaceGroupAdminStatusType>(Value, ParkingSpaceGroupAdminStatusType.TryParse,
+                                                    () => parkingSpaceGroup.CurrentAdminStatus,
+                                                    (status, timestamp) => parkingSpaceGroup.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => parkingSpaceGroup.SetAdminStatus([ new Timestamped<ParkingSpaceGroupAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ParkingSpaceGroupStatusType>(Value, ParkingSpaceGroupStatusType.TryParse,
+                                                    () => parkingSpaceGroup.CurrentStatus,
+                                                    (status, timestamp) => parkingSpaceGroup.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => parkingSpaceGroup.SetStatus([ new Timestamped<ParkingSpaceGroupStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
                 case nameof(ChargingPool):
 
                     if (!ChargingPool_Id.TryParse(EntityId, out var chargingPoolId) ||
@@ -538,6 +768,66 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     Add(statuses, POIRuntimeStatusKind.Status,      nameof(EnergyMeter), energyMeter.Id.ToString(), energyMeter.CurrentStatus);
                 }
 
+                foreach (var parkingOperator in network.ParkingOperators)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ParkingOperator), parkingOperator.Id.ToString(), parkingOperator.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(ParkingOperator), parkingOperator.Id.ToString(), parkingOperator.CurrentStatus);
+                }
+
+                foreach (var parkingGarage in network.ParkingGarages)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ParkingGarage), parkingGarage.Id.ToString(), parkingGarage.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(ParkingGarage), parkingGarage.Id.ToString(), parkingGarage.CurrentStatus);
+                }
+
+                foreach (var parkingSpace in network.ParkingSpaces)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ParkingSpace), parkingSpace.Id.ToString(), parkingSpace.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(ParkingSpace), parkingSpace.Id.ToString(), parkingSpace.CurrentStatus);
+                }
+
+                foreach (var parkingSensor in network.ParkingSensors)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ParkingSensor), parkingSensor.Id.ToString(), parkingSensor.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(ParkingSensor), parkingSensor.Id.ToString(), parkingSensor.CurrentStatus);
+                }
+
+                foreach (var chargingTariff in network.ChargingTariffs)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingTariff), chargingTariff.Id.ToString(), chargingTariff.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(ChargingTariff), chargingTariff.Id.ToString(), chargingTariff.CurrentStatus);
+                }
+
+                foreach (var evseGroup in network.EVSEGroups)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(EVSEGroup), evseGroup.Id.ToString(), evseGroup.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(EVSEGroup), evseGroup.Id.ToString(), evseGroup.CurrentStatus);
+                }
+
+                foreach (var chargingStationGroup in network.ChargingStationGroups)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingStationGroup), chargingStationGroup.Id.ToString(), chargingStationGroup.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(ChargingStationGroup), chargingStationGroup.Id.ToString(), chargingStationGroup.CurrentStatus);
+                }
+
+                foreach (var chargingPoolGroup in network.ChargingPoolGroups)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingPoolGroup), chargingPoolGroup.Id.ToString(), chargingPoolGroup.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(ChargingPoolGroup), chargingPoolGroup.Id.ToString(), chargingPoolGroup.CurrentStatus);
+                }
+
+                foreach (var chargingTariffGroup in network.ChargingTariffGroups)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingTariffGroup), chargingTariffGroup.Id.ToString(), chargingTariffGroup.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(ChargingTariffGroup), chargingTariffGroup.Id.ToString(), chargingTariffGroup.CurrentStatus);
+                }
+
+                foreach (var parkingSpaceGroup in network.ParkingSpaceGroups)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ParkingSpaceGroup), parkingSpaceGroup.Id.ToString(), parkingSpaceGroup.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(ParkingSpaceGroup), parkingSpaceGroup.Id.ToString(), parkingSpaceGroup.CurrentStatus);
+                }
+
                 foreach (var manufacturer in network.ChargingStationManufacturers)
                 {
                     Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingStationManufacturer), manufacturer.Id.ToString(), manufacturer.CurrentAdminStatus);
@@ -633,6 +923,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var entities = new HashSet<Object>(ReferenceEqualityComparer.Instance) { RoamingNetwork };
 
                 entities.UnionWith(RoamingNetwork.ChargingStationManufacturers);
+                entities.UnionWith(RoamingNetwork.EVSEGroups);
+                entities.UnionWith(RoamingNetwork.ChargingStationGroups);
+                entities.UnionWith(RoamingNetwork.ChargingPoolGroups);
+                entities.UnionWith(RoamingNetwork.ChargingTariffGroups);
+                entities.UnionWith(RoamingNetwork.ParkingSpaceGroups);
+                entities.UnionWith(RoamingNetwork.ChargingTariffs);
+                entities.UnionWith(RoamingNetwork.ParkingOperators);
+                entities.UnionWith(RoamingNetwork.ParkingGarages);
+                entities.UnionWith(RoamingNetwork.ParkingSpaces);
+                entities.UnionWith(RoamingNetwork.ParkingSensors);
                 entities.UnionWith(RoamingNetwork.EMobilityProviders);
                 entities.UnionWith(RoamingNetwork.GridOperators);
                 entities.UnionWith(RoamingNetwork.EnergyMeters);
@@ -665,6 +965,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var energyMeter in RoamingNetwork.EnergyMeters)
                     if (!listeners.ContainsKey(energyMeter))
                         listeners[energyMeter] = ListenTo(energyMeter);
+
+                foreach (var parkingOperator in RoamingNetwork.ParkingOperators)
+                    if (!listeners.ContainsKey(parkingOperator))
+                        listeners[parkingOperator] = ListenTo(parkingOperator);
+
+                foreach (var parkingGarage in RoamingNetwork.ParkingGarages)
+                    if (!listeners.ContainsKey(parkingGarage))
+                        listeners[parkingGarage] = ListenTo(parkingGarage);
+
+                foreach (var parkingSpace in RoamingNetwork.ParkingSpaces)
+                    if (!listeners.ContainsKey(parkingSpace))
+                        listeners[parkingSpace] = ListenTo(parkingSpace);
+
+                foreach (var parkingSensor in RoamingNetwork.ParkingSensors)
+                    if (!listeners.ContainsKey(parkingSensor))
+                        listeners[parkingSensor] = ListenTo(parkingSensor);
+
+                foreach (var chargingTariff in RoamingNetwork.ChargingTariffs)
+                    if (!listeners.ContainsKey(chargingTariff))
+                        listeners[chargingTariff] = ListenTo(chargingTariff);
+
+                foreach (var evseGroup in RoamingNetwork.EVSEGroups)
+                    if (!listeners.ContainsKey(evseGroup))
+                        listeners[evseGroup] = ListenTo(evseGroup);
+
+                foreach (var chargingStationGroup in RoamingNetwork.ChargingStationGroups)
+                    if (!listeners.ContainsKey(chargingStationGroup))
+                        listeners[chargingStationGroup] = ListenTo(chargingStationGroup);
+
+                foreach (var chargingPoolGroup in RoamingNetwork.ChargingPoolGroups)
+                    if (!listeners.ContainsKey(chargingPoolGroup))
+                        listeners[chargingPoolGroup] = ListenTo(chargingPoolGroup);
+
+                foreach (var chargingTariffGroup in RoamingNetwork.ChargingTariffGroups)
+                    if (!listeners.ContainsKey(chargingTariffGroup))
+                        listeners[chargingTariffGroup] = ListenTo(chargingTariffGroup);
+
+                foreach (var parkingSpaceGroup in RoamingNetwork.ParkingSpaceGroups)
+                    if (!listeners.ContainsKey(parkingSpaceGroup))
+                        listeners[parkingSpaceGroup] = ListenTo(parkingSpaceGroup);
 
                 foreach (var manufacturer in RoamingNetwork.ChargingStationManufacturers)
                     if (!listeners.ContainsKey(manufacturer))
@@ -818,6 +1158,276 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             OnEnergyMeterStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
                 Raise(POIRuntimeStatusKind.Status, nameof(EnergyMeter), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(ParkingOperator)
+
+        private Action ListenTo(ParkingOperator Entity)
+        {
+
+            OnParkingOperatorAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ParkingOperator), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnParkingOperatorStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ParkingOperator), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(ParkingGarage)
+
+        private Action ListenTo(ParkingGarage Entity)
+        {
+
+            OnParkingGarageAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ParkingGarage), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnParkingGarageStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ParkingGarage), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(ParkingSpace)
+
+        private Action ListenTo(ParkingSpace Entity)
+        {
+
+            OnParkingSpaceAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ParkingSpace), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnParkingSpaceStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ParkingSpace), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(ParkingSensor)
+
+        private Action ListenTo(ParkingSensor Entity)
+        {
+
+            OnParkingSensorAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ParkingSensor), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnParkingSensorStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ParkingSensor), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(ChargingTariff)
+
+        private Action ListenTo(ChargingTariff Entity)
+        {
+
+            OnChargingTariffAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ChargingTariff), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnChargingTariffStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ChargingTariff), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(EVSEGroup)
+
+        private Action ListenTo(EVSEGroup Entity)
+        {
+
+            OnEVSEGroupAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(EVSEGroup), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnEVSEGroupStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(EVSEGroup), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(ChargingStationGroup)
+
+        private Action ListenTo(ChargingStationGroup Entity)
+        {
+
+            OnChargingStationGroupAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ChargingStationGroup), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnChargingStationGroupStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ChargingStationGroup), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(ChargingPoolGroup)
+
+        private Action ListenTo(ChargingPoolGroup Entity)
+        {
+
+            OnChargingPoolGroupAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ChargingPoolGroup), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnChargingPoolGroupStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ChargingPoolGroup), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(ChargingTariffGroup)
+
+        private Action ListenTo(ChargingTariffGroup Entity)
+        {
+
+            OnChargingTariffGroupAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ChargingTariffGroup), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnChargingTariffGroupStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ChargingTariffGroup), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(ParkingSpaceGroup)
+
+        private Action ListenTo(ParkingSpaceGroup Entity)
+        {
+
+            OnParkingSpaceGroupAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ParkingSpaceGroup), entity.Id.ToString(), newStatus, oldStatus, null);
+                return Task.CompletedTask;
+            };
+
+            OnParkingSpaceGroupStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ParkingSpaceGroup), entity.Id.ToString(), newStatus, oldStatus, null);
                 return Task.CompletedTask;
             };
 
@@ -1003,6 +1613,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            Concat(network.EMobilityProviders.SelectMany(eMobilityProvider => new[] { eMobilityProvider.NextAdminStatus?.Timestamp, eMobilityProvider.NextStatus?.Timestamp })).
                            Concat(network.GridOperators.SelectMany(gridOperator => new[] { gridOperator.NextAdminStatus?.Timestamp, gridOperator.NextStatus?.Timestamp })).
                            Concat(network.EnergyMeters.SelectMany(energyMeter => new[] { energyMeter.NextAdminStatus?.Timestamp, energyMeter.NextStatus?.Timestamp })).
+                           Concat(network.ParkingOperators.SelectMany(parkingOperator => new[] { parkingOperator.NextAdminStatus?.Timestamp, parkingOperator.NextStatus?.Timestamp })).
+                           Concat(network.ParkingGarages.SelectMany(parkingGarage => new[] { parkingGarage.NextAdminStatus?.Timestamp, parkingGarage.NextStatus?.Timestamp })).
+                           Concat(network.ParkingSpaces.SelectMany(parkingSpace => new[] { parkingSpace.NextAdminStatus?.Timestamp, parkingSpace.NextStatus?.Timestamp })).
+                           Concat(network.ParkingSensors.SelectMany(parkingSensor => new[] { parkingSensor.NextAdminStatus?.Timestamp, parkingSensor.NextStatus?.Timestamp })).
+                           Concat(network.ChargingTariffs.SelectMany(chargingTariff => new[] { chargingTariff.NextAdminStatus?.Timestamp, chargingTariff.NextStatus?.Timestamp })).
+                           Concat(network.EVSEGroups.SelectMany(evseGroup => new[] { evseGroup.NextAdminStatus?.Timestamp, evseGroup.NextStatus?.Timestamp })).
+                           Concat(network.ChargingStationGroups.SelectMany(chargingStationGroup => new[] { chargingStationGroup.NextAdminStatus?.Timestamp, chargingStationGroup.NextStatus?.Timestamp })).
+                           Concat(network.ChargingPoolGroups.SelectMany(chargingPoolGroup => new[] { chargingPoolGroup.NextAdminStatus?.Timestamp, chargingPoolGroup.NextStatus?.Timestamp })).
+                           Concat(network.ChargingTariffGroups.SelectMany(chargingTariffGroup => new[] { chargingTariffGroup.NextAdminStatus?.Timestamp, chargingTariffGroup.NextStatus?.Timestamp })).
+                           Concat(network.ParkingSpaceGroups.SelectMany(parkingSpaceGroup => new[] { parkingSpaceGroup.NextAdminStatus?.Timestamp, parkingSpaceGroup.NextStatus?.Timestamp })).
                            Concat(network.ChargingStationManufacturers.SelectMany(manufacturer => new[] { manufacturer.NextAdminStatus?.Timestamp, manufacturer.NextStatus?.Timestamp })).
                            Where(timestamp => timestamp.HasValue).
                            Min();
@@ -1066,6 +1686,66 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
                     _ = energyMeter.AdminStatus;
                     _ = energyMeter.Status;
+                }
+
+                foreach (var parkingOperator in network.ParkingOperators)
+                {
+                    _ = parkingOperator.AdminStatus;
+                    _ = parkingOperator.Status;
+                }
+
+                foreach (var parkingGarage in network.ParkingGarages)
+                {
+                    _ = parkingGarage.AdminStatus;
+                    _ = parkingGarage.Status;
+                }
+
+                foreach (var parkingSpace in network.ParkingSpaces)
+                {
+                    _ = parkingSpace.AdminStatus;
+                    _ = parkingSpace.Status;
+                }
+
+                foreach (var parkingSensor in network.ParkingSensors)
+                {
+                    _ = parkingSensor.AdminStatus;
+                    _ = parkingSensor.Status;
+                }
+
+                foreach (var chargingTariff in network.ChargingTariffs)
+                {
+                    _ = chargingTariff.AdminStatus;
+                    _ = chargingTariff.Status;
+                }
+
+                foreach (var evseGroup in network.EVSEGroups)
+                {
+                    _ = evseGroup.AdminStatus;
+                    _ = evseGroup.Status;
+                }
+
+                foreach (var chargingStationGroup in network.ChargingStationGroups)
+                {
+                    _ = chargingStationGroup.AdminStatus;
+                    _ = chargingStationGroup.Status;
+                }
+
+                foreach (var chargingPoolGroup in network.ChargingPoolGroups)
+                {
+                    _ = chargingPoolGroup.AdminStatus;
+                    _ = chargingPoolGroup.Status;
+                }
+
+                foreach (var chargingTariffGroup in network.ChargingTariffGroups)
+                {
+                    _ = chargingTariffGroup.AdminStatus;
+                    _ = chargingTariffGroup.Status;
+                }
+
+                foreach (var parkingSpaceGroup in network.ParkingSpaceGroups)
+                {
+                    _ = parkingSpaceGroup.AdminStatus;
+                    _ = parkingSpaceGroup.Status;
                 }
 
                 foreach (var manufacturer in network.ChargingStationManufacturers)

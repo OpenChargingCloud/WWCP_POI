@@ -103,6 +103,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public String?  FirmwareVersion    { get; }
 
+        /// <summary>
+        /// The transparency software releases for its measurements, with their legal status, at most one per release.
+        /// </summary>
+        public ImmutableArray<TransparencySoftwareAssignment>  TransparencySoftwareStatus  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -121,6 +126,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            String?                                     SerialNumber                 = null,
                            String?                                     HardwareVersion              = null,
                            String?                                     FirmwareVersion              = null,
+                           IEnumerable<TransparencySoftwareAssignment>? TransparencySoftwareStatus  = null,
 
                            Timestamped<EnergyMeterAdminStatusType>?    InitialAdminStatus           = null,
                            Timestamped<EnergyMeterStatusType>?         InitialStatus                = null,
@@ -161,6 +167,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.SerialNumber     = SerialNumber;
             this.HardwareVersion  = HardwareVersion;
             this.FirmwareVersion  = FirmwareVersion;
+            this.TransparencySoftwareStatus = TransparencySoftwareAssignment.Checked(TransparencySoftwareStatus, $"the energy meter '{Id}'");
 
         }
 
@@ -263,6 +270,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (FirmwareVersion is not null)
                 json.Add("firmwareVersion",  FirmwareVersion);
 
+            if (TransparencySoftwareStatus.Length > 0)
+                json.Add("transparencySoftwareStatus", new JArray(TransparencySoftwareStatus.Select(assignment => assignment.ToJSON())));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -313,6 +323,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                var transparencySoftwareStatus = new List<TransparencySoftwareAssignment>();
+
+                if (JSON["transparencySoftwareStatus"] is JToken transparencySoftwareStatusJSON)
+                {
+
+                    if (transparencySoftwareStatusJSON is not JArray transparencySoftwareStatusArray)
+                    {
+                        ErrorResponse = "The transparency software status of an energy meter must be a JSON array!";
+                        return false;
+                    }
+
+                    foreach (var assignmentJSON in transparencySoftwareStatusArray)
+                    {
+
+                        if (assignmentJSON is not JObject assignmentObject)
+                        {
+                            ErrorResponse = "A transparency software status must be a JSON object!";
+                            return false;
+                        }
+
+                        if (!TransparencySoftwareAssignment.TryParse(assignmentObject, out var assignment, out ErrorResponse))
+                            return false;
+
+                        transparencySoftwareStatus.Add(assignment);
+
+                    }
+
+                }
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -333,6 +372,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               serialNumber,
                                               hardwareVersion,
                                               firmwareVersion,
+                                              transparencySoftwareStatus,
                                               DataSource:  dataSource,
                                               Created:     created,
                                               LastChange:  lastChange,

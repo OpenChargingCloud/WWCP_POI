@@ -269,6 +269,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse groups                   [optional]
+
+                if (!POIJSON.TryParseChildren<EVSEGroup>(JSON, "EVSEGroups", "EVSEGroupIds", "EVSEGroups", EVSEGroup.TryParse, out var evseGroups, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseChildren<ChargingStationGroup>(JSON, "chargingStationGroups", "chargingStationGroupIds", "ChargingStationGroups", ChargingStationGroup.TryParse, out var chargingStationGroups, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseChildren<ChargingPoolGroup>(JSON, "chargingPoolGroups", "chargingPoolGroupIds", "ChargingPoolGroups", ChargingPoolGroup.TryParse, out var chargingPoolGroups, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseChildren<ChargingTariffGroup>(JSON, "chargingTariffGroups", "chargingTariffGroupIds", "ChargingTariffGroups", ChargingTariffGroup.TryParse, out var chargingTariffGroups, out ErrorResponse))
+                    return false;
+
+                #endregion
+
+                #region Parse ChargingTariffs          [optional]
+
+                if (!POIJSON.TryParseChildren<ChargingTariff>(JSON,
+                                                              "chargingTariffs",
+                                                              "chargingTariffIds",
+                                                              "charging tariffs",
+                                                              ChargingTariff.TryParse,
+                                                              out var chargingTariffs,
+                                                              out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Created, LastChange, CustomData [optional]
 
                 if (!POIEntityMetadata.TryParse(JSON,
@@ -297,6 +328,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               termsAndConditionsURL,
                                               dataLicenses,
                                               chargingPools,
+                                              chargingTariffs,
+                                              EVSEGroups: evseGroups,
+                                              ChargingStationGroups: chargingStationGroups,
+                                              ChargingPoolGroups: chargingPoolGroups,
+                                              ChargingTariffGroups: chargingTariffGroups,
                                               DataSource:  dataSource,
                                               Created:     created,
                                               LastChange:  lastChange,

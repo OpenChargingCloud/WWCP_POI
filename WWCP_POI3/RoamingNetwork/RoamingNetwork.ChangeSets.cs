@@ -453,6 +453,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var manufacturers         = new Dictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>(chargingStationManufacturers);
             var providers             = new Dictionary<EMobilityProvider_Id, EMobilityProvider>(eMobilityProviders);
             var gridOps               = new Dictionary<GridOperator_Id, GridOperator>(gridOperators);
+            var parkingOps            = new Dictionary<ParkingOperator_Id, ParkingOperator>(parkingOperators);
+            var softwares             = new Dictionary<TransparencySoftware_Id, TransparencySoftware>(transparencySoftware);
+            var certificates          = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(transparencySoftwareCertificates);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
@@ -770,6 +773,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parking operators, parking garages, parking spaces and parking sensors
+
+                else if (change.EntityType == nameof(ParkingOperator))
+                {
+                    if (!TryApplyRegistryChange(ParkingOperatorRegistry,   change, index, ChangeSet.CreatedAt, parkingOps,    out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                else if (IsParking(change.EntityType))
+                {
+                    if (!TryApplyParkingChange(change, index, ChangeSet.CreatedAt, parkingOps, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                #endregion
+
+                #region Transparency software releases and certificates
+
+                else if (change.EntityType == nameof(TransparencySoftware))
+                {
+                    if (!TryApplyRegistryChange(TransparencySoftwareRegistry,            change, index, ChangeSet.CreatedAt, softwares,    out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                else if (change.EntityType == nameof(TransparencySoftwareCertificate))
+                {
+                    if (!TryApplyRegistryChange(TransparencySoftwareCertificateRegistry, change, index, ChangeSet.CreatedAt, certificates, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                #endregion
+
                 #region Charging pools, charging stations and EVSEs
 
                 else if (IsInfrastructure(change.EntityType))
@@ -814,7 +849,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // must still be one of the network; energy meters must be unique within the network.
             if ((UnknownManufacturer (operators.Values, manufacturers) ??
                  UnknownGridOperator (operators.Values, gridOps)       ??
-                 DuplicateEnergyMeter(operators.Values)) is String referenceError)
+                 DuplicateEnergyMeter(operators.Values)                ??
+                 DuplicateParking    (parkingOps.Values)               ??
+                 UnknownChargingStation(parkingOps.Values, operators)  ??
+                 UnknownTransparencyReference(operators.Values, softwares, certificates, manufacturers)) is String referenceError)
             {
                 ErrorResponse = referenceError;
                 return false;
@@ -837,7 +875,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  operators.Values,
                                  manufacturers.Values,
                                  providers.Values,
-                                 gridOps.Values
+                                 gridOps.Values,
+                                 parkingOps.Values,
+                                 softwares.Values,
+                                 certificates.Values
                              ) {
                                  Revision = Revision + 1
                              };
