@@ -254,6 +254,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse ChargingPools            [optional]
+
+                if (!POIJSON.TryParseChildren<ChargingPool>(JSON,
+                                                            "chargingPools",
+                                                            "chargingPoolIds",
+                                                            "charging pools",
+                                                            ChargingPool.TryParse,
+                                                            out var chargingPools,
+                                                            out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Created, LastChange, CustomData [optional]
 
                 if (!POIEntityMetadata.TryParse(JSON,
@@ -281,6 +296,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               hotlinePhoneNumber,
                                               termsAndConditionsURL,
                                               dataLicenses,
+                                              chargingPools,
                                               DataSource:  dataSource,
                                               Created:     created,
                                               LastChange:  lastChange,

@@ -450,6 +450,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var licenses              = DataLicenses.ToImmutableArray();
             var customData            = CustomData;
             var operators             = new Dictionary<ChargingStationOperator_Id, ChargingStationOperator>(chargingStationOperators);
+            var manufacturers         = new Dictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>(chargingStationManufacturers);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
@@ -548,8 +549,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 return false;
                             }
 
-                            // Its admin status, status and internal data are not content: they go along.
-                            changedOperator.ShareRuntimeOf(currentOperator!);
+                            // Its admin status, status and internal data are not content: they go along,
+                            // as those of its charging pools, charging stations and EVSEs.
+                            changedOperator.ShareRuntimeOfAll(currentOperator!);
 
                             operators[operatorId] = changedOperator;
                             break;
@@ -744,6 +746,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Charging station manufacturers
+
+                else if (change.EntityType == nameof(ChargingStationManufacturer))
+                {
+                    if (!TryApplyManufacturerChange(change, index, ChangeSet.CreatedAt, manufacturers, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                #endregion
+
+                #region Charging pools, charging stations and EVSEs
+
+                else if (IsInfrastructure(change.EntityType))
+                {
+                    if (!TryApplyInfrastructureChange(change, index, ChangeSet.CreatedAt, operators, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                #endregion
+
                 else
                 {
                     ErrorResponse = $"Change {index}: changes of {change.EntityType} '{change.EntityId}' are not supported yet!";
@@ -774,6 +796,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            // Every manufacturer a charging station names must still be one of the network.
+            if (UnknownManufacturer(operators.Values, manufacturers) is String unknownManufacturer)
+            {
+                ErrorResponse = unknownManufacturer;
+                return false;
+            }
+
             RoamingNetwork = new RoamingNetwork(
                                  Id,
                                  name,
@@ -788,7 +817,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  customData,
                                  InternalData,
                                  licenses,
-                                 operators.Values
+                                 operators.Values,
+                                 manufacturers.Values
                              ) {
                                  Revision = Revision + 1
                              };

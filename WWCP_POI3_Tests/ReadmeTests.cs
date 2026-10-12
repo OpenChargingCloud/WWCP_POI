@@ -46,11 +46,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                          DataSource:                "v1",
                                          ChargingStationOperators:  [ gef ]);
 
-            var bdo = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*BDO"));
+            var newOperator = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*NEW"));
 
             var cs  = rn1.CreateChangeSet([
                           RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "v2"),             // the network
-                          RoamingNetworkChange.Add           (bdo),                                       // a new operator
+                          RoamingNetworkChange.Add           (newOperator),                               // a new operator
                           RoamingNetworkChange.UpdateProperty(gef, "telephone",  null, "+49 30 7654321")  // the operator DE*GEF
                       ]);
 

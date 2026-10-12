@@ -449,6 +449,78 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region ChargingPools, ChargingStations, EVSEs
+
+        private readonly System.Collections.Immutable.ImmutableDictionary<ChargingPool_Id,    ChargingPool>     chargingPoolIndex;
+        private readonly System.Collections.Immutable.ImmutableDictionary<ChargingStation_Id, ChargingStation>  chargingStationIndex;
+        private readonly System.Collections.Immutable.ImmutableDictionary<EVSE_Id,            EVSE>             evseIndex;
+
+        /// <summary>
+        /// The charging pools, embedded completely with their charging stations and EVSEs, in the order of their identifications.
+        /// </summary>
+        public System.Collections.Immutable.ImmutableArray<ChargingPool>  ChargingPools    { get; } = [];
+
+        /// <summary>
+        /// The charging stations of all its charging pools.
+        /// </summary>
+        public IEnumerable<ChargingStation>                               ChargingStations
+            => ChargingPools.SelectMany(chargingPool => chargingPool.ChargingStations);
+
+        /// <summary>
+        /// The EVSEs of all its charging pools.
+        /// </summary>
+        public IEnumerable<EVSE>                                          EVSEs
+            => ChargingPools.SelectMany(chargingPool => chargingPool.EVSEs);
+
+        /// <summary>
+        /// Try to return the charging pool with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingPool(ChargingPool_Id                                                 ChargingPoolId,
+                                          [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ChargingPool?  ChargingPool)
+
+            => chargingPoolIndex.TryGetValue(ChargingPoolId, out ChargingPool);
+
+        /// <summary>
+        /// Try to return the charging station with the given identification, in any of its charging pools.
+        /// </summary>
+        public Boolean TryGetChargingStation(ChargingStation_Id                                                    ChargingStationId,
+                                             [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ChargingStation?  ChargingStation)
+
+            => chargingStationIndex.TryGetValue(ChargingStationId, out ChargingStation);
+
+        /// <summary>
+        /// Try to return the EVSE with the given identification, in any of its charging stations.
+        /// </summary>
+        public Boolean TryGetEVSE(EVSE_Id                                                    EVSEId,
+                                  [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EVSE?  EVSE)
+
+            => evseIndex.TryGetValue(EVSEId, out EVSE);
+
+        /// <summary>
+        /// Take the runtime status and internal data of the given previous version of this operator,
+        /// and of every charging pool, charging station and EVSE it had, by their identifications.
+        /// </summary>
+        internal void ShareRuntimeOfAll(ChargingStationOperator Previous)
+        {
+
+            ShareRuntimeOf(Previous);
+
+            foreach (var chargingPool in ChargingPools)
+                if (Previous.TryGetChargingPool(chargingPool.Id, out var previousChargingPool))
+                    chargingPool.ShareRuntimeOf(previousChargingPool);
+
+            foreach (var chargingStation in ChargingStations)
+                if (Previous.TryGetChargingStation(chargingStation.Id, out var previousChargingStation))
+                    chargingStation.ShareRuntimeOf(previousChargingStation);
+
+            foreach (var evse in EVSEs)
+                if (Previous.TryGetEVSE(evse.Id, out var previousEVSE))
+                    evse.ShareRuntimeOf(previousEVSE);
+
+        }
+
+        #endregion
+
 
         //ToDo: Technical reachability via: DNS-SRV / DNS-HTTPS Records and/or EV-RoamingNetworks
 
@@ -490,6 +562,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        PhoneNumber?                                          HotlinePhoneNumber                     = null,
                                        URL?                                                  TermsAndConditionsURL                  = null,
                                        IEnumerable<DataLicense>?                             DataLicenses                           = null,
+                                       IEnumerable<ChargingPool>?                            ChargingPools                          = null,
 
                                        Timestamped<ChargingStationOperatorAdminStatusType>?  InitialAdminStatus                     = null,
                                        Timestamped<ChargingStationOperatorStatusType>?       InitialStatus                          = null,
@@ -543,6 +616,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("A data license must not be given twice.", nameof(DataLicenses));
 
             this.immutableDataLicenses  = [.. dataLicenses.Ordered()];
+
+            #region Charging pools, unique by their identifications, as their charging stations and EVSEs
+
+            var chargingPools = (ChargingPools ?? []).ToArray();
+
+            if (chargingPools.Any(chargingPool => chargingPool is null))
+                throw new ArgumentException("Charging pools must not contain null entries!", nameof(ChargingPools));
+
+            foreach (var chargingPool in chargingPools)
+                if (chargingPool.Id.OperatorId != Id)
+                    throw new ArgumentException($"The charging pool '{chargingPool.Id}' does not belong to the operator '{Id}'!", nameof(ChargingPools));
+
+            this.ChargingPools = [.. chargingPools.OrderBy(chargingPool => chargingPool.Id.ToString(), StringComparer.Ordinal)];
+
+            try
+            {
+                this.chargingPoolIndex     = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.ChargingPools.   Select(chargingPool    => new KeyValuePair<ChargingPool_Id,    ChargingPool>   (chargingPool.Id,    chargingPool)));
+                this.chargingStationIndex  = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.ChargingStations.Select(chargingStation => new KeyValuePair<ChargingStation_Id, ChargingStation>(chargingStation.Id, chargingStation)));
+                this.evseIndex             = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.EVSEs.           Select(evse            => new KeyValuePair<EVSE_Id,            EVSE>           (evse.Id,            evse)));
+            }
+            catch (ArgumentException)
+            {
+                throw new ArgumentException($"A charging pool, charging station or EVSE of the operator '{Id}' must not be given twice!", nameof(ChargingPools));
+            }
+
+            #endregion
 
         }
 
@@ -923,6 +1022,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                null
 
                                );
+
+                // Embedded completely, as content.
+                if (ChargingPools.Length > 0)
+                    json.Add("chargingPools", new JArray(ChargingPools.Select(chargingPool => chargingPool.ToJSON())));
 
                 // Always part of the content.
                 POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);

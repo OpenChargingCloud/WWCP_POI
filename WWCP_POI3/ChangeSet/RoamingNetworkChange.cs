@@ -422,6 +422,202 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Add                   (ChargingStationManufacturer)
+
+        /// <summary>
+        /// Add the given charging station manufacturer to its roaming network.
+        /// </summary>
+        /// <param name="ChargingStationManufacturer">The new charging station manufacturer.</param>
+        public static RoamingNetworkChange Add(ChargingStationManufacturer ChargingStationManufacturer)
+
+            => Add(nameof(POI.ChargingStationManufacturer),
+                   ChargingStationManufacturer.Id.ToString(),
+                   ChargingStationManufacturer.ToJSON());
+
+        /// <summary>
+        /// Remove the given charging station manufacturer, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingStationManufacturer_Id  ChargingStationManufacturerId,
+                                                  JToken?                         OldValue   = null)
+
+            => Remove(nameof(POI.ChargingStationManufacturer),
+                      ChargingStationManufacturerId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given charging station manufacturer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingStationManufacturer  ChargingStationManufacturer,
+                                                          String                       PropertyName,
+                                                          JToken?                      OldValue,
+                                                          JToken                       NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingStationManufacturer), ChargingStationManufacturer.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given charging station manufacturer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingStationManufacturer  ChargingStationManufacturer,
+                                                          String                       PropertyName,
+                                                          JToken?                      OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingStationManufacturer), ChargingStationManufacturer.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ChargingPool)
+
+        /// <summary>
+        /// Add the given charging pool, with its charging stations and EVSEs, to its charging station operator.
+        /// </summary>
+        /// <param name="ChargingPool">The new charging pool.</param>
+        public static RoamingNetworkChange Add(ChargingPool ChargingPool)
+
+            => Add(nameof(POI.ChargingPool),
+                   ChargingPool.Id.ToString(),
+                   ChargingPool.ToJSON(),
+                   nameof(POI.ChargingStationOperator),
+                   ChargingPool.Id.OperatorId.ToString());
+
+        #endregion
+
+        #region Add                   (ChargingStation, ChargingPoolId)
+
+        /// <summary>
+        /// Add the given charging station, with its EVSEs, to the given charging pool.
+        /// </summary>
+        /// <param name="ChargingStation">The new charging station.</param>
+        /// <param name="ChargingPoolId">The identification of its charging pool.</param>
+        public static RoamingNetworkChange Add(ChargingStation  ChargingStation,
+                                               ChargingPool_Id  ChargingPoolId)
+
+            => Add(nameof(POI.ChargingStation),
+                   ChargingStation.Id.ToString(),
+                   ChargingStation.ToJSON(),
+                   nameof(POI.ChargingPool),
+                   ChargingPoolId.ToString());
+
+        #endregion
+
+        #region Add                   (EVSE, ChargingStationId)
+
+        /// <summary>
+        /// Add the given EVSE to the given charging station.
+        /// </summary>
+        /// <param name="EVSE">The new EVSE.</param>
+        /// <param name="ChargingStationId">The identification of its charging station.</param>
+        public static RoamingNetworkChange Add(EVSE                EVSE,
+                                               ChargingStation_Id  ChargingStationId)
+
+            => Add(nameof(POI.EVSE),
+                   EVSE.Id.ToString(),
+                   EVSE.ToJSON(),
+                   nameof(POI.ChargingStation),
+                   ChargingStationId.ToString());
+
+        #endregion
+
+        #region Remove                (ChargingPoolId | ChargingStationId | EVSEId, OldValue = null)
+
+        /// <summary>
+        /// Remove the given charging pool, with its charging stations and EVSEs,
+        /// optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingPool_Id  ChargingPoolId,
+                                                  JToken?          OldValue   = null)
+
+            => Remove(nameof(POI.ChargingPool),
+                      ChargingPoolId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Remove the given charging station, with its EVSEs,
+        /// optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingStation_Id  ChargingStationId,
+                                                  JToken?             OldValue   = null)
+
+            => Remove(nameof(POI.ChargingStation),
+                      ChargingStationId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Remove the given EVSE, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(EVSE_Id  EVSEId,
+                                                  JToken?  OldValue   = null)
+
+            => Remove(nameof(POI.EVSE),
+                      EVSEId.ToString(),
+                      OldValue);
+
+        #endregion
+
+        #region UpdateProperty        (ChargingPool | ChargingStation | EVSE, PropertyName, OldValue, NewValue)
+
+        /// <summary>
+        /// Update one property of the given charging pool, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingPool  ChargingPool,
+                                                          String        PropertyName,
+                                                          JToken?       OldValue,
+                                                          JToken        NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingPool), ChargingPool.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Update one property of the given charging station, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingStation  ChargingStation,
+                                                          String           PropertyName,
+                                                          JToken?          OldValue,
+                                                          JToken           NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingStation), ChargingStation.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Update one property of the given EVSE, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(EVSE     EVSE,
+                                                          String   PropertyName,
+                                                          JToken?  OldValue,
+                                                          JToken   NewValue)
+
+            => UpdateProperty(nameof(POI.EVSE), EVSE.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        #endregion
+
+        #region RemoveProperty        (ChargingPool | ChargingStation | EVSE, PropertyName, OldValue = null)
+
+        /// <summary>
+        /// Remove one property of the given charging pool, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingPool  ChargingPool,
+                                                          String        PropertyName,
+                                                          JToken?       OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingPool), ChargingPool.Id.ToString(), PropertyName, OldValue);
+
+        /// <summary>
+        /// Remove one property of the given charging station, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingStation  ChargingStation,
+                                                          String           PropertyName,
+                                                          JToken?          OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingStation), ChargingStation.Id.ToString(), PropertyName, OldValue);
+
+        /// <summary>
+        /// Remove one property of the given EVSE, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(EVSE     EVSE,
+                                                          String   PropertyName,
+                                                          JToken?  OldValue   = null)
+
+            => RemoveProperty(nameof(POI.EVSE), EVSE.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
         #region AddElement            (EntityType, EntityId, ElementPath, Value, ...)
 
         /// <summary>

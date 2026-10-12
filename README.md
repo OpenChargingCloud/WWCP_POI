@@ -6,17 +6,35 @@ A .NET 10 library of the Open Charging Cloud.
 | Directory | What it is |
 |---|---|
 | `WWCP_POI2` | Shared lower layer: identifications, status values, predefined strings, energy information, transparency software |
-| `WWCP_POI3` | Roaming networks, operators, change sets, history and their HTTP API |
+| `WWCP_POI3` | Roaming networks with their manufacturers, operators, pools, stations and EVSEs; change sets, history, sync |
 | `old` | The earlier implementation, for reference only; not developed further |
 
 ## Data
 
-A `RoamingNetwork` holds its charging station operators and data licenses.
-Charging pools, stations, EVSEs and e-mobility providers follow.
+```mermaid
+flowchart TD
+    RoamingNetwork --> ChargingStationOperator
+    RoamingNetwork --> ChargingStationManufacturer
+    ChargingStationOperator --> ChargingPool
+    ChargingPool --> ChargingStation
+    ChargingStation --> EVSE
+    EVSE --> ChargingConnector
+    ChargingStation -. manufacturerId .-> ChargingStationManufacturer
+    RoamingNetwork -. dataLicenses .-> DataLicense
+    ChargingStationOperator -. dataLicenses .-> DataLicense
+    ChargingPool -. dataLicenses .-> DataLicense
+```
+
+Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `chargingPools`,
+`chargingStations`, `EVSEs`, `chargingConnectors`), each 0..n in the order of their ids; dotted lines are references.
+A pool, station or EVSE belongs to the operator its id names; ids are unique within the operator.
+E-mobility providers, tariffs and more follow.
 
 - **Content:** everything in the JSON and CBOR representations, completely, in a fixed order:
-  operators and licenses embedded, `created`, `lastChange` and `customData` included,
+  children and licenses embedded, `created`, `lastChange` and `customData` included,
   timestamps to the millisecond. CBOR uses the keys and values of JSON.
+- **EVSE:** `currentTypes`, `chargingModes` (arrays of names), `maxVoltage` (V), `maxCurrent` (A),
+  `maxPower` (W), `physicalReference` and `chargingConnectors` (`{@id, type, lockable?}`).
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
   They identify a version; `CalcETags()` and `ValidateETags(…)`.
 - **Runtime:** admin status and status are not content and have no ETags. Each entity keeps them
@@ -37,19 +55,20 @@ var rn1 = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                              DataSource:                "v1",
                              ChargingStationOperators:  [ gef ]);
 
-var bdo = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*BDO"));
+var newOperator = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*NEW"));
 
 var cs  = rn1.CreateChangeSet([
               RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "v2"),             // the network
-              RoamingNetworkChange.Add           (bdo),                                       // a new operator
+              RoamingNetworkChange.Add           (newOperator),                               // a new operator
               RoamingNetworkChange.UpdateProperty(gef, "telephone",  null, "+49 30 7654321")  // the operator DE*GEF
           ]);
 
 var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 ```
 
-- **Changes:** `UpdateProperty`/`RemoveProperty` of the network (`name`, `description`, `dataSource`,
-  `dataLicenses`, `customData`) and of operators; `Add`/`Remove` of operators. The overload by the entity's
+- **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
+  `Add`/`Remove` of manufacturers, operators, pools, stations (`Add(station, poolId)`) and EVSEs
+  (`Add(evse, stationId)`). A station's manufacturer must exist. The overload by the entity's
   type names it: a change is data, `{entityType, entityId, propertyName, oldValue, newValue}`, applied
   to the entity with that id in the version it is applied to.
 - **Old values:** `CreateChangeSet` gives every change the value it finds; JSON `null` means

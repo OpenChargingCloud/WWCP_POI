@@ -364,11 +364,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             webSocketServer.AddTopic(new POIWebSocketTopic(AdminStatusUpdatesTopic,
                                                            "adminStatusUpdate",
-                                                           "Every change of the admin status of the roaming network and of its charging station operators."));
+                                                           "Every change of the admin status of the roaming network and of its manufacturers, operators, pools, stations and EVSEs."));
 
             webSocketServer.AddTopic(new POIWebSocketTopic(StatusUpdatesTopic,
                                                            "statusUpdate",
-                                                           "Every change of the status of the roaming network and of its charging station operators."));
+                                                           "Every change of the status of the roaming network and of its manufacturers, operators, pools, stations and EVSEs."));
 
             #endregion
 

@@ -84,7 +84,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                    DataSource:                "test",
                    Created:                   DateTimeOffset.Parse("2026-01-01T00:00:00Z"),
                    DataLicenses:              [ OwnLicense, DataLicense.OpenDatabaseLicense ],
-                   ChargingStationOperators:  [ NewOperator("DE*GEF", "GraphDefined"), NewOperator("DE*BDO", "Example Operator") ]
+                   ChargingStationOperators:  [ NewOperator("DE*GEF", "GraphDefined"), NewOperator("DE*EXA", "Example Operator") ]
                );
 
         #endregion
@@ -271,8 +271,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(() => rn0.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(rn0, "description") ]),
                             Throws.ArgumentException.With.Message.Contains("does not exist"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.Remove("ChargingPool", "DE*GEF*P1") ]),
-                            Throws.ArgumentException.With.Message.Contains("changes of ChargingPool 'DE*GEF*P1' are not supported yet"));
+                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.Remove("ParkingOperator", "DE*PAR") ]),
+                            Throws.ArgumentException.With.Message.Contains("changes of ParkingOperator 'DE*PAR' are not supported yet"));
 
                 Assert.That(() => new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn2")).ApplyChangeSet(
                                       rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ])),
@@ -315,11 +315,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1  = NewNetwork();
-            var bdo  = rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*BDO"))!;
+            var exa  = rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*EXA"))!;
 
             var cs1  = rn1.CreateChangeSet([
                            RoamingNetworkChange.Add   (NewOperator("DE*NEW", "A new operator")),
-                           RoamingNetworkChange.Remove(bdo.Id)
+                           RoamingNetworkChange.Remove(exa.Id)
                        ]);
 
             var rn2  = rn1.ApplyChangeSet(RoamingNetworkChangeSet.Parse(cs1.ToJSON().ToString()));
@@ -334,10 +334,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
                 // The removal remembers the operator it removed.
                 Assert.That(cs1.Changes[0].OldValue,                                            Is.Null);
-                Assert.That(cs1.Changes[1].OldValue,                                            Is.EqualTo(bdo.ToEmbeddedJSON()).Using<JToken>(JToken.DeepEquals));
+                Assert.That(cs1.Changes[1].OldValue,                                            Is.EqualTo(exa.ToEmbeddedJSON()).Using<JToken>(JToken.DeepEquals));
 
                 // The old version stays as it was.
-                Assert.That(rn1.ChargingStationOperators.Select(o => o.Id.ToString()).Order(),  Is.EqualTo(new[] { "DE*BDO", "DE*GEF" }));
+                Assert.That(rn1.ChargingStationOperators.Select(o => o.Id.ToString()).Order(),  Is.EqualTo(new[] { "DE*EXA", "DE*GEF" }));
 
             }
 
@@ -416,8 +416,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(cs1.Changes[3].OldValue!.Value<String>(),     Is.EqualTo(gef.Homepage.ToString()));
 
                 // The other operator and the old version stay as they were.
-                Assert.That(rn2.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*BDO"))!.ToEmbeddedJSON(),
-                            Is.EqualTo(rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*BDO"))!.ToEmbeddedJSON()).Using<JToken>(JToken.DeepEquals));
+                Assert.That(rn2.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*EXA"))!.ToEmbeddedJSON(),
+                            Is.EqualTo(rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*EXA"))!.ToEmbeddedJSON()).Using<JToken>(JToken.DeepEquals));
                 Assert.That(gef.Telephone,                                Is.EqualTo(PhoneNumber.Parse("+49 3641 123456")));
 
             }
@@ -588,11 +588,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1     = NewNetwork();
-            var bdo     = ChargingStationOperator_Id.Parse("DE*BDO");
+            var exa     = ChargingStationOperator_Id.Parse("DE*EXA");
 
-            // A replaces DE*BDO, B removes it and C removes DE*GEF, all against the same version.
-            var csA     = rn1.CreateChangeSet([ RoamingNetworkChange.Remove(bdo), RoamingNetworkChange.Add(NewOperator("DE*BDO", "Renamed")) ]);
-            var csB     = rn1.CreateChangeSet([ RoamingNetworkChange.Remove(bdo) ]);
+            // A replaces DE*EXA, B removes it and C removes DE*GEF, all against the same version.
+            var csA     = rn1.CreateChangeSet([ RoamingNetworkChange.Remove(exa), RoamingNetworkChange.Add(NewOperator("DE*EXA", "Renamed")) ]);
+            var csB     = rn1.CreateChangeSet([ RoamingNetworkChange.Remove(exa) ]);
             var csC     = rn1.CreateChangeSet([ RoamingNetworkChange.Remove(ChargingStationOperator_Id.Parse("DE*GEF")) ]);
 
             var rn2     = rn1.ApplyChangeSet(csA);
@@ -602,7 +602,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
                 // B would remove the operator A has replaced.
                 Assert.That(() => rn2.CreateChangeSet(csB.Changes),
-                            Throws.ArgumentException.With.Message.Contains("'DE*BDO' is no longer the expected old value"));
+                            Throws.ArgumentException.With.Message.Contains("'DE*EXA' is no longer the expected old value"));
 
                 // C touches another operator and can be prepared again.
                 var rn3 = rn2.ApplyChangeSet(rn2.CreateChangeSet(csC.Changes));
@@ -706,13 +706,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                                 Created:                   rn1.Created,
                                 LastChange:                rn1.LastChangeDate,
                                 DataLicenses:              rn1.DataLicenses,
-                                ChargingStationOperators:  [ NewOperator("DE*GEF", "GraphDefined"), NewOperator("DE*BDO", "Another name") ]
+                                ChargingStationOperators:  [ NewOperator("DE*GEF", "GraphDefined"), NewOperator("DE*EXA", "Another name") ]
                             );
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(json["chargingStationOperators"]!.Select(o => o["@id"]!.Value<String>()),  Is.EqualTo(new[] { "DE*BDO", "DE*GEF" }));
+                Assert.That(json["chargingStationOperators"]!.Select(o => o["@id"]!.Value<String>()),  Is.EqualTo(new[] { "DE*EXA", "DE*GEF" }));
                 Assert.That(json["dataLicenses"]!.            Select(l => l["@id"]!.Value<String>()),  Is.EqualTo(new[] { "ODbL", "own-1.0" }));
                 Assert.That(json["dataLicenses"]![1]!["URLs"]!.Values<String>(),                      Is.EqualTo(new[] { "https://example.org/a", "https://example.org/z" }));
                 Assert.That(json["chargingStationOperators"]![0]!["dataLicenses"]!.Count(),           Is.EqualTo(2));
@@ -748,7 +748,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(operatorIds["chargingStationOperatorIds"]!.Values<String>(),  Is.EqualTo(new[] { "DE*BDO", "DE*GEF" }));
+                Assert.That(operatorIds["chargingStationOperatorIds"]!.Values<String>(),  Is.EqualTo(new[] { "DE*EXA", "DE*GEF" }));
 
                 Assert.That(RoamingNetwork.TryParse(operatorIds, out _, out var error1),  Is.False);
                 Assert.That(error1,                                                       Does.Contain("only by their identifications"));
@@ -819,7 +819,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
             var rn1          = NewNetwork();
             var gef          = rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*GEF"))!;
-            var bdo          = rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*BDO"))!;
+            var exa          = rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*EXA"))!;
 
             // A new operator given without timestamps.
             var newOperator  = NewOperator("DE*NEW", "New").ToEmbeddedJSON();
@@ -849,7 +849,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(new2.LastChangeDate,  Is.EqualTo(CommitTime));
 
                 // An operator not changed keeps its last change.
-                Assert.That(rn2.GetChargingStationOperatorById(bdo.Id)!.LastChangeDate,  Is.EqualTo(bdo.LastChangeDate));
+                Assert.That(rn2.GetChargingStationOperatorById(exa.Id)!.LastChangeDate,  Is.EqualTo(exa.LastChangeDate));
 
                 // Timestamps are managed by change sets, not changed by them.
                 Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "lastChange", null, "2030-01-01T00:00:00.000Z") ]),

@@ -193,7 +193,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               UserDefinedDictionary?          InternalData                 = null,
 
                               IEnumerable<DataLicense>?              DataLicenses               = null,
-                              IEnumerable<ChargingStationOperator>?  ChargingStationOperators   = null)
+                              IEnumerable<ChargingStationOperator>?  ChargingStationOperators   = null,
+                              IEnumerable<ChargingStationManufacturer>?  ChargingStationManufacturers   = null)
 
             : base(Id,
                    Name,
@@ -232,6 +233,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     throw new ArgumentException($"The charging station operator '{chargingStationOperator.Id}' must not be given twice!", nameof(ChargingStationOperators));
 
             }
+
+            foreach (var chargingStationManufacturer in ChargingStationManufacturers ?? [])
+            {
+
+                ArgumentNullException.ThrowIfNull(chargingStationManufacturer, nameof(ChargingStationManufacturers));
+
+                if (!chargingStationManufacturers.TryAdd(chargingStationManufacturer.Id, chargingStationManufacturer))
+                    throw new ArgumentException($"The charging station manufacturer '{chargingStationManufacturer.Id}' must not be given twice!", nameof(ChargingStationManufacturers));
+
+            }
+
+            // Every manufacturer a charging station names is one of this network.
+            if (UnknownManufacturer(chargingStationOperators.Values, chargingStationManufacturers) is String unknownManufacturer)
+                throw new ArgumentException(unknownManufacturer, nameof(ChargingStationManufacturers));
 
             #endregion
 
@@ -464,6 +479,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse ChargingStationManufacturers [optional]
+
+                if (!POIJSON.TryParseChildren<ChargingStationManufacturer>(JSON,
+                                                                           "chargingStationManufacturers",
+                                                                           "chargingStationManufacturerIds",
+                                                                           "charging station manufacturers",
+                                                                           ChargingStationManufacturer.TryParse,
+                                                                           out var chargingStationManufacturers,
+                                                                           out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse ChargingStationOperators [optional]
 
                 if (JSON.ContainsKey("chargingStationOperatorIds"))
@@ -518,7 +548,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      LastChange:                lastChange,
                                      CustomData:                customData,
                                      DataLicenses:              dataLicenses,
-                                     ChargingStationOperators:  chargingStationOperators
+                                     ChargingStationOperators:  chargingStationOperators,
+                                     ChargingStationManufacturers:  chargingStationManufacturers
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -713,6 +744,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              );
 
             // Always part of the content.
+            if (!chargingStationManufacturers.IsEmpty)
+                JSON.Add("chargingStationManufacturers", new JArray(OrderedChargingStationManufacturers.Select(chargingStationManufacturer => chargingStationManufacturer.ToJSON())));
+
             POIEntityMetadata.AddTo(JSON, Created, LastChangeDate, CustomData);
 
             // The ETags describe the content without them, irrespective of the view options.
@@ -870,6 +904,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse ChargingStationManufacturers [optional]
+
+                // With the keys and values of the JSON representation.
+                var manufacturersJSON = new JObject();
+
+                if (CBOR.TryGetValue(CBORValue.FromText("chargingStationManufacturers"),   out var manufacturersCBOR))
+                    manufacturersJSON.Add("chargingStationManufacturers",   CBORJSON.ToJSON(manufacturersCBOR));
+
+                if (CBOR.TryGetValue(CBORValue.FromText("chargingStationManufacturerIds"), out var manufacturerIdsCBOR))
+                    manufacturersJSON.Add("chargingStationManufacturerIds", CBORJSON.ToJSON(manufacturerIdsCBOR));
+
+                if (!POIJSON.TryParseChildren<ChargingStationManufacturer>(manufacturersJSON,
+                                                                           "chargingStationManufacturers",
+                                                                           "chargingStationManufacturerIds",
+                                                                           "charging station manufacturers",
+                                                                           ChargingStationManufacturer.TryParse,
+                                                                           out var chargingStationManufacturers,
+                                                                           out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse ChargingStationOperators [optional]
 
                 if (CBOR.TryGetValue(CBORValue.FromText("chargingStationOperatorIds"), out _))
@@ -918,7 +976,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      LastChange:                lastChange,
                                      CustomData:                customData,
                                      DataLicenses:              dataLicenses,
-                                     ChargingStationOperators:  chargingStationOperators
+                                     ChargingStationOperators:  chargingStationOperators,
+                                     ChargingStationManufacturers:  chargingStationManufacturers
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -976,6 +1035,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          CBORValue.FromArray(OrderedChargingStationOperators.
                                                  Select(chargingStationOperator => chargingStationOperator.ToCBOR(Embedded: true))));
 
+            if (!chargingStationManufacturers.IsEmpty)
+                CBOR.Add(CBORValue.FromText("chargingStationManufacturers"),
+                         CBORValue.FromArray(OrderedChargingStationManufacturers.
+                                                 Select(chargingStationManufacturer => chargingStationManufacturer.ToCBOR())));
+
             // Always part of the content, with the keys and values of the JSON representation.
             foreach (var metadata in POIEntityMetadata.AddTo([], Created, LastChangeDate, CustomData).Properties())
                 CBOR.Add(CBORValue.FromText(metadata.Name),           CBORJSON.ToCBOR(metadata.Value));
@@ -1010,6 +1074,53 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
 
+
+
+        #region Charging station manufacturers
+
+        private readonly ConcurrentDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer> chargingStationManufacturers = [];
+
+        /// <summary>
+        /// The manufacturers of charging stations in this immutable network version.
+        /// </summary>
+        public IEnumerable<ChargingStationManufacturer> ChargingStationManufacturers
+            => chargingStationManufacturers.Values;
+
+        /// <summary>
+        /// The manufacturers ordered by their identification (ordinal), as in the JSON and CBOR representations.
+        /// </summary>
+        private IEnumerable<ChargingStationManufacturer> OrderedChargingStationManufacturers
+            => chargingStationManufacturers.Values.OrderBy(chargingStationManufacturer => chargingStationManufacturer.Id.ToString(), StringComparer.Ordinal);
+
+        /// <summary>
+        /// Try to get the charging station manufacturer having the given identification.
+        /// </summary>
+        /// <param name="ChargingStationManufacturerId">The identification of a charging station manufacturer.</param>
+        /// <param name="ChargingStationManufacturer">The charging station manufacturer.</param>
+        public Boolean TryGetChargingStationManufacturerById(ChargingStationManufacturer_Id                        ChargingStationManufacturerId,
+                                                             [NotNullWhen(true)] out ChargingStationManufacturer?  ChargingStationManufacturer)
+
+            => chargingStationManufacturers.TryGetValue(ChargingStationManufacturerId, out ChargingStationManufacturer);
+
+        /// <summary>
+        /// The error, when a charging station names a manufacturer the given ones do not have.
+        /// </summary>
+        internal static String? UnknownManufacturer(IEnumerable<ChargingStationOperator>                                              ChargingStationOperators,
+                                                    IReadOnlyDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>  ChargingStationManufacturers)
+        {
+
+            foreach (var chargingStation in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStations))
+                if (chargingStation.ManufacturerId.HasValue &&
+                    !ChargingStationManufacturers.ContainsKey(chargingStation.ManufacturerId.Value))
+                {
+                    return $"The manufacturer '{chargingStation.ManufacturerId}' of the charging station '{chargingStation.Id}' is unknown in the roaming network!";
+                }
+
+            return null;
+
+        }
+
+        #endregion
 
 
         #region Charging station operators

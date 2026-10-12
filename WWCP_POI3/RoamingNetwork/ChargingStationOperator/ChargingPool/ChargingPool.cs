@@ -1,0 +1,465 @@
+/*
+ * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
+ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
+ *
+ * Licensed under the Affero GPL license, Version 3.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.gnu.org/licenses/agpl.html
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#region Usings
+
+using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
+
+using Newtonsoft.Json.Linq;
+
+using org.GraphDefined.Vanaheimr.Aegir;
+using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+
+#endregion
+
+namespace cloud.charging.open.protocols.WWCP.POI
+{
+
+    /// <summary>
+    /// The admin status of a charging pool changed.
+    /// </summary>
+    public delegate Task OnChargingPoolAdminStatusChangedDelegate(DateTimeOffset                             Timestamp,
+                                                                  EventTracking_Id                           EventTrackingId,
+                                                                  ChargingPool                               ChargingPool,
+                                                                  Timestamped<ChargingPoolAdminStatusType>   OldStatus,
+                                                                  Timestamped<ChargingPoolAdminStatusType>   NewStatus);
+
+    /// <summary>
+    /// The status of a charging pool changed.
+    /// </summary>
+    public delegate Task OnChargingPoolStatusChangedDelegate(DateTimeOffset                        Timestamp,
+                                                             EventTracking_Id                      EventTrackingId,
+                                                             ChargingPool                          ChargingPool,
+                                                             Timestamped<ChargingPoolStatusType>   OldStatus,
+                                                             Timestamped<ChargingPoolStatusType>   NewStatus);
+
+
+    /// <summary>
+    /// A charging pool: a location with its charging stations, embedded completely in its charging station operator.
+    /// </summary>
+    public sealed class ChargingPool : AImmutableEMobilityEntity<ChargingPool_Id,
+                                                                 ChargingPoolAdminStatusType,
+                                                                 ChargingPoolStatusType>,
+                                       IEquatable<ChargingPool>,
+                                       IComparable<ChargingPool>
+    {
+
+        #region Data
+
+        private readonly ImmutableDictionary<ChargingStation_Id, ChargingStation> chargingStationIndex;
+
+        #endregion
+
+        #region Properties
+
+        /// <summary>
+        /// The address.
+        /// </summary>
+        public Address?                         Address               { get; }
+
+        /// <summary>
+        /// The geographical location.
+        /// </summary>
+        public GeoCoordinate?                   GeoLocation           { get; }
+
+        /// <summary>
+        /// The type of parking, e.g. PARKING_LOT.
+        /// </summary>
+        public ParkingType?                     ParkingType           { get; }
+
+        /// <summary>
+        /// Who may use it, e.g. FreePubliclyAccessible.
+        /// </summary>
+        public AccessibilityType?               Accessibility         { get; }
+
+        /// <summary>
+        /// The hotline phone number.
+        /// </summary>
+        public PhoneNumber?                     HotlinePhoneNumber    { get; }
+
+        /// <summary>
+        /// The data licenses, ordered.
+        /// </summary>
+        public ImmutableArray<DataLicense>      DataLicenses          { get; }
+
+        /// <summary>
+        /// The charging stations, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<ChargingStation>  ChargingStations      { get; }
+
+        /// <summary>
+        /// The EVSEs of all its charging stations.
+        /// </summary>
+        public IEnumerable<EVSE>                EVSEs
+            => ChargingStations.SelectMany(chargingStation => chargingStation.EVSEs);
+
+        #endregion
+
+        #region Constructor(s)
+
+        /// <summary>
+        /// Create a new charging pool.
+        /// </summary>
+        public ChargingPool(ChargingPool_Id                              Id,
+                            I18NString?                                  Name                         = null,
+                            I18NString?                                  Description                  = null,
+                            Address?                                     Address                      = null,
+                            GeoCoordinate?                               GeoLocation                  = null,
+                            ParkingType?                                 ParkingType                  = null,
+                            AccessibilityType?                           Accessibility                = null,
+                            PhoneNumber?                                 HotlinePhoneNumber           = null,
+                            IEnumerable<DataLicense>?                    DataLicenses                 = null,
+                            IEnumerable<ChargingStation>?                ChargingStations             = null,
+
+                            Timestamped<ChargingPoolAdminStatusType>?    InitialAdminStatus           = null,
+                            Timestamped<ChargingPoolStatusType>?         InitialStatus                = null,
+                            UInt16?                                      MaxAdminStatusScheduleSize   = null,
+                            UInt16?                                      MaxStatusScheduleSize        = null,
+
+                            String?                                      DataSource                   = null,
+                            DateTimeOffset?                              Created                      = null,
+                            DateTimeOffset?                              LastChange                   = null,
+
+                            CustomDataNew?                               CustomData                   = null,
+                            UserDefinedDictionary?                       InternalData                 = null)
+
+            : base(Id,
+                   Name,
+                   Description,
+
+                   // Since its creation, unless told otherwise.
+                   InitialAdminStatus         ?? new Timestamped<ChargingPoolAdminStatusType>(Created ?? Timestamp.Now, ChargingPoolAdminStatusType.Operational),
+                   InitialStatus              ?? new Timestamped<ChargingPoolStatusType>     (Created ?? Timestamp.Now, ChargingPoolStatusType.Available),
+                   MaxAdminStatusScheduleSize ?? DefaultMaxAdminStatusScheduleSize,
+                   MaxStatusScheduleSize      ?? DefaultMaxStatusScheduleSize,
+
+                   DataSource,
+                   Created,
+                   LastChange,
+
+                   CustomData,
+                   InternalData)
+
+        {
+
+            var dataLicenses      = (DataLicenses     ?? []).ToArray();
+            var chargingStations  = (ChargingStations ?? []).ToArray();
+
+            if (dataLicenses.Any(dataLicense => dataLicense is null))
+                throw new ArgumentException("Data licenses must not contain null entries!", nameof(DataLicenses));
+
+            if (dataLicenses.Select(dataLicense => dataLicense.Id).Distinct().Count() != dataLicenses.Length)
+                throw new ArgumentException("A data license must not be given twice!", nameof(DataLicenses));
+
+            if (chargingStations.Any(chargingStation => chargingStation is null))
+                throw new ArgumentException("Charging stations must not contain null entries!", nameof(ChargingStations));
+
+            foreach (var chargingStation in chargingStations)
+                if (chargingStation.Id.OperatorId != Id.OperatorId)
+                    throw new ArgumentException($"The charging station '{chargingStation.Id}' does not belong to the operator '{Id.OperatorId}' of the charging pool '{Id}'!", nameof(ChargingStations));
+
+            if (chargingStations.Select(chargingStation => chargingStation.Id).Distinct().Count() != chargingStations.Length)
+                throw new ArgumentException($"A charging station of the charging pool '{Id}' must not be given twice!", nameof(ChargingStations));
+
+            this.Address               = Address;
+            this.GeoLocation           = GeoLocation;
+            this.ParkingType           = ParkingType;
+            this.Accessibility         = Accessibility;
+            this.HotlinePhoneNumber    = HotlinePhoneNumber;
+            this.DataLicenses          = [.. dataLicenses.Ordered()];
+            this.ChargingStations      = [.. chargingStations.OrderBy(chargingStation => chargingStation.Id.ToString(), StringComparer.Ordinal)];
+            this.chargingStationIndex  = this.ChargingStations.ToImmutableDictionary(chargingStation => chargingStation.Id);
+
+        }
+
+        #endregion
+
+
+        #region TryGetChargingStation(ChargingStationId, out ChargingStation)
+
+        /// <summary>
+        /// Try to return the charging station with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingStation(ChargingStation_Id                         ChargingStationId,
+                                             [NotNullWhen(true)] out ChargingStation?  ChargingStation)
+
+            => chargingStationIndex.TryGetValue(ChargingStationId, out ChargingStation);
+
+        #endregion
+
+
+        #region Status events
+
+        private readonly Lock                                       statusEventsLock  = new ();
+        private          OnChargingPoolAdminStatusChangedDelegate?  onAdminStatusChanged;
+        private          OnChargingPoolStatusChangedDelegate?       onStatusChanged;
+
+        /// <summary>
+        /// An event fired whenever the admin status changed.
+        /// </summary>
+        public event OnChargingPoolAdminStatusChangedDelegate? OnAdminStatusChanged
+        {
+            add    { lock (statusEventsLock) { onAdminStatusChanged += value; ListenToAdminStatus(onAdminStatusChanged is not null); } }
+            remove { lock (statusEventsLock) { onAdminStatusChanged -= value; ListenToAdminStatus(onAdminStatusChanged is not null); } }
+        }
+
+        /// <summary>
+        /// An event fired whenever the status changed.
+        /// </summary>
+        public event OnChargingPoolStatusChangedDelegate? OnStatusChanged
+        {
+            add    { lock (statusEventsLock) { onStatusChanged += value; ListenToStatus(onStatusChanged is not null); } }
+            remove { lock (statusEventsLock) { onStatusChanged -= value; ListenToStatus(onStatusChanged is not null); } }
+        }
+
+        /// <inheritdoc/>
+        protected override async Task OnAdminStatusScheduleChanged(DateTimeOffset                            Timestamp,
+                                                                   EventTracking_Id                          EventTrackingId,
+                                                                   Timestamped<ChargingPoolAdminStatusType>  NewStatus,
+                                                                   Timestamped<ChargingPoolAdminStatusType>  OldStatus,
+                                                                   Context?                                  DataSource)
+        {
+            var onAdminStatusChanged = this.onAdminStatusChanged;
+            if (onAdminStatusChanged is not null)
+                await onAdminStatusChanged(Timestamp, EventTrackingId, this, OldStatus, NewStatus);
+        }
+
+        /// <inheritdoc/>
+        protected override async Task OnStatusScheduleChanged(DateTimeOffset                       Timestamp,
+                                                              EventTracking_Id                     EventTrackingId,
+                                                              Timestamped<ChargingPoolStatusType>  NewStatus,
+                                                              Timestamped<ChargingPoolStatusType>  OldStatus,
+                                                              Context?                             DataSource)
+        {
+            var onStatusChanged = this.onStatusChanged;
+            if (onStatusChanged is not null)
+                await onStatusChanged(Timestamp, EventTrackingId, this, OldStatus, NewStatus);
+        }
+
+        #endregion
+
+
+        #region ToJSON()
+
+        /// <summary>
+        /// Return the JSON representation of this charging pool, as its operator embeds it:
+        /// with its data licenses and charging stations.
+        /// </summary>
+        public JObject ToJSON()
+        {
+
+            var json = new JObject(
+                           new JProperty("@id", Id.ToString())
+                       );
+
+            if (Name.IsNotNullOrEmpty())
+                json.Add("name",              Name.ToJSON());
+
+            if (Description.IsNotNullOrEmpty())
+                json.Add("description",       Description.ToJSON());
+
+            if (DataSource is not null)
+                json.Add("dataSource",        DataSource);
+
+            if (DataLicenses.Length > 0)
+                json.Add("dataLicenses",      DataLicenses.ToPOIJSON());
+
+            if (Address is not null)
+                json.Add("address",           Address.ToJSON(Embedded: true));
+
+            if (GeoLocation.HasValue)
+                json.Add("geoLocation",       GeoLocation.Value.ToJSON(Embedded: true));
+
+            if (ParkingType.HasValue)
+                json.Add("parkingType",       ParkingType.Value.ToString());
+
+            if (Accessibility.HasValue)
+                json.Add("accessibility",     Accessibility.Value.ToString());
+
+            if (HotlinePhoneNumber.HasValue)
+                json.Add("hotline",           HotlinePhoneNumber.Value.ToString());
+
+            if (ChargingStations.Length > 0)
+                json.Add("chargingStations",  new JArray(ChargingStations.Select(chargingStation => chargingStation.ToJSON())));
+
+            POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
+
+            return json;
+
+        }
+
+        #endregion
+
+        #region (static) TryParse(JSON, out ChargingPool, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given JSON representation of a charging pool, with its charging stations and EVSEs.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="ChargingPool">The parsed charging pool.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public static Boolean TryParse(JObject                                 JSON,
+                                       [NotNullWhen(true)]  out ChargingPool?  ChargingPool,
+                                       [NotNullWhen(false)] out String?        ErrorResponse)
+        {
+
+            ChargingPool = null;
+
+            try
+            {
+
+                if (!JSON.ParseMandatory("@id",
+                                         "charging pool identification",
+                                         ChargingPool_Id.TryParse,
+                                         out ChargingPool_Id id,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N       (JSON, "name",           "charging pool name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N       (JSON, "description",    "charging pool description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, "dataSource",     "data source",                out var dataSource,   out ErrorResponse) ||
+                    !POIJSON.TryParseAddress    (JSON,                                                 out var address,      out ErrorResponse) ||
+                    !POIJSON.TryParseGeoLocation(JSON,                                                 out var geoLocation,  out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, "parkingType",    "parking type",               POI.ParkingType.      TryParse, out ParkingType?        parkingType,    out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, "accessibility",  "accessibility",              POI.AccessibilityType.TryParse, out AccessibilityType?  accessibility,  out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, "hotline",        "hotline phone number",       PhoneNumber.          TryParse, out PhoneNumber?        hotline,        out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIDataLicenses.TryParse(JSON["dataLicenses"],
+                                              JSON["dataLicenseIds"],
+                                              out var dataLicenses,
+                                              out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIJSON.TryParseChildren<ChargingStation>(JSON,
+                                                               "chargingStations",
+                                                               "chargingStationIds",
+                                                               "charging stations",
+                                                               ChargingStation.TryParse,
+                                                               out var chargingStations,
+                                                               out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIEntityMetadata.TryParse(JSON,
+                                                out var created,
+                                                out var lastChange,
+                                                out var customData,
+                                                out ErrorResponse))
+                {
+                    return false;
+                }
+
+                ChargingPool = new ChargingPool(id,
+                                                name,
+                                                description,
+                                                address,
+                                                geoLocation,
+                                                parkingType,
+                                                accessibility,
+                                                hotline,
+                                                dataLicenses,
+                                                chargingStations,
+                                                DataSource:  dataSource,
+                                                Created:     created,
+                                                LastChange:  lastChange,
+                                                CustomData:  customData);
+
+                ErrorResponse = null;
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                ChargingPool   = null;
+                ErrorResponse  = "The given JSON representation of a charging pool is invalid: " + e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+
+        #region Operator overloading, IEquatable, IComparable
+
+        /// <summary>
+        /// Compares two charging pools for equality by their identifications.
+        /// </summary>
+        public static Boolean operator == (ChargingPool? ChargingPool1, ChargingPool? ChargingPool2)
+
+            => ReferenceEquals(ChargingPool1, ChargingPool2) ||
+               (ChargingPool1 is not null && ChargingPool1.Equals(ChargingPool2));
+
+        /// <summary>
+        /// Compares two charging pools for inequality by their identifications.
+        /// </summary>
+        public static Boolean operator != (ChargingPool? ChargingPool1, ChargingPool? ChargingPool2)
+
+            => !(ChargingPool1 == ChargingPool2);
+
+        /// <inheritdoc/>
+        public override Int32 CompareTo(Object? Object)
+
+            => Object is ChargingPool chargingPool
+                   ? CompareTo(chargingPool)
+                   : throw new ArgumentException("The given object is not a charging pool!", nameof(Object));
+
+        /// <inheritdoc/>
+        public Int32 CompareTo(ChargingPool? ChargingPool)
+
+            => ChargingPool is null
+                   ? throw new ArgumentNullException(nameof(ChargingPool), "The given charging pool must not be null!")
+                   : Id.CompareTo(ChargingPool.Id);
+
+        /// <inheritdoc/>
+        public override Boolean Equals(Object? Object)
+
+            => Object is ChargingPool chargingPool &&
+               Equals(chargingPool);
+
+        /// <inheritdoc/>
+        public Boolean Equals(ChargingPool? ChargingPool)
+
+            => ChargingPool is not null &&
+               Id.Equals(ChargingPool.Id);
+
+        /// <inheritdoc/>
+        public override Int32 GetHashCode()
+
+            => Id.GetHashCode();
+
+        /// <inheritdoc/>
+        public override String ToString()
+
+            => Id.ToString();
+
+        #endregion
+
+    }
+
+}
