@@ -137,7 +137,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             // A change of the EVSE keeps its energy status.
             leader.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!.TryGetEVSE(E1, out var e1);
-            leader.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(e1!, "maxPower", null, 11000) ], CreatedAt: T0.AddMinutes(1)));
+            leader.Commit(leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(e1!, "maxPower", null, 11000) ], CreatedAt: T0.AddMinutes(1)));
 
             leader.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!.TryGetEVSE(E1, out var changedE1);
 

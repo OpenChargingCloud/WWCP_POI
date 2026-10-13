@@ -275,9 +275,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
         #region Publish(Value, Minute)
 
-        private RoamingNetworkPublishResult Publish(String Value, Int32 Minute)
+        private RoamingNetworkCommitResult Publish(String Value, Int32 Minute)
 
-            => leader!.Publish(
+            => leader!.Commit(
                    leader.Head.RoamingNetwork.CreateSignedChangeSet(
                        [ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, Value) ],
                        Description:  I18NString.Create(Languages.en, "Data source " + Value),
@@ -397,14 +397,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
             var published = await client.Request("2", "commitChangeSet",
                                                   Binary:       true,
                                                   PayloadCBOR:  CBORValue.FromMap([
-                                                                    new (CBORValue.FromText("changeSet"),     ChangeSet(follower!, "from CBOR").ToCBOR()),
-                                                                    new (CBORValue.FromText("expectedHead"),  CBORValue.FromText(follower!.Head.Commit.Id.ToString()))
+                                                                    new (CBORValue.FromText("changeSet"),     ChangeSet(follower!, "from CBOR").ToCBOR())
                                                                 ]));
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(published.MessageType,                                     Is.EqualTo(POIWebSocketMessageType.Response), published.ErrorDescription);
-                Assert.That(published.GetPayloadJSON()!["status"]!.Value<String>(),    Is.EqualTo("Published"));
+                Assert.That(published.GetPayloadJSON()!["status"]!.Value<String>(),    Is.EqualTo("Committed"));
                 Assert.That(leader!.Head.RoamingNetwork.DataSource,                    Is.EqualTo("from CBOR"));
             }
 
@@ -513,6 +512,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
             var head0      = leader!.Head.Commit.Id;
             var changeSet  = ChangeSet(leader, "A");
+            var changeSetB = ChangeSet(leader, "B");
             var payload    = new JObject(new JProperty("changeSet", changeSet.ToJSON()));
 
             var refused    = await client.Request("1", "commitChangeSet", payload);
@@ -521,8 +521,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
             var published  = await client.Request("2", "commitChangeSet", payload);
             var again      = await client.Request("3", "commitChangeSet", payload);
-            var stale      = await client.Request("4", "commitChangeSet", new JObject(new JProperty("changeSet",     ChangeSet(leader, "B").ToJSON()),
-                                                                                       new JProperty("expectedHead",  head0.ToString())));
+            var conflict   = await client.Request("4", "commitChangeSet", new JObject(new JProperty("changeSet",     changeSetB.ToJSON())));
             var invalid    = await client.Request("5", "commitChangeSet", new JObject(new JProperty("changeSet",     "no change set")));
 
             using (Assert.EnterMultipleScope())
@@ -530,12 +529,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
                 Assert.That(refused.ErrorCode,                                    Is.EqualTo(POIWebSocketErrorCodes.SecurityError));
 
-                Assert.That(published.Payload!["status"]!.Value<String>(),        Is.EqualTo("Published"));
-                Assert.That(published.Payload["@id"]!.Value<String>(),            Is.EqualTo(leader.Head.Commit.Id.ToString()));
-                Assert.That(again.Payload!["status"]!.Value<String>(),            Is.EqualTo("AlreadyPublished"));
+                Assert.That(published.Payload!["status"]!.Value<String>(),        Is.EqualTo("Committed"));
+                Assert.That(leader.Tips.Select(tip => tip.Commit.Id.ToString()),  Does.Contain(published.Payload["@id"]!.Value<String>()));
+                Assert.That(again.Payload!["status"]!.Value<String>(),            Is.EqualTo("AlreadyCommitted"));
 
-                Assert.That(stale.Payload!["status"]!.Value<String>(),            Is.EqualTo("HeadMoved"));
-                Assert.That(stale.Payload["head"]!["revision"]!.Value<Int32>(),   Is.EqualTo(1));
+                // B, made for the version A was, too, is committed to it, but conflicts with A.
+                Assert.That(conflict.Payload!["status"]!.Value<String>(),         Is.EqualTo("Committed"));
+                Assert.That(conflict.Payload["conflicts"]!.Count(),               Is.EqualTo(1));
+                Assert.That(leader.Head.Commit.ParentIds,                         Is.EqualTo(new[] { head0 }));
 
                 Assert.That(invalid.ErrorCode,                                    Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
 
@@ -1002,11 +1003,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
             webSocketServer!.PushCoalescingDelay = TimeSpan.FromMilliseconds(300);
 
             // The roaming network operator adds the operator, the operator its charging pool.
-            leader!.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([
+            leader!.Commit(leader.Head.RoamingNetwork.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add(new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF")).WithKeys())
                             ], CreatedAt: DateTimeOffset.Parse("2026-10-11T10:00:00Z")));
 
-            leader!.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([
+            leader!.Commit(leader.Head.RoamingNetwork.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add(new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
                                                                           ChargingStations: [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
                                                                                                                   EVSEs: [ new EVSE(EVSE_Id.Parse("DE*GEF*E1*1")),

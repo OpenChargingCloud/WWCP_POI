@@ -213,7 +213,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                RoamingNetworkChange.Remove        (T2)
                            ], CreatedAt: T0.AddMinutes(1));
 
-            history.Publish(cs);
+            history.Commit(cs);
 
             var rn2      = history.Head.RoamingNetwork;
             var gef2     = rn2.GetChargingStationOperatorById(GEF)!;

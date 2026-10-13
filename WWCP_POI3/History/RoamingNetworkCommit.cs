@@ -32,9 +32,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// One step in the history of a roaming network: a change set applied to the version of its parent commit,
+    /// One step in the history of a roaming network: a change set applied to the version of its first parent commit,
     /// the revision it leads to and the ETags of the resulting version.
-    /// A genesis commit has neither a parent nor a change set: it names the version a history starts with.
+    /// A genesis commit has neither parents nor a change set: it names the version a history starts with.
+    /// A merge commit has two parents, its change set leads from the version of the first one to the merge of both,
+    /// as everyone calculates it: it is not signed by owners, but checked by calculating it again.
     /// Its identification is the SHA-256 digest of its canonical JSON content without signatures,
     /// so it names its whole ancestry, and signatures added later do not change it.
     /// </summary>
@@ -46,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The versioned profile of the content a commit identification is calculated over.
         /// </summary>
-        public const String IdentityProfile = "wwcp-poi-commit-v1";
+        public const String IdentityProfile = "wwcp-poi-commit-v2";
 
         #endregion
 
@@ -58,9 +60,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RoamingNetworkCommit_Id    Id                  { get; }
 
         /// <summary>
-        /// The identification of the parent commit, or null for a genesis commit.
+        /// The identifications of the parent commits: none for a genesis commit, two for a merge commit.
+        /// The change set leads from the version of the first one.
         /// </summary>
-        public RoamingNetworkCommit_Id?   ParentId            { get; }
+        public ImmutableArray<RoamingNetworkCommit_Id>  ParentIds  { get; }
+
+        /// <summary>
+        /// The identification of the first parent commit, whose version the change set is applied to,
+        /// or null for a genesis commit.
+        /// </summary>
+        public RoamingNetworkCommit_Id?   ParentId
+            => ParentIds.IsEmpty ? null : ParentIds[0];
 
         /// <summary>
         /// The roaming network of this commit.
@@ -68,7 +78,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RoamingNetwork_Id          RoamingNetworkId    { get; }
 
         /// <summary>
-        /// The revision this commit leads to: one more than its parent's.
+        /// The revision this commit leads to: one more than the highest one of its parents.
         /// </summary>
         public UInt64                     Revision            { get; }
 
@@ -94,11 +104,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean                    IsGenesis
             => ChangeSet is null;
 
+        /// <summary>
+        /// Whether this commit merges two branches.
+        /// </summary>
+        public Boolean                    IsMerge
+            => ParentIds.Length > 1;
+
         #endregion
 
         #region Constructor(s)
 
-        private RoamingNetworkCommit(RoamingNetworkCommit_Id?  ParentId,
+        private RoamingNetworkCommit(ImmutableArray<RoamingNetworkCommit_Id>  ParentIds,
                                      RoamingNetwork_Id         RoamingNetworkId,
                                      UInt64                    Revision,
                                      ImmutableArray<ETag>      ETags,
@@ -109,13 +125,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ETags.IsDefaultOrEmpty || ETags.Any(eTag => !eTag.IsValid))
                 throw new ArgumentException("A commit requires valid ETags of its version.", nameof(ETags));
 
-            if ((ParentId is null) != (ChangeSet is null))
-                throw new ArgumentException("A commit has both a parent and a change set, or, as a genesis commit, neither.");
+            ParentIds = ParentIds.IsDefault ? [] : ParentIds;
+
+            if (ParentIds.IsEmpty != (ChangeSet is null))
+                throw new ArgumentException("A commit has both parents and a change set, or, as a genesis commit, neither.");
+
+            if (ParentIds.Length > 2)
+                throw new ArgumentException("A commit has at most two parents.", nameof(ParentIds));
+
+            if (ParentIds.Distinct().Count() != ParentIds.Length)
+                throw new ArgumentException("A commit must not name a parent twice.", nameof(ParentIds));
 
             if (ChangeSet is not null && ChangeSet.RoamingNetworkId != RoamingNetworkId)
                 throw new ArgumentException("The change set is for another roaming network.", nameof(ChangeSet));
 
-            this.ParentId          = ParentId;
+            this.ParentIds         = ParentIds;
             this.RoamingNetworkId  = RoamingNetworkId;
             this.Revision          = Revision;
             this.ETags             = ETags;
@@ -136,7 +160,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="RoamingNetwork">The first version of a roaming network.</param>
         public static RoamingNetworkCommit Genesis(RoamingNetwork RoamingNetwork)
 
-            => new (null,
+            => new ([],
                     RoamingNetwork.Id,
                     RoamingNetwork.Revision,
                     RoamingNetwork.CalcETags(),
@@ -156,9 +180,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 RoamingNetworkChangeSet  ChangeSet,
                                                 RoamingNetwork           RoamingNetwork)
 
-            => new (Parent.Id,
+            => new ([ Parent.Id ],
                     Parent.RoamingNetworkId,
                     Parent.Revision + 1,
+                    RoamingNetwork.CalcETags(),
+                    ChangeSet);
+
+        #endregion
+
+        #region (static) Merge  (Left, Right, ChangeSet, RoamingNetwork)
+
+        /// <summary>
+        /// The commit merging the given right commit into the given left one:
+        /// the change set leads from the version of the left one to the merge of both.
+        /// </summary>
+        /// <param name="Left">The first parent commit, whose version the change set is applied to.</param>
+        /// <param name="Right">The second parent commit.</param>
+        /// <param name="ChangeSet">The change set leading to the merge.</param>
+        /// <param name="RoamingNetwork">The resulting version.</param>
+        public static RoamingNetworkCommit Merge(RoamingNetworkCommit     Left,
+                                                 RoamingNetworkCommit     Right,
+                                                 RoamingNetworkChangeSet  ChangeSet,
+                                                 RoamingNetwork           RoamingNetwork)
+
+            => new ([ Left.Id, Right.Id ],
+                    Left.RoamingNetworkId,
+                    Math.Max(Left.Revision, Right.Revision) + 1,
                     RoamingNetwork.CalcETags(),
                     ChangeSet);
 
@@ -274,20 +321,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Parse ParentId            [optional]
+                #region Parse ParentIds           [optional]
 
-                RoamingNetworkCommit_Id? parentId = null;
+                var parentIds = ImmutableArray.CreateBuilder<RoamingNetworkCommit_Id>();
 
-                if (JSON["parentId"] is JToken parentIdJSON)
+                if (JSON["parentIds"] is JToken parentIdsJSON)
                 {
 
-                    if (parentIdJSON.Type != JTokenType.String || !RoamingNetworkCommit_Id.TryParse(parentIdJSON.Value<String>(), out var parsedParentId))
+                    if (parentIdsJSON is not JArray { Count: > 0 } parentIdsArray)
                     {
-                        ErrorResponse = "Invalid parent commit identification!";
+                        ErrorResponse = "The parent commit identifications must be a nonempty JSON array!";
                         return false;
                     }
 
-                    parentId = parsedParentId;
+                    foreach (var parentIdJSON in parentIdsArray)
+                    {
+
+                        if (parentIdJSON.Type != JTokenType.String || !RoamingNetworkCommit_Id.TryParse(parentIdJSON.Value<String>(), out var parsedParentId))
+                        {
+                            ErrorResponse = "Invalid parent commit identification!";
+                            return false;
+                        }
+
+                        parentIds.Add(parsedParentId);
+
+                    }
 
                 }
 
@@ -395,7 +453,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
                 var commit = new RoamingNetworkCommit(
-                                 parentId,
+                                 parentIds.ToImmutable(),
                                  roamingNetworkId,
                                  revision,
                                  eTags.MoveToImmutable(),
@@ -519,8 +577,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            new JProperty("eTags",             new JArray(ETags.Select(eTag => eTag.ToJSON())))
                        );
 
-            if (ParentId.HasValue)
-                json.Add("parentId",   ParentId.Value.ToString());
+            if (!ParentIds.IsEmpty)
+                json.Add("parentIds",  new JArray(ParentIds.Select(parentId => parentId.ToString())));
 
             if (ChangeSet is not null)
                 json.Add("changeSet",  ChangeSet.ToJSON(IncludeSignatures));
@@ -553,7 +611,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"Commit {Id} (revision {Revision}{(ParentId.HasValue ? $", parent {ParentId}" : ", genesis")})";
+            => $"Commit {Id} (revision {Revision}{(ParentIds.IsEmpty ? ", genesis" : $", parents {String.Join(", ", ParentIds)}")})";
 
         #endregion
 

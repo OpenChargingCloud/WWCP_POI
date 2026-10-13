@@ -192,7 +192,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var eg2      = EVSEGroup_Id.Parse("DE*GEF*EG2");
 
-            history.Publish(rn1.CreateSignedChangeSet([
+            history.Commit(rn1.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add           (new EVSEGroup(eg2, EVSEIds: [ E1 ])),
                                 RoamingNetworkChange.UpdateProperty(eg1!,    "EVSEIds",          null, new JArray(E1.ToString())),
                                 RoamingNetworkChange.RemoveProperty(eg1!,    "chargingTariffId"),

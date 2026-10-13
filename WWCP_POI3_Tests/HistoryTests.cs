@@ -73,13 +73,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             var leader    = RoamingNetworkHistory.Start(NewNetwork());
 
-            Assert.That(leader.Publish(DataSource(leader, "A", 1)).Status,  Is.EqualTo(RoamingNetworkPublishStatus.Published));
+            Assert.That(leader.Commit(DataSource(leader, "A", 1)).Status,  Is.EqualTo(RoamingNetworkCommitStatus.Committed));
 
             // The follower starts from a snapshot of the leader's head, as JSON text...
             Assert.That(RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotJSON().ToString(), out var follower, out var error1),  Is.True, error1);
 
-            Assert.That(leader.Publish(DataSource(leader, "B", 2)).Status,  Is.EqualTo(RoamingNetworkPublishStatus.Published));
-            Assert.That(leader.Publish(DataSource(leader, "C", 3)).Status,  Is.EqualTo(RoamingNetworkPublishStatus.Published));
+            Assert.That(leader.Commit(DataSource(leader, "B", 2)).Status,  Is.EqualTo(RoamingNetworkCommitStatus.Committed));
+            Assert.That(leader.Commit(DataSource(leader, "C", 3)).Status,  Is.EqualTo(RoamingNetworkCommitStatus.Committed));
 
             // ...and fetches the commits since its head, also as JSON text.
             Assert.That(leader.TryGetCommitsSince(follower!.Head.Commit.Id, out var commits, out var error2),  Is.True, error2);
@@ -120,7 +120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var root    = leader.Head.Commit;
 
             for (var i = 1; i <= 5; i++)
-                leader.Publish(DataSource(leader, "v" + i, i));
+                leader.Commit(DataSource(leader, "v" + i, i));
 
             Assert.That(leader.TryGetCommitInfosSince(root.Id, out var infos,     out var error1),              Is.True, error1);
             Assert.That(leader.TryGetCommitInfosSince(root.Id, out var firstTwo,  out var error2, MaxCount: 2), Is.True, error2);
@@ -153,54 +153,77 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
-        #region Publishing_reports_what_happened()
+        #region Committing_branches_and_merges()
 
         [Test]
-        public void Publishing_reports_what_happened()
+        public void Committing_branches_and_merges()
         {
 
-            var leader  = RoamingNetworkHistory.Start(NewNetwork());
-            var head0   = leader.Head.Commit.Id;
+            var history  = RoamingNetworkHistory.Start(NewNetwork());
+            var root     = history.Head;
 
-            var csA     = DataSource(leader, "A", 1);
-            var csB     = leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(leader.Head.RoamingNetwork, "description") ]);
-            var csC     = DataSource(leader, "C", 3);
+            // Three change sets made for the same version, e.g. on three servers.
+            var csA      = DataSource(history, "A", 1);
+            var csB      = history.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(history.Head.RoamingNetwork, "description") ],
+                                                                             CreatedAt: DateTimeOffset.Parse("2026-10-11T12:02:00Z"));
+            var csC      = DataSource(history, "C", 3);
 
-            var a       = leader.Publish(csA, ExpectedHeadId: head0);
-            var again   = leader.Publish(csA);
-            var stale   = leader.Publish(csB, ExpectedHeadId: head0);
-            var notFit  = leader.Publish(csB);
-            var unsigned = leader.Publish(csB, Rebase: true);
-            var b       = leader.Publish(leader.Head.RoamingNetwork.Rebase(csB).SignedByAll(leader.Head.RoamingNetwork));
-            var bAgain  = leader.Publish(csB, Rebase: true);
-            var c       = leader.Publish(csC, Rebase: true);
+            var a        = history.Commit(csA);
+            var again    = history.Commit(csA);
+
+            // B fits the root, not the head: a branch, merged with A, as they change different properties.
+            var b        = history.Commit(csB);
+            var mergeAB  = history.Head;
+
+            // C changes the data source, as A did: it stays a tip of its own.
+            var c        = history.Commit(csC);
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(a.Status,        Is.EqualTo(RoamingNetworkPublishStatus.Published));
-                Assert.That(again.Status,    Is.EqualTo(RoamingNetworkPublishStatus.AlreadyPublished));
-                Assert.That(again.Commit,    Is.SameAs(a.Commit));
+                Assert.That(a.Status,                                  Is.EqualTo(RoamingNetworkCommitStatus.Committed));
+                Assert.That(again.Status,                              Is.EqualTo(RoamingNetworkCommitStatus.AlreadyCommitted));
+                Assert.That(again.Commit,                              Is.SameAs(a.Commit));
 
-                Assert.That(stale.Status,    Is.EqualTo(RoamingNetworkPublishStatus.HeadMoved));
-                Assert.That(notFit.Status,   Is.EqualTo(RoamingNetworkPublishStatus.HeadMoved));
+                Assert.That(b.Status,                                  Is.EqualTo(RoamingNetworkCommitStatus.Committed));
+                Assert.That(b.Commit!.ParentIds,                       Is.EqualTo(new[] { root.Commit.Id }));
+                Assert.That(mergeAB.Commit.IsMerge,                    Is.True);
+                Assert.That(mergeAB.Commit.Revision,                   Is.EqualTo(2));
+                Assert.That(mergeAB.Commit.ChangeSet!.Signatures,      Is.Empty);
+                Assert.That(mergeAB.RoamingNetwork.DataSource,         Is.EqualTo("A"));
+                Assert.That(mergeAB.RoamingNetwork.Description.Count,  Is.Zero);
 
-                // A rebased change set must be signed again by its owners.
-                Assert.That(unsigned.Status,         Is.EqualTo(RoamingNetworkPublishStatus.Refused));
-                Assert.That(unsigned.ErrorResponse,  Does.Contain("its owners must sign it again"));
+                Assert.That(c.Status,                                  Is.EqualTo(RoamingNetworkCommitStatus.Committed));
+                Assert.That(history.Head.Commit.Id,                    Is.EqualTo(mergeAB.Commit.Id));
+                Assert.That(history.Tips.Select(tip => tip.Commit.Id), Is.EqualTo(new[] { mergeAB.Commit.Id, c.Commit!.Id }));
+                Assert.That(history.Conflicts.Single().Kind,           Is.EqualTo(RoamingNetworkMergeConflictKind.DifferentValues));
+                Assert.That(history.Conflicts.Single().PropertyName,   Is.EqualTo("dataSource"));
+                Assert.That(history.Conflicts.Single().Left?.ToString(),   Is.EqualTo("A"));
+                Assert.That(history.Conflicts.Single().Right?.ToString(),  Is.EqualTo("C"));
 
-                Assert.That(b.Status,        Is.EqualTo(RoamingNetworkPublishStatus.Published));
-                Assert.That(b.Commit!.ChangeSet!.Id,  Is.Not.EqualTo(csB.Id));
+            }
 
-                // The original of a rebased change set counts as published.
-                Assert.That(bAgain.Status,   Is.EqualTo(RoamingNetworkPublishStatus.AlreadyPublished));
-                Assert.That(bAgain.Commit,   Is.SameAs(b.Commit));
+            // The owner resolves the conflict: on the branch of C, it takes the value of the other one.
+            var cVersion  = history.Tips[1].RoamingNetwork;
+            var resolved  = history.Commit(cVersion.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(cVersion, "dataSource", null, "A") ],
+                                                                          CreatedAt: DateTimeOffset.Parse("2026-10-11T12:04:00Z")));
 
-                // C changes the data source, as A did: a conflict.
-                Assert.That(c.Status,        Is.EqualTo(RoamingNetworkPublishStatus.Refused));
-                Assert.That(c.ErrorResponse, Does.Contain("no longer the expected old value"));
+            // A change set made for a version this history does not have.
+            var unknown   = history.Commit(new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"), DataSource: "x").WithKeys().
+                                               CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(history.Head.RoamingNetwork, "dataSource", null, "y") ]));
 
-                Assert.That(leader.Head.Commit.Revision,  Is.EqualTo(2));
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(resolved.Status,                           Is.EqualTo(RoamingNetworkCommitStatus.Committed));
+                Assert.That(history.Tips,                              Has.Count.EqualTo(1));
+                Assert.That(history.Conflicts,                         Is.Empty);
+                Assert.That(history.Head.Commit.IsMerge,               Is.True);
+                Assert.That(history.Head.Commit.ParentIds,             Does.Contain(mergeAB.Commit.Id));
+                Assert.That(history.Head.RoamingNetwork.DataSource,    Is.EqualTo("A"));
+
+                Assert.That(unknown.Status,                            Is.EqualTo(RoamingNetworkCommitStatus.Refused));
+                Assert.That(unknown.ErrorResponse,                     Does.Contain("fits no version"));
 
             }
 
@@ -217,8 +240,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var leader    = RoamingNetworkHistory.Start(NewNetwork());
             RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotJSON(), out var follower, out _);
 
-            var commit1   = leader.Publish(DataSource(leader, "A", 1)).Commit!;
-            var commit2   = leader.Publish(DataSource(leader, "B", 2)).Commit!;
+            var commit1   = leader.Commit(DataSource(leader, "A", 1)).Commit!;
+            var commit2   = leader.Commit(DataSource(leader, "B", 2)).Commit!;
 
             // Another content under the same identification.
             var forged    = commit1.ToJSON();
@@ -239,7 +262,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
                 // A commit skipping its predecessor.
                 Assert.That(follower!.TryAppend(commit2, out var error3),                   Is.False);
-                Assert.That(error3,                                                         Does.Contain("does not follow the head"));
+                Assert.That(error3,                                                         Does.Contain("is unknown here"));
 
                 Assert.That(follower.TryAppend(commit1, out var error4),                    Is.True, error4);
                 Assert.That(follower.TryAppend(commit2, out var error5),                    Is.True, error5);
@@ -268,8 +291,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var stranger  = leader.Head.RoamingNetwork.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, "A") ]).
                                                        Sign(Alice, "alice", COSEAlgorithm.Ed25519);
 
-            var refused   = leader.Publish(stranger);
-            var published = leader.Publish(DataSource(leader, "A", 1));
+            var refused   = leader.Commit(stranger);
+            var published = leader.Commit(DataSource(leader, "A", 1));
 
             // The same commit, without the signatures of its change set: they are not part of its identification.
             var stripped  = published.Commit!.ToJSON();
@@ -278,9 +301,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(refused.Status,                                    Is.EqualTo(RoamingNetworkPublishStatus.Refused));
+                Assert.That(refused.Status,                                    Is.EqualTo(RoamingNetworkCommitStatus.Refused));
                 Assert.That(refused.ErrorResponse,                             Does.Contain("'alice' is no key of a party"));
-                Assert.That(published.Status,                                  Is.EqualTo(RoamingNetworkPublishStatus.Published), published.ErrorResponse);
+                Assert.That(published.Status,                                  Is.EqualTo(RoamingNetworkCommitStatus.Committed), published.ErrorResponse);
 
                 // The signatures travel with the commit; a follower checks them with the keys of the network.
                 Assert.That(published.Commit.ChangeSet!.Signatures.Length,    Is.GreaterThan(0));
@@ -303,7 +326,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         {
 
             var leader  = RoamingNetworkHistory.Start(NewNetwork());
-            var commit  = leader.Publish(DataSource(leader, "A", 1)).Commit!;
+            var commit  = leader.Commit(DataSource(leader, "A", 1)).Commit!;
 
             var bytes   = commit.ToCBOR().ToByteArray(CBORWriterOptions.Canonical);
 

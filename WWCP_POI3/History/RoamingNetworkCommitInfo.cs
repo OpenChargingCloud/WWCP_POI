@@ -45,7 +45,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The identification of the parent commit, or null for a genesis commit.
         /// </summary>
-        public RoamingNetworkCommit_Id?        ParentId              { get; }
+        public RoamingNetworkCommit_Id?        ParentId
+            => ParentIds.IsEmpty ? null : ParentIds[0];
+
+        /// <summary>
+        /// The identifications of the parent commits: none for a genesis commit, two for a merge commit.
+        /// </summary>
+        public ImmutableArray<RoamingNetworkCommit_Id>  ParentIds  { get; }
 
         /// <summary>
         /// The revision the commit leads to.
@@ -94,7 +100,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.Id               = Commit.Id;
-            this.ParentId         = Commit.ParentId;
+            this.ParentIds        = Commit.ParentIds;
             this.Revision         = Commit.Revision;
             this.ETags            = Commit.ETags;
             this.ChangeSetId      = Commit.ChangeSet?.Id;
@@ -123,8 +129,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            new JProperty("numberOfChanges",  NumberOfChanges)
                        );
 
-            if (ParentId.HasValue)
-                json.Add("parentId",         ParentId.Value.ToString());
+            if (!ParentIds.IsEmpty)
+                json.Add("parentIds",        new JArray(ParentIds.Select(parentId => parentId.ToString())));
 
             if (ChangeSetId.HasValue)
                 json.Add("changeSetId",      ChangeSetId.Value.ToString());

@@ -239,7 +239,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var newMeter = new EnergyMeter(EnergyMeter_Id.Parse("evse-meter-2"), Role: "evse").ToJSON();
 
-            history.Publish(rn1.CreateSignedChangeSet([
+            history.Commit(rn1.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add           (new EMobilityProvider(EMobilityProvider_Id.Parse("DE*ZAP")).WithKeys()),
                                 RoamingNetworkChange.UpdateProperty(net,  "homepage",            null, "https://netz.example"),
                                 RoamingNetworkChange.UpdateProperty(pool, "gridConnectionPoint", null, point),

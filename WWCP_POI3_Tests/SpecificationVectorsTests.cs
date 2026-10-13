@@ -49,11 +49,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private const String CBORETag        = "cbor:sha256:hex:631d24121cc4ee0177f262b6703b1ddfd63552dc69109c77971ae079e679f421";
         private const String ETagsJSON       = "[[\"json\",\"sha256\",\"hex\",\"a3432d3ec7622d4272a7d4c0eba47883ee562c5501804285d9b01aea0dd692de\"],[\"cbor\",\"sha256\",\"hex\",\"631d24121cc4ee0177f262b6703b1ddfd63552dc69109c77971ae079e679f421\"]]";
 
-        private const String CommitContent   = "{\"eTags\":" + ETagsJSON + ",\"profile\":\"wwcp-poi-commit-v1\",\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
-        private const String CommitId        = "f572ecd1b3ae708cb7eacf0e9da3a34537aae55c94d88ad7224a9bef1663c45f";
+        private const String CommitContent   = "{\"eTags\":" + ETagsJSON + ",\"profile\":\"wwcp-poi-commit-v2\",\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
+        private const String CommitId        = "77fc198bdb99288bf482666a94f3a4a38bbe1f95087f0caf9b58a7e8648e83a8";
 
         private const String SigningInput    = "{\"algorithm\":\"Ed25519\",\"commit\":{\"@id\":\"" + CommitId + "\",\"eTags\":" + ETagsJSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"},\"encoding\":\"base64\",\"keyId\":\"leader\",\"profile\":\"wwcp-poi-commit-signature-v1\",\"role\":\"leader\",\"signedAt\":\"2026-10-12T12:00:00.000Z\",\"signer\":\"leader.example.org\"}";
-        private const String SignatureValue  = "su8SeDqPhzRxZYvEvQ89OiaIDKjVhnMShfO+iPsoGzqAAel6JMykYRKlttQGBYB5uyRIRe+P15XYrNmiDPf0CA==";
+        private const String SignatureValue  = "/dZDnTZyyEV4ijgtwArwcN72xtrdDUvtAIptyVEVRjwNx1mQQ5olgd3lJAQP28PZaAMcek+fAMzCMu45t82aDA==";
         private const String PublicKey       = "d3bocLkzVPKgskwj8qNsxOgOIjIYwbl5Jv3QGDlqK5s=";
 
         #endregion

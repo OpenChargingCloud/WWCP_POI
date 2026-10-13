@@ -200,36 +200,53 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 
 ## History and sync
 
-One leading server orders all changes; the other servers follow it.
+There is no leader: every server commits change sets signed by their owners, takes the commits
+of the others, and merges the tips that do not conflict, deterministically, so that all servers
+make the same merge commits.
 
 ```csharp
-var leader = RoamingNetworkHistory.Start(rn1);
-var result = leader.Publish(cs, Rebase: true);          // Published, AlreadyPublished, HeadMoved, Refused
+var server1 = RoamingNetworkHistory.Start(rn1);
+RoamingNetworkHistory.TryFromSnapshot(server1.ToSnapshotJSON(), out var server2, out _);
 
-RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotJSON(), out var follower, out _);
-leader.TryGetCommitsSince(follower!.Head.Commit.Id, out var commits, out _);
-follower.TryAppend(commits!, out _, out _);
+var result  = server1.Commit(cs);                         // Committed, AlreadyCommitted, Refused
+
+server1.TryGetMissingCommits(server2!.HaveIds(), out var commits, out _);
+server2.TryAppend(commits!, out _, out _);                // and merged with the tips of server 2
 ```
 
-- **Commits:** a change set, its parent, its revision and the ETags of the result.
+- **Commits:** a change set, its `parentIds`, its revision and the ETags of the result.
   The id is the SHA-256 of the commit's canonical JSON without signatures; it is checked when read.
+  The revision is one more than the highest one of the parents.
+- **Commit:** `Commit(cs)` commits a change set to the version it was made for, named by its before
+  ETags: the head, another tip, or an older commit, which then starts a branch. Signed change sets
+  are not rebased: they are committed where they fit, and merged.
+- **Tips and merges:** the tips are the commits no other one follows, ordered by revision, then by id;
+  the head is the first one, its version is `Head.RoamingNetwork`. The first two tips that do not
+  conflict are merged into a merge commit with both as `parentIds`: a three-way merge with their best
+  common ancestor, entity by entity and property by property, written as an unsigned change set from
+  the first one; everyone can calculate it, and `TryAppend` checks it. Conflicting tips stay, with their
+  `Conflicts` (`{kind, entityType, entityId, propertyName?, base, left, right}`), until the owner commits
+  a change set to one of them that resolves the conflict, e.g. taking the value of the other one.
+- **Exchange:** `HaveIds()` names the tips and a sample of older commits, `TryGetMissingCommits(have)`
+  returns what is missing there, parents first, and `TryAppend(commits)` takes them and merges afterwards.
 - **Commit signatures:** several parties sign a commit, each on its own and in any order, with a `role`
   (`leader`, `roamingNetworkOperator`, `chargingStationOperator`, …), an optional `signer` and `signedAt`:
-  the leader through `Start(network, Signers: […])` or `history.Signers`, a roaming network operator that
+  a server through `Start(network, Signers: […])` or `history.Signers`, a roaming network operator that
   checked the data of a charging station operator later through `commit.CreateSignature(…)` and
   `TryAddSignatures(…)`. A signature covers the commit and the signatures of its change set; adding one
   does not change the commit id. `TryAppend` verifies every signature (`VerifyCommitSignature`) and
   may require roles (`RequiredSignatureRoles`); `OnCommitSignatures` tells of new ones.
-- **Followers** start from a snapshot and append commits; each must follow the head and lead to its ETags.
+- **Appending:** a commit's parents must be known; one with one parent must be signed by its owners and
+  lead to its ETags, a merge commit must be the merge of its parents.
 - **Snapshot:** now and complete, for the first sync: `{timestamp, commit, roamingNetwork, runtimeStatus}`.
   `TryFromSnapshot` checks the commit id, recomputes the ETags of the network and takes the runtime status
-  as the leader's; changes follow as commits since. `runtimeStatus=false` leaves the status out.
+  as the server's; changes follow as commits since. `runtimeStatus=false` leaves the status out.
 - **Announcements:** `OnCommitAnnouncement` tells of every commit a history takes, in order:
   timestamp, commit id, parent ids, revision, description.
 - **Runtime status:** `history.RuntimeStatus` sets and reads the status of the head's entities by name,
   `TryUpdate(kind, entityType, entityId, value, timestamp, …)`: an older timestamp is `Outdated`,
   the same value `Unchanged`, a later one than now `Scheduled`. `OnStatusUpdate` tells of every change,
-  also of one set at the entity, and of a planned status when it is due. A status update of the leader,
+  also of one set at the entity, and of a planned status when it is due. A status update of another server,
   `TryUpdate(statusUpdate, …)`, is taken with its timestamp.
 
 `POI_API` serves a history in JSON, or in CBOR for `Accept: application/cbor` (also as request body):
@@ -241,7 +258,7 @@ follower.TryAppend(commits!, out _, out _);
 | `GET ~/roamingNetworks/{id}/history/commitInfos?since={commitId}&max={n}` | metadata of the commits since |
 | `GET ~/roamingNetworks/{id}/history/commits?since={commitId}&max={n}` | complete commits since |
 | `GET ~/roamingNetworks/{id}/history/commits/{commitId}` | one commit |
-| `COMMIT ~/roamingNetworks/{id}/history/changeSets?expectedHead={commitId}&rebase=true` | 201 published, 200 already published, 409 head moved, 422 refused |
+| `COMMIT ~/roamingNetworks/{id}/history/changeSets` | 201 committed, 200 already committed (the commit, the `head`, the `conflicts` left), 422 refused |
 | `POST ~/roamingNetworks/{id}/history/commits/{commitId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403, 404, 422 invalid |
 
 Submitting is refused unless `AuthorizeChangeSetSubmission` decides who may submit;
@@ -260,7 +277,7 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 ```
 
 - **Actions:** `head`, `snapshot`, `commitInfos`, `commits`, `commit {commitId}`,
-  `commitChangeSet {changeSet, expectedHead?, rebase?}` → `{status, …}`, `runtimeStatus`,
+  `commitChangeSet {changeSet}` → `{status, …, head, conflicts?}`, `runtimeStatus`,
   `signCommit {commitId, signatures}` → `{commitId, signatures, added}`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
   `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced),

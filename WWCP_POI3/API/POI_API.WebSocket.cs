@@ -505,7 +505,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) CommitChangeSet(Request, History)
 
         /// <summary>
-        /// Publish the change set of the request as the new head commit,
+        /// Commit the change set of the request to the version it was made for, and merge it with the other tips,
         /// as SubmitChangeSet() does for an HTTP request.
         /// </summary>
         private POIWebSocketMessage CommitChangeSet(POIWebSocketRequest    Request,
@@ -537,58 +537,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (changeSet.RoamingNetworkId != History.RoamingNetworkId)
                 return Request.Error(POIWebSocketErrorCodes.FormatViolation, $"The change set is for the roaming network '{changeSet.RoamingNetworkId}', not for '{History.RoamingNetworkId}'!");
 
-            RoamingNetworkCommit_Id? expectedHead = null;
-
-            if (Request.Payload.ParseOptionalStruct("expectedHead",
-                                                    "expected head commit identification",
-                                                    RoamingNetworkCommit_Id.TryParse,
-                                                    out RoamingNetworkCommit_Id expectedHeadValue,
-                                                    out var errorResponse))
-            {
-
-                if (errorResponse is not null)
-                    return Request.Error(POIWebSocketErrorCodes.FormatViolation, errorResponse);
-
-                expectedHead = expectedHeadValue;
-
-            }
-
-            if (Request.Payload.ParseOptional("rebase",
-                                              "rebase",
-                                              out Boolean? rebase,
-                                              out errorResponse))
-            {
-                if (errorResponse is not null)
-                    return Request.Error(POIWebSocketErrorCodes.FormatViolation, errorResponse);
-            }
-
             #endregion
 
             if (!AuthorizeChangeSetSubmission(upgradeRequest, changeSet))
                 return Request.Error(POIWebSocketErrorCodes.SecurityError, "The sender may not submit this change set!");
 
-            var result = History.Publish(changeSet,
-                                         expectedHead,
-                                         rebase ?? false,
-                                         VerifyChangeSetSignature);
+            var result = History.Commit(changeSet,
+                                        VerifyChangeSetSignature);
 
-            return result.Status switch {
+            return result.IsCommitted
 
-                       RoamingNetworkPublishStatus.Published or
-                       RoamingNetworkPublishStatus.AlreadyPublished  => Request.Respond(PublishedJSON(result)),
+                       ? Request.Respond(CommittedJSON(result, History))
 
-                       RoamingNetworkPublishStatus.HeadMoved         => Request.Respond(new JObject(
-                                                                            new JProperty("status",       result.Status.ToString()),
-                                                                            new JProperty("description",  result.ErrorResponse),
-                                                                            new JProperty("head",         new RoamingNetworkCommitInfo(result.Head.Commit).ToJSON())
-                                                                        )),
-
-                       _                                             => Request.Respond(new JObject(
-                                                                            new JProperty("status",       result.Status.ToString()),
-                                                                            new JProperty("description",  result.ErrorResponse)
-                                                                        ))
-
-                   };
+                       : Request.Respond(new JObject(
+                             new JProperty("status",       result.Status.ToString()),
+                             new JProperty("description",  result.ErrorResponse)
+                         ));
 
         }
 

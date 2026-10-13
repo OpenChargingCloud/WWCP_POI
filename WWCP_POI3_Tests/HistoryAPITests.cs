@@ -98,9 +98,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #region Publish(Value, Minute)
 
-        private RoamingNetworkPublishResult Publish(String Value, Int32 Minute)
+        private RoamingNetworkCommitResult Publish(String Value, Int32 Minute)
 
-            => leader!.Publish(
+            => leader!.Commit(
                    leader.Head.RoamingNetwork.CreateSignedChangeSet(
                        [ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, Value) ],
                        Description:  I18NString.Create(Languages.en, "Data source " + Value),
@@ -324,7 +324,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             // The follower prepares a change set against its head and submits it to the leader...
             var changeSet  = ChangeSet(follower!, "dataSource", "from the follower");
-            var published  = await Commit(changeSet, $"?expectedHead={follower!.Head.Commit.Id}");
+            var published  = await Commit(changeSet);
             var again      = await Commit(changeSet);
 
             // ...and gets it back as a commit, as every other follower does.
@@ -335,12 +335,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             {
 
                 Assert.That(published.StatusCode,                                  Is.EqualTo(HttpStatusCode.Created));
-                Assert.That(published.JSON["status"]!.Value<String>(),             Is.EqualTo("Published"));
-                Assert.That(published.JSON["rebased"]!.Value<Boolean>(),           Is.False);
+                Assert.That(published.JSON["status"]!.Value<String>(),             Is.EqualTo("Committed"));
                 Assert.That(published.JSON["@id"]!.Value<String>(),                Is.EqualTo(leader.Head.Commit.Id.ToString()));
 
                 Assert.That(again.StatusCode,                                      Is.EqualTo(HttpStatusCode.OK));
-                Assert.That(again.JSON["status"]!.Value<String>(),                 Is.EqualTo("AlreadyPublished"));
+                Assert.That(again.JSON["status"]!.Value<String>(),                 Is.EqualTo("AlreadyCommitted"));
 
                 Assert.That(follower.Head.Commit.Id,                               Is.EqualTo(leader.Head.Commit.Id));
                 Assert.That(follower.Head.RoamingNetwork.DataSource,               Is.EqualTo("from the follower"));
@@ -359,38 +358,31 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             poiAPI!.AuthorizeChangeSetSubmission = (request, changeSet) => true;
 
-            var head0      = leader!.Head.Commit.Id;
-
-            // Three change sets against the same head.
-            var a          = ChangeSet(leader, "dataSource",  "A");
-            var b          = ChangeSet(leader, "name",        new JObject(new JProperty("en", "B")));
-            var c          = ChangeSet(leader, "dataSource",  "C");
+            // Three change sets for the same version, e.g. from three servers.
+            var a          = ChangeSet(leader!, "dataSource",  "A");
+            var b          = ChangeSet(leader,  "name",        new JObject(new JProperty("en", "B")));
+            var c          = ChangeSet(leader,  "dataSource",  "C");
 
             var postA      = await Commit(a);
-            var staleB     = await Commit(b, $"?expectedHead={head0}");
-            var notFitB    = await Commit(b);
-            var rebasedB   = await Commit(b, "?rebase=true");
-            var resignedB  = await Commit(leader.Head.RoamingNetwork.Rebase(b).SignedByAll(leader.Head.RoamingNetwork));
-            var conflictC  = await Commit(c, "?rebase=true");
+            var postB      = await Commit(b);
+            var postC      = await Commit(c);
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(postA.StatusCode,                                  Is.EqualTo(HttpStatusCode.Created));
+                Assert.That(postA.StatusCode,                                    Is.EqualTo(HttpStatusCode.Created));
 
-                Assert.That(staleB.StatusCode,                                 Is.EqualTo(HttpStatusCode.Conflict));
-                Assert.That(staleB.JSON["head"]!["revision"]!.Value<Int32>(),  Is.EqualTo(1));
-                Assert.That(notFitB.StatusCode,                                Is.EqualTo(HttpStatusCode.Conflict));
+                // B is committed to the version it was made for, and merged with A.
+                Assert.That(postB.StatusCode,                                    Is.EqualTo(HttpStatusCode.Created));
+                Assert.That(postB.JSON["head"]!["parentIds"]!.Count(),           Is.EqualTo(2));
+                Assert.That(postB.JSON["conflicts"],                             Is.Null);
 
-                // Rebased, it must be signed again by its owners.
-                Assert.That(rebasedB.StatusCode,                               Is.EqualTo((HttpStatusCode) 422));
-                Assert.That(rebasedB.JSON["description"]!.Value<String>(),     Does.Contain("its owners must sign it again"));
-                Assert.That(resignedB.StatusCode,                              Is.EqualTo(HttpStatusCode.Created));
+                // C changes the data source, as A did: committed, but it conflicts.
+                Assert.That(postC.StatusCode,                                    Is.EqualTo(HttpStatusCode.Created));
+                Assert.That(postC.JSON["conflicts"]![0]!["propertyName"]!.Value<String>(),  Is.EqualTo("dataSource"));
 
-                Assert.That(conflictC.StatusCode,                              Is.EqualTo((HttpStatusCode) 422));
-                Assert.That(conflictC.JSON["description"]!.Value<String>(),    Does.Contain("no longer the expected old value"));
-
-                Assert.That(leader.Head.Commit.Revision,                       Is.EqualTo(2));
+                Assert.That(leader.Head.Commit.Revision,                         Is.EqualTo(2));
+                Assert.That(leader.Tips,                                         Has.Count.EqualTo(2));
 
             }
 
@@ -416,7 +408,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             using var invalid        = await httpClient!.SendAsync(invalidRequest);
 
             var wrongNetwork  = await Commit(ChangeSet(otherHistory, "dataSource", "x"));
-            var invalidRebase = await Commit(ChangeSet(leader!, "dataSource", "x"), "?rebase=yes");
 
             var signed        = await Commit(ChangeSet(leader!, "dataSource", "x").Sign(new Org.BouncyCastle.Crypto.Parameters.Ed25519PrivateKeyParameters(new Byte[32], 0),
                                                                                     "alice",
@@ -430,7 +421,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
                 Assert.That(invalid.StatusCode,        Is.EqualTo(HttpStatusCode.BadRequest));
                 Assert.That(wrongNetwork.StatusCode,   Is.EqualTo(HttpStatusCode.BadRequest));
-                Assert.That(invalidRebase.StatusCode,  Is.EqualTo(HttpStatusCode.BadRequest));
 
                 // Signed also by a key of no party of the roaming network.
                 Assert.That(signed.StatusCode,                                Is.EqualTo((HttpStatusCode) 422));
@@ -507,7 +497,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
                 Assert.That(posted.StatusCode,                                    Is.EqualTo(HttpStatusCode.Created));
                 Assert.That(posted.Content.Headers.ContentType?.MediaType,        Is.EqualTo("application/cbor"));
-                Assert.That(postedCBOR.TryGetValue(CBORValue.FromText("status"), out var status) && status.AsText() == "Published",  Is.True);
+                Assert.That(postedCBOR.TryGetValue(CBORValue.FromText("status"), out var status) && status.AsText() == "Committed",  Is.True);
 
                 Assert.That(follower.Head.Commit.Id,                              Is.EqualTo(leader!.Head.Commit.Id));
                 Assert.That(follower.Head.RoamingNetwork.DataSource,              Is.EqualTo("from CBOR"));

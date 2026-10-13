@@ -320,7 +320,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var gef      = history.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!;
             gef.TryGetEVSE(E1, out var e1);
 
-            history.Publish(history.Head.RoamingNetwork.CreateSignedChangeSet([
+            history.Commit(history.Head.RoamingNetwork.CreateSignedChangeSet([
                                 RoamingNetworkChange.UpdateProperty(e1!,  "maxPower",  null, 11000),
                                 RoamingNetworkChange.UpdateProperty(gef,  "telephone", null, "+49 30 1234567")
                             ], CreatedAt: T0.AddMinutes(1)));
@@ -332,7 +332,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             newE1!.SetStatus(EVSEStatusType.Available, T0.AddMinutes(2));
 
             // Removed: its status goes with it.
-            history.Publish(history.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.Remove(E1) ], CreatedAt: T0.AddMinutes(3)));
+            history.Commit(history.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.Remove(E1) ], CreatedAt: T0.AddMinutes(3)));
 
             using (Assert.EnterMultipleScope())
             {
@@ -376,7 +376,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var gef = leader.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!;
             gef.TryGetEVSE(E1, out var e1);
 
-            leader.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(e1!, "maxPower", null, 11000) ], CreatedAt: T0.AddMinutes(1)));
+            leader.Commit(leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(e1!, "maxPower", null, 11000) ], CreatedAt: T0.AddMinutes(1)));
             leader.TryGetCommitsSince(follower!.Head.Commit.Id, out var commits, out _);
 
             using (Assert.EnterMultipleScope())

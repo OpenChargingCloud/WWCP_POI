@@ -83,7 +83,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Commit       = Commit;
             this.Timestamp    = DateTimeOffset.FromUnixTimeMilliseconds(Timestamp.ToUnixTimeMilliseconds());
             this.CommitId     = Commit.Id;
-            this.ParentIds    = Commit.ParentId.HasValue ? [ Commit.ParentId.Value ] : [];
+            this.ParentIds    = Commit.ParentIds;
             this.Revision     = Commit.Revision;
             this.Description  = Commit.ChangeSet?.Description ?? ImmutableI18NString.Empty;
 

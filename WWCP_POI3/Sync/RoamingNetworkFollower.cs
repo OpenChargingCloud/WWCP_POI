@@ -243,33 +243,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region CommitChangeSetAsync(ChangeSet, ExpectedHeadId = null, Rebase = false, CancellationToken = default)
+        #region CommitChangeSetAsync(ChangeSet, CancellationToken = default)
 
         /// <summary>
-        /// Submit the given change set to the leader; it comes back as a commit.
+        /// Submit the given change set, signed by its owners, to the server followed;
+        /// it commits it to the version it was made for, and it comes back as a commit.
         /// </summary>
         /// <param name="ChangeSet">A change set, e.g. made against the head of this follower.</param>
-        /// <param name="ExpectedHeadId">The optional head the leader is expected to have.</param>
-        /// <param name="Rebase">Whether the leader may rebase it.</param>
         /// <param name="CancellationToken">An optional cancellation token.</param>
-        /// <returns>The answer of the leader: { status, … }.</returns>
-        public Task<JObject> CommitChangeSetAsync(RoamingNetworkChangeSet   ChangeSet,
-                                                  RoamingNetworkCommit_Id?  ExpectedHeadId      = null,
-                                                  Boolean                   Rebase              = false,
-                                                  CancellationToken         CancellationToken   = default)
-        {
+        /// <returns>The answer of the server: { status, … }.</returns>
+        public Task<JObject> CommitChangeSetAsync(RoamingNetworkChangeSet  ChangeSet,
+                                                  CancellationToken        CancellationToken   = default)
 
-            var payload = new JObject(
-                              new JProperty("changeSet",  ChangeSet.ToJSON()),
-                              new JProperty("rebase",     Rebase)
-                          );
-
-            if (ExpectedHeadId.HasValue)
-                payload.Add("expectedHead", ExpectedHeadId.Value.ToString());
-
-            return RequestAsync("commitChangeSet", payload, CancellationToken);
-
-        }
+            => RequestAsync("commitChangeSet",
+                            new JObject(new JProperty("changeSet", ChangeSet.ToJSON())),
+                            CancellationToken);
 
         #endregion
 
@@ -536,8 +524,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (RoamingNetworkCommit.TryParse(CommitJSON, out var commit, out _, options.ChangeSetLimits))
             {
 
-                // A commit held already only brings signatures in addition.
-                if ((currentHistory.Contains(commit.Id) || commit.ParentId == currentHistory.Head.Commit.Id) &&
+                // A commit held already only brings signatures in addition; one whose parents are all held is appended.
+                if ((currentHistory.Contains(commit.Id) || commit.ParentIds.All(currentHistory.Contains)) &&
                     currentHistory.TryAppend(commit, out _, options.VerifyChangeSetSignature, options.VerifyCommitSignature, options.RequiredSignatureRoles))
                 {
                     return;

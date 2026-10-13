@@ -197,7 +197,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                 RoamingNetworkChange.UpdateProperty(parking,  "homepage",         null, "https://parking.example")
                             ], CreatedAt: T0.AddMinutes(1));
 
-            history.Publish(cs);
+            history.Commit(cs);
 
             var rn2       = history.Head.RoamingNetwork;
 

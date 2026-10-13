@@ -462,11 +462,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) SubmitChangeSet(Request)
 
         /// <summary>
-        /// Publish the change set in the body of the request as the new head commit.
-        /// 201 Created:          published now; the metadata of the commit, and whether it was rebased
-        /// 200 OK:               published before, also in a rebased version; the metadata of its commit
-        /// 409 Conflict:         the head moved, or the change set does not fit it; the metadata of the head
-        /// 422 Unprocessable:    refused, e.g. as it conflicts or a signature is invalid
+        /// Commit the change set in the body of the request to the version it was made for,
+        /// and merge it with the other tips where it does not conflict.
+        /// 201 Created:          committed now; the metadata of the commit, of the head, and the conflicts left
+        /// 200 OK:               committed before, also in a rebased version; the metadata of its commit
+        /// 422 Unprocessable:    refused, e.g. as it is not signed by its owners or fits no version
         /// 400 Bad Request:      no valid change set, or one for another roaming network
         /// 403 Forbidden:        submitting is not enabled, or not allowed for the sender
         /// </summary>
@@ -499,53 +499,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (changeSet.RoamingNetworkId != history.RoamingNetworkId)
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, $"The change set is for the roaming network '{changeSet.RoamingNetworkId}', not for '{history.RoamingNetworkId}'!");
 
-            RoamingNetworkCommit_Id? expectedHead = null;
-
-            if (Request.QueryString.GetString("expectedHead") is String expectedHeadText)
-            {
-
-                if (!RoamingNetworkCommit_Id.TryParse(expectedHeadText, out var parsedExpectedHead))
-                    return ErrorResponse(Request, HTTPStatusCode.BadRequest, $"Invalid commit identification '{expectedHeadText}'!");
-
-                expectedHead = parsedExpectedHead;
-
-            }
-
-            var rebaseText = Request.QueryString.GetString("rebase");
-
-            if (rebaseText is not null && rebaseText is not ("true" or "false"))
-                return ErrorResponse(Request, HTTPStatusCode.BadRequest, $"Invalid rebase option '{rebaseText}'; use true or false!");
-
             #endregion
 
             if (!AuthorizeChangeSetSubmission(Request, changeSet))
                 return ErrorResponse(Request, HTTPStatusCode.Forbidden, "The sender may not submit this change set!");
 
-            var result = history.Publish(changeSet,
-                                         expectedHead,
-                                         rebaseText == "true",
-                                         VerifyChangeSetSignature);
+            var result = history.Commit(changeSet,
+                                        VerifyChangeSetSignature);
 
             return result.Status switch {
 
-                       RoamingNetworkPublishStatus.Published         => JSONResponse(Request,
-                                                                                     HTTPStatusCode.Created,
-                                                                                     PublishedJSON(result)),
+                       RoamingNetworkCommitStatus.Committed         => JSONResponse(Request,
+                                                                                    HTTPStatusCode.Created,
+                                                                                    CommittedJSON(result, history)),
 
-                       RoamingNetworkPublishStatus.AlreadyPublished  => JSONResponse(Request,
-                                                                                     HTTPStatusCode.OK,
-                                                                                     PublishedJSON(result)),
+                       RoamingNetworkCommitStatus.AlreadyCommitted  => JSONResponse(Request,
+                                                                                    HTTPStatusCode.OK,
+                                                                                    CommittedJSON(result, history)),
 
-                       RoamingNetworkPublishStatus.HeadMoved         => JSONResponse(Request,
-                                                                                     HTTPStatusCode.Conflict,
-                                                                                     new JObject(
-                                                                                         new JProperty("description",  result.ErrorResponse),
-                                                                                         new JProperty("head",         new RoamingNetworkCommitInfo(result.Head.Commit).ToJSON())
-                                                                                     )),
-
-                       _                                             => ErrorResponse(Request,
-                                                                                      HTTPStatusCode.UnprocessableEntity,
-                                                                                      result.ErrorResponse)
+                       _                                            => ErrorResponse(Request,
+                                                                                     HTTPStatusCode.UnprocessableEntity,
+                                                                                     result.ErrorResponse)
 
                    };
 
@@ -568,18 +542,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) PublishedJSON(Result)
+        #region (internal static) CommittedJSON(Result, History)
 
         /// <summary>
-        /// The metadata of the commit of a published change set, and whether it was rebased.
+        /// The metadata of the commit of a committed change set, of the head afterwards, and the conflicts left between the tips.
         /// </summary>
-        private static JObject PublishedJSON(RoamingNetworkPublishResult Result)
+        internal static JObject CommittedJSON(RoamingNetworkCommitResult  Result,
+                                              RoamingNetworkHistory       History)
         {
 
             var json = new RoamingNetworkCommitInfo(Result.Commit!).ToJSON();
 
-            json.Add("status",   Result.Status.ToString());
-            json.Add("rebased",  Result.Rebased);
+            json.Add("status",  Result.Status.ToString());
+            json.Add("head",    new RoamingNetworkCommitInfo(Result.Head.Commit).ToJSON());
+
+            var conflicts = History.Conflicts;
+
+            if (!conflicts.IsEmpty)
+                json.Add("conflicts", new JArray(conflicts.Select(conflict => conflict.ToJSON())));
 
             return json;
 

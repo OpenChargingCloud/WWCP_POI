@@ -32,7 +32,8 @@ A version of a roaming network is identified by its **content**: its JSON repres
   `dataSource`, `dataLicenses`, every embedded entity completely (operators with their pools,
   stations, EVSEs, connectors, energy meters, tariffs and groups; manufacturers, e-mobility
   providers, grid operators, parking operators, brands, energy meter manufacturers, transparency
-  software releases and certificates), `created`, `lastChange` and `customData`.
+  software releases and certificates), the `signingKeys` and `identityKeys` of the roaming network
+  and of its parties, `created`, `lastChange` and `customData`.
 - **Excluded:** `eTags`; the runtime status (admin status, status, energy status); the local
   revision counter; internal data.
 - **Order:** embedded entities in the ordinal order of their identifications; the order of
@@ -83,8 +84,8 @@ A change set leads from the version of its `beforeETags` to the version of its `
   "beforeETags": [ … ], "afterETags": [ … ], "signatures": [ … ] }
 ```
 
-**Signatures** (profile `wwcp-poi-changeset-json-v3`), e.g. of the charging station operator
-whose data it changes: `{ algorithm, keyId, value, profile, encoding: "base64" }`.
+**Signatures** (profile `wwcp-poi-changeset-json-v3`) of the owners of what it changes
+(section 4.1): `{ algorithm, keyId, value, profile, encoding: "base64" }`.
 The signature input is the canonical JSON of
 
 ```json
@@ -98,22 +99,59 @@ Algorithms are the COSE names of Styx: `Ed25519`, `Ed448`, `EdDSA`, `ES256`, `ES
 an unknown profile, an encoding other than `base64`, non-canonical Base64, an algorithm name that
 is not canonical, and a key identification other than the one of the trusted key.
 
+### 4.1 Keys and owners
+
+A **key** of a party is a public COSE key in its static data:
+
+```json
+{ "@id": "<SHA-256 COSE key thumbprint [RFC 9679], 64 lowercase hex digits>",
+  "key": "<Base64 of the deterministic CBOR of the public COSE key>",
+  "notBefore": "…", "notAfter": "…" }
+```
+
+A reader MUST calculate the thumbprint and refuse a key whose `@id` differs, and a key with
+private parts. The roaming network (for its operator, the RNO), charging station operators,
+e-mobility providers, grid operators and parking operators each name 1..n `signingKeys`, e.g.
+secp256r1, and 1..n `identityKeys`, e.g. secp521r1; a key is not both. The `keyId` of a
+signature is the `@id` of the key.
+
+Every change has exactly one **owner**:
+
+| Change | Owner |
+|---|---|
+| the roaming network itself, brands, charging station and energy meter manufacturers, transparency software releases and certificates | the RNO |
+| `Add` and `Remove` of a charging station operator, e-mobility provider, grid operator or parking operator | the RNO |
+| the other properties of such a party | the party |
+| pools, stations, EVSEs, tariffs and groups | the charging station operator their identification names |
+| parking garages, spaces, sensors, space groups and products | their parking operator (the parent of an `Add`) |
+
+A change set MUST be refused unless, for every owner of one of its changes, it has a valid
+signature with a key that owner names **in the version the change set is applied to**, valid at
+its `createdAt`: a signing key for data; for the `signingKeys` and `identityKeys` of a party one
+of its identity keys or, for recovery, an identity key of the RNO. Every signature MUST be by a key
+of a party. A party is added with at least one key of each kind and without embedded children,
+and keeps at least one of each.
+
 
 ## 5. Commits
 
-A commit is one step of the history: a change set applied to the version of its parent.
+A commit is one step of the history: a change set applied to the version of its first parent.
+Every server may commit; there is no leader. The history is a graph: a commit has no parents
+(genesis), one, or two (merge).
 
 ### 5.1 Identification
 
 The commit identification is the SHA-256 of the canonical JSON of
 
 ```json
-{ "profile": "wwcp-poi-commit-v1", "roamingNetworkId": "rn1", "revision": 1,
+{ "profile": "wwcp-poi-commit-v2", "roamingNetworkId": "rn1", "revision": 1,
   "eTags": [ <the ETags of the resulting version> ],
-  "parentId": "<parent commit id>", "changeSet": <the change set without its signatures> }
+  "parentIds": [ "<first parent commit id>", "<second one, for a merge>" ],
+  "changeSet": <the change set without its signatures> }
 ```
 
-as 64 lowercase hexadecimal digits. A genesis commit has neither `parentId` nor `changeSet`.
+as 64 lowercase hexadecimal digits. A genesis commit has neither `parentIds` nor `changeSet`.
+The `revision` is one more than the highest revision of the parents, 0 for a genesis commit.
 Signatures are not part of it: neither those of the change set nor those of the commit, so that
 they can be added later without changing the identification.
 
@@ -121,16 +159,52 @@ they can be added later without changing the identification.
 
 ```json
 { "@id": "<commit id>", "roamingNetworkId": "rn1", "revision": 1, "eTags": [ … ],
-  "parentId": "…", "changeSet": <the change set with its signatures>,
+  "parentIds": [ "…" ], "changeSet": <the change set with its signatures>,
   "signatures": [ <commit signatures> ] }
 ```
 
 A reader MUST calculate the identification and refuse the commit when it differs from `@id`.
 The CBOR representation has the keys and values of the JSON one.
 
-### 5.3 Signatures
+A commit with one parent MUST be refused unless its change set fits the version of its parent,
+is signed by its owners (section 4.1) and leads to its ETags.
 
-A commit can be signed by several parties, each on its own, in any order: the leader that made
+### 5.3 Merges
+
+The **tips** of a history are the commits no other commit follows, in their **order**: the higher
+revision first, among equal revisions the lower identification (ordinal). A server merges the
+first two tips that do not conflict, again and again. Their **merge commit**:
+
+- `parentIds`: the two tips in their order; its change set leads from the version of the first one;
+- the change set has the `@id` `merge-` followed by the first 32 hex digits of the SHA-256 of
+  `"<first parent id>+<second parent id>"` (UTF-8), the `createdAt` of the later `lastChange` of
+  both versions, the description `{"en":"Merge"}`, no metadata and no signatures;
+- its changes follow from a three-way merge with the **merge base**, the best common ancestor
+  (one no other common ancestor follows); several best common ancestors are merged first, the
+  same way.
+
+The three-way merge compares every entity a change set addresses (section 4.1), by its type and
+identification, without its embedded children and without `lastChange`, property by property,
+absent being a value of its own:
+
+- a property only one version changed takes that change; both changed it alike, it is kept once;
+  both changed it differently, they **conflict**;
+- an entity only one version added is added, with what it embeds, unless the other one removed
+  where it is added; one removed is removed, unless the other one changed it; both added it with
+  different properties, they conflict; moved to another parent by one version only, it is
+  removed and added again, unless the other one changed it.
+
+The changes are written in this order: `Add` (of the topmost added entities, with what they
+embed, in the order of the second version), `UpdateProperty`/`RemoveProperty` (in the order of
+the first version, properties in the order of the union of their names), removals and additions
+of moved entities, `Remove` (of the topmost removed entities). Their `oldValue` is the value they
+find. A merge commit MUST be refused unless it is the merge of its parents as calculated here,
+exactly. Conflicting tips stay until an owner commits a change set to one of them that resolves
+the conflict, e.g. taking the value of the other one.
+
+### 5.4 Signatures
+
+A commit can be signed by several parties, each on its own, in any order: the server that made
 it, a roaming network operator that received the data of a charging station operator and checked
 it, the charging station operator itself, or others.
 
@@ -156,8 +230,8 @@ So every signature covers the commit identification, the ETags of the resulting 
 change set and **the signatures of the change set**: whoever signs a commit confirms the data
 together with who signed it. The verification rules of section 4 apply.
 
-A server that follows a leader MUST verify every signature of a commit before it takes the commit,
-and MAY require signatures in certain roles, e.g. `leader`. Signatures added later are sent with
+A server MUST verify every signature of a commit before it takes the commit,
+and MAY require signatures in certain roles. Signatures added later are sent with
 `signCommit` over the WebSocket or `POST …/history/commits/{commitId}/signatures`, and pushed
 on the topic `commitSignatures`.
 
@@ -183,10 +257,10 @@ cbor:sha256:hex:631d24121cc4ee0177f262b6703b1ddfd63552dc69109c77971ae079e679f421
 **Genesis commit:** the SHA-256 of
 
 ```json
-{"eTags":[["json","sha256","hex","a3432d3ec7622d4272a7d4c0eba47883ee562c5501804285d9b01aea0dd692de"],["cbor","sha256","hex","631d24121cc4ee0177f262b6703b1ddfd63552dc69109c77971ae079e679f421"]],"profile":"wwcp-poi-commit-v1","revision":0,"roamingNetworkId":"rn1"}
+{"eTags":[["json","sha256","hex","a3432d3ec7622d4272a7d4c0eba47883ee562c5501804285d9b01aea0dd692de"],["cbor","sha256","hex","631d24121cc4ee0177f262b6703b1ddfd63552dc69109c77971ae079e679f421"]],"profile":"wwcp-poi-commit-v2","revision":0,"roamingNetworkId":"rn1"}
 ```
 
-is the commit identification `f572ecd1b3ae708cb7eacf0e9da3a34537aae55c94d88ad7224a9bef1663c45f`.
+is the commit identification `77fc198bdb99288bf482666a94f3a4a38bbe1f95087f0caf9b58a7e8648e83a8`.
 
 **Leader signature** of the genesis commit, with the Ed25519 key of the private seed
 `101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f` (public key, Base64:
@@ -194,13 +268,13 @@ is the commit identification `f572ecd1b3ae708cb7eacf0e9da3a34537aae55c94d88ad722
 `leader.example.org`, signed at 2026-10-12T12:00:00.000Z. Signature input:
 
 ```json
-{"algorithm":"Ed25519","commit":{"@id":"f572ecd1b3ae708cb7eacf0e9da3a34537aae55c94d88ad7224a9bef1663c45f","eTags":[["json","sha256","hex","a3432d3ec7622d4272a7d4c0eba47883ee562c5501804285d9b01aea0dd692de"],["cbor","sha256","hex","631d24121cc4ee0177f262b6703b1ddfd63552dc69109c77971ae079e679f421"]],"revision":0,"roamingNetworkId":"rn1"},"encoding":"base64","keyId":"leader","profile":"wwcp-poi-commit-signature-v1","role":"leader","signedAt":"2026-10-12T12:00:00.000Z","signer":"leader.example.org"}
+{"algorithm":"Ed25519","commit":{"@id":"77fc198bdb99288bf482666a94f3a4a38bbe1f95087f0caf9b58a7e8648e83a8","eTags":[["json","sha256","hex","a3432d3ec7622d4272a7d4c0eba47883ee562c5501804285d9b01aea0dd692de"],["cbor","sha256","hex","631d24121cc4ee0177f262b6703b1ddfd63552dc69109c77971ae079e679f421"]],"revision":0,"roamingNetworkId":"rn1"},"encoding":"base64","keyId":"leader","profile":"wwcp-poi-commit-signature-v1","role":"leader","signedAt":"2026-10-12T12:00:00.000Z","signer":"leader.example.org"}
 ```
 
 Signature value:
 
 ```
-su8SeDqPhzRxZYvEvQ89OiaIDKjVhnMShfO+iPsoGzqAAel6JMykYRKlttQGBYB5uyRIRe+P15XYrNmiDPf0CA==
+/dZDnTZyyEV4ijgtwArwcN72xtrdDUvtAIptyVEVRjwNx1mQQ5olgd3lJAQP28PZaAMcek+fAMzCMu45t82aDA==
 ```
 
 

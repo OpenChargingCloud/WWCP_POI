@@ -60,10 +60,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #region Publish(History, Changes)
 
-        private static RoamingNetworkPublishResult Publish(RoamingNetworkHistory              History,
+        private static RoamingNetworkCommitResult Publish(RoamingNetworkHistory              History,
                                                            params RoamingNetworkChange[]      Changes)
 
-            => History.Publish(History.Head.RoamingNetwork.CreateSignedChangeSet(Changes,
+            => History.Commit(History.Head.RoamingNetwork.CreateSignedChangeSet(Changes,
                                                                             Description:  I18NString.Create(Languages.en, "Change " + (History.Head.Commit.Revision + 1)),
                                                                             CreatedAt:    T0.AddMinutes((Double) History.Head.Commit.Revision + 1)));
 
@@ -440,18 +440,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                                                                   Description:  I18NString.Create(Languages.en, "Change 1"),
                                                                   CreatedAt:    T0);
 
-            leader.Publish(first);
+            leader.Commit(first);
             Publish(leader, RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, "v2"));
 
             // Published again: no new commit, no announcement.
-            var again = leader.Publish(first);
+            var again = leader.Commit(first);
             leader.TryGetCommitsSince(root, out var commits, out _);
             follower.TryAppend(commits!, out _, out _);
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(again.Status,                                                  Is.EqualTo(RoamingNetworkPublishStatus.AlreadyPublished));
+                Assert.That(again.Status,                                                  Is.EqualTo(RoamingNetworkCommitStatus.AlreadyCommitted));
                 Assert.That(announcements.Select(announcement => announcement.Revision),  Is.EqualTo(new UInt64[] { 1, 2 }));
                 Assert.That(announcements[0].ParentIds,                                    Is.EqualTo(new[] { root }));
                 Assert.That(announcements[1].ParentIds,                                    Is.EqualTo(new[] { announcements[0].CommitId }));

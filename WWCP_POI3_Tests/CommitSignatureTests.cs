@@ -94,9 +94,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                                 CreatedAt: T0.AddMinutes((Double) History.Head.Commit.Revision)
                             );
 
-            var result = History.Publish(changeSet);
+            var result = History.Commit(changeSet);
 
-            Assert.That(result.Status, Is.EqualTo(RoamingNetworkPublishStatus.Published), result.ErrorResponse);
+            Assert.That(result.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), result.ErrorResponse);
 
             return result.Commit!;
 

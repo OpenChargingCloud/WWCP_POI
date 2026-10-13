@@ -121,7 +121,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                                                                          DataSource:  "test",
                                                                          Created:     DateTimeOffset.Parse("2026-01-01T00:00:00Z")).WithKeys());
 
-            leader.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, "test2") ],
+            leader.Commit(leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, "test2") ],
                                                                       CreatedAt: DateTimeOffset.Parse("2026-10-12T12:00:00Z")));
 
             // The same content, but read anew: revision 0.

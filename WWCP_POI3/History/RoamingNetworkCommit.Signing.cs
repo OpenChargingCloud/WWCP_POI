@@ -67,7 +67,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             return newSignatures.Length == 0
                        ? this
-                       : new RoamingNetworkCommit(ParentId,
+                       : new RoamingNetworkCommit(ParentIds,
                                                   RoamingNetworkId,
                                                   Revision,
                                                   ETags,

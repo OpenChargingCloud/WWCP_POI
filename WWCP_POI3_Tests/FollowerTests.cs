@@ -110,9 +110,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
         #region Publish(Value)
 
-        private RoamingNetworkPublishResult Publish(String Value)
+        private RoamingNetworkCommitResult Publish(String Value)
 
-            => leader!.Publish(
+            => leader!.Commit(
                    leader.Head.RoamingNetwork.CreateSignedChangeSet(
                        [ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, Value) ],
                        Description:  I18NString.Create(Languages.en, "Data source " + Value),
@@ -358,14 +358,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             poiAPI!.AuthorizeChangeSetSubmission  = (request, changeSet)            => true;
             poiAPI.AuthorizeStatusUpdate          = (request, login, statusUpdate)  => true;
 
-            var published  = await follower.CommitChangeSetAsync(changeSet, ExpectedHeadId: head.Commit.Id);
+            var published  = await follower.CommitChangeSetAsync(changeSet);
             var status     = await follower.SetStatusAsync(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "offline", T0);
 
             using (Assert.EnterMultipleScope())
             {
 
                 Assert.That(refused?.ErrorCode,                      Is.EqualTo(POIWebSocketErrorCodes.SecurityError));
-                Assert.That(published["status"]!.ToString(),         Is.EqualTo("Published"));
+                Assert.That(published["status"]!.ToString(),         Is.EqualTo("Committed"));
                 Assert.That(status["result"]!.ToString(),            Is.EqualTo("Updated"));
 
                 // Back from the leader, as for every other follower.
@@ -461,7 +461,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
             var e1 = EVSE_Id.Parse("DE*GEF*E1*1");
 
-            leader!.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([
+            leader!.Commit(leader.Head.RoamingNetwork.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add(new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
                                                                           ChargingStations: [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
                                                                                                                   EVSEs: [ new EVSE(e1) ]) ]))
