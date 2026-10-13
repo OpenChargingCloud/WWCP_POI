@@ -52,7 +52,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// and answered in the format they came in, JSON text or CBOR binary.
     /// </summary>
     /// <remarks>
-    /// It is lent to an HTTP path via WebSocketUpgrade.For() and never started itself.
+    /// A WebSocket endpoint without a TCP server of its own, put on an HTTP path via WebSocketUpgrade.For().
     /// While all request slots of a connection are taken, no further message is read from it.
     /// Responses, errors and sends of the client are not answered: this server sends no requests.
     ///
@@ -68,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// waiting together are sent as one push with { "batch": [ … ] }, up to the maxBatchSize of the
     /// subscribe request; PushCoalescingDelay lets more of them gather.
     /// </remarks>
-    public class POIWebSocketServer : AWebSocketServer
+    public class POIWebSocketServer : AWebSocketEndpoint
     {
 
         #region Data
@@ -184,7 +184,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Constructor(s)
 
         /// <summary>
-        /// Create a new POI WebSocket server, to be lent to an HTTP path.
+        /// Create a new POI WebSocket server, to be put on an HTTP path.
         /// </summary>
         /// <param name="HTTPServiceName">An optional HTTP service name.</param>
         /// <param name="RequireAuthentication">Whether clients must authenticate; by default not.</param>
@@ -195,11 +195,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   AuthenticatePOIWebSocketClientDelegate?  AuthenticateClient      = null,
                                   ILoggerFactory?                          LoggerFactory           = null)
 
-            : base(TCPPort:                IPPort.Zero,
-                   HTTPServerName:         HTTPServiceName ?? "WWCP POI WebSocket Server",
+            : base(HTTPServiceName:        HTTPServiceName ?? "WWCP POI WebSocket Server",
                    RequireAuthentication:  RequireAuthentication || AuthenticateClient is not null,
-                   LoggerFactory:          LoggerFactory,
-                   AutoStart:              false)
+                   LoggerFactory:          LoggerFactory)
 
         {
 
@@ -433,7 +431,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Process a message in JSON text.
         /// </summary>
         public override Task ProcessTextMessage(DateTimeOffset             Timestamp,
-                                                AWebSocketServer           Server,
+                                                AWebSocketEndpoint         Server,
                                                 WebSocketServerConnection  Connection,
                                                 EventTracking_Id           EventTrackingId,
                                                 WebSocketFrame             TextFrame,
@@ -452,7 +450,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Process a message in CBOR.
         /// </summary>
         public override Task ProcessBinaryMessage(DateTimeOffset             Timestamp,
-                                                  AWebSocketServer           Server,
+                                                  AWebSocketEndpoint         Server,
                                                   WebSocketServerConnection  Connection,
                                                   EventTracking_Id           EventTrackingId,
                                                   WebSocketFrame             BinaryFrame,

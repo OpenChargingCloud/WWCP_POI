@@ -398,7 +398,6 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 ## Open
 
 - Finer subscription filters
-- A WebSocket endpoint in Hermod without a TCP server behind it
 - Further entities: as the use cases need them
 
 ## Tests
