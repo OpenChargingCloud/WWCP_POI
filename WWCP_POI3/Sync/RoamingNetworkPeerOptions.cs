@@ -48,6 +48,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean                             PushCommits                 { get; init; } = true;
 
         /// <summary>
+        /// The store to keep a history started from a snapshot in, e.g. at first or when the other server knew none of its commits:
+        /// its content is replaced then. A history given to the peer keeps the store it has.
+        /// </summary>
+        public IRoamingNetworkHistoryStore?       Store                       { get; init; }
+
+        /// <summary>
+        /// What a history started from a snapshot keeps; everything, unless given.
+        /// </summary>
+        public RoamingNetworkHistoryRetention?    Retention                   { get; init; }
+
+        /// <summary>
         /// The identifications of keys of the roaming network operator a snapshot must name, e.g. its identity key:
         /// the trust anchor of a history started from the snapshot of another server. Not checked, unless given.
         /// </summary>

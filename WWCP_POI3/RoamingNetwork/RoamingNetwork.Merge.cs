@@ -270,13 +270,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (internal) TryApplyMerge(ChangeSet, out RoamingNetwork, out ErrorResponse)
+        #region (internal) TryApplyKnown(ChangeSet, out RoamingNetwork, out ErrorResponse)
 
         /// <summary>
-        /// Apply the change set of a merge, calculated by TryMerge, without signatures of owners:
+        /// Apply a change set checked before, e.g. one of a commit of a history whose version is calculated again,
+        /// or the change set of a merge calculated by TryMerge, without checking the signatures of its owners:
         /// it must fit this version by its before ETags, and lead to its after ETags.
         /// </summary>
-        internal Boolean TryApplyMerge(RoamingNetworkChangeSet                   ChangeSet,
+        internal Boolean TryApplyKnown(RoamingNetworkChangeSet                   ChangeSet,
                                        [NotNullWhen(true)]  out RoamingNetwork?  RoamingNetwork,
                                        [NotNullWhen(false)] out String?          ErrorResponse)
         {

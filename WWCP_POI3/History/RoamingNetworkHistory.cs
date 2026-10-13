@@ -112,7 +112,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// Conflicting tips stay until an owner resolves the conflict with a change set on one of them.
     /// Every change of the history is atomic: it is visible completely or not at all.
     /// </summary>
-    public sealed class RoamingNetworkHistory
+    public sealed partial class RoamingNetworkHistory
     {
 
         #region Data
@@ -176,7 +176,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 lock (historyLock)
                 {
-                    return [ .. tips.Select(tip => new RoamingNetworkHead(commits[commitIndex[tip]], versions[tip])) ];
+                    return [ .. tips.Select(tip => new RoamingNetworkHead(commits[commitIndex[tip]], VersionOf(tip))) ];
                 }
             }
         }
@@ -240,6 +240,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.RuntimeStatus     = new RoamingNetworkRuntimeStatus(this);
 
             RuntimeStatus.Attach(RoamingNetwork);
+            RuntimeStatus.OnStatusUpdate += AppendStatusUpdate;
 
             Remember(Root, RoamingNetwork);
             tips.Add(Root.Id);
@@ -249,23 +250,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) Start        (RoamingNetwork, Signers = null)
+        #region (static) Start        (RoamingNetwork, Signers = null, Store = null, Retention = null)
 
         /// <summary>
         /// Start the history of the given first version of a roaming network with its genesis commit.
         /// </summary>
         /// <param name="RoamingNetwork">The first version of a roaming network.</param>
-        /// <param name="Signers">The optional keys that sign the genesis commit and every commit published here.</param>
+        /// <param name="Signers">The optional keys that sign the genesis commit and every commit made here.</param>
+        /// <param name="Store">An optional empty store to keep the history in.</param>
+        /// <param name="Retention">What to keep; everything, unless given.</param>
         public static RoamingNetworkHistory Start(RoamingNetwork                            RoamingNetwork,
-                                                  IEnumerable<RoamingNetworkCommitSigner>?  Signers   = null)
+                                                  IEnumerable<RoamingNetworkCommitSigner>?  Signers     = null,
+                                                  IRoamingNetworkHistoryStore?              Store       = null,
+                                                  RoamingNetworkHistoryRetention?           Retention   = null)
         {
 
             var signers = Signers?.ToImmutableArray() ?? [];
 
-            return new (SignedBy(signers, RoamingNetworkCommit.Genesis(RoamingNetwork)),
-                        RoamingNetwork) {
-                       Signers = signers
-                   };
+            var history = new RoamingNetworkHistory(SignedBy(signers, RoamingNetworkCommit.Genesis(RoamingNetwork)),
+                                                    RoamingNetwork) {
+                              Signers    = signers,
+                              Retention  = Retention ?? RoamingNetworkHistoryRetention.KeepEverything
+                          };
+
+            if (Store is not null)
+                history.AttachStore(Store);
+
+            return history;
 
         }
 
@@ -611,22 +622,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return new (RoamingNetworkCommitStatus.AlreadyCommitted, Head, committed);
 
                 // The version it was made for: a tip, the head first, or else the latest commit having it.
-                var parentId = tips.
-                                   Concat(Enumerable.Range(0, commits.Count).Reverse().Select(index => commits[index].Id)).
-                                   FirstOrDefault(commitId => versions[commitId].Fits(ChangeSet));
-
-                if (parentId == default(RoamingNetworkCommit_Id))
+                if (FindVersionFor(ChangeSet) is not (RoamingNetworkCommit parent, RoamingNetwork parentVersion))
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: "The change set fits no version of this history: prepare it again for the head!");
 
-                var parent = commits[commitIndex[parentId]];
-
-                if (!versions[parentId].TryApplyChangeSet(ChangeSet, out var roamingNetwork, out var applyError, VerifySignature))
+                if (!parentVersion.TryApplyChangeSet(ChangeSet, out var roamingNetwork, out var applyError, VerifySignature))
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: applyError);
 
                 var commit = SignedBy(Signers, RoamingNetworkCommit.Next(parent, ChangeSet, roamingNetwork));
 
-                Take(commit, roamingNetwork);
+                try
+                {
+                    Take(commit, roamingNetwork);
+                }
+                catch (Exception e)
+                {
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: "The commit can not be stored: " + e.Message);
+                }
+
                 MergeTips();
+                CompactIfDue();
 
                 return new (RoamingNetworkCommitStatus.Committed, Head, commit);
 
@@ -657,11 +671,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  VerifyCommitSignatureDelegate?      VerifyCommitSignature    = null,
                                  IReadOnlyCollection<String>?        RequiredSignatureRoles   = null)
 
-            => TryAppend(Commit, true, out ErrorResponse, VerifySignature, VerifyCommitSignature, RequiredSignatureRoles);
+            => TryAppend(Commit, true, false, out ErrorResponse, VerifySignature, VerifyCommitSignature, RequiredSignatureRoles);
 
 
+        /// <param name="Commit">The commit.</param>
+        /// <param name="MergeTips">Whether to merge the tips afterwards.</param>
+        /// <param name="Known">Whether its signatures were checked before, e.g. when it comes from the store.</param>
         private Boolean TryAppend(RoamingNetworkCommit                Commit,
                                   Boolean                             MergeTips,
+                                  Boolean                             Known,
                                   [NotNullWhen(false)] out String?    ErrorResponse,
                                   VerifyChangeSetSignatureDelegate?   VerifySignature,
                                   VerifyCommitSignatureDelegate?      VerifyCommitSignature,
@@ -678,9 +696,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 if (commitIndex.ContainsKey(Commit.Id))
-                    return TryAddSignatures(Commit.Id, Commit.Signatures, VerifyCommitSignature, out _, out _, out ErrorResponse);
+                {
 
-                if (!CheckSignatures(Commit, VerifyCommitSignature, RequiredSignatureRoles, out ErrorResponse))
+                    if (!Known)
+                        return TryAddSignatures(Commit.Id, Commit.Signatures, VerifyCommitSignature, out _, out _, out ErrorResponse);
+
+                    TakeKnownSignatures(Commit.Id, Commit.Signatures);
+                    ErrorResponse = null;
+                    return true;
+
+                }
+
+                if (!Known && !CheckSignatures(Commit, VerifyCommitSignature, RequiredSignatureRoles, out ErrorResponse))
                     return false;
 
                 if (Commit.RoamingNetworkId != RoamingNetworkId)
@@ -736,9 +763,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                else if (!versions[parents[0].Id].TryApplyChangeSet(Commit.ChangeSet!, out roamingNetwork, out var applyError, VerifySignature))
+                else if (!TryGetVersion(parents[0].Id, out var parentVersion, out ErrorResponse) ||
+                         !parentVersion.TryApplyChangeSet(Commit.ChangeSet!, out roamingNetwork, out ErrorResponse, VerifySignature))
                 {
-                    ErrorResponse = applyError;
                     return false;
                 }
 
@@ -748,10 +775,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                Take(Commit, roamingNetwork);
+                try
+                {
+                    Take(Commit, roamingNetwork);
+                }
+                catch (Exception e)
+                {
+                    ErrorResponse = "The commit can not be stored: " + e.Message;
+                    return false;
+                }
 
                 if (MergeTips)
+                {
                     this.MergeTips();
+                    CompactIfDue();
+                }
 
                 ErrorResponse = null;
                 return true;
@@ -794,7 +832,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     foreach (var commit in Commits)
                     {
 
-                        if (!TryAppend(commit, false, out ErrorResponse, VerifySignature, VerifyCommitSignature, RequiredSignatureRoles))
+                        if (!TryAppend(commit, false, false, out ErrorResponse, VerifySignature, VerifyCommitSignature, RequiredSignatureRoles))
                         {
                             ErrorResponse = $"Commit {Appended}: {ErrorResponse}";
                             return false;
@@ -808,7 +846,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 finally
                 {
                     if (Appended > 0)
+                    {
                         MergeTips();
+                        CompactIfDue();
+                    }
                 }
 
             }
@@ -867,6 +908,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var signature in newSignatures)
                     if (!CheckSignature(commit, signature, VerifyCommitSignature, out ErrorResponse))
                         return false;
+
+                try
+                {
+                    StoreAppend(RoamingNetworkHistoryLogEntry.ForSignatures(CommitId, newSignatures));
+                }
+                catch (Exception e)
+                {
+                    ErrorResponse = "The signatures can not be stored: " + e.Message;
+                    return false;
+                }
 
                 commit          = commit.WithSignatures(newSignatures);
                 commits[index]  = commit;
@@ -984,6 +1035,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                           RoamingNetwork        RoamingNetwork)
         {
 
+            // Kept before it is shown: a store failing keeps it from the history.
+            StoreAppend(RoamingNetworkHistoryLogEntry.ForCommit(Commit));
+
             Remember(Commit, RoamingNetwork);
 
             foreach (var parentId in Commit.ParentIds)
@@ -992,13 +1046,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             tips.Add(Commit.Id);
             tips.Sort((tip1, tip2) => IsCanonicalOrder(commits[commitIndex[tip1]], commits[commitIndex[tip2]]) ? (tip1 == tip2 ? 0 : -1) : 1);
 
-            var newHead = new RoamingNetworkHead(commits[commitIndex[tips[0]]], versions[tips[0]]);
+            var newHead = new RoamingNetworkHead(commits[commitIndex[tips[0]]], VersionOf(tips[0]));
 
             if (newHead.Commit.Id != Head.Commit.Id)
             {
                 Volatile.Write(ref head, newHead);
                 RuntimeStatus.Attach(newHead.RoamingNetwork);
             }
+
+            RetainVersions();
 
             var announcement = new RoamingNetworkCommitAnnouncement(Commit, Timestamp.Now);
 
@@ -1047,8 +1103,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         if (TryMerge(left, right, out var roamingNetwork, out var changeSet, out var mergeConflicts, out var mergeError))
                         {
-                            Take(SignedBy(Signers, RoamingNetworkCommit.Merge(left, right, changeSet, roamingNetwork)), roamingNetwork);
+
+                            try
+                            {
+                                Take(SignedBy(Signers, RoamingNetworkCommit.Merge(left, right, changeSet, roamingNetwork)), roamingNetwork);
+                            }
+                            catch (Exception e)
+                            {
+                                // Made again when the history is loaded, or with the next commit.
+                                RaiseStoreError("A merge commit can not be stored: " + e.Message, e);
+                                return;
+                            }
+
                             merged = true;
+
                         }
 
                         else
@@ -1084,12 +1152,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChangeSet       = null;
             Conflicts       = [];
 
-            if (!TryGetMergeBase(Left.Id, Right.Id, 0, out var mergeBase, out ErrorResponse))
+            if (!TryGetMergeBase(Left.Id, Right.Id, 0, out var mergeBase, out ErrorResponse) ||
+                !TryGetVersion  (Left.Id,  out var leftVersion,  out ErrorResponse) ||
+                !TryGetVersion  (Right.Id, out var rightVersion, out ErrorResponse))
+            {
                 return false;
+            }
 
             return POI.RoamingNetwork.TryMerge(mergeBase,
-                                               versions[Left.Id],
-                                               versions[Right.Id],
+                                               leftVersion,
+                                               rightVersion,
                                                MergeChangeSetId(Left.Id, Right.Id),
                                                out RoamingNetwork,
                                                out ChangeSet,
@@ -1138,10 +1210,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             best.Sort((commit1, commit2) => IsCanonicalOrder(commit1, commit2) ? (commit1.Id == commit2.Id ? 0 : -1) : 1);
 
             if (best.Count == 1)
-            {
-                MergeBase = versions[best[0].Id];
-                return true;
-            }
+                return TryGetVersion(best[0].Id, out MergeBase, out ErrorResponse);
 
             if (Depth > 16)
             {
@@ -1150,15 +1219,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // Several best common ancestors: merged one after the other, as long as they do not conflict.
-            var virtualBase = versions[best[0].Id];
+            if (!TryGetVersion(best[0].Id, out var virtualBase, out ErrorResponse))
+                return false;
 
             foreach (var other in best.Skip(1))
             {
 
-                if (!TryGetMergeBase(best[0].Id, other.Id, Depth + 1, out var innerBase, out ErrorResponse))
+                if (!TryGetMergeBase(best[0].Id, other.Id, Depth + 1, out var innerBase, out ErrorResponse) ||
+                    !TryGetVersion  (other.Id, out var otherVersion, out ErrorResponse))
+                {
                     return false;
+                }
 
-                if (!POI.RoamingNetwork.TryMerge(innerBase, virtualBase, versions[other.Id], MergeChangeSetId(best[0].Id, other.Id), out var merged, out _, out var innerConflicts))
+                if (!POI.RoamingNetwork.TryMerge(innerBase, virtualBase, otherVersion, MergeChangeSetId(best[0].Id, other.Id), out var merged, out _, out var innerConflicts))
                 {
                     ErrorResponse = $"The common ancestors of the commits '{Left}' and '{Right}' conflict: {String.Join(" ", innerConflicts.Select(conflict => conflict.Description))}";
                     return false;

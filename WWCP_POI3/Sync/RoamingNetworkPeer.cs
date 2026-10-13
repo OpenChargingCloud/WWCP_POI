@@ -712,6 +712,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new InvalidOperationException("The snapshot of the other server names none of the trusted keys of the roaming network operator!");
             }
 
+            if (options.Retention is not null)
+                newHistory.Retention = options.Retention;
+
+            // The store, of the history replaced or given, keeps the new one from now on.
+            var store = History?.DetachStore() ?? options.Store;
+
+            if (store is not null)
+                newHistory.AttachStore(store);
+
             var oldHistory = Interlocked.Exchange(ref history, newHistory);
 
             statusFromSnapshot = options.FollowStatus;

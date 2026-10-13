@@ -253,6 +253,37 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   also of one set at the entity, and of a planned status when it is due. A status update of another server,
   `TryUpdate(statusUpdate, …)`, is taken with its timestamp.
 
+### Persistence and retention
+
+A history keeps itself in a store, an `IRoamingNetworkHistoryStore`, and is loaded from it after a restart:
+
+```csharp
+using var store = new RoamingNetworkHistoryFileStore("data/rn1");      // one directory per roaming network
+
+var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
+                  ? loaded!
+                  : RoamingNetworkHistory.Start(rn1, Store: store,
+                                                Retention: new RoamingNetworkHistoryRetention { RetainCommits = 1000 });
+```
+
+- **Content:** a base, the snapshot of the root with its runtime status, and a log since, one entry per line:
+  every commit, signatures added later, and every change of the runtime status. Commits and signatures
+  are written, and synced to the disk, before the history shows them: a store failing refuses the commit.
+  Status updates are synced in batches (`StatusFlushInterval`, 1 s).
+- **Files:** `CURRENT` names a generation `gen-NNNNNN` with `base.json` and `log.jsonl`. A last line written
+  only partly by a crash is dropped when loading; compacting writes a new generation completely before
+  `CURRENT` names it. The file `LOCK` keeps a second store from the directory.
+- **Loading:** `TryLoad` checks every commit again (owners' signatures, merges calculated again, ETags) and
+  merges the tips afterwards, e.g. when a crash came before a merge commit was written.
+- **Retention:** a history keeps the versions of its root, its tips, every `VersionCheckpointInterval`-th
+  revision and its `RecentVersions` latest commits, and calculates others again when needed.
+  `Compact()`, or the history itself once the log has `CompactAfterLogEntries` entries, drops the commits
+  before a new root, the latest commit all tips follow at least `RetainCommits` revisions behind the head,
+  and folds the runtime status into the new base. A server knowing only older commits starts from a
+  snapshot then, and a branch older than the root can no longer be appended.
+- **Peers** keep a history started from a snapshot in `RoamingNetworkPeerOptions.Store`, with its `Retention`.
+  `RoamingNetworkHistoryMemoryStore` keeps the same content in memory, e.g. for tests.
+
 `POI_API` serves a history in JSON, or in CBOR for `Accept: application/cbor` (also as request body):
 
 | Request | Returns |
@@ -354,7 +385,6 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 
 ## Open
 
-- Persistence and retention of histories
 - Peers push the status they set themselves to the other server
 - Recursive merge bases whose own merge conflicts
 - Finer subscription filters
