@@ -1175,13 +1175,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The version of the best common ancestor of the given commits: one no other common ancestor follows.
-        /// Several of them are merged into a virtual one, as git's recursive strategy does.
+        /// Several of them, in their order, are merged into a virtual one, as git's recursive strategy does:
+        /// where they conflict, it has conflict markers, so that the merge conflicts there unless both commits agree.
         /// </summary>
-        private Boolean TryGetMergeBase(RoamingNetworkCommit_Id                   Left,
-                                        RoamingNetworkCommit_Id                   Right,
-                                        Int32                                     Depth,
-                                        [NotNullWhen(true)]  out RoamingNetwork?  MergeBase,
-                                        out String?                               ErrorResponse)
+        private Boolean TryGetMergeBase(RoamingNetworkCommit_Id                                      Left,
+                                        RoamingNetworkCommit_Id                                      Right,
+                                        Int32                                                        Depth,
+                                        [NotNullWhen(true)]  out POI.RoamingNetwork.MergeBase?       MergeBase,
+                                        out String?                                                  ErrorResponse)
         {
 
             MergeBase      = null;
@@ -1209,35 +1210,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             best.Sort((commit1, commit2) => IsCanonicalOrder(commit1, commit2) ? (commit1.Id == commit2.Id ? 0 : -1) : 1);
 
-            if (best.Count == 1)
-                return TryGetVersion(best[0].Id, out MergeBase, out ErrorResponse);
+            if (!TryGetVersion(best[0].Id, out var firstVersion, out ErrorResponse))
+                return false;
 
-            if (Depth > 16)
+            var virtualBase = POI.RoamingNetwork.MergeBase.Of(firstVersion);
+
+            if (best.Count > 1 && Depth > 16)
             {
                 ErrorResponse = $"The merge base of the commits '{Left}' and '{Right}' is too deeply nested!";
                 return false;
             }
 
-            // Several best common ancestors: merged one after the other, as long as they do not conflict.
-            if (!TryGetVersion(best[0].Id, out var virtualBase, out ErrorResponse))
-                return false;
-
+            // Several best common ancestors: merged one after the other, with conflict markers where they conflict.
             foreach (var other in best.Skip(1))
             {
 
-                if (!TryGetMergeBase(best[0].Id, other.Id, Depth + 1, out var innerBase, out ErrorResponse) ||
-                    !TryGetVersion  (other.Id, out var otherVersion, out ErrorResponse))
+                if (!TryGetMergeBase(best[0].Id, other.Id, Depth + 1, out var innerBase,    out ErrorResponse) ||
+                    !TryGetVersion  (other.Id,                       out var otherVersion, out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (!POI.RoamingNetwork.TryMerge(innerBase, virtualBase, otherVersion, MergeChangeSetId(best[0].Id, other.Id), out var merged, out _, out var innerConflicts))
-                {
-                    ErrorResponse = $"The common ancestors of the commits '{Left}' and '{Right}' conflict: {String.Join(" ", innerConflicts.Select(conflict => conflict.Description))}";
-                    return false;
-                }
-
-                virtualBase = merged;
+                virtualBase = POI.RoamingNetwork.MergeBase.Virtual(innerBase, virtualBase, POI.RoamingNetwork.MergeBase.Of(otherVersion));
 
             }
 

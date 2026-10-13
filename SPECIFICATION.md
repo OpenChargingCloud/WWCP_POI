@@ -180,8 +180,23 @@ first two tips that do not conflict, again and again. Their **merge commit**:
   `"<first parent id>+<second parent id>"` (UTF-8), the `createdAt` of the later `lastChange` of
   both versions, the description `{"en":"Merge"}`, no metadata and no signatures;
 - its changes follow from a three-way merge with the **merge base**, the best common ancestor
-  (one no other common ancestor follows); several best common ancestors are merged first, the
-  same way.
+  (one no other common ancestor follows); several best common ancestors form a **virtual merge
+  base** (below).
+
+Several best common ancestors, in the order of tips, are merged one after the other: the first
+with the second, with their own merge base (calculated the same way), the result with the third,
+and so on. This virtual merge base compares like the three-way merge below, but never conflicts:
+where they conflict, it has the **conflict marker** `{"@conflict": {"base": …, "left": …, "right": …}}`
+(absent values left out), which equals no value of a version, so that the merge of the tips conflicts
+there unless both tips have the same:
+
+- a property both changed differently has the conflict marker as its value;
+- an entity one of them removed and the other one changed, or moved by both, or moved by one and
+  changed by the other, has the conflict marker of its properties as its only property, under the
+  parent of the first one having it;
+- otherwise an entity both have under the same parent takes the merged properties; one moved by
+  one of them only, unchanged by the other, is as the one that moved it has it; one only one of
+  them has is kept, unless the other one removed it unchanged.
 
 The three-way merge compares every entity a change set addresses (section 4.1), by its type and
 identification, without its embedded children and without `lastChange`, property by property,

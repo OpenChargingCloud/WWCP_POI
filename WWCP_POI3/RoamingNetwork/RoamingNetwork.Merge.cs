@@ -71,7 +71,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <param name="EntityType">The type of the entity.</param>
     /// <param name="EntityId">The identification of the entity.</param>
     /// <param name="PropertyName">The property, unless the entity conflicts as a whole.</param>
-    /// <param name="Base">The value of the common ancestor; null when absent.</param>
+    /// <param name="Base">The value of the common ancestor; null when absent. Where several best common ancestors conflict,
+    /// a conflict marker, { "@conflict": { base?, left?, right? } }, with what they have.</param>
     /// <param name="Left">The value of the left version; null when absent.</param>
     /// <param name="Right">The value of the right version; null when absent.</param>
     /// <param name="Description">A description.</param>
@@ -131,7 +132,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed partial class RoamingNetwork
     {
 
-        #region (private) MergeEntity
+        #region (internal) MergeEntity
 
         /// <summary>
         /// An entity of a version, as the merge compares it.
@@ -141,15 +142,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Parent">The type and identification of the entity embedding it, unless it is the roaming network itself.</param>
         /// <param name="Own">Its properties, without its embedded children and without its last change.</param>
         /// <param name="Full">Its complete JSON representation, with its embedded children.</param>
-        private sealed record MergeEntity(String                            Type,
-                                          String                            Id,
-                                          (String Type, String Id)?         Parent,
-                                          JObject                           Own,
-                                          JObject                           Full);
+        internal sealed record MergeEntity(String                            Type,
+                                           String                            Id,
+                                           (String Type, String Id)?         Parent,
+                                           JObject                           Own,
+                                           JObject                           Full);
+
+        #endregion
+
+        #region (internal) MergeBase
+
+        /// <summary>
+        /// The merge base of two versions, as the merge compares it: the version of their best common ancestor,
+        /// or a virtual one, several best common ancestors merged one after the other.
+        /// </summary>
+        /// <remarks>
+        /// A virtual merge base never conflicts: where the common ancestors conflict, it has a conflict marker
+        /// instead, { "@conflict": { base?, left?, right? } }, as a value or as the only property of an entity.
+        /// It equals no value of a version, so that the merge conflicts there, unless both versions have the same.
+        /// </remarks>
+        internal sealed class MergeBase
+        {
+
+            /// <summary>
+            /// Its entities, by their type and identification.
+            /// </summary>
+            internal Dictionary<(String Type, String Id), MergeEntity>  Entities  { get; }
+
+            private MergeBase(Dictionary<(String Type, String Id), MergeEntity> Entities)
+            {
+                this.Entities = Entities;
+            }
+
+            /// <summary>
+            /// The given version as a merge base.
+            /// </summary>
+            /// <param name="Version">The version of the best common ancestor.</param>
+            internal static MergeBase Of(RoamingNetwork Version)
+
+                => new (Flatten(Version));
+
+            /// <summary>
+            /// The virtual merge base of the left and the right one, merged with their own merge base, without conflicts.
+            /// </summary>
+            /// <param name="Base">The merge base of the left and the right one.</param>
+            /// <param name="Left">A common ancestor, or the virtual merge base of the ones before.</param>
+            /// <param name="Right">The next common ancestor.</param>
+            internal static MergeBase Virtual(MergeBase  Base,
+                                              MergeBase  Left,
+                                              MergeBase  Right)
+
+                => new (MergeVirtual(Base.Entities, Left.Entities, Right.Entities));
+
+        }
 
         #endregion
 
         #region Data
+
+        /// <summary>
+        /// The property of a conflict marker of a virtual merge base: where its common ancestors conflict.
+        /// </summary>
+        public const String ConflictMarkerProperty = "@conflict";
 
         /// <summary>
         /// The embedded children a change set addresses on their own: their JSON key and entity type, by the entity type embedding them.
@@ -216,13 +270,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        [NotNullWhen(true)]  out RoamingNetwork?                        Merge,
                                        [NotNullWhen(true)]  out RoamingNetworkChangeSet?               ChangeSet,
                                        out IReadOnlyList<RoamingNetworkMergeConflict>                  Conflicts)
+
+            => TryMerge(MergeBase.Of(Base),
+                        Left,
+                        Right,
+                        ChangeSetId,
+                        out Merge,
+                        out ChangeSet,
+                        out Conflicts);
+
+
+        /// <summary>
+        /// Try to merge the right version into the left one, with the given merge base: the version of their
+        /// best common ancestor, or a virtual one of several.
+        /// </summary>
+        /// <param name="Base">The merge base.</param>
+        /// <param name="Left">The left version, the one the change set is applied to.</param>
+        /// <param name="Right">The right version.</param>
+        /// <param name="ChangeSetId">The identification of the change set of the merge.</param>
+        /// <param name="Merge">The merged version.</param>
+        /// <param name="ChangeSet">The change set leading from the left version to the merge.</param>
+        /// <param name="Conflicts">The conflicts, when they can not be merged.</param>
+        internal static Boolean TryMerge(MergeBase                                                       Base,
+                                         RoamingNetwork                                                  Left,
+                                         RoamingNetwork                                                  Right,
+                                         ChangeSet_Id                                                    ChangeSetId,
+                                         [NotNullWhen(true)]  out RoamingNetwork?                        Merge,
+                                         [NotNullWhen(true)]  out RoamingNetworkChangeSet?               ChangeSet,
+                                         out IReadOnlyList<RoamingNetworkMergeConflict>                  Conflicts)
         {
 
             Merge      = null;
             ChangeSet  = null;
 
             var conflicts  = new List<RoamingNetworkMergeConflict>();
-            var changes    = MergeChanges(Flatten(Base), Flatten(Left), Flatten(Right), conflicts);
+            var changes    = MergeChanges(Base.Entities, Flatten(Left), Flatten(Right), conflicts);
 
             if (conflicts.Count > 0)
             {
@@ -582,6 +664,127 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Added first, so that what is changed or kept can name it; removed last.
             return [ .. adds, .. updates, .. replaces, .. removes ];
+
+        }
+
+        #endregion
+
+        #region (private static) MergeVirtual(Base, Left, Right)
+
+        /// <summary>
+        /// The entities of the virtual merge base of the left and the right ones, merged with their merge base
+        /// as a three-way merge does, but with a conflict marker where they conflict:
+        /// a property both changed differently has it as its value; an entity one removed and the other changed,
+        /// or one both moved, or moved by one and changed by the other, has it as its only property.
+        /// </summary>
+        private static Dictionary<(String Type, String Id), MergeEntity> MergeVirtual(Dictionary<(String Type, String Id), MergeEntity>  Base,
+                                                                                      Dictionary<(String Type, String Id), MergeEntity>  Left,
+                                                                                      Dictionary<(String Type, String Id), MergeEntity>  Right)
+        {
+
+            static Boolean Unchanged(MergeEntity Entity, MergeEntity BaseEntity)
+                => Entity.Parent == BaseEntity.Parent && JToken.DeepEquals(Entity.Own, BaseEntity.Own);
+
+            static MergeEntity Conflicted(MergeEntity Entity, MergeEntity? BaseEntity, MergeEntity? LeftEntity, MergeEntity? RightEntity)
+            {
+                var own = ConflictMarker(BaseEntity?.Own, LeftEntity?.Own, RightEntity?.Own);
+                return new MergeEntity(Entity.Type, Entity.Id, Entity.Parent, own, own);
+            }
+
+            var entities  = new Dictionary<(String Type, String Id), MergeEntity>();
+
+            var keys      = Left.Keys.
+                                Concat(Right.Keys.Where(key => !Left.ContainsKey(key))).
+                                ToArray();
+
+            foreach (var key in keys)
+            {
+
+                Base. TryGetValue(key, out var b);
+                Left. TryGetValue(key, out var l);
+                Right.TryGetValue(key, out var r);
+
+                // Only one of them has it: added by it, removed by the other one, or removed by one and changed by the other.
+                if (l is null || r is null)
+                {
+
+                    var one = (l ?? r)!;
+
+                    if (b is null)
+                        entities[key] = one;
+
+                    else if (!Unchanged(one, b))
+                        entities[key] = Conflicted(one, b, l, r);
+
+                    continue;
+
+                }
+
+                if (l.Parent != r.Parent)
+                {
+
+                    entities[key] = b is not null && Unchanged(l, b) ? r
+                                  : b is not null && Unchanged(r, b) ? l
+                                  : Conflicted(l, b, l, r);
+
+                    continue;
+
+                }
+
+                var own            = new JObject();
+                var propertyNames  = l.Own.Properties().Select(property => property.Name).
+                                         Union(r.Own.Properties().Select(property => property.Name)).
+                                         Union(b?.Own.Properties().Select(property => property.Name) ?? []).
+                                         ToArray();
+
+                foreach (var propertyName in propertyNames)
+                {
+
+                    var bv     = b?.Own[propertyName];
+                    var lv     = l. Own[propertyName];
+                    var rv     = r. Own[propertyName];
+
+                    var value  = Same(lv, rv) || Same(rv, bv) ? lv
+                               : Same(lv, bv)                 ? rv
+                               : ConflictMarker(bv, lv, rv);
+
+                    if (value is not null)
+                        own.Add(propertyName, value.DeepClone());
+
+                }
+
+                entities[key] = new MergeEntity(l.Type, l.Id, l.Parent, own, own);
+
+            }
+
+            return entities;
+
+        }
+
+        #endregion
+
+        #region (private static) ConflictMarker(Base, Left, Right)
+
+        /// <summary>
+        /// The conflict marker of a virtual merge base: { "@conflict": { base?, left?, right? } }, absent values left out.
+        /// </summary>
+        private static JObject ConflictMarker(JToken?  Base,
+                                              JToken?  Left,
+                                              JToken?  Right)
+        {
+
+            var conflict = new JObject();
+
+            if (Base  is not null)
+                conflict.Add("base",   Base. DeepClone());
+
+            if (Left  is not null)
+                conflict.Add("left",   Left. DeepClone());
+
+            if (Right is not null)
+                conflict.Add("right",  Right.DeepClone());
+
+            return new JObject(new JProperty(ConflictMarkerProperty, conflict));
 
         }
 

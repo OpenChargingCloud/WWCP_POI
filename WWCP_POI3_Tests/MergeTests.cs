@@ -322,6 +322,132 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region ChangeAt(History, Commit, Minutes, Changes)
+
+        /// <summary>
+        /// Commit the given changes, signed by their owners, to the version of the given tip of the given history.
+        /// </summary>
+        private static RoamingNetworkCommit ChangeAt(RoamingNetworkHistory                         History,
+                                                     RoamingNetworkCommit                          Commit,
+                                                     Int32                                         Minutes,
+                                                     Func<RoamingNetwork, RoamingNetworkChange[]>  Changes)
+        {
+
+            var version  = History.Tips.Single(tip => tip.Commit.Id == Commit.Id).RoamingNetwork;
+            var result   = History.Commit(version.CreateSignedChangeSet(Changes(version), CreatedAt: T0.AddMinutes(Minutes)));
+
+            Assert.That(result.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), result.ErrorResponse);
+
+            return result.Commit!;
+
+        }
+
+        #endregion
+
+        #region CrissCross(ResolveOnServer2)
+
+        /// <summary>
+        /// GEF sets the maximum power of its EVSE to 11000 W on server 1 and to 7400 W on server 2, the tips conflict.
+        /// On server 1 it resolves for 7400 W, on top of the tip with 11000 W, and server 1 merges; on server 2
+        /// it resolves as given, and server 2 merges. Both merges have the two conflicting commits as their
+        /// best common ancestors.
+        /// </summary>
+        private static (RoamingNetworkHistory Server1, RoamingNetworkHistory Server2) CrissCross(Func<RoamingNetworkHistory, RoamingNetworkCommit, RoamingNetworkCommit, RoamingNetworkCommit> ResolveOnServer2)
+        {
+
+            var (server1, server2) = Servers();
+
+            var x = Change(server1, 1, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 11000) ]);
+            var y = Change(server2, 2, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 7400) ]);
+
+            Exchange(server1, server2);
+            Exchange(server2, server1);
+
+            Assert.That(server1.Tips, Has.Count.EqualTo(2));
+
+            ChangeAt(server1, x, 3, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 7400) ]);
+            ResolveOnServer2(server2, x, y);
+
+            Assert.That(server1.Tips, Has.Count.EqualTo(1));
+            Assert.That(server2.Tips, Has.Count.EqualTo(1));
+
+            Exchange(server1, server2);
+            Exchange(server2, server1);
+
+            return (server1, server2);
+
+        }
+
+        #endregion
+
+
+        #region Conflicting_common_ancestors_resolved_alike_merge()
+
+        [Test]
+        public void Conflicting_common_ancestors_resolved_alike_merge()
+        {
+
+            // Server 2 resolves for 7400 W too, in a commit of its own.
+            var (server1, server2) = CrissCross((server2, x, y) => ChangeAt(server2, x, 4, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 7400) ]));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(server1.Tips,                                       Has.Count.EqualTo(1));
+                Assert.That(server1.Conflicts,                                  Is.Empty);
+                Assert.That(server1.Head.Commit.IsMerge,                        Is.True);
+                Assert.That(EVSE(server1.Head.RoamingNetwork).MaxPower?.Value,  Is.EqualTo(7400m));
+                Assert.That(server2.Head.Commit.Id,                             Is.EqualTo(server1.Head.Commit.Id));
+                Assert.That(server2.Head.RoamingNetwork.ETags,                  Is.EqualTo(server1.Head.RoamingNetwork.ETags));
+            }
+
+        }
+
+        #endregion
+
+        #region Conflicting_common_ancestors_resolved_differently_conflict_until_the_owner_decides()
+
+        [Test]
+        public void Conflicting_common_ancestors_resolved_differently_conflict_until_the_owner_decides()
+        {
+
+            // Server 2 resolves for 11000 W, on top of the tip with 7400 W.
+            var (server1, server2) = CrissCross((server2, x, y) => ChangeAt(server2, y, 4, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 11000) ]));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(server1.Tips,                                       Has.Count.EqualTo(2));
+                Assert.That(server2.Head.Commit.Id,                             Is.EqualTo(server1.Head.Commit.Id));
+
+                // Where the common ancestors conflict, their merge base has a conflict marker.
+                var conflict = server1.Conflicts.Single();
+                Assert.That(conflict.Kind,                                      Is.EqualTo(RoamingNetworkMergeConflictKind.DifferentValues));
+                Assert.That(conflict.EntityId,                                  Is.EqualTo(E1.ToString()));
+                Assert.That(conflict.PropertyName,                              Is.EqualTo("maxPower"));
+                Assert.That(conflict.Base?[RoamingNetwork.ConflictMarkerProperty]?["base"]?.Value<Decimal>(),  Is.EqualTo(22000m));
+                Assert.That(new[] { conflict.Left!.Value<Decimal>(), conflict.Right!.Value<Decimal>() },        Is.EquivalentTo(new[] { 11000m, 7400m }));
+
+            }
+
+            // GEF decides for 7400 W, on the tip with 11000 W.
+            var tip11000 = server1.Tips.Single(tip => EVSE(tip.RoamingNetwork).MaxPower?.Value == 11000m).Commit;
+
+            ChangeAt(server1, tip11000, 5, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 7400) ]);
+
+            Exchange(server1, server2);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(server1.Tips,                                       Has.Count.EqualTo(1));
+                Assert.That(server1.Conflicts,                                  Is.Empty);
+                Assert.That(EVSE(server1.Head.RoamingNetwork).MaxPower?.Value,  Is.EqualTo(7400m));
+                Assert.That(server2.Head.Commit.Id,                             Is.EqualTo(server1.Head.Commit.Id));
+            }
+
+        }
+
+        #endregion
+
         #region (private static) WithContent(Commit, Change)
 
         /// <summary>

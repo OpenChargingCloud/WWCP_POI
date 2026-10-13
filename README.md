@@ -231,6 +231,10 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   the first one; everyone can calculate it, and `TryAppend` checks it. Conflicting tips stay, with their
   `Conflicts` (`{kind, entityType, entityId, propertyName?, base, left, right}`), until the owner commits
   a change set to one of them that resolves the conflict, e.g. taking the value of the other one.
+- **Several best common ancestors**, e.g. after a conflict was resolved on two servers, are merged into
+  a virtual merge base, as git's recursive strategy does. Where they conflict, it has a conflict marker
+  (`{"@conflict": {base, left, right}}`, also the `base` of a conflict there): the tips merge if they
+  resolved it alike, and conflict otherwise.
 - **Exchange:** `HaveIds()` names the tips and a sample of older commits, `TryGetMissingCommits(have)`
   returns what is missing there, parents first, and `TryAppend(commits)` takes them and merges afterwards.
 - **Commit signatures:** several parties sign a commit, each on its own and in any order, with a `role`
@@ -393,7 +397,6 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 
 ## Open
 
-- Recursive merge bases whose own merge conflicts
 - Finer subscription filters
 - A WebSocket endpoint in Hermod without a TCP server behind it
 - Further entities: as the use cases need them
