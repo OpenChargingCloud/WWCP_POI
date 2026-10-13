@@ -50,7 +50,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static RoamingNetwork NewNetwork()
 
-            => new (RoamingNetwork_Id.Parse("rn1"),
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                   Created,
                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                              Created:        Created,
@@ -58,7 +58,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                 Created:           Created,
                                                                                                                 ChargingStations:  [ new ChargingStation(S1,
                                                                                                                                                          Created:  Created,
-                                                                                                                                                         EVSEs:    [ new EVSE(E1, MaxPower: Watt.FromW(22000), Created: Created) ]) ]) ]) ]);
+                                                                                                                                                         EVSEs:    [ new EVSE(E1, MaxPower: Watt.FromW(22000), Created: Created) ]) ]) ]) ]).WithKeys();
 
         #endregion
 
@@ -137,7 +137,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             // A change of the EVSE keeps its energy status.
             leader.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!.TryGetEVSE(E1, out var e1);
-            leader.Publish(leader.Head.RoamingNetwork.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(e1!, "maxPower", null, 11000) ], CreatedAt: T0.AddMinutes(1)));
+            leader.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(e1!, "maxPower", null, 11000) ], CreatedAt: T0.AddMinutes(1)));
 
             leader.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!.TryGetEVSE(E1, out var changedE1);
 

@@ -61,7 +61,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static RoamingNetwork NewNetwork()
 
-            => new (RoamingNetwork_Id.Parse("rn1"),
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                   Created,
                     EMobilityProviders:        [ new EMobilityProvider(EMP,
                                                                        I18NString.Create(Languages.en, "Example Mobility"),
@@ -94,7 +94,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                             Created:  Created,
                                                                                                                                                             EVSEs:    [ new EVSE(E1,
                                                                                                                                                                                  EnergyMeter:  new EnergyMeter(EVSEMeter, ManufacturerId: ACME, ModelId: ACME3000, Created: Created),
-                                                                                                                                                                                 Created:      Created) ]) ]) ]) ]);
+                                                                                                                                                                                 Created:      Created) ]) ]) ]) ]).WithKeys();
 
         #endregion
 
@@ -103,7 +103,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static RoamingNetwork Apply(RoamingNetwork                  Network,
                                             params RoamingNetworkChange[]   Changes)
 
-            => Network.ApplyChangeSet(Network.CreateChangeSet(Changes, CreatedAt: T0));
+            => Network.ApplyChangeSet(Network.CreateSignedChangeSet(Changes, CreatedAt: T0));
 
         #endregion
 
@@ -239,8 +239,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var newMeter = new EnergyMeter(EnergyMeter_Id.Parse("evse-meter-2"), Role: "evse").ToJSON();
 
-            history.Publish(rn1.CreateChangeSet([
-                                RoamingNetworkChange.Add           (new EMobilityProvider(EMobilityProvider_Id.Parse("DE*ZAP"))),
+            history.Publish(rn1.CreateSignedChangeSet([
+                                RoamingNetworkChange.Add           (new EMobilityProvider(EMobilityProvider_Id.Parse("DE*ZAP")).WithKeys()),
                                 RoamingNetworkChange.UpdateProperty(net,  "homepage",            null, "https://netz.example"),
                                 RoamingNetworkChange.UpdateProperty(pool, "gridConnectionPoint", null, point),
                                 RoamingNetworkChange.UpdateProperty(e1,   "energyMeter",         null, newMeter),

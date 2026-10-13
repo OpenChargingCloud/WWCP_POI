@@ -70,7 +70,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static RoamingNetwork NewNetwork()
 
-            => new (RoamingNetwork_Id.Parse("rn1"),
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                       Created,
                     ChargingStationManufacturers:  [ new ChargingStationManufacturer(ACME,
                                                                                      I18NString.Create(Languages.en, "ACME Chargers"),
@@ -89,7 +89,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                              ManufacturerId:     ACME,
                                                                                                                                                              ModelId:            ChargingStationModel_Id.Parse("Wallbox-22"),
                                                                                                                                                              EVSEs:              [ NewEVSE(E1), NewEVSE(E2) ],
-                                                                                                                                                             Created:            Created) ]) ]) ]);
+                                                                                                                                                             Created:            Created) ]) ]) ]).WithKeys();
 
         #endregion
 
@@ -98,7 +98,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static RoamingNetwork Apply(RoamingNetwork                  Network,
                                             params RoamingNetworkChange[]   Changes)
 
-            => Network.ApplyChangeSet(Network.CreateChangeSet(Changes, CreatedAt: T0));
+            => Network.ApplyChangeSet(Network.CreateSignedChangeSet(Changes, CreatedAt: T0));
 
         #endregion
 
@@ -193,7 +193,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var s2   = ChargingStation_Id.Parse("DE*GEF*S2");
             var e3   = EVSE_Id.           Parse("DE*GEF*E2*1");
 
-            var cs   = rn1.CreateChangeSet([
+            var cs   = rn1.CreateSignedChangeSet([
                            RoamingNetworkChange.Add           (new ChargingPool(p2, I18NString.Create(Languages.en, "Pool 2"))),
                            RoamingNetworkChange.Add           (new ChargingStation(s2, ManufacturerId: ACME, Created: Created), p2),
                            RoamingNetworkChange.Add           (NewEVSE(e3, 50000), s2),
@@ -320,7 +320,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var gef      = history.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!;
             gef.TryGetEVSE(E1, out var e1);
 
-            history.Publish(history.Head.RoamingNetwork.CreateChangeSet([
+            history.Publish(history.Head.RoamingNetwork.CreateSignedChangeSet([
                                 RoamingNetworkChange.UpdateProperty(e1!,  "maxPower",  null, 11000),
                                 RoamingNetworkChange.UpdateProperty(gef,  "telephone", null, "+49 30 1234567")
                             ], CreatedAt: T0.AddMinutes(1)));
@@ -332,7 +332,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             newE1!.SetStatus(EVSEStatusType.Available, T0.AddMinutes(2));
 
             // Removed: its status goes with it.
-            history.Publish(history.Head.RoamingNetwork.CreateChangeSet([ RoamingNetworkChange.Remove(E1) ], CreatedAt: T0.AddMinutes(3)));
+            history.Publish(history.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.Remove(E1) ], CreatedAt: T0.AddMinutes(3)));
 
             using (Assert.EnterMultipleScope())
             {
@@ -376,7 +376,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var gef = leader.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!;
             gef.TryGetEVSE(E1, out var e1);
 
-            leader.Publish(leader.Head.RoamingNetwork.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(e1!, "maxPower", null, 11000) ], CreatedAt: T0.AddMinutes(1)));
+            leader.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(e1!, "maxPower", null, 11000) ], CreatedAt: T0.AddMinutes(1)));
             leader.TryGetCommitsSince(follower!.Head.Commit.Id, out var commits, out _);
 
             using (Assert.EnterMultipleScope())

@@ -125,7 +125,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     public sealed partial class RoamingNetwork : AImmutableEMobilityEntity<RoamingNetwork_Id,
                                                                            RoamingNetworkAdminStatusType,
-                                                                           RoamingNetworkStatusType>
+                                                                           RoamingNetworkStatusType>,
+                                                 IPOIParty
     {
 
         #region Data
@@ -160,6 +161,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         [Mandatory]
         public IEnumerable<DataLicense> DataLicenses
             => dataLicenses.Values;
+
+        #endregion
+
+        #region SigningKeys, IdentityKeys
+
+        /// <summary>
+        /// The keys of the roaming network operator signing its change sets and commits, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<POIPublicKey>  SigningKeys     { get; }
+
+        /// <summary>
+        /// The identity keys of the roaming network operator, signing changes of its own keys
+        /// and, for recovery, of the keys of other parties, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<POIPublicKey>  IdentityKeys    { get; }
 
         #endregion
 
@@ -201,7 +217,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               IEnumerable<TransparencySoftware>?         TransparencySoftware           = null,
                               IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates  = null,
                               IEnumerable<Brand>?                        Brands                         = null,
-                              IEnumerable<EnergyMeterManufacturer>?      EnergyMeterManufacturers       = null)
+                              IEnumerable<EnergyMeterManufacturer>?      EnergyMeterManufacturers       = null,
+                              IEnumerable<POIPublicKey>?                 SigningKeys                    = null,
+                              IEnumerable<POIPublicKey>?                 IdentityKeys                   = null)
 
             : base(Id,
                    Name,
@@ -218,6 +236,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    InternalData)
 
         {
+
+            (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the roaming network '{Id}'");
 
             #region Data licenses and charging station operators
 
@@ -605,6 +625,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse SigningKeys, IdentityKeys [optional]
+
+                if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
+
+                #endregion
+
                 #region Parse ChargingStationManufacturers [optional]
 
                 if (!POIJSON.TryParseChildren<ChargingStationManufacturer>(JSON,
@@ -745,7 +772,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      TransparencySoftware:      transparencySoftware,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
                                      Brands:                    brands,
-                                     EnergyMeterManufacturers:  energyMeterManufacturers
+                                     EnergyMeterManufacturers:  energyMeterManufacturers,
+                                     SigningKeys:               signingKeys,
+                                     IdentityKeys:              identityKeys
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -964,6 +993,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!transparencySoftwareCertificates.IsEmpty)
                 JSON.Add("transparencySoftwareCertificates", new JArray(OrderedTransparencySoftwareCertificates.Select(certificate => certificate.ToJSON())));
 
+            POIPartyKeys.AddTo(JSON, this);
+
             POIEntityMetadata.AddTo(JSON, Created, LastChangeDate, CustomData);
 
             // The ETags describe the content without them, irrespective of the view options.
@@ -1121,6 +1152,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse SigningKeys, IdentityKeys [optional]
+
+                var keysJSON = new JObject();
+
+                foreach (var keysProperty in new[] { POIPartyKeys.SigningKeysProperty, POIPartyKeys.IdentityKeysProperty })
+                    if (CBOR.TryGetValue(CBORValue.FromText(keysProperty), out var keysCBOR))
+                        keysJSON.Add(keysProperty, CBORJSON.ToJSON(keysCBOR));
+
+                if (!POIPartyKeys.TryParse(keysJSON, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
+
+                #endregion
+
                 #region Parse ChargingStationManufacturers, EMobilityProviders, GridOperators [optional]
 
                 if (!TryParseCBORChildren<ChargingStationManufacturer>(CBOR,
@@ -1248,7 +1292,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      TransparencySoftware:      transparencySoftware,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
                                      Brands:                    brands,
-                                     EnergyMeterManufacturers:  energyMeterManufacturers
+                                     EnergyMeterManufacturers:  energyMeterManufacturers,
+                                     SigningKeys:               signingKeys,
+                                     IdentityKeys:              identityKeys
                                  );
 
                 if (CustomRoamingNetworkParser is not null)
@@ -1345,6 +1391,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 CBOR.Add(CBORValue.FromText("transparencySoftwareCertificates"),
                          CBORValue.FromArray(OrderedTransparencySoftwareCertificates.
                                                  Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON()))));
+
+            foreach (var keys in POIPartyKeys.AddTo([], this).Properties())
+                CBOR.Add(CBORValue.FromText(keys.Name), CBORJSON.ToCBOR(keys.Value));
 
             // Always part of the content, with the keys and values of the JSON representation.
             foreach (var metadata in POIEntityMetadata.AddTo([], Created, LastChangeDate, CustomData).Properties())

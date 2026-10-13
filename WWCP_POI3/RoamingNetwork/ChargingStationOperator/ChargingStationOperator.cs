@@ -229,7 +229,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     public sealed partial class ChargingStationOperator : AImmutableEMobilityEntity<ChargingStationOperator_Id,
                                                                                     ChargingStationOperatorAdminStatusType,
-                                                                                    ChargingStationOperatorStatusType>
+                                                                                    ChargingStationOperatorStatusType>,
+                                                         IPOIParty
     {
 
         #region Data
@@ -412,6 +413,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         }
+
+        #endregion
+
+        #region SigningKeys, IdentityKeys
+
+        /// <inheritdoc/>
+        public ImmutableArray<POIPublicKey>  SigningKeys     { get; }
+
+        /// <inheritdoc/>
+        public ImmutableArray<POIPublicKey>  IdentityKeys    { get; }
 
         #endregion
 
@@ -681,6 +692,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        IEnumerable<ChargingStationGroup>?                    ChargingStationGroups                   = null,
                                        IEnumerable<ChargingPoolGroup>?                       ChargingPoolGroups                      = null,
                                        IEnumerable<ChargingTariffGroup>?                     ChargingTariffGroups                    = null,
+                                       IEnumerable<POIPublicKey>?                            SigningKeys                             = null,
+                                       IEnumerable<POIPublicKey>?                            IdentityKeys                            = null,
 
                                        Timestamped<ChargingStationOperatorAdminStatusType>?  InitialAdminStatus                     = null,
                                        Timestamped<ChargingStationOperatorStatusType>?       InitialStatus                          = null,
@@ -724,6 +737,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.homepage               = Homepage;
             this.hotlinePhoneNumber     = HotlinePhoneNumber;
             this.termsAndConditionsURL  = TermsAndConditionsURL;
+
+            (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the charging station operator '{Id}'");
 
             var dataLicenses = (DataLicenses ?? []).ToArray();
 
@@ -1339,6 +1354,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (ChargingTariffGroups.Length > 0)
                     json.Add("chargingTariffGroups", new JArray(ChargingTariffGroups.Select(group => group.ToJSON())));
+
+                POIPartyKeys.AddTo(json, this);
 
                 // Always part of the content.
                 POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);

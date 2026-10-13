@@ -300,6 +300,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse SigningKeys, IdentityKeys [optional]
+
+                if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
+
+                #endregion
+
                 #region Parse Created, LastChange, CustomData [optional]
 
                 if (!POIEntityMetadata.TryParse(JSON,
@@ -333,6 +340,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               ChargingStationGroups: chargingStationGroups,
                                               ChargingPoolGroups: chargingPoolGroups,
                                               ChargingTariffGroups: chargingTariffGroups,
+                                              SigningKeys:  signingKeys,
+                                              IdentityKeys: identityKeys,
                                               DataSource:  dataSource,
                                               Created:     created,
                                               LastChange:  lastChange,

@@ -68,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static RoamingNetwork NewNetwork()
 
-            => new (RoamingNetwork_Id.Parse("rn1"),
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                   Created,
                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                              Created:        Created,
@@ -94,7 +94,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                      ParkingSpaceGroups:  [ new ParkingSpaceGroup(ParkingSpaceGroup_Id.Parse("level-1"),
                                                                                                                   ParkingSpaceIds:    [ SP1 ],
                                                                                                                   ParkingProductIds:  [ Hourly ],
-                                                                                                                  Created:            Created) ]) ]);
+                                                                                                                  Created:            Created) ]) ]).WithKeys();
 
         #endregion
 
@@ -103,7 +103,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static RoamingNetwork Apply(RoamingNetwork                  Network,
                                             params RoamingNetworkChange[]   Changes)
 
-            => Network.ApplyChangeSet(Network.CreateChangeSet(Changes, CreatedAt: T0));
+            => Network.ApplyChangeSet(Network.CreateSignedChangeSet(Changes, CreatedAt: T0));
 
         #endregion
 
@@ -207,7 +207,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var weekly   = ParkingProduct_Id.Parse("Weekly");
 
-            var cs       = rn1.CreateChangeSet([
+            var cs       = rn1.CreateSignedChangeSet([
                                RoamingNetworkChange.Add           (new ParkingProduct(weekly, StopParkingAfterTime: TimeSpan.FromDays(7)), PAR),
                                RoamingNetworkChange.UpdateProperty(hourly!, "minDuration",        null, 900),
                                RoamingNetworkChange.UpdateProperty(sp1!,    "parkingProductIds",  null, new JArray("Weekly")),

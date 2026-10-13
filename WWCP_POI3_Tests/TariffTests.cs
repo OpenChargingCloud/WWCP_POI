@@ -75,7 +75,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static RoamingNetwork NewNetwork()
 
-            => new (RoamingNetwork_Id.Parse("rn1"),
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                   Created,
                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                              Created:          Created,
@@ -86,7 +86,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                            Created:  Created,
                                                                                                                                                            EVSEs:    [ new EVSE(E1,
                                                                                                                                                                                 ChargingTariffIds:  [ T2, T1 ],
-                                                                                                                                                                                Created:            Created) ]) ]) ]) ]);
+                                                                                                                                                                                Created:            Created) ]) ]) ]) ]).WithKeys();
 
         #endregion
 
@@ -95,7 +95,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static RoamingNetwork Apply(RoamingNetwork                  Network,
                                             params RoamingNetworkChange[]   Changes)
 
-            => Network.ApplyChangeSet(Network.CreateChangeSet(Changes, CreatedAt: T0));
+            => Network.ApplyChangeSet(Network.CreateSignedChangeSet(Changes, CreatedAt: T0));
 
         #endregion
 
@@ -206,7 +206,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var t3       = ChargingTariff_Id.Parse("DE*GEF*T3");
             var elements = new JArray(new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.59m, StepSize: 1000) ]).ToJSON());
 
-            var cs       = rn1.CreateChangeSet([
+            var cs       = rn1.CreateSignedChangeSet([
                                RoamingNetworkChange.Add           (NewTariff(t3, 0.29m)),
                                RoamingNetworkChange.UpdateProperty(t1!, "elements",          null, elements),
                                RoamingNetworkChange.UpdateProperty(e1,  "chargingTariffIds", null, new JArray(t3.ToString())),

@@ -241,7 +241,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
                                   Name:        I18NString.Create(Languages.en, "Roaming Network 1"),
                                   DataSource:  "v0",
                                   Created:     DateTimeOffset.Parse("2026-01-01T00:00:00Z")
-                              )
+                              ).WithKeys()
                           );
 
             poiAPI.AddRoamingNetworkHistory(leader);
@@ -278,7 +278,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
         private RoamingNetworkPublishResult Publish(String Value, Int32 Minute)
 
             => leader!.Publish(
-                   leader.Head.RoamingNetwork.CreateChangeSet(
+                   leader.Head.RoamingNetwork.CreateSignedChangeSet(
                        [ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, Value) ],
                        Description:  I18NString.Create(Languages.en, "Data source " + Value),
                        CreatedAt:    DateTimeOffset.Parse("2026-10-11T12:00:00Z").AddMinutes(Minute)
@@ -292,7 +292,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
         private static RoamingNetworkChangeSet ChangeSet(RoamingNetworkHistory  History,
                                                          String                 Value)
 
-            => History.Head.RoamingNetwork.CreateChangeSet(
+            => History.Head.RoamingNetwork.CreateSignedChangeSet(
                    [ RoamingNetworkChange.UpdateProperty(History.Head.RoamingNetwork, "dataSource", null, Value) ],
                    CreatedAt: DateTimeOffset.Parse("2026-10-11T13:00:00Z")
                );
@@ -1001,12 +1001,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
             poiAPI!.AuthorizeStatusUpdate = (request, login, statusUpdate) => true;
             webSocketServer!.PushCoalescingDelay = TimeSpan.FromMilliseconds(300);
 
-            leader!.Publish(leader.Head.RoamingNetwork.CreateChangeSet([
-                                RoamingNetworkChange.Add(new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"),
-                                                                                     ChargingPools: [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
-                                                                                                                       ChargingStations: [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
-                                                                                                                                                               EVSEs: [ new EVSE(EVSE_Id.Parse("DE*GEF*E1*1")),
-                                                                                                                                                                        new EVSE(EVSE_Id.Parse("DE*GEF*E1*2")) ]) ]) ]))
+            // The roaming network operator adds the operator, the operator its charging pool.
+            leader!.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([
+                                RoamingNetworkChange.Add(new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF")).WithKeys())
+                            ], CreatedAt: DateTimeOffset.Parse("2026-10-11T10:00:00Z")));
+
+            leader!.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([
+                                RoamingNetworkChange.Add(new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
+                                                                          ChargingStations: [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
+                                                                                                                  EVSEs: [ new EVSE(EVSE_Id.Parse("DE*GEF*E1*1")),
+                                                                                                                           new EVSE(EVSE_Id.Parse("DE*GEF*E1*2")) ]) ]))
                             ], CreatedAt: DateTimeOffset.Parse("2026-10-11T11:00:00Z")));
 
             await using var subscriber  = await Connect();

@@ -55,7 +55,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static RoamingNetwork NewNetwork()
 
-            => new (RoamingNetwork_Id.Parse("rn1"),
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                   Created,
                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                              Created:        Created,
@@ -78,7 +78,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                         new ParkingSpace(SP2,
                                                                                                          ParkingGarageId:     G1,
                                                                                                          Created:             Created) ],
-                                                                     ParkingSensors:  [ new ParkingSensor(SN1, Created: Created) ]) ]);
+                                                                     ParkingSensors:  [ new ParkingSensor(SN1, Created: Created) ]) ]).WithKeys();
 
         #endregion
 
@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static RoamingNetwork Apply(RoamingNetwork                  Network,
                                             params RoamingNetworkChange[]   Changes)
 
-            => Network.ApplyChangeSet(Network.CreateChangeSet(Changes, CreatedAt: T0));
+            => Network.ApplyChangeSet(Network.CreateSignedChangeSet(Changes, CreatedAt: T0));
 
         #endregion
 
@@ -190,7 +190,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var sn2       = ParkingSensor_Id.Parse("sensor-2");
 
-            var cs        = rn1.CreateChangeSet([
+            var cs        = rn1.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add           (new ParkingSensor(sn2), PAR),
                                 RoamingNetworkChange.UpdateProperty(sp1!,     "parkingSensorIds", null, new JArray("sensor-1", "sensor-2")),
                                 RoamingNetworkChange.Remove        (SP2),

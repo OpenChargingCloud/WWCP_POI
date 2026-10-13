@@ -89,7 +89,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      transparencySoftware.Values,
                                      transparencySoftwareCertificates.Values,
                                      brands.Values,
-                                     energyMeterManufacturers.Values
+                                     energyMeterManufacturers.Values,
+                                     SigningKeys,
+                                     IdentityKeys
                                  ) {
                                      Revision = Revision
                                  };
@@ -247,24 +249,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                #region Signatures
+                #region Signatures: by the owners of everything it changes, and of the optional verifier
 
-                for (var index = 0; index < ChangeSet.Signatures.Length; index++)
+                if (!TryCheckOwnership(ChangeSet, out var ownershipError))
                 {
-
-                    if (VerifySignature is null)
-                    {
-                        ErrorResponse = "A signed change set requires a signature verifier!";
-                        return false;
-                    }
-
-                    if (!VerifySignature(ChangeSet, ChangeSet.Signatures[index]))
-                    {
-                        ErrorResponse = $"Signature {index} ('{ChangeSet.Signatures[index].KeyId}') is invalid!";
-                        return false;
-                    }
-
+                    ErrorResponse = ownershipError;
+                    return false;
                 }
+
+                if (VerifySignature is not null)
+                    for (var index = 0; index < ChangeSet.Signatures.Length; index++)
+                        if (!VerifySignature(ChangeSet, ChangeSet.Signatures[index]))
+                        {
+                            ErrorResponse = $"Signature {index} ('{ChangeSet.Signatures[index].KeyId}') is invalid!";
+                            return false;
+                        }
 
                 #endregion
 
@@ -375,24 +374,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                #region Signatures
+                #region Signatures of the optional verifier: the rebased change set is unsigned and must be signed again
 
-                for (var index = 0; index < ChangeSet.Signatures.Length; index++)
-                {
-
-                    if (VerifySignature is null)
-                    {
-                        ErrorResponse = "A signed change set requires a signature verifier!";
-                        return false;
-                    }
-
-                    if (!VerifySignature(ChangeSet, ChangeSet.Signatures[index]))
-                    {
-                        ErrorResponse = $"Signature {index} ('{ChangeSet.Signatures[index].KeyId}') is invalid!";
-                        return false;
-                    }
-
-                }
+                if (VerifySignature is not null)
+                    for (var index = 0; index < ChangeSet.Signatures.Length; index++)
+                        if (!VerifySignature(ChangeSet, ChangeSet.Signatures[index]))
+                        {
+                            ErrorResponse = $"Signature {index} ('{ChangeSet.Signatures[index].KeyId}') is invalid!";
+                            return false;
+                        }
 
                 #endregion
 
@@ -498,6 +488,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var dataSource            = DataSource;
             var licenses              = DataLicenses.ToImmutableArray();
             var customData            = CustomData;
+            var signingKeys           = SigningKeys;
+            var identityKeys          = IdentityKeys;
             var operators             = new Dictionary<ChargingStationOperator_Id, ChargingStationOperator>(chargingStationOperators);
             var manufacturers         = new Dictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>(chargingStationManufacturers);
             var providers             = new Dictionary<EMobilityProvider_Id, EMobilityProvider>(eMobilityProviders);
@@ -673,7 +665,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
 
                     var propertyName  = change.PropertyName ?? "";
-                    currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses, customData);
+                    currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses, customData, signingKeys, identityKeys);
 
                     if (change.OldValue is JToken oldValue &&
                         !OldValueMatches(oldValue, currentValue))
@@ -737,6 +729,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         return false;
                                     }
                                     customData = CustomDataNew.ParseJObject(newCustomData);
+                                    break;
+
+                                case POIPartyKeys.SigningKeysProperty:
+                                case POIPartyKeys.IdentityKeysProperty:
+                                    if (!POIPartyKeys.TryParse(new JObject(new JProperty(propertyName, newValue)), out var newSigningKeys, out var newIdentityKeys, out var keysError))
+                                    {
+                                        ErrorResponse = $"Change {index}: {keysError}";
+                                        return false;
+                                    }
+                                    if (propertyName == POIPartyKeys.SigningKeysProperty)
+                                        signingKeys  = POIPublicKey.Ordered(newSigningKeys,  $"signing key of the roaming network '{Id}'");
+                                    else
+                                        identityKeys = POIPublicKey.Ordered(newIdentityKeys, $"identity key of the roaming network '{Id}'");
                                     break;
 
                                 default:
@@ -954,7 +959,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  softwares.Values,
                                  certificates.Values,
                                  brandRegistry.Values,
-                                 meterManufacturers.Values
+                                 meterManufacturers.Values,
+                                 signingKeys,
+                                 identityKeys
                              ) {
                                  Revision = Revision + 1
                              };
@@ -1004,6 +1011,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "homepage",
             "hotline",
             "termsAndConditions",
+            "signingKeys",
+            "identityKeys",
             "customData"
         ];
 
@@ -1019,7 +1028,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             ImmutableI18NString        Description,
                                             String?                    DataSource,
                                             ImmutableArray<DataLicense>  DataLicenses,
-                                            CustomDataNew              CustomData)
+                                            CustomDataNew              CustomData,
+                                            ImmutableArray<POIPublicKey>  SigningKeys,
+                                            ImmutableArray<POIPublicKey>  IdentityKeys)
 
             => PropertyName switch {
                    "name"          => Name.       IsNotNullOrEmpty()       ? Name.       ToJSON()      : null,
@@ -1027,6 +1038,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    "dataSource"    => DataSource.IsNeitherNullNorEmpty()   ? DataSource                : null,
                    "dataLicenses"  => DataLicenses.Length > 0              ? DataLicenses.ToPOIJSON()  : null,
                    "customData"    => CustomData.HasValues                 ? CustomData.ToJObject()    : null,
+                   POIPartyKeys.SigningKeysProperty   => SigningKeys. Length > 0  ? new JArray(SigningKeys. Select(key => key.ToJSON())) : null,
+                   POIPartyKeys.IdentityKeysProperty  => IdentityKeys.Length > 0  ? new JArray(IdentityKeys.Select(key => key.ToJSON())) : null,
                    _               => null
                };
 

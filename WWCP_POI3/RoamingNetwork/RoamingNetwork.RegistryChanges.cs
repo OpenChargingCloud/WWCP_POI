@@ -80,6 +80,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "customData"
         ];
 
+        /// <summary>
+        /// The properties of a party of a registry: those of an entity of a registry, and its keys.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> ChangeablePartyProperties = ChangeableRegistryProperties.Union([
+            POIPartyKeys.SigningKeysProperty,
+            POIPartyKeys.IdentityKeysProperty
+        ]);
+
         private static readonly Registry<ChargingStationManufacturer_Id, ChargingStationManufacturer> ManufacturerRegistry = new (
             "charging station manufacturer",
             "a",
@@ -94,7 +102,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly Registry<EMobilityProvider_Id, EMobilityProvider> EMobilityProviderRegistry = new (
             "e-mobility provider",
             "an",
-            ChangeableRegistryProperties,
+            ChangeablePartyProperties,
             EMobilityProvider_Id.TryParse,
             EMobilityProvider.TryParse,
             eMobilityProvider => eMobilityProvider.Id,
@@ -105,7 +113,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly Registry<GridOperator_Id, GridOperator> GridOperatorRegistry = new (
             "grid operator",
             "a",
-            ChangeableRegistryProperties,
+            ChangeablePartyProperties,
             GridOperator_Id.TryParse,
             GridOperator.TryParse,
             gridOperator => gridOperator.Id,
@@ -113,11 +121,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             (changed, previous) => changed.ShareRuntimeOf(previous)
         );
 
-        // In this file, after ChangeableRegistryProperties: static fields are initialized in their textual order only within one file.
+        // In this file, after ChangeablePartyProperties: static fields are initialized in their textual order only within one file.
         private static readonly Registry<ParkingOperator_Id, ParkingOperator> ParkingOperatorRegistry = new (
             "parking operator",
             "a",
-            ChangeableRegistryProperties,
+            ChangeablePartyProperties,
             ParkingOperator_Id.TryParse,
             ParkingOperator.TryParse,
             parkingOperator => parkingOperator.Id,

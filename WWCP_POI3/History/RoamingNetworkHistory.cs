@@ -605,6 +605,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (!head.RoamingNetwork.TryRebase(changeSet, out var rebasedChangeSet, out var rebaseError, VerifySignature))
                         return new (RoamingNetworkPublishStatus.Refused, head, ErrorResponse: rebaseError);
 
+                    // The signatures of the owners cover the before ETags: only they can sign a rebased change set.
+                    if (rebasedChangeSet.Signatures.IsEmpty)
+                        return new (RoamingNetworkPublishStatus.Refused, head, ErrorResponse: "The change set does not fit the head: it can be rebased, but its owners must sign it again!");
+
                     changeSet = rebasedChangeSet;
                     rebased   = true;
 

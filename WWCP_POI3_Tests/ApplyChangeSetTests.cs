@@ -57,7 +57,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
         private static ChargingStationOperator NewOperator(String Id, String Name)
 
-            => new (
+            => new ChargingStationOperator(
                    Id:                     ChargingStationOperator_Id.Parse(Id),
                    Name:                   I18NString.Create(Languages.en, Name),
                    Description:            I18NString.Create(Languages.de, "Ein Betreiber"),
@@ -72,11 +72,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                    DataLicenses:           [ OwnLicense, DataLicense.OpenDatabaseLicense ],
                    DataSource:             "test",
                    Created:                DateTimeOffset.Parse("2026-01-01T00:00:00Z")
-               );
+               ).WithKeys();
 
         private static RoamingNetwork NewNetwork()
 
-            => new (
+            => new RoamingNetwork(
                    Id:                        RoamingNetwork_Id.Parse("rn1"),
                    Name:                      I18NString.Create(Languages.en, "Roaming Network 1"),
                    Description:               I18NString.Create(Languages.en, "My first roaming network!").
@@ -85,7 +85,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                    Created:                   DateTimeOffset.Parse("2026-01-01T00:00:00Z"),
                    DataLicenses:              [ OwnLicense, DataLicense.OpenDatabaseLicense ],
                    ChargingStationOperators:  [ NewOperator("DE*GEF", "GraphDefined"), NewOperator("DE*EXA", "Example Operator") ]
-               );
+               ).WithKeys();
 
         #endregion
 
@@ -98,7 +98,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
             var rn1  = NewNetwork();
 
-            var cs1  = rn1.CreateChangeSet(
+            var cs1  = rn1.CreateSignedChangeSet(
                            [
                                RoamingNetworkChange.UpdateProperty(rn1, "dataSource", OldValue: "test", NewValue: "test2"),
                                RoamingNetworkChange.UpdateProperty(rn1, "name",       OldValue: null,   NewValue: new JObject(new JProperty("en", "Network 1"))),
@@ -144,7 +144,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1  = NewNetwork();
-            var cs1  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
+            var cs1  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
 
             var rn2  = rn1.ApplyChangeSet(RoamingNetworkChangeSet.Parse(cs1.ToJSON().ToString()));
 
@@ -161,7 +161,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1  = NewNetwork();
-            var cs1  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
+            var cs1  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
             var rn2  = rn1.ApplyChangeSet(cs1);
 
             Assert.That(rn2.TryApplyChangeSet(cs1, out _, out var error),  Is.False);
@@ -178,8 +178,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1  = NewNetwork();
-            var csA  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]);
-            var csB  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "B") ]);
+            var csA  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]);
+            var csB  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "B") ]);
 
             var rn2  = rn1.ApplyChangeSet(csA);
 
@@ -191,7 +191,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(error1,                                             Does.Contain("does not fit this version"));
 
                 // ...and its changes, prepared again, find "A" where they expect "test".
-                Assert.That(() => rn2.CreateChangeSet(csB.Changes),
+                Assert.That(() => rn2.CreateSignedChangeSet(csB.Changes),
                             Throws.ArgumentException.With.Message.Contains("no longer the expected old value"));
 
             }
@@ -207,11 +207,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1  = NewNetwork();
-            var csA  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]);
-            var csB  = rn1.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(rn1, "description") ]);
+            var csA  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]);
+            var csB  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(rn1, "description") ]);
 
             var rn3  = rn1.ApplyChangeSet(csA).
-                           ApplyChangeSet(rn1.ApplyChangeSet(csA).CreateChangeSet(csB.Changes));
+                           ApplyChangeSet(rn1.ApplyChangeSet(csA).CreateSignedChangeSet(csB.Changes));
 
             using (Assert.EnterMultipleScope())
             {
@@ -231,14 +231,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1    = NewNetwork();
-            var cs1    = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
+            var cs1    = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
 
             var wrong  = new RoamingNetworkChangeSet(cs1.Id,
                                                      cs1.RoamingNetworkId,
                                                      cs1.CreatedAt,
                                                      cs1.Changes,
                                                      cs1.BeforeETags,
-                                                     cs1.BeforeETags);
+                                                     cs1.BeforeETags).SignedByAll(rn1);
 
             Assert.That(rn1.TryApplyChangeSet(wrong, out _, out var error),  Is.False);
             Assert.That(error,                                               Does.Contain("result does not match"));
@@ -254,28 +254,28 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1 = NewNetwork();
-            var rn0 = new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn1"));
+            var rn0 = new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn1")).WithKeys();
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "name", null, "no object") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "name", null, "no object") ]),
                             Throws.ArgumentException.With.Message.Contains("invalid name"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, 42) ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, 42) ]),
                             Throws.ArgumentException.With.Message.Contains("nonempty text"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "@id", null, "rn2") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "@id", null, "rn2") ]),
                             Throws.ArgumentException.With.Message.Contains("can not be changed"));
 
-                Assert.That(() => rn0.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(rn0, "description") ]),
+                Assert.That(() => rn0.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(rn0, "description") ]),
                             Throws.ArgumentException.With.Message.Contains("does not exist"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.Remove("Unicorn", "U1") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.Remove("Unicorn", "U1") ]),
                             Throws.ArgumentException.With.Message.Contains("changes of Unicorn 'U1' are not supported yet"));
 
                 Assert.That(() => new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn2")).ApplyChangeSet(
-                                      rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ])),
+                                      rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ])),
                             Throws.ArgumentException.With.Message.Contains("is for the roaming network 'rn1'"));
 
             }
@@ -291,7 +291,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1  = NewNetwork();
-            var cs1  = rn1.CreateChangeSet([
+            var cs1  = rn1.CreateSignedChangeSet([
                            RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A"),
                            RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "B")
                        ]);
@@ -317,7 +317,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             var rn1  = NewNetwork();
             var exa  = rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*EXA"))!;
 
-            var cs1  = rn1.CreateChangeSet([
+            var cs1  = rn1.CreateSignedChangeSet([
                            RoamingNetworkChange.Add   (NewOperator("DE*NEW", "A new operator")),
                            RoamingNetworkChange.Remove(exa.Id)
                        ]);
@@ -358,22 +358,22 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.Add(NewOperator("DE*GEF", "Twice")) ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.Add(NewOperator("DE*GEF", "Twice")) ]),
                             Throws.ArgumentException.With.Message.Contains("'DE*GEF' already exists"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.Remove(ChargingStationOperator_Id.Parse("DE*XYZ")) ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.Remove(ChargingStationOperator_Id.Parse("DE*XYZ")) ]),
                             Throws.ArgumentException.With.Message.Contains("'DE*XYZ' does not exist"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.Add("ChargingStationOperator", "DE*XYZ", NewOperator("DE*NEW", "New").ToEmbeddedJSON()) ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.Add("ChargingStationOperator", "DE*XYZ", NewOperator("DE*NEW", "New").ToEmbeddedJSON()) ]),
                             Throws.ArgumentException.With.Message.Contains("is not the one to add, 'DE*XYZ'"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.Add("ChargingStationOperator", "DE*NEW", invalid) ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.Add("ChargingStationOperator", "DE*NEW", invalid) ]),
                             Throws.ArgumentException.With.Message.Contains("telephone number"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.Add("ChargingStationOperator", "DE*NEW", NewOperator("DE*NEW", "New").ToEmbeddedJSON(), "RoamingNetwork", "rn2") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.Add("ChargingStationOperator", "DE*NEW", NewOperator("DE*NEW", "New").ToEmbeddedJSON(), "RoamingNetwork", "rn2") ]),
                             Throws.ArgumentException.With.Message.Contains("not to RoamingNetwork 'rn2'"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.AddElement("ChargingStationOperator", "DE*GEF", [ new POIElementPathSegment("brands", "b1") ], new JObject()) ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.AddElement("ChargingStationOperator", "DE*GEF", [ new POIElementPathSegment("brands", "b1") ], new JObject()) ]),
                             Throws.ArgumentException.With.Message.Contains("AddElement of a charging station operator is not supported yet"));
 
             }
@@ -391,7 +391,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             var rn1  = NewNetwork();
             var gef  = rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*GEF"))!;
 
-            var cs1  = rn1.CreateChangeSet([
+            var cs1  = rn1.CreateSignedChangeSet([
                            RoamingNetworkChange.UpdateProperty(gef, "telephone",     null, "+49 30 7654321"),
                            RoamingNetworkChange.UpdateProperty(gef, "name",          null, new JObject(new JProperty("en", "GraphDefined GmbH"))),
                            RoamingNetworkChange.UpdateProperty(gef, "dataLicenses",  null, new JArray(DataLicense.OpenDatabaseLicense.ToPOIJSON())),
@@ -438,22 +438,22 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "@id", null, "DE*XYZ") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "@id", null, "DE*XYZ") ]),
                             Throws.ArgumentException.With.Message.Contains("'@id' of a charging station operator can not be changed"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "unknown", null, "x") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "unknown", null, "x") ]),
                             Throws.ArgumentException.With.Message.Contains("'unknown' of a charging station operator can not be changed"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "telephone", null, "no phone number") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "telephone", null, "no phone number") ]),
                             Throws.ArgumentException.With.Message.Contains("telephone number"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(gef, "name") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(gef, "name") ]),
                             Throws.ArgumentException.With.Message.Contains("can not be removed, only changed"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(gef, "homepage"), RoamingNetworkChange.RemoveProperty(gef, "homepage") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(gef, "homepage"), RoamingNetworkChange.RemoveProperty(gef, "homepage") ]),
                             Throws.ArgumentException.With.Message.Contains("Change 1: the property 'homepage' of the charging station operator 'DE*GEF' does not exist"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty("ChargingStationOperator", "DE*XYZ", "telephone", null, "+49 30 1234") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty("ChargingStationOperator", "DE*XYZ", "telephone", null, "+49 30 1234") ]),
                             Throws.ArgumentException.With.Message.Contains("'DE*XYZ' does not exist"));
 
             }
@@ -471,9 +471,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             var rn1  = NewNetwork();
             var gef  = rn1.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*GEF"))!;
 
-            var csA  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "telephone", null, "+49 30 1111111") ]);
-            var csB  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "homepage",  null, "https://example.com") ]);
-            var csC  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "telephone", null, "+49 30 2222222") ]);
+            var csA  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "telephone", null, "+49 30 1111111") ]);
+            var csB  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "homepage",  null, "https://example.com") ]);
+            var csC  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "telephone", null, "+49 30 2222222") ]);
 
             var rn2  = rn1.ApplyChangeSet(csA);
 
@@ -481,12 +481,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             {
 
                 // B changes another property of the same operator and can be prepared again...
-                var rn3 = rn2.ApplyChangeSet(rn2.CreateChangeSet(csB.Changes));
+                var rn3 = rn2.ApplyChangeSet(rn2.CreateSignedChangeSet(csB.Changes));
                 Assert.That(rn3.GetChargingStationOperatorById(gef.Id)!.Telephone,  Is.EqualTo(PhoneNumber.Parse("+49 30 1111111")));
                 Assert.That(rn3.GetChargingStationOperatorById(gef.Id)!.Homepage,   Is.EqualTo(URL.Parse("https://example.com")));
 
                 // ...C changes the same property and conflicts.
-                Assert.That(() => rn2.CreateChangeSet(csC.Changes),
+                Assert.That(() => rn2.CreateSignedChangeSet(csC.Changes),
                             Throws.ArgumentException.With.Message.Contains("'telephone' of the charging station operator 'DE*GEF' is no longer the expected old value"));
 
             }
@@ -503,13 +503,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
             var rn1       = NewNetwork();
 
-            var cs1       = rn1.CreateChangeSet([
+            var cs1       = rn1.CreateSignedChangeSet([
                                 RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray(DataLicense.CreativeCommons_BY_4.ToPOIJSON(), OwnLicense.ToPOIJSON()))
                             ]);
 
             var rn2       = rn1.ApplyChangeSet(RoamingNetworkChangeSet.Parse(cs1.ToJSON().ToString()));
 
-            var cs2       = rn2.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(rn2, "dataLicenses") ]);
+            var cs2       = rn2.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(rn2, "dataLicenses") ]);
             var rn3       = rn2.ApplyChangeSet(cs2);
 
             using (Assert.EnterMultipleScope())
@@ -539,21 +539,21 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1  = NewNetwork();
-            var rn0  = new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn1"));
+            var rn0  = new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn1")).WithKeys();
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, "ODbL") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, "ODbL") ]),
                             Throws.ArgumentException.With.Message.Contains("must be a JSON array"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray(new JObject(new JProperty("description", new JObject())))) ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray(new JObject(new JProperty("description", new JObject())))) ]),
                             Throws.ArgumentException.With.Message.Contains("Invalid data license"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray(OwnLicense.ToPOIJSON(), OwnLicense.ToPOIJSON())) ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray(OwnLicense.ToPOIJSON(), OwnLicense.ToPOIJSON())) ]),
                             Throws.ArgumentException.With.Message.Contains("'own-1.0' must not be given twice"));
 
-                Assert.That(() => rn0.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(rn0, "dataLicenses") ]),
+                Assert.That(() => rn0.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(rn0, "dataLicenses") ]),
                             Throws.ArgumentException.With.Message.Contains("'dataLicenses' does not exist"));
 
             }
@@ -569,12 +569,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1  = NewNetwork();
-            var csA  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray(DataLicense.CreativeCommons_BY_4.ToPOIJSON())) ]);
-            var csB  = rn1.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(rn1, "dataLicenses") ]);
+            var csA  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray(DataLicense.CreativeCommons_BY_4.ToPOIJSON())) ]);
+            var csB  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(rn1, "dataLicenses") ]);
 
             var rn2  = rn1.ApplyChangeSet(csA);
 
-            Assert.That(() => rn2.CreateChangeSet(csB.Changes),
+            Assert.That(() => rn2.CreateSignedChangeSet(csB.Changes),
                         Throws.ArgumentException.With.Message.Contains("'dataLicenses' is no longer the expected old value"));
 
         }
@@ -591,9 +591,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             var exa     = ChargingStationOperator_Id.Parse("DE*EXA");
 
             // A replaces DE*EXA, B removes it and C removes DE*GEF, all against the same version.
-            var csA     = rn1.CreateChangeSet([ RoamingNetworkChange.Remove(exa), RoamingNetworkChange.Add(NewOperator("DE*EXA", "Renamed")) ]);
-            var csB     = rn1.CreateChangeSet([ RoamingNetworkChange.Remove(exa) ]);
-            var csC     = rn1.CreateChangeSet([ RoamingNetworkChange.Remove(ChargingStationOperator_Id.Parse("DE*GEF")) ]);
+            var csA     = rn1.CreateSignedChangeSet([ RoamingNetworkChange.Remove(exa), RoamingNetworkChange.Add(NewOperator("DE*EXA", "Renamed")) ]);
+            var csB     = rn1.CreateSignedChangeSet([ RoamingNetworkChange.Remove(exa) ]);
+            var csC     = rn1.CreateSignedChangeSet([ RoamingNetworkChange.Remove(ChargingStationOperator_Id.Parse("DE*GEF")) ]);
 
             var rn2     = rn1.ApplyChangeSet(csA);
 
@@ -601,11 +601,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             {
 
                 // B would remove the operator A has replaced.
-                Assert.That(() => rn2.CreateChangeSet(csB.Changes),
+                Assert.That(() => rn2.CreateSignedChangeSet(csB.Changes),
                             Throws.ArgumentException.With.Message.Contains("'DE*EXA' is no longer the expected old value"));
 
                 // C touches another operator and can be prepared again.
-                var rn3 = rn2.ApplyChangeSet(rn2.CreateChangeSet(csC.Changes));
+                var rn3 = rn2.ApplyChangeSet(rn2.CreateSignedChangeSet(csC.Changes));
                 Assert.That(rn3.ChargingStationOperators.Single().Name[Languages.en],  Is.EqualTo("Renamed"));
 
             }
@@ -621,14 +621,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1   = NewNetwork();
-            var cs1   = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
+            var cs1   = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
 
             var only  = new RoamingNetworkChangeSet(cs1.Id,
                                                     cs1.RoamingNetworkId,
                                                     cs1.CreatedAt,
                                                     cs1.Changes,
                                                     [ cs1.BeforeETags.Single(eTag => eTag.Format == ETagFormat.JSON) ],
-                                                    [ cs1.AfterETags. Single(eTag => eTag.Format == ETagFormat.CBOR) ]);
+                                                    [ cs1.AfterETags. Single(eTag => eTag.Format == ETagFormat.CBOR) ]).SignedByAll(rn1);
 
             Assert.That(rn1.TryApplyChangeSet(only, out var rn2, out var error),  Is.True, error);
             Assert.That(rn2?.DataSource,                                          Is.EqualTo("test2"));
@@ -644,7 +644,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1     = NewNetwork();
-            var cs1     = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
+            var cs1     = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
             var rn2     = rn1.ApplyChangeSet(cs1);
 
             var before  = ETag.Compute(ETagFormat.JSON, ETagHashAlgorithm.SHA512, CanonicalJSON.ToUTF8Bytes(rn1.ToJSON(IncludeETags: false)));
@@ -652,10 +652,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             var wrong   = ETag.Compute(ETagFormat.JSON, ETagHashAlgorithm.SHA512, CanonicalJSON.ToUTF8Bytes(rn2.ToJSON(IncludeETags: false)));
 
             // ...and they survive the JSON text of their change set.
-            var sha     = RoamingNetworkChangeSet.Parse(new RoamingNetworkChangeSet(cs1.Id, cs1.RoamingNetworkId, cs1.CreatedAt, cs1.Changes, [ before ], [ after ]).
+            var sha     = RoamingNetworkChangeSet.Parse(new RoamingNetworkChangeSet(cs1.Id, cs1.RoamingNetworkId, cs1.CreatedAt, cs1.Changes, [ before ], [ after ]).SignedByAll(rn1).
                                                             ToJSON().ToString());
 
-            var stale   = new RoamingNetworkChangeSet(cs1.Id, cs1.RoamingNetworkId, cs1.CreatedAt, cs1.Changes, [ wrong ], [ after ]);
+            var stale   = new RoamingNetworkChangeSet(cs1.Id, cs1.RoamingNetworkId, cs1.CreatedAt, cs1.Changes, [ wrong ], [ after ]).SignedByAll(rn1);
 
             using (Assert.EnterMultipleScope())
             {
@@ -695,7 +695,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                                 LastChange:                rn1.LastChangeDate,
                                 DataLicenses:              rn1.DataLicenses.Reverse(),
                                 ChargingStationOperators:  rn1.ChargingStationOperators.Reverse()
-                            );
+                            ).WithKeys();
 
             // One operator with another telephone number.
             var changed   = new RoamingNetwork(
@@ -707,7 +707,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                                 LastChange:                rn1.LastChangeDate,
                                 DataLicenses:              rn1.DataLicenses,
                                 ChargingStationOperators:  [ NewOperator("DE*GEF", "GraphDefined"), NewOperator("DE*EXA", "Another name") ]
-                            );
+                            ).WithKeys();
 
             using (Assert.EnterMultipleScope())
             {
@@ -722,7 +722,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(changed.  CalcETags(),  Is.Not.EqualTo(eTags));
 
                 // A change set keeps the operators and licenses.
-                var rn2 = rn1.ApplyChangeSet(rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]));
+                var rn2 = rn1.ApplyChangeSet(rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]));
                 Assert.That(rn2.ChargingStationOperators.Count(),  Is.EqualTo(2));
                 Assert.That(rn2.DataLicenses.Count(),              Is.EqualTo(2));
 
@@ -743,7 +743,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             var operatorIds  = rn1.ToJSON(ExpandChargingStationOperatorIds: InfoStatus.ShowIdOnly, IncludeETags: false);
             var licenseIds   = rn1.ToJSON(ExpandDataLicenses:               InfoStatus.ShowIdOnly, IncludeETags: false);
 
-            var knownOnly    = new RoamingNetwork(Id: rn1.Id, DataLicenses: [ DataLicense.OpenDatabaseLicense ]);
+            var knownOnly    = new RoamingNetwork(Id: rn1.Id, DataLicenses: [ DataLicense.OpenDatabaseLicense ]).WithKeys();
 
             using (Assert.EnterMultipleScope())
             {
@@ -776,12 +776,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
             RoamingNetwork network(DateTimeOffset Created)
 
-                => new (
+                => new RoamingNetwork(
                        Id:          RoamingNetwork_Id.Parse("rn1"),
                        Created:     Created,
                        LastChange:  DateTimeOffset.Parse("2026-02-02T02:02:02.123Z"),
                        CustomData:  customData
-                   );
+                   ).WithKeys();
 
             var rn1         = network(DateTimeOffset.Parse("2026-01-01T00:00:00.4567891Z"));
             var json        = rn1.ToJSON(IncludeETags: false);
@@ -826,7 +826,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             newOperator.Remove("created");
             newOperator.Remove("lastChange");
 
-            var cs1          = rn1.CreateChangeSet([
+            var cs1          = rn1.CreateSignedChangeSet([
                                    RoamingNetworkChange.UpdateProperty(gef, "telephone", null, "+49 30 7654321"),
                                    RoamingNetworkChange.Add("ChargingStationOperator", "DE*NEW", newOperator)
                                ],
@@ -852,10 +852,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(rn2.GetChargingStationOperatorById(exa.Id)!.LastChangeDate,  Is.EqualTo(exa.LastChangeDate));
 
                 // Timestamps are managed by change sets, not changed by them.
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "lastChange", null, "2030-01-01T00:00:00.000Z") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(gef, "lastChange", null, "2030-01-01T00:00:00.000Z") ]),
                             Throws.ArgumentException.With.Message.Contains("'lastChange' of a charging station operator can not be changed"));
 
-                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "created", null, "2030-01-01T00:00:00.000Z") ]),
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "created", null, "2030-01-01T00:00:00.000Z") ]),
                             Throws.ArgumentException.With.Message.Contains("'created' of a roaming network can not be changed"));
 
             }
@@ -871,8 +871,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         {
 
             var rn1  = NewNetwork();
-            var rn2  = rn1.ApplyChangeSet(rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "customData", null, new JObject(new JProperty("a", 1))) ]));
-            var cs3  = rn2.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(rn2, "customData") ]);
+            var rn2  = rn1.ApplyChangeSet(rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "customData", null, new JObject(new JProperty("a", 1))) ]));
+            var cs3  = rn2.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(rn2, "customData") ]);
             var rn3  = rn2.ApplyChangeSet(cs3);
 
             using (Assert.EnterMultipleScope())
@@ -905,7 +905,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             var viaCBORtoJSON = RoamingNetwork.Parse(JObject.Parse(RoamingNetwork.Parse(CBORValue.Parse(rn1.ToCBOR().ToByteArray(CBORWriterOptions.Canonical))).
                                                                          ToJSON().ToString()));
 
-            var minimal       = new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn0"));
+            var minimal       = new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn0")).WithKeys();
             var minimalETags  = minimal.CalcETags();
 
             using (Assert.EnterMultipleScope())
@@ -922,35 +922,36 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
         #endregion
 
-        #region A_signed_change_set_needs_a_verifier()
+        #region A_change_set_is_signed_by_the_owners_of_what_it_changes()
 
         [Test]
-        public void A_signed_change_set_needs_a_verifier()
+        public void A_change_set_is_signed_by_the_owners_of_what_it_changes()
         {
 
-            var rn1     = NewNetwork();
-            var signed  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]).
-                              Sign(Alice, "alice", COSEAlgorithm.Ed25519);
-
-            var publicKey = Alice.GeneratePublicKey();
+            var rn1       = NewNetwork();
+            var unsigned  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "test2") ]);
+            var byRNO     = unsigned.SignedBy(TestParties.Party(rn1));
+            var byAlice   = byRNO.Sign(Alice, "alice", COSEAlgorithm.Ed25519);
+            var byEXA     = unsigned.SignedBy(TestParties.Party(ChargingStationOperator_Id.Parse("DE*EXA")));
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(rn1.TryApplyChangeSet(signed, out _, out var error1),  Is.False);
-                Assert.That(error1,                                                Does.Contain("requires a signature verifier"));
+                Assert.That(rn1.TryApplyChangeSet(unsigned, out _, out var error1),  Is.False);
+                Assert.That(error1,                                                  Does.Contain("is unsigned"));
 
-                Assert.That(rn1.TryApplyChangeSet(signed, out _, out var error2, (changeSet, signature) => false),  Is.False);
-                Assert.That(error2,                                                                                Does.Contain("'alice') is invalid"));
+                Assert.That(rn1.TryApplyChangeSet(byAlice,  out _, out var error2),  Is.False);
+                Assert.That(error2,                                                  Does.Contain("'alice' is no key of a party"));
 
-                Assert.That(rn1.TryApplyChangeSet(signed,
-                                                  out var rn2,
-                                                  out var error3,
-                                                  (changeSet, signature) => changeSet.VerifySignature(signature, publicKey, "alice", out _)),
-                            Is.True,
-                            error3);
+                Assert.That(rn1.TryApplyChangeSet(byEXA,    out _, out var error3),  Is.False);
+                Assert.That(error3,                                                  Does.Contain("needs a signature by a signing key of the roaming network operator"));
 
-                Assert.That(rn2?.DataSource, Is.EqualTo("test2"));
+                // An optional verifier checks every signature in addition.
+                Assert.That(rn1.TryApplyChangeSet(byRNO,    out _, out var error4, (changeSet, signature) => false),  Is.False);
+                Assert.That(error4,                                                                                  Does.Contain("is invalid"));
+
+                Assert.That(rn1.TryApplyChangeSet(byRNO,    out var rn2, out var error5),  Is.True, error5);
+                Assert.That(rn2?.DataSource,                                               Is.EqualTo("test2"));
 
             }
 

@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static RoamingNetwork NewNetwork(TransparencySoftwareAssignment[]? Assignments = null)
 
-            => new (RoamingNetwork_Id.Parse("rn1"),
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                           Created,
                     ChargingStationManufacturers:      [ new ChargingStationManufacturer(ACME, Created: Created) ],
                     TransparencySoftware:              [ NewRelease(Chargy10, "1.0"), NewRelease(Chargy11, "1.1") ],
@@ -105,7 +105,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                                                                                         new TransparencySoftwareAssignment(Chargy11, LegalStatus.ForInformationOnly)
                                                                                                                                                                                                                     ],
                                                                                                                                                                                                                     Created:                     Created),
-                                                                                                                                                                                      Created:      Created) ]) ]) ]) ]);
+                                                                                                                                                                                      Created:      Created) ]) ]) ]) ]).WithKeys();
 
         #endregion
 
@@ -114,7 +114,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static RoamingNetwork Apply(RoamingNetwork                  Network,
                                             params RoamingNetworkChange[]   Changes)
 
-            => Network.ApplyChangeSet(Network.CreateChangeSet(Changes, CreatedAt: T0));
+            => Network.ApplyChangeSet(Network.CreateSignedChangeSet(Changes, CreatedAt: T0));
 
         #endregion
 

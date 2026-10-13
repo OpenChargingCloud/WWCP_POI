@@ -132,6 +132,11 @@ parking product ids compare case-sensitively.
   available since their creation.
 - **Energy status:** EVSEs and charging stations also have an energy status, `{used, available, storedEnergy?}`
   in W, W and Wh, kept the same way; there is none until one is reported. Its schedule keeps the last ten.
+- **Keys:** the roaming network (for its operator, the RNO), charging station operators, e-mobility providers,
+  grid operators and parking operators each name 1..n `signingKeys`, short keys signing their change sets
+  (e.g. secp256r1), and 1..n `identityKeys`, long-term keys signing changes of their own keys (e.g. secp521r1):
+  `{@id, key, notBefore?, notAfter?}`, the public COSE key as Base64 of its deterministic CBOR, identified by its
+  SHA-256 COSE key thumbprint [RFC 9679] in lowercase hex. A key is not both.
 
 ## Change sets
 
@@ -139,20 +144,29 @@ A change set is an ordered list of changes against one version, named by its bef
 leading to the version named by its after ETags.
 
 ```csharp
+// The public halves of the private keys of the parties.
 var gef = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"),
-                                      I18NString.Create(Languages.en, "GraphDefined"));
+                                      I18NString.Create(Languages.en, "GraphDefined"),
+                                      SigningKeys:   [ POIPublicKey.From(gefSigningKey)  ],   // e.g. secp256r1
+                                      IdentityKeys:  [ POIPublicKey.From(gefIdentityKey) ]);  // e.g. secp521r1
 
 var rn1 = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                              DataSource:                "v1",
-                             ChargingStationOperators:  [ gef ]);
+                             ChargingStationOperators:  [ gef ],
+                             SigningKeys:               [ POIPublicKey.From(rnoSigningKey)  ],
+                             IdentityKeys:              [ POIPublicKey.From(rnoIdentityKey) ]);
 
-var newOperator = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*NEW"));
+var newOperator = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*NEW"),
+                                              SigningKeys:   [ POIPublicKey.From(newSigningKey)  ],
+                                              IdentityKeys:  [ POIPublicKey.From(newIdentityKey) ]);
 
 var cs  = rn1.CreateChangeSet([
               RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "v2"),             // the network
               RoamingNetworkChange.Add           (newOperator),                               // a new operator
               RoamingNetworkChange.UpdateProperty(gef, "telephone",  null, "+49 30 7654321")  // the operator DE*GEF
-          ]);
+          ]).
+          Sign(rnoSigningKey, POIPublicKey.From(rnoSigningKey).Id, COSEAlgorithm.ES256).      // owns the network and adds operators
+          Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);      // owns DE*GEF
 
 var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 ```
@@ -169,9 +183,19 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 - **Old values:** `CreateChangeSet` gives every change the value it finds; JSON `null` means
   "expected absent". A change finding another value conflicts.
 - **Timestamps:** a change set sets `lastChange` to its `CreatedAt`, so its after ETags are deterministic.
-- **Rebase:** `rn2.TryRebase(cs, …)` prepares a change set of an older version again, unless it conflicts.
+- **Owners:** every change set must be signed by the owner of every change it makes, with a key the owner has
+  in the version it is applied to, valid at its `createdAt` (`TryCheckOwnership`); every signature must be one of
+  a key of a party. Nobody else's signature counts, there is no external trust configuration.
+  - The **RNO** owns the roaming network itself, brands, manufacturers, energy meter manufacturers and
+    transparency software, and adds and removes parties: with their keys, without their children.
+  - A **charging station operator** owns its properties, pools, stations, EVSEs, tariffs and groups,
+    named by their ids; a **parking operator** its parking data; e-mobility providers and grid operators their properties.
+  - Data is signed with a signing key; the `signingKeys` and `identityKeys` of a party with one of its identity
+    keys or, for recovery, an identity key of the RNO. A party keeps at least one key of each kind.
+- **Rebase:** `rn2.TryRebase(cs, …)` prepares a change set of an older version again, unless it conflicts;
+  the rebased change set is unsigned, its owners sign it again.
 - **Signatures:** `Sign(…)` and `VerifySignature(…)` over canonical JSON (COSE algorithms of Styx);
-  a signed change set is applied only with a verifier.
+  an optional `VerifyChangeSetSignature` checks them in addition.
 - **Wire:** JSON and CBOR; `RoamingNetworkChangeSetLimits` bound bytes, depth, changes and signatures.
 
 ## History and sync
@@ -220,8 +244,8 @@ follower.TryAppend(commits!, out _, out _);
 | `COMMIT ~/roamingNetworks/{id}/history/changeSets?expectedHead={commitId}&rebase=true` | 201 published, 200 already published, 409 head moved, 422 refused |
 | `POST ~/roamingNetworks/{id}/history/commits/{commitId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403, 404, 422 invalid |
 
-Submitting is refused unless `AuthorizeChangeSetSubmission` decides who may submit what;
-signed change sets need `VerifyChangeSetSignature`. Adding commit signatures likewise needs
+Submitting is refused unless `AuthorizeChangeSetSubmission` decides who may submit;
+what a change set may change, its owners' signatures decide. Adding commit signatures needs
 `AuthorizeCommitSignature` (e.g. whether the sender has the role it signs in) and `VerifyCommitSignature`.
 
 ### WebSocket

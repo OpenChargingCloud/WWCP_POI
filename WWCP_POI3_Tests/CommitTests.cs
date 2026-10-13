@@ -46,7 +46,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                           Description:  I18NString.Create(Languages.en, "My first roaming network!").
                                                       Set(Languages.de, "Mein erstes Roaming-Netzwerk!"),
                           DataSource:   "test"
-                      );
+                      ).WithKeys();
 
             var e1  = rn1.CalcETags();
 
@@ -60,7 +60,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
             ];
 
             // The change set the network makes of the changes knows the ETags after them.
-            var cs1 = rn1.CreateChangeSet(
+            var cs1 = rn1.CreateSignedChangeSet(
                           Changes:      c1,
                           Description:  new ImmutableI18NString(I18NString.Create("Hello world!")),
                           Metadata:     new JObject(new JProperty("hello", "world!")),
@@ -119,9 +119,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
 
             var leader  = RoamingNetworkHistory.Start(new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                                                                          DataSource:  "test",
-                                                                         Created:     DateTimeOffset.Parse("2026-01-01T00:00:00Z")));
+                                                                         Created:     DateTimeOffset.Parse("2026-01-01T00:00:00Z")).WithKeys());
 
-            leader.Publish(leader.Head.RoamingNetwork.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, "test2") ],
+            leader.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, "test2") ],
                                                                       CreatedAt: DateTimeOffset.Parse("2026-10-12T12:00:00Z")));
 
             // The same content, but read anew: revision 0.
@@ -153,7 +153,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                           Description:  I18NString.Create(Languages.en, "My first roaming network!").
                                                       Set(Languages.de, "Mein erstes Roaming-Netzwerk!"),
                           DataSource:   "test"
-                      );
+                      ).WithKeys();
 
             var c1  = rn1.ToCBOR();
             var e1  = rn1.CalcETags(CBOR: c1);

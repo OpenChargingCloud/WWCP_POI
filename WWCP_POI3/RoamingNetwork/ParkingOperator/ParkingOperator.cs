@@ -58,7 +58,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                     ParkingOperatorAdminStatusType,
                                                                     ParkingOperatorStatusType>,
                                           IEquatable<ParkingOperator>,
-                                          IComparable<ParkingOperator>
+                                          IComparable<ParkingOperator>,
+                                          IPOIParty
     {
 
         #region Data
@@ -87,6 +88,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The hotline phone number.
         /// </summary>
         public PhoneNumber?                   HotlinePhoneNumber    { get; }
+
+        /// <inheritdoc/>
+        public ImmutableArray<POIPublicKey>   SigningKeys           { get; }
+
+        /// <inheritdoc/>
+        public ImmutableArray<POIPublicKey>   IdentityKeys          { get; }
 
         /// <summary>
         /// The parking garages, in the order of their identifications.
@@ -131,6 +138,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                IEnumerable<ParkingSensor>?                     ParkingSensors               = null,
                                IEnumerable<ParkingSpaceGroup>?                 ParkingSpaceGroups           = null,
                                IEnumerable<ParkingProduct>?                    ParkingProducts              = null,
+                               IEnumerable<POIPublicKey>?                      SigningKeys                  = null,
+                               IEnumerable<POIPublicKey>?                      IdentityKeys                 = null,
 
                                Timestamped<ParkingOperatorAdminStatusType>?    InitialAdminStatus           = null,
                                Timestamped<ParkingOperatorStatusType>?         InitialStatus                = null,
@@ -167,7 +176,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Homepage            = Homepage;
             this.HotlinePhoneNumber  = HotlinePhoneNumber;
 
-            this.ParkingGarages      = Ordered(ParkingGarages, garage => garage.Id.ToString(), "parking garage");
+            (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the parking operator '{Id}'");
+
+            this.ParkingGarages     = Ordered(ParkingGarages, garage => garage.Id.ToString(), "parking garage");
             this.ParkingSpaces       = Ordered(ParkingSpaces,  space  => space. Id.ToString(), "parking space");
             this.ParkingSensors      = Ordered(ParkingSensors, sensor => sensor.Id.ToString(), "parking sensor");
 
@@ -409,6 +420,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ParkingProducts.Length > 0)
                 json.Add("parkingProducts", new JArray(ParkingProducts.Select(parkingProduct => parkingProduct.ToJSON())));
 
+            POIPartyKeys.AddTo(json, this);
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -475,6 +488,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -495,6 +511,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       parkingSensors,
                                                       parkingSpaceGroups,
                                                       parkingProducts,
+                                                      signingKeys,
+                                                      identityKeys,
                                                       DataSource:  dataSource,
                                                       Created:     created,
                                                       LastChange:  lastChange,

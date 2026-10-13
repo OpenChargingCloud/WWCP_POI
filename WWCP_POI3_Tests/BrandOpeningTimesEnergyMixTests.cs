@@ -81,7 +81,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static RoamingNetwork NewNetwork()
 
-            => new (RoamingNetwork_Id.Parse("rn1"),
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                   Created,
                     Brands:                    [ new Brand(Fast,  new ImmutableI18NString(I18NString.Create(Languages.en, "Fast Charge")),  Logo: URL.Parse("https://fast.example/logo.png")),
                                                  new Brand(Green, new ImmutableI18NString(I18NString.Create(Languages.en, "Green Charge"))) ],
@@ -106,7 +106,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                      Created:         Created,
                                                                      ParkingGarages:  [ new ParkingGarage(ParkingGarage_Id.Parse("garage-1"),
                                                                                                           OpeningTimes:  NewOpeningTimes(),
-                                                                                                          Created:       Created) ]) ]);
+                                                                                                          Created:       Created) ]) ]).WithKeys();
 
         #endregion
 
@@ -115,7 +115,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static RoamingNetwork Apply(RoamingNetwork                  Network,
                                             params RoamingNetworkChange[]   Changes)
 
-            => Network.ApplyChangeSet(Network.CreateChangeSet(Changes, CreatedAt: T0));
+            => Network.ApplyChangeSet(Network.CreateSignedChangeSet(Changes, CreatedAt: T0));
 
         #endregion
 

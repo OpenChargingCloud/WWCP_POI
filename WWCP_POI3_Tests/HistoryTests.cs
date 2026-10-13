@@ -43,7 +43,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         private static RoamingNetwork NewNetwork()
 
-            => new (
+            => new RoamingNetwork(
                    Id:                        RoamingNetwork_Id.Parse("rn1"),
                    Name:                      I18NString.Create(Languages.en, "Roaming Network 1"),
                    Description:               I18NString.Create(Languages.en, "My first roaming network!"),
@@ -52,11 +52,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                    ChargingStationOperators:  [ new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"),
                                                                             I18NString.Create(Languages.en, "GraphDefined"),
                                                                             Created: DateTimeOffset.Parse("2026-01-01T00:00:00Z")) ]
-               );
+               ).WithKeys();
 
         private static RoamingNetworkChangeSet DataSource(RoamingNetworkHistory History, String Value, Int32 Minute = 0)
 
-            => History.Head.RoamingNetwork.CreateChangeSet(
+            => History.Head.RoamingNetwork.CreateSignedChangeSet(
                    [ RoamingNetworkChange.UpdateProperty(History.Head.RoamingNetwork, "dataSource", null, Value) ],
                    Description:  I18NString.Create(Languages.en, "Data source " + Value),
                    CreatedAt:    DateTimeOffset.Parse("2026-10-11T12:00:00Z").AddMinutes(Minute)
@@ -120,8 +120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var root    = leader.Head.Commit;
 
             for (var i = 1; i <= 5; i++)
-                leader.Publish(DataSource(leader, "v" + i, i).Sign(Alice, "alice", COSEAlgorithm.Ed25519),
-                               VerifySignature: (changeSet, signature) => changeSet.VerifySignature(signature, Alice.GeneratePublicKey(), "alice", out _));
+                leader.Publish(DataSource(leader, "v" + i, i));
 
             Assert.That(leader.TryGetCommitInfosSince(root.Id, out var infos,     out var error1),              Is.True, error1);
             Assert.That(leader.TryGetCommitInfosSince(root.Id, out var firstTwo,  out var error2, MaxCount: 2), Is.True, error2);
@@ -134,7 +133,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(infos![0].ParentId,                             Is.EqualTo(root.Id));
                 Assert.That(infos![0].Description[Languages.en],            Is.EqualTo("Data source v1"));
                 Assert.That(infos![0].NumberOfChanges,                      Is.EqualTo(1));
-                Assert.That(infos![0].SignatureKeyIds,                      Is.EqualTo(new[] { "alice" }));
+                Assert.That(leader.TryGetCommit(infos![0].Id, out var first),  Is.True);
+                Assert.That(infos![0].SignatureKeyIds,                      Is.EqualTo(first!.ChangeSet!.Signatures.Select(signature => signature.KeyId)).And.Not.Empty);
                 Assert.That(infos![4].Id,                                   Is.EqualTo(leader.Head.Commit.Id));
 
                 // Metadata only.
@@ -163,14 +163,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var head0   = leader.Head.Commit.Id;
 
             var csA     = DataSource(leader, "A", 1);
-            var csB     = leader.Head.RoamingNetwork.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(leader.Head.RoamingNetwork, "description") ]);
+            var csB     = leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(leader.Head.RoamingNetwork, "description") ]);
             var csC     = DataSource(leader, "C", 3);
 
             var a       = leader.Publish(csA, ExpectedHeadId: head0);
             var again   = leader.Publish(csA);
             var stale   = leader.Publish(csB, ExpectedHeadId: head0);
             var notFit  = leader.Publish(csB);
-            var b       = leader.Publish(csB, Rebase: true);
+            var unsigned = leader.Publish(csB, Rebase: true);
+            var b       = leader.Publish(leader.Head.RoamingNetwork.Rebase(csB).SignedByAll(leader.Head.RoamingNetwork));
             var bAgain  = leader.Publish(csB, Rebase: true);
             var c       = leader.Publish(csC, Rebase: true);
 
@@ -184,8 +185,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(stale.Status,    Is.EqualTo(RoamingNetworkPublishStatus.HeadMoved));
                 Assert.That(notFit.Status,   Is.EqualTo(RoamingNetworkPublishStatus.HeadMoved));
 
+                // A rebased change set must be signed again by its owners.
+                Assert.That(unsigned.Status,         Is.EqualTo(RoamingNetworkPublishStatus.Refused));
+                Assert.That(unsigned.ErrorResponse,  Does.Contain("its owners must sign it again"));
+
                 Assert.That(b.Status,        Is.EqualTo(RoamingNetworkPublishStatus.Published));
-                Assert.That(b.Rebased,       Is.True);
                 Assert.That(b.Commit!.ChangeSet!.Id,  Is.Not.EqualTo(csB.Id));
 
                 // The original of a rebased change set counts as published.
@@ -258,29 +262,33 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         public void Signed_change_sets_are_verified_by_leader_and_follower()
         {
 
-            VerifyChangeSetSignatureDelegate verifier = (changeSet, signature) => changeSet.VerifySignature(signature, Alice.GeneratePublicKey(), "alice", out _);
-
             var leader    = RoamingNetworkHistory.Start(NewNetwork());
             RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotJSON(), out var follower, out _);
 
-            var signed    = DataSource(leader, "A", 1).Sign(Alice, "alice", COSEAlgorithm.Ed25519);
+            var stranger  = leader.Head.RoamingNetwork.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, "A") ]).
+                                                       Sign(Alice, "alice", COSEAlgorithm.Ed25519);
 
-            var refused   = leader.Publish(signed);
-            var published = leader.Publish(signed, VerifySignature: verifier);
+            var refused   = leader.Publish(stranger);
+            var published = leader.Publish(DataSource(leader, "A", 1));
+
+            // The same commit, without the signatures of its change set: they are not part of its identification.
+            var stripped  = published.Commit!.ToJSON();
+            ((JObject) stripped["changeSet"]!).Remove("signatures");
 
             using (Assert.EnterMultipleScope())
             {
 
                 Assert.That(refused.Status,                                    Is.EqualTo(RoamingNetworkPublishStatus.Refused));
-                Assert.That(refused.ErrorResponse,                             Does.Contain("requires a signature verifier"));
-                Assert.That(published.Status,                                  Is.EqualTo(RoamingNetworkPublishStatus.Published));
+                Assert.That(refused.ErrorResponse,                             Does.Contain("'alice' is no key of a party"));
+                Assert.That(published.Status,                                  Is.EqualTo(RoamingNetworkPublishStatus.Published), published.ErrorResponse);
 
-                // The signature travels with the commit, but is not part of its identification.
-                Assert.That(published.Commit!.ChangeSet!.Signatures.Length,   Is.EqualTo(1));
+                // The signatures travel with the commit; a follower checks them with the keys of the network.
+                Assert.That(published.Commit.ChangeSet!.Signatures.Length,    Is.GreaterThan(0));
+                Assert.That(RoamingNetworkCommit.TryParse(stripped, out var strippedCommit, out var parseError),  Is.True, parseError);
 
-                Assert.That(follower!.TryAppend(published.Commit, out var error1),            Is.False);
-                Assert.That(error1,                                                           Does.Contain("requires a signature verifier"));
-                Assert.That(follower. TryAppend(published.Commit, out var error2, verifier),  Is.True, error2);
+                Assert.That(follower!.TryAppend(strippedCommit!, out var error1),             Is.False);
+                Assert.That(error1,                                                           Does.Contain("is unsigned"));
+                Assert.That(follower. TryAppend(published.Commit, out var error2),           Is.True, error2);
 
             }
 

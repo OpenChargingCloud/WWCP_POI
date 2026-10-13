@@ -59,7 +59,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static RoamingNetwork NewNetwork()
 
-            => new (RoamingNetwork_Id.Parse("rn1"),
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                   Created,
                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                              Created:                Created,
@@ -83,7 +83,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                             new ParkingSpace(ParkingSpace_Id.Parse("space-2"), Created: Created) ],
                                                                      ParkingSpaceGroups:  [ new ParkingSpaceGroup(Level1,
                                                                                                                   ParkingSpaceIds:  [ ParkingSpace_Id.Parse("space-1"), ParkingSpace_Id.Parse("space-2") ],
-                                                                                                                  Created:          Created) ]) ]);
+                                                                                                                  Created:          Created) ]) ]).WithKeys();
 
         #endregion
 
@@ -92,7 +92,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static RoamingNetwork Apply(RoamingNetwork                  Network,
                                             params RoamingNetworkChange[]   Changes)
 
-            => Network.ApplyChangeSet(Network.CreateChangeSet(Changes, CreatedAt: T0));
+            => Network.ApplyChangeSet(Network.CreateSignedChangeSet(Changes, CreatedAt: T0));
 
         #endregion
 
@@ -192,7 +192,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var eg2      = EVSEGroup_Id.Parse("DE*GEF*EG2");
 
-            history.Publish(rn1.CreateChangeSet([
+            history.Publish(rn1.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add           (new EVSEGroup(eg2, EVSEIds: [ E1 ])),
                                 RoamingNetworkChange.UpdateProperty(eg1!,    "EVSEIds",          null, new JArray(E1.ToString())),
                                 RoamingNetworkChange.RemoveProperty(eg1!,    "chargingTariffId"),

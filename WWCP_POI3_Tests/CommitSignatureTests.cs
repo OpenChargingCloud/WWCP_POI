@@ -59,9 +59,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             TrustedKeys.TryGetValue(signature.KeyId, out var publicKey) &&
             commit.VerifySignature(signature, publicKey, signature.KeyId, out _);
 
-        private static readonly VerifyChangeSetSignatureDelegate VerifyChangeSet = (changeSet, signature) =>
-            changeSet.VerifySignature(signature, CSOKey.GeneratePublicKey(), "cso", out _);
-
         #endregion
 
 
@@ -77,28 +74,27 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         private static RoamingNetwork NewNetwork()
 
-            => new (RoamingNetwork_Id.Parse("rn1"),
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     DataSource:  "v0",
-                    Created:     DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
+                    Created:     DateTimeOffset.Parse("2026-01-01T00:00:00Z")).WithKeys();
 
         #endregion
 
-        #region (private static) Publish(History, Value, SignByCSO = false)
+        #region (private static) Publish(History, Value)
 
+        /// <summary>
+        /// Publish a change of the data source, signed by the roaming network operator.
+        /// </summary>
         private static RoamingNetworkCommit Publish(RoamingNetworkHistory  History,
-                                                    String                 Value,
-                                                    Boolean                SignByCSO   = false)
+                                                    String                 Value)
         {
 
-            var changeSet = History.Head.RoamingNetwork.CreateChangeSet(
+            var changeSet = History.Head.RoamingNetwork.CreateSignedChangeSet(
                                 [ RoamingNetworkChange.UpdateProperty(History.Head.RoamingNetwork, "dataSource", null, Value) ],
                                 CreatedAt: T0.AddMinutes((Double) History.Head.Commit.Revision)
                             );
 
-            if (SignByCSO)
-                changeSet = changeSet.Sign(CSOKey, "cso", COSEAlgorithm.Ed25519);
-
-            var result = History.Publish(changeSet, VerifySignature: VerifyChangeSet);
+            var result = History.Publish(changeSet);
 
             Assert.That(result.Status, Is.EqualTo(RoamingNetworkPublishStatus.Published), result.ErrorResponse);
 
@@ -172,7 +168,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         {
 
             var leader    = RoamingNetworkHistory.Start(NewNetwork());
-            var commit    = Publish(leader, "v1", SignByCSO: true);
+            var commit    = Publish(leader, "v1");
             var signed    = commit.WithSignatures([ RNOSignature(commit) ]);
             var json      = signed.ToJSON();
 
@@ -227,7 +223,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         {
 
             var leader      = RoamingNetworkHistory.Start(NewNetwork(), [ LeaderSigner ]);
-            var commit      = Publish(leader, "v1", SignByCSO: true);
+            var commit      = Publish(leader, "v1");
             var told        = new List<(RoamingNetworkCommit Commit, IReadOnlyList<RoamingNetworkCommitSignature> NewSignatures)>();
 
             leader.OnCommitSignatures += (commit, newSignatures) => told.Add((commit, newSignatures));

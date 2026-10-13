@@ -68,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                                   Name:        I18NString.Create(Languages.en, "Roaming Network 1"),
                                   DataSource:  "v0",
                                   Created:     DateTimeOffset.Parse("2026-01-01T00:00:00Z")
-                              )
+                              ).WithKeys()
                           );
 
             poiAPI.AddRoamingNetworkHistory(leader);
@@ -101,7 +101,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         private RoamingNetworkPublishResult Publish(String Value, Int32 Minute)
 
             => leader!.Publish(
-                   leader.Head.RoamingNetwork.CreateChangeSet(
+                   leader.Head.RoamingNetwork.CreateSignedChangeSet(
                        [ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, Value) ],
                        Description:  I18NString.Create(Languages.en, "Data source " + Value),
                        CreatedAt:    DateTimeOffset.Parse("2026-10-11T12:00:00Z").AddMinutes(Minute)
@@ -208,7 +208,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                                                          String                 Property,
                                                          JToken                 Value)
 
-            => History.Head.RoamingNetwork.CreateChangeSet(
+            => History.Head.RoamingNetwork.CreateSignedChangeSet(
                    [ RoamingNetworkChange.UpdateProperty(History.Head.RoamingNetwork, Property, null, Value) ],
                    CreatedAt: DateTimeOffset.Parse("2026-10-11T13:00:00Z")
                );
@@ -370,6 +370,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var staleB     = await Commit(b, $"?expectedHead={head0}");
             var notFitB    = await Commit(b);
             var rebasedB   = await Commit(b, "?rebase=true");
+            var resignedB  = await Commit(leader.Head.RoamingNetwork.Rebase(b).SignedByAll(leader.Head.RoamingNetwork));
             var conflictC  = await Commit(c, "?rebase=true");
 
             using (Assert.EnterMultipleScope())
@@ -381,8 +382,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(staleB.JSON["head"]!["revision"]!.Value<Int32>(),  Is.EqualTo(1));
                 Assert.That(notFitB.StatusCode,                                Is.EqualTo(HttpStatusCode.Conflict));
 
-                Assert.That(rebasedB.StatusCode,                               Is.EqualTo(HttpStatusCode.Created));
-                Assert.That(rebasedB.JSON["rebased"]!.Value<Boolean>(),        Is.True);
+                // Rebased, it must be signed again by its owners.
+                Assert.That(rebasedB.StatusCode,                               Is.EqualTo((HttpStatusCode) 422));
+                Assert.That(rebasedB.JSON["description"]!.Value<String>(),     Does.Contain("its owners must sign it again"));
+                Assert.That(resignedB.StatusCode,                              Is.EqualTo(HttpStatusCode.Created));
 
                 Assert.That(conflictC.StatusCode,                              Is.EqualTo((HttpStatusCode) 422));
                 Assert.That(conflictC.JSON["description"]!.Value<String>(),    Does.Contain("no longer the expected old value"));
@@ -405,7 +408,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             poiAPI!.AuthorizeChangeSetSubmission = (request, changeSet) => allowed;
 
-            var otherNetwork  = new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn2"), Created: DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
+            var otherNetwork  = new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn2"), Created: DateTimeOffset.Parse("2026-01-01T00:00:00Z")).WithKeys();
             var otherHistory  = RoamingNetworkHistory.Start(otherNetwork);
 
             using var garbage = new StringContent("{ \"no\": \"change set\" }", System.Text.Encoding.UTF8, "application/json");
@@ -429,9 +432,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(wrongNetwork.StatusCode,   Is.EqualTo(HttpStatusCode.BadRequest));
                 Assert.That(invalidRebase.StatusCode,  Is.EqualTo(HttpStatusCode.BadRequest));
 
-                // Signed, but the leader has no verifier for signatures.
+                // Signed also by a key of no party of the roaming network.
                 Assert.That(signed.StatusCode,                                Is.EqualTo((HttpStatusCode) 422));
-                Assert.That(signed.JSON["description"]!.Value<String>(),      Does.Contain("requires a signature verifier"));
+                Assert.That(signed.JSON["description"]!.Value<String>(),      Does.Contain("'alice' is no key of a party"));
 
                 Assert.That(forbidden.StatusCode,                             Is.EqualTo(HttpStatusCode.Forbidden));
                 Assert.That(leader!.Head.Commit.Revision,                     Is.Zero);
@@ -478,7 +481,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             // A change set submitted in CBOR, answered in CBOR.
             using var post = new HttpRequestMessage(COMMIT, "changeSets") {
-                                 Content = new ByteArrayContent(follower!.Head.RoamingNetwork.CreateChangeSet(
+                                 Content = new ByteArrayContent(follower!.Head.RoamingNetwork.CreateSignedChangeSet(
                                                                     [ RoamingNetworkChange.UpdateProperty(follower.Head.RoamingNetwork, "dataSource", null, "from CBOR") ],
                                                                     CreatedAt: DateTimeOffset.Parse("2026-10-11T13:00:00Z")
                                                                 ).ToCBOR().ToByteArray(CBORWriterOptions.Canonical))

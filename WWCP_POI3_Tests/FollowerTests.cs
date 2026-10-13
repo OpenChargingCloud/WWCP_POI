@@ -103,7 +103,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                        ChargingStationOperators:  [ new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"),
                                                                                 I18NString.Create(Languages.en, "GraphDefined"),
                                                                                 Created: DateTimeOffset.Parse("2026-01-01T00:00:00Z")) ]
-                   )
+                   ).WithKeys()
                );
 
         #endregion
@@ -113,7 +113,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
         private RoamingNetworkPublishResult Publish(String Value)
 
             => leader!.Publish(
-                   leader.Head.RoamingNetwork.CreateChangeSet(
+                   leader.Head.RoamingNetwork.CreateSignedChangeSet(
                        [ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, Value) ],
                        Description:  I18NString.Create(Languages.en, "Data source " + Value),
                        CreatedAt:    T0.AddMinutes((Double) leader.Head.Commit.Revision + 1)
@@ -339,7 +339,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             var follower   = await StartFollower();
 
             var head       = follower.History!.Head;
-            var changeSet  = head.RoamingNetwork.CreateChangeSet(
+            var changeSet  = head.RoamingNetwork.CreateSignedChangeSet(
                                  [ RoamingNetworkChange.UpdateProperty(head.RoamingNetwork, "dataSource", null, "from the follower") ],
                                  CreatedAt: T0
                              );
@@ -461,7 +461,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
             var e1 = EVSE_Id.Parse("DE*GEF*E1*1");
 
-            leader!.Publish(leader.Head.RoamingNetwork.CreateChangeSet([
+            leader!.Publish(leader.Head.RoamingNetwork.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add(new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
                                                                           ChargingStations: [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
                                                                                                                   EVSEs: [ new EVSE(e1) ]) ]))

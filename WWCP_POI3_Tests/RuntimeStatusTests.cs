@@ -53,7 +53,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                        ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                                 I18NString.Create(Languages.en, "GraphDefined"),
                                                                                 Created: Created) ]
-                   )
+                   ).WithKeys()
                );
 
         #endregion
@@ -63,7 +63,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         private static RoamingNetworkPublishResult Publish(RoamingNetworkHistory              History,
                                                            params RoamingNetworkChange[]      Changes)
 
-            => History.Publish(History.Head.RoamingNetwork.CreateChangeSet(Changes,
+            => History.Publish(History.Head.RoamingNetwork.CreateSignedChangeSet(Changes,
                                                                             Description:  I18NString.Create(Languages.en, "Change " + (History.Head.Commit.Revision + 1)),
                                                                             CreatedAt:    T0.AddMinutes((Double) History.Head.Commit.Revision + 1)));
 
@@ -258,7 +258,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             GEFOf(history).SetStatus(ChargingStationOperatorStatusType.Offline, T0);
 
             // A change set only prepared, never published: it shares the schedules, but must not disturb.
-            history.Head.RoamingNetwork.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(GEFOf(history), "telephone", null, "+49 30 7654321") ],
+            history.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(GEFOf(history), "telephone", null, "+49 30 7654321") ],
                                                         CreatedAt: T0);
 
             history.Head.RoamingNetwork.SetAdminStatus(RoamingNetworkAdminStatusType.OutOfService, T0);
@@ -436,7 +436,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             var root = leader.Head.Commit.Id;
 
-            var first = leader.Head.RoamingNetwork.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, "v1") ],
+            var first = leader.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, "v1") ],
                                                                   Description:  I18NString.Create(Languages.en, "Change 1"),
                                                                   CreatedAt:    T0);
 

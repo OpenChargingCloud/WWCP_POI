@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
@@ -57,7 +58,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                       EMobilityProviderAdminStatusType,
                                                                       EMobilityProviderStatusType>,
                                             IEquatable<EMobilityProvider>,
-                                            IComparable<EMobilityProvider>
+                                            IComparable<EMobilityProvider>,
+                                            IPOIParty
     {
 
         #region Properties
@@ -77,6 +79,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public PhoneNumber?  HotlinePhoneNumber    { get; }
 
+        /// <inheritdoc/>
+        public ImmutableArray<POIPublicKey>  SigningKeys     { get; }
+
+        /// <inheritdoc/>
+        public ImmutableArray<POIPublicKey>  IdentityKeys    { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -90,6 +98,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  Address?                                          Address                      = null,
                                  URL?                                              Homepage                     = null,
                                  PhoneNumber?                                      HotlinePhoneNumber           = null,
+                                 IEnumerable<POIPublicKey>?                        SigningKeys                  = null,
+                                 IEnumerable<POIPublicKey>?                        IdentityKeys                 = null,
 
                                  Timestamped<EMobilityProviderAdminStatusType>?    InitialAdminStatus           = null,
                                  Timestamped<EMobilityProviderStatusType>?         InitialStatus                = null,
@@ -125,6 +135,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Address             = Address;
             this.Homepage            = Homepage;
             this.HotlinePhoneNumber  = HotlinePhoneNumber;
+
+            (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the e-mobility provider '{Id}'");
 
         }
 
@@ -212,6 +224,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (HotlinePhoneNumber.HasValue)
                 json.Add("hotline",      HotlinePhoneNumber.Value.ToString());
 
+            POIPartyKeys.AddTo(json, this);
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -268,6 +282,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -283,6 +300,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           address,
                                                           homepage,
                                                           hotline,
+                                                          SigningKeys:   signingKeys,
+                                                          IdentityKeys:  identityKeys,
                                                           DataSource:  dataSource,
                                                           Created:     created,
                                                           LastChange:  lastChange,
