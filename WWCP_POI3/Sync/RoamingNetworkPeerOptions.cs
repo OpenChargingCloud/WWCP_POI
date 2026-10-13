@@ -48,6 +48,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean                             PushCommits                 { get; init; } = true;
 
         /// <summary>
+        /// Whether to push the status set at this history to the other server, set here or taken from elsewhere, but not from
+        /// the other server: after connecting the status it has differently, then every change. The other server must allow it
+        /// (AuthorizeStatusPush). Default: yes.
+        /// </summary>
+        public Boolean                             PushStatus                  { get; init; } = true;
+
+        /// <summary>
+        /// The number of status updates pushed at once, at most the batch size of the other server.
+        /// </summary>
+        public Int32                               MaxStatusUpdatesPerRequest  { get; init; } = POIWebSocketServer.DefaultMaxBatchSize;
+
+        /// <summary>
         /// The store to keep a history started from a snapshot in, e.g. at first or when the other server knew none of its commits:
         /// its content is replaced then. A history given to the peer keeps the store it has.
         /// </summary>

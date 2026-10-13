@@ -318,7 +318,7 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 ```
 
 - **Actions:** `head`, `tips`, `haveIds`, `snapshot`, `commitInfos`, `commits {since? | have?, max?}`, `commit {commitId}`,
-  `pushCommits {commits}` → `{appended, head, tips, conflicts?, description?}`,
+  `pushCommits {commits}` → `{appended, head, tips, conflicts?, description?}`, `pushStatusUpdates` (below),
   `commitChangeSet {changeSet}` → `{status, …, head, conflicts?}`, `runtimeStatus`,
   `signCommit {commitId, signatures}` → `{commitId, signatures, added}`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
@@ -330,9 +330,13 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 - **Async:** requests are processed concurrently, up to `MaxConcurrentRequests` per connection;
   answers come when ready and are matched by their id. A connection's requests are cancelled when it closes.
 - **setStatus** `{kind, entityType, entityId, value, timestamp?, dataSource?}` → `{result, description?, current?}`,
-  allowed as `AuthorizeStatusUpdate` decides (refused without it); peers take it from the server they follow.
+  allowed as `AuthorizeStatusUpdate` decides (refused without it).
   `kind` is `adminStatus`, `status` or `energyStatus`, whose `value` is an object `{used, available, storedEnergy?}`.
   Status updates come often, e.g. within a minute as the AFIR asks: send them as one batch.
+- **pushStatusUpdates** `{statusUpdates: […]}` → `{results: [{result, description?}, …]}`: status updates of
+  another server, as the topics push them, up to `MaxBatchSize`, each allowed as `AuthorizeStatusPush` decides
+  (refused without it), e.g. only for the operators that server hosts. They are taken with their timestamps:
+  the latest status of an entity wins, wherever it was set.
 - **Batches:** messages of the same action aggregate. A request `{batch: [p1, p2, …]}` runs per payload,
   in order, and is answered with `{batch: [r1, {error: {code, description, details}}, …]}`, up to `MaxBatchSize`.
   Pushes of the same action that wait together go out as one `{batch: […]}`, up to the `maxBatchSize`
@@ -364,11 +368,15 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   those it holds (`have`), the runtime status, and then it pushes the commits the other server misses.
   Pushed commits whose parents it holds are appended, others make it fetch; new commits of its own
   history, made here or taken from elsewhere, are pushed as they come (`PushCommits`).
+- **Status:** the status of the other server is taken (`FollowStatus`); the status set here, e.g. by an
+  operator's backend, or taken from elsewhere, goes there (`PushStatus`, `pushStatusUpdates`): after connecting
+  the status it has differently, e.g. set while not connected, then every change, in order with the commits,
+  so that a new EVSE arrives before its status. Nothing that came from the other server goes back.
 - **Trust:** `TrustedRoamingNetworkOperatorKeyIds` names keys of the roaming network operator a snapshot
   must have; afterwards, every change set is checked by the keys in the data.
 - **Reconnect:** a broken connection is opened again with growing delays, and it catches up.
   None of its commits known there starts it again from a snapshot (`OnHistoryReplaced`).
-- **Options:** complete commits or announcements, status or not, pushing or not, credentials via
+- **Options:** complete commits or announcements, following status or not, pushing commits and status or not, credentials via
   `ConfigureWebSocket`, an additional verifier of change set signatures, a verifier of commit signatures,
   the roles every commit must be signed in, limits.
 - **Signing:** `SignCommitAsync(commitId, signatures)` sends the signatures of, e.g., a roaming network
@@ -385,7 +393,6 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 
 ## Open
 
-- Peers push the status they set themselves to the other server
 - Recursive merge bases whose own merge conflicts
 - Finer subscription filters
 - A WebSocket endpoint in Hermod without a TCP server behind it

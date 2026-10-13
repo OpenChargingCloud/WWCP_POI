@@ -70,7 +70,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// After connecting it subscribes first, so that nothing gets lost, then starts from a snapshot when it has
     /// no history yet, fetches the commits it misses, naming those it holds, and takes the current runtime status:
     /// from the snapshot, or asked for when it continued its history. Then it pushes the commits the other server
-    /// misses, and every new one of its own history, if allowed there.
+    /// misses, the status it has differently, and every new commit and status update of its own history, if allowed there,
+    /// in their order; nothing that came from the other server goes back. The latest status of an entity wins everywhere.
     /// Afterwards it appends the pushed commits; one whose parents it misses, or one only announced,
     /// makes it fetch again. None of its commits known there makes it start again from a snapshot.
     /// When the connection breaks it connects again, waiting longer after every failure, and catches up.
@@ -92,6 +93,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         // The commits taken from the other server: not to be pushed back.
         private readonly ConcurrentDictionary<RoamingNetworkCommit_Id, Byte>  receivedCommits  = [];
+
+        // The latest status of every entity known at the other server: not to be pushed back.
+        private readonly ConcurrentDictionary<(POIRuntimeStatusKind Kind, String EntityType, String EntityId), (DateTimeOffset Timestamp, String Value)>  receivedStatus  = [];
+
+        // While connected: the commits and status updates of the watched history to push, in their order.
+        private readonly Lock                                                 watchLock        = new ();
+        private          Channel<Object>?                                     outgoing;
+        private          RoamingNetworkHistory?                               watched;
 
         #endregion
 
@@ -374,26 +383,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     firstSynchronization.TrySetResult();
                     OnSynchronized?.Invoke(this, History!);
 
-                    // New commits of this history, made here or taken from elsewhere, go to the other server.
-                    var outgoing        = Channel.CreateUnbounded<RoamingNetworkCommit>(new UnboundedChannelOptions { SingleReader = true });
-                    var currentHistory  = History!;
-
-                    void Announced(RoamingNetworkCommitAnnouncement Announcement)
-                    {
-                        if (!receivedCommits.ContainsKey(Announcement.CommitId))
-                            outgoing.Writer.TryWrite(Announcement.Commit);
-                    }
-
-                    if (options.PushCommits)
-                        currentHistory.OnCommitAnnouncement += Announced;
+                    // New commits and status updates of this history, made here or taken from elsewhere, go to the other server.
+                    var pushes = Channel.CreateUnbounded<Object>(new UnboundedChannelOptions { SingleReader = true });
 
                     using var following = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
 
                     try
                     {
 
-                        var pushing = options.PushCommits
-                                          ? PushNewCommitsAsync(currentConnection, outgoing.Reader, following.Token)
+                        lock (watchLock)
+                        {
+                            outgoing = pushes;
+                            Watch(History);
+                        }
+
+                        // The status set here while not connected, or differently than there.
+                        if (options.PushStatus)
+                            foreach (var statusUpdate in History!.RuntimeStatus.All)
+                                if (!IsReceived(statusUpdate))
+                                    pushes.Writer.TryWrite(statusUpdate);
+
+                        var pushing = options.PushCommits || options.PushStatus
+                                          ? PushAsync(currentConnection, pushes.Reader, following.Token)
                                           : Task.CompletedTask;
 
                         try
@@ -409,7 +420,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
                     finally
                     {
-                        currentHistory.OnCommitAnnouncement -= Announced;
+                        lock (watchLock)
+                        {
+                            outgoing = null;
+                            Watch(null);
+                        }
                     }
 
                 }
@@ -486,13 +501,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 await PushMissingCommitsAsync(Connection, CancellationToken);
 
             // A snapshot brought the runtime status of its moment; what changed since was pushed.
-            if (options.FollowStatus && !statusFromSnapshot)
+            // Without following it, the status there is still asked for: to push only what differs.
+            if (options.FollowStatus ? !statusFromSnapshot : options.PushStatus)
             {
 
                 var runtimeStatus = await Expect(Connection, "runtimeStatus", [], CancellationToken);
 
                 foreach (var statusJSON in runtimeStatus["runtimeStatus"]?.OfType<JObject>() ?? [])
-                    TakeStatusUpdate(statusJSON);
+                {
+                    if (options.FollowStatus)
+                        TakeStatusUpdate(statusJSON);
+
+                    else if (POIStatusUpdate.TryParse(statusJSON, out var statusUpdate, out _))
+                        Received(statusUpdate);
+                }
 
             }
 
@@ -619,11 +641,89 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (POIStatusUpdate.TryParse(StatusJSON, out var statusUpdate, out var errorResponse))
+            {
+                // First: taking it tells of it, and what came from there does not go back.
+                Received(statusUpdate);
                 History!.RuntimeStatus.TryUpdate(statusUpdate, out _);
+            }
 
             else
                 RaiseError("Invalid status update: " + errorResponse, null);
 
+        }
+
+        #endregion
+
+        #region (private) Received(StatusUpdate)
+
+        /// <summary>
+        /// Remember the given status update as known at the other server, unless a later one of the entity is.
+        /// </summary>
+        private void Received(POIStatusUpdate StatusUpdate)
+        {
+
+            var timestamp = DateTimeOffset.FromUnixTimeMilliseconds(StatusUpdate.Timestamp.ToUnixTimeMilliseconds());
+
+            receivedStatus.AddOrUpdate((StatusUpdate.Kind, StatusUpdate.EntityType, StatusUpdate.EntityId),
+                                       (timestamp, StatusUpdate.Value),
+                                       (_, known) => timestamp >= known.Timestamp ? (timestamp, StatusUpdate.Value) : known);
+
+        }
+
+        #endregion
+
+        #region (private) IsReceived(StatusUpdate)
+
+        /// <summary>
+        /// Whether the other server knows the given status of the entity already, e.g. as it came from there.
+        /// </summary>
+        private Boolean IsReceived(POIStatusUpdate StatusUpdate)
+
+            => receivedStatus.TryGetValue((StatusUpdate.Kind, StatusUpdate.EntityType, StatusUpdate.EntityId), out var known) &&
+               known.Timestamp.ToUnixTimeMilliseconds() == StatusUpdate.Timestamp.ToUnixTimeMilliseconds() &&
+               String.Equals(known.Value, StatusUpdate.Value, StringComparison.OrdinalIgnoreCase);
+
+        #endregion
+
+        #region (private) Watch(History)
+
+        /// <summary>
+        /// Push the new commits and status updates of the given history from now on, none of the one before; called with watchLock held.
+        /// </summary>
+        private void Watch(RoamingNetworkHistory? History)
+        {
+
+            if (watched is not null)
+            {
+                watched.OnCommitAnnouncement          -= Announced;
+                watched.RuntimeStatus.OnStatusUpdate  -= StatusUpdated;
+            }
+
+            watched = outgoing is not null ? History : null;
+
+            if (watched is not null)
+            {
+
+                if (options.PushCommits)
+                    watched.OnCommitAnnouncement          += Announced;
+
+                if (options.PushStatus)
+                    watched.RuntimeStatus.OnStatusUpdate  += StatusUpdated;
+
+            }
+
+        }
+
+        private void Announced(RoamingNetworkCommitAnnouncement Announcement)
+        {
+            if (!receivedCommits.ContainsKey(Announcement.CommitId))
+                Volatile.Read(ref outgoing)?.Writer.TryWrite(Announcement.Commit);
+        }
+
+        private void StatusUpdated(POIStatusUpdate StatusUpdate)
+        {
+            if (!IsReceived(StatusUpdate))
+                Volatile.Read(ref outgoing)?.Writer.TryWrite(StatusUpdate);
         }
 
         #endregion
@@ -721,7 +821,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (store is not null)
                 newHistory.AttachStore(store);
 
-            var oldHistory = Interlocked.Exchange(ref history, newHistory);
+            // The status of the snapshot is the one there.
+            receivedStatus.Clear();
+
+            foreach (var statusUpdate in newHistory.RuntimeStatus.All)
+                Received(statusUpdate);
+
+            RoamingNetworkHistory? oldHistory;
+
+            lock (watchLock)
+            {
+                oldHistory = Interlocked.Exchange(ref history, newHistory);
+                Watch(newHistory);
+            }
 
             statusFromSnapshot = options.FollowStatus;
 
@@ -761,28 +873,108 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) PushNewCommitsAsync(Connection, Commits, CancellationToken)
+        #region (private) PushAsync(Connection, Pushes, CancellationToken)
 
         /// <summary>
-        /// Push the new commits of this history to the other server, as they come, those waiting together at once.
+        /// Push the new commits and status updates of this history to the other server, as they come, in their order,
+        /// e.g. a new EVSE before its status; those of a kind waiting together at once.
+        /// A kind the other server does not take is not pushed any more.
         /// </summary>
-        private async Task PushNewCommitsAsync(Connection                          Connection,
-                                               ChannelReader<RoamingNetworkCommit>  Commits,
-                                               CancellationToken                   CancellationToken)
+        private async Task PushAsync(Connection             Connection,
+                                     ChannelReader<Object>  Pushes,
+                                     CancellationToken      CancellationToken)
         {
 
-            while (await Commits.WaitToReadAsync(CancellationToken))
+            var pushCommits  = options.PushCommits;
+            var pushStatus   = options.PushStatus;
+            Object? next     = null;
+
+            while (pushCommits || pushStatus)
             {
 
-                var page = new List<RoamingNetworkCommit>();
+                if (next is null)
+                {
 
-                while (page.Count < options.MaxCommitsPerRequest && Commits.TryRead(out var commit))
-                    page.Add(commit);
+                    if (!await Pushes.WaitToReadAsync(CancellationToken))
+                        return;
 
-                if (!await TryPushAsync(Connection, page, CancellationToken))
-                    return;
+                    if (!Pushes.TryRead(out next))
+                        continue;
+
+                }
+
+                if (next is RoamingNetworkCommit firstCommit)
+                {
+
+                    var commits = new List<RoamingNetworkCommit> { firstCommit };
+                    next = null;
+
+                    while (commits.Count < options.MaxCommitsPerRequest && Pushes.TryRead(out next) && next is RoamingNetworkCommit commit)
+                    {
+                        commits.Add(commit);
+                        next = null;
+                    }
+
+                    if (pushCommits && !await TryPushAsync(Connection, commits, CancellationToken))
+                        pushCommits = false;
+
+                }
+
+                else if (next is POIStatusUpdate firstStatusUpdate)
+                {
+
+                    var statusUpdates = new List<POIStatusUpdate> { firstStatusUpdate };
+                    next = null;
+
+                    while (statusUpdates.Count < options.MaxStatusUpdatesPerRequest && Pushes.TryRead(out next) && next is POIStatusUpdate statusUpdate)
+                    {
+                        statusUpdates.Add(statusUpdate);
+                        next = null;
+                    }
+
+                    if (pushStatus && !await TryPushStatusAsync(Connection, statusUpdates, CancellationToken))
+                        pushStatus = false;
+
+                }
+
+                else
+                    next = null;
 
             }
+
+        }
+
+        #endregion
+
+        #region (private) TryPushStatusAsync(Connection, StatusUpdates, CancellationToken)
+
+        /// <summary>
+        /// Push the given status updates; false when the other server does not allow it.
+        /// </summary>
+        private async Task<Boolean> TryPushStatusAsync(Connection                      Connection,
+                                                       IReadOnlyList<POIStatusUpdate>  StatusUpdates,
+                                                       CancellationToken               CancellationToken)
+        {
+
+            var answer = await Connection.RequestAsync("pushStatusUpdates",
+                                                       new JObject(new JProperty("statusUpdates", new JArray(StatusUpdates.Select(statusUpdate => statusUpdate.ToJSON())))),
+                                                       CancellationToken);
+
+            if (answer.IsError)
+            {
+                RaiseError($"The other server takes no status updates: {answer.ErrorDescription}", null);
+                return false;
+            }
+
+            var refused = (answer.GetPayloadJSON()?["results"] as JArray ?? []).
+                              OfType<JObject>().
+                              Where (result => result["result"]?.Value<String>() == nameof(POIStatusUpdateResult.Refused)).
+                              ToArray();
+
+            if (refused.Length > 0)
+                RaiseError($"The other server refused {refused.Length} of {StatusUpdates.Count} status updates: {refused[0]["description"]?.Value<String>()}", null);
+
+            return true;
 
         }
 

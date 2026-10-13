@@ -43,6 +43,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
         private static readonly DateTimeOffset              T0       = DateTimeOffset.Parse("2026-10-13T12:00:00Z");
         private static readonly ChargingStationOperator_Id  GEF      = ChargingStationOperator_Id.Parse("DE*GEF");
 
+        // Status timestamps in the past: a later one is planned only.
+        private static readonly DateTimeOffset              Past     = DateTimeOffset.Parse("2026-10-12T12:00:00Z");
+        private const           String                      Operator = nameof(ChargingStationOperator);
+
         private HTTPServer?              httpServer;
         private POI_API?                 poiAPI;
         private RoamingNetworkHistory?   serverA;
@@ -100,11 +104,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
         /// <summary>
         /// A server starting from a snapshot of server A, and keeping in sync with it.
         /// </summary>
-        private async Task<RoamingNetworkPeer> StartPeer(RoamingNetworkPeerOptions? Options = null)
+        private async Task<RoamingNetworkPeer> StartPeer(RoamingNetworkPeerOptions?  Options   = null,
+                                                         RoamingNetworkHistory?      History   = null)
         {
 
             var peer = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"),
-                                              Options: Options ?? new RoamingNetworkPeerOptions {
+                                              History,
+                                              Options ?? new RoamingNetworkPeerOptions {
                                                                       MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
                                                                       MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
                                                                   });
@@ -163,11 +169,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             var resultC   = historyC.Commit(changeC);
 
             Boolean Converged()
-                => historyB.Head.Commit.Id == serverA!.Head.Commit.Id &&
-                   historyC.Head.Commit.Id == serverA.Head.Commit.Id &&
-                   serverA.Tips.Count == 1 &&
-                   serverA.Head.RoamingNetwork.DataSource == "v2" &&
-                   serverA.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!.ChargingPools.Single().HotlinePhoneNumber?.ToString() == "+49 800 1234";
+            {
+
+                // One head of server A for all comparisons: it may move on in between.
+                var tips  = serverA!.Tips;
+                var head  = tips[0];
+
+                return tips.Count == 1 &&
+                       historyB.Head.Commit.Id == head.Commit.Id &&
+                       historyC.Head.Commit.Id == head.Commit.Id &&
+                       head.RoamingNetwork.DataSource == "v2" &&
+                       head.RoamingNetwork.GetChargingStationOperatorById(GEF)!.ChargingPools.Single().HotlinePhoneNumber?.ToString() == "+49 800 1234";
+
+            }
 
             using (Assert.EnterMultipleScope())
             {
@@ -294,6 +308,178 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                 Assert.That(peerC.History,                                    Is.Null);
                 lock (errors)
                     Assert.That(errors.Any(error => error.Contains("none of the trusted keys")),  Is.True);
+            }
+
+        }
+
+        #endregion
+
+
+        #region Status(History, Kind = Status, EntityType = Operator, EntityId = "DE*GEF")
+
+        private static (String? Value, DateTimeOffset? Timestamp) Status(RoamingNetworkHistory  History,
+                                                                         POIRuntimeStatusKind   Kind         = POIRuntimeStatusKind.Status,
+                                                                         String                 EntityType   = Operator,
+                                                                         String                 EntityId     = "DE*GEF")
+
+            => History.RuntimeStatus.TryGet(Kind, EntityType, EntityId, out var status)
+                   ? (status.Value, status.Timestamp)
+                   : (null, null);
+
+        #endregion
+
+
+        #region A_peer_pushes_the_status_set_there_on_to_all_servers()
+
+        [Test]
+        public async Task A_peer_pushes_the_status_set_there_on_to_all_servers()
+        {
+
+            poiAPI!.AuthorizeStatusPush = (request, login, statusUpdate) => true;
+
+            var peerB    = await StartPeer();
+            var peerC    = await StartPeer();
+
+            var updates  = 0;
+            serverA!.RuntimeStatus.OnStatusUpdate += statusUpdate => Interlocked.Increment(ref updates);
+
+            // Set at server B, e.g. by the operator's backend.
+            var result   = peerB.History!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "offline", Past, out _, out _);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(result,                                                         Is.EqualTo(POIStatusUpdateResult.Updated));
+                Assert.That(await Eventually(() => Status(serverA).Value == "offline"),     Is.True, "Not at server A.");
+                Assert.That(await Eventually(() => Status(peerC.History!).Value == "offline"), Is.True, "Not at server C.");
+
+                // With the timestamp of server B, and once: nothing goes back and forth.
+                await Task.Delay(300);
+
+                Assert.That(Status(serverA).Timestamp,                                     Is.EqualTo(Past));
+                Assert.That(Status(peerC.History!).Timestamp,                              Is.EqualTo(Past));
+                Assert.That(Status(peerB.History!).Timestamp,                              Is.EqualTo(Past));
+                Assert.That(Volatile.Read(ref updates),                                     Is.EqualTo(1));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_peer_pushes_the_status_set_while_not_connected()
+
+        [Test]
+        public async Task A_peer_pushes_the_status_set_while_not_connected()
+        {
+
+            poiAPI!.AuthorizeStatusPush = (request, login, statusUpdate) => true;
+
+            // A history of server B, e.g. loaded from its store, with a status set while it was not connected.
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(serverA!.ToSnapshotJSON(), out var historyB, out var error), Is.True, error);
+
+            historyB!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, Operator, "DE*GEF", "outOfService", Past, out _, out _);
+
+            // A later status of server A wins at server B.
+            serverA.RuntimeStatus.TryUpdate  (POIRuntimeStatusKind.Status,      Operator, "DE*GEF", "offline",      Past, out _, out _);
+            historyB.RuntimeStatus.TryUpdate (POIRuntimeStatusKind.Status,      Operator, "DE*GEF", "available",    Past.AddMinutes(-1), out _, out _);
+
+            await StartPeer(History: historyB);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(await Eventually(() => Status(serverA, POIRuntimeStatusKind.AdminStatus).Value == "outOfService"),  Is.True);
+                Assert.That(await Eventually(() => Status(historyB).Value == "offline"),                                         Is.True);
+                Assert.That(Status(serverA).Value,                                                                                Is.EqualTo("offline"));
+            }
+
+        }
+
+        #endregion
+
+        #region A_new_entity_is_pushed_before_its_status()
+
+        [Test]
+        public async Task A_new_entity_is_pushed_before_its_status()
+        {
+
+            poiAPI!.AuthorizeStatusPush = (request, login, statusUpdate) => true;
+
+            var errors    = new List<String>();
+            var peerB     = await StartPeer();
+            var historyB  = peerB.History!;
+
+            peerB.OnError += (peer, description, exception) => { lock (errors) errors.Add(description); };
+
+            var committed = historyB.Commit(historyB.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.Add(new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P2"), Created: Created)) ],
+                                                                                               CreatedAt: T0.AddMinutes(1)));
+
+            var updated   = historyB.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, nameof(ChargingPool), "DE*GEF*P2", "offline", Past, out _, out _);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(committed.IsCommitted,                                                                                    Is.True, committed.ErrorResponse);
+                Assert.That(updated,                                                                                                  Is.EqualTo(POIStatusUpdateResult.Updated));
+                Assert.That(await Eventually(() => Status(serverA!, EntityType: nameof(ChargingPool), EntityId: "DE*GEF*P2").Value == "offline"), Is.True);
+                lock (errors)
+                    Assert.That(errors,                                                                                               Is.Empty);
+            }
+
+        }
+
+        #endregion
+
+        #region A_server_refusing_status_pushes_still_takes_commits()
+
+        [Test]
+        public async Task A_server_refusing_status_pushes_still_takes_commits()
+        {
+
+            var errors    = new List<String>();
+            var peerB     = await StartPeer();
+            var historyB  = peerB.History!;
+
+            peerB.OnError += (peer, description, exception) => { lock (errors) errors.Add(description); };
+
+            historyB.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "offline", Past, out _, out _);
+
+            historyB.Commit(historyB.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(historyB.Head.RoamingNetwork, "dataSource", null, "v2") ],
+                                                                               CreatedAt: T0.AddMinutes(1)));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(await Eventually(() => { lock (errors) return errors.Any(error => error.Contains("takes no status updates")); }),  Is.True);
+                Assert.That(await Eventually(() => serverA!.Head.RoamingNetwork.DataSource == "v2"),                                          Is.True);
+                Assert.That(Status(serverA!).Value,                                                                                           Is.Not.EqualTo("offline"));
+            }
+
+        }
+
+        #endregion
+
+        #region A_server_decides_which_status_a_peer_may_push()
+
+        [Test]
+        public async Task A_server_decides_which_status_a_peer_may_push()
+        {
+
+            // E.g. only the status, not the admin status.
+            poiAPI!.AuthorizeStatusPush = (request, login, statusUpdate) => statusUpdate.Kind == POIRuntimeStatusKind.Status;
+
+            var errors    = new List<String>();
+            var peerB     = await StartPeer();
+            var historyB  = peerB.History!;
+
+            peerB.OnError += (peer, description, exception) => { lock (errors) errors.Add(description); };
+
+            historyB.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, Operator, "DE*GEF", "outOfService", Past, out _, out _);
+            historyB.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      Operator, "DE*GEF", "offline",      Past, out _, out _);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(await Eventually(() => Status(serverA!).Value == "offline"),                                               Is.True);
+                Assert.That(await Eventually(() => { lock (errors) return errors.Any(error => error.Contains("refused 1 of")); }),      Is.True);
+                Assert.That(Status(serverA!, POIRuntimeStatusKind.AdminStatus).Value,                                                   Is.Not.EqualTo("outOfService"));
             }
 
         }

@@ -76,9 +76,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     /// <remarks>
     /// An update with an earlier timestamp than the current status goes into the history of the entity only,
-    /// so that updates arriving out of order, e.g. at a follower, end with the latest one.
-    /// The same status again keeps its timestamp: since when the entity has it. A status update of the
-    /// leading server, TryUpdate(StatusUpdate, …), is taken as it is, though: its "since" is the leader's.
+    /// so that updates arriving out of order, e.g. at a peer, end with the latest one.
+    /// The same status again keeps its timestamp: since when the entity has it. A status update of another
+    /// server, TryUpdate(StatusUpdate, …), is taken as it is, though: its "since" counts, and the latest one wins.
     /// </remarks>
     public sealed class RoamingNetworkRuntimeStatus
     {
@@ -176,8 +176,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region TryUpdate(StatusUpdate, out ErrorResponse)
 
         /// <summary>
-        /// Take the status of the given status update of the leading server as it is: also the same status
-        /// with a later timestamp, as the leader's "since" counts, so that an older update arriving afterwards
+        /// Take the status of the given status update of another server as it is: also the same status
+        /// with a later timestamp, as its "since" counts, so that an older update arriving afterwards
         /// is out of date. Its old status is ignored.
         /// </summary>
         /// <param name="StatusUpdate">A status update.</param>
@@ -916,7 +916,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (internal) TryTake(StatusUpdates, out ErrorResponse)
 
         /// <summary>
-        /// Take the given statuses of the leading server as they are, e.g. those of a snapshot.
+        /// Take the given statuses of another server as they are, e.g. those of a snapshot.
         /// A status of an unknown entity or an invalid one refuses all after it.
         /// </summary>
         internal Boolean TryTake(IEnumerable<POIStatusUpdate>      StatusUpdates,
@@ -1893,7 +1893,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (EqualityComparer<T>.Default.Equals(current.Value.Value, status))
                 {
 
-                    // The leader's "since" counts.
+                    // The "since" of the other server counts.
                     if (Authoritative && At > current.Value.Timestamp)
                         Set(status, At);
 

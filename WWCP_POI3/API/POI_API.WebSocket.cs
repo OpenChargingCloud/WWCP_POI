@@ -66,7 +66,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// runtimeStatus     {}                                         { runtimeStatus: [ … ] }: the current admin status and status
     /// setStatus         { kind, entityType, entityId, value,       { result, description?, current? }: Updated, Unchanged, Outdated,
     ///                     timestamp?, dataSource? }                Scheduled or Refused, and the current status afterwards
-    /// signCommit        { commitId, signatures: [ … ] }            { commitId, signatures, added }: all signatures of the commit afterwards,
+    /// pushStatusUpdates { statusUpdates: [ … ] }                   { results: [ { result, description? }, … ] }: status updates of another
+    ///                                                              server, as the topics push them, taken with their timestamps,
+    ///                                                              as AuthorizeStatusPush allows
+    /// signCommit       { commitId, signatures: [ … ] }            { commitId, signatures, added }: all signatures of the commit afterwards,
     ///                                                              and how many were added
     /// topics            {}                                         { topics: [ { name, action, description } ] }
     /// subscribe         { topics: [ … ] }                          { topics: [ … ] }: all topics subscribed now
@@ -163,9 +166,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Decides who may set which status over the WebSocket of a history. Without it, setting a status is refused:
         /// a server has to decide on purpose whom it lets change the status of its roaming networks.
-        /// The status of a history is set at the server holding it; followers take it from their leader.
         /// </summary>
         public AuthorizeStatusUpdateDelegate? AuthorizeStatusUpdate { get; set; }
+
+        /// <summary>
+        /// Decides who may push which status updates, e.g. another server pushing the status set there,
+        /// per status update. Without it, pushing status updates is refused.
+        /// </summary>
+        public AuthorizeStatusUpdateDelegate? AuthorizeStatusPush { get; set; }
 
         /// <summary>
         /// The maximum size of a commit pushed completely to the subscribers of "commits", as JSON text.
@@ -443,6 +451,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region pushStatusUpdates
+
+            webSocketServer.AddCommand("pushStatusUpdates", request =>
+
+                Task.FromResult(
+                    PushStatusUpdates(request, History, webSocketServer.MaxBatchSize)
+                )
+
+            );
+
+            #endregion
+
             #region Topics
 
             webSocketServer.AddTopic(new POIWebSocketTopic(CommitAnnouncementsTopic,
@@ -695,6 +715,74 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 response.Add("current", current.ToJSON());
 
             return Request.Respond(response);
+
+        }
+
+        #endregion
+
+        #region (private) PushStatusUpdates(Request, History, MaxStatusUpdates)
+
+        /// <summary>
+        /// Take the status updates another server pushes, e.g. the status set there, with their timestamps:
+        /// the latest one of an entity wins, wherever it was set first.
+        /// </summary>
+        private POIWebSocketMessage PushStatusUpdates(POIWebSocketRequest    Request,
+                                                      RoamingNetworkHistory  History,
+                                                      Int32                  MaxStatusUpdates)
+        {
+
+            if (AuthorizeStatusPush is null)
+                return Request.Error(POIWebSocketErrorCodes.SecurityError, "Pushing status updates is not enabled here!");
+
+            if (Request.Session.UpgradeRequest is not HTTPRequest upgradeRequest)
+                return Request.Error(POIWebSocketErrorCodes.SecurityError, "The sender of the status updates is unknown!");
+
+            #region Parse the status updates
+
+            if (Request.Payload["statusUpdates"] is not JArray statusUpdatesJSON)
+                return Request.Error(POIWebSocketErrorCodes.FormatViolation, "Missing status updates!");
+
+            if (statusUpdatesJSON.Count > MaxStatusUpdates)
+                return Request.Error(POIWebSocketErrorCodes.FormatViolation, $"At most {MaxStatusUpdates} status updates at once!");
+
+            var statusUpdates = new List<POIStatusUpdate>();
+
+            foreach (var statusUpdateJSON in statusUpdatesJSON)
+            {
+
+                if (statusUpdateJSON is not JObject statusUpdateObject ||
+                    !POIStatusUpdate.TryParse(statusUpdateObject, out var statusUpdate, out _))
+                {
+                    return Request.Error(POIWebSocketErrorCodes.FormatViolation, $"Invalid status update {statusUpdates.Count}!");
+                }
+
+                statusUpdates.Add(statusUpdate);
+
+            }
+
+            #endregion
+
+            var results = new JArray();
+
+            foreach (var statusUpdate in statusUpdates)
+            {
+
+                var     result       = POIStatusUpdateResult.Refused;
+                String? description  = "The sender may not set this status!";
+
+                if (AuthorizeStatusPush(upgradeRequest, Request.Session.Login, statusUpdate))
+                    result = History.RuntimeStatus.TryUpdate(statusUpdate, out description);
+
+                var resultJSON = new JObject(new JProperty("result", result.ToString()));
+
+                if (description is not null)
+                    resultJSON.Add("description", description);
+
+                results.Add(resultJSON);
+
+            }
+
+            return Request.Respond(new JObject(new JProperty("results", results)));
 
         }
 
