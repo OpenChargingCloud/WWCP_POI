@@ -8,8 +8,12 @@ e-mobility as immutable, versioned data sets between servers and servers and (sm
 - **Dynamic data is kept strictly apart.** Admin status, status and energy status are
   not content: they have no ETags, change without a new version and are shared by all versions
   of their entity.
-- **WebSocket first.** Followers subscribe to commits and status updates over one WebSocket
-  for fast, low-latency sync; HTTP serves the same reads.
+- **Signed by the owners.** Every change set is signed by the owners of what it changes, with keys the
+  data names: a charging station operator changes only its own data. Everyone can check every commit.
+- **No leader.** Every server commits; the history is a graph of commits, and tips that do not conflict
+  are merged deterministically, so that all servers make the same merge commits.
+- **WebSocket first.** Peers subscribe to commits and status updates over one WebSocket and push
+  their own commits, for fast, low-latency sync; HTTP serves the same reads.
 - **JSON and CBOR.** Every representation exists in both, with the same keys and values;
   ETags exist for canonical JSON and canonical CBOR.
 
@@ -254,15 +258,21 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
 | Request | Returns |
 |---|---|
 | `GET ~/roamingNetworks/{id}/history/head` | metadata of the head commit |
+| `GET ~/roamingNetworks/{id}/history/tips` | metadata of the head and all tips, and the conflicts keeping them apart |
+| `GET ~/roamingNetworks/{id}/history/haveIds` | the tips and a sample of older commits held here |
 | `GET ~/roamingNetworks/{id}/history/snapshot?runtimeStatus=false` | head commit, complete network and its runtime status |
 | `GET ~/roamingNetworks/{id}/history/commitInfos?since={commitId}&max={n}` | metadata of the commits since |
 | `GET ~/roamingNetworks/{id}/history/commits?since={commitId}&max={n}` | complete commits since |
+| `GET ~/roamingNetworks/{id}/history/commits?have={commitId,…}&max={n}` | complete commits missing at who holds these, parents first |
+| `POST ~/roamingNetworks/{id}/history/commits` `{commits: […]}` | 200 appended (how many, head, tips, conflicts), 422 one refused, 403 |
 | `GET ~/roamingNetworks/{id}/history/commits/{commitId}` | one commit |
 | `COMMIT ~/roamingNetworks/{id}/history/changeSets` | 201 committed, 200 already committed (the commit, the `head`, the `conflicts` left), 422 refused |
 | `POST ~/roamingNetworks/{id}/history/commits/{commitId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403, 404, 422 invalid |
 
 Submitting is refused unless `AuthorizeChangeSetSubmission` decides who may submit;
-what a change set may change, its owners' signatures decide. Adding commit signatures needs
+what a change set may change, its owners' signatures decide. Pushing commits is refused unless
+`AuthorizeCommitPush` decides who may push, e.g. other servers; they are checked as every commit.
+Adding commit signatures needs
 `AuthorizeCommitSignature` (e.g. whether the sender has the role it signs in) and `VerifyCommitSignature`.
 
 ### WebSocket
@@ -276,7 +286,8 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 [4, "42", "NotFound", "The commit … is unknown here!", {}]   request error
 ```
 
-- **Actions:** `head`, `snapshot`, `commitInfos`, `commits`, `commit {commitId}`,
+- **Actions:** `head`, `tips`, `haveIds`, `snapshot`, `commitInfos`, `commits {since? | have?, max?}`, `commit {commitId}`,
+  `pushCommits {commits}` → `{appended, head, tips, conflicts?, description?}`,
   `commitChangeSet {changeSet}` → `{status, …, head, conflicts?}`, `runtimeStatus`,
   `signCommit {commitId, signatures}` → `{commitId, signatures, added}`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
@@ -288,7 +299,7 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 - **Async:** requests are processed concurrently, up to `MaxConcurrentRequests` per connection;
   answers come when ready and are matched by their id. A connection's requests are cancelled when it closes.
 - **setStatus** `{kind, entityType, entityId, value, timestamp?, dataSource?}` → `{result, description?, current?}`,
-  allowed as `AuthorizeStatusUpdate` decides (refused without it); set it at the leader, followers take it from there.
+  allowed as `AuthorizeStatusUpdate` decides (refused without it); peers take it from the server they follow.
   `kind` is `adminStatus`, `status` or `energyStatus`, whose `value` is an object `{used, available, storedEnergy?}`.
   Status updates come often, e.g. within a minute as the AFIR asks: send them as one batch.
 - **Batches:** messages of the same action aggregate. A request `{batch: [p1, p2, …]}` runs per payload,
@@ -299,29 +310,38 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 - **Access:** open like the HTTP reads, unless `AuthenticateWebSocketClient` is set;
   `commitChangeSet` asks `AuthorizeChangeSetSubmission` with the upgrade request.
 
-### Follower
+### Peer
 
-`RoamingNetworkFollower` keeps a history in sync with the leader over its WebSocket:
+`RoamingNetworkPeer` keeps a history in sync with another server over its WebSocket. There is no leader:
+both commit, push their commits to each other, and merge alike.
 
 ```csharp
-await using var follower = new RoamingNetworkFollower(new Uri("wss://leader/roamingNetworks/rn1/history/ws"));
-await follower.StartAsync();                     // returns once caught up for the first time
+await using var peer = new RoamingNetworkPeer(new Uri("wss://server1/roamingNetworks/rn1/history/ws"),
+                                              Options: new RoamingNetworkPeerOptions {
+                                                           TrustedRoamingNetworkOperatorKeyIds = [ rnoIdentityKeyId ]
+                                                       });
+await peer.StartAsync();                          // returns once caught up for the first time
 
-var current = follower.History!.Head.RoamingNetwork;         // the current version
+var current = peer.History!.Head.RoamingNetwork;  // the current version
 
-await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader; it comes back as a commit
-          RoamingNetworkChange.UpdateProperty(current, "dataSource", null, "v3")
-      ]));
+peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to server 1, merged there
+              RoamingNetworkChange.UpdateProperty(current, "dataSource", null, "v3")
+          ]).Sign(rnoSigningKey, rnoSigningKeyId, COSEAlgorithm.ES256));
 ```
 
-- **Sync:** subscribe first, then a snapshot (when it has no history yet), the commits since its head,
-  and the runtime status. Pushed commits are appended; an announced, missed or too large one makes it catch up.
+- **Sync:** subscribe first, then a snapshot (when it has no history yet), the commits it misses, naming
+  those it holds (`have`), the runtime status, and then it pushes the commits the other server misses.
+  Pushed commits whose parents it holds are appended, others make it fetch; new commits of its own
+  history, made here or taken from elsewhere, are pushed as they come (`PushCommits`).
+- **Trust:** `TrustedRoamingNetworkOperatorKeyIds` names keys of the roaming network operator a snapshot
+  must have; afterwards, every change set is checked by the keys in the data.
 - **Reconnect:** a broken connection is opened again with growing delays, and it catches up.
-  A head the leader does not know starts it again from a snapshot (`OnHistoryReplaced`).
-- **Options:** complete commits or announcements, status or not, credentials via `ConfigureWebSocket`,
-  verifiers of change set and commit signatures, the roles every commit must be signed in, limits.
+  None of its commits known there starts it again from a snapshot (`OnHistoryReplaced`).
+- **Options:** complete commits or announcements, status or not, pushing or not, credentials via
+  `ConfigureWebSocket`, an additional verifier of change set signatures, a verifier of commit signatures,
+  the roles every commit must be signed in, limits.
 - **Signing:** `SignCommitAsync(commitId, signatures)` sends the signatures of, e.g., a roaming network
-  operator to the leader; every follower takes them from the `commitSignatures` topic.
+  operator to the other server; every peer takes them from the `commitSignatures` topic.
 
 ## Submodules
 
@@ -335,6 +355,8 @@ await follower.CommitChangeSetAsync(current.CreateChangeSet([  // to the leader;
 ## Open
 
 - Persistence and retention of histories
+- Peers push the status they set themselves to the other server
+- Recursive merge bases whose own merge conflicts
 - Finer subscription filters
 - A WebSocket endpoint in Hermod without a TCP server behind it
 - Further entities: as the use cases need them

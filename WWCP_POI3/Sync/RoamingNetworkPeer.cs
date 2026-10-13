@@ -33,53 +33,55 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// The follower has caught up with its leader, after connecting.
+    /// The peer has caught up with the other server, after connecting.
     /// </summary>
-    /// <param name="Follower">The follower.</param>
+    /// <param name="Follower">The peer.</param>
     /// <param name="History">Its history.</param>
-    public delegate void OnRoamingNetworkFollowerSynchronizedDelegate(RoamingNetworkFollower  Follower,
+    public delegate void OnRoamingNetworkPeerSynchronizedDelegate(RoamingNetworkPeer  Follower,
                                                                       RoamingNetworkHistory   History);
 
     /// <summary>
-    /// The follower started its history from a snapshot of its leader: at first, or because the leader
-    /// did not know its head any more.
+    /// The peer started its history from a snapshot of the other server: at first, or because the other server
+    /// knew none of its commits.
     /// </summary>
-    /// <param name="Follower">The follower.</param>
+    /// <param name="Follower">The peer.</param>
     /// <param name="OldHistory">The history before, if any.</param>
     /// <param name="NewHistory">The new history.</param>
-    public delegate void OnRoamingNetworkFollowerHistoryReplacedDelegate(RoamingNetworkFollower   Follower,
+    public delegate void OnRoamingNetworkPeerHistoryReplacedDelegate(RoamingNetworkPeer   Follower,
                                                                          RoamingNetworkHistory?   OldHistory,
                                                                          RoamingNetworkHistory    NewHistory);
 
     /// <summary>
-    /// Something went wrong; the follower connects again.
+    /// Something went wrong; the peer connects again.
     /// </summary>
-    /// <param name="Follower">The follower.</param>
+    /// <param name="Follower">The peer.</param>
     /// <param name="Description">What went wrong.</param>
     /// <param name="Exception">The exception, if any.</param>
-    public delegate void OnRoamingNetworkFollowerErrorDelegate(RoamingNetworkFollower  Follower,
+    public delegate void OnRoamingNetworkPeerErrorDelegate(RoamingNetworkPeer  Follower,
                                                                String                  Description,
                                                                Exception?              Exception);
 
 
     /// <summary>
-    /// Keeps the history of a roaming network in sync with its leading server, over the WebSocket of the leader's history.
+    /// Keeps the history of a roaming network in sync with another server, over the WebSocket of its history:
+    /// there is no leader, both commit, and both merge alike.
     /// </summary>
     /// <remarks>
     /// After connecting it subscribes first, so that nothing gets lost, then starts from a snapshot when it has
-    /// no history yet, catches up with the commits since its head, and takes the current runtime status:
-    /// from the snapshot, or asked for when it continued its history.
-    /// Afterwards it appends the pushed commits; a commit that does not follow its head, or one only announced,
-    /// makes it catch up again. A head the leader does not know makes it start again from a snapshot.
+    /// no history yet, fetches the commits it misses, naming those it holds, and takes the current runtime status:
+    /// from the snapshot, or asked for when it continued its history. Then it pushes the commits the other server
+    /// misses, and every new one of its own history, if allowed there.
+    /// Afterwards it appends the pushed commits; one whose parents it misses, or one only announced,
+    /// makes it fetch again. None of its commits known there makes it start again from a snapshot.
     /// When the connection breaks it connects again, waiting longer after every failure, and catches up.
-    /// Change sets and status updates are sent to the leader, which pushes them back as commits and status updates.
+    /// Change sets and status updates can also be sent to the other server, which pushes them back.
     /// </remarks>
-    public sealed class RoamingNetworkFollower : IAsyncDisposable
+    public sealed class RoamingNetworkPeer : IAsyncDisposable
     {
 
         #region Data
 
-        private readonly RoamingNetworkFollowerOptions  options;
+        private readonly RoamingNetworkPeerOptions  options;
         private readonly TaskCompletionSource           firstSynchronization  = new (TaskCreationOptions.RunContinuationsAsynchronously);
         private          RoamingNetworkHistory?         history;
         private          Connection?                    connection;
@@ -88,23 +90,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private          Int64                          reconnects;
         private          Boolean                        statusFromSnapshot;
 
+        // The commits taken from the other server: not to be pushed back.
+        private readonly ConcurrentDictionary<RoamingNetworkCommit_Id, Byte>  receivedCommits  = [];
+
         #endregion
 
         #region Properties
 
         /// <summary>
-        /// The URL of the WebSocket of the leader's history, e.g. ws://leader/roamingNetworks/rn1/history/ws.
+        /// The URL of the WebSocket of the history of the other server, e.g. ws://server2/roamingNetworks/rn1/history/ws.
         /// </summary>
-        public Uri                     LeaderURL      { get; }
+        public Uri                     PeerURL      { get; }
 
         /// <summary>
-        /// The history kept in sync; null until the first snapshot. It is replaced when the leader does not know its head.
+        /// The history kept in sync; null until the first snapshot. It is replaced when the other server knows none of its commits.
         /// </summary>
         public RoamingNetworkHistory?  History
             => Volatile.Read(ref history);
 
         /// <summary>
-        /// Whether the follower is connected to its leader right now.
+        /// Whether the peer is connected to the other server right now.
         /// </summary>
         public Boolean                 IsConnected
             => Volatile.Read(ref connection)?.IsOpen == true;
@@ -122,17 +127,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The follower has caught up with its leader, after connecting.
         /// </summary>
-        public event OnRoamingNetworkFollowerSynchronizedDelegate?     OnSynchronized;
+        public event OnRoamingNetworkPeerSynchronizedDelegate?     OnSynchronized;
 
         /// <summary>
         /// The follower started its history from a snapshot.
         /// </summary>
-        public event OnRoamingNetworkFollowerHistoryReplacedDelegate?  OnHistoryReplaced;
+        public event OnRoamingNetworkPeerHistoryReplacedDelegate?  OnHistoryReplaced;
 
         /// <summary>
         /// Something went wrong; the follower connects again.
         /// </summary>
-        public event OnRoamingNetworkFollowerErrorDelegate?            OnError;
+        public event OnRoamingNetworkPeerErrorDelegate?            OnError;
 
         #endregion
 
@@ -141,17 +146,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Create a follower of the history behind the given WebSocket URL.
         /// </summary>
-        /// <param name="LeaderURL">The URL of the WebSocket of the leader's history.</param>
+        /// <param name="PeerURL">The URL of the WebSocket of the leader's history.</param>
         /// <param name="History">An optional history to continue, e.g. one persisted before; a snapshot otherwise.</param>
         /// <param name="Options">Optional options.</param>
-        public RoamingNetworkFollower(Uri                             LeaderURL,
+        public RoamingNetworkPeer(Uri                             PeerURL,
                                       RoamingNetworkHistory?          History   = null,
-                                      RoamingNetworkFollowerOptions?  Options   = null)
+                                      RoamingNetworkPeerOptions?  Options   = null)
         {
 
-            this.LeaderURL  = LeaderURL;
+            this.PeerURL  = PeerURL;
             this.history    = History;
-            this.options    = Options ?? new RoamingNetworkFollowerOptions();
+            this.options    = Options ?? new RoamingNetworkPeerOptions();
 
         }
 
@@ -369,7 +374,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     firstSynchronization.TrySetResult();
                     OnSynchronized?.Invoke(this, History!);
 
-                    await FollowAsync(currentConnection, CancellationToken);
+                    // New commits of this history, made here or taken from elsewhere, go to the other server.
+                    var outgoing        = Channel.CreateUnbounded<RoamingNetworkCommit>(new UnboundedChannelOptions { SingleReader = true });
+                    var currentHistory  = History!;
+
+                    void Announced(RoamingNetworkCommitAnnouncement Announcement)
+                    {
+                        if (!receivedCommits.ContainsKey(Announcement.CommitId))
+                            outgoing.Writer.TryWrite(Announcement.Commit);
+                    }
+
+                    if (options.PushCommits)
+                        currentHistory.OnCommitAnnouncement += Announced;
+
+                    using var following = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+
+                    try
+                    {
+
+                        var pushing = options.PushCommits
+                                          ? PushNewCommitsAsync(currentConnection, outgoing.Reader, following.Token)
+                                          : Task.CompletedTask;
+
+                        try
+                        {
+                            await FollowAsync(currentConnection, CancellationToken);
+                        }
+                        finally
+                        {
+                            following.Cancel();
+                            try { await pushing; } catch { }
+                        }
+
+                    }
+                    finally
+                    {
+                        currentHistory.OnCommitAnnouncement -= Announced;
+                    }
 
                 }
                 catch (OperationCanceledException) when (CancellationToken.IsCancellationRequested)
@@ -378,7 +419,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (Exception e)
                 {
-                    RaiseError($"Following '{LeaderURL}' failed: {e.Message}", e);
+                    RaiseError($"Following '{PeerURL}' failed: {e.Message}", e);
                 }
                 finally
                 {
@@ -440,6 +481,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 await StartFromSnapshotAsync(Connection, CancellationToken);
 
             await CatchUpAsync(Connection, CancellationToken);
+
+            if (options.PushCommits)
+                await PushMissingCommitsAsync(Connection, CancellationToken);
 
             // A snapshot brought the runtime status of its moment; what changed since was pushed.
             if (options.FollowStatus && !statusFromSnapshot)
@@ -524,6 +568,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (RoamingNetworkCommit.TryParse(CommitJSON, out var commit, out _, options.ChangeSetLimits))
             {
 
+                receivedCommits.TryAdd(commit.Id, 0);
+
                 // A commit held already only brings signatures in addition; one whose parents are all held is appended.
                 if ((currentHistory.Contains(commit.Id) || commit.ParentIds.All(currentHistory.Contains)) &&
                     currentHistory.TryAppend(commit, out _, options.VerifyChangeSetSignature, options.VerifyCommitSignature, options.RequiredSignatureRoles))
@@ -533,7 +579,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            // Missed, unreadable or not appendable: ask the leader for everything since the head.
+            // Missed, unreadable or not appendable: ask for everything missing here.
             await CatchUpAsync(Connection, CancellationToken);
 
         }
@@ -585,8 +631,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) CatchUpAsync(Connection, CancellationToken)
 
         /// <summary>
-        /// Append all commits of the leader since the head, page by page, until there are no more.
-        /// A head the leader does not know makes the follower start again from a snapshot.
+        /// Append all commits of the other server missing here, page by page, naming the commits held here,
+        /// until there are no more. None of them known there makes the peer start again from a snapshot.
         /// </summary>
         private async Task CatchUpAsync(Connection         Connection,
                                         CancellationToken  CancellationToken)
@@ -598,8 +644,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var currentHistory  = History!;
                 var answer          = await Connection.RequestAsync("commits",
                                                                     new JObject(
-                                                                        new JProperty("since",  currentHistory.Head.Commit.Id.ToString()),
-                                                                        new JProperty("max",    options.MaxCommitsPerRequest)
+                                                                        new JProperty("have",  new JArray(currentHistory.HaveIds().Select(commitId => commitId.ToString()))),
+                                                                        new JProperty("max",   options.MaxCommitsPerRequest)
                                                                     ),
                                                                     CancellationToken);
 
@@ -622,18 +668,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
 
                     if (!RoamingNetworkCommit.TryParse(commitJSON, out var commit, out var commitError, options.ChangeSetLimits))
-                        throw new InvalidOperationException("Invalid commit of the leader: " + commitError);
+                        throw new InvalidOperationException("Invalid commit of the other server: " + commitError);
 
+                    receivedCommits.TryAdd(commit.Id, 0);
                     commits.Add(commit);
 
                 }
 
-                // Until an empty page: the leader may send fewer than asked for.
-                if (commits.Count == 0)
+                // Until a page brings nothing new: the other server may send fewer than asked for, and some held here already.
+                if (commits.All(commit => currentHistory.Contains(commit.Id)))
                     return;
 
                 if (!currentHistory.TryAppend(commits, out _, out var appendError, options.VerifyChangeSetSignature, options.VerifyCommitSignature, options.RequiredSignatureRoles))
-                    throw new InvalidOperationException("The commits of the leader can not be appended: " + appendError);
+                    throw new InvalidOperationException("The commits of the other server can not be appended: " + appendError);
 
             }
 
@@ -653,16 +700,112 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         CancellationToken);
 
             if (!RoamingNetworkHistory.TryFromSnapshot(snapshot, out var newHistory, out var errorResponse, options.ChangeSetLimits))
-                throw new InvalidOperationException("Invalid snapshot of the leader: " + errorResponse);
+                throw new InvalidOperationException("Invalid snapshot of the other server: " + errorResponse);
 
             if (!RoamingNetworkHistory.CheckSignatures(newHistory.Head.Commit, options.VerifyCommitSignature, options.RequiredSignatureRoles, out var signatureError))
-                throw new InvalidOperationException("The snapshot of the leader is not signed as required: " + signatureError);
+                throw new InvalidOperationException("The snapshot of the other server is not signed as required: " + signatureError);
+
+            // The trust anchor: the snapshot must be one of the roaming network the keys of its operator name.
+            if (options.TrustedRoamingNetworkOperatorKeyIds is { Count: > 0 } trustedKeyIds &&
+                !newHistory.Head.RoamingNetwork.IdentityKeys.Concat(newHistory.Head.RoamingNetwork.SigningKeys).Any(key => trustedKeyIds.Contains(key.Id)))
+            {
+                throw new InvalidOperationException("The snapshot of the other server names none of the trusted keys of the roaming network operator!");
+            }
 
             var oldHistory = Interlocked.Exchange(ref history, newHistory);
 
             statusFromSnapshot = options.FollowStatus;
 
             OnHistoryReplaced?.Invoke(this, oldHistory, newHistory);
+
+        }
+
+        #endregion
+
+        #region (private) PushMissingCommitsAsync(Connection, CancellationToken)
+
+        /// <summary>
+        /// Push the commits of this history the other server misses, as it names the commits it holds, page by page.
+        /// A server not allowing it is told so once, by an error.
+        /// </summary>
+        private async Task PushMissingCommitsAsync(Connection         Connection,
+                                                   CancellationToken  CancellationToken)
+        {
+
+            var currentHistory  = History!;
+            var haveIds         = await Expect(Connection, "haveIds", [], CancellationToken);
+
+            var have            = (haveIds["haveIds"] as JArray ?? []).
+                                      Select (item     => RoamingNetworkCommit_Id.TryParse(item.Value<String>() ?? "", out var commitId) ? commitId : (RoamingNetworkCommit_Id?) null).
+                                      Where  (commitId => commitId.HasValue).
+                                      Select (commitId => commitId!.Value).
+                                      ToArray();
+
+            if (!currentHistory.TryGetMissingCommits(have, out var missing, out _, Int32.MaxValue))
+                return;
+
+            foreach (var page in missing.Where(commit => !receivedCommits.ContainsKey(commit.Id)).Chunk(options.MaxCommitsPerRequest))
+                if (!await TryPushAsync(Connection, page, CancellationToken))
+                    return;
+
+        }
+
+        #endregion
+
+        #region (private) PushNewCommitsAsync(Connection, Commits, CancellationToken)
+
+        /// <summary>
+        /// Push the new commits of this history to the other server, as they come, those waiting together at once.
+        /// </summary>
+        private async Task PushNewCommitsAsync(Connection                          Connection,
+                                               ChannelReader<RoamingNetworkCommit>  Commits,
+                                               CancellationToken                   CancellationToken)
+        {
+
+            while (await Commits.WaitToReadAsync(CancellationToken))
+            {
+
+                var page = new List<RoamingNetworkCommit>();
+
+                while (page.Count < options.MaxCommitsPerRequest && Commits.TryRead(out var commit))
+                    page.Add(commit);
+
+                if (!await TryPushAsync(Connection, page, CancellationToken))
+                    return;
+
+            }
+
+        }
+
+        #endregion
+
+        #region (private) TryPushAsync(Connection, Commits, CancellationToken)
+
+        /// <summary>
+        /// Push the given commits; false when the other server does not allow it.
+        /// </summary>
+        private async Task<Boolean> TryPushAsync(Connection                           Connection,
+                                                 IReadOnlyList<RoamingNetworkCommit>  Commits,
+                                                 CancellationToken                    CancellationToken)
+        {
+
+            if (Commits.Count == 0)
+                return true;
+
+            var answer = await Connection.RequestAsync("pushCommits",
+                                                       new JObject(new JProperty("commits", new JArray(Commits.Select(commit => commit.ToJSON())))),
+                                                       CancellationToken);
+
+            if (answer.IsError)
+            {
+                RaiseError($"The other server takes no commits: {answer.ErrorDescription}", null);
+                return false;
+            }
+
+            if (answer.GetPayloadJSON()?["description"]?.Value<String>() is String description)
+                RaiseError("The other server did not take all commits: " + description, null);
+
+            return true;
 
         }
 
@@ -715,7 +858,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Data
 
-            private readonly RoamingNetworkFollower                                                   follower;
+            private readonly RoamingNetworkPeer                                                   follower;
             private readonly ClientWebSocket                                                          webSocket    = new ();
             private readonly SemaphoreSlim                                                            sendLock     = new (1, 1);
             private readonly ConcurrentDictionary<String, TaskCompletionSource<POIWebSocketMessage>>  pending      = new (StringComparer.Ordinal);
@@ -737,14 +880,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            private Connection(RoamingNetworkFollower Follower)
+            private Connection(RoamingNetworkPeer Follower)
             {
                 this.follower = Follower;
             }
 
             #region (static) ConnectAsync(Follower, CancellationToken)
 
-            public static async Task<Connection> ConnectAsync(RoamingNetworkFollower  Follower,
+            public static async Task<Connection> ConnectAsync(RoamingNetworkPeer  Follower,
                                                               CancellationToken       CancellationToken)
             {
 
@@ -755,7 +898,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     Follower.options.ConfigureWebSocket?.Invoke(connection.webSocket.Options);
 
-                    await connection.webSocket.ConnectAsync(Follower.LeaderURL, CancellationToken);
+                    await connection.webSocket.ConnectAsync(Follower.PeerURL, CancellationToken);
 
                     connection.receiver = Task.Run(connection.ReceiveAsync);
 

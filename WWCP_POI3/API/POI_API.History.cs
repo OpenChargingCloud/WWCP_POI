@@ -293,27 +293,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region GET ~/roamingNetworks/{roamingNetworkId}/history/commits?since={commitId}&max={n}
+            #region GET ~/roamingNetworks/{roamingNetworkId}/history/commits?since={commitId}&have={commitId,…}&max={n}
 
             AddHandler(history + "/commits",
                        HTTPMethod:    HTTPMethod.GET,
-                       HTTPDelegate:  request => Task.FromResult(
+                       HTTPDelegate:  request => {
 
-                           !TryGetHistory(request, out var roamingNetworkHistory, out var errorResponse)
-                               ? errorResponse
+                           if (!TryGetHistory(request, out var roamingNetworkHistory, out var errorResponse) ||
+                               !TryGetSince  (request, roamingNetworkHistory, out var since, out var max, out errorResponse))
+                           {
+                               return Task.FromResult(errorResponse);
+                           }
 
-                               : !TryGetSince(request, roamingNetworkHistory, out var since, out var max, out errorResponse)
-                                     ? errorResponse
+                           IReadOnlyList<RoamingNetworkCommit>? commits;
+                           String?                              error;
 
-                                     : roamingNetworkHistory.TryGetCommitsSince(since, out var commits, out var error, max)
-                                           ? JSONResponse(request, HTTPStatusCode.OK, new JArray(commits.Select(commit => commit.ToJSON())))
-                                           : ErrorResponse(request, HTTPStatusCode.NotFound, error)
+                           // The commits missing at a server holding the given ones, e.g. its tips and a sample of older commits.
+                           if (request.QueryString.GetString("have") is String haveText)
+                           {
 
-                       ));
+                               if (!TryParseHave(haveText, out var haveIds, out var haveError))
+                                   return Task.FromResult(ErrorResponse(request, HTTPStatusCode.BadRequest, haveError));
+
+                               roamingNetworkHistory.TryGetMissingCommits(haveIds, out commits, out error, max);
+
+                           }
+                           else
+                               roamingNetworkHistory.TryGetCommitsSince(since, out commits, out error, max);
+
+                           return Task.FromResult(
+                                      commits is not null
+                                          ? JSONResponse(request, HTTPStatusCode.OK, new JArray(commits.Select(commit => commit.ToJSON())))
+                                          : ErrorResponse(request, HTTPStatusCode.NotFound, error)
+                                  );
+
+                       });
 
             #endregion
 
-            #region COMMIT ~/roamingNetworks/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&rebase=true
+            #region COMMIT ~/roamingNetworks/{roamingNetworkId}/history/changeSets
 
             AddHandler(history + "/changeSets",
                        HTTPMethod:    COMMIT,

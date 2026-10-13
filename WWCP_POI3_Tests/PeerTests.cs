@@ -35,7 +35,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
     /// A follower keeping its history in sync with its leader over the WebSocket.
     /// </summary>
     [TestFixture]
-    public class FollowerTests
+    public class PeerTests
     {
 
         #region Data
@@ -47,7 +47,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
         private POI_API?                 poiAPI;
         private RoamingNetworkHistory?   leader;
         private POIWebSocketServer?      webSocketServer;
-        private RoamingNetworkFollower?  follower;
+        private RoamingNetworkPeer?  follower;
 
         #endregion
 
@@ -124,13 +124,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
         #region StartFollower(History = null, Options = null)
 
-        private async Task<RoamingNetworkFollower> StartFollower(RoamingNetworkHistory?          History   = null,
-                                                                 RoamingNetworkFollowerOptions?  Options   = null)
+        private async Task<RoamingNetworkPeer> StartFollower(RoamingNetworkHistory?          History   = null,
+                                                                 RoamingNetworkPeerOptions?  Options   = null)
         {
 
-            follower = new RoamingNetworkFollower(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"),
+            follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"),
                                                   History,
-                                                  Options ?? new RoamingNetworkFollowerOptions {
+                                                  Options ?? new RoamingNetworkPeerOptions {
                                                                  MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
                                                                  MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
                                                              });
@@ -186,7 +186,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "offline", T0, out _, out _);
 
             var replaced  = 0;
-            var follower  = new RoamingNetworkFollower(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"));
+            var follower  = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"));
             this.follower = follower;
 
             follower.OnHistoryReplaced += (_, oldHistory, newHistory) => replaced++;
@@ -230,7 +230,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
             poiAPI!.MaxPushedCommitSize = 100;
 
-            await StartFollower(Options: new RoamingNetworkFollowerOptions {
+            await StartFollower(Options: new RoamingNetworkPeerOptions {
                                              PushCompleteCommits  = PushCompleteCommits,
                                              MinReconnectDelay    = TimeSpan.FromMilliseconds(50)
                                          });
@@ -284,7 +284,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             var other     = NewHistory("other");
             var replaced  = new List<(RoamingNetworkHistory? Old, RoamingNetworkHistory New)>();
 
-            follower = new RoamingNetworkFollower(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"), other);
+            follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"), other);
             follower.OnHistoryReplaced += (_, oldHistory, newHistory) => replaced.Add((oldHistory, newHistory));
 
             await follower.StartAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
@@ -397,7 +397,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
             Publish("v1");
 
-            var follower   = await StartFollower(Options: new RoamingNetworkFollowerOptions {
+            var follower   = await StartFollower(Options: new RoamingNetworkPeerOptions {
                                                                VerifyCommitSignature   = verify,
                                                                RequiredSignatureRoles  = [ RoamingNetworkCommitSignatureRoles.Leader ],
                                                                MinReconnectDelay       = TimeSpan.FromMilliseconds(50),

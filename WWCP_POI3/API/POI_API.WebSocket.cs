@@ -57,8 +57,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// commitInfos       { since?, max? }                           { commitInfos: [ … ] }
     /// commits           { since?, max? }                           { commits:     [ … ] }
     /// commit            { commitId }                               the complete commit
-    /// commitChangeSet   { changeSet, expectedHead?, rebase? }      { status, … }: Published or AlreadyPublished with the metadata of
-    ///                                                              the commit and "rebased", HeadMoved with the head, Refused
+    /// commitChangeSet   { changeSet }                              { status, …, head, conflicts? }: Committed or AlreadyCommitted with the
+    ///                                                              metadata of the commit, the head and the conflicts left, or Refused
+    /// tips              {}                                         { head, tips: [ … ], conflicts? }: the metadata of the tips
+    /// haveIds           {}                                         { haveIds: [ … ] }: the tips and a sample of older commits held here
+    /// pushCommits       { commits: [ … ] }                         { appended, head, tips, conflicts?, description? }: commits of
+    ///                                                              another server, parents first, as AuthorizeCommitPush allows
     /// runtimeStatus     {}                                         { runtimeStatus: [ … ] }: the current admin status and status
     /// setStatus         { kind, entityType, entityId, value,       { result, description?, current? }: Updated, Unchanged, Outdated,
     ///                     timestamp?, dataSource? }                Scheduled or Refused, and the current status afterwards
@@ -291,20 +295,80 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region commits
 
-            webSocketServer.AddCommand("commits", request =>
+            webSocketServer.AddCommand("commits", request => {
+
+                if (!TryGetSince(request, History, out var since, out var max, out var errorMessage))
+                    return Task.FromResult(errorMessage);
+
+                IReadOnlyList<RoamingNetworkCommit>? commits;
+                String?                              error;
+
+                // The commits missing at a server holding the given ones, e.g. its tips and a sample of older commits.
+                if (request.Payload["have"] is JToken have)
+                {
+
+                    if (!TryParseHave(have, out var haveIds, out var haveError))
+                        return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, haveError));
+
+                    History.TryGetMissingCommits(haveIds, out commits, out error, max);
+
+                }
+                else
+                    History.TryGetCommitsSince(since, out commits, out error, max);
+
+                return Task.FromResult(
+                           commits is not null
+                               ? request.Respond(new JObject(new JProperty("commits", new JArray(commits.Select(commit => commit.ToJSON())))))
+                               : request.Error(POIWebSocketErrorCodes.NotFound, error)
+                       );
+
+            });
+
+            #endregion
+
+            #region tips
+
+            webSocketServer.AddCommand("tips", request =>
 
                 Task.FromResult(
-
-                    !TryGetSince(request, History, out var since, out var max, out var errorMessage)
-                        ? errorMessage
-
-                        : History.TryGetCommitsSince(since, out var commits, out var error, max)
-                              ? request.Respond(new JObject(new JProperty("commits", new JArray(commits.Select(commit => commit.ToJSON())))))
-                              : request.Error(POIWebSocketErrorCodes.NotFound, error)
-
+                    request.Respond(TipsJSON(History))
                 )
 
             );
+
+            #endregion
+
+            #region haveIds
+
+            webSocketServer.AddCommand("haveIds", request =>
+
+                Task.FromResult(
+                    request.Respond(HaveIdsJSON(History))
+                )
+
+            );
+
+            #endregion
+
+            #region pushCommits
+
+            webSocketServer.AddCommand("pushCommits", request => {
+
+                if (request.Session.UpgradeRequest is not HTTPRequest upgradeRequest)
+                    return Task.FromResult(request.Error(POIWebSocketErrorCodes.SecurityError, "The sender of the commits is unknown!"));
+
+                if (!TryParseCommits(request.Payload, out var commits, out var commitsError))
+                    return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, commitsError));
+
+                var result = PushCommits(upgradeRequest, History, commits);
+
+                return Task.FromResult(
+                           result.Forbidden
+                               ? request.Error(POIWebSocketErrorCodes.SecurityError, result.ErrorResponse!)
+                               : request.Respond(result.JSON)
+                       );
+
+            });
 
             #endregion
 
