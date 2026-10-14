@@ -333,7 +333,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            // Parking garages, spaces and sensors are unique within the network;
+            // Parking garages, spaces, sensors, space groups and products are unique within the network;
             // the charging stations they name are ones of this network, and so are the parking spaces charging stations name.
             if ((DuplicateParking      (parkingOperators.Values) ??
                  UnknownChargingStation(parkingOperators.Values, chargingStationOperators) ??
@@ -1715,7 +1715,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => parkingSensors.TryGetValue(ParkingSensorId, out ParkingSensor);
 
         /// <summary>
-        /// The error, when two of the given parking operators have a parking garage, space or sensor with the same identification.
+        /// The error, when two of the given parking operators have a parking garage, space, sensor, space group or product
+        /// with the same identification.
         /// </summary>
         internal static String? DuplicateParking(IEnumerable<ParkingOperator> ParkingOperators)
         {

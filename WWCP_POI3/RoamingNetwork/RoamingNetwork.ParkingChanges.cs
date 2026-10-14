@@ -30,12 +30,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// Changes of the parking garages, parking spaces and parking sensors of a roaming network.
+    /// Changes of the parking garages, parking spaces, parking sensors, parking space groups and parking products of a roaming network.
     /// </summary>
     /// <remarks>
     /// They are embedded completely in their parking operator: a change edits the embedded JSON of the
     /// parking operator and reads it again, so that the changed parking operator is valid as a whole.
-    /// Its admin status, status and internal data, and those of its garages, spaces and sensors, go along.
+    /// Its admin status, status and internal data, and those of its garages, spaces, sensors and space groups, go along.
     /// Their identifications are unique within the network, so an existing one is found without its parent;
     /// adding one names its parking operator. A given parent of any other change must be the actual one.
     /// </remarks>
@@ -173,7 +173,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) TryApplyParkingChange(Change, Index, CreatedAt, ParkingOperators, out CurrentValue, out ErrorResponse)
 
         /// <summary>
-        /// Apply a change of a parking garage, parking space or parking sensor to the given parking operators.
+        /// Apply a change of a parking garage, parking space, parking sensor, parking space group or parking product
+        /// to the given parking operators.
         /// </summary>
         private static Boolean TryApplyParkingChange(RoamingNetworkChange                             Change,
                                                      Int32                                            Index,

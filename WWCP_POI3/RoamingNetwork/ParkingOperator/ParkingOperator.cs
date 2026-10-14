@@ -51,8 +51,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
-    /// An operator of parking garages, parking spaces and parking sensors, embedded completely in its roaming network.
-    /// It owns all of them directly; a parking space may name a parking garage and parking sensors of the same operator.
+    /// An operator of parking garages, parking spaces, parking sensors and parking space groups, offering parking products,
+    /// embedded completely in its roaming network. It owns all of them directly; a parking space may name a parking garage
+    /// and parking sensors of the same operator.
     /// </summary>
     public sealed class ParkingOperator : AImmutableEMobilityEntity<ParkingOperator_Id,
                                                                     ParkingOperatorAdminStatusType,
@@ -295,7 +296,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Take the runtime status and internal data of the given previous version of this parking operator,
-        /// and of every parking garage, parking space and parking sensor it had, by their identifications.
+        /// and of every parking garage, parking space, parking sensor and parking space group it had, by their identifications.
         /// </summary>
         internal void ShareRuntimeOfAll(ParkingOperator Previous)
         {
@@ -378,7 +379,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Return the JSON representation of this parking operator, as its roaming network embeds it:
-        /// with its parking garages, parking spaces and parking sensors.
+        /// with its parking garages, parking spaces, parking sensors, parking space groups and parking products.
         /// </summary>
         public JObject ToJSON()
         {
@@ -445,7 +446,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Try to parse the given JSON representation of a parking operator,
-        /// with its parking garages, parking spaces and parking sensors.
+        /// with its parking garages, parking spaces, parking sensors, parking space groups and parking products.
         /// </summary>
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="ParkingOperator">The parsed parking operator.</param>
