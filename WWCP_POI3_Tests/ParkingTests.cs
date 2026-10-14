@@ -156,7 +156,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             // The same sensor at two parking operators.
             var otherOperator   = Changed(network => ((JArray) network["parkingOperators"]!).Add(
                                                          new JObject(new JProperty("@id",             "DE*OTH"),
-                                                                     new JProperty("parkingSensors",  new JArray(new JObject(new JProperty("@id", "sensor-1")))))));
+                                                                     new JProperty("created",         "2026-01-01T00:00:00.000Z"),
+                                                                     new JProperty("parkingSensors",  new JArray(new JObject(new JProperty("@id",      "sensor-1"),
+                                                                                                                             new JProperty("created",  "2026-01-01T00:00:00.000Z")))))));
 
             using (Assert.EnterMultipleScope())
             {

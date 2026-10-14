@@ -117,16 +117,23 @@ These are the properties every entity has; the files of the entities list them o
 | `name` | `Name` | `ImmutableI18NString` | Optional multi-language name, `{"en": "…", "de": "…"}`; empty when absent, and then not written. |
 | `description` | `Description` | `ImmutableI18NString` | Optional multi-language description, as `name`. |
 | `dataSource` | `DataSource` | `String?` | Optional source of the information, e.g. the importer used. A change set sets it to a nonempty text or removes it. |
-| `created` | `Created` | `DateTimeOffset` | When the entity was created. Always written, UTC to the millisecond; optional when read. |
+| `created` | `Created` | `DateTimeOffset` | When the entity was created. Always written, UTC to the millisecond; mandatory when JSON or CBOR is read, see below. |
 | `lastChange` | `LastChangeDate` | `DateTimeOffset` | When its content was changed last. Always written as `created`; a change set sets it to its `createdAt`, so that everyone applying it gets the same ETags. |
 | `customData` | `CustomData` | `CustomDataNew` | Optional JSON object for vendor-specific extensions; part of the content and of the ETags, written only when it has values. The getter returns a copy. |
 | `eTags` | `ETags` | `ImmutableArray<ETag>` | Digests of the canonical JSON and deterministic CBOR representations, see [ETags](#etags). Only the roaming network writes them into its representation. |
 | — | `InternalData` | `UserDefinedDictionary` | Local runtime context, never serialized, not part of the content; `IsDefined`, `GetInternalData(As)`, `TryGetInternalData(As)`, `IfDefined(As)` read it. |
 | — | `AdminStatus`, `Status` | `Timestamped<TAdminStatus>`, `Timestamped<TStatus>` | The current runtime status, see [Runtime status](#runtime-status). |
 
-Defaults when creating an entity: `created` is the given creation, else the given last change, else now;
+Defaults when creating an entity in C#: `created` is the given creation, else the given last change, else now;
 `lastChange` the given last change, else the creation, else now. Both are cut to the millisecond, as their
 representations keep them.
+
+Reading JSON or CBOR, `created` is mandatory and `lastChange` is the creation unless given. Otherwise an entity
+read without its creation would be created *now*, and everyone reading the same representation, e.g. of a change
+set, would get another version with other ETags. The one exception is the entity a change set adds: unless given,
+its creation is the `createdAt` of the change set. Its embedded children, e.g. the EVSEs of an added charging
+station, need their own. Objects without timestamps (brands, grid connection points, parking products) accept
+them, but do not keep them.
 
 A change set names the property by its JSON key: `name`, `description`, `dataSource` and `customData`
 can be updated and removed for every entity type, `@id`, `created` and `lastChange` for none. Which further

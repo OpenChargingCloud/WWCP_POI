@@ -173,8 +173,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 if (!POIEntityMetadata.TryParse(JSON,
-                                                out _,
-                                                out _,
                                                 out var customData,
                                                 out ErrorResponse))
                 {

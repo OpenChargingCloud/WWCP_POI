@@ -232,6 +232,53 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Entities_are_read_only_with_their_creation()
+
+        /// <summary>
+        /// Read without its creation, an entity would be created now, and everyone applying the same change set
+        /// would get another version: the creation is mandatory when reading JSON or CBOR, except for the entity
+        /// a change adds, which is created by the change set unless given.
+        /// </summary>
+        [Test]
+        public void Entities_are_read_only_with_their_creation()
+        {
+
+            var rn1         = NewNetwork();
+            var s8          = ChargingStation_Id.Parse("DE*GEF*S8");
+
+            var station     = new ChargingStation(s8, EVSEs: [ NewEVSE(EVSE_Id.Parse("DE*GEF*E8*1")) ], Created: Created).ToJSON();
+            station.Remove("created");
+            station.Remove("lastChange");
+
+            var nestedEVSE  = (JObject) station.DeepClone();
+            ((JObject) nestedEVSE["EVSEs"]![0]!).Remove("created");
+            ((JObject) nestedEVSE["EVSEs"]![0]!).Remove("lastChange");
+
+            var network     = rn1.ToJSON();
+            network.Remove("created");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // The added station is created by the change set, its EVSE is given with its creation.
+                var rn2 = Apply(rn1, RoamingNetworkChange.Add("ChargingStation", s8.ToString(), station, "ChargingPool", P1.ToString()));
+                Assert.That(rn2.GetChargingStationOperatorById(GEF)!.TryGetChargingStation(s8, out var added),  Is.True);
+                Assert.That(added!.Created,                                                                     Is.EqualTo(T0));
+                Assert.That(added.EVSEs.Single().Created,                                                       Is.EqualTo(Created));
+
+                // An EVSE embedded without its creation is refused.
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Add("ChargingStation", s8.ToString(), nestedEVSE, "ChargingPool", P1.ToString())),
+                            Throws.ArgumentException.With.Message.Contains("The creation timestamp 'created' of 'DE*GEF*E8*1' is missing"));
+
+                Assert.That(RoamingNetwork.TryParse(network, out _, out var error),                              Is.False);
+                Assert.That(error,                                                                               Does.Contain("'created' of 'rn1' is missing"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Invalid_infrastructure_changes_are_refused()
 
         [Test]

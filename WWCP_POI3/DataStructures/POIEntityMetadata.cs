@@ -75,10 +75,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Try to read the creation and last change timestamps and the custom data of a POI entity.
-        /// Both timestamps are optional when reading, but always written.
+        /// The creation is mandatory when reading, the last change is the creation unless given:
+        /// otherwise an entity read without them would be created now, and everyone reading the same
+        /// representation, e.g. of a change set, would get another version with other ETags.
+        /// Only the constructors in C# default both to now.
         /// </summary>
         public static Boolean TryParse(JObject                           JSON,
-                                       out DateTimeOffset?               Created,
+                                       [NotNullWhen(true)] out DateTimeOffset?  Created,
                                        out DateTimeOffset?               LastChange,
                                        out CustomDataNew?                CustomData,
                                        [NotNullWhen(false)] out String?  ErrorResponse)
@@ -88,11 +91,57 @@ namespace cloud.charging.open.protocols.WWCP.POI
             LastChange  = null;
             CustomData  = null;
 
+            if (JSON["created"] is null)
+            {
+                ErrorResponse = $"The creation timestamp 'created'{(JSON["@id"] is JValue id ? $" of '{id}'" : "")} is missing!";
+                return false;
+            }
+
             if (!TryParseTimestamp(JSON["created"],     "creation timestamp",     out Created,     out ErrorResponse) ||
                 !TryParseTimestamp(JSON["lastChange"],  "last change timestamp",  out LastChange,  out ErrorResponse))
             {
                 return false;
             }
+
+            return TryParseCustomData(JSON, out CustomData, out ErrorResponse);
+
+        }
+
+        #endregion
+
+        #region TryParse        (JSON, out CustomData, out ErrorResponse)
+
+        /// <summary>
+        /// Try to read the custom data of a POI object without timestamps, e.g. a brand or a parking product.
+        /// Timestamps it is given must be valid, but are not kept.
+        /// </summary>
+        public static Boolean TryParse(JObject                           JSON,
+                                       out CustomDataNew?                CustomData,
+                                       [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            CustomData = null;
+
+            if (!TryParseTimestamp(JSON["created"],     "creation timestamp",     out _,  out ErrorResponse) ||
+                !TryParseTimestamp(JSON["lastChange"],  "last change timestamp",  out _,  out ErrorResponse))
+            {
+                return false;
+            }
+
+            return TryParseCustomData(JSON, out CustomData, out ErrorResponse);
+
+        }
+
+        #endregion
+
+        #region (private static) TryParseCustomData(JSON, out CustomData, out ErrorResponse)
+
+        private static Boolean TryParseCustomData(JObject                           JSON,
+                                                  out CustomDataNew?                CustomData,
+                                                  [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            CustomData = null;
 
             if (JSON["customData"] is JToken customDataJSON)
             {

@@ -179,8 +179,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (ErrorResponse is not null) return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,
-                                                out _,
-                                                out _,
                                                 out var customData,
                                                 out ErrorResponse))
                 {
