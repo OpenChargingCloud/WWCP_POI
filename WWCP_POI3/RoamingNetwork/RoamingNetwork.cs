@@ -251,140 +251,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            foreach (var chargingStationOperator in ChargingStationOperators ?? [])
-            {
+            this.chargingStationOperators = new (ChargingStationOperators, entity => entity.Id, "charging station operator");
 
-                ArgumentNullException.ThrowIfNull(chargingStationOperator, nameof(ChargingStationOperators));
-
-                if (!chargingStationOperators.TryAdd(chargingStationOperator.Id, chargingStationOperator))
-                    throw new ArgumentException($"The charging station operator '{chargingStationOperator.Id}' must not be given twice!", nameof(ChargingStationOperators));
-
-            }
-
-            foreach (var chargingStationManufacturer in ChargingStationManufacturers ?? [])
-            {
-
-                ArgumentNullException.ThrowIfNull(chargingStationManufacturer, nameof(ChargingStationManufacturers));
-
-                if (!chargingStationManufacturers.TryAdd(chargingStationManufacturer.Id, chargingStationManufacturer))
-                    throw new ArgumentException($"The charging station manufacturer '{chargingStationManufacturer.Id}' must not be given twice!", nameof(ChargingStationManufacturers));
-
-            }
+            this.chargingStationManufacturers = new (ChargingStationManufacturers, entity => entity.Id, "charging station manufacturer");
 
             // Every manufacturer a charging station names is one of this network.
-            if (UnknownManufacturer(chargingStationOperators.Values, chargingStationManufacturers) is String unknownManufacturer)
+            if (UnknownManufacturer(chargingStationOperators, chargingStationManufacturers.Index) is String unknownManufacturer)
                 throw new ArgumentException(unknownManufacturer, nameof(ChargingStationManufacturers));
 
-            foreach (var eMobilityProvider in EMobilityProviders ?? [])
-            {
+            this.eMobilityProviders = new (EMobilityProviders, entity => entity.Id, "e-mobility provider");
 
-                ArgumentNullException.ThrowIfNull(eMobilityProvider, nameof(EMobilityProviders));
-
-                if (!eMobilityProviders.TryAdd(eMobilityProvider.Id, eMobilityProvider))
-                    throw new ArgumentException($"The e-mobility provider '{eMobilityProvider.Id}' must not be given twice!", nameof(EMobilityProviders));
-
-            }
-
-            foreach (var gridOperator in GridOperators ?? [])
-            {
-
-                ArgumentNullException.ThrowIfNull(gridOperator, nameof(GridOperators));
-
-                if (!gridOperators.TryAdd(gridOperator.Id, gridOperator))
-                    throw new ArgumentException($"The grid operator '{gridOperator.Id}' must not be given twice!", nameof(GridOperators));
-
-            }
+            this.gridOperators = new (GridOperators, entity => entity.Id, "grid operator");
 
             // Grid connection points are unique within the network, and every one a charging pool names is one of this network.
-            if ((DuplicateGridConnectionPoint(gridOperators.Values) ??
-                 UnknownGridConnectionPoint  (chargingStationOperators.Values, gridOperators.Values)) is String gridError)
+            if ((DuplicateGridConnectionPoint(gridOperators) ??
+                 UnknownGridConnectionPoint  (chargingStationOperators, gridOperators)) is String gridError)
             {
                 throw new ArgumentException(gridError, nameof(GridOperators));
             }
 
             // Energy meters are unique within the network, not only within their operator.
-            if (DuplicateEnergyMeter(AllEnergyMeters(chargingStationOperators.Values, gridOperators.Values)) is String duplicateEnergyMeter)
+            if (DuplicateEnergyMeter(AllEnergyMeters(chargingStationOperators, gridOperators)) is String duplicateEnergyMeter)
                 throw new ArgumentException(duplicateEnergyMeter, nameof(ChargingStationOperators));
 
-            foreach (var energyMeter in AllEnergyMeters(chargingStationOperators.Values, gridOperators.Values))
+            foreach (var energyMeter in AllEnergyMeters(chargingStationOperators, gridOperators))
                 energyMeters.TryAdd(energyMeter.Id, energyMeter);
 
-            foreach (var energyMeterManufacturer in EnergyMeterManufacturers ?? [])
-            {
-
-                ArgumentNullException.ThrowIfNull(energyMeterManufacturer, nameof(EnergyMeterManufacturers));
-
-                if (!energyMeterManufacturers.TryAdd(energyMeterManufacturer.Id, energyMeterManufacturer))
-                    throw new ArgumentException($"The energy meter manufacturer '{energyMeterManufacturer.Id}' must not be given twice!", nameof(EnergyMeterManufacturers));
-
-            }
+            this.energyMeterManufacturers = new (EnergyMeterManufacturers, entity => entity.Id, "energy meter manufacturer");
 
             // Every manufacturer an energy meter names is one of this network.
-            if (UnknownEnergyMeterManufacturer(AllEnergyMeters(chargingStationOperators.Values, gridOperators.Values), energyMeterManufacturers) is String unknownEnergyMeterManufacturer)
+            if (UnknownEnergyMeterManufacturer(AllEnergyMeters(chargingStationOperators, gridOperators), energyMeterManufacturers.Index) is String unknownEnergyMeterManufacturer)
                 throw new ArgumentException(unknownEnergyMeterManufacturer, nameof(EnergyMeterManufacturers));
 
-            foreach (var parkingOperator in ParkingOperators ?? [])
-            {
-
-                ArgumentNullException.ThrowIfNull(parkingOperator, nameof(ParkingOperators));
-
-                if (!parkingOperators.TryAdd(parkingOperator.Id, parkingOperator))
-                    throw new ArgumentException($"The parking operator '{parkingOperator.Id}' must not be given twice!", nameof(ParkingOperators));
-
-            }
+            this.parkingOperators = new (ParkingOperators, entity => entity.Id, "parking operator");
 
             // Parking garages, spaces, sensors, space groups and products are unique within the network;
             // the charging stations they name are ones of this network, and so are the parking spaces charging stations name.
-            if ((DuplicateParking      (parkingOperators.Values) ??
-                 UnknownChargingStation(parkingOperators.Values, chargingStationOperators) ??
-                 UnknownParkingSpace   (chargingStationOperators.Values, parkingOperators.Values)) is String parkingError)
+            if ((DuplicateParking      (parkingOperators) ??
+                 UnknownChargingStation(parkingOperators, chargingStationOperators.Index) ??
+                 UnknownParkingSpace   (chargingStationOperators, parkingOperators)) is String parkingError)
             {
                 throw new ArgumentException(parkingError, nameof(ParkingOperators));
             }
 
             // The maintainers of grid connection points are charging station operators and parking operators of this network.
-            if (UnknownMaintainer(gridOperators.Values, chargingStationOperators, parkingOperators) is String maintainerError)
+            if (UnknownMaintainer(gridOperators, chargingStationOperators.Index, parkingOperators.Index) is String maintainerError)
                 throw new ArgumentException(maintainerError, nameof(GridOperators));
 
-            foreach (var release in TransparencySoftware ?? [])
-            {
+            this.transparencySoftware = new (TransparencySoftware, entity => entity.Id, "transparency software release");
 
-                ArgumentNullException.ThrowIfNull(release, nameof(TransparencySoftware));
+            this.transparencySoftwareCertificates = new (TransparencySoftwareCertificates, entity => entity.Id, "transparency software certificate");
 
-                if (!transparencySoftware.TryAdd(release.Id, release))
-                    throw new ArgumentException($"The transparency software release '{release.Id}' must not be given twice!", nameof(TransparencySoftware));
-
-            }
-
-            foreach (var certificate in TransparencySoftwareCertificates ?? [])
-            {
-
-                ArgumentNullException.ThrowIfNull(certificate, nameof(TransparencySoftwareCertificates));
-
-                if (!transparencySoftwareCertificates.TryAdd(certificate.Id, certificate))
-                    throw new ArgumentException($"The transparency software certificate '{certificate.Id}' must not be given twice!", nameof(TransparencySoftwareCertificates));
-
-            }
-
-            foreach (var brand in Brands ?? [])
-            {
-
-                ArgumentNullException.ThrowIfNull(brand, nameof(Brands));
-
-                if (!brands.TryAdd(brand.Id, brand))
-                    throw new ArgumentException($"The brand '{brand.Id}' must not be given twice!", nameof(Brands));
-
-            }
+            this.brands = new (Brands, entity => entity.Id, "brand");
 
             // Charging pools, stations and EVSEs name brands of this network.
-            if (UnknownBrand(chargingStationOperators.Values, brands) is String brandError)
+            if (UnknownBrand(chargingStationOperators, brands.Index) is String brandError)
                 throw new ArgumentException(brandError, nameof(Brands));
 
             // Certificates name releases and manufacturers of this network; energy meters name releases and certificates.
-            if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators.Values, gridOperators.Values), transparencySoftware, transparencySoftwareCertificates, chargingStationManufacturers) is String transparencyError)
+            if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators, gridOperators), transparencySoftware.Index, transparencySoftwareCertificates.Index, chargingStationManufacturers.Index) is String transparencyError)
                 throw new ArgumentException(transparencyError, nameof(TransparencySoftware));
 
-            foreach (var parkingOperator in parkingOperators.Values)
+            foreach (var parkingOperator in parkingOperators)
             {
 
                 foreach (var parkingGarage in parkingOperator.ParkingGarages)
@@ -868,7 +796,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    () => new JProperty(
                                              "chargingStationOperatorIds",
                                              new JArray(
-                                                 OrderedChargingStationOperators.
+                                                 chargingStationOperators.
                                                      Select(chargingStationOperator => chargingStationOperator.Id.ToString())
                                              )
                                          ),
@@ -876,7 +804,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    () => new JProperty(
                                              "chargingStationOperators",
                                              new JArray(
-                                                 OrderedChargingStationOperators.
+                                                 chargingStationOperators.
                                                      Select(chargingStationOperator => chargingStationOperator.ToJSON(
                                                                                            Embedded:                                 true,
                                                                                            ExpandChargingPoolIds:                    ExpandChargingPoolIds,
@@ -978,28 +906,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Always part of the content.
             if (!chargingStationManufacturers.IsEmpty)
-                JSON.Add("chargingStationManufacturers", new JArray(OrderedChargingStationManufacturers.Select(chargingStationManufacturer => chargingStationManufacturer.ToJSON())));
+                JSON.Add("chargingStationManufacturers", new JArray(chargingStationManufacturers.Select(chargingStationManufacturer => chargingStationManufacturer.ToJSON())));
 
             if (!eMobilityProviders.IsEmpty)
-                JSON.Add("eMobilityProviders",           new JArray(OrderedEMobilityProviders.Select(eMobilityProvider => eMobilityProvider.ToJSON())));
+                JSON.Add("eMobilityProviders",           new JArray(eMobilityProviders.Select(eMobilityProvider => eMobilityProvider.ToJSON())));
 
             if (!gridOperators.IsEmpty)
-                JSON.Add("gridOperators",                new JArray(OrderedGridOperators.Select(gridOperator => gridOperator.ToJSON())));
+                JSON.Add("gridOperators",                new JArray(gridOperators.Select(gridOperator => gridOperator.ToJSON())));
 
             if (!parkingOperators.IsEmpty)
-                JSON.Add("parkingOperators",             new JArray(OrderedParkingOperators.Select(parkingOperator => parkingOperator.ToJSON())));
+                JSON.Add("parkingOperators",             new JArray(parkingOperators.Select(parkingOperator => parkingOperator.ToJSON())));
 
             if (!brands.IsEmpty)
-                JSON.Add("brands",                       new JArray(OrderedBrands.Select(brand => brand.ToJSON())));
+                JSON.Add("brands",                       new JArray(brands.Select(brand => brand.ToJSON())));
 
             if (!energyMeterManufacturers.IsEmpty)
-                JSON.Add("energyMeterManufacturers",     new JArray(OrderedEnergyMeterManufacturers.Select(energyMeterManufacturer => energyMeterManufacturer.ToJSON())));
+                JSON.Add("energyMeterManufacturers",     new JArray(energyMeterManufacturers.Select(energyMeterManufacturer => energyMeterManufacturer.ToJSON())));
 
             if (!transparencySoftware.IsEmpty)
-                JSON.Add("transparencySoftware",         new JArray(OrderedTransparencySoftware.Select(release => release.ToJSON())));
+                JSON.Add("transparencySoftware",         new JArray(transparencySoftware.Select(release => release.ToJSON())));
 
             if (!transparencySoftwareCertificates.IsEmpty)
-                JSON.Add("transparencySoftwareCertificates", new JArray(OrderedTransparencySoftwareCertificates.Select(certificate => certificate.ToJSON())));
+                JSON.Add("transparencySoftwareCertificates", new JArray(transparencySoftwareCertificates.Select(certificate => certificate.ToJSON())));
 
             POIPartyKeys.AddTo(JSON, this);
 
@@ -1358,47 +1286,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (ChargingStationOperators.Any())
                 CBOR.Add(CBORValue.FromText("chargingStationOperators"),
-                         CBORValue.FromArray(OrderedChargingStationOperators.
+                         CBORValue.FromArray(chargingStationOperators.
                                                  Select(chargingStationOperator => chargingStationOperator.ToCBOR(Embedded: true))));
 
             if (!chargingStationManufacturers.IsEmpty)
                 CBOR.Add(CBORValue.FromText("chargingStationManufacturers"),
-                         CBORValue.FromArray(OrderedChargingStationManufacturers.
+                         CBORValue.FromArray(chargingStationManufacturers.
                                                  Select(chargingStationManufacturer => chargingStationManufacturer.ToCBOR())));
 
             if (!eMobilityProviders.IsEmpty)
                 CBOR.Add(CBORValue.FromText("eMobilityProviders"),
-                         CBORValue.FromArray(OrderedEMobilityProviders.
+                         CBORValue.FromArray(eMobilityProviders.
                                                  Select(eMobilityProvider => eMobilityProvider.ToCBOR())));
 
             if (!gridOperators.IsEmpty)
                 CBOR.Add(CBORValue.FromText("gridOperators"),
-                         CBORValue.FromArray(OrderedGridOperators.
+                         CBORValue.FromArray(gridOperators.
                                                  Select(gridOperator => gridOperator.ToCBOR())));
 
             if (!parkingOperators.IsEmpty)
                 CBOR.Add(CBORValue.FromText("parkingOperators"),
-                         CBORValue.FromArray(OrderedParkingOperators.
+                         CBORValue.FromArray(parkingOperators.
                                                  Select(parkingOperator => parkingOperator.ToCBOR())));
 
             if (!brands.IsEmpty)
                 CBOR.Add(CBORValue.FromText("brands"),
-                         CBORValue.FromArray(OrderedBrands.
+                         CBORValue.FromArray(brands.
                                                  Select(brand => CBORJSON.ToCBOR(brand.ToJSON()))));
 
             if (!energyMeterManufacturers.IsEmpty)
                 CBOR.Add(CBORValue.FromText("energyMeterManufacturers"),
-                         CBORValue.FromArray(OrderedEnergyMeterManufacturers.
+                         CBORValue.FromArray(energyMeterManufacturers.
                                                  Select(energyMeterManufacturer => energyMeterManufacturer.ToCBOR())));
 
             if (!transparencySoftware.IsEmpty)
                 CBOR.Add(CBORValue.FromText("transparencySoftware"),
-                         CBORValue.FromArray(OrderedTransparencySoftware.
+                         CBORValue.FromArray(transparencySoftware.
                                                  Select(release => CBORJSON.ToCBOR(release.ToJSON()))));
 
             if (!transparencySoftwareCertificates.IsEmpty)
                 CBOR.Add(CBORValue.FromText("transparencySoftwareCertificates"),
-                         CBORValue.FromArray(OrderedTransparencySoftwareCertificates.
+                         CBORValue.FromArray(transparencySoftwareCertificates.
                                                  Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON()))));
 
             foreach (var keys in POIPartyKeys.AddTo([], this).Properties())
@@ -1477,19 +1405,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region E-mobility providers
 
-        private readonly ConcurrentDictionary<EMobilityProvider_Id, EMobilityProvider> eMobilityProviders = [];
+        private readonly POICollection<EMobilityProvider_Id, EMobilityProvider> eMobilityProviders;
 
         /// <summary>
         /// The e-mobility providers in this immutable network version.
         /// </summary>
-        public IEnumerable<EMobilityProvider> EMobilityProviders
-            => eMobilityProviders.Values;
-
-        /// <summary>
-        /// The e-mobility providers ordered by their identification (ordinal), as in the JSON and CBOR representations.
-        /// </summary>
-        private IEnumerable<EMobilityProvider> OrderedEMobilityProviders
-            => eMobilityProviders.Values.OrderBy(eMobilityProvider => eMobilityProvider.Id.ToString(), StringComparer.Ordinal);
+        public POICollection<EMobilityProvider_Id, EMobilityProvider> EMobilityProviders
+            => eMobilityProviders;
 
         /// <summary>
         /// Try to get the e-mobility provider having the given identification.
@@ -1499,26 +1421,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetEMobilityProviderById(EMobilityProvider_Id                        EMobilityProviderId,
                                                    [NotNullWhen(true)] out EMobilityProvider?  EMobilityProvider)
 
-            => eMobilityProviders.TryGetValue(EMobilityProviderId, out EMobilityProvider);
+            => eMobilityProviders.TryGet(EMobilityProviderId, out EMobilityProvider);
 
         #endregion
 
 
         #region Grid operators
 
-        private readonly ConcurrentDictionary<GridOperator_Id, GridOperator> gridOperators = [];
+        private readonly POICollection<GridOperator_Id, GridOperator> gridOperators;
 
         /// <summary>
         /// The grid operators in this immutable network version.
         /// </summary>
-        public IEnumerable<GridOperator> GridOperators
-            => gridOperators.Values;
-
-        /// <summary>
-        /// The grid operators ordered by their identification (ordinal), as in the JSON and CBOR representations.
-        /// </summary>
-        private IEnumerable<GridOperator> OrderedGridOperators
-            => gridOperators.Values.OrderBy(gridOperator => gridOperator.Id.ToString(), StringComparer.Ordinal);
+        public POICollection<GridOperator_Id, GridOperator> GridOperators
+            => gridOperators;
 
         /// <summary>
         /// Try to get the grid operator having the given identification.
@@ -1528,13 +1444,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetGridOperatorById(GridOperator_Id                        GridOperatorId,
                                               [NotNullWhen(true)] out GridOperator?  GridOperator)
 
-            => gridOperators.TryGetValue(GridOperatorId, out GridOperator);
+            => gridOperators.TryGet(GridOperatorId, out GridOperator);
 
         /// <summary>
         /// The grid connection points of all grid operators.
         /// </summary>
         public IEnumerable<GridConnectionPoint> GridConnectionPoints
-            => gridOperators.Values.SelectMany(gridOperator => gridOperator.GridConnectionPoints);
+            => gridOperators.SelectMany(gridOperator => gridOperator.GridConnectionPoints);
 
         /// <summary>
         /// Try to get the grid connection point having the given identification, and its grid operator.
@@ -1547,7 +1463,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  [NotNullWhen(true)] out GridConnectionPoint?  GridConnectionPoint)
         {
 
-            foreach (var gridOperator in gridOperators.Values)
+            foreach (var gridOperator in gridOperators)
                 if (gridOperator.TryGetGridConnectionPoint(GridConnectionPointId, out GridConnectionPoint))
                 {
                     GridOperator = gridOperator;
@@ -1628,7 +1544,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Parking operators, parking garages, parking spaces, parking sensors
 
-        private readonly ConcurrentDictionary<ParkingOperator_Id, ParkingOperator>  parkingOperators  = [];
+        private readonly POICollection<ParkingOperator_Id, ParkingOperator>  parkingOperators;
         private readonly ConcurrentDictionary<ParkingGarage_Id,   ParkingGarage>    parkingGarages    = [];
         private readonly ConcurrentDictionary<ParkingSpace_Id,    ParkingSpace>     parkingSpaces     = [];
         private readonly ConcurrentDictionary<ParkingSensor_Id,   ParkingSensor>    parkingSensors    = [];
@@ -1636,8 +1552,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The parking operators in this immutable network version.
         /// </summary>
-        public IEnumerable<ParkingOperator> ParkingOperators
-            => parkingOperators.Values;
+        public POICollection<ParkingOperator_Id, ParkingOperator> ParkingOperators
+            => parkingOperators;
 
         /// <summary>
         /// The parking garages of all parking operators.
@@ -1658,24 +1574,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => parkingSensors.Values;
 
         /// <summary>
-        /// The parking operators ordered by their identification (ordinal), as in the JSON and CBOR representations.
-        /// </summary>
-        private IEnumerable<ParkingOperator> OrderedParkingOperators
-            => parkingOperators.Values.OrderBy(parkingOperator => parkingOperator.Id.ToString(), StringComparer.Ordinal);
-
-        /// <summary>
         /// Try to get the parking operator having the given identification.
         /// </summary>
         public Boolean TryGetParkingOperatorById(ParkingOperator_Id                        ParkingOperatorId,
                                                  [NotNullWhen(true)] out ParkingOperator?  ParkingOperator)
 
-            => parkingOperators.TryGetValue(ParkingOperatorId, out ParkingOperator);
+            => parkingOperators.TryGet(ParkingOperatorId, out ParkingOperator);
 
         /// <summary>
         /// The parking products of all parking operators.
         /// </summary>
         public IEnumerable<ParkingProduct> ParkingProducts
-            => parkingOperators.Values.SelectMany(parkingOperator => parkingOperator.ParkingProducts);
+            => parkingOperators.SelectMany(parkingOperator => parkingOperator.ParkingProducts);
 
         /// <summary>
         /// Try to get the parking product having the given identification, of any parking operator.
@@ -1684,7 +1594,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 [NotNullWhen(true)] out ParkingProduct?  ParkingProduct)
         {
 
-            foreach (var parkingOperator in parkingOperators.Values)
+            foreach (var parkingOperator in parkingOperators)
                 if (parkingOperator.TryGetParkingProduct(ParkingProductId, out ParkingProduct))
                     return true;
 
@@ -1813,16 +1723,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Brands
 
-        private readonly ConcurrentDictionary<Brand_Id, Brand> brands = [];
+        private readonly POICollection<Brand_Id, Brand> brands;
 
         /// <summary>
         /// The brands in this immutable network version.
         /// </summary>
-        public IEnumerable<Brand> Brands
-            => brands.Values;
-
-        private IEnumerable<Brand> OrderedBrands
-            => brands.Values.OrderBy(brand => brand.Id.ToString(), StringComparer.Ordinal);
+        public POICollection<Brand_Id, Brand> Brands
+            => brands;
 
         /// <summary>
         /// Try to get the brand having the given identification.
@@ -1830,7 +1737,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetBrandById(Brand_Id                        BrandId,
                                        [NotNullWhen(true)] out Brand?  Brand)
 
-            => brands.TryGetValue(BrandId, out Brand);
+            => brands.TryGet(BrandId, out Brand);
 
         /// <summary>
         /// The error, when a charging pool, charging station or EVSE names a brand the given ones do not have.
@@ -1863,26 +1770,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Transparency software releases and certificates
 
-        private readonly ConcurrentDictionary<TransparencySoftware_Id,             TransparencySoftware>             transparencySoftware              = [];
-        private readonly ConcurrentDictionary<TransparencySoftwareCertificate_Id,  TransparencySoftwareCertificate>  transparencySoftwareCertificates  = [];
+        private readonly POICollection<TransparencySoftware_Id, TransparencySoftware>             transparencySoftware;
+        private readonly POICollection<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  transparencySoftwareCertificates;
 
         /// <summary>
         /// The transparency software releases in this immutable network version: one per version of a software.
         /// </summary>
-        public IEnumerable<TransparencySoftware>             TransparencySoftware
-            => transparencySoftware.Values;
+        public POICollection<TransparencySoftware_Id, TransparencySoftware>             TransparencySoftware
+            => transparencySoftware;
 
         /// <summary>
         /// The certificates of transparency software releases in this immutable network version.
         /// </summary>
-        public IEnumerable<TransparencySoftwareCertificate>  TransparencySoftwareCertificates
-            => transparencySoftwareCertificates.Values;
-
-        private IEnumerable<TransparencySoftware>             OrderedTransparencySoftware
-            => transparencySoftware.Values.OrderBy(release => release.Id.ToString(), StringComparer.Ordinal);
-
-        private IEnumerable<TransparencySoftwareCertificate>  OrderedTransparencySoftwareCertificates
-            => transparencySoftwareCertificates.Values.OrderBy(certificate => certificate.Id.ToString(), StringComparer.Ordinal);
+        public POICollection<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  TransparencySoftwareCertificates
+            => transparencySoftwareCertificates;
 
         /// <summary>
         /// Try to get the transparency software release having the given identification.
@@ -1890,7 +1791,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetTransparencySoftwareById(TransparencySoftware_Id                        TransparencySoftwareId,
                                                       [NotNullWhen(true)] out TransparencySoftware?  TransparencySoftware)
 
-            => transparencySoftware.TryGetValue(TransparencySoftwareId, out TransparencySoftware);
+            => transparencySoftware.TryGet(TransparencySoftwareId, out TransparencySoftware);
 
         /// <summary>
         /// Try to get the transparency software certificate having the given identification.
@@ -1898,7 +1799,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetTransparencySoftwareCertificateById(TransparencySoftwareCertificate_Id                        CertificateId,
                                                                  [NotNullWhen(true)] out TransparencySoftwareCertificate?  Certificate)
 
-            => transparencySoftwareCertificates.TryGetValue(CertificateId, out Certificate);
+            => transparencySoftwareCertificates.TryGet(CertificateId, out Certificate);
 
         /// <summary>
         /// The error, when a certificate names an unknown release or manufacturer,
@@ -1958,7 +1859,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The EVSEGroups of all charging station operators.
         /// </summary>
         public IEnumerable<EVSEGroup> EVSEGroups
-            => chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.EVSEGroups);
+            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EVSEGroups);
 
         /// <summary>
         /// Try to get the EVSEGroup having the given identification, of the operator it names.
@@ -1967,7 +1868,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      [NotNullWhen(true)] out EVSEGroup?  EVSEGroup)
         {
 
-            if (chargingStationOperators.TryGetValue(EVSEGroupId.OperatorId, out var chargingStationOperator))
+            if (chargingStationOperators.TryGet(EVSEGroupId.OperatorId, out var chargingStationOperator))
                 return chargingStationOperator.TryGetEVSEGroup(EVSEGroupId, out EVSEGroup);
 
             EVSEGroup = null;
@@ -1979,7 +1880,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The ChargingStationGroups of all charging station operators.
         /// </summary>
         public IEnumerable<ChargingStationGroup> ChargingStationGroups
-            => chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationGroups);
+            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationGroups);
 
         /// <summary>
         /// Try to get the ChargingStationGroup having the given identification, of the operator it names.
@@ -1988,7 +1889,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      [NotNullWhen(true)] out ChargingStationGroup?  ChargingStationGroup)
         {
 
-            if (chargingStationOperators.TryGetValue(ChargingStationGroupId.OperatorId, out var chargingStationOperator))
+            if (chargingStationOperators.TryGet(ChargingStationGroupId.OperatorId, out var chargingStationOperator))
                 return chargingStationOperator.TryGetChargingStationGroup(ChargingStationGroupId, out ChargingStationGroup);
 
             ChargingStationGroup = null;
@@ -2000,7 +1901,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The ChargingPoolGroups of all charging station operators.
         /// </summary>
         public IEnumerable<ChargingPoolGroup> ChargingPoolGroups
-            => chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPoolGroups);
+            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPoolGroups);
 
         /// <summary>
         /// Try to get the ChargingPoolGroup having the given identification, of the operator it names.
@@ -2009,7 +1910,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      [NotNullWhen(true)] out ChargingPoolGroup?  ChargingPoolGroup)
         {
 
-            if (chargingStationOperators.TryGetValue(ChargingPoolGroupId.OperatorId, out var chargingStationOperator))
+            if (chargingStationOperators.TryGet(ChargingPoolGroupId.OperatorId, out var chargingStationOperator))
                 return chargingStationOperator.TryGetChargingPoolGroup(ChargingPoolGroupId, out ChargingPoolGroup);
 
             ChargingPoolGroup = null;
@@ -2021,7 +1922,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The ChargingTariffGroups of all charging station operators.
         /// </summary>
         public IEnumerable<ChargingTariffGroup> ChargingTariffGroups
-            => chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.ChargingTariffGroups);
+            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingTariffGroups);
 
         /// <summary>
         /// Try to get the ChargingTariffGroup having the given identification, of the operator it names.
@@ -2030,7 +1931,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      [NotNullWhen(true)] out ChargingTariffGroup?  ChargingTariffGroup)
         {
 
-            if (chargingStationOperators.TryGetValue(ChargingTariffGroupId.OperatorId, out var chargingStationOperator))
+            if (chargingStationOperators.TryGet(ChargingTariffGroupId.OperatorId, out var chargingStationOperator))
                 return chargingStationOperator.TryGetChargingTariffGroup(ChargingTariffGroupId, out ChargingTariffGroup);
 
             ChargingTariffGroup = null;
@@ -2063,7 +1964,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The charging tariffs of all charging station operators.
         /// </summary>
         public IEnumerable<ChargingTariff> ChargingTariffs
-            => chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.ChargingTariffs);
+            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingTariffs);
 
         /// <summary>
         /// Try to get the charging tariff having the given identification, of the operator it names.
@@ -2074,7 +1975,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 [NotNullWhen(true)] out ChargingTariff?  ChargingTariff)
         {
 
-            if (chargingStationOperators.TryGetValue(ChargingTariffId.OperatorId, out var chargingStationOperator))
+            if (chargingStationOperators.TryGet(ChargingTariffId.OperatorId, out var chargingStationOperator))
                 return chargingStationOperator.TryGetChargingTariff(ChargingTariffId, out ChargingTariff);
 
             ChargingTariff = null;
@@ -2087,16 +1988,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Energy meter manufacturers
 
-        private readonly ConcurrentDictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer> energyMeterManufacturers = [];
+        private readonly POICollection<EnergyMeterManufacturer_Id, EnergyMeterManufacturer> energyMeterManufacturers;
 
         /// <summary>
         /// The energy meter manufacturers in this immutable network version.
         /// </summary>
-        public IEnumerable<EnergyMeterManufacturer> EnergyMeterManufacturers
-            => energyMeterManufacturers.Values;
-
-        private IEnumerable<EnergyMeterManufacturer> OrderedEnergyMeterManufacturers
-            => energyMeterManufacturers.Values.OrderBy(energyMeterManufacturer => energyMeterManufacturer.Id.ToString(), StringComparer.Ordinal);
+        public POICollection<EnergyMeterManufacturer_Id, EnergyMeterManufacturer> EnergyMeterManufacturers
+            => energyMeterManufacturers;
 
         /// <summary>
         /// Try to get the energy meter manufacturer having the given identification.
@@ -2106,7 +2004,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetEnergyMeterManufacturerById(EnergyMeterManufacturer_Id                        EnergyMeterManufacturerId,
                                                          [NotNullWhen(true)] out EnergyMeterManufacturer?  EnergyMeterManufacturer)
 
-            => energyMeterManufacturers.TryGetValue(EnergyMeterManufacturerId, out EnergyMeterManufacturer);
+            => energyMeterManufacturers.TryGet(EnergyMeterManufacturerId, out EnergyMeterManufacturer);
 
         /// <summary>
         /// The error, when an energy meter of the given operators names a manufacturer not among the given ones.
@@ -2179,19 +2077,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Charging station manufacturers
 
-        private readonly ConcurrentDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer> chargingStationManufacturers = [];
+        private readonly POICollection<ChargingStationManufacturer_Id, ChargingStationManufacturer> chargingStationManufacturers;
 
         /// <summary>
         /// The manufacturers of charging stations in this immutable network version.
         /// </summary>
-        public IEnumerable<ChargingStationManufacturer> ChargingStationManufacturers
-            => chargingStationManufacturers.Values;
-
-        /// <summary>
-        /// The manufacturers ordered by their identification (ordinal), as in the JSON and CBOR representations.
-        /// </summary>
-        private IEnumerable<ChargingStationManufacturer> OrderedChargingStationManufacturers
-            => chargingStationManufacturers.Values.OrderBy(chargingStationManufacturer => chargingStationManufacturer.Id.ToString(), StringComparer.Ordinal);
+        public POICollection<ChargingStationManufacturer_Id, ChargingStationManufacturer> ChargingStationManufacturers
+            => chargingStationManufacturers;
 
         /// <summary>
         /// Try to get the charging station manufacturer having the given identification.
@@ -2201,7 +2093,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetChargingStationManufacturerById(ChargingStationManufacturer_Id                        ChargingStationManufacturerId,
                                                              [NotNullWhen(true)] out ChargingStationManufacturer?  ChargingStationManufacturer)
 
-            => chargingStationManufacturers.TryGetValue(ChargingStationManufacturerId, out ChargingStationManufacturer);
+            => chargingStationManufacturers.TryGet(ChargingStationManufacturerId, out ChargingStationManufacturer);
 
         /// <summary>
         /// The error, when a charging station names a manufacturer the given ones do not have.
@@ -2226,19 +2118,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Charging station operators
 
-        private readonly ConcurrentDictionary<ChargingStationOperator_Id, ChargingStationOperator> chargingStationOperators = [];
+        private readonly POICollection<ChargingStationOperator_Id, ChargingStationOperator> chargingStationOperators;
 
         /// <summary>
         /// The operators in this immutable network version.
         /// </summary>
-        public IEnumerable<ChargingStationOperator> ChargingStationOperators
-            => chargingStationOperators.Values;
-
-        /// <summary>
-        /// The operators ordered by their identification (ordinal), as in the JSON and CBOR representations.
-        /// </summary>
-        private IEnumerable<ChargingStationOperator> OrderedChargingStationOperators
-            => chargingStationOperators.Values.OrderBy(chargingStationOperator => chargingStationOperator.Id.ToString(), StringComparer.Ordinal);
+        public POICollection<ChargingStationOperator_Id, ChargingStationOperator> ChargingStationOperators
+            => chargingStationOperators;
 
 
         #region ChargingStationOperatorExists    (ChargingStationOperator)
@@ -2248,7 +2134,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="ChargingStationOperatorId">The unique identification of the charging station operator.</param>
         public Boolean ChargingStationOperatorExists(ChargingStationOperator  ChargingStationOperator)
-            => chargingStationOperators.ContainsKey(ChargingStationOperator.Id);
+            => chargingStationOperators.Contains(ChargingStationOperator.Id);
 
         /// <summary>
         /// Determines whether the given user identification exists within this API.
@@ -2258,7 +2144,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => ChargingStationOperatorId.HasValue &&
                ChargingStationOperatorId.IsNotNullOrEmpty() &&
-               chargingStationOperators.ContainsKey(ChargingStationOperatorId.Value);
+               chargingStationOperators.Contains(ChargingStationOperatorId.Value);
 
         #endregion
 
@@ -2271,7 +2157,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ChargingStationOperator? GetChargingStationOperatorById(ChargingStationOperator_Id ChargingStationOperatorId)
         {
 
-            if (chargingStationOperators.TryGetValue(ChargingStationOperatorId, out var chargingStationOperator))
+            if (chargingStationOperators.TryGet(ChargingStationOperatorId, out var chargingStationOperator))
                 return chargingStationOperator;
 
             return null;
@@ -2292,7 +2178,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (ChargingStationOperatorId.HasValue &&
-                chargingStationOperators.TryGetValue(ChargingStationOperatorId.Value, out ChargingStationOperator))
+                chargingStationOperators.TryGet(ChargingStationOperatorId.Value, out ChargingStationOperator))
             {
                 return true;
             }

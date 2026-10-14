@@ -55,12 +55,12 @@ The operator writes no `eTags`.
 | `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | update/remove | See [Contact](#contact). |
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update | 1..n keys signing its change sets, see [Keys](#signing-and-identity-keys). |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update | 1..n long-term keys signing changes of its identity keys. |
-| `chargingTariffs` | `ChargingTariffs` | `ImmutableArray<ChargingTariff>` | add/remove | Its [charging tariffs](#charging-tariffs). |
-| `chargingPools` | `ChargingPools` | `ImmutableArray<ChargingPool>` | add/remove | Its [charging pools](#charging-pools). |
-| `EVSEGroups` | `EVSEGroups` | `ImmutableArray<EVSEGroup>` | add/remove | See [Groups](#groups). |
-| `chargingStationGroups` | `ChargingStationGroups` | `ImmutableArray<ChargingStationGroup>` | add/remove | See [Groups](#groups). |
-| `chargingPoolGroups` | `ChargingPoolGroups` | `ImmutableArray<ChargingPoolGroup>` | add/remove | See [Groups](#groups). |
-| `chargingTariffGroups` | `ChargingTariffGroups` | `ImmutableArray<ChargingTariffGroup>` | add/remove | See [Groups](#groups). |
+| `chargingTariffs` | `ChargingTariffs` | `POICollection<ChargingTariff_Id, ChargingTariff>` | add/remove | Its [charging tariffs](#charging-tariffs). |
+| `chargingPools` | `ChargingPools` | `POICollection<ChargingPool_Id, ChargingPool>` | add/remove | Its [charging pools](#charging-pools). |
+| `EVSEGroups` | `EVSEGroups` | `POICollection<EVSEGroup_Id, EVSEGroup>` | add/remove | See [Groups](#groups). |
+| `chargingStationGroups` | `ChargingStationGroups` | `POICollection<ChargingStationGroup_Id, ChargingStationGroup>` | add/remove | See [Groups](#groups). |
+| `chargingPoolGroups` | `ChargingPoolGroups` | `POICollection<ChargingPoolGroup_Id, ChargingPoolGroup>` | add/remove | See [Groups](#groups). |
+| `chargingTariffGroups` | `ChargingTariffGroups` | `POICollection<ChargingTariffGroup_Id, ChargingTariffGroup>` | add/remove | See [Groups](#groups). |
 
 Children are written only when there are any; collections in the ordinal order of their identifications.
 

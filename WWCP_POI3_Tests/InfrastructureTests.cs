@@ -237,7 +237,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(cs.Changes[4].OldValue!["@id"]!.ToString(),                     Is.EqualTo(E2.ToString()));
 
                 // rn1 stays as it was.
-                Assert.That(gef.ChargingPools.Length,                                       Is.EqualTo(1));
+                Assert.That(gef.ChargingPools.Count,                                        Is.EqualTo(1));
                 Assert.That(rn2.Fits(cs),                                                   Is.False);
 
             }

@@ -206,6 +206,20 @@ differs from its own. The roaming network calculates and writes its ETags (see
 roaming network that embeds it, as its HTTP `ETag`.
 
 
+### Collections
+
+The children of an entity, and the parties and registries of a roaming network, are `POICollection<TId, TEntity>`
+([source](../WWCP_POI3/DataStructures/POICollection.cs)): immutable, in the ordinal order of the texts of their
+identifications (the order of JSON and CBOR), looked up by identification with `TryGet`, `Contains` and `Get`.
+Identifications are equal as their type compares them, e.g. most without case, parking products with case; a
+collection refuses null entries and an identification given twice. It enumerates its children, so it reads like
+any other sequence; `Items`, `Ids` and `Index` give them as an array, their identifications, and a dictionary.
+
+A collection also keeps its representations: `Representation(view, format, json)` calculates the canonical JSON or
+CBOR of a view, e.g. the list of its children in short, and its ETag once, and returns the same afterwards.
+POI_API serves the lists of a roaming network, e.g. `~/RNs/{RN_Id}/CSOs`, from there.
+
+
 ### Errors and logging
 
 `LogEvent(...)` calls all handlers of an event of a subclass concurrently and passes an exception of any of

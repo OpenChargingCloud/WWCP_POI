@@ -74,7 +74,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data
 
-        private readonly ImmutableDictionary<EVSE_Id, EVSE> evseIndex;
 
         #endregion
 
@@ -113,7 +112,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The EVSEs, in the order of their identifications.
         /// </summary>
-        public ImmutableArray<EVSE>  EVSEs                 { get; }
+        public POICollection<EVSE_Id, EVSE>  EVSEs         { get; }
 
         /// <summary>
         /// Its own energy meters, in the order of their identifications; not those of its EVSEs.
@@ -251,17 +250,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (evse.Id.OperatorId != Id.OperatorId)
                     throw new ArgumentException($"The EVSE '{evse.Id}' does not belong to the operator '{Id.OperatorId}' of the charging station '{Id}'!", nameof(EVSEs));
 
-            if (evses.Select(evse => evse.Id).Distinct().Count() != evses.Length)
-                throw new ArgumentException($"An EVSE of the charging station '{Id}' must not be given twice!", nameof(EVSEs));
-
             this.PhysicalReference   = PhysicalReference;
             this.Address             = Address;
             this.GeoLocation         = GeoLocation;
             this.HotlinePhoneNumber  = HotlinePhoneNumber;
             this.ManufacturerId      = ManufacturerId;
             this.ModelId             = ModelId;
-            this.EVSEs               = [.. evses.OrderBy(evse => evse.Id.ToString(), StringComparer.Ordinal)];
-            this.evseIndex           = this.EVSEs.ToImmutableDictionary(evse => evse.Id);
+            this.EVSEs               = new (evses, evse => evse.Id, "EVSE", $"the charging station '{Id}'");
             this.EnergyMeters        = EnergyMeter.Ordered(EnergyMeters, $"the charging station '{Id}'");
             this.BrandIds            = POIJSON.OrderedIds(BrandIds, $"brand of the charging station '{Id}'");
             this.OpeningTimes        = OpeningTimes;
@@ -288,7 +283,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetEVSE(EVSE_Id                         EVSEId,
                                   [NotNullWhen(true)] out EVSE?  EVSE)
 
-            => evseIndex.TryGetValue(EVSEId, out EVSE);
+            => EVSEs.TryGet(EVSEId, out EVSE);
 
         #endregion
 
@@ -455,7 +450,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (EnergyMeters.Length > 0)
                 json.Add("energyMeters",       new JArray(EnergyMeters.Select(energyMeter => energyMeter.ToJSON())));
 
-            if (EVSEs.Length > 0)
+            if (EVSEs.Count > 0)
                 json.Add("EVSEs",              new JArray(EVSEs.Select(evse => evse.ToJSON())));
 
             if (BrandIds.Length > 0)

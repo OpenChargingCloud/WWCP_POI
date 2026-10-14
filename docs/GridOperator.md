@@ -51,7 +51,7 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | Hotline phone number. |
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update (signing or identity key) | Keys signing its change sets, see [Keys](#keys). |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update (identity key) | Long-term keys signing changes of its identity keys, see [Keys](#keys). |
-| `gridConnectionPoints` | `GridConnectionPoints` | `ImmutableArray<GridConnectionPoint>` | add/remove | Its [grid connection points](#grid-connection-points), in the ordinal order of their identifications. |
+| `gridConnectionPoints` | `GridConnectionPoints` | `POICollection<GridConnectionPoint_Id, GridConnectionPoint>` | add/remove | Its [grid connection points](#grid-connection-points), in the ordinal order of their identifications. |
 
 **Derived (not serialized):** `EnergyMeters`, the meters of its grid connection points;
 `TryGetGridConnectionPoint(id, out point)`.

@@ -46,11 +46,11 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `address` | `Address` | `Address?` | update/remove | Address of the headquarters, as Styx writes it embedded (`street`, `houseNumber`, `postalCode`, `city`, `country` as ISO 3166 alpha-3, …). |
 | `homepage` | `Homepage` | `URL?` | update/remove | Homepage. |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | Hotline phone number. |
-| `parkingGarages` | `ParkingGarages` | `ImmutableArray<ParkingGarage>` | add/remove | Its [parking garages](#parking-garages), ordered by identification. |
-| `parkingSpaces` | `ParkingSpaces` | `ImmutableArray<ParkingSpace>` | add/remove | Its [parking spaces](#parking-spaces), ordered by identification. |
-| `parkingSensors` | `ParkingSensors` | `ImmutableArray<ParkingSensor>` | add/remove | Its [parking sensors](#parking-sensors), ordered by identification. |
-| `parkingSpaceGroups` | `ParkingSpaceGroups` | `ImmutableArray<ParkingSpaceGroup>` | add/remove | Its [parking space groups](#parking-space-groups), ordered by identification; they may overlap. |
-| `parkingProducts` | `ParkingProducts` | `ImmutableArray<ParkingProduct>` | add/remove | Its [parking products](#parking-products), ordered by identification (ordinal, case-sensitive). |
+| `parkingGarages` | `ParkingGarages` | `POICollection<ParkingGarage_Id, ParkingGarage>` | add/remove | Its [parking garages](#parking-garages), ordered by identification. |
+| `parkingSpaces` | `ParkingSpaces` | `POICollection<ParkingSpace_Id, ParkingSpace>` | add/remove | Its [parking spaces](#parking-spaces), ordered by identification. |
+| `parkingSensors` | `ParkingSensors` | `POICollection<ParkingSensor_Id, ParkingSensor>` | add/remove | Its [parking sensors](#parking-sensors), ordered by identification. |
+| `parkingSpaceGroups` | `ParkingSpaceGroups` | `POICollection<ParkingSpaceGroup_Id, ParkingSpaceGroup>` | add/remove | Its [parking space groups](#parking-space-groups), ordered by identification; they may overlap. |
+| `parkingProducts` | `ParkingProducts` | `POICollection<ParkingProduct_Id, ParkingProduct>` | add/remove | Its [parking products](#parking-products), ordered by identification (ordinal, case-sensitive). |
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update (signing or identity key) | Keys signing its change sets, see [Keys](#keys). |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update (identity key) | Long-term keys signing changes of its identity keys, see [Keys](#keys). |
 

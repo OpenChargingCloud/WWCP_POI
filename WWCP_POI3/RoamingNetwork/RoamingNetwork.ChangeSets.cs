@@ -81,15 +81,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      CustomData,
                                      InternalData,
                                      DataLicenses,
-                                     chargingStationOperators.Values,
-                                     chargingStationManufacturers.Values,
-                                     eMobilityProviders.Values,
-                                     gridOperators.Values,
-                                     parkingOperators.Values,
-                                     transparencySoftware.Values,
-                                     transparencySoftwareCertificates.Values,
-                                     brands.Values,
-                                     energyMeterManufacturers.Values,
+                                     chargingStationOperators,
+                                     chargingStationManufacturers,
+                                     eMobilityProviders,
+                                     gridOperators,
+                                     parkingOperators,
+                                     transparencySoftware,
+                                     transparencySoftwareCertificates,
+                                     brands,
+                                     energyMeterManufacturers,
                                      SigningKeys,
                                      IdentityKeys
                                  ) {
@@ -490,15 +490,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var customData            = CustomData;
             var signingKeys           = SigningKeys;
             var identityKeys          = IdentityKeys;
-            var operators             = new Dictionary<ChargingStationOperator_Id, ChargingStationOperator>(chargingStationOperators);
-            var manufacturers         = new Dictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>(chargingStationManufacturers);
-            var providers             = new Dictionary<EMobilityProvider_Id, EMobilityProvider>(eMobilityProviders);
-            var gridOps               = new Dictionary<GridOperator_Id, GridOperator>(gridOperators);
-            var parkingOps            = new Dictionary<ParkingOperator_Id, ParkingOperator>(parkingOperators);
-            var softwares             = new Dictionary<TransparencySoftware_Id, TransparencySoftware>(transparencySoftware);
-            var certificates          = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(transparencySoftwareCertificates);
-            var brandRegistry         = new Dictionary<Brand_Id, Brand>(brands);
-            var meterManufacturers    = new Dictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>(energyMeterManufacturers);
+            var operators             = new Dictionary<ChargingStationOperator_Id, ChargingStationOperator>(chargingStationOperators.Index);
+            var manufacturers         = new Dictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>(chargingStationManufacturers.Index);
+            var providers             = new Dictionary<EMobilityProvider_Id, EMobilityProvider>(eMobilityProviders.Index);
+            var gridOps               = new Dictionary<GridOperator_Id, GridOperator>(gridOperators.Index);
+            var parkingOps            = new Dictionary<ParkingOperator_Id, ParkingOperator>(parkingOperators.Index);
+            var softwares             = new Dictionary<TransparencySoftware_Id, TransparencySoftware>(transparencySoftware.Index);
+            var certificates          = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(transparencySoftwareCertificates.Index);
+            var brandRegistry         = new Dictionary<Brand_Id, Brand>(brands.Index);
+            var meterManufacturers    = new Dictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>(energyMeterManufacturers.Index);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)

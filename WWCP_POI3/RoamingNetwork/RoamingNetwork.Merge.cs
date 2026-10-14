@@ -902,15 +902,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             // Only what is new in the merge: what it took from the left version unchanged is that version's, and may be listened to.
-            foreach (var chargingStationOperator in chargingStationOperators.Values)
+            foreach (var chargingStationOperator in chargingStationOperators)
             {
 
-                Left.chargingStationOperators.TryGetValue(chargingStationOperator.Id, out var left);
+                Left.chargingStationOperators.TryGet(chargingStationOperator.Id, out var left);
 
                 if (ReferenceEquals(chargingStationOperator, left))
                     continue;
 
-                if (Right.chargingStationOperators.TryGetValue(chargingStationOperator.Id, out var right))
+                if (Right.chargingStationOperators.TryGet(chargingStationOperator.Id, out var right))
                     chargingStationOperator.ShareRuntimeOfAll(right);
 
                 if (left is not null)
@@ -918,15 +918,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            foreach (var parkingOperator in parkingOperators.Values)
+            foreach (var parkingOperator in parkingOperators)
             {
 
-                Left.parkingOperators.TryGetValue(parkingOperator.Id, out var left);
+                Left.parkingOperators.TryGet(parkingOperator.Id, out var left);
 
                 if (ReferenceEquals(parkingOperator, left))
                     continue;
 
-                if (Right.parkingOperators.TryGetValue(parkingOperator.Id, out var right))
+                if (Right.parkingOperators.TryGet(parkingOperator.Id, out var right))
                     parkingOperator.ShareRuntimeOfAll(right);
 
                 if (left is not null)
@@ -934,19 +934,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            foreach (var eMobilityProvider in eMobilityProviders.Values)
-                if (!Left.eMobilityProviders.ContainsKey(eMobilityProvider.Id) && Right.eMobilityProviders.TryGetValue(eMobilityProvider.Id, out var right))
+            foreach (var eMobilityProvider in eMobilityProviders)
+                if (!Left.eMobilityProviders.Contains(eMobilityProvider.Id) && Right.eMobilityProviders.TryGet(eMobilityProvider.Id, out var right))
                     eMobilityProvider.ShareRuntimeOf(right);
 
-            foreach (var gridOperator in gridOperators.Values)
+            foreach (var gridOperator in gridOperators)
             {
 
-                Left.gridOperators.TryGetValue(gridOperator.Id, out var left);
+                Left.gridOperators.TryGet(gridOperator.Id, out var left);
 
                 if (ReferenceEquals(gridOperator, left))
                     continue;
 
-                if (Right.gridOperators.TryGetValue(gridOperator.Id, out var right))
+                if (Right.gridOperators.TryGet(gridOperator.Id, out var right))
                     gridOperator.ShareRuntimeOfAll(right);
 
                 if (left is not null)
@@ -954,8 +954,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            foreach (var manufacturer in chargingStationManufacturers.Values)
-                if (!Left.chargingStationManufacturers.ContainsKey(manufacturer.Id) && Right.chargingStationManufacturers.TryGetValue(manufacturer.Id, out var right))
+            foreach (var manufacturer in chargingStationManufacturers)
+                if (!Left.chargingStationManufacturers.Contains(manufacturer.Id) && Right.chargingStationManufacturers.TryGet(manufacturer.Id, out var right))
                     manufacturer.ShareRuntimeOf(right);
 
         }

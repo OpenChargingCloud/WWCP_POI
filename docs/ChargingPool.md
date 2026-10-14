@@ -53,7 +53,7 @@ All optional; absent values and empty arrays are not written.
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | The telephone number of the hotline for this pool. |
 | `gridConnectionPointId` | `GridConnectionPointId` | `GridConnectionPoint_Id?` | update/remove | Where it is connected to the public grid: a grid connection point of a grid operator of the network, see [Grid connection point](#grid-connection-point). |
 | `energyMeters` | `EnergyMeters` | `ImmutableArray<EnergyMeter>` | update/remove | Its own energy meters, see [Energy meters](#energy-meters). |
-| `chargingStations` | `ChargingStations` | `ImmutableArray<ChargingStation>` | add/remove | Its [charging stations](#charging-stations). |
+| `chargingStations` | `ChargingStations` | `POICollection<ChargingStation_Id, ChargingStation>` | add/remove | Its [charging stations](#charging-stations). |
 | `brandIds` | `BrandIds` | `ImmutableArray<Brand_Id>` | update/remove | The brands it is offered under, brands of the roaming network; ordinal order, each once. |
 | `openingTimes` | `OpeningTimes` | `ImmutableOpeningTimes?` | update/remove | When it is open, see [Opening times](#opening-times); always, unless given. |
 | `energyMix` | `EnergyMix` | `EnergyMix?` | update/remove | The mix of the energy it delivers, see [Energy mix](#energy-mix). |

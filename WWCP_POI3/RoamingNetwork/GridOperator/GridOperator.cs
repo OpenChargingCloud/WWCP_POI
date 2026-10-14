@@ -90,15 +90,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The grid connection points, in the order of their identifications.
         /// </summary>
-        public ImmutableArray<GridConnectionPoint>  GridConnectionPoints    { get; }
+        public POICollection<GridConnectionPoint_Id, GridConnectionPoint>  GridConnectionPoints    { get; }
 
         /// <summary>
         /// The energy meters of its grid connection points.
         /// </summary>
         public IEnumerable<EnergyMeter>  EnergyMeters
             => GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.EnergyMeter).OfType<EnergyMeter>();
-
-        private readonly ImmutableDictionary<GridConnectionPoint_Id, GridConnectionPoint> gridConnectionPointIndex;
 
         #endregion
 
@@ -154,17 +152,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the grid operator '{Id}'");
 
-            var gridConnectionPoints = (GridConnectionPoints ?? []).ToArray();
-
-            if (gridConnectionPoints.Any(gridConnectionPoint => gridConnectionPoint is null))
-                throw new ArgumentException($"The grid connection points of the grid operator '{Id}' must not contain null entries!", nameof(GridConnectionPoints));
-
             // Grid connection point identifications compare without case.
-            if (gridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.Id).Distinct().Count() != gridConnectionPoints.Length)
-                throw new ArgumentException($"A grid connection point of the grid operator '{Id}' must not be given twice!", nameof(GridConnectionPoints));
-
-            this.GridConnectionPoints      = [.. gridConnectionPoints.OrderBy(gridConnectionPoint => gridConnectionPoint.Id.ToString(), StringComparer.Ordinal)];
-            this.gridConnectionPointIndex  = this.GridConnectionPoints.ToImmutableDictionary(gridConnectionPoint => gridConnectionPoint.Id);
+            this.GridConnectionPoints = new (GridConnectionPoints, gridConnectionPoint => gridConnectionPoint.Id, "grid connection point", $"the grid operator '{Id}'");
 
         }
 
@@ -179,7 +168,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetGridConnectionPoint(GridConnectionPoint_Id                         GridConnectionPointId,
                                                  [NotNullWhen(true)] out GridConnectionPoint?   GridConnectionPoint)
 
-            => gridConnectionPointIndex.TryGetValue(GridConnectionPointId, out GridConnectionPoint);
+            => GridConnectionPoints.TryGet(GridConnectionPointId, out GridConnectionPoint);
 
         #endregion
 
@@ -286,7 +275,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (HotlinePhoneNumber.HasValue)
                 json.Add("hotline",      HotlinePhoneNumber.Value.ToString());
 
-            if (GridConnectionPoints.Length > 0)
+            if (GridConnectionPoints.Count > 0)
                 json.Add("gridConnectionPoints", new JArray(GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.ToJSON())));
 
             POIPartyKeys.AddTo(json, this);

@@ -68,9 +68,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// Versions are immutable, and their runtime status is no part of their representations:
     /// so the content and the ETag of every representation are calculated once per version and format,
     /// and kept as long as the version is. An entity unchanged by a commit is the same object in the
-    /// new version, and keeps its representations. The list of the roaming networks is kept while the
-    /// same versions are served. Only an expanded view, which depends on more than one version, is
-    /// calculated for every request.
+    /// new version, and keeps its representations. A list is kept with its collection, a POICollection
+    /// of the version; the list of the roaming networks while the same versions are served. Only an
+    /// expanded view, which depends on more than one version, is calculated for every request.
     /// HEAD is answered by Hermod from GET; OPTIONS answers the CORS preflights of every origin.
     /// </remarks>
     public partial class POI_API
@@ -89,50 +89,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly String[]     EntityRequestHeaders = [ "Accept", "If-None-Match" ];
 
         /// <summary>
-        /// The representations of versions: of roaming networks, of the entities they embed, and of their lists,
-        /// as long as the versions are referenced elsewhere.
+        /// The view of a collection as a list of its children in short.
+        /// </summary>
+        private const           String       SummariesView        = "summaries";
+
+        /// <summary>
+        /// The representations of versions of roaming networks and of the entities they embed,
+        /// as long as the versions are referenced elsewhere. Lists keep theirs in their collections.
         /// </summary>
         private readonly ConditionalWeakTable<Object, Representations> representationCache = new ();
 
         /// <summary>
-        /// The list of the roaming networks, while the same versions are served.
+        /// The roaming networks served, with the representations of their list, while the same versions are served.
         /// </summary>
-        private volatile RoamingNetworksList? roamingNetworksList;
+        private volatile POICollection<RoamingNetwork_Id, RoamingNetwork>? roamingNetworksServed;
 
         #endregion
 
-        #region (private) Representation, Representations, RoamingNetworksList
+        #region (private) Representations
 
         /// <summary>
-        /// One representation: its canonical content and its ETag.
-        /// </summary>
-        private sealed record Representation(Byte[]  Content,
-                                             ETag    ETag);
-
-        /// <summary>
-        /// The representations of one immutable version, by view and format, each calculated once.
+        /// The representations of one immutable version of an entity, by view and format, each calculated once.
         /// </summary>
         private sealed class Representations
         {
 
-            private readonly ConcurrentDictionary<(String View, Boolean CBOR), Lazy<Representation>> representations = new ();
+            private readonly ConcurrentDictionary<(String View, ETagFormat Format), Lazy<POIRepresentation>> representations = new ();
 
             /// <summary>
             /// The representation of the given view and format, calculated by the given delegate the first time only.
             /// </summary>
-            public Representation GetOrAdd(String                View,
-                                           Boolean               CBOR,
-                                           Func<Representation>  Create)
+            public POIRepresentation GetOrAdd(String                   View,
+                                              ETagFormat               Format,
+                                              Func<POIRepresentation>  Create)
 
-                => representations.GetOrAdd((View, CBOR), _ => new Lazy<Representation>(Create)).Value;
+                => representations.GetOrAdd((View, Format), _ => new Lazy<POIRepresentation>(Create)).Value;
 
         }
-
-        /// <summary>
-        /// The list of the roaming networks of the given versions, in the order of their identifications.
-        /// </summary>
-        private sealed record RoamingNetworksList(RoamingNetwork[]  Versions,
-                                                  Representations   Representations);
 
         #endregion
 
@@ -166,11 +159,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region ~/RNs/{RN_Id}/CSOs, GOs, EMPs, CSMs, POs
 
-            AddListHandlers(roamingNetworkPath, "CSOs",  roamingNetwork => EntitySummaries(roamingNetwork.ChargingStationOperators));
-            AddListHandlers(roamingNetworkPath, "GOs",   roamingNetwork => EntitySummaries(roamingNetwork.GridOperators));
-            AddListHandlers(roamingNetworkPath, "EMPs",  roamingNetwork => EntitySummaries(roamingNetwork.EMobilityProviders));
-            AddListHandlers(roamingNetworkPath, "CSMs",  roamingNetwork => EntitySummaries(roamingNetwork.ChargingStationManufacturers));
-            AddListHandlers(roamingNetworkPath, "POs",   roamingNetwork => EntitySummaries(roamingNetwork.ParkingOperators));
+            AddListHandlers(roamingNetworkPath, "CSOs",  roamingNetwork => roamingNetwork.ChargingStationOperators,      EntitySummaries);
+            AddListHandlers(roamingNetworkPath, "GOs",   roamingNetwork => roamingNetwork.GridOperators,                 EntitySummaries);
+            AddListHandlers(roamingNetworkPath, "EMPs",  roamingNetwork => roamingNetwork.EMobilityProviders,            EntitySummaries);
+            AddListHandlers(roamingNetworkPath, "CSMs",  roamingNetwork => roamingNetwork.ChargingStationManufacturers,  EntitySummaries);
+            AddListHandlers(roamingNetworkPath, "POs",   roamingNetwork => roamingNetwork.ParkingOperators,              EntitySummaries);
 
             #endregion
 
@@ -377,20 +370,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private) AddListHandlers(RoamingNetworkPath, Collection, List)
+        #region (private) AddListHandlers(RoamingNetworkPath, Name, Collection, Summaries)
 
         /// <summary>
-        /// Answer GET of ~/RNs/{RN_Id}/{Collection} with the list of the roaming network named in the path,
-        /// kept with its version; HEAD by Hermod from it, and OPTIONS.
+        /// Answer GET of ~/RNs/{RN_Id}/{Name} with the list of the given collection of the roaming network named
+        /// in the path, in short, kept with the collection; HEAD by Hermod from it, and OPTIONS.
         /// </summary>
-        private void AddListHandlers(HTTPPath                       RoamingNetworkPath,
-                                     String                         Collection,
-                                     Func<RoamingNetwork, JArray>   List)
+        private void AddListHandlers<TId, TEntity>(HTTPPath                                               RoamingNetworkPath,
+                                                   String                                                 Name,
+                                                   Func<RoamingNetwork, POICollection<TId, TEntity>>      Collection,
+                                                   Func<IEnumerable<TEntity>, JArray>                     Summaries)
 
-            => AddEntityHandlers(RoamingNetworkPath + "/" + Collection,
-                                 request => TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse)
-                                                ? CachedEntityResponse(request, roamingNetwork, () => List(roamingNetwork), Collection)
-                                                : errorResponse);
+            where TId     : notnull
+            where TEntity : class
+
+            => AddEntityHandlers(RoamingNetworkPath + "/" + Name,
+                                 request => {
+
+                                     if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
+                                         return errorResponse;
+
+                                     var collection  = Collection(roamingNetwork);
+                                     var format      = FormatOf(request);
+
+                                     return EntityResponse(request,
+                                                           format,
+                                                           collection.Representation(SummariesView, format, () => Summaries(collection)));
+
+                                 });
 
         #endregion
 
@@ -578,17 +585,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 OrderBy(roamingNetwork => roamingNetwork.Id.ToString(), StringComparer.Ordinal).
                                 ToArray();
 
-            var list      = roamingNetworksList;
+            var served    = roamingNetworksServed;
 
             // Roaming networks equal by their identifications: the versions must be the very same.
-            if (list is null || !list.Versions.SequenceEqual(versions, ReferenceEqualityComparer.Instance))
-                roamingNetworksList = list = new RoamingNetworksList(versions, new Representations());
+            if (served is null || !Enumerable.SequenceEqual<RoamingNetwork>(served, versions, ReferenceEqualityComparer.Instance))
+                roamingNetworksServed = served = new (versions, roamingNetwork => roamingNetwork.Id, "roaming network");
 
-            var cbor      = WantsCBOR(Request);
+            var format    = FormatOf(Request);
 
             return EntityResponse(Request,
-                                  cbor,
-                                  list.Representations.GetOrAdd("", cbor, () => Represent(EntitySummaries(versions), cbor)));
+                                  format,
+                                  served.Representation(SummariesView, format, () => EntitySummaries(served)));
 
         }
 
@@ -605,32 +612,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     RoamingNetwork  RoamingNetwork)
         {
 
-            var cbor        = WantsCBOR(Request);
-            var format      = cbor ? ETagFormat.CBOR : ETagFormat.JSON;
+            var format      = FormatOf(Request);
+            var cbor        = format == ETagFormat.CBOR;
             var eTags       = RoamingNetwork.ETags.IsDefault ? [] : RoamingNetwork.ETags;
             var stored      = eTags.Where(eTag => eTag.Format == format).ToArray();
 
             if (stored.Length > 0)
                 return EntityResponse(Request,
-                                      cbor,
+                                      format,
                                       representationCache.GetValue(RoamingNetwork, _ => new Representations()).
                                                           GetOrAdd($"roamingNetwork:{eTags.Length}",
-                                                                   cbor,
-                                                                   () => new Representation(cbor
-                                                                                                ? RoamingNetwork.ToCBOR().ToByteArray(CBORWriterOptions.Canonical)
-                                                                                                : CanonicalJSON.ToUTF8Bytes(RoamingNetwork.ToJSON()),
-                                                                                            stored[0])));
+                                                                   format,
+                                                                   () => new POIRepresentation(cbor
+                                                                                                   ? RoamingNetwork.ToCBOR().ToByteArray(CBORWriterOptions.Canonical)
+                                                                                                   : CanonicalJSON.ToUTF8Bytes(RoamingNetwork.ToJSON()),
+                                                                                               stored[0])));
 
             // Without its ETags, e.g. one added without a history.
             return EntityResponse(Request,
-                                  cbor,
-                                  new Representation(cbor
-                                                         ? RoamingNetwork.ToCBOR().ToByteArray(CBORWriterOptions.Canonical)
-                                                         : CanonicalJSON.ToUTF8Bytes(RoamingNetwork.ToJSON()),
-                                                     ETag.Compute(format,
-                                                                  cbor
-                                                                      ? RoamingNetwork.ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical)
-                                                                      : CanonicalJSON.ToUTF8Bytes(RoamingNetwork.ToJSON(IncludeETags: false)))));
+                                  format,
+                                  new POIRepresentation(cbor
+                                                            ? RoamingNetwork.ToCBOR().ToByteArray(CBORWriterOptions.Canonical)
+                                                            : CanonicalJSON.ToUTF8Bytes(RoamingNetwork.ToJSON()),
+                                                        ETag.Compute(format,
+                                                                     cbor
+                                                                         ? RoamingNetwork.ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical)
+                                                                         : CanonicalJSON.ToUTF8Bytes(RoamingNetwork.ToJSON(IncludeETags: false)))));
 
         }
 
@@ -668,45 +675,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) Represent             (JSON, CBOR)
+        #region (private static) FormatOf              (Request)
 
         /// <summary>
-        /// The given entity or list in canonical JSON, or in canonical CBOR with the keys and values of the JSON,
-        /// with the SHA-256 of the content as its ETag.
+        /// CBOR when the request prefers it to JSON by its Accept header field, else JSON.
         /// </summary>
-        private static Representation Represent(JToken   JSON,
-                                                Boolean  CBOR)
-        {
+        private static ETagFormat FormatOf(HTTPRequest Request)
 
-            var content = CBOR
-                              ? CBORJSON.ToCBOR(JSON).ToByteArray(CBORWriterOptions.Canonical)
-                              : CanonicalJSON.ToUTF8Bytes(JSON);
-
-            return new (content,
-                        ETag.Compute(CBOR ? ETagFormat.CBOR : ETagFormat.JSON, content));
-
-        }
+            => WantsCBOR(Request)
+                   ? ETagFormat.CBOR
+                   : ETagFormat.JSON;
 
         #endregion
 
-        #region (private)        CachedEntityResponse  (Request, Version, JSON, View = "")
+        #region (private)        CachedEntityResponse  (Request, Version, JSON)
 
         /// <summary>
-        /// The given immutable version of an entity, or the given view of it, e.g. a list of a roaming network,
-        /// in JSON or in CBOR as the request prefers: calculated once per version, view and format.
+        /// The given immutable version of an entity in JSON or in CBOR as the request prefers,
+        /// calculated once per version and format.
         /// </summary>
         private HTTPResponse CachedEntityResponse(HTTPRequest   Request,
                                                   Object        Version,
-                                                  Func<JToken>  JSON,
-                                                  String        View   = "")
+                                                  Func<JToken>  JSON)
         {
 
-            var cbor = WantsCBOR(Request);
+            var format = FormatOf(Request);
 
             return EntityResponse(Request,
-                                  cbor,
+                                  format,
                                   representationCache.GetValue(Version, _ => new Representations()).
-                                                      GetOrAdd(View, cbor, () => Represent(JSON(), cbor)));
+                                                      GetOrAdd("", format, () => POIRepresentation.Of(JSON(), format)));
 
         }
 
@@ -715,31 +713,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) EntityResponse        (Request, JSON)
 
         /// <summary>
-        /// The given entity or list in canonical JSON, or in canonical CBOR, calculated for this request.
+        /// The given entity in canonical JSON, or in canonical CBOR, calculated for this request.
         /// </summary>
         private static HTTPResponse EntityResponse(HTTPRequest  Request,
                                                    JToken       JSON)
         {
 
-            var cbor = WantsCBOR(Request);
+            var format = FormatOf(Request);
 
             return EntityResponse(Request,
-                                  cbor,
-                                  Represent(JSON, cbor));
+                                  format,
+                                  POIRepresentation.Of(JSON, format));
 
         }
 
         #endregion
 
-        #region (private static) EntityResponse        (Request, CBOR, Representation)
+        #region (private static) EntityResponse        (Request, Format, Representation)
 
         /// <summary>
         /// 200 OK with the given representation and its ETag, or 304 Not Modified when the If-None-Match
         /// of the request names the ETag. Caches revalidate it; every origin may read it and its ETag.
         /// </summary>
-        private static HTTPResponse EntityResponse(HTTPRequest     Request,
-                                                   Boolean         CBOR,
-                                                   Representation  Representation)
+        private static HTTPResponse EntityResponse(HTTPRequest        Request,
+                                                   ETagFormat         Format,
+                                                   POIRepresentation  Representation)
         {
 
             var eTag         = $"\"{Representation.ETag.ToString(ETagDigestEncoding.HEX)}\"";
@@ -758,7 +756,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // A 304 carries no content, and no metadata of it beyond the ETag, Cache-Control and Vary.
             if (!notModified)
             {
-                response.ContentType  = CBOR
+                response.ContentType  = Format == ETagFormat.CBOR
                                             ? HTTPContentType.Application.CBOR
                                             : HTTPContentType.Application.JSON_UTF8;
                 response.Content      = Representation.Content;

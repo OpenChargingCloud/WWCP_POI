@@ -52,7 +52,7 @@ See [common properties](README.md#common-properties). A charging station does no
 | `manufacturerId` | `ManufacturerId` | `ChargingStationManufacturer_Id?` | update/remove | A [ChargingStationManufacturer](ChargingStationManufacturer.md) of the roaming network; see [Manufacturer and model](#manufacturer-and-model). |
 | `modelId` | `ModelId` | `ChargingStationModel_Id?` | update/remove | The model as its manufacturer names it, e.g. `"Wallbox-22"`. |
 | `energyMeters` | `EnergyMeters` | `ImmutableArray<EnergyMeter>` | update/remove | Its own energy meters, not those of its EVSEs; see [energyMeters](#energymeters). |
-| `EVSEs` | `EVSEs` | `ImmutableArray<EVSE>` | add/remove | Its EVSEs, embedded completely; see [EVSEs](#evses). |
+| `EVSEs` | `EVSEs` | `POICollection<EVSE_Id, EVSE>` | add/remove | Its EVSEs, embedded completely; see [EVSEs](#evses). |
 | `brandIds` | `BrandIds` | `ImmutableArray<Brand_Id>` | update/remove | Brands it is offered under; see [brandIds](#brandids). |
 | `openingTimes` | `OpeningTimes` | `ImmutableOpeningTimes?` | update/remove | When it is open; always, unless given. See [openingTimes](#openingtimes). |
 | `images` | `Images` | `ImmutableArray<Image>` | update/remove | Its images, in their given order; see [images](#images). |

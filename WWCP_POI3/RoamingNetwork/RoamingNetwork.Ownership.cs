@@ -174,19 +174,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 nameof(RoamingNetwork)           => IsThisRoamingNetwork(PartyId.EntityId) ? this : null,
 
                 nameof(ChargingStationOperator)  => ChargingStationOperator_Id.TryParse(PartyId.EntityId, out var chargingStationOperatorId) &&
-                                                    chargingStationOperators.TryGetValue(chargingStationOperatorId, out var chargingStationOperator)
+                                                    chargingStationOperators.TryGet(chargingStationOperatorId, out var chargingStationOperator)
                                                         ? chargingStationOperator : null,
 
                 nameof(EMobilityProvider)        => EMobilityProvider_Id.TryParse(PartyId.EntityId, out var eMobilityProviderId) &&
-                                                    eMobilityProviders.TryGetValue(eMobilityProviderId, out var eMobilityProvider)
+                                                    eMobilityProviders.TryGet(eMobilityProviderId, out var eMobilityProvider)
                                                         ? eMobilityProvider : null,
 
                 nameof(GridOperator)             => GridOperator_Id.TryParse(PartyId.EntityId, out var gridOperatorId) &&
-                                                    gridOperators.TryGetValue(gridOperatorId, out var gridOperator)
+                                                    gridOperators.TryGet(gridOperatorId, out var gridOperator)
                                                         ? gridOperator : null,
 
                 nameof(ParkingOperator)          => ParkingOperator_Id.TryParse(PartyId.EntityId, out var parkingOperatorId) &&
-                                                    parkingOperators.TryGetValue(parkingOperatorId, out var parkingOperator)
+                                                    parkingOperators.TryGet(parkingOperatorId, out var parkingOperator)
                                                         ? parkingOperator : null,
 
                 _                                => null
@@ -224,16 +224,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 yield return (new POIPartyId(nameof(RoamingNetwork), Id.ToString()), this);
 
-                foreach (var chargingStationOperator in chargingStationOperators.Values)
+                foreach (var chargingStationOperator in chargingStationOperators)
                     yield return (new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString()), chargingStationOperator);
 
-                foreach (var eMobilityProvider in eMobilityProviders.Values)
+                foreach (var eMobilityProvider in eMobilityProviders)
                     yield return (new POIPartyId(nameof(EMobilityProvider),       eMobilityProvider.      Id.ToString()), eMobilityProvider);
 
-                foreach (var gridOperator in gridOperators.Values)
+                foreach (var gridOperator in gridOperators)
                     yield return (new POIPartyId(nameof(GridOperator),            gridOperator.           Id.ToString()), gridOperator);
 
-                foreach (var parkingOperator in parkingOperators.Values)
+                foreach (var parkingOperator in parkingOperators)
                     yield return (new POIPartyId(nameof(ParkingOperator),         parkingOperator.        Id.ToString()), parkingOperator);
 
             }
@@ -571,7 +571,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     // The parking operator as the keys of the parties name it.
                     parkingOperatorId = ParkingOperator_Id.TryParse(Change.ParentEntityId, out var parentId) &&
-                                        parkingOperators.TryGetValue(parentId, out var parent)
+                                        parkingOperators.TryGet(parentId, out var parent)
                                             ? parent.Id.ToString()
                                             : Change.ParentEntityId;
 
@@ -580,7 +580,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 else if (!AddedParking.TryGetValue((Change.EntityType, parkingId), out parkingOperatorId))
-                    parkingOperatorId = parkingOperators.Values.FirstOrDefault(parkingOperator => ParkingStoredId(parkingOperator, Change.EntityType, Change.EntityId) is not null)?.Id.ToString();
+                    parkingOperatorId = parkingOperators.FirstOrDefault(parkingOperator => ParkingStoredId(parkingOperator, Change.EntityType, Change.EntityId) is not null)?.Id.ToString();
 
                 if (parkingOperatorId is null)
                 {

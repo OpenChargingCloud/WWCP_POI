@@ -63,7 +63,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data
 
-        private readonly ImmutableDictionary<ChargingStation_Id, ChargingStation> chargingStationIndex;
 
         #endregion
 
@@ -102,7 +101,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The charging stations, in the order of their identifications.
         /// </summary>
-        public ImmutableArray<ChargingStation>  ChargingStations      { get; }
+        public POICollection<ChargingStation_Id, ChargingStation>  ChargingStations  { get; }
 
         /// <summary>
         /// The EVSEs of all its charging stations.
@@ -312,17 +311,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (chargingStation.Id.OperatorId != Id.OperatorId)
                     throw new ArgumentException($"The charging station '{chargingStation.Id}' does not belong to the operator '{Id.OperatorId}' of the charging pool '{Id}'!", nameof(ChargingStations));
 
-            if (chargingStations.Select(chargingStation => chargingStation.Id).Distinct().Count() != chargingStations.Length)
-                throw new ArgumentException($"A charging station of the charging pool '{Id}' must not be given twice!", nameof(ChargingStations));
-
             this.Address               = Address;
             this.GeoLocation           = GeoLocation;
             this.ParkingType           = ParkingType;
             this.Accessibility         = Accessibility;
             this.HotlinePhoneNumber    = HotlinePhoneNumber;
             this.DataLicenses          = [.. dataLicenses.Ordered()];
-            this.ChargingStations      = [.. chargingStations.OrderBy(chargingStation => chargingStation.Id.ToString(), StringComparer.Ordinal)];
-            this.chargingStationIndex  = this.ChargingStations.ToImmutableDictionary(chargingStation => chargingStation.Id);
+            this.ChargingStations      = new (chargingStations, chargingStation => chargingStation.Id, "charging station", $"the charging pool '{Id}'");
             this.GridConnectionPointId = GridConnectionPointId;
             this.EnergyMeters          = EnergyMeter.Ordered(EnergyMeters, $"the charging pool '{Id}'");
             this.BrandIds              = POIJSON.OrderedIds(BrandIds, $"brand of the charging pool '{Id}'");
@@ -360,7 +355,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetChargingStation(ChargingStation_Id                         ChargingStationId,
                                              [NotNullWhen(true)] out ChargingStation?  ChargingStation)
 
-            => chargingStationIndex.TryGetValue(ChargingStationId, out ChargingStation);
+            => ChargingStations.TryGet(ChargingStationId, out ChargingStation);
 
         #endregion
 
@@ -462,7 +457,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (EnergyMeters.Length > 0)
                 json.Add("energyMeters",      new JArray(EnergyMeters.Select(energyMeter => energyMeter.ToJSON())));
 
-            if (ChargingStations.Length > 0)
+            if (ChargingStations.Count > 0)
                 json.Add("chargingStations",  new JArray(ChargingStations.Select(chargingStation => chargingStation.ToJSON())));
 
             if (BrandIds.Length > 0)
