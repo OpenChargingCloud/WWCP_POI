@@ -44,7 +44,7 @@ The operator writes no `eTags`.
 
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
-| `dataLicenses` | `DataLicenses` | `ImmutableArray<DataLicense>` | update/remove | The licenses of its data, see [Data licenses](#data-licenses). Written also when empty, `[]`, as the roaming network embeds it. |
+| `dataLicenses` | `DataLicenses` | `ImmutableArray<DataLicense>` | update/remove | The licenses of its data, see [Data licenses](#data-licenses); omitted when empty. |
 | `address` | `Address` | `Address?` | update/remove | The address of its headquarters, see [Address and geo location](#address-and-geo-location). |
 | `logos` | `Logo` | `URL?` | update/remove | Its logo, see [Logos](#logos). |
 | `geoLocation` | `GeoLocation` | `GeoCoordinate?` | update/remove | Its geographical location. |
@@ -218,7 +218,7 @@ each at most once.
 When read, `dataLicenseIds` may instead name well-known licenses by their identification alone: `None`, `PDDL`,
 `ODC-By`, `ODbL`, `dl-de/by-2-0`, `dl-de/zero-2-0`, `GeoLizenz_V1.3`, `CC BY 4.0`, `CC BY-SA 4.0`, `CC BY-ND 4.0`,
 `CC BY-NC 4.0`, `CC BY-NC-SA 4.0`, `CC BY-NC-ND 4.0`. Any other identification must be given completely. A change
-set updates `dataLicenses` as a whole; removing it leaves `[]`.
+set updates `dataLicenses` as a whole; removing it, or updating it to `[]`, leaves no `dataLicenses`.
 
 
 ## Contact

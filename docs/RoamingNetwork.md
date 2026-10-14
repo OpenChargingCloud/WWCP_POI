@@ -371,7 +371,6 @@ Checked when a change set is applied:
   "chargingStationOperators": [
     { "@id": "DE*GEF",
       "name": { "en": "GraphDefined" },
-      "dataLicenses": [],
       "signingKeys":  [ { "@id": "3f0c…", "key": "pQECIAEh…" } ],
       "identityKeys": [ { "@id": "a81d…", "key": "pQECIAMh…" } ],
       "created":    "2026-01-01T00:00:00.000Z",

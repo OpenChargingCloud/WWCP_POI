@@ -59,7 +59,7 @@ An ETag is a digest of the content in one of two formats.
 
 - **JSON:** `["json", "sha256", "hex", "<64 lowercase hex digits>"]`; the encoding MAY also be
   `base64`, with canonical padding.
-- **CBOR:** `[format, "sha256", h'<digest>']`, e.g. `["cbor", "sha256", h'631d…']`, the digest as a byte string.
+- **CBOR:** `[format, "sha256", h'<digest>']`, e.g. `["cbor", "sha256", h'291e…']`, the digest as a byte string.
 - **Text:** `json:sha256:hex:<digest>`.
 - **Algorithms:** `sha256` (default), `sha384`, `sha512`.
 - A roaming network lists its ETags in `eTags`, ordered by format: `json`, then `cbor`.
@@ -264,23 +264,23 @@ one pool, one station and one EVSE `DE*GEF*E1*1` of 22000 W and 230.5 V.
 **Content** (canonical JSON):
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork","@id":"rn1","chargingStationOperators":[{"@id":"DE*GEF","chargingPools":[{"@id":"DE*GEF*P1","chargingStations":[{"@id":"DE*GEF*S1","EVSEs":[{"@id":"DE*GEF*E1*1","created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","maxPower":22000,"maxVoltage":230.5}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z"}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z"}],"created":"2026-01-01T00:00:00.000Z","dataLicenses":[],"lastChange":"2026-01-01T00:00:00.000Z","name":{"en":"Charging Station Operator DE*GEF"}}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","name":{"en":"Example"}}
+{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork","@id":"rn1","chargingStationOperators":[{"@id":"DE*GEF","chargingPools":[{"@id":"DE*GEF*P1","chargingStations":[{"@id":"DE*GEF*S1","EVSEs":[{"@id":"DE*GEF*E1*1","created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","maxPower":22000,"maxVoltage":230.5}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z"}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z"}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","name":{"en":"Charging Station Operator DE*GEF"}}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","name":{"en":"Example"}}
 ```
 
 **ETags:**
 
 ```
-json:sha256:hex:a3432d3ec7622d4272a7d4c0eba47883ee562c5501804285d9b01aea0dd692de
-cbor:sha256:hex:631d24121cc4ee0177f262b6703b1ddfd63552dc69109c77971ae079e679f421
+json:sha256:hex:8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224
+cbor:sha256:hex:291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549
 ```
 
 **Genesis commit:** the SHA-256 of
 
 ```json
-{"eTags":[["json","sha256","hex","a3432d3ec7622d4272a7d4c0eba47883ee562c5501804285d9b01aea0dd692de"],["cbor","sha256","hex","631d24121cc4ee0177f262b6703b1ddfd63552dc69109c77971ae079e679f421"]],"profile":"wwcp-poi-commit-v2","revision":0,"roamingNetworkId":"rn1"}
+{"eTags":[["json","sha256","hex","8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224"],["cbor","sha256","hex","291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549"]],"profile":"wwcp-poi-commit-v2","revision":0,"roamingNetworkId":"rn1"}
 ```
 
-is the commit identification `77fc198bdb99288bf482666a94f3a4a38bbe1f95087f0caf9b58a7e8648e83a8`.
+is the commit identification `d48066e0a5e68f9019c8c2e0a911ff7d99e2ff054a79e3343e5de2ea14e33117`.
 
 **Leader signature** of the genesis commit, with the Ed25519 key of the private seed
 `101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f` (public key, Base64:
@@ -288,13 +288,13 @@ is the commit identification `77fc198bdb99288bf482666a94f3a4a38bbe1f95087f0caf9b
 `leader.example.org`, signed at 2026-10-12T12:00:00.000Z. Signature input:
 
 ```json
-{"algorithm":"Ed25519","commit":{"@id":"77fc198bdb99288bf482666a94f3a4a38bbe1f95087f0caf9b58a7e8648e83a8","eTags":[["json","sha256","hex","a3432d3ec7622d4272a7d4c0eba47883ee562c5501804285d9b01aea0dd692de"],["cbor","sha256","hex","631d24121cc4ee0177f262b6703b1ddfd63552dc69109c77971ae079e679f421"]],"revision":0,"roamingNetworkId":"rn1"},"encoding":"base64","keyId":"leader","profile":"wwcp-poi-commit-signature-v1","role":"leader","signedAt":"2026-10-12T12:00:00.000Z","signer":"leader.example.org"}
+{"algorithm":"Ed25519","commit":{"@id":"d48066e0a5e68f9019c8c2e0a911ff7d99e2ff054a79e3343e5de2ea14e33117","eTags":[["json","sha256","hex","8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224"],["cbor","sha256","hex","291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549"]],"revision":0,"roamingNetworkId":"rn1"},"encoding":"base64","keyId":"leader","profile":"wwcp-poi-commit-signature-v1","role":"leader","signedAt":"2026-10-12T12:00:00.000Z","signer":"leader.example.org"}
 ```
 
 Signature value:
 
 ```
-/dZDnTZyyEV4ijgtwArwcN72xtrdDUvtAIptyVEVRjwNx1mQQ5olgd3lJAQP28PZaAMcek+fAMzCMu45t82aDA==
+uGmXUXrvziqRwcQIDE5C7ew7Rv1HPJ2vzqHwL+181Z7SWohOuOUEHvDWmrb7HaRyJxsbuFOsruTYOrTLoHFLAA==
 ```
 
 

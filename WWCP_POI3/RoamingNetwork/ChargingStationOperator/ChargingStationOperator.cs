@@ -1184,7 +1184,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    ? new JProperty("dataSource",          DataSource)
                                    : null,
 
-                               ExpandDataLicenses != InfoStatus.Hidden
+                               // No data licenses, no property: as the roaming network and its charging pools write them.
+                               ExpandDataLicenses != InfoStatus.Hidden && DataLicenses.Any()
                                    ? ExpandDataLicenses.Switch(
                                          () => new JProperty("dataLicenseIds",  DataLicenses.ToPOIIdsJSON()),
                                          () => new JProperty("dataLicenses",    DataLicenses.ToPOIJSON()))
