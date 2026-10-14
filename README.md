@@ -142,6 +142,35 @@ parking product ids compare case-sensitively.
   `{@id, key, notBefore?, notAfter?}`, the public COSE key as Base64 of its deterministic CBOR, identified by its
   SHA-256 COSE key thumbprint [RFC 9679] in lowercase hex. A key is not both.
 
+### Entities
+
+Every entity derives from `AImmutableEMobilityEntity`: an identification, a name, a description, a data source,
+timestamps and custom data as content, and an admin status and a status as runtime status, shared by all its
+versions. [docs/](docs/README.md) explains this base class and documents every entity with all the properties
+a change set can manage:
+
+| Entity | Description |
+|---|---|
+| [RoamingNetwork](docs/RoamingNetwork.md) | The root: one version of a roaming network with everything it embeds, its keys and its ETags. |
+| [ChargingStationOperator](docs/ChargingStationOperator.md) | A charge point operator with its charging pools, tariffs and groups. |
+| [ChargingPool](docs/ChargingPool.md) | A charging location: address, opening times, facilities, grid connection point and charging stations. |
+| [ChargingStation](docs/ChargingStation.md) | A charger with its EVSEs, manufacturer and model, energy meters and energy status. |
+| [EVSE](docs/EVSE.md) | One charging point: power, voltage, current, connectors, tariffs and energy status. |
+| [ChargingTariff](docs/ChargingTariff.md) | A price as in OCPI: currency, elements with price components and restrictions. |
+| [EVSEGroup](docs/EVSEGroup.md) | EVSEs of one operator, optionally with a common tariff. |
+| [ChargingStationGroup](docs/ChargingStationGroup.md) | Charging stations of one operator, optionally with a common tariff. |
+| [ChargingPoolGroup](docs/ChargingPoolGroup.md) | Charging pools of one operator, optionally with a common tariff. |
+| [ChargingTariffGroup](docs/ChargingTariffGroup.md) | Charging tariffs of one operator. |
+| [EnergyMeter](docs/EnergyMeter.md) | A meter of a pool, grid connection point, station or EVSE, with its transparency software. |
+| [ChargingStationManufacturer](docs/ChargingStationManufacturer.md) | A maker of charging stations, named by the stations it built. |
+| [EMobilityProvider](docs/EMobilityProvider.md) | An e-mobility service provider with its keys. |
+| [GridOperator](docs/GridOperator.md) | A distribution system operator, named by grid connection points, with its keys. |
+| [ParkingOperator](docs/ParkingOperator.md) | Runs parking garages, spaces and sensors and offers parking products. |
+| [ParkingGarage](docs/ParkingGarage.md) | A car park with opening times, images and parking products. |
+| [ParkingSpace](docs/ParkingSpace.md) | One parking space, possibly in a garage, with its sensors and charging stations. |
+| [ParkingSensor](docs/ParkingSensor.md) | A sensor detecting whether parking spaces are occupied, named by the spaces it watches. |
+| [ParkingSpaceGroup](docs/ParkingSpaceGroup.md) | Parking spaces of one operator, e.g. a level or a zone. |
+
 ## Change sets
 
 A change set is an ordered list of changes against one version, named by its before ETags,
