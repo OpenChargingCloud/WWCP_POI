@@ -100,9 +100,9 @@ omitted when absent (an empty object is allowed). Times are local times of the l
 | JSON key | Type | Description |
 |---|---|---|
 | `startTime` | string | `HH:mm`, from this time of day on, inclusive. Whole minutes only. |
-| `endTime` | string | `HH:mm`, until this time of day, exclusive; before `startTime` it means the next day (e.g. `22:00`–`06:30`). |
+| `endTime` | string | `HH:mm`, until this time of day, exclusive; before `startTime` it means the next day (e.g. `22:00`–`06:30`); not equal to `startTime`, which would be ambiguous. |
 | `startDate` | string | `yyyy-MM-dd`, from this date on, inclusive. |
-| `endDate` | string | `yyyy-MM-dd`, until this date, exclusive; not before `startDate`. |
+| `endDate` | string | `yyyy-MM-dd`, until this date, exclusive; after `startDate`, so a period is at least one day. |
 | `minEnergy` / `maxEnergy` | decimal | Energy charged so far, in Wh. |
 | `minCurrent` / `maxCurrent` | decimal | Current, in A. |
 | `minPower` / `maxPower` | decimal | Power, in W. |
@@ -175,7 +175,7 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
 - Every element: `priceComponents` a JSON array with at least one price component; `restrictions`, when given, a JSON object.
 - Every price component: `type` mandatory and known; `price` mandatory, ≥ 0; `vat` 0..100; `stepSize` > 0 for every type
   but `FLAT`, absent for `FLAT`.
-- Restrictions: `HH:mm` and `yyyy-MM-dd` exactly; times in whole minutes; `startDate` ≤ `endDate`; minima and maxima ≥ 0,
+- Restrictions: `HH:mm` and `yyyy-MM-dd` exactly; times in whole minutes, `startTime` ≠ `endTime`; `startDate` < `endDate`; minima and maxima ≥ 0,
   minimum ≤ maximum; `daysOfWeek` upper-case day names, each at most once.
 - `energyMix`, when given, a valid [energy mix](#energymix).
 - Network level: every `chargingTariffIds`/`chargingTariffId` of the operator's EVSEs and groups names one of its tariffs.

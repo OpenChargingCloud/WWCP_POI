@@ -171,6 +171,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 ("min above max",        Changed(network => Restrictions(network)["minPower"] = 50000),                                           "must not exceed its maximum"),
                 ("invalid time",         Changed(network => Restrictions(network)["startTime"] = "25:00"),                                         "expected HH:mm"),
                 ("lower case day",       Changed(network => Restrictions(network)["daysOfWeek"] = new JArray("monday")),                          "day of the week"),
+                ("equal times",          Changed(network => { Restrictions(network)["startTime"] = "08:00"; Restrictions(network)["endTime"] = "08:00"; }),
+                                                                                                                                                   "start and end times of a charging tariff restriction must differ"),
+                ("empty date range",     Changed(network => { Restrictions(network)["startDate"] = "2026-06-01"; Restrictions(network)["endDate"] = "2026-06-01"; }),
+                                                                                                                                                   "start date of a charging tariff restriction must be before its end date"),
                 ("foreign tariff",       Changed(network => Tariff(network)["@id"] = "DE*XYZ*T1"),                                                 "does not belong to the operator"),
                 ("unknown tariff",       Changed(network => network["chargingStationOperators"]![0]!["chargingPools"]![0]!["chargingStations"]![0]!["EVSEs"]![0]!["chargingTariffIds"] = new JArray("DE*GEF*T9")),
                                                                                                                                                    "charging tariff 'DE*GEF*T9' of the EVSE")

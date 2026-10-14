@@ -138,8 +138,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("The start and end times of a charging tariff restriction are given in minutes!");
             }
 
-            if (StartDate > EndDate)
-                throw new ArgumentException("The start date of a charging tariff restriction must not be after its end date!");
+            // Equal times would be ambiguous: no time at all, or the whole day.
+            if (StartTime.HasValue && StartTime == EndTime)
+                throw new ArgumentException("The start and end times of a charging tariff restriction must differ!");
+
+            // The end date is exclusive: a period is at least one day.
+            if (StartDate >= EndDate)
+                throw new ArgumentException("The start date of a charging tariff restriction must be before its end date!");
 
             var daysOfWeek = (DaysOfWeek ?? []).ToArray();
 
