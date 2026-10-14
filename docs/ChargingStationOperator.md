@@ -72,16 +72,17 @@ Children are written only when there are any; collections in the ordinal order o
 - `TryGetChargingPool`, `TryGetChargingStation`, `TryGetEVSE`, `TryGetEnergyMeter`, `TryGetChargingTariff`,
   `TryGetEVSEGroup`, `TryGetChargingStationGroup`, `TryGetChargingPoolGroup`, `TryGetChargingTariffGroup`:
   lookups by identification, across all pools.
-- `RoamingNetwork`: a back reference, currently never set.
+- No reference to its roaming network: versions share the operators they did not change, so it would be the
+  wrong version for all but one of them. An operator is always reached through its roaming network.
 
 
 ### ToJSON and ToEmbeddedJSON
 
 | Method | Writes |
 |---|---|
-| `ToEmbeddedJSON()` | The content, as the roaming network embeds it: no `@context`, no `roamingNetworkId`, `dataLicenses` complete. Change sets compare and edit this representation, `RoamingNetworkChange.Add(operator)` sends it, and `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` serves it. |
-| `ToCBOR(Embedded = false)` | The keys and values of `ToJSON(Embedded, ExpandRoamingNetworkId: Hidden, ExpandDataLicenses: Expanded)`. |
-| `ToJSON(Embedded = false, …)` | With its defaults: `@context` (`https://open.charging.cloud/contexts/wwcp+json/chargingStationOperator`) unless embedded, and `dataLicenseIds` (identifications only) instead of `dataLicenses`. `ExpandRoamingNetworkId` would add `roamingNetworkId`/`roamingNetwork` if the back reference were set. |
+| `ToEmbeddedJSON()` | The content, as the roaming network embeds it: no `@context`, `dataLicenses` complete. Change sets compare and edit this representation, `RoamingNetworkChange.Add(operator)` sends it, and `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` serves it. |
+| `ToCBOR(Embedded = false)` | The keys and values of `ToJSON(Embedded, ExpandDataLicenses: Expanded)`. |
+| `ToJSON(Embedded = false, …)` | With its defaults: `@context` (`https://open.charging.cloud/contexts/wwcp+json/chargingStationOperator`) unless embedded, and `dataLicenseIds` (identifications only) instead of `dataLicenses`. |
 
 `TryParse(JSON)` reads all of them: it ignores `@context` and `roamingNetworkId`, and reads `dataLicenseIds` only
 for well-known licenses. `TryParse(CBOR)` reads the CBOR map as JSON.

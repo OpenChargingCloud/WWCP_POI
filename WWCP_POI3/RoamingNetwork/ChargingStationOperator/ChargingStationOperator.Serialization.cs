@@ -448,9 +448,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         public CBORValue ToCBOR(Boolean Embedded = false)
 
-            => CBORJSON.ToCBOR(ToJSON(Embedded:                Embedded,
-                                      ExpandRoamingNetworkId:  InfoStatus.Hidden,
-                                      ExpandDataLicenses:      InfoStatus.Expanded));
+            => CBORJSON.ToCBOR(ToJSON(Embedded:            Embedded,
+                                      ExpandDataLicenses:  InfoStatus.Expanded));
 
         #endregion
 
@@ -458,14 +457,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The complete JSON representation of this charging station operator
-        /// as its roaming network embeds it: without the reference to the network,
+        /// as its roaming network embeds it:
         /// with its data licenses. Changes of operators use and compare it.
         /// </summary>
         public JObject ToEmbeddedJSON()
 
-            => ToJSON(Embedded:                true,
-                      ExpandRoamingNetworkId:  InfoStatus.Hidden,
-                      ExpandDataLicenses:      InfoStatus.Expanded);
+            => ToJSON(Embedded:            true,
+                      ExpandDataLicenses:  InfoStatus.Expanded);
 
         #endregion
 

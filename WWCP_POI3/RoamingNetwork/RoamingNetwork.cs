@@ -870,7 +870,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  OrderedChargingStationOperators.
                                                      Select(chargingStationOperator => chargingStationOperator.ToJSON(
                                                                                            Embedded:                                 true,
-                                                                                           ExpandRoamingNetworkId:                   InfoStatus.Hidden,
                                                                                            ExpandChargingPoolIds:                    ExpandChargingPoolIds,
                                                                                            ExpandChargingStationIds:                 ExpandChargingStationIds,
                                                                                            ExpandEVSEIds:                            ExpandEVSEIds,

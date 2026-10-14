@@ -57,7 +57,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     UInt64?                                                    Skip                                      = null,
                                     UInt64?                                                    Take                                      = null,
                                     Boolean                                                    Embedded                                  = false,
-                                    InfoStatus                                                 ExpandRoamingNetworkId                    = InfoStatus.ShowIdOnly,
                                     InfoStatus                                                 ExpandChargingPoolIds                     = InfoStatus.ShowIdOnly,
                                     InfoStatus                                                 ExpandChargingStationIds                  = InfoStatus.ShowIdOnly,
                                     InfoStatus                                                 ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
@@ -78,7 +77,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              OrderBy        (cso => cso.Id).
                              SkipTakeFilter (Skip, Take).
                              SafeSelect     (cso => cso.ToJSON(Embedded,
-                                                               ExpandRoamingNetworkId,
                                                                ExpandChargingPoolIds,
                                                                ExpandChargingStationIds,
                                                                ExpandEVSEIds,
@@ -253,8 +251,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
         #region Properties
-
-        public RoamingNetwork?  RoamingNetwork    { get; internal set; }
 
 
         #region Logo
@@ -726,7 +722,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
-            //this.RoamingNetwork = RoamingNetwork;
             //this.chargingPools = new EntityHashSet<ChargingStationOperator, ChargingPool_Id, ChargingPool>(this);
 
             this.logo                   = Logo;
@@ -1143,7 +1138,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Embedded">Whether this data is embedded into another data structure, e.g. into a roaming network.</param>
         public JObject ToJSON(Boolean                                                    Embedded                                  = false,
-                              InfoStatus                                                 ExpandRoamingNetworkId                    = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandChargingPoolIds                     = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandChargingStationIds                  = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
@@ -1189,18 +1183,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    ? ExpandDataLicenses.Switch(
                                          () => new JProperty("dataLicenseIds",  DataLicenses.ToPOIIdsJSON()),
                                          () => new JProperty("dataLicenses",    DataLicenses.ToPOIJSON()))
-                                   : null,
-
-                               RoamingNetwork is not null && ExpandRoamingNetworkId != InfoStatus.Hidden
-                                   ? ExpandRoamingNetworkId.Switch(
-                                         () => new JProperty("roamingNetworkId",   RoamingNetwork.Id. ToString()),
-                                         () => new JProperty("roamingNetwork",     RoamingNetwork.    ToJSON(Embedded:                          true,
-                                                                                                             ExpandChargingStationOperatorIds:  InfoStatus.Hidden,
-                                                                                                             ExpandChargingPoolIds:             InfoStatus.Hidden,
-                                                                                                             ExpandChargingStationIds:          InfoStatus.Hidden,
-                                                                                                             ExpandEVSEIds:                     InfoStatus.Hidden,
-                                                                                                             ExpandBrandIds:                    InfoStatus.Hidden,
-                                                                                                             ExpandDataLicenses:                InfoStatus.Hidden)))
                                    : null,
 
                                Address is not null
@@ -1611,8 +1593,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    Name.FirstText(),
                    "' (",
                    Id.ToString(),
-                   ") in ",
-                   RoamingNetwork.Id.ToString()
+                   ")"
                );
 
         #endregion
