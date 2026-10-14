@@ -108,9 +108,9 @@ parking product ids compare case-sensitively.
   `stopParkingAfterTime` in s, without status and timestamps) are named by `parkingProductIds` of garages,
   spaces and space groups of the same operator; they offer, they do not calculate prices.
 - **Charging tariff:** as in OCPI: `currency` (ISO 4217), `tariffURL` and `elements`, each with
-  `priceComponents` (`{type, price, vat?, stepSize?}`, `type` one of `ENERGY`, `FLAT`, `MAX_CURRENT`,
-  `MIN_CURRENT`, `PARKING_TIME`, `TIME`; `stepSize` in Wh, A or s) and optional `restrictions`
-  (`startTime`/`endTime` as `HH:mm`, `startDate`/`endDate` as `yyyy-MM-dd`, `min/maxEnergy` (Wh),
+  `priceComponents` (`{type, price, vat?, stepSize}`, `type` one of `ENERGY`, `FLAT`, `MAX_CURRENT`,
+  `MIN_CURRENT`, `PARKING_TIME`, `TIME`; `stepSize` in Wh, A or s, positive, for every type but `FLAT`,
+  which has none) and optional `restrictions` (`startTime`/`endTime` as `HH:mm`, `startDate`/`endDate` as `yyyy-MM-dd`, `min/maxEnergy` (Wh),
   `min/maxCurrent` (A), `min/maxPower` (W), `min/maxDuration` (s), `daysOfWeek`). EVSEs name
   `chargingTariffIds` of their operator.
 - **Brands:** embedded in the network, so that operators can share them, without status and timestamps:
