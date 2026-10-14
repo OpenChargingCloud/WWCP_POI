@@ -264,10 +264,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region Keys_are_changed_with_identity_keys()
+        #region Keys_are_changed_by_their_owners()
 
+        /// <summary>
+        /// Signing keys are rotated by the signing keys they replace, or by an identity key;
+        /// identity keys only by an identity key. The roaming network operator recovers the keys of every party.
+        /// </summary>
         [Test]
-        public void Keys_are_changed_with_identity_keys()
+        public void Keys_are_changed_by_their_owners()
         {
 
             var rn1       = NewNetwork();
@@ -285,10 +289,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(Apply(rn1, bySigning).Error,  Does.Contain("needs a signature by an identity key of the ChargingStationOperator 'DE*GEF' or an identity key of the roaming network operator"));
-                Assert.That(Apply(rn1, byRNO).Applied,    Is.True, "Recovery by the roaming network operator.");
+                Assert.That(Apply(rn1, bySigning).Applied,   Is.True, "Rotated by the signing key it replaces.");
+                Assert.That(Apply(rn1, byRNO).Applied,       Is.True, "Recovery by the roaming network operator.");
 
                 Assert.That(rn1.TryApplyChangeSet(byIdentity, out var rn2, out var error), Is.True, error);
+
+                // Identity keys only by an identity key.
+                var rotatedIdentity = TestParties.Key(new POIPartyId(nameof(ChargingStationOperator), "DE*GEF#3"));
+                var identityChange  = Change(rn1, RoamingNetworkChange.UpdateProperty(gef, "identityKeys", null, new JArray(rotatedIdentity.Public.ToJSON())));
+
+                Assert.That(Apply(rn1, identityChange.SignedBy(TestParties.Party(GEF))).Error,
+                            Does.Contain("needs a signature by an identity key of the ChargingStationOperator 'DE*GEF' or an identity key of the roaming network operator"));
+                Assert.That(Apply(rn1, identityChange.SignedBy(TestParties.Party(GEF), POIKeyKind.Identity)).Applied,
+                            Is.True);
 
                 // From now on, the new key signs, the old one no longer.
                 var pool = rn2!.GetChargingStationOperatorById(GEF)!.ChargingPools.Single();
@@ -307,12 +320,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                            SignedBy(TestParties.Party(GEF), POIKeyKind.Identity)).Error,
                             Does.Contain("must keep at least one of its identityKeys"));
 
-                // The keys of the roaming network operator itself: only with its identity key.
-                var rnoKeys = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1, "signingKeys", null, newKeys));
-                Assert.That(Apply(rn1, rnoKeys.SignedBy(TestParties.Party(rn1))).Error,
+                // The keys of the roaming network operator itself, without anybody to recover them:
+                // its signing keys by a signing or an identity key, its identity keys only by an identity key.
+                var rnoSigningKeys   = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1, "signingKeys",  null, newKeys));
+                var rnoIdentityKeys  = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1, "identityKeys", null, new JArray(rotatedIdentity.Public.ToJSON())));
+
+                Assert.That(Apply(rn1, rnoSigningKeys. SignedBy(TestParties.Party(rn1))).Applied,                       Is.True);
+                Assert.That(Apply(rn1, rnoSigningKeys. SignedBy(TestParties.Party(rn1), POIKeyKind.Identity)).Applied,  Is.True);
+                Assert.That(Apply(rn1, rnoIdentityKeys.SignedBy(TestParties.Party(rn1))).Error,
                             Does.Contain("needs a signature by an identity key of the roaming network operator"));
-                Assert.That(Apply(rn1, rnoKeys.SignedBy(TestParties.Party(rn1), POIKeyKind.Identity)).Applied,
-                            Is.True);
+                Assert.That(Apply(rn1, rnoIdentityKeys.SignedBy(TestParties.Party(rn1), POIKeyKind.Identity)).Applied,  Is.True);
 
             }
 

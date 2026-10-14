@@ -127,10 +127,15 @@ Every change has exactly one **owner**:
 
 A change set MUST be refused unless, for every owner of one of its changes, it has a valid
 signature with a key that owner names **in the version the change set is applied to**, valid at
-its `createdAt`: a signing key for data; for the `signingKeys` and `identityKeys` of a party one
-of its identity keys or, for recovery, an identity key of the RNO. Every signature MUST be by a key
-of a party. A party is added with at least one key of each kind and without embedded children,
-and keeps at least one of each.
+its `createdAt`: a signing key for data; for the `signingKeys` of a party one of its signing keys
+or one of its identity keys; for its `identityKeys` one of its identity keys. For recovery, an
+identity key of the RNO also counts for both kinds of keys of every other party. Every signature
+MUST be by a key of a party. A party is added with at least one key of each kind and without
+embedded children, and keeps at least one of each.
+
+Nobody can replace the identity keys of the RNO once they are lost or expired. An RNO SHOULD name
+at least two identity keys with different `notAfter`, and SHOULD replace an identity key before it
+expires.
 
 
 ## 5. Commits

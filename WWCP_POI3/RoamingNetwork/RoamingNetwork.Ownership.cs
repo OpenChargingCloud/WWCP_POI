@@ -72,14 +72,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <remarks>
     /// Every change of a change set has an owner, and a change set needs a valid signature of every owner,
     /// by a key the owner has in the version the change set is applied to, valid at its creation:
-    /// a signing key for data, an identity key for the keys of a party.
+    /// a signing key for data and for the signing keys of a party, an identity key for its identity keys.
     /// <list type="bullet">
     ///   <item>The roaming network operator (the keys of the roaming network) owns the roaming network itself, brands,
     ///         manufacturers, energy meter manufacturers and transparency software, and adds and removes parties.</item>
     ///   <item>A charging station operator, e-mobility provider, grid operator or parking operator owns its own properties,
     ///         a charging station operator its pools, stations, EVSEs, tariffs and groups, a parking operator its parking data.</item>
-    ///   <item>The keys of a party are changed with one of its identity keys or, for recovery, with an identity key
-    ///         of the roaming network operator. A party always keeps at least one signing and one identity key.</item>
+    ///   <item>The signing keys of a party are changed with one of its current signing keys, or with one of its identity
+    ///         keys when none of them can sign any more; its identity keys only with one of its identity keys.
+    ///         For recovery, an identity key of the roaming network operator changes both kinds of keys of every other party.
+    ///         A party always keeps at least one signing and one identity key.</item>
     ///   <item>A party is added with its keys and without embedded children: its data is its own to add.</item>
     /// </list>
     /// </remarks>
@@ -308,7 +310,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (Change.EntityType == nameof(RoamingNetwork))
             {
-                Owners = [ (roamingNetworkOperator, POIPartyKeys.IsKeyProperty(Change.PropertyName) ? POIKeyKind.Identity : POIKeyKind.Signing) ];
+                Owners = Change.PropertyName == POIPartyKeys.SigningKeysProperty
+                             ? [ (roamingNetworkOperator, POIKeyKind.Signing), (roamingNetworkOperator, POIKeyKind.Identity) ]
+                             : [ (roamingNetworkOperator, POIPartyKeys.IsKeyProperty(Change.PropertyName) ? POIKeyKind.Identity : POIKeyKind.Signing) ];
                 return true;
             }
 
@@ -321,11 +325,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var party = new POIPartyId(Change.EntityType, Change.EntityId);
 
+                // Signing keys are rotated by the signing keys they replace, or by an identity key when none of them
+                // can sign any more; identity keys only by an identity key. The roaming network operator recovers both.
                 Owners = !isProperty
                              ? [ (roamingNetworkOperator, POIKeyKind.Signing) ]
-                             : POIPartyKeys.IsKeyProperty(Change.PropertyName)
-                                   ? [ (party, POIKeyKind.Identity), (roamingNetworkOperator, POIKeyKind.Identity) ]
-                                   : [ (party, POIKeyKind.Signing) ];
+                             : Change.PropertyName == POIPartyKeys.SigningKeysProperty
+                                   ? [ (party, POIKeyKind.Signing), (party, POIKeyKind.Identity), (roamingNetworkOperator, POIKeyKind.Identity) ]
+                                   : POIPartyKeys.IsKeyProperty(Change.PropertyName)
+                                         ? [ (party, POIKeyKind.Identity), (roamingNetworkOperator, POIKeyKind.Identity) ]
+                                         : [ (party, POIKeyKind.Signing) ];
 
                 return true;
 

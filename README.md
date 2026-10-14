@@ -138,7 +138,7 @@ parking product ids compare case-sensitively.
   in W, W and Wh, kept the same way; there is none until one is reported. Its schedule keeps the last ten.
 - **Keys:** the roaming network (for its operator, the RNO), charging station operators, e-mobility providers,
   grid operators and parking operators each name 1..n `signingKeys`, short keys signing their change sets
-  (e.g. secp256r1), and 1..n `identityKeys`, long-term keys signing changes of their own keys (e.g. secp521r1):
+  (e.g. secp256r1), and 1..n `identityKeys`, long-term keys signing changes of their identity keys (e.g. secp521r1):
   `{@id, key, notBefore?, notAfter?}`, the public COSE key as Base64 of its deterministic CBOR, identified by its
   SHA-256 COSE key thumbprint [RFC 9679] in lowercase hex. A key is not both.
 
@@ -194,8 +194,13 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
     transparency software, and adds and removes parties: with their keys, without their children.
   - A **charging station operator** owns its properties, pools, stations, EVSEs, tariffs and groups,
     named by their ids; a **parking operator** its parking data; e-mobility providers and grid operators their properties.
-  - Data is signed with a signing key; the `signingKeys` and `identityKeys` of a party with one of its identity
-    keys or, for recovery, an identity key of the RNO. A party keeps at least one key of each kind.
+  - Data is signed with a signing key. The `signingKeys` of a party are rotated with one of its current signing
+    keys or, when none of them can sign any more, one of its identity keys; its `identityKeys` only with one of
+    its identity keys. For recovery, an identity key of the RNO changes both kinds of keys of every other party.
+    A party keeps at least one key of each kind.
+  - The RNO's identity keys are the root of trust: nobody can replace them once they are lost or expired.
+    An RNO should therefore name at least two identity keys with different `notAfter`, one of them kept
+    offline, and replace an identity key well before it expires.
 - **Rebase:** `rn2.TryRebase(cs, …)` prepares a change set of an older version again, unless it conflicts;
   the rebased change set is unsigned, its owners sign it again.
 - **Signatures:** `Sign(…)` and `VerifySignature(…)` over canonical JSON (COSE algorithms of Styx);
