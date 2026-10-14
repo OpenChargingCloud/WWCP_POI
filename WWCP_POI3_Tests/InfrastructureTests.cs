@@ -165,6 +165,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             pool["chargingStationIds"] = new JArray(S1.ToString());
             pool.Remove("chargingStations");
 
+            // Flags only by their names, exactly: no numbers, no blanks.
+            JObject WithCurrentTypes(params String[] CurrentTypes)
+            {
+                var changed = (JObject) json.DeepClone();
+                changed["chargingStationOperators"]![0]!["chargingPools"]![0]!["chargingStations"]![0]!["EVSEs"]![0]!["currentTypes"] = new JArray(CurrentTypes);
+                return changed;
+            }
+
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(RoamingNetwork.TryParse(unknownManufacturer, out _, out var error1),  Is.False);
@@ -173,6 +181,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(RoamingNetwork.TryParse(foreignPool,         out _, out _),           Is.False);
                 Assert.That(RoamingNetwork.TryParse(onlyIds,             out _, out var error4),  Is.False);
                 Assert.That(error4,                                                               Does.Contain("completely"));
+
+                Assert.That(RoamingNetwork.TryParse(WithCurrentTypes("DC"),  out _, out var error5),  Is.True, error5);
+                Assert.That(RoamingNetwork.TryParse(WithCurrentTypes("4"),   out _, out var error6),  Is.False);
+                Assert.That(error6,                                                                   Does.Contain("'4'"));
+                Assert.That(RoamingNetwork.TryParse(WithCurrentTypes(" DC"), out _, out _),           Is.False);
+                Assert.That(RoamingNetwork.TryParse(WithCurrentTypes("dc"),  out _, out _),           Is.False);
             }
 
         }

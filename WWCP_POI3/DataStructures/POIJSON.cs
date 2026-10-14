@@ -359,7 +359,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var item in array)
             {
 
+                // Names only, exactly: Enum.TryParse would also take numbers and names with blanks around them.
                 if (item.Type != JTokenType.String ||
+                    !Enum.GetNames<TEnum>().Contains(item.Value<String>(), StringComparer.Ordinal) ||
                     !Enum.TryParse<TEnum>(item.Value<String>(), ignoreCase: false, out var flag) ||
                     !Enum.IsDefined(flag) ||
                     Convert.ToInt64(flag) == 0)
