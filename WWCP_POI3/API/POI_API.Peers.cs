@@ -67,9 +67,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private void RegisterPeerURLTemplates()
         {
 
-            var history = HTTPPath.Root + "roamingNetworks/{roamingNetworkId}/history";
+            var history = HTTPPath.Root + "RNs/{roamingNetworkId}/history";
 
-            #region GET  ~/roamingNetworks/{roamingNetworkId}/history/tips
+            #region GET  ~/RNs/{roamingNetworkId}/history/tips
 
             AddHandler(history + "/tips",
                        HTTPMethod:    HTTPMethod.GET,
@@ -83,7 +83,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region GET  ~/roamingNetworks/{roamingNetworkId}/history/haveIds
+            #region GET  ~/RNs/{roamingNetworkId}/history/haveIds
 
             AddHandler(history + "/haveIds",
                        HTTPMethod:    HTTPMethod.GET,
@@ -97,7 +97,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region POST ~/roamingNetworks/{roamingNetworkId}/history/commits
+            #region POST ~/RNs/{roamingNetworkId}/history/commits
 
             AddHandler(history + "/commits",
                        HTTPMethod:    HTTPMethod.POST,

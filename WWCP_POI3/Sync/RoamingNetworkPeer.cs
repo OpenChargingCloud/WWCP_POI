@@ -107,7 +107,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
-        /// The URL of the WebSocket of the history of the other server, e.g. ws://server2/roamingNetworks/rn1/history/ws.
+        /// The URL of the WebSocket of the history of the other server, e.g. ws://server2/RNs/rn1/history/ws.
         /// </summary>
         public Uri                     PeerURL      { get; }
 

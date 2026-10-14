@@ -338,17 +338,17 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
 
 | Request | Returns |
 |---|---|
-| `GET ~/roamingNetworks/{id}/history/head` | metadata of the head commit |
-| `GET ~/roamingNetworks/{id}/history/tips` | metadata of the head and all tips, and the conflicts keeping them apart |
-| `GET ~/roamingNetworks/{id}/history/haveIds` | the tips and a sample of older commits held here |
-| `GET ~/roamingNetworks/{id}/history/snapshot?runtimeStatus=false` | head commit, complete network and its runtime status |
-| `GET ~/roamingNetworks/{id}/history/commitInfos?since={commitId}&max={n}` | metadata of the commits since |
-| `GET ~/roamingNetworks/{id}/history/commits?since={commitId}&max={n}` | complete commits since |
-| `GET ~/roamingNetworks/{id}/history/commits?have={commitId,…}&max={n}` | complete commits missing at who holds these, parents first |
-| `POST ~/roamingNetworks/{id}/history/commits` `{commits: […]}` | 200 appended (how many, head, tips, conflicts), 422 one refused, 403 |
-| `GET ~/roamingNetworks/{id}/history/commits/{commitId}` | one commit |
-| `COMMIT ~/roamingNetworks/{id}/history/changeSets` | 201 committed, 200 already committed (the commit, the `head`, the `conflicts` left), 422 refused |
-| `POST ~/roamingNetworks/{id}/history/commits/{commitId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403, 404, 422 invalid |
+| `GET ~/RNs/{id}/history/head` | metadata of the head commit |
+| `GET ~/RNs/{id}/history/tips` | metadata of the head and all tips, and the conflicts keeping them apart |
+| `GET ~/RNs/{id}/history/haveIds` | the tips and a sample of older commits held here |
+| `GET ~/RNs/{id}/history/snapshot?runtimeStatus=false` | head commit, complete network and its runtime status |
+| `GET ~/RNs/{id}/history/commitInfos?since={commitId}&max={n}` | metadata of the commits since |
+| `GET ~/RNs/{id}/history/commits?since={commitId}&max={n}` | complete commits since |
+| `GET ~/RNs/{id}/history/commits?have={commitId,…}&max={n}` | complete commits missing at who holds these, parents first |
+| `POST ~/RNs/{id}/history/commits` `{commits: […]}` | 200 appended (how many, head, tips, conflicts), 422 one refused, 403 |
+| `GET ~/RNs/{id}/history/commits/{commitId}` | one commit |
+| `COMMIT ~/RNs/{id}/history/changeSets` | 201 committed, 200 already committed (the commit, the `head`, the `conflicts` left), 422 refused |
+| `POST ~/RNs/{id}/history/commits/{commitId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403, 404, 422 invalid |
 
 It also serves the roaming networks and their entities, readable from every origin (CORS `*`), each in canonical
 JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json:sha256:hex:…"`); a known
@@ -376,7 +376,7 @@ Adding commit signatures needs
 
 ### WebSocket
 
-`GET ~/roamingNetworks/{id}/history/ws` upgrades to a WebSocket with OCPP-J frames,
+`GET ~/RNs/{id}/history/ws` upgrades to a WebSocket with OCPP-J frames,
 JSON in text frames, CBOR in binary frames; every request is answered in its own format.
 
 ```
@@ -419,7 +419,7 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 both commit, push their commits to each other, and merge alike.
 
 ```csharp
-await using var peer = new RoamingNetworkPeer(new Uri("wss://server1/roamingNetworks/rn1/history/ws"),
+await using var peer = new RoamingNetworkPeer(new Uri("wss://server1/RNs/rn1/history/ws"),
                                               Options: new RoamingNetworkPeerOptions {
                                                            TrustedRoamingNetworkOperatorKeyIds = [ rnoIdentityKeyId ]
                                                        });

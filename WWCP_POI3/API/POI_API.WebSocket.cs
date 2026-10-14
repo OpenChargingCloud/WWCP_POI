@@ -48,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// as OCPP-J framed requests answered asynchronously, in JSON text or in CBOR binary frames.
     /// </summary>
     /// <remarks>
-    /// GET ~/roamingNetworks/{roamingNetworkId}/history/ws   upgrade to the WebSocket of the history
+    /// GET ~/RNs/{roamingNetworkId}/history/ws   upgrade to the WebSocket of the history
     ///
     /// Action            Request payload                            Response payload
     /// head              {}                                         the metadata of the head commit
@@ -204,9 +204,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private void RegisterWebSocketURLTemplates()
         {
 
-            #region GET ~/roamingNetworks/{roamingNetworkId}/history/ws
+            #region GET ~/RNs/{roamingNetworkId}/history/ws
 
-            AddHandler(HTTPPath.Root + "roamingNetworks/{roamingNetworkId}/history/ws",
+            AddHandler(HTTPPath.Root + "RNs/{roamingNetworkId}/history/ws",
                        HTTPMethod:    HTTPMethod.GET,
                        HTTPDelegate:  request =>
 

@@ -269,7 +269,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
         private Task<TestClient> Connect(String RoamingNetworkId = "rn1")
 
-            => TestClient.Connect(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/{RoamingNetworkId}/history/ws"));
+            => TestClient.Connect(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/{RoamingNetworkId}/history/ws"));
 
         #endregion
 
@@ -1171,7 +1171,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
         public async Task The_WebSocket_path_answers_plain_requests()
         {
 
-            using var httpClient = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/") };
+            using var httpClient = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{httpServer!.TCPPort}/RNs/") };
 
             using var known    = await httpClient.GetAsync("rn1/history/ws");
             using var unknown  = await httpClient.GetAsync("rn2/history/ws");
@@ -1201,7 +1201,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
             using var alice = new ClientWebSocket();
             alice.Options.SetRequestHeader("Authorization", "Basic " + Convert.ToBase64String(Encoding.UTF8.GetBytes("alice:secret")));
-            await alice.ConnectAsync(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"), CancellationToken.None);
+            await alice.ConnectAsync(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"), CancellationToken.None);
 
             using (Assert.EnterMultipleScope())
             {

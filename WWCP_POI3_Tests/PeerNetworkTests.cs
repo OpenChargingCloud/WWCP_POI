@@ -108,7 +108,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                                                          RoamingNetworkHistory?      History   = null)
         {
 
-            var peer = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"),
+            var peer = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"),
                                               History,
                                               Options ?? new RoamingNetworkPeerOptions {
                                                                       MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
@@ -289,7 +289,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
             // Another key: the peer never starts.
             var errors   = new List<String>();
-            var peerC    = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"),
+            var peerC    = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"),
                                                   Options: new RoamingNetworkPeerOptions {
                                                                TrustedRoamingNetworkOperatorKeyIds  = [ new String('0', 64) ],
                                                                MinReconnectDelay                    = TimeSpan.FromMilliseconds(50),

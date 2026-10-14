@@ -121,14 +121,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// and to submit its change sets to the leading server.
     /// </summary>
     /// <remarks>
-    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/head                                  the metadata of the head commit
-    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/snapshot?runtimeStatus=false          the head commit, the complete roaming network and its runtime status
-    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/commitInfos?since={commitId}&amp;max={n}   the metadata of the commits since, without changes
-    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/commits?since={commitId}&amp;max={n}       the complete commits since
-    /// GET    ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}                    one complete commit
-    /// COMMIT ~/roamingNetworks/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&amp;rebase=true
+    /// GET    ~/RNs/{roamingNetworkId}/history/head                                  the metadata of the head commit
+    /// GET    ~/RNs/{roamingNetworkId}/history/snapshot?runtimeStatus=false          the head commit, the complete roaming network and its runtime status
+    /// GET    ~/RNs/{roamingNetworkId}/history/commitInfos?since={commitId}&amp;max={n}   the metadata of the commits since, without changes
+    /// GET    ~/RNs/{roamingNetworkId}/history/commits?since={commitId}&amp;max={n}       the complete commits since
+    /// GET    ~/RNs/{roamingNetworkId}/history/commits/{commitId}                    one complete commit
+    /// COMMIT ~/RNs/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&amp;rebase=true
     ///                                                                                         publish a change set as the new head commit
-    /// POST   ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}/signatures      add signatures to a commit: { signatures: [ … ] }
+    /// POST   ~/RNs/{roamingNetworkId}/history/commits/{commitId}/signatures      add signatures to a commit: { signatures: [ … ] }
     /// Without "since", the commits since the root are returned. "max" is at most MaxCommitsPerRequest.
     /// </remarks>
     public partial class POI_API
@@ -238,9 +238,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private void RegisterHistoryURLTemplates()
         {
 
-            var history = HTTPPath.Root + "roamingNetworks/{roamingNetworkId}/history";
+            var history = HTTPPath.Root + "RNs/{roamingNetworkId}/history";
 
-            #region GET ~/roamingNetworks/{roamingNetworkId}/history/head
+            #region GET ~/RNs/{roamingNetworkId}/history/head
 
             AddHandler(history + "/head",
                        HTTPMethod:    HTTPMethod.GET,
@@ -254,7 +254,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region GET ~/roamingNetworks/{roamingNetworkId}/history/snapshot
+            #region GET ~/RNs/{roamingNetworkId}/history/snapshot
 
             AddHandler(history + "/snapshot",
                        HTTPMethod:    HTTPMethod.GET,
@@ -273,7 +273,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region GET ~/roamingNetworks/{roamingNetworkId}/history/commitInfos?since={commitId}&max={n}
+            #region GET ~/RNs/{roamingNetworkId}/history/commitInfos?since={commitId}&max={n}
 
             AddHandler(history + "/commitInfos",
                        HTTPMethod:    HTTPMethod.GET,
@@ -293,7 +293,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region GET ~/roamingNetworks/{roamingNetworkId}/history/commits?since={commitId}&have={commitId,…}&max={n}
+            #region GET ~/RNs/{roamingNetworkId}/history/commits?since={commitId}&have={commitId,…}&max={n}
 
             AddHandler(history + "/commits",
                        HTTPMethod:    HTTPMethod.GET,
@@ -331,7 +331,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region COMMIT ~/roamingNetworks/{roamingNetworkId}/history/changeSets
+            #region COMMIT ~/RNs/{roamingNetworkId}/history/changeSets
 
             AddHandler(history + "/changeSets",
                        HTTPMethod:    COMMIT,
@@ -339,7 +339,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region POST ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}/signatures
+            #region POST ~/RNs/{roamingNetworkId}/history/commits/{commitId}/signatures
 
             AddHandler(history + "/commits/{commitId}/signatures",
                        HTTPMethod:    HTTPMethod.POST,
@@ -347,7 +347,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region GET ~/roamingNetworks/{roamingNetworkId}/history/commits/{commitId}
+            #region GET ~/RNs/{roamingNetworkId}/history/commits/{commitId}
 
             AddHandler(history + "/commits/{commitId}",
                        HTTPMethod:    HTTPMethod.GET,

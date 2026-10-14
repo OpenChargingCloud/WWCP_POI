@@ -74,7 +74,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             poiAPI.AddRoamingNetworkHistory(leader);
 
             httpClient  = new HttpClient {
-                              BaseAddress = new Uri($"http://127.0.0.1:{httpServer.TCPPort}/roamingNetworks/rn1/history/")
+                              BaseAddress = new Uri($"http://127.0.0.1:{httpServer.TCPPort}/RNs/rn1/history/")
                           };
 
         }
@@ -561,7 +561,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var invalidMax      = await Get("commits?max=0");
             var missingCommit   = await Get($"commits/{new String('0', 64)}");
 
-            using var unknownNetworkResponse = await httpClient!.GetAsync("/roamingNetworks/rn2/history/head");
+            using var unknownNetworkResponse = await httpClient!.GetAsync("/RNs/rn2/history/head");
 
             using (Assert.EnterMultipleScope())
             {

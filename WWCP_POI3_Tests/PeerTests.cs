@@ -128,7 +128,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                                                                  RoamingNetworkPeerOptions?  Options   = null)
         {
 
-            follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"),
+            follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"),
                                                   History,
                                                   Options ?? new RoamingNetworkPeerOptions {
                                                                  MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
@@ -186,7 +186,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "offline", T0, out _, out _);
 
             var replaced  = 0;
-            var follower  = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"));
+            var follower  = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"));
             this.follower = follower;
 
             follower.OnHistoryReplaced += (_, oldHistory, newHistory) => replaced++;
@@ -284,7 +284,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             var other     = NewHistory("other");
             var replaced  = new List<(RoamingNetworkHistory? Old, RoamingNetworkHistory New)>();
 
-            follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/roamingNetworks/rn1/history/ws"), other);
+            follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"), other);
             follower.OnHistoryReplaced += (_, oldHistory, newHistory) => replaced.Add((oldHistory, newHistory));
 
             await follower.StartAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);

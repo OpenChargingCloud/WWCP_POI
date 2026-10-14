@@ -23,7 +23,7 @@ change set and commit (`roamingNetworkId`).
 | Status | `RoamingNetworkStatusType`, initially `available` |
 | Embedded in | — (root) |
 | Owner | the roaming network operator (RNO), by the network's own `signingKeys` / `identityKeys` |
-| HTTP | `GET ~/RNs` (list of `{@id, name, description}`), `GET ~/RNs/{RN_Id}`; history under `~/roamingNetworks/{RN_Id}/history/…`, see [../README.md](../README.md#history-and-sync) |
+| HTTP | `GET ~/RNs` (list of `{@id, name, description}`), `GET ~/RNs/{RN_Id}`; history under `~/RNs/{RN_Id}/history/…`, see [../README.md](../README.md#history-and-sync) |
 
 `GET ~/RNs/{RN_Id}` serves the complete network as canonical JSON, or as deterministic CBOR for
 `Accept: application/cbor`, with its `eTags`; the HTTP ETag is the POI ETag of the format of the response.
