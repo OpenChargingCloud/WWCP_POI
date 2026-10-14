@@ -889,6 +889,40 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
         #endregion
 
+        #region A_network_without_a_name_writes_none()
+
+        /// <summary>
+        /// A roaming network without a name writes none, as its description, also after its name was removed:
+        /// change sets see it absent, and so does its content.
+        /// </summary>
+        [Test]
+        public void A_network_without_a_name_writes_none()
+        {
+
+            var rn1   = NewNetwork();
+            var rn2   = rn1.ApplyChangeSet(rn1.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(rn1, "name") ]));
+            var json  = rn2.ToJSON();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(json["name"],                                                         Is.Null);
+                Assert.That(RoamingNetwork.TryParse(rn2.ToCBOR(), out var fromCBOR, out var error),  Is.True, error);
+                Assert.That(fromCBOR!.ToJSON()["name"],                                           Is.Null);
+                Assert.That(fromCBOR.CalcETags(),                                                 Is.EqualTo(rn2.CalcETags()));
+                Assert.That(RoamingNetwork.Parse(json).CalcETags(),                               Is.EqualTo(rn2.CalcETags()));
+
+                // Absent, as the old value of the next change sees it.
+                var named = rn2.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn2, "name", null, new JObject(new JProperty("en", "Named again"))) ]);
+                Assert.That(named.Changes.Single().OldValue?.Type ?? JTokenType.Null,             Is.EqualTo(JTokenType.Null), "JSON null: expected absent.");
+                Assert.That(rn2.ApplyChangeSet(named).Name[Languages.en],                         Is.EqualTo("Named again"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Network_custom_data_is_updated_and_removed()
 
         [Test]

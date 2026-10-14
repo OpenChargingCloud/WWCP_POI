@@ -838,7 +838,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              ? new JProperty("@context",        JSONLDContext)
                              : null,
 
-                               new JProperty("name",            Name.       ToJSON()),
+                         Name.IsNotNullOrEmpty()
+                             ? new JProperty("name",            Name.       ToJSON())
+                             : null,
 
                          Description.IsNotNullOrEmpty()
                              ? new JProperty("description",     Description.ToJSON())
@@ -1342,7 +1344,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!Embedded)
                 CBOR.Add(CBORValue.FromText("@context"),              CBORValue.FromText(JSONLDContext));
 
-            CBOR.Add(CBORValue.FromText("name"),                      Name.ToCBOR());
+            if (Name.IsNotNullOrEmpty())
+                CBOR.Add(CBORValue.FromText("name"),                  Name.ToCBOR());
 
             if (Description.IsNotNullOrEmpty())
                 CBOR.Add(CBORValue.FromText("description"),           Description.ToCBOR());
