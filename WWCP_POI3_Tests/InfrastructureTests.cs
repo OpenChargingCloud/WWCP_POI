@@ -274,6 +274,63 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Entities_are_found_in_every_spelling_of_their_identification()
+
+        /// <summary>
+        /// A change names an entity and its parent in any spelling their identification types consider equal,
+        /// e.g. without the '*' of the operator, in lower case, without the '*' in the suffix of an EVSE,
+        /// and changes the same entity, with the same result, as with the spelling it is kept with.
+        /// </summary>
+        [Test]
+        public void Entities_are_found_in_every_spelling_of_their_identification()
+        {
+
+            var rn1        = NewNetwork();
+            var e3         = EVSE_Id.Parse("DE*GEF*E1*3");
+
+            var canonical  = Apply(rn1, RoamingNetworkChange.UpdateProperty("ChargingStation", "DE*GEF*S1",   "physicalReference", null, "Station One"));
+            var respelled  = Apply(rn1, RoamingNetworkChange.UpdateProperty("ChargingStation", "DEGEF*S1",    "physicalReference", null, "Station One"));
+
+            var rn2        = Apply(rn1,
+                                   RoamingNetworkChange.UpdateProperty("EVSE",            "DE*GEF*E11",  "maxPower", null, 11000, "ChargingStation", "de*gef*S1"),
+                                   RoamingNetworkChange.Add           ("EVSE",            e3.ToString(), NewEVSE(e3).ToJSON(),    "ChargingStation", "DEGEF*S1"),
+                                   RoamingNetworkChange.Add           ("ChargingStation", "DE*GEF*S7",   new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S7"), Created: Created).ToJSON(),
+                                                                                                                                  "ChargingPool",    "degef*P1"),
+                                   RoamingNetworkChange.Remove        ("EVSE",            "DE*GEF*E12"));
+
+            var gef2       = rn2.GetChargingStationOperatorById(GEF)!;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // The same change, the same result.
+                Assert.That(respelled.CalcETags(),                                                  Is.EqualTo(canonical.CalcETags()));
+                Assert.That(respelled.GetChargingStationOperatorById(GEF)!.ChargingStations.
+                                Select(chargingStation => chargingStation.Id.ToString()),           Is.EqualTo(new[] { "DE*GEF*S1" }));
+                Assert.That(respelled.GetChargingStationOperatorById(GEF)!.ChargingStations.
+                                Single().PhysicalReference,                                         Is.EqualTo("Station One"));
+
+                Assert.That(gef2.TryGetEVSE(E1, out var changedE1),                                 Is.True);
+                Assert.That(changedE1!.MaxPower,                                                    Is.EqualTo(Watt.FromW(11000)));
+                Assert.That(gef2.TryGetChargingStation(S1, out var s1),                             Is.True);
+                Assert.That(s1!.EVSEs.Select(evse => evse.Id.ToString()),                           Is.EqualTo(new[] { "DE*GEF*E1*1", "DE*GEF*E1*3" }));
+                Assert.That(gef2.ChargingStations.Select(chargingStation => chargingStation.Id.ToString()),
+                                                                                                    Is.EqualTo(new[] { "DE*GEF*S1", "DE*GEF*S7" }));
+
+                // An entity added in another spelling of an existing one is one already there.
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Add("EVSE", "DE*GEF*E11", NewEVSE(EVSE_Id.Parse("DE*GEF*E11")).ToJSON(), "ChargingStation", "DE*GEF*S1")),
+                            Throws.ArgumentException.With.Message.Contains("already exists"));
+
+                // Another parent is still another one.
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.UpdateProperty("EVSE", "DE*GEF*E11", "maxPower", null, 1, "ChargingStation", "DEGEF*S9")),
+                            Throws.ArgumentException.With.Message.Contains("belongs to ChargingStation 'DE*GEF*S1'"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Manufacturers_are_changed_by_change_sets()
 
         [Test]

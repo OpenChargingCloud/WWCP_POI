@@ -239,12 +239,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region The entity, the array holding it, and its parent
 
-            var (entityJSON, container, parentType, parentId) = Find(operatorJSON, Change.EntityType, entityId);
+            // A change may name an entity in every spelling its identification type considers equal,
+            // e.g. without the '*' of its operator: it is found under the identification it is kept with.
+            var (entityJSON, container, parentType, parentId) = Find(operatorJSON,
+                                                                     Change.EntityType,
+                                                                     StoredId(currentOperator, Change.EntityType, entityId) ?? entityId);
 
             // The actual parent, of an existing entity.
             if (entityJSON is not null &&
                 Change.ParentEntityType is not null &&
-               (Change.ParentEntityType != parentType || Change.ParentEntityId != parentId))
+               (Change.ParentEntityType != parentType || StoredId(currentOperator, Change.ParentEntityType, Change.ParentEntityId) != parentId))
             {
                 ErrorResponse = $"Change {Index}: the {description} '{entityId}' belongs to {parentType} '{parentId}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
                 return false;
@@ -338,7 +342,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                    if (!TryFindParentArray(operatorJSON, Change, operatorId.Value, out var children, out ErrorResponse))
+                    if (!TryFindParentArray(operatorJSON, Change, currentOperator, out var children, out ErrorResponse))
                     {
                         ErrorResponse = $"Change {Index}: {ErrorResponse}";
                         return false;
@@ -468,15 +472,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) TryFindParentArray(OperatorJSON, Change, OperatorId, out Children, out ErrorResponse)
+        #region (private static) TryFindParentArray(OperatorJSON, Change, Operator, out Children, out ErrorResponse)
 
         /// <summary>
         /// The array a new entity is added to: of the operator for a charging pool,
         /// of the named charging pool for a charging station, of the named charging station for an EVSE.
+        /// The parent may be named in every spelling its identification type considers equal.
         /// </summary>
         private static Boolean TryFindParentArray(JObject                                OperatorJSON,
                                                   RoamingNetworkChange                   Change,
-                                                  ChargingStationOperator_Id             OperatorId,
+                                                  ChargingStationOperator                Operator,
                                                   [NotNullWhen(true)]  out JArray?       Children,
                                                   [NotNullWhen(false)] out String?       ErrorResponse)
         {
@@ -497,9 +502,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 case nameof(ChargingTariffGroup):
 
                     if (Change.ParentEntityType is not null &&
-                       (Change.ParentEntityType != nameof(ChargingStationOperator) || Change.ParentEntityId != OperatorId.ToString()))
+                       (Change.ParentEntityType != nameof(ChargingStationOperator) || StoredId(Operator, Change.ParentEntityType, Change.ParentEntityId) is null))
                     {
-                        ErrorResponse = $"a {Describe(Change.EntityType)} '{Change.EntityId}' belongs to ChargingStationOperator '{OperatorId}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
+                        ErrorResponse = $"a {Describe(Change.EntityType)} '{Change.EntityId}' belongs to ChargingStationOperator '{Operator.Id}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
                         return false;
                     }
 
@@ -515,7 +520,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                    if (Find(OperatorJSON, nameof(ChargingPool), Change.ParentEntityId).Entity is not JObject chargingPool)
+                    if (Find(OperatorJSON, nameof(ChargingPool), StoredId(Operator, nameof(ChargingPool), Change.ParentEntityId) ?? Change.ParentEntityId).Entity is not JObject chargingPool)
                     {
                         ErrorResponse = $"the charging pool '{Change.ParentEntityId}' of the charging station '{Change.EntityId}' does not exist!";
                         return false;
@@ -533,7 +538,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                    if (Find(OperatorJSON, nameof(ChargingStation), Change.ParentEntityId).Entity is not JObject chargingStation)
+                    if (Find(OperatorJSON, nameof(ChargingStation), StoredId(Operator, nameof(ChargingStation), Change.ParentEntityId) ?? Change.ParentEntityId).Entity is not JObject chargingStation)
                     {
                         ErrorResponse = $"the charging station '{Change.ParentEntityId}' of the EVSE '{Change.EntityId}' does not exist!";
                         return false;
@@ -556,6 +561,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return true;
 
         }
+
+        #endregion
+
+        #region (private static) StoredId(Operator, EntityType, EntityId)
+
+        /// <summary>
+        /// The identification the given operator keeps the named entity with, as its JSON writes it:
+        /// the operator itself, or one of its charging pools, charging stations, EVSEs, charging tariffs or groups.
+        /// Identifications are equal as their types compare them, e.g. 'DEGEF*S1' and 'DE*GEF*S1',
+        /// not as texts. Null for an invalid identification or an entity the operator does not have.
+        /// </summary>
+        private static String? StoredId(ChargingStationOperator  Operator,
+                                        String?                  EntityType,
+                                        String?                  EntityId)
+
+            => EntityId is null
+                   ? null
+                   : EntityType switch {
+                         nameof(ChargingStationOperator) => ChargingStationOperator_Id.TryParse(EntityId, out var operatorId)             && operatorId == Operator.Id                                                    ? Operator.Id.ToString()             : null,
+                         nameof(ChargingPool)            => ChargingPool_Id.           TryParse(EntityId, out var chargingPoolId)         && Operator.TryGetChargingPool        (chargingPoolId,         out var chargingPool)         ? chargingPool.        Id.ToString() : null,
+                         nameof(ChargingStation)         => ChargingStation_Id.        TryParse(EntityId, out var chargingStationId)      && Operator.TryGetChargingStation     (chargingStationId,      out var chargingStation)      ? chargingStation.     Id.ToString() : null,
+                         nameof(EVSE)                    => EVSE_Id.                   TryParse(EntityId, out var evseId)                 && Operator.TryGetEVSE                (evseId,                 out var evse)                 ? evse.                Id.ToString() : null,
+                         nameof(ChargingTariff)          => ChargingTariff_Id.         TryParse(EntityId, out var chargingTariffId)       && Operator.TryGetChargingTariff      (chargingTariffId,       out var chargingTariff)       ? chargingTariff.      Id.ToString() : null,
+                         nameof(EVSEGroup)               => EVSEGroup_Id.              TryParse(EntityId, out var evseGroupId)            && Operator.TryGetEVSEGroup           (evseGroupId,            out var evseGroup)            ? evseGroup.           Id.ToString() : null,
+                         nameof(ChargingStationGroup)    => ChargingStationGroup_Id.   TryParse(EntityId, out var chargingStationGroupId) && Operator.TryGetChargingStationGroup(chargingStationGroupId, out var chargingStationGroup) ? chargingStationGroup.Id.ToString() : null,
+                         nameof(ChargingPoolGroup)       => ChargingPoolGroup_Id.      TryParse(EntityId, out var chargingPoolGroupId)    && Operator.TryGetChargingPoolGroup   (chargingPoolGroupId,    out var chargingPoolGroup)    ? chargingPoolGroup.   Id.ToString() : null,
+                         nameof(ChargingTariffGroup)     => ChargingTariffGroup_Id.    TryParse(EntityId, out var chargingTariffGroupId)  && Operator.TryGetChargingTariffGroup (chargingTariffGroupId,  out var chargingTariffGroup)  ? chargingTariffGroup. Id.ToString() : null,
+                         _                               => null
+                     };
 
         #endregion
 

@@ -240,6 +240,58 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Parking_is_found_in_every_spelling_of_its_identification()
+
+        /// <summary>
+        /// A change names a parking entity and its parking operator in any spelling their identification types
+        /// consider equal: garages, spaces and sensors without case, parking products with case.
+        /// The owner is found, and signs, in every such spelling, also of an entity added by the same change set.
+        /// </summary>
+        [Test]
+        public void Parking_is_found_in_every_spelling_of_its_identification()
+        {
+
+            var upper  = ParkingProduct_Id.Parse("ABC");
+            var lower  = ParkingProduct_Id.Parse("abc");
+            var sn2    = ParkingSensor_Id. Parse("sensor-2");
+
+            var rn1    = Apply(NewNetwork(),
+                               RoamingNetworkChange.Add(new ParkingProduct(upper, StopParkingAfterTime: TimeSpan.FromHours(1)), PAR),
+                               RoamingNetworkChange.Add(new ParkingProduct(lower, StopParkingAfterTime: TimeSpan.FromHours(2)), PAR));
+
+            var rn2    = Apply(rn1,
+                               RoamingNetworkChange.UpdateProperty("ParkingSpace",   "SPACE-1",   "parkingSensorIds",     null, new JArray("sensor-1")),
+                               RoamingNetworkChange.UpdateProperty("ParkingProduct", "abc",       "stopParkingAfterTime", null, 10800),
+                               RoamingNetworkChange.Add           ("ParkingSensor",  "sensor-2",  new ParkingSensor(sn2, Created: Created).ToJSON(), "ParkingOperator", "de*par"),
+                               RoamingNetworkChange.UpdateProperty("ParkingSensor",  "SENSOR-2",  "name",                 null, new JObject(new JProperty("en", "Sensor 2"))),
+                               RoamingNetworkChange.Remove        ("ParkingSpace",   "Space-2"));
+
+            var parking = rn2.ParkingOperators.Single();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(parking.TryGetParkingProduct(lower, out var changedLower),               Is.True);
+                Assert.That(changedLower!.StopParkingAfterTime,                                      Is.EqualTo(TimeSpan.FromHours(3)));
+                Assert.That(parking.TryGetParkingProduct(upper, out var unchangedUpper),             Is.True);
+                Assert.That(unchangedUpper!.StopParkingAfterTime,                                    Is.EqualTo(TimeSpan.FromHours(1)), "Not the product of the other case.");
+
+                Assert.That(rn2.TryGetParkingSpaceById(SP1, out var changedSP1),                     Is.True);
+                Assert.That(changedSP1!.LastChangeDate,                                              Is.EqualTo(T0));
+                Assert.That(rn2.TryGetParkingSpaceById(SP2, out _),                                  Is.False);
+                Assert.That(rn2.TryGetParkingSensorById(sn2, out var addedSensor),                   Is.True);
+                Assert.That(addedSensor!.Name[Languages.en],                                         Is.EqualTo("Sensor 2"));
+
+                // Another parking operator is still another one.
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.UpdateProperty("ParkingSpace", "SPACE-1", "parkingSensorIds", null, new JArray(), "ParkingOperator", "DE*XYZ")),
+                            Throws.ArgumentException.With.Message.Contains("belongs to ParkingOperator 'DE*PAR'"));
+
+            }
+
+        }
+
+        #endregion
+
         #region The_runtime_status_reaches_parking()
 
         [Test]

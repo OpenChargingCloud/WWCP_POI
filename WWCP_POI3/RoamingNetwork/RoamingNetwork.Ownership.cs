@@ -248,8 +248,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Every change needs one of its owners
 
-            // Parking entities added by an earlier change of this change set, by their parking operator.
-            var addedParking = new Dictionary<(String, String), String>();
+            // Parking entities added by an earlier change of this change set, by their parking operator;
+            // keyed by their typed identifications, so that a later change may name them in another spelling.
+            var addedParking = new Dictionary<(String, Object), String>();
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
             {
@@ -292,7 +293,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The parties and kinds of keys of which one must sign the given change.
         /// </summary>
         private Boolean TryGetOwners(RoamingNetworkChange                                    Change,
-                                     Dictionary<(String, String), String>                    AddedParking,
+                                     Dictionary<(String, Object), String>                    AddedParking,
                                      [NotNullWhen(true)]  out (POIPartyId, POIKeyKind)[]?    Owners,
                                      [NotNullWhen(false)] out String?                        ErrorResponse)
         {
@@ -380,6 +381,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (IsParking(Change.EntityType))
             {
 
+                if (ParkingId(Change.EntityType, Change.EntityId) is not Object parkingId)
+                {
+                    ErrorResponse = $"invalid {Change.EntityType} identification '{Change.EntityId}'!";
+                    return false;
+                }
+
                 String? parkingOperatorId = null;
 
                 if (Change.Kind == RoamingNetworkChangeKind.Add)
@@ -391,13 +398,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                    parkingOperatorId = Change.ParentEntityId;
-                    AddedParking[(Change.EntityType, Change.EntityId)] = parkingOperatorId;
+                    // The parking operator as the keys of the parties name it.
+                    parkingOperatorId = ParkingOperator_Id.TryParse(Change.ParentEntityId, out var parentId) &&
+                                        parkingOperators.TryGetValue(parentId, out var parent)
+                                            ? parent.Id.ToString()
+                                            : Change.ParentEntityId;
+
+                    AddedParking[(Change.EntityType, parkingId)] = parkingOperatorId;
 
                 }
 
-                else if (!AddedParking.TryGetValue((Change.EntityType, Change.EntityId), out parkingOperatorId))
-                    parkingOperatorId = parkingOperators.Values.FirstOrDefault(parkingOperator => ParkingIds(parkingOperator, Change.EntityType).Contains(Change.EntityId))?.Id.ToString();
+                else if (!AddedParking.TryGetValue((Change.EntityType, parkingId), out parkingOperatorId))
+                    parkingOperatorId = parkingOperators.Values.FirstOrDefault(parkingOperator => ParkingStoredId(parkingOperator, Change.EntityType, Change.EntityId) is not null)?.Id.ToString();
 
                 if (parkingOperatorId is null)
                 {
@@ -416,24 +428,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return false;
 
         }
-
-        #endregion
-
-        #region (private static) ParkingIds(ParkingOperator, EntityType)
-
-        /// <summary>
-        /// The identifications of the parking entities of the given type of the given parking operator.
-        /// </summary>
-        private static IEnumerable<String> ParkingIds(ParkingOperator  ParkingOperator,
-                                                      String           EntityType)
-
-            => EntityType switch {
-                   nameof(ParkingGarage)      => ParkingOperator.ParkingGarages.    Select(parkingGarage     => parkingGarage.    Id.ToString()),
-                   nameof(ParkingSpace)       => ParkingOperator.ParkingSpaces.     Select(parkingSpace      => parkingSpace.     Id.ToString()),
-                   nameof(ParkingSensor)      => ParkingOperator.ParkingSensors.    Select(parkingSensor     => parkingSensor.    Id.ToString()),
-                   nameof(ParkingSpaceGroup)  => ParkingOperator.ParkingSpaceGroups.Select(parkingSpaceGroup => parkingSpaceGroup.Id.ToString()),
-                   _                          => ParkingOperator.ParkingProducts.   Select(parkingProduct    => parkingProduct.   Id.ToString())
-               };
 
         #endregion
 

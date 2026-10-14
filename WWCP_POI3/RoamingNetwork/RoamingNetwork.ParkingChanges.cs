@@ -128,6 +128,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private static) ParkingId(EntityType, EntityId)
+
+        /// <summary>
+        /// The identification of the given parking entity type the given text names, compared as its type compares it;
+        /// null for an invalid one.
+        /// </summary>
+        private static Object? ParkingId(String  EntityType,
+                                         String  EntityId)
+
+            => EntityType switch {
+                   nameof(ParkingGarage)      => ParkingGarage_Id.    TryParse(EntityId, out var garageId)  ? garageId  : null,
+                   nameof(ParkingSpace)       => ParkingSpace_Id.     TryParse(EntityId, out var spaceId)   ? spaceId   : null,
+                   nameof(ParkingSensor)      => ParkingSensor_Id.    TryParse(EntityId, out var sensorId)  ? sensorId  : null,
+                   nameof(ParkingSpaceGroup)  => ParkingSpaceGroup_Id.TryParse(EntityId, out var groupId)   ? groupId   : null,
+                   nameof(ParkingProduct)     => ParkingProduct_Id.   TryParse(EntityId, out var productId) ? productId : null,
+                   _                          => null
+               };
+
+        #endregion
+
+        #region (private static) ParkingStoredId(ParkingOperator, EntityType, EntityId)
+
+        /// <summary>
+        /// The identification the given parking operator keeps the named parking entity with, as its JSON writes it.
+        /// Identifications are equal as their types compare them, not as texts.
+        /// Null for an invalid identification or an entity the parking operator does not have.
+        /// </summary>
+        private static String? ParkingStoredId(ParkingOperator  ParkingOperator,
+                                               String           EntityType,
+                                               String           EntityId)
+
+            => EntityType switch {
+                   nameof(ParkingGarage)      => ParkingGarage_Id.    TryParse(EntityId, out var garageId)  && ParkingOperator.TryGetParkingGarage    (garageId,  out var garage)  ? garage. Id.ToString() : null,
+                   nameof(ParkingSpace)       => ParkingSpace_Id.     TryParse(EntityId, out var spaceId)   && ParkingOperator.TryGetParkingSpace     (spaceId,   out var space)   ? space.  Id.ToString() : null,
+                   nameof(ParkingSensor)      => ParkingSensor_Id.    TryParse(EntityId, out var sensorId)  && ParkingOperator.TryGetParkingSensor    (sensorId,  out var sensor)  ? sensor. Id.ToString() : null,
+                   nameof(ParkingSpaceGroup)  => ParkingSpaceGroup_Id.TryParse(EntityId, out var groupId)   && ParkingOperator.TryGetParkingSpaceGroup(groupId,   out var group)   ? group.  Id.ToString() : null,
+                   nameof(ParkingProduct)     => ParkingProduct_Id.   TryParse(EntityId, out var productId) && ParkingOperator.TryGetParkingProduct   (productId, out var product) ? product.Id.ToString() : null,
+                   _                          => null
+               };
+
+        #endregion
+
         #region (private static) TryApplyParkingChange(Change, Index, CreatedAt, ParkingOperators, out CurrentValue, out ErrorResponse)
 
         /// <summary>
@@ -158,21 +200,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region The parking operator: the one having it, or the parent of a new one
 
-            Func<ParkingOperator, Boolean>? owns = Change.EntityType switch {
-                nameof(ParkingGarage)  => ParkingGarage_Id.TryParse(entityId, out var garageId) ? parkingOperator => parkingOperator.TryGetParkingGarage(garageId, out _) : null,
-                nameof(ParkingSpace)   => ParkingSpace_Id. TryParse(entityId, out var spaceId)  ? parkingOperator => parkingOperator.TryGetParkingSpace (spaceId,  out _) : null,
-                nameof(ParkingSpaceGroup) => ParkingSpaceGroup_Id.TryParse(entityId, out var groupId) ? parkingOperator => parkingOperator.TryGetParkingSpaceGroup(groupId, out _) : null,
-                nameof(ParkingProduct)    => ParkingProduct_Id.   TryParse(entityId, out var productId) ? parkingOperator => parkingOperator.TryGetParkingProduct(productId, out _) : null,
-                _                      => ParkingSensor_Id.TryParse(entityId, out var sensorId) ? parkingOperator => parkingOperator.TryGetParkingSensor(sensorId, out _) : null
-            };
-
-            if (owns is null)
+            if (ParkingId(Change.EntityType, entityId) is null)
             {
                 ErrorResponse = $"Change {Index}: invalid {description} identification '{entityId}'!";
                 return false;
             }
 
-            var owner = ParkingOperators.Values.FirstOrDefault(owns);
+            var owner = ParkingOperators.Values.FirstOrDefault(parkingOperator => ParkingStoredId(parkingOperator, Change.EntityType, entityId) is not null);
 
             if (Change.Kind == RoamingNetworkChangeKind.Add)
             {
@@ -203,7 +237,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 if (Change.ParentEntityType is not null &&
-                   (Change.ParentEntityType != nameof(ParkingOperator) || Change.ParentEntityId != owner.Id.ToString()))
+                   (Change.ParentEntityType != nameof(ParkingOperator)                         ||
+                    !ParkingOperator_Id.TryParse(Change.ParentEntityId ?? "", out var namedParentId) ||
+                    namedParentId != owner.Id))
                 {
                     ErrorResponse = $"Change {Index}: the {description} '{entityId}' belongs to ParkingOperator '{owner.Id}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
                     return false;
@@ -213,10 +249,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var operatorJSON  = owner.ToJSON();
             var children      = operatorJSON[arrayName] as JArray;
-            // Identifications compare without case sensitivity.
+            // Found under the identification it is kept with: the change may name it in every spelling
+            // its identification type considers equal, e.g. without case for garages, with case for products.
+            var storedId      = ParkingStoredId(owner, Change.EntityType, entityId);
             var entityJSON    = Change.Kind == RoamingNetworkChangeKind.Add
                                     ? null
-                                    : children?.OfType<JObject>().FirstOrDefault(child => String.Equals(child["@id"]?.Value<String>(), entityId, StringComparison.OrdinalIgnoreCase));
+                                    : children?.OfType<JObject>().FirstOrDefault(child => child["@id"]?.Value<String>() == storedId);
 
             #endregion
 
