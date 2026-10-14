@@ -9,7 +9,8 @@ not embedded in it.
 It owns its own properties and all its parking data, and signs their changes with one of its `signingKeys`;
 it rotates its `signingKeys` with one of them, or with one of its `identityKeys` when none of them can sign any more,
 and its `identityKeys` only with one of those; for recovery, an identity key of the roaming network operator (RNO)
-changes both. The RNO adds and removes it, without its parking data. Its identification is a free text,
+changes both. The RNO adds it without its parking data, and removes it with all of it, without its signature: the RNO
+decides who is a member of the roaming network. Its identification is a free text,
 compared case-insensitively, e.g. `DE*PRK`, unique within the roaming network.
 
 | | |

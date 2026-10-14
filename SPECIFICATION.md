@@ -131,7 +131,8 @@ its `createdAt`: a signing key for data; for the `signingKeys` of a party one of
 or one of its identity keys; for its `identityKeys` one of its identity keys. For recovery, an
 identity key of the RNO also counts for both kinds of keys of every other party. Every signature
 MUST be by a key of a party. A party is added with at least one key of each kind and without
-embedded children, and keeps at least one of each.
+embedded children, and keeps at least one of each. The RNO decides who is a member: removing a
+party removes everything it embeds, and needs no signature of the party.
 
 Nobody can replace the identity keys of the RNO once they are lost or expired. An RNO SHOULD name
 at least two identity keys with different `notAfter`, and SHOULD replace an identity key before it

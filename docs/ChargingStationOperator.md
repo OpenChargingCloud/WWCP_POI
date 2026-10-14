@@ -198,6 +198,9 @@ Each key:
   is applied to.
 - **Add:** the RNO adds the operator with at least one key of each kind and without charging pools, tariffs or
   groups: those are the operator's own to add.
+- **Remove:** the RNO removes the operator with its pools, stations, EVSEs, tariffs and groups, with one of its
+  signing keys and without the operator's signature: the RNO decides who is a member of the roaming network.
+  The history keeps the versions before.
 - **Change:** `signingKeys` are rotated with a signature by one of the operator's current signing keys or, when none
   of them can sign any more, one of its identity keys; `identityKeys` only with one of its identity keys. For recovery,
   an identity key of the RNO changes both. Never removed or emptied: at least one key of each kind stays.

@@ -75,7 +75,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// a signing key for data and for the signing keys of a party, an identity key for its identity keys.
     /// <list type="bullet">
     ///   <item>The roaming network operator (the keys of the roaming network) owns the roaming network itself, brands,
-    ///         manufacturers, energy meter manufacturers and transparency software, and adds and removes parties.</item>
+    ///         manufacturers, energy meter manufacturers and transparency software, and adds and removes parties:
+    ///         it decides who is a member, so removing a party removes all its data with it, without its signature.</item>
     ///   <item>A charging station operator, e-mobility provider, grid operator or parking operator owns its own properties,
     ///         a charging station operator its pools, stations, EVSEs, tariffs and groups, a parking operator its parking data.</item>
     ///   <item>The signing keys of a party are changed with one of its current signing keys, or with one of its identity

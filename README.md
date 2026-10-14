@@ -220,7 +220,9 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
   in the version it is applied to, valid at its `createdAt` (`TryCheckOwnership`); every signature must be one of
   a key of a party. Nobody else's signature counts, there is no external trust configuration.
   - The **RNO** owns the roaming network itself, brands, manufacturers, energy meter manufacturers and
-    transparency software, and adds and removes parties: with their keys, without their children.
+    transparency software, and adds and removes parties: with their keys, without their children. The RNO decides
+    who is a member: removing a party removes all its data with it, without the party's signature; the history
+    keeps the versions before.
   - A **charging station operator** owns its properties, pools, stations, EVSEs, tariffs and groups,
     named by their ids; a **parking operator** its parking data; e-mobility providers and grid operators their properties.
   - Data is signed with a signing key. The `signingKeys` of a party are rotated with one of its current signing

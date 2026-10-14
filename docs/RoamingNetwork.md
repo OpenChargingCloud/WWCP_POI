@@ -286,7 +286,9 @@ A change set must be signed by the owner of each of its changes ([../README.md](
 - A party is added with at least one `signingKeys` and one `identityKeys` entry, and without embedded children
   (`chargingPools`, `chargingTariffs`, the four group arrays; `parkingGarages`, `parkingSpaces`, `parkingSensors`,
   `parkingSpaceGroups`, `parkingProducts`): they are its own to add. Its other properties it changes itself.
-- Removing a party removes it with everything it embeds, unless something remaining still names part of it.
+- Removing a party removes it with everything it embeds, unless something remaining still names part of it. This
+  is intended: the RNO decides who is a member of the roaming network, also without the party's consent, e.g. when
+  its contract ended; its data goes with it. The history keeps the versions before.
 - A change of the network itself names `entityType` `RoamingNetwork` and its `@id`, without a parent; a registry
   entry or party may name the network as its parent, no other one.
 - `Add` sets `created` (unless given) and `lastChange` to the change set's `createdAt` for entities with timestamps;
