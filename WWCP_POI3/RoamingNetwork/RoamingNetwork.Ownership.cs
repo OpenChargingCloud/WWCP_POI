@@ -56,6 +56,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              String  EntityId)
     {
 
+        /// <summary>
+        /// { "entityType", "entityId" }.
+        /// </summary>
+        public JObject ToJSON()
+
+            => new (
+                   new JProperty("entityType",  EntityType),
+                   new JProperty("entityId",    EntityId)
+               );
+
+        /// <summary>
+        /// Try to parse { "entityType", "entityId" }.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="PartyId">The parsed party identification.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public static Boolean TryParse(JToken                            JSON,
+                                       out POIPartyId                    PartyId,
+                                       [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            PartyId = default;
+
+            if (JSON is not JObject json                                                                         ||
+                json["entityType"] is not JValue { Type: JTokenType.String } entityType                         ||
+                json["entityId"]   is not JValue { Type: JTokenType.String } entityId                           ||
+                json.Count != 2                                                                                  ||
+                String.IsNullOrWhiteSpace(entityType.Value<String>())                                            ||
+                String.IsNullOrWhiteSpace(entityId.  Value<String>()))
+            {
+                ErrorResponse = "A party must be { \"entityType\", \"entityId\" }!";
+                return false;
+            }
+
+            PartyId        = new POIPartyId(entityType.Value<String>()!, entityId.Value<String>()!);
+            ErrorResponse  = null;
+            return true;
+
+        }
+
         /// <inheritdoc/>
         public override String ToString()
 
@@ -79,6 +119,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///         it decides who is a member, so removing a party removes all its data with it, without its signature.</item>
     ///   <item>A charging station operator, e-mobility provider, grid operator or parking operator owns its own properties,
     ///         a charging station operator its pools, stations, EVSEs, tariffs and groups, a parking operator its parking data.</item>
+    ///   <item>A grid connection point is owned by its maintainer: its grid operator, or the charging station operator or
+    ///         parking operator its maintainedBy names. One of them adds it, with the maintainer it names, or its grid operator.
+    ///         Its maintainedBy is changed by its grid operator, taking it over or handing it on, by its maintainer,
+    ///         handing it on, or by an identity key of the roaming network operator.</item>
+    ///   <item>A grid operator may be added without keys: it does not take part. Then the roaming network operator signs
+    ///         in its place, until it gets keys from an identity key of the roaming network operator.</item>
     ///   <item>The signing keys of a party are changed with one of its current signing keys, or with one of its identity
     ///         keys when none of them can sign any more; its identity keys only with one of its identity keys.
     ///         For recovery, an identity key of the roaming network operator changes both kinds of keys of every other party.
@@ -107,7 +153,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly Dictionary<String, String[]> PartyChildren = new () {
             { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups" ] },
             { nameof(EMobilityProvider),       [] },
-            { nameof(GridOperator),            [] },
+            { nameof(GridOperator),            [ "gridConnectionPoints" ] },
             { nameof(ParkingOperator),         [ "parkingGarages", "parkingSpaces", "parkingSensors", "parkingSpaceGroups", "parkingProducts" ] }
         };
 
@@ -268,12 +314,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // keyed by their typed identifications, so that a later change may name them in another spelling.
             var addedParking = new Dictionary<(String, Object), String>();
 
+            // Grid connection points added by an earlier change of this change set: their grid operator and maintainer.
+            var addedGridConnectionPoints = new Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>();
+
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
             {
 
                 var change = ChangeSet.Changes[index];
 
-                if (!TryGetOwners(change, addedParking, out var owners, out ErrorResponse))
+                if (!TryGetOwners(change, addedParking, addedGridConnectionPoints, out var owners, out ErrorResponse))
                 {
                     ErrorResponse = $"Change {index}: {ErrorResponse}";
                     return false;
@@ -303,15 +352,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryGetOwners(Change, AddedParking, out Owners, out ErrorResponse)
+        #region (private) PartyIdOf(PartyId)
+
+        /// <summary>
+        /// The given party as the keys of the parties name it: a party may be named in every spelling
+        /// its identification type considers equal.
+        /// </summary>
+        private POIPartyId PartyIdOf(POIPartyId PartyId)
+
+            => TryGetParty(PartyId, out var party)
+                   ? Parties.First(knownParty => ReferenceEquals(knownParty.Party, party)).Id
+                   : PartyId;
+
+        #endregion
+
+        #region (private) SignerOf(PartyId)
+
+        /// <summary>
+        /// Who signs the data of the given party: the party with a signing key, or the roaming network operator
+        /// in the place of a party of this version without signing keys, e.g. a grid operator not taking part.
+        /// </summary>
+        private (POIPartyId, POIKeyKind) SignerOf(POIPartyId PartyId)
+
+            => TryGetParty(PartyId, out var party) && party.SigningKeys.IsDefaultOrEmpty && PartyId.EntityType != nameof(RoamingNetwork)
+                   ? (new POIPartyId(nameof(RoamingNetwork), Id.ToString()), POIKeyKind.Signing)
+                   : (PartyIdOf(PartyId), POIKeyKind.Signing);
+
+        #endregion
+
+        #region (private) TryGetOwners(Change, AddedParking, AddedGridConnectionPoints, out Owners, out ErrorResponse)
 
         /// <summary>
         /// The parties and kinds of keys of which one must sign the given change.
         /// </summary>
-        private Boolean TryGetOwners(RoamingNetworkChange                                    Change,
-                                     Dictionary<(String, Object), String>                    AddedParking,
-                                     [NotNullWhen(true)]  out (POIPartyId, POIKeyKind)[]?    Owners,
-                                     [NotNullWhen(false)] out String?                        ErrorResponse)
+        private Boolean TryGetOwners(RoamingNetworkChange                                                                    Change,
+                                     Dictionary<(String, Object), String>                                                    AddedParking,
+                                     Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>  AddedGridConnectionPoints,
+                                     [NotNullWhen(true)]  out (POIPartyId, POIKeyKind)[]?                                    Owners,
+                                     [NotNullWhen(false)] out String?                                                        ErrorResponse)
         {
 
             Owners         = null;
@@ -350,7 +428,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    ? [ (party, POIKeyKind.Signing), (party, POIKeyKind.Identity), (roamingNetworkOperator, POIKeyKind.Identity) ]
                                    : POIPartyKeys.IsKeyProperty(Change.PropertyName)
                                          ? [ (party, POIKeyKind.Identity), (roamingNetworkOperator, POIKeyKind.Identity) ]
-                                         : [ (party, POIKeyKind.Signing) ];
+                                         : [ SignerOf(party) ];
 
                 return true;
 
@@ -395,6 +473,74 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 Owners = [ (new POIPartyId(nameof(ChargingStationOperator), operatorId.Value.ToString()), POIKeyKind.Signing) ];
+                return true;
+
+            }
+
+            #endregion
+
+            #region The grid connection points of a grid operator, by their maintainers
+
+            if (Change.EntityType == nameof(GridConnectionPoint))
+            {
+
+                if (!GridConnectionPoint_Id.TryParse(Change.EntityId, out var gridConnectionPointId))
+                {
+                    ErrorResponse = $"invalid {Change.EntityType} identification '{Change.EntityId}'!";
+                    return false;
+                }
+
+                if (Change.Kind == RoamingNetworkChangeKind.Add)
+                {
+
+                    if (Change.ParentEntityType != nameof(GridOperator) || Change.ParentEntityId is null)
+                    {
+                        ErrorResponse = $"adding the {Change.EntityType} '{Change.EntityId}' needs its GridOperator as its parent!";
+                        return false;
+                    }
+
+                    var gridOperatorParty  = PartyIdOf(new POIPartyId(nameof(GridOperator), Change.ParentEntityId));
+
+                    // An invalid maintainer is refused when the change is applied.
+                    var newMaintainer      = Change.NewValue is JObject newPoint &&
+                                             newPoint[MaintainedByProperty] is JToken maintainedByJSON &&
+                                             POIPartyId.TryParse(maintainedByJSON, out var namedMaintainer, out _)
+                                                 ? PartyIdOf(namedMaintainer)
+                                                 : gridOperatorParty;
+
+                    AddedGridConnectionPoints[gridConnectionPointId] = (gridOperatorParty, newMaintainer);
+
+                    // Added by the maintainer it names, or by its grid operator.
+                    Owners = [ .. new[] { SignerOf(newMaintainer), SignerOf(gridOperatorParty) }.Distinct() ];
+                    return true;
+
+                }
+
+                POIPartyId gridOperatorId;
+                POIPartyId maintainer;
+
+                if (AddedGridConnectionPoints.TryGetValue(gridConnectionPointId, out var added))
+                    (gridOperatorId, maintainer) = added;
+
+                else if (TryGetGridConnectionPoint(gridConnectionPointId, out var gridOperator, out var gridConnectionPoint))
+                {
+                    gridOperatorId  = PartyIdOf(new POIPartyId(nameof(GridOperator), gridOperator.Id.ToString()));
+                    maintainer      = gridConnectionPoint.MaintainedBy is POIPartyId maintainedBy
+                                          ? PartyIdOf(maintainedBy)
+                                          : gridOperatorId;
+                }
+
+                else
+                {
+                    ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' belongs to no grid operator!";
+                    return false;
+                }
+
+                // Taken over or handed on by its grid operator, handed on by its maintainer, or reassigned by the roaming network operator.
+                Owners = isProperty && Change.PropertyName == MaintainedByProperty
+                             ? [ .. new[] { SignerOf(gridOperatorId), (maintainer, POIKeyKind.Signing), (roamingNetworkOperator, POIKeyKind.Identity) }.Distinct() ]
+                             : [ SignerOf(maintainer) ];
+
                 return true;
 
             }
@@ -479,12 +625,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Change.NewValue is not JObject newParty)
                     return true;
 
-                foreach (var keysProperty in new[] { POIPartyKeys.SigningKeysProperty, POIPartyKeys.IdentityKeysProperty })
-                    if (newParty[keysProperty] is not JArray { Count: > 0 })
-                    {
-                        ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' must be added with its {keysProperty}!";
-                        return false;
-                    }
+                // A grid operator not taking part is added without any keys.
+                var withoutKeys = Change.EntityType == nameof(GridOperator) &&
+                                  newParty[POIPartyKeys.SigningKeysProperty]  is null &&
+                                  newParty[POIPartyKeys.IdentityKeysProperty] is null;
+
+                if (!withoutKeys)
+                    foreach (var keysProperty in new[] { POIPartyKeys.SigningKeysProperty, POIPartyKeys.IdentityKeysProperty })
+                        if (newParty[keysProperty] is not JArray { Count: > 0 })
+                        {
+                            ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' must be added with its {keysProperty}!";
+                            return false;
+                        }
 
                 if (PartyChildren.TryGetValue(Change.EntityType, out var children) &&
                     children.FirstOrDefault(child => newParty[child] is JArray { Count: > 0 }) is String child)

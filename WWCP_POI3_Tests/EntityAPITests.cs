@@ -131,7 +131,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                                                        Created: Created) ],
                     GridOperators:             [ new GridOperator(NET,
                                                                   I18NString.Create(Languages.en, "Example Netz"),
-                                                                  Created: Created),
+                                                                  GridConnectionPoints:  [ new GridConnectionPoint(GCP, VoltageLevel: GridVoltageLevel.LowVoltage) ],
+                                                                  Created:               Created),
                                                  new GridOperator(NET2,
                                                                   I18NString.Create(Languages.en, "Other Netz"),
                                                                   Created: Created) ],
@@ -139,11 +140,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                                                              I18NString.Create(Languages.en, "GraphDefined"),
                                                                              Created:        Created,
                                                                              ChargingPools:  [ new ChargingPool(P1,
-                                                                                                                Created:              Created,
-                                                                                                                GridConnectionPoint:  new GridConnectionPoint(GCP,
-                                                                                                                                                              NET,
-                                                                                                                                                              VoltageLevel:  GridVoltageLevel.LowVoltage),
-                                                                                                                ChargingStations:     [ new ChargingStation(S1,
+                                                                                                                Created:                Created,
+                                                                                                                GridConnectionPointId:  GCP,
+                                                                                                                ChargingStations:       [ new ChargingStation(S1,
                                                                                                                                                             Created:  Created,
                                                                                                                                                             EVSEs:    [ new EVSE(E1, Created: Created) ]) ]) ]) ]).WithKeys();
 
@@ -316,6 +315,44 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                     Assert.That(list.All(entry => ((JObject) entry).Properties().All(property => property.Name is "@id" or "name" or "description")),  Is.True, path);
                     Assert.That(unknown.StatusCode,                                  Is.EqualTo(HttpStatusCode.NotFound), path);
                 }
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_charging_pool_embeds_its_grid_connection_point_on_request()
+
+        [Test]
+        public async Task A_charging_pool_embeds_its_grid_connection_point_on_request()
+        {
+
+            var (named,    namedContent)     = await Send(HttpMethod.Get, CP);
+            var (expanded, expandedContent)  = await Send(HttpMethod.Get, CP + "?expand=gridConnectionPoint");
+            var (unknown,  _)                = await Send(HttpMethod.Get, CP + "?expand=chargingStations");
+
+            var namedJSON     = ParseJSON(namedContent);
+            var expandedJSON  = ParseJSON(expandedContent);
+            var point         = expandedJSON["gridConnectionPoint"] as JObject;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(namedJSON["gridConnectionPointId"]!.Value<String>(),      Is.EqualTo("connection-42"));
+                Assert.That(namedJSON["gridConnectionPoint"],                          Is.Null);
+
+                Assert.That(expanded.StatusCode,                                       Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(expandedJSON["gridConnectionPointId"],                     Is.Null);
+                Assert.That(point?["@id"]?.Value<String>(),                            Is.EqualTo("connection-42"));
+                Assert.That(point?["gridOperatorId"]?.Value<String>(),                 Is.EqualTo("DE*NET"));
+                Assert.That(point?["voltageLevel"]?.Value<String>(),                   Is.EqualTo("LowVoltage"));
+
+                // Another representation: its own ETag, of its own content.
+                Assert.That(HeaderOf(expanded, "ETag"),                                Is.EqualTo(ETagOf("json", expandedContent)));
+                Assert.That(HeaderOf(expanded, "ETag"),                                Is.Not.EqualTo(HeaderOf(named, "ETag")));
+
+                Assert.That(unknown.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
 
             }
 

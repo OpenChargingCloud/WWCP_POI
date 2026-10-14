@@ -17,6 +17,9 @@ flowchart TD
     RoamingNetwork --> EMobilityProvider
     RoamingNetwork --> GridOperator
     RoamingNetwork --> ParkingOperator
+    GridOperator --> GridConnectionPoint
+    GridConnectionPoint --> EnergyMeter
+    ChargingPool -. gridConnectionPointId .-> GridConnectionPoint
     ChargingStationOperator --> ChargingPool
     ChargingStationOperator --> ChargingTariff
     ChargingStationOperator --> Groups["EVSEGroup, ChargingStationGroup,<br/>ChargingPoolGroup, ChargingTariffGroup"]
@@ -43,10 +46,10 @@ flowchart TD
 | [ChargingStationGroup](ChargingStationGroup.md) | operator, `chargingStationGroups` | its operator | Charging stations of the operator, optionally with a common tariff. |
 | [ChargingPoolGroup](ChargingPoolGroup.md) | operator, `chargingPoolGroups` | its operator | Charging pools of the operator, optionally with a common tariff. |
 | [ChargingTariffGroup](ChargingTariffGroup.md) | operator, `chargingTariffGroups` | its operator | Charging tariffs of the operator. |
-| [EnergyMeter](EnergyMeter.md) | pool, grid connection point, station, EVSE | whoever owns what embeds it | A meter with its role, manufacturer, model, versions and transparency software. |
+| [EnergyMeter](EnergyMeter.md) | pool, grid connection point, station, EVSE | whoever owns or maintains what embeds it | A meter with its role, manufacturer, model, versions and transparency software. |
 | [ChargingStationManufacturer](ChargingStationManufacturer.md) | roaming network, `chargingStationManufacturers` | RNO | A maker of charging stations, named by stations' `manufacturerId`. |
 | [EMobilityProvider](EMobilityProvider.md) | roaming network, `eMobilityProviders` | the provider; added and removed by the RNO | An EMSP, with its keys. |
-| [GridOperator](GridOperator.md) | roaming network, `gridOperators` | the grid operator; added and removed by the RNO | A DSO, named by grid connection points, with its keys. |
+| [GridOperator](GridOperator.md) | roaming network, `gridOperators` | the grid operator, or the RNO while it has no keys; added and removed by the RNO | A DSO with its grid connection points, each signed by its maintainer. |
 | [ParkingOperator](ParkingOperator.md) | roaming network, `parkingOperators` | the parking operator; added and removed by the RNO | Runs garages, spaces and sensors and offers parking products. |
 | [ParkingGarage](ParkingGarage.md) | parking operator, `parkingGarages` | its parking operator | A car park with opening times, images and products. |
 | [ParkingSpace](ParkingSpace.md) | parking operator, `parkingSpaces` | its parking operator | One parking space, possibly in a garage, with sensors and charging stations. |
@@ -62,7 +65,8 @@ status and no file here:
 | Signing and identity keys | [RoamingNetwork](RoamingNetwork.md), and each party: [ChargingStationOperator](ChargingStationOperator.md), [EMobilityProvider](EMobilityProvider.md), [GridOperator](GridOperator.md), [ParkingOperator](ParkingOperator.md) |
 | Data licenses | [RoamingNetwork](RoamingNetwork.md), [ChargingStationOperator](ChargingStationOperator.md), [ChargingPool](ChargingPool.md) |
 | Logos, contact data | [ChargingStationOperator](ChargingStationOperator.md) |
-| Grid connection point, authentication modes, opening times, energy mix, images, related locations | [ChargingPool](ChargingPool.md) |
+| Grid connection points and their maintainers | [GridOperator](GridOperator.md) |
+| Authentication modes, opening times, energy mix, images, related locations | [ChargingPool](ChargingPool.md) |
 | Charging connectors | [EVSE](EVSE.md) |
 | Tariff elements, price components, restrictions | [ChargingTariff](ChargingTariff.md) |
 | Transparency software status | [EnergyMeter](EnergyMeter.md) |

@@ -31,7 +31,7 @@ A version of a roaming network is identified by its **content**: its JSON repres
   (`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork`), `@id`, `name`, `description`,
   `dataSource`, `dataLicenses`, every embedded entity completely (operators with their pools,
   stations, EVSEs, connectors, energy meters, tariffs and groups; manufacturers, e-mobility
-  providers, grid operators, parking operators, brands, energy meter manufacturers, transparency
+  providers, grid operators with their grid connection points, parking operators, brands, energy meter manufacturers, transparency
   software releases and certificates), the `signingKeys` and `identityKeys` of the roaming network
   and of its parties, `created`, `lastChange` and `customData`.
 - **Excluded:** `eTags`; the runtime status (admin status, status, energy status); the local
@@ -84,6 +84,12 @@ A change set leads from the version of its `beforeETags` to the version of its `
   "beforeETags": [ … ], "afterETags": [ … ], "signatures": [ … ] }
 ```
 
+**Timestamps:** a change set sets `lastChange` to its `createdAt`: of the roaming network always; of an entity
+when it is added (and `created`, unless given) or when one of its own properties changes; not when only an entity
+it embeds changes. `lastChange` therefore does not tell when anything below an entity last changed: its
+representation, and so its ETag, changes with everything it embeds, and the history tells what changed.
+Grid connection points, brands and parking products have no timestamps.
+
 **Signatures** (profile `wwcp-poi-changeset-json-v3`) of the owners of what it changes
 (section 4.1): `{ algorithm, keyId, value, profile, encoding: "base64" }`.
 The signature input is the canonical JSON of
@@ -112,7 +118,8 @@ A **key** of a party is a public COSE key in its static data:
 A reader MUST calculate the thumbprint and refuse a key whose `@id` differs, and a key with
 private parts. The roaming network (for its operator, the RNO), charging station operators,
 e-mobility providers, grid operators and parking operators each name 1..n `signingKeys`, e.g.
-secp256r1, and 1..n `identityKeys`, e.g. secp521r1; a key is not both. The `keyId` of a
+secp256r1, and 1..n `identityKeys`, e.g. secp521r1; a key is not both. A grid operator not taking
+part names neither. The `keyId` of a
 signature is the `@id` of the key.
 
 Every change has exactly one **owner**:
@@ -121,17 +128,23 @@ Every change has exactly one **owner**:
 |---|---|
 | the roaming network itself, brands, charging station and energy meter manufacturers, transparency software releases and certificates | the RNO |
 | `Add` and `Remove` of a charging station operator, e-mobility provider, grid operator or parking operator | the RNO |
-| the other properties of such a party | the party |
+| the other properties of such a party | the party; the RNO for a party without signing keys |
 | pools, stations, EVSEs, tariffs and groups | the charging station operator their identification names |
 | parking garages, spaces, sensors, space groups and products | their parking operator (the parent of an `Add`) |
+| a grid connection point | its maintainer: the party its `maintainedBy` names, else its grid operator; an `Add` also its grid operator |
+| `maintainedBy` of a grid connection point | its grid operator, its maintainer, or an identity key of the RNO |
+
+"Its grid operator" signs with its signing key, or the RNO in its place while it has none. A
+grid connection point's `maintainedBy` names a charging station operator or parking operator of
+the network; its identification is unique within the network.
 
 A change set MUST be refused unless, for every owner of one of its changes, it has a valid
 signature with a key that owner names **in the version the change set is applied to**, valid at
 its `createdAt`: a signing key for data; for the `signingKeys` of a party one of its signing keys
 or one of its identity keys; for its `identityKeys` one of its identity keys. For recovery, an
 identity key of the RNO also counts for both kinds of keys of every other party. Every signature
-MUST be by a key of a party. A party is added with at least one key of each kind and without
-embedded children, and keeps at least one of each. The RNO decides who is a member: removing a
+MUST be by a key of a party. A party is added with at least one key of each kind, a grid operator
+also with none, and without embedded children, and keeps at least one of each once it has them. The RNO decides who is a member: removing a
 party removes everything it embeds, and needs no signature of the party.
 
 Nobody can replace the identity keys of the RNO once they are lost or expired. An RNO SHOULD name
@@ -301,4 +314,5 @@ uGmXUXrvziqRwcQIDE5C7ew7Rv1HPJ2vzqHwL+181Z7SWohOuOUEHvDWmrb7HaRyJxsbuFOsruTYOrTL
 
 ## 7. Open points
 
-- HTTP `ETag` and `If-None-Match` headers are not served yet.
+- The HTTP `ETag` of an entity is the SHA-256 of its canonical representation as the roaming network
+  embeds it; change sets still name only the ETags of whole versions, not of entities.

@@ -827,6 +827,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                 }
 
+                else if (change.EntityType == nameof(GridConnectionPoint))
+                {
+                    if (!TryApplyGridConnectionPointChange(change, index, gridOps, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
                 #endregion
 
                 #region Parking operators, parking garages, parking spaces and parking sensors
@@ -921,17 +927,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            // Every manufacturer a charging station names, and every grid operator a grid connection point names,
-            // must still be one of the network; energy meters must be unique within the network.
+            // Every manufacturer a charging station names, every grid connection point a charging pool names,
+            // and every maintainer of a grid connection point must still be one of the network;
+            // grid connection points and energy meters must be unique within the network.
+            var allEnergyMeters = AllEnergyMeters(operators.Values, gridOps.Values).ToArray();
+
             if ((UnknownManufacturer (operators.Values, manufacturers) ??
-                 UnknownGridOperator (operators.Values, gridOps)       ??
-                 DuplicateEnergyMeter(operators.Values)                ??
+                 DuplicateGridConnectionPoint(gridOps.Values)          ??
+                 UnknownGridConnectionPoint(operators.Values, gridOps.Values) ??
+                 UnknownMaintainer(gridOps.Values, operators, parkingOps) ??
+                 DuplicateEnergyMeter(allEnergyMeters)                 ??
                  DuplicateParking    (parkingOps.Values)               ??
                  UnknownChargingStation(parkingOps.Values, operators)  ??
                  UnknownParkingSpace(operators.Values, parkingOps.Values) ??
-                 UnknownTransparencyReference(operators.Values, softwares, certificates, manufacturers) ??
+                 UnknownTransparencyReference(allEnergyMeters, softwares, certificates, manufacturers) ??
                  UnknownBrand(operators.Values, brandRegistry) ??
-                 UnknownEnergyMeterManufacturer(operators.Values, meterManufacturers)) is String referenceError)
+                 UnknownEnergyMeterManufacturer(allEnergyMeters, meterManufacturers)) is String referenceError)
             {
                 ErrorResponse = referenceError;
                 return false;

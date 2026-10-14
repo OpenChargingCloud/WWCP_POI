@@ -51,8 +51,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
-    /// An operator of an electricity grid, embedded completely in its roaming network.
-    /// Grid connection points name it by its identification.
+    /// An operator of an electricity grid, embedded completely in its roaming network,
+    /// with its grid connection points. A grid operator without keys does not take part:
+    /// the roaming network operator maintains it, and charging station operators or parking
+    /// operators may maintain its grid connection points.
     /// </summary>
     public sealed class GridOperator : AImmutableEMobilityEntity<GridOperator_Id,
                                                                  GridOperatorAdminStatusType,
@@ -85,6 +87,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <inheritdoc/>
         public ImmutableArray<POIPublicKey>  IdentityKeys    { get; }
 
+        /// <summary>
+        /// The grid connection points, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<GridConnectionPoint>  GridConnectionPoints    { get; }
+
+        /// <summary>
+        /// The energy meters of its grid connection points.
+        /// </summary>
+        public IEnumerable<EnergyMeter>  EnergyMeters
+            => GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.EnergyMeter).OfType<EnergyMeter>();
+
+        private readonly ImmutableDictionary<GridConnectionPoint_Id, GridConnectionPoint> gridConnectionPointIndex;
+
         #endregion
 
         #region Constructor(s)
@@ -98,6 +113,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             Address?                                      Address                      = null,
                             URL?                                          Homepage                     = null,
                             PhoneNumber?                                  HotlinePhoneNumber           = null,
+                            IEnumerable<GridConnectionPoint>?             GridConnectionPoints         = null,
                             IEnumerable<POIPublicKey>?                    SigningKeys                  = null,
                             IEnumerable<POIPublicKey>?                    IdentityKeys                 = null,
 
@@ -137,6 +153,52 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.HotlinePhoneNumber  = HotlinePhoneNumber;
 
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the grid operator '{Id}'");
+
+            var gridConnectionPoints = (GridConnectionPoints ?? []).ToArray();
+
+            if (gridConnectionPoints.Any(gridConnectionPoint => gridConnectionPoint is null))
+                throw new ArgumentException($"The grid connection points of the grid operator '{Id}' must not contain null entries!", nameof(GridConnectionPoints));
+
+            // Grid connection point identifications compare without case.
+            if (gridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.Id).Distinct().Count() != gridConnectionPoints.Length)
+                throw new ArgumentException($"A grid connection point of the grid operator '{Id}' must not be given twice!", nameof(GridConnectionPoints));
+
+            this.GridConnectionPoints      = [.. gridConnectionPoints.OrderBy(gridConnectionPoint => gridConnectionPoint.Id.ToString(), StringComparer.Ordinal)];
+            this.gridConnectionPointIndex  = this.GridConnectionPoints.ToImmutableDictionary(gridConnectionPoint => gridConnectionPoint.Id);
+
+        }
+
+        #endregion
+
+
+        #region TryGetGridConnectionPoint(GridConnectionPointId, out GridConnectionPoint)
+
+        /// <summary>
+        /// Try to return the grid connection point with the given identification.
+        /// </summary>
+        public Boolean TryGetGridConnectionPoint(GridConnectionPoint_Id                         GridConnectionPointId,
+                                                 [NotNullWhen(true)] out GridConnectionPoint?   GridConnectionPoint)
+
+            => gridConnectionPointIndex.TryGetValue(GridConnectionPointId, out GridConnectionPoint);
+
+        #endregion
+
+        #region (internal) ShareRuntimeOfAll(Previous)
+
+        /// <summary>
+        /// Take the runtime status and internal data of the given previous version of this grid operator,
+        /// and of the energy meters of its grid connection points, by their identifications.
+        /// </summary>
+        internal void ShareRuntimeOfAll(GridOperator Previous)
+        {
+
+            ShareRuntimeOf(Previous);
+
+            var previousMeters = Previous.EnergyMeters.ToDictionary(energyMeter => energyMeter.Id);
+
+            foreach (var energyMeter in EnergyMeters)
+                if (previousMeters.TryGetValue(energyMeter.Id, out var previousMeter))
+                    energyMeter.ShareRuntimeOf(previousMeter);
 
         }
 
@@ -224,6 +286,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (HotlinePhoneNumber.HasValue)
                 json.Add("hotline",      HotlinePhoneNumber.Value.ToString());
 
+            if (GridConnectionPoints.Length > 0)
+                json.Add("gridConnectionPoints", new JArray(GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.ToJSON())));
+
             POIPartyKeys.AddTo(json, this);
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
@@ -282,6 +347,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIJSON.TryParseChildren<GridConnectionPoint>(JSON, "gridConnectionPoints", "gridConnectionPointIds", "grid connection points", GridConnectionPoint.TryParse, out var gridConnectionPoints, out ErrorResponse))
+                    return false;
+
                 if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
                     return false;
 
@@ -300,6 +368,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 address,
                                                 homepage,
                                                 hotline,
+                                                gridConnectionPoints,
                                                 SigningKeys:   signingKeys,
                                                 IdentityKeys:  identityKeys,
                                                 DataSource:  dataSource,

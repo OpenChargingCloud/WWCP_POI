@@ -111,23 +111,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => ChargingStations.SelectMany(chargingStation => chargingStation.EVSEs);
 
         /// <summary>
-        /// Where it is connected to the public grid.
+        /// Where it is connected to the public grid: a grid connection point of a grid operator of its roaming network.
         /// </summary>
-        public GridConnectionPoint?             GridConnectionPoint   { get; }
+        public GridConnectionPoint_Id?          GridConnectionPointId { get; }
 
         /// <summary>
-        /// Its own energy meters, in the order of their identifications;
-        /// not that of its grid connection point, not those of its charging stations.
+        /// Its own energy meters, in the order of their identifications; not those of its charging stations.
+        /// The meter of its grid connection point belongs to the grid connection point.
         /// </summary>
         public ImmutableArray<EnergyMeter>      EnergyMeters          { get; }
 
         /// <summary>
-        /// Its own energy meters, that of its grid connection point,
-        /// and those of its charging stations and their EVSEs.
+        /// Its own energy meters, and those of its charging stations and their EVSEs.
         /// </summary>
         public IEnumerable<EnergyMeter>         AllEnergyMeters
             => EnergyMeters.
-                   Concat(GridConnectionPoint?.EnergyMeter is EnergyMeter gridMeter ? [ gridMeter ] : []).
                    Concat(ChargingStations.SelectMany(chargingStation => chargingStation.AllEnergyMeters));
 
 
@@ -245,7 +243,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             PhoneNumber?                                 HotlinePhoneNumber           = null,
                             IEnumerable<DataLicense>?                    DataLicenses                 = null,
                             IEnumerable<ChargingStation>?                ChargingStations             = null,
-                            GridConnectionPoint?                         GridConnectionPoint          = null,
+                            GridConnectionPoint_Id?                      GridConnectionPointId        = null,
                             IEnumerable<EnergyMeter>?                    EnergyMeters                 = null,
                             IEnumerable<Brand_Id>?                       BrandIds                     = null,
                             ImmutableOpeningTimes?                       OpeningTimes                 = null,
@@ -325,7 +323,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.DataLicenses          = [.. dataLicenses.Ordered()];
             this.ChargingStations      = [.. chargingStations.OrderBy(chargingStation => chargingStation.Id.ToString(), StringComparer.Ordinal)];
             this.chargingStationIndex  = this.ChargingStations.ToImmutableDictionary(chargingStation => chargingStation.Id);
-            this.GridConnectionPoint   = GridConnectionPoint;
+            this.GridConnectionPointId = GridConnectionPointId;
             this.EnergyMeters          = EnergyMeter.Ordered(EnergyMeters, $"the charging pool '{Id}'");
             this.BrandIds              = POIJSON.OrderedIds(BrandIds, $"brand of the charging pool '{Id}'");
             this.OpeningTimes          = OpeningTimes;
@@ -458,8 +456,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (HotlinePhoneNumber.HasValue)
                 json.Add("hotline",           HotlinePhoneNumber.Value.ToString());
 
-            if (GridConnectionPoint is not null)
-                json.Add("gridConnectionPoint",  GridConnectionPoint.ToJSON());
+            if (GridConnectionPointId.HasValue)
+                json.Add("gridConnectionPointId",  GridConnectionPointId.Value.ToString());
 
             if (EnergyMeters.Length > 0)
                 json.Add("energyMeters",      new JArray(EnergyMeters.Select(energyMeter => energyMeter.ToJSON())));
@@ -590,7 +588,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POI.GridConnectionPoint.TryParseOne(JSON, "gridConnectionPoint", out var gridConnectionPoint, out ErrorResponse))
+                if (JSON["gridConnectionPoint"] is not null)
+                {
+                    ErrorResponse = $"The grid connection point of the charging pool '{id}' is embedded in its grid operator: name it by 'gridConnectionPointId'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseText(JSON, "gridConnectionPointId", "grid connection point identification", GridConnectionPoint_Id.TryParse, out GridConnectionPoint_Id? gridConnectionPointId, out ErrorResponse))
                     return false;
 
                 if (!POIJSON.TryParseChildren<EnergyMeter>(JSON,
@@ -656,7 +660,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 hotline,
                                                 dataLicenses,
                                                 chargingStations,
-                                                gridConnectionPoint,
+                                                gridConnectionPointId,
                                                 energyMeters,
                                                 brandIds,
                                                 openingTimes,

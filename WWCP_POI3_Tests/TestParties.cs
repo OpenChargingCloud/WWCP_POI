@@ -68,6 +68,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             => new (nameof(ChargingStationOperator), OperatorId.ToString());
 
         /// <summary>
+        /// A grid operator.
+        /// </summary>
+        public static POIPartyId Party(GridOperator_Id OperatorId)
+            => new (nameof(GridOperator), OperatorId.ToString());
+
+        /// <summary>
         /// A parking operator.
         /// </summary>
         public static POIPartyId Party(ParkingOperator_Id OperatorId)

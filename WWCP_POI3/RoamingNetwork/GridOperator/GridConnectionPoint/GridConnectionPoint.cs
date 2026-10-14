@@ -31,10 +31,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// Where a charging pool is connected to the public grid: an immutable description,
-    /// embedded completely in its charging pool, naming its grid operator by its identification.
+    /// Where charging pools are connected to the public grid: an immutable description,
+    /// embedded completely in its grid operator. Charging pools name it by its identification,
+    /// which is unique within the roaming network.
     /// </summary>
     /// <remarks>
+    /// One party maintains it and signs its changes: its grid operator, or the charging station operator
+    /// or parking operator named by maintainedBy, e.g. while the grid operator does not take part.
+    /// The grid operator takes it over by changing maintainedBy.
     /// Its electrical values are static agreed ratings in their base units: nominalVoltage in V
     /// (line-to-line for three phases), nominalFrequency in Hz, the contracted powers in W and VA.
     /// Missing values are unknown. Live measurements belong to its energy meter.
@@ -42,17 +46,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class GridConnectionPoint
     {
 
+        #region Data
+
+        /// <summary>
+        /// The parties besides its grid operator that may maintain a grid connection point.
+        /// </summary>
+        public static readonly IReadOnlySet<String> MaintainerTypes = new HashSet<String> {
+            nameof(ChargingStationOperator),
+            nameof(ParkingOperator)
+        };
+
+        #endregion
+
         #region Properties
 
         /// <summary>
         /// The identification of the connection point, assigned by the grid operator.
         /// </summary>
         public GridConnectionPoint_Id  Id                               { get; }
-
-        /// <summary>
-        /// The identification of its grid operator, one of the roaming network.
-        /// </summary>
-        public GridOperator_Id         GridOperatorId                   { get; }
 
         /// <summary>
         /// The multi-language name.
@@ -140,6 +151,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public EnergyMeter?            EnergyMeter                      { get; }
 
         /// <summary>
+        /// The charging station operator or parking operator maintaining it, or null for its grid operator.
+        /// </summary>
+        public POIPartyId?             MaintainedBy                     { get; }
+
+        /// <summary>
         /// Custom data.
         /// </summary>
         public CustomDataNew?          CustomData                       { get; }
@@ -152,7 +168,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Create a new grid connection point.
         /// </summary>
         public GridConnectionPoint(GridConnectionPoint_Id  Id,
-                                   GridOperator_Id         GridOperatorId,
                                    ImmutableI18NString?    Name                            = null,
                                    ImmutableI18NString?    Description                     = null,
                                    Address?                Address                         = null,
@@ -170,8 +185,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    IEnumerable<String>?    MarketLocationIds               = null,
                                    IEnumerable<String>?    MeteringLocationIds             = null,
                                    EnergyMeter?            EnergyMeter                     = null,
+                                   POIPartyId?             MaintainedBy                    = null,
                                    CustomDataNew?          CustomData                      = null)
         {
+
+            if (MaintainedBy.HasValue && !MaintainerTypes.Contains(MaintainedBy.Value.EntityType))
+                throw new ArgumentException($"The grid connection point '{Id}' can only be maintained by its grid operator, a charging station operator or a parking operator, not by {MaintainedBy}!");
 
             if (NominalVoltage?.Value <= 0 || NominalFrequency?.Value <= 0)
                 throw new ArgumentException($"The nominal voltage and frequency of the grid connection point '{Id}' must be positive!");
@@ -189,7 +208,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             this.Id                             = Id;
-            this.GridOperatorId                 = GridOperatorId;
             this.Name                           = Name;
             this.Description                    = Description;
             this.Address                        = Address;
@@ -207,6 +225,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.MarketLocationIds              = Identifiers(MarketLocationIds,    "market location identification");
             this.MeteringLocationIds            = Identifiers(MeteringLocationIds,  "metering location identification");
             this.EnergyMeter                    = EnergyMeter;
+            this.MaintainedBy                   = MaintainedBy;
             this.CustomData                     = CustomData;
 
         }
@@ -217,14 +236,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region ToJSON()
 
         /// <summary>
-        /// Return the JSON representation of this grid connection point, as its charging pool embeds it.
+        /// Return the JSON representation of this grid connection point, as its grid operator embeds it.
         /// </summary>
         public JObject ToJSON()
         {
 
             var json = new JObject(
-                           new JProperty("@id",             Id.            ToString()),
-                           new JProperty("gridOperatorId",  GridOperatorId.ToString())
+                           new JProperty("@id", Id.ToString())
                        );
 
             if (Name.IsNotNullOrEmpty())
@@ -278,6 +296,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (EnergyMeter is not null)
                 json.Add("energyMeter",                    EnergyMeter.ToJSON());
 
+            if (MaintainedBy.HasValue)
+                json.Add("maintainedBy",                   MaintainedBy.Value.ToJSON());
+
             if (CustomData is not null && CustomData.HasValues)
                 json.Add("customData",                     CustomData.ToJObject());
 
@@ -314,19 +335,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (JSON["gridOperator"] is not null)
+                if (JSON["gridOperator"] is not null || JSON["gridOperatorId"] is not null)
                 {
-                    ErrorResponse = "The grid operator of a grid connection point must be named by 'gridOperatorId'; it is embedded in the roaming network!";
+                    ErrorResponse = $"The grid connection point '{id}' is embedded in its grid operator: it names none!";
                     return false;
                 }
 
-                if (!JSON.ParseMandatory("gridOperatorId",
-                                         "grid operator identification",
-                                         GridOperator_Id.TryParse,
-                                         out GridOperator_Id gridOperatorId,
-                                         out ErrorResponse))
+                POIPartyId? maintainedBy = null;
+
+                if (JSON["maintainedBy"] is JToken maintainedByJSON)
                 {
-                    return false;
+
+                    if (!POIPartyId.TryParse(maintainedByJSON, out var maintainer, out ErrorResponse))
+                    {
+                        ErrorResponse = $"Invalid maintainer of the grid connection point '{id}': {ErrorResponse}";
+                        return false;
+                    }
+
+                    maintainedBy = maintainer;
+
                 }
 
                 if (!POIJSON.TryParseI18N       (JSON, "name",                   "grid connection point name",           out var name,                   out ErrorResponse) ||
@@ -370,7 +397,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 GridConnectionPoint = new GridConnectionPoint(id,
-                                                              gridOperatorId,
                                                               name,
                                                               description,
                                                               address,
@@ -388,6 +414,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                               marketLocationIds,
                                                               meteringLocationIds,
                                                               energyMeter,
+                                                              maintainedBy,
                                                               customData);
 
                 ErrorResponse = null;
@@ -400,37 +427,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ErrorResponse        = "The given JSON representation of a grid connection point is invalid: " + e.Message;
                 return false;
             }
-
-        }
-
-        #endregion
-
-        #region (static) TryParseOne(JSON, PropertyName, out GridConnectionPoint, out ErrorResponse)
-
-        /// <summary>
-        /// Try to parse the optional grid connection point embedded in the given property.
-        /// </summary>
-        internal static Boolean TryParseOne(JObject                           JSON,
-                                            String                            PropertyName,
-                                            out GridConnectionPoint?          GridConnectionPoint,
-                                            [NotNullWhen(false)] out String?  ErrorResponse)
-        {
-
-            GridConnectionPoint = null;
-
-            if (JSON[PropertyName] is not JToken token)
-            {
-                ErrorResponse = null;
-                return true;
-            }
-
-            if (token is not JObject gridConnectionPointJSON)
-            {
-                ErrorResponse = "The grid connection point must be a JSON object!";
-                return false;
-            }
-
-            return TryParse(gridConnectionPointJSON, out GridConnectionPoint, out ErrorResponse);
 
         }
 
@@ -477,7 +473,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <inheritdoc/>
         public override String ToString()
 
-            => $"{Id} ({GridOperatorId})";
+            => Id.ToString();
 
     }
 

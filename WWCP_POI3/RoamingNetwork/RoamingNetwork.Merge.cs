@@ -226,6 +226,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   ("chargingTariffGroups",              nameof(ChargingTariffGroup)) ] },
             { nameof(ChargingPool),             [ ("chargingStations",                  nameof(ChargingStation)) ] },
             { nameof(ChargingStation),          [ ("EVSEs",                             nameof(EVSE)) ] },
+            { nameof(GridOperator),             [ ("gridConnectionPoints",              nameof(GridConnectionPoint)) ] },
             { nameof(ParkingOperator),          [ ("parkingGarages",                    nameof(ParkingGarage)),
                                                   ("parkingSpaces",                     nameof(ParkingSpace)),
                                                   ("parkingSensors",                    nameof(ParkingSensor)),
@@ -882,6 +883,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    nameof(ParkingSensor)                    => ChangeableParkingSensorProperties,
                    nameof(ParkingSpaceGroup)                => ChangeableParkingSpaceGroupProperties,
                    nameof(ParkingProduct)                   => ChangeableParkingProductProperties,
+                   nameof(GridConnectionPoint)              => ChangeableGridConnectionPointProperties,
                    _ when ChangeableGroupProperties.TryGetValue(EntityType, out var groupProperties)
                                                             => groupProperties,
                    _                                        => []
@@ -937,8 +939,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     eMobilityProvider.ShareRuntimeOf(right);
 
             foreach (var gridOperator in gridOperators.Values)
-                if (!Left.gridOperators.ContainsKey(gridOperator.Id) && Right.gridOperators.TryGetValue(gridOperator.Id, out var right))
-                    gridOperator.ShareRuntimeOf(right);
+            {
+
+                Left.gridOperators.TryGetValue(gridOperator.Id, out var left);
+
+                if (ReferenceEquals(gridOperator, left))
+                    continue;
+
+                if (Right.gridOperators.TryGetValue(gridOperator.Id, out var right))
+                    gridOperator.ShareRuntimeOfAll(right);
+
+                if (left is not null)
+                    gridOperator.ShareRuntimeOfAll(left);
+
+            }
 
             foreach (var manufacturer in chargingStationManufacturers.Values)
                 if (!Left.chargingStationManufacturers.ContainsKey(manufacturer.Id) && Right.chargingStationManufacturers.TryGetValue(manufacturer.Id, out var right))

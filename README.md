@@ -39,7 +39,7 @@ flowchart TD
     ChargingStationOperator --> Groups["EVSEGroup, ChargingStationGroup,<br/>ChargingPoolGroup, ChargingTariffGroup"]
     ChargingStationOperator --> ChargingPool
     ChargingPool --> ChargingStation
-    ChargingPool --> GridConnectionPoint
+    GridOperator --> GridConnectionPoint
     ChargingStation --> EVSE
     EVSE --> ChargingConnector
     ChargingPool --> EnergyMeter
@@ -47,7 +47,8 @@ flowchart TD
     ChargingStation --> EnergyMeter
     EVSE --> EnergyMeter
     ChargingStation -. manufacturerId .-> ChargingStationManufacturer
-    GridConnectionPoint -. gridOperatorId .-> GridOperator
+    ChargingPool -. gridConnectionPointId .-> GridConnectionPoint
+    GridConnectionPoint -. maintainedBy .-> ChargingStationOperator
     ParkingSpace -. parkingGarageId .-> ParkingGarage
     ParkingSpace -. parkingSensorIds .-> ParkingSensor
     ParkingGarage -. chargingStationIds .-> ChargingStation
@@ -66,12 +67,12 @@ flowchart TD
 Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`,
 `gridOperators`, `parkingOperators`, `brands`, `energyMeterManufacturers`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
 `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `chargingPools`, `chargingStations`,
-`EVSEs`, `chargingConnectors`, `energyMeters`, `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups`,
-`parkingProducts`), each 0..n
-in the order of their ids; a pool has 0..1 `gridConnectionPoint`, a grid connection point and an EVSE each 0..1 `energyMeter`.
+`EVSEs`, `chargingConnectors`, `energyMeters`, `gridConnectionPoints`, `parkingGarages`, `parkingSpaces`, `parkingSensors`,
+`parkingSpaceGroups`, `parkingProducts`), each 0..n
+in the order of their ids; a grid connection point and an EVSE each have 0..1 `energyMeter`.
 Dotted lines are references, which must exist in the network.
 A pool, station, EVSE, tariff or group belongs to the operator its id names; ids are unique within the operator.
-Energy meter, parking garage, space, sensor, space group and product ids are unique within the network;
+Energy meter, grid connection point, parking garage, space, sensor, space group and product ids are unique within the network;
 parking product ids compare case-sensitively.
 
 - **Content:** everything in the JSON and CBOR representations, completely, in a fixed order:
@@ -90,10 +91,12 @@ parking product ids compare case-sensitively.
 - **EVSE:** `currentTypes`, `chargingModes` (arrays of names), `maxVoltage` (V), `maxCurrent` (A),
   `maxPower` (W), `geoLocation` when it differs from its station's, `maxReservationDuration` (s),
   `physicalReference` and `chargingConnectors` (`{@id, type, lockable?}`).
-- **Grid connection point:** a description without status: `gridOperatorId`, `voltageLevel`, `connectionType`,
+- **Grid connection point:** a description without status, embedded in its grid operator; pools name it by
+  `gridConnectionPointId`: `voltageLevel`, `connectionType`,
   `nominalVoltage` (V), `nominalFrequency` (Hz), `contractedImport/ExportPower` (W),
   `contractedImport/ExportApparentPower` (VA), `connectionAgreementId`, `networkLocationId`,
-  `marketLocationIds`, `meteringLocationIds`. Missing values are unknown; active power must not
+  `marketLocationIds`, `meteringLocationIds`, and `maintainedBy` (`{entityType, entityId}`, a charging station
+  operator or parking operator; absent: the grid operator). Missing values are unknown; active power must not
   exceed apparent power.
 - **Energy meter:** `role` (e.g. `grid`, `pv`, `battery`), `manufacturerId`, `modelId`, `modelURL`,
   `serialNumber`, `hardwareVersion`, `firmwareVersion`; with admin status and status.
@@ -137,7 +140,7 @@ parking product ids compare case-sensitively.
 - **Energy status:** EVSEs and charging stations also have an energy status, `{used, available, storedEnergy?}`
   in W, W and Wh, kept the same way; there is none until one is reported. Its schedule keeps the last ten.
 - **Keys:** the roaming network (for its operator, the RNO), charging station operators, e-mobility providers,
-  grid operators and parking operators each name 1..n `signingKeys`, short keys signing their change sets
+  grid operators and parking operators each name 1..n `signingKeys` (a grid operator not taking part none at all), short keys signing their change sets
   (e.g. secp256r1), and 1..n `identityKeys`, long-term keys signing changes of their identity keys (e.g. secp521r1):
   `{@id, key, notBefore?, notAfter?}`, the public COSE key as Base64 of its deterministic CBOR, identified by its
   SHA-256 COSE key thumbprint [RFC 9679] in lowercase hex. A key is not both.
@@ -164,7 +167,7 @@ a change set can manage:
 | [EnergyMeter](docs/EnergyMeter.md) | A meter of a pool, grid connection point, station or EVSE, with its transparency software. |
 | [ChargingStationManufacturer](docs/ChargingStationManufacturer.md) | A maker of charging stations, named by the stations it built. |
 | [EMobilityProvider](docs/EMobilityProvider.md) | An e-mobility service provider with its keys. |
-| [GridOperator](docs/GridOperator.md) | A distribution system operator, named by grid connection points, with its keys. |
+| [GridOperator](docs/GridOperator.md) | A distribution system operator with its grid connection points, each signed by its maintainer. |
 | [ParkingOperator](docs/ParkingOperator.md) | Runs parking garages, spaces and sensors and offers parking products. |
 | [ParkingGarage](docs/ParkingGarage.md) | A car park with opening times, images and parking products. |
 | [ParkingSpace](docs/ParkingSpace.md) | One parking space, possibly in a garage, with its sensors and charging stations. |
@@ -207,24 +210,31 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
   `Add`/`Remove` of operators, manufacturers, energy meter manufacturers, e-mobility providers, grid operators, parking operators, brands,
   transparency software releases and certificates, pools, tariffs, groups, stations (`Add(station, poolId)`),
-  EVSEs (`Add(evse, stationId)`) and parking garages, spaces, sensors and space groups
-  (`Add(space, parkingOperatorId)`). Grid connection points and energy meters
-  are properties of what embeds them (`gridConnectionPoint`, `energyMeters`, `energyMeter`).
+  EVSEs (`Add(evse, stationId)`), parking garages, spaces, sensors and space groups
+  (`Add(space, parkingOperatorId)`) and grid connection points (`Add(point, gridOperatorId)`). Energy meters
+  are properties of what embeds them (`energyMeters`, `energyMeter`).
   Every reference must exist; a referenced entity can not be removed. The overload by the entity's
   type names it: a change is data, `{entityType, entityId, propertyName, oldValue, newValue}`, applied
   to the entity with that id in the version it is applied to.
 - **Old values:** `CreateChangeSet` gives every change the value it finds; JSON `null` means
   "expected absent". A change finding another value conflicts.
-- **Timestamps:** a change set sets `lastChange` to its `CreatedAt`, so its after ETags are deterministic.
+- **Timestamps:** a change set sets `lastChange` to its `CreatedAt`, so its after ETags are deterministic:
+  of the roaming network always, of an entity when it is added or its own properties change, not when only what
+  it embeds changes. Whether anything below an entity changed shows its ETag, what changed the history.
 - **Owners:** every change set must be signed by the owner of every change it makes, with a key the owner has
   in the version it is applied to, valid at its `createdAt` (`TryCheckOwnership`); every signature must be one of
   a key of a party. Nobody else's signature counts, there is no external trust configuration.
   - The **RNO** owns the roaming network itself, brands, manufacturers, energy meter manufacturers and
-    transparency software, and adds and removes parties: with their keys, without their children. The RNO decides
+    transparency software, and adds and removes parties: with their keys (a grid operator not taking part
+    without, then the RNO signs in its place until it gives it keys), without their children. The RNO decides
     who is a member: removing a party removes all its data with it, without the party's signature; the history
     keeps the versions before.
   - A **charging station operator** owns its properties, pools, stations, EVSEs, tariffs and groups,
     named by their ids; a **parking operator** its parking data; e-mobility providers and grid operators their properties.
+  - A **grid connection point** is owned by its maintainer: its grid operator, or the charging station operator
+    or parking operator its `maintainedBy` names, e.g. while the grid operator does not take part. The grid
+    operator takes it over or hands it on by changing `maintainedBy`; the maintainer can hand it on; an identity
+    key of the RNO reassigns it.
   - Data is signed with a signing key. The `signingKeys` of a party are rotated with one of its current signing
     keys or, when none of them can sign any more, one of its identity keys; its `identityKeys` only with one of
     its identity keys. For recovery, an identity key of the RNO changes both kinds of keys of every other party.
@@ -339,6 +349,19 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
 | `GET ~/roamingNetworks/{id}/history/commits/{commitId}` | one commit |
 | `COMMIT ~/roamingNetworks/{id}/history/changeSets` | 201 committed, 200 already committed (the commit, the `head`, the `conflicts` left), 422 refused |
 | `POST ~/roamingNetworks/{id}/history/commits/{commitId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403, 404, 422 invalid |
+
+It also serves the roaming networks and their entities, readable from every origin (CORS `*`), each in canonical
+JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json:sha256:hex:…"`); a known
+`If-None-Match` is answered with 304. HEAD and OPTIONS are answered for every one:
+
+| Request | Returns |
+|---|---|
+| `GET ~/RNs` | the roaming networks, as `{@id, name, description}` |
+| `GET ~/RNs/{RN_Id}` | the roaming network, the head of its history |
+| `GET ~/RNs/{RN_Id}/{CSOs\|GOs\|EMPs\|CSMs\|POs}` | its charging station operators, grid operators, e-mobility providers, charging station manufacturers or parking operators, as `{@id, name, description}` |
+| `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}[/CPs/{CP_Id}[/CSs/{CS_Id}[/EVSEs/{EVSE_Id}]]]` | an operator, pool, station or EVSE as its parent embeds it; a pool with `?expand=gridConnectionPoint` |
+| `GET ~/RNs/{RN_Id}/GOs/{GO_Id}[/GCPs/{GCP_Id}]` | a grid operator, or one of its grid connection points |
+| `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer or parking operator |
 
 Submitting is refused unless `AuthorizeChangeSetSubmission` decides who may submit;
 what a change set may change, its owners' signatures decide. Pushing commits is refused unless

@@ -72,23 +72,23 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                              Created:   Created) ],
                     GridOperators:             [ new GridOperator(NET,
                                                                   I18NString.Create(Languages.en, "Example Netz"),
-                                                                  Created: Created) ],
+                                                                  GridConnectionPoints:  [ new GridConnectionPoint(GCP,
+                                                                                                                   VoltageLevel:                   GridVoltageLevel.LowVoltage,
+                                                                                                                   ConnectionType:                 GridConnectionTypes.AC_ThreePhases,
+                                                                                                                   NominalVoltage:                 Volt.FromV(400),
+                                                                                                                   NominalFrequency:               Hertz.FromHz(50),
+                                                                                                                   ContractedImportPower:          Watt.FromW(250000),
+                                                                                                                   ContractedExportPower:          Watt.FromW(100000),
+                                                                                                                   ContractedImportApparentPower:  VoltAmpere.FromVA(300000),
+                                                                                                                   MarketLocationIds:              [ "DE0001", "DE0002" ],
+                                                                                                                   EnergyMeter:                    new EnergyMeter(GridMeter, Role: "grid", Created: Created)) ],
+                                                                  Created:               Created) ],
                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                              I18NString.Create(Languages.en, "GraphDefined"),
                                                                              Created:        Created,
                                                                              ChargingPools:  [ new ChargingPool(P1,
-                                                                                                                Created:              Created,
-                                                                                                                GridConnectionPoint:  new GridConnectionPoint(GCP,
-                                                                                                                                                              NET,
-                                                                                                                                                              VoltageLevel:                   GridVoltageLevel.LowVoltage,
-                                                                                                                                                              ConnectionType:                 GridConnectionTypes.AC_ThreePhases,
-                                                                                                                                                              NominalVoltage:                 Volt.FromV(400),
-                                                                                                                                                              NominalFrequency:               Hertz.FromHz(50),
-                                                                                                                                                              ContractedImportPower:          Watt.FromW(250000),
-                                                                                                                                                              ContractedExportPower:          Watt.FromW(100000),
-                                                                                                                                                              ContractedImportApparentPower:  VoltAmpere.FromVA(300000),
-                                                                                                                                                              MarketLocationIds:              [ "DE0001", "DE0002" ],
-                                                                                                                                                              EnergyMeter:                    new EnergyMeter(GridMeter, Role: "grid", Created: Created)),
+                                                                                                                Created:                Created,
+                                                                                                                GridConnectionPointId:  GCP,
                                                                                                                 EnergyMeters:         [ new EnergyMeter(PVMeter, Role: "pv", SerialNumber: "PV-1", Created: Created) ],
                                                                                                                 ChargingStations:     [ new ChargingStation(S1,
                                                                                                                                                             Created:  Created,
@@ -121,7 +121,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             Assert.That(RoamingNetwork.TryParse(rn1.ToCBOR(), out var fromCBOR, out var errorCBOR),  Is.True, errorCBOR);
 
             var pool  = json["chargingStationOperators"]![0]!["chargingPools"]![0]!;
-            var gcp   = pool["gridConnectionPoint"]!;
+            var gcp   = json["gridOperators"]![0]!["gridConnectionPoints"]![0]!;
 
             using (Assert.EnterMultipleScope())
             {
@@ -132,7 +132,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(json["eMobilityProviders"]![0]!["@id"]!.ToString(),      Is.EqualTo("DE*EMP"));
                 Assert.That(json["gridOperators"]![0]!["@id"]!.ToString(),           Is.EqualTo("DE*NET"));
-                Assert.That(gcp["gridOperatorId"]!.ToString(),                        Is.EqualTo("DE*NET"));
+                Assert.That(pool["gridConnectionPointId"]!.ToString(),                Is.EqualTo("connection-42"));
+                Assert.That(gcp["gridOperatorId"],                                    Is.Null);
+                Assert.That(gcp["maintainedBy"],                                      Is.Null);
                 Assert.That(gcp["voltageLevel"]!.ToString(),                          Is.EqualTo("LowVoltage"));
                 Assert.That(gcp["nominalFrequency"]!.Value<Decimal>(),                Is.EqualTo(50));
                 Assert.That(gcp["contractedImportPower"]!.Value<Decimal>(),           Is.EqualTo(250000));
@@ -176,9 +178,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 => (JObject) Network["chargingStationOperators"]![0]!["chargingPools"]![0]!;
 
             JObject Point(JObject Network)
-                => (JObject) Pool(Network)["gridConnectionPoint"]!;
+                => (JObject) Network["gridOperators"]![0]!["gridConnectionPoints"]![0]!;
 
-            var unknownGridOperator  = Changed(network => network.Remove("gridOperators"));
+            var unknownPoint         = Changed(network => network.Remove("gridOperators"));
+            var embeddedPoint        = Changed(network => Pool(network)["gridConnectionPoint"] = Point(network).DeepClone());
+            var pointTwice           = Changed(network => ((JArray) network["gridOperators"]!).Add(new JObject(new JProperty("@id", "DE*NE2"),
+                                                                                                                new JProperty("created", "2026-01-01T00:00:00.000Z"),
+                                                                                                                new JProperty("gridConnectionPoints", new JArray(new JObject(new JProperty("@id", "CONNECTION-42")))))));
+            var unknownMaintainer    = Changed(network => Point(network)["maintainedBy"] = new JObject(new JProperty("entityType", "ChargingStationOperator"), new JProperty("entityId", "DE*XYZ")));
+            var providerMaintainer   = Changed(network => Point(network)["maintainedBy"] = new JObject(new JProperty("entityType", "EMobilityProvider"),       new JProperty("entityId", "DE*EMP")));
             var meterTwice           = Changed(network => Point(network)["energyMeter"]!["@id"] = "pv-meter");
             var embeddedOperator     = Changed(network => Point(network)["gridOperator"] = new JObject(new JProperty("@id", "DE*NET")));
             var tooMuchActivePower   = Changed(network => Point(network)["contractedImportPower"] = 400000);
@@ -193,19 +201,27 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                            gef2["@id"] = "DE*XYZ";
                                            var pool = (JObject) gef2["chargingPools"]![0]!;
                                            pool["@id"] = "DE*XYZ*P1";
-                                           pool.Remove("gridConnectionPoint");
+                                           pool.Remove("gridConnectionPointId");
                                            pool.Remove("chargingStations");
                                            ((JArray) network["chargingStationOperators"]!).Add(gef2);
                                        });
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(RoamingNetwork.TryParse(unknownGridOperator,  out _, out var error1),  Is.False);
-                Assert.That(error1,                                                                Does.Contain("grid operator 'DE*NET'"));
+                Assert.That(RoamingNetwork.TryParse(unknownPoint,         out _, out var error1),  Is.False);
+                Assert.That(error1,                                                                Does.Contain("grid connection point 'connection-42' of the charging pool 'DE*GEF*P1' is unknown"));
+                Assert.That(RoamingNetwork.TryParse(embeddedPoint,        out _, out var error5),  Is.False);
+                Assert.That(error5,                                                                Does.Contain("name it by 'gridConnectionPointId'"));
+                Assert.That(RoamingNetwork.TryParse(pointTwice,           out _, out var error6),  Is.False);
+                Assert.That(error6,                                                                Does.Contain("must be unique within the roaming network"));
+                Assert.That(RoamingNetwork.TryParse(unknownMaintainer,    out _, out var error7),  Is.False);
+                Assert.That(error7,                                                                Does.Contain("is unknown in the roaming network"));
+                Assert.That(RoamingNetwork.TryParse(providerMaintainer,   out _, out var error8),  Is.False);
+                Assert.That(error8,                                                                Does.Contain("can only be maintained by"));
                 Assert.That(RoamingNetwork.TryParse(meterTwice,           out _, out var error2),  Is.False);
                 Assert.That(error2,                                                                Does.Contain("energy meter"));
                 Assert.That(RoamingNetwork.TryParse(embeddedOperator,     out _, out var error3),  Is.False);
-                Assert.That(error3,                                                                Does.Contain("gridOperatorId"));
+                Assert.That(error3,                                                                Does.Contain("embedded in its grid operator"));
                 Assert.That(RoamingNetwork.TryParse(tooMuchActivePower,   out _, out var error4),  Is.False);
                 Assert.That(error4,                                                                Does.Contain("apparent power"));
                 Assert.That(RoamingNetwork.TryParse(negativeVoltage,      out _, out _),           Is.False);
@@ -234,15 +250,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, nameof(EnergyMeter), "grid-meter", "offline", T0, out _, out _);
 
-            var point    = (JObject) pool.GridConnectionPoint!.ToJSON();
-            point["contractedImportPower"] = 200000;
+            var point    = net.GridConnectionPoints.Single();
 
             var newMeter = new EnergyMeter(EnergyMeter_Id.Parse("evse-meter-2"), Role: "evse").ToJSON();
 
             history.Commit(rn1.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add           (new EMobilityProvider(EMobilityProvider_Id.Parse("DE*ZAP")).WithKeys()),
                                 RoamingNetworkChange.UpdateProperty(net,  "homepage",            null, "https://netz.example"),
-                                RoamingNetworkChange.UpdateProperty(pool, "gridConnectionPoint", null, point),
+                                RoamingNetworkChange.UpdateProperty(point, "contractedImportPower", null, 200000),
                                 RoamingNetworkChange.UpdateProperty(e1,   "energyMeter",         null, newMeter),
                                 RoamingNetworkChange.Remove        (EMP)
                             ], CreatedAt: T0.AddMinutes(1)));
@@ -255,7 +270,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(rn2.EMobilityProviders.Select(provider => provider.Id.ToString()),  Is.EqualTo(new[] { "DE*ZAP" }));
                 Assert.That(rn2.GridOperators.Single().Homepage?.ToString(),                    Is.EqualTo("https://netz.example"));
-                Assert.That(pool2.GridConnectionPoint!.ContractedImportPower,                   Is.EqualTo(Watt.FromW(200000)));
+                Assert.That(rn2.GridOperators.Single().GridConnectionPoints.Single().ContractedImportPower,  Is.EqualTo(Watt.FromW(200000)));
+                Assert.That(pool2.GridConnectionPointId,                                        Is.EqualTo(GCP));
                 Assert.That(rn2.TryGetEnergyMeterById(EVSEMeter, out _),                        Is.False);
                 Assert.That(rn2.TryGetEnergyMeterById(EnergyMeter_Id.Parse("evse-meter-2"), out _),  Is.True);
 
@@ -263,9 +279,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(history.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, nameof(EnergyMeter), "grid-meter", out var gridMeterStatus),  Is.True);
                 Assert.That(gridMeterStatus!.Value,                                                                                                 Is.EqualTo("offline"));
 
-                // A grid operator still named by a grid connection point can not be removed.
+                // A grid operator, and a grid connection point, still named by a charging pool can not be removed.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(NET)),
-                            Throws.ArgumentException.With.Message.Contains("grid operator 'DE*NET' of the grid connection point"));
+                            Throws.ArgumentException.With.Message.Contains("grid connection point 'connection-42' of the charging pool 'DE*GEF*P1' is unknown"));
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(GCP)),
+                            Throws.ArgumentException.With.Message.Contains("grid connection point 'connection-42' of the charging pool 'DE*GEF*P1' is unknown"));
 
                 // A meter given twice by a change is refused.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(pool2, "energyMeters", null, new JArray(new EnergyMeter(GridMeter).ToJSON()))),

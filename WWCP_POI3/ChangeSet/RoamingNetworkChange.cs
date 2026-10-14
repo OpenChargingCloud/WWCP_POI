@@ -715,6 +715,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Add                   (GridConnectionPoint, GridOperatorId)
+
+        /// <summary>
+        /// Add the given grid connection point to the given grid operator.
+        /// </summary>
+        public static RoamingNetworkChange Add(GridConnectionPoint  GridConnectionPoint,
+                                               GridOperator_Id      GridOperatorId)
+
+            => Add(nameof(POI.GridConnectionPoint), GridConnectionPoint.Id.ToString(), GridConnectionPoint.ToJSON(), nameof(POI.GridOperator), GridOperatorId.ToString());
+
+        #endregion
+
+        #region Remove                (GridConnectionPointId, OldValue = null)
+
+        /// <summary>
+        /// Remove the given grid connection point, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(GridConnectionPoint_Id  GridConnectionPointId,
+                                                  JToken?                 OldValue   = null)
+
+            => Remove(nameof(POI.GridConnectionPoint), GridConnectionPointId.ToString(), OldValue);
+
+        #endregion
+
+        #region UpdateProperty        (GridConnectionPoint, PropertyName, OldValue, NewValue)
+
+        /// <summary>
+        /// Update one property of the given grid connection point, optionally asserting its previous value,
+        /// e.g. maintainedBy to take it over or to hand it on.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(GridConnectionPoint  GridConnectionPoint,
+                                                          String               PropertyName,
+                                                          JToken?              OldValue,
+                                                          JToken               NewValue)
+
+            => UpdateProperty(nameof(POI.GridConnectionPoint), GridConnectionPoint.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        #endregion
+
+        #region RemoveProperty        (GridConnectionPoint, PropertyName, OldValue = null)
+
+        /// <summary>
+        /// Remove one property of the given grid connection point, optionally asserting its previous value,
+        /// e.g. maintainedBy to be maintained by its grid operator.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(GridConnectionPoint  GridConnectionPoint,
+                                                          String               PropertyName,
+                                                          JToken?              OldValue   = null)
+
+            => RemoveProperty(nameof(POI.GridConnectionPoint), GridConnectionPoint.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
         #region Add                   (ChargingTariff)
 
         /// <summary>

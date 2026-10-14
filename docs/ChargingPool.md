@@ -5,8 +5,8 @@ times, access, parking, payment and authentication, energy mix, images, and wher
 It corresponds to a location in OCPI.
 
 It is embedded completely in its [ChargingStationOperator](ChargingStationOperator.md) under `chargingPools`, in the
-ordinal order of the identifications, and itself embeds its charging stations (with their EVSEs), its own energy
-meters and its grid connection point. It belongs to the operator its identification names, and only that operator
+ordinal order of the identifications, and itself embeds its charging stations (with their EVSEs) and its own energy
+meters, and names its grid connection point. It belongs to the operator its identification names, and only that operator
 changes it, with one of its signing keys.
 
 Its identification is the operator's identification, `*P` and a suffix, e.g. `DE*GEF*P1`, unique within the operator.
@@ -51,7 +51,7 @@ All optional; absent values and empty arrays are not written.
 | `parkingType` | `ParkingType` | `ParkingType?` | update/remove | The type of parking, e.g. `ALONG_MOTORWAY`, `PARKING_GARAGE`, `PARKING_LOT`, `ON_DRIVEWAY`, `ON_STREET`, `UNDERGROUND_GARAGE`, `OTHER`, `UNKNOWN`. |
 | `accessibility` | `Accessibility` | `AccessibilityType?` | update/remove | Who may use it, e.g. `FreePubliclyAccessible`, `RestrictedAccess`, `PayingPubliclyAccessible`, `TestStation`, `TestPool`, `Unspecified`. |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | The telephone number of the hotline for this pool. |
-| `gridConnectionPoint` | `GridConnectionPoint` | `GridConnectionPoint?` | update/remove | Where it is connected to the public grid, see [Grid connection point](#grid-connection-point). |
+| `gridConnectionPointId` | `GridConnectionPointId` | `GridConnectionPoint_Id?` | update/remove | Where it is connected to the public grid: a grid connection point of a grid operator of the network, see [Grid connection point](#grid-connection-point). |
 | `energyMeters` | `EnergyMeters` | `ImmutableArray<EnergyMeter>` | update/remove | Its own energy meters, see [Energy meters](#energy-meters). |
 | `chargingStations` | `ChargingStations` | `ImmutableArray<ChargingStation>` | add/remove | Its [charging stations](#charging-stations). |
 | `brandIds` | `BrandIds` | `ImmutableArray<Brand_Id>` | update/remove | The brands it is offered under, brands of the roaming network; ordinal order, each once. |
@@ -84,8 +84,7 @@ should send them in that order, as it compares old values as JSON.
 **Derived (not serialized)**
 
 - `EVSEs`: the EVSEs of all its charging stations.
-- `AllEnergyMeters`: its own energy meters, that of its grid connection point, and those of its charging stations
-  and their EVSEs.
+- `AllEnergyMeters`: its own energy meters, and those of its charging stations and their EVSEs.
 - `TryGetChargingStation(id, out station)`: a lookup by identification.
 
 
@@ -105,46 +104,21 @@ See [ChargingStation](ChargingStation.md).
 
 ## Grid connection point
 
-`gridConnectionPoint`: where the pool is connected to the public grid. It is no entity: it has no status and no
-timestamps, it is embedded completely in its pool, at most one per pool, and changed only as a whole, as the pool's
-property `gridConnectionPoint`. It names its [GridOperator](GridOperator.md) by `gridOperatorId`, which must be a grid
-operator of the roaming network. Its electrical values are static, agreed ratings in base units; absent values are
-unknown. Live measurements belong to its energy meter.
+`gridConnectionPointId`: where the pool is connected to the public grid, a grid connection point of the roaming
+network. The grid connection point is embedded in its [GridOperator](GridOperator.md#grid-connection-points) and
+documented there; several pools may name the same one. Its maintainer, the grid operator or e.g. this pool's
+charging station operator, signs its changes; the pool's operator only chooses which point the pool names.
+Embedding it in the pool (`gridConnectionPoint`) is refused.
 
-C# class `GridConnectionPoint` — [source](../WWCP_POI3/RoamingNetwork/GridOperator/GridConnectionPoint/GridConnectionPoint.cs).
-
-| JSON key | Type | Description |
-|---|---|---|
-| `@id` | text | Mandatory. The identification assigned by the grid operator, any nonempty text. |
-| `gridOperatorId` | text | Mandatory. The grid operator, e.g. `DE*SWJ`. Embedding the grid operator (`gridOperator`) is refused. |
-| `name` | I18N text | |
-| `description` | I18N text | |
-| `address` | object | The address of the connection, see [Address and geo locations](#address-and-geo-locations). |
-| `geoLocation` | object | The geographical location of the connection. |
-| `voltageLevel` | text | `LowVoltage`, `MediumVoltage`, `HighVoltage` or `ExtraHighVoltage`; case-sensitive. |
-| `connectionType` | text | `Unknown`, `AC_SinglePhase`, `AC_SinglePhase_L0`, `AC_SinglePhase_L1`, `AC_SinglePhase_L2` or `AC_ThreePhases`; case-sensitive. |
-| `nominalVoltage` | number | V, line-to-line for three phases; positive. |
-| `nominalFrequency` | number | Hz; positive. |
-| `contractedImportPower` | number | W, the agreed active power taken from the grid; not negative. |
-| `contractedExportPower` | number | W, the agreed active power supplied to the grid; 0 means none. |
-| `contractedImportApparentPower` | number | VA; not negative, not less than `contractedImportPower`. |
-| `contractedExportApparentPower` | number | VA; not negative, not less than `contractedExportPower`. |
-| `connectionAgreementId` | text | The reference of the connection agreement with the grid operator; trimmed, not empty. |
-| `networkLocationId` | text | The network location, e.g. a German NeLo; trimmed, not empty. |
-| `marketLocationIds` | array of texts | Market locations, e.g. MaLos for consumption and generation; in their given order, each once, trimmed, not empty. |
-| `meteringLocationIds` | array of texts | Metering locations, e.g. MeLos; as `marketLocationIds`. |
-| `energyMeter` | object | The [energy meter](EnergyMeter.md) of the connection, 0..1; unique within the roaming network like every energy meter. |
-| `customData` | object | Written only when it has values. |
-
-`created` and `lastChange` are read without error but neither kept nor written. Over HTTP a grid connection point
-is also served under its grid operator: `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}` (the first pool, in the order
-of the operators, with that identification and grid operator).
+Over HTTP, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}?expand=gridConnectionPoint` embeds it in the place of
+`gridConnectionPointId`, with its `gridOperatorId`: another representation, with its own ETag.
 
 
 ## Energy meters
 
 `energyMeters`: the pool's own energy meters, e.g. a meter of the PV system or battery on site, in the ordinal order
-of their identifications; not the meter of its grid connection point and not those of its stations and EVSEs.
+of their identifications; not those of its stations and EVSEs. The meter of its grid connection point belongs to
+the grid connection point, in its grid operator.
 Energy meters have admin status and status, but no change set of their own: they are changed as the pool's property
 `energyMeters`, as a whole. Their identifications are unique within the roaming network; their manufacturers must
 be energy meter manufacturers of the network. `energyMeterIds` alone are refused.
@@ -263,9 +237,8 @@ Events: `OnAdminStatusChanged` (`OnChargingPoolAdminStatusChangedDelegate`) and 
   the operator. `chargingStationIds` alone are refused.
 - **Energy meters:** no null entry, none twice in the pool, and none twice in the roaming network (including the
   meters of grid connection points, stations and EVSEs).
-- **Grid connection point:** `@id` and `gridOperatorId` mandatory, the grid operator one of the network; nominal
-  voltage and frequency positive; contracted powers not negative; active power not above apparent power;
-  identifiers trimmed and not empty, location identifications each once.
+- **Grid connection point:** `gridConnectionPointId` names a grid connection point of the roaming network;
+  an embedded `gridConnectionPoint` is refused.
 - **Collections:** no null entry and nothing twice in `dataLicenses`, `brandIds`, `facilities`, `paymentOptions`,
   `uiFeatures`, `features`, `locationLanguages`, `parkingRestrictions`; `images` by URL; `authenticationModes` by
   type; `relatedLocations` by their JSON.
@@ -299,17 +272,7 @@ Events: `OnAdminStatusChanged` (`OnChargingPoolAdminStatusChangedDelegate`) and 
   "parkingType": "PARKING_LOT",
   "accessibility": "FreePubliclyAccessible",
   "hotline": "+49 3641 7654321",
-  "gridConnectionPoint": {
-    "@id": "GCP-0815",
-    "gridOperatorId": "DE*SWJ",
-    "voltageLevel": "LowVoltage",
-    "connectionType": "AC_ThreePhases",
-    "nominalVoltage": 400,
-    "nominalFrequency": 50,
-    "contractedImportPower": 110000,
-    "contractedImportApparentPower": 120000,
-    "marketLocationIds": [ "50123456789" ]
-  },
+  "gridConnectionPointId": "GCP-0815",
   "chargingStations": [
     {
       "@id": "DE*GEF*S1",

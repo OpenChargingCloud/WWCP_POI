@@ -295,15 +295,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            // Every grid operator a grid connection point names is one of this network.
-            if (UnknownGridOperator(chargingStationOperators.Values, gridOperators) is String unknownGridOperator)
-                throw new ArgumentException(unknownGridOperator, nameof(GridOperators));
+            // Grid connection points are unique within the network, and every one a charging pool names is one of this network.
+            if ((DuplicateGridConnectionPoint(gridOperators.Values) ??
+                 UnknownGridConnectionPoint  (chargingStationOperators.Values, gridOperators.Values)) is String gridError)
+            {
+                throw new ArgumentException(gridError, nameof(GridOperators));
+            }
 
             // Energy meters are unique within the network, not only within their operator.
-            if (DuplicateEnergyMeter(chargingStationOperators.Values) is String duplicateEnergyMeter)
+            if (DuplicateEnergyMeter(AllEnergyMeters(chargingStationOperators.Values, gridOperators.Values)) is String duplicateEnergyMeter)
                 throw new ArgumentException(duplicateEnergyMeter, nameof(ChargingStationOperators));
 
-            foreach (var energyMeter in chargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters))
+            foreach (var energyMeter in AllEnergyMeters(chargingStationOperators.Values, gridOperators.Values))
                 energyMeters.TryAdd(energyMeter.Id, energyMeter);
 
             foreach (var energyMeterManufacturer in EnergyMeterManufacturers ?? [])
@@ -317,7 +320,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // Every manufacturer an energy meter names is one of this network.
-            if (UnknownEnergyMeterManufacturer(chargingStationOperators.Values, energyMeterManufacturers) is String unknownEnergyMeterManufacturer)
+            if (UnknownEnergyMeterManufacturer(AllEnergyMeters(chargingStationOperators.Values, gridOperators.Values), energyMeterManufacturers) is String unknownEnergyMeterManufacturer)
                 throw new ArgumentException(unknownEnergyMeterManufacturer, nameof(EnergyMeterManufacturers));
 
             foreach (var parkingOperator in ParkingOperators ?? [])
@@ -338,6 +341,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 throw new ArgumentException(parkingError, nameof(ParkingOperators));
             }
+
+            // The maintainers of grid connection points are charging station operators and parking operators of this network.
+            if (UnknownMaintainer(gridOperators.Values, chargingStationOperators, parkingOperators) is String maintainerError)
+                throw new ArgumentException(maintainerError, nameof(GridOperators));
 
             foreach (var release in TransparencySoftware ?? [])
             {
@@ -374,7 +381,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException(brandError, nameof(Brands));
 
             // Certificates name releases and manufacturers of this network; energy meters name releases and certificates.
-            if (UnknownTransparencyReference(chargingStationOperators.Values, transparencySoftware, transparencySoftwareCertificates, chargingStationManufacturers) is String transparencyError)
+            if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators.Values, gridOperators.Values), transparencySoftware, transparencySoftwareCertificates, chargingStationManufacturers) is String transparencyError)
                 throw new ArgumentException(transparencyError, nameof(TransparencySoftware));
 
             foreach (var parkingOperator in parkingOperators.Values)
@@ -1521,18 +1528,93 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => gridOperators.TryGetValue(GridOperatorId, out GridOperator);
 
         /// <summary>
-        /// The error, when a grid connection point names a grid operator the given ones do not have.
+        /// The grid connection points of all grid operators.
         /// </summary>
-        internal static String? UnknownGridOperator(IEnumerable<ChargingStationOperator>                ChargingStationOperators,
-                                                    IReadOnlyDictionary<GridOperator_Id, GridOperator>  GridOperators)
+        public IEnumerable<GridConnectionPoint> GridConnectionPoints
+            => gridOperators.Values.SelectMany(gridOperator => gridOperator.GridConnectionPoints);
+
+        /// <summary>
+        /// Try to get the grid connection point having the given identification, and its grid operator.
+        /// </summary>
+        /// <param name="GridConnectionPointId">The identification of a grid connection point, unique within the network.</param>
+        /// <param name="GridOperator">Its grid operator.</param>
+        /// <param name="GridConnectionPoint">The grid connection point.</param>
+        public Boolean TryGetGridConnectionPoint(GridConnectionPoint_Id                        GridConnectionPointId,
+                                                 [NotNullWhen(true)] out GridOperator?         GridOperator,
+                                                 [NotNullWhen(true)] out GridConnectionPoint?  GridConnectionPoint)
         {
 
-            foreach (var chargingPool in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPools))
-                if (chargingPool.GridConnectionPoint is GridConnectionPoint gridConnectionPoint &&
-                    !GridOperators.ContainsKey(gridConnectionPoint.GridOperatorId))
+            foreach (var gridOperator in gridOperators.Values)
+                if (gridOperator.TryGetGridConnectionPoint(GridConnectionPointId, out GridConnectionPoint))
                 {
-                    return $"The grid operator '{gridConnectionPoint.GridOperatorId}' of the grid connection point '{gridConnectionPoint.Id}' of the charging pool '{chargingPool.Id}' is unknown in the roaming network!";
+                    GridOperator = gridOperator;
+                    return true;
                 }
+
+            GridOperator         = null;
+            GridConnectionPoint  = null;
+            return false;
+
+        }
+
+        /// <summary>
+        /// The error, when two of the given grid operators have a grid connection point with the same identification.
+        /// </summary>
+        internal static String? DuplicateGridConnectionPoint(IEnumerable<GridOperator> GridOperators)
+        {
+
+            var seen = new Dictionary<GridConnectionPoint_Id, GridOperator_Id>();
+
+            foreach (var gridOperator in GridOperators)
+                foreach (var gridConnectionPoint in gridOperator.GridConnectionPoints)
+                    if (!seen.TryAdd(gridConnectionPoint.Id, gridOperator.Id))
+                        return $"The grid connection point '{gridConnectionPoint.Id}' of the grid operator '{gridOperator.Id}' must be unique within the roaming network, but the grid operator '{seen[gridConnectionPoint.Id]}' has it too!";
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when a charging pool names a grid connection point the given grid operators do not have.
+        /// </summary>
+        internal static String? UnknownGridConnectionPoint(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
+                                                           IEnumerable<GridOperator>             GridOperators)
+        {
+
+            var known = GridOperators.SelectMany(gridOperator => gridOperator.GridConnectionPoints).Select(gridConnectionPoint => gridConnectionPoint.Id).ToHashSet();
+
+            foreach (var chargingPool in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPools))
+                if (chargingPool.GridConnectionPointId.HasValue &&
+                    !known.Contains(chargingPool.GridConnectionPointId.Value))
+                {
+                    return $"The grid connection point '{chargingPool.GridConnectionPointId}' of the charging pool '{chargingPool.Id}' is unknown in the roaming network!";
+                }
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when a grid connection point is maintained by a charging station operator or parking operator the given ones do not have.
+        /// </summary>
+        internal static String? UnknownMaintainer(IEnumerable<GridOperator>                                                   GridOperators,
+                                                  IReadOnlyDictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators,
+                                                  IReadOnlyDictionary<ParkingOperator_Id,         ParkingOperator>          ParkingOperators)
+        {
+
+            foreach (var gridOperator in GridOperators)
+                foreach (var gridConnectionPoint in gridOperator.GridConnectionPoints)
+                    if (gridConnectionPoint.MaintainedBy is POIPartyId maintainer &&
+                        !(maintainer.EntityType switch {
+                              nameof(ChargingStationOperator)  => ChargingStationOperator_Id.TryParse(maintainer.EntityId, out var chargingStationOperatorId) &&
+                                                                  ChargingStationOperators.ContainsKey(chargingStationOperatorId),
+                              nameof(ParkingOperator)          => ParkingOperator_Id.TryParse(maintainer.EntityId, out var parkingOperatorId) &&
+                                                                  ParkingOperators.ContainsKey(parkingOperatorId),
+                              _                                => false
+                          }))
+                    {
+                        return $"The maintainer of the grid connection point '{gridConnectionPoint.Id}', {maintainer}, is unknown in the roaming network!";
+                    }
 
             return null;
 
@@ -1818,7 +1900,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The error, when a certificate names an unknown release or manufacturer,
         /// or an energy meter an unknown release, an unknown certificate, or a certificate not covering its release.
         /// </summary>
-        internal static String? UnknownTransparencyReference(IEnumerable<ChargingStationOperator>                                                    ChargingStationOperators,
+        internal static String? UnknownTransparencyReference(IEnumerable<EnergyMeter>                                                                EnergyMeters,
                                                              IReadOnlyDictionary<TransparencySoftware_Id,            TransparencySoftware>             TransparencySoftware,
                                                              IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  Certificates,
                                                              IReadOnlyDictionary<ChargingStationManufacturer_Id,     ChargingStationManufacturer>      ChargingStationManufacturers)
@@ -1839,7 +1921,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            foreach (var energyMeter in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters))
+            foreach (var energyMeter in EnergyMeters)
                 foreach (var assignment in energyMeter.TransparencySoftwareStatus)
                 {
 
@@ -2025,11 +2107,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The error, when an energy meter of the given operators names a manufacturer not among the given ones.
         /// </summary>
-        internal static String? UnknownEnergyMeterManufacturer(IEnumerable<ChargingStationOperator>                                      ChargingStationOperators,
+        internal static String? UnknownEnergyMeterManufacturer(IEnumerable<EnergyMeter>                                                  EnergyMeters,
                                                                IReadOnlyDictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>  EnergyMeterManufacturers)
         {
 
-            foreach (var energyMeter in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters))
+            foreach (var energyMeter in EnergyMeters)
                 if (energyMeter.ManufacturerId.HasValue &&
                     !EnergyMeterManufacturers.ContainsKey(energyMeter.ManufacturerId.Value))
                 {
@@ -2048,10 +2130,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly ConcurrentDictionary<EnergyMeter_Id, EnergyMeter> energyMeters = [];
 
         /// <summary>
-        /// The energy meters of all charging pools, their grid connection points, charging stations and EVSEs.
+        /// The energy meters of all charging pools, charging stations and EVSEs, and of all grid connection points.
         /// </summary>
         public IEnumerable<EnergyMeter> EnergyMeters
             => energyMeters.Values;
+
+        /// <summary>
+        /// The energy meters of the given charging station operators and grid operators.
+        /// </summary>
+        internal static IEnumerable<EnergyMeter> AllEnergyMeters(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
+                                                                 IEnumerable<GridOperator>             GridOperators)
+
+            => ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters).
+                   Concat(GridOperators.SelectMany(gridOperator => gridOperator.EnergyMeters));
 
         /// <summary>
         /// Try to get the energy meter having the given identification, anywhere in the network.
@@ -2064,14 +2155,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => energyMeters.TryGetValue(EnergyMeterId, out EnergyMeter);
 
         /// <summary>
-        /// The error, when two of the given operators have an energy meter with the same identification.
+        /// The error, when two of the given energy meters have the same identification.
         /// </summary>
-        internal static String? DuplicateEnergyMeter(IEnumerable<ChargingStationOperator> ChargingStationOperators)
+        internal static String? DuplicateEnergyMeter(IEnumerable<EnergyMeter> EnergyMeters)
         {
 
             var seen = new HashSet<EnergyMeter_Id>();
 
-            foreach (var energyMeter in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters))
+            foreach (var energyMeter in EnergyMeters)
                 if (!seen.Add(energyMeter.Id))
                     return $"The energy meter '{energyMeter.Id}' must not be given twice in the roaming network!";
 

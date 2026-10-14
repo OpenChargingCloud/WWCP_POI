@@ -40,7 +40,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}                                                          the roaming network
     /// GET ~/RNs/{RN_Id}/CSOs                                                     its charging station operators, in short
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}                                            a charging station operator
-    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool;
+    ///     ?expand=gridConnectionPoint embeds its grid connection point instead of naming it
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}                    a charging station
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}    an EVSE
     /// GET ~/RNs/{RN_Id}/GOs                                                      its grid operators, in short
@@ -58,7 +59,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// with the ETag of the list.
     /// An entity is the representation its roaming network embeds, so its ETag is the one of that
     /// part of the roaming network: SHA-256 over its canonical JSON or canonical CBOR, which is also
-    /// the content of the response. The roaming network carries its own ETags, calculated without them.
+    /// the content of the response. An expanded view is another representation with its own ETag. The roaming network carries its own ETags, calculated without them.
     /// The HTTP ETag is the POI ETag of the format of the response, e.g. "json:sha256:hex:…";
     /// an If-None-Match naming it is answered with 304 Not Modified.
     /// HEAD is answered by Hermod from GET; OPTIONS answers the CORS preflights of every origin.
@@ -130,9 +131,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}
 
             AddEntityHandlers(chargingPoolPath,
-                              request => TryGetRequestedChargingPool(request, out var chargingPool, out var errorResponse)
-                                             ? EntityResponse(request, chargingPool.ToJSON())
-                                             : errorResponse);
+                              request => {
+
+                                  if (!TryGetRequestedChargingPool  (request, out var chargingPool,   out var errorResponse) ||
+                                      !TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out errorResponse))
+                                  {
+                                      return errorResponse;
+                                  }
+
+                                  var json = chargingPool.ToJSON();
+
+                                  if (request.QueryString.GetString("expand") is String expand)
+                                  {
+
+                                      foreach (var expansion in expand.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                          if (expansion != "gridConnectionPoint")
+                                              return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Unknown expansion '{expansion}'; a charging pool expands only 'gridConnectionPoint'!");
+
+                                      // Embedded with its grid operator, in the place of its identification.
+                                      if (chargingPool.GridConnectionPointId is GridConnectionPoint_Id gridConnectionPointId &&
+                                          roamingNetwork.TryGetGridConnectionPoint(gridConnectionPointId, out var gridOperator, out var gridConnectionPoint) &&
+                                          json.Property("gridConnectionPointId") is JProperty idProperty)
+                                      {
+
+                                          var embedded = new JObject(
+                                                             new JProperty("@id",             gridConnectionPoint.Id.ToString()),
+                                                             new JProperty("gridOperatorId",  gridOperator.Id.ToString())
+                                                         );
+
+                                          foreach (var property in gridConnectionPoint.ToJSON().Properties().Where(property => property.Name != "@id"))
+                                              embedded.Add(new JProperty(property.Name, property.Value.DeepClone()));
+
+                                          idProperty.Replace(new JProperty("gridConnectionPoint", embedded));
+
+                                      }
+
+                                  }
+
+                                  return EntityResponse(request, json);
+
+                              });
 
             #endregion
 
@@ -175,25 +213,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}
 
-            // The charging pools embed the grid connection points, naming their grid operators.
             AddEntityHandlers(gridOperatorPath + "/GCPs/{gridConnectionPointId}",
                               request => {
 
-                                  if (!TryGetRequestedGridOperator(request, out var roamingNetwork, out var gridOperator, out var errorResponse))
+                                  if (!TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse))
                                       return errorResponse;
 
                                   if (!GridConnectionPoint_Id.TryParse(request.ParsedURLParameters[2], out var gridConnectionPointId))
                                       return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid grid connection point identification!");
 
-                                  var gridConnectionPoint = roamingNetwork.ChargingStationOperators.
-                                                                OrderBy   (chargingStationOperator => chargingStationOperator.Id.ToString(), StringComparer.Ordinal).
-                                                                SelectMany(chargingStationOperator => chargingStationOperator.ChargingPools).
-                                                                Select    (chargingPool            => chargingPool.GridConnectionPoint).
-                                                                FirstOrDefault(point => point is not null &&
-                                                                                        point.Id.            Equals(gridConnectionPointId) &&
-                                                                                        point.GridOperatorId.Equals(gridOperator.Id));
-
-                                  return gridConnectionPoint is not null
+                                  return gridOperator.TryGetGridConnectionPoint(gridConnectionPointId, out var gridConnectionPoint)
                                              ? EntityResponse     (request, gridConnectionPoint.ToJSON())
                                              : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The grid connection point '{gridConnectionPointId}' of the grid operator '{gridOperator.Id}' is unknown!");
 

@@ -118,7 +118,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             GridOperator.TryParse,
             gridOperator => gridOperator.Id,
             gridOperator => gridOperator.ToJSON(),
-            (changed, previous) => changed.ShareRuntimeOf(previous)
+            // The meters of its grid connection points are embedded: theirs go along too.
+            (changed, previous) => changed.ShareRuntimeOfAll(previous)
         );
 
         // In this file, after ChangeablePartyProperties: static fields are initialized in their textual order only within one file.

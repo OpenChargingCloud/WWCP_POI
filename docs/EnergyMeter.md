@@ -1,14 +1,15 @@
 # EnergyMeter
 
-An energy meter measures the energy of what embeds it: a whole charging pool, its grid connection point
+An energy meter measures the energy of what embeds it: a whole charging pool, a grid connection point
 (e.g. the grid meter), a charging station, or a single EVSE (e.g. the calibration-law meter of a charge point).
 It is described by its role, its manufacturer and model, serial number and versions, and by the transparency
 software releases that can verify its signed measurements, with their legal status.
 
 An energy meter is an entity with admin status and status, but it is **not addressed by change sets on its own**:
 it is embedded completely in what it measures and changes as a property of that ([below](#where-energy-meters-live)).
-All four places belong to a [ChargingStationOperator](ChargingStationOperator.md), which therefore owns its meters
-and signs their changes.
+Pools, stations and EVSEs belong to a [ChargingStationOperator](ChargingStationOperator.md), which therefore owns
+their meters and signs their changes; the meter of a grid connection point belongs to the maintainer of the point
+([GridOperator](GridOperator.md#maintainer)).
 
 The identification is an `EnergyMeter_Id`, any nonempty text, trimmed, compared case-insensitively, e.g.
 `grid-meter` or `1ESY1161229886`. It is unique within the whole roaming network, not only within its embedder.
@@ -19,8 +20,8 @@ The identification is an `EnergyMeter_Id`, any nonempty text, trimmed, compared 
 | Identification | `EnergyMeter_Id`, e.g. `grid-meter` |
 | Admin status | `EnergyMeterAdminStatusType`, initially `operational` |
 | Status | `EnergyMeterStatusType`, initially `available` |
-| Embedded in | [ChargingPool](ChargingPool.md) as `energyMeters`, its grid connection point as `energyMeter`, [ChargingStation](ChargingStation.md) as `energyMeters`, [EVSE](EVSE.md) as `energyMeter` |
-| Owner | the charging station operator owning the embedding pool, station or EVSE |
+| Embedded in | [ChargingPool](ChargingPool.md) as `energyMeters`, a [grid connection point](GridOperator.md#grid-connection-points) as `energyMeter`, [ChargingStation](ChargingStation.md) as `energyMeters`, [EVSE](EVSE.md) as `energyMeter` |
+| Owner | the charging station operator owning the embedding pool, station or EVSE; the maintainer of the embedding grid connection point |
 | HTTP | no route of its own; embedded in `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}`, `…/CSs/{CS_Id}` and `…/EVSEs/{EVSE_Id}` |
 
 
@@ -28,8 +29,8 @@ The identification is an `EnergyMeter_Id`, any nonempty text, trimmed, compared 
 
 See [README.md](README.md#common-properties). No `eTags`.
 
-"via parent" means: the property changes only when the embedding property (`energyMeters`, `energyMeter`,
-`gridConnectionPoint`) is replaced or removed as a whole ([below](#change-sets)).
+"via parent" means: the property changes only when the embedding property (`energyMeters`, `energyMeter`)
+is replaced or removed as a whole ([below](#change-sets)).
 
 | JSON key | Change set | Notes |
 |---|---|---|
@@ -57,9 +58,9 @@ See [README.md](README.md#common-properties). No `eTags`.
 
 All are optional and omitted when absent.
 
-**Derived (not serialized)** — the embedders collect their meters: `ChargingPool.AllEnergyMeters` (its own, its grid
-connection point's, its stations' and EVSEs'), `ChargingStation.AllEnergyMeters`, `EVSE.AllEnergyMeters`,
-`ChargingStationOperator.EnergyMeters`, `RoamingNetwork.EnergyMeters` with `TryGetEnergyMeterById`.
+**Derived (not serialized)** — the embedders collect their meters: `ChargingPool.AllEnergyMeters` (its own, its
+stations' and EVSEs'), `ChargingStation.AllEnergyMeters`, `EVSE.AllEnergyMeters`, `ChargingStationOperator.EnergyMeters`,
+`GridOperator.EnergyMeters` (those of its grid connection points), `RoamingNetwork.EnergyMeters` with `TryGetEnergyMeterById`.
 
 
 ## Where energy meters live
@@ -67,11 +68,11 @@ connection point's, its stations' and EVSEs'), `ChargingStation.AllEnergyMeters`
 | Embedder | JSON key | Cardinality | Changed by |
 |---|---|---|---|
 | [ChargingPool](ChargingPool.md) | `energyMeters` | 0..n, ordered by `@id` (ordinal) | `UpdateProperty(pool, "energyMeters", old, new JArray(…))`, `RemoveProperty(pool, "energyMeters")` |
-| grid connection point of a [ChargingPool](ChargingPool.md) | `gridConnectionPoint.energyMeter` | 0..1 | `UpdateProperty(pool, "gridConnectionPoint", old, newPoint)` — the grid connection point as a whole |
+| [grid connection point](GridOperator.md#grid-connection-points) of a grid operator | `energyMeter` | 0..1 | `UpdateProperty(point, "energyMeter", old, meter.ToJSON())`, `RemoveProperty(point, "energyMeter")`, signed by its maintainer |
 | [ChargingStation](ChargingStation.md) | `energyMeters` | 0..n, ordered by `@id` (ordinal) | `UpdateProperty(station, "energyMeters", …)`, `RemoveProperty(station, "energyMeters")` |
 | [EVSE](EVSE.md) | `energyMeter` | 0..1 | `UpdateProperty(evse, "energyMeter", old, meter.ToJSON())`, `RemoveProperty(evse, "energyMeter")` |
 
-- A pool's `energyMeters` are its own, not those of its grid connection point or its stations.
+- A pool's `energyMeters` are its own, not those of its stations, and not that of the grid connection point it names.
 - The arrays are written only when not empty, and are read only completely: `energyMeterIds` is refused.
 - There is no `RoamingNetworkChange.Add`/`Remove` of an energy meter, and no entity type `EnergyMeter` in change sets.
   Adding, changing or removing a meter replaces the embedding property; a three-way merge compares that property

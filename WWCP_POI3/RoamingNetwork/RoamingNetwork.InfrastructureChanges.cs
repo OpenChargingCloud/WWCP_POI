@@ -58,7 +58,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "parkingType",
             "accessibility",
             "hotline",
-            "gridConnectionPoint",
+            "gridConnectionPointId",
             "energyMeters",
             "brandIds",
             "openingTimes",
