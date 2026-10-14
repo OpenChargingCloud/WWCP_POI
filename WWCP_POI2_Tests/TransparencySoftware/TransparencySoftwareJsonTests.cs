@@ -251,7 +251,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
         [TestCase("en-US")]
         [TestCase("de-DE")]
         [TestCase("tr-TR")]
-        public void Status_roundtrip_preserves_certificates_UTC_instants_and_ticks(string culture)
+        public void Status_roundtrip_preserves_certificates_UTC_instants_to_the_millisecond(string culture)
         {
 
             var previous = CultureInfo.CurrentCulture;
@@ -267,8 +267,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
                 Assert.That(parsed, Is.EqualTo(source));
                 Assert.That(parsed.GetHashCode(), Is.EqualTo(source.GetHashCode()));
                 Assert.That(parsed.Certificate!.NotBefore!.Value.Offset, Is.EqualTo(TimeSpan.Zero));
-                Assert.That(parsed.Certificate!.NotBefore.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(1234567));
-                Assert.That(parsed.Certificate!.NotAfter!.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(7654321));
+                Assert.That(parsed.Certificate!.NotBefore.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(1230000), "To the millisecond, as the content keeps timestamps.");
+                Assert.That(parsed.Certificate!.NotAfter!.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(7650000));
                 Assert.That(JToken.DeepEquals(parsed.ToJSON(), source.ToJSON()), Is.True);
 
             }
@@ -339,7 +339,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
 
             var parsed = TransparencySoftwareCertificate.Parse(json);
 
-            Assert.That(parsed.NotBefore, Is.EqualTo(DateTimeOffset.Parse("2026-01-01T10:30:00.1234567Z", CultureInfo.InvariantCulture)));
+            Assert.That(parsed.NotBefore, Is.EqualTo(DateTimeOffset.Parse("2026-01-01T10:30:00.123Z", CultureInfo.InvariantCulture)), "To the millisecond, as the content keeps timestamps.");
             Assert.That(parsed.NotBefore!.Value.Offset, Is.EqualTo(TimeSpan.Zero));
             Assert.That(parsed.ToJSON().ToString(), Is.EqualTo(Certificate().ToJSON().ToString()));
 

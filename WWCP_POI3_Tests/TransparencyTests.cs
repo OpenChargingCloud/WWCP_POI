@@ -144,6 +144,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(json["transparencySoftware"]!.Select(release => release["@id"]!.ToString()),  Is.EqualTo(new[] { "chargy-1.0", "chargy-1.1" }));
                 Assert.That(json["transparencySoftwareCertificates"]![0]!["@id"]!.ToString(),       Is.EqualTo("cert-1"));
+                Assert.That(json["transparencySoftwareCertificates"]![0]!["notBefore"]!.ToString(), Is.EqualTo("2026-01-01T00:00:00.000Z"));
                 Assert.That(meter["transparencySoftwareStatus"]![0]!["certificateId"]!.ToString(),  Is.EqualTo("cert-1"));
                 Assert.That(meter["transparencySoftwareStatus"]![0]!["legalStatus"]!.ToString(),    Is.EqualTo(LegalStatus.GermanCalibrationLaw.ToString()));
 
@@ -154,6 +155,39 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(fromJSON.TryGetEnergyMeterById(Meter1, out var meter1),                 Is.True);
                 Assert.That(meter1!.TransparencySoftwareStatus.Length,                              Is.EqualTo(2));
 
+            }
+
+        }
+
+        #endregion
+
+        #region Certificates_are_valid_to_the_millisecond()
+
+        /// <summary>
+        /// The validity of a certificate is content: written as every timestamp of the content, in UTC to the millisecond.
+        /// </summary>
+        [Test]
+        public void Certificates_are_valid_to_the_millisecond()
+        {
+
+            var certificate  = new TransparencySoftwareCertificate(Cert1,
+                                                                   "PTB",
+                                                                   "Wallbox-22",
+                                                                   "1.0",
+                                                                   [ Chargy10 ],
+                                                                   [],
+                                                                   NotBefore:  DateTimeOffset.Parse("2026-01-01T01:00:00.1234567+01:00"),
+                                                                   NotAfter:   DateTimeOffset.Parse("2031-01-01T00:00:00Z"));
+
+            var json         = certificate.ToJSON();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(json["notBefore"]!.ToString(),                       Is.EqualTo("2026-01-01T00:00:00.123Z"));
+                Assert.That(json["notAfter"]!. ToString(),                       Is.EqualTo("2031-01-01T00:00:00.000Z"));
+                Assert.That(certificate.NotBefore,                               Is.EqualTo(DateTimeOffset.Parse("2026-01-01T00:00:00.123Z")));
+                Assert.That(TransparencySoftwareCertificate.TryParse(json, out var parsed, out var error),  Is.True, error);
+                Assert.That(parsed!.ToJSON().ToString(),                         Is.EqualTo(json.ToString()));
             }
 
         }

@@ -260,7 +260,7 @@ is an error.
 | `chargingStationManufacturerId` | string | update/remove | Optional; a [ChargingStationManufacturer](ChargingStationManufacturer.md) of the network. |
 | `documentNumber` | string | update/remove | The issuer's number, if it differs from `@id`. |
 | `documentURL` | URL | update/remove | Absolute. |
-| `notBefore` | timestamp | update/remove | Start of validity, written round-trip (`O`), e.g. `2026-01-01T00:00:00.0000000+00:00`. |
+| `notBefore` | timestamp | update/remove | Start of validity, in UTC to the millisecond like every timestamp of the content, e.g. `2026-01-01T00:00:00.000Z`. |
 | `notAfter` | timestamp | update/remove | End of validity; not before `notBefore`. |
 
 - At least one release in both lists together; a release not in both, not twice, not empty.
@@ -405,7 +405,7 @@ Checked when a change set is applied:
       "chargingStationModelVersion": "2.1",
       "verifiedTransparencySoftwareIds":   [ "chargy-desktop-1.4.0" ],
       "compatibleTransparencySoftwareIds": [],
-      "notBefore": "2026-01-01T00:00:00.0000000+00:00" }
+      "notBefore": "2026-01-01T00:00:00.000Z" }
   ],
   "signingKeys":  [ { "@id": "5b9e…", "key": "pQECIAEh…" } ],
   "identityKeys": [ { "@id": "c2f4…", "key": "pQECIAMh…", "notAfter": "2036-01-01T00:00:00.000Z" } ],

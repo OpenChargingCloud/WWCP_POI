@@ -17,7 +17,6 @@
 
 #region Usings
 
-using System.Globalization;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
@@ -172,8 +171,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ChargingStationManufacturerId      = ChargingStationManufacturerId;
             this.DocumentNumber                     = DocumentNumber;
             this.DocumentURL                        = DocumentURL;
-            this.NotBefore                          = NotBefore?.ToUniversalTime();
-            this.NotAfter                           = NotAfter?. ToUniversalTime();
+            // To the millisecond, as their representations keep them.
+            this.NotBefore                          = NotBefore.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(NotBefore.Value.ToUnixTimeMilliseconds()) : null;
+            this.NotAfter                           = NotAfter. HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(NotAfter. Value.ToUnixTimeMilliseconds()) : null;
 
         }
 
@@ -285,11 +285,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : null,
 
                            NotBefore.HasValue
-                               ? new JProperty("notBefore",                          NotBefore.Value.ToString("O", CultureInfo.InvariantCulture))
+                               ? new JProperty("notBefore",                          NotBefore.Value.ToISO8601())
                                : null,
 
                            NotAfter.HasValue
-                               ? new JProperty("notAfter",                           NotAfter. Value.ToString("O", CultureInfo.InvariantCulture))
+                               ? new JProperty("notAfter",                           NotAfter. Value.ToISO8601())
                                : null
 
                        );
