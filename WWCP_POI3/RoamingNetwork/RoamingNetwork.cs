@@ -68,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     InfoStatus                                                 ExpandChargingStationIds                  = InfoStatus.ShowIdOnly,
                                     InfoStatus                                                 ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
                                     InfoStatus                                                 ExpandBrandIds                            = InfoStatus.ShowIdOnly,
-                                    InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.ShowIdOnly,
+                                    InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.Expanded,
                                     InfoStatus                                                 ExpandEMobilityProviderId                 = InfoStatus.ShowIdOnly,
 
                                     CustomJObjectSerializerDelegate<RoamingNetwork>?           CustomRoamingNetworkSerializer            = null)

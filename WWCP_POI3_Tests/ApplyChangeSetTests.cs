@@ -766,6 +766,31 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
         #endregion
 
+        #region Operators_write_their_data_licenses_completely()
+
+        /// <summary>
+        /// Unless asked for identifications only, an operator writes its data licenses completely,
+        /// so that one not well-known is read again.
+        /// </summary>
+        [Test]
+        public void Operators_write_their_data_licenses_completely()
+        {
+
+            var gef   = NewNetwork().GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*GEF"))!;
+            var json  = gef.ToJSON();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(json["dataLicenseIds"],                                                Is.Null);
+                Assert.That(json["dataLicenses"]!.Select(license => license["@id"]!.ToString()),  Is.EqualTo(new[] { "ODbL", "own-1.0" }));
+                Assert.That(ChargingStationOperator.TryParse(json, out var parsed, out var error), Is.True, error);
+                Assert.That(parsed!.ToEmbeddedJSON().ToString(),                                   Is.EqualTo(gef.ToEmbeddedJSON().ToString()));
+            }
+
+        }
+
+        #endregion
+
         #region Timestamps_and_custom_data_are_content()
 
         [Test]

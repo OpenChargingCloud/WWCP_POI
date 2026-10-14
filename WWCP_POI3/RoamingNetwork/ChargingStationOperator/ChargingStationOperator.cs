@@ -61,7 +61,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     InfoStatus                                                 ExpandChargingStationIds                  = InfoStatus.ShowIdOnly,
                                     InfoStatus                                                 ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
                                     InfoStatus                                                 ExpandBrandIds                            = InfoStatus.ShowIdOnly,
-                                    InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.ShowIdOnly,
+                                    InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.Expanded,
                                     CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null)
                                     //CustomJObjectSerializerDelegate<ChargingPool>?             CustomChargingPoolSerializer              = null,
                                     //CustomJObjectSerializerDelegate<ChargingStation>?          CustomChargingStationSerializer           = null,
@@ -1142,7 +1142,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               InfoStatus                                                 ExpandChargingStationIds                  = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandBrandIds                            = InfoStatus.ShowIdOnly,
-                              InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.Expanded,
                               CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null,
                               //CustomJObjectSerializerDelegate<ChargingPool>?             CustomChargingPoolSerializer              = null,
                               //CustomJObjectSerializerDelegate<ChargingStation>?          CustomChargingStationSerializer           = null,
