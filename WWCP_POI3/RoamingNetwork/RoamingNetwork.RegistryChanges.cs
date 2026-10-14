@@ -213,7 +213,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var description = Registry.Description;
 
             if (Change.ParentEntityType is not null &&
-               (Change.ParentEntityType != nameof(POI.RoamingNetwork) || Change.ParentEntityId != Id.ToString()))
+               (Change.ParentEntityType != nameof(POI.RoamingNetwork) || !IsThisRoamingNetwork(Change.ParentEntityId)))
             {
                 ErrorResponse = $"Change {Index}: {Registry.Article} {description} of this roaming network belongs to RoamingNetwork '{Id}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
                 return false;

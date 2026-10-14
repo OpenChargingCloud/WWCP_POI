@@ -124,7 +124,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Party = PartyId.EntityType switch {
 
-                nameof(RoamingNetwork)           => PartyId.EntityId == Id.ToString() ? this : null,
+                nameof(RoamingNetwork)           => IsThisRoamingNetwork(PartyId.EntityId) ? this : null,
 
                 nameof(ChargingStationOperator)  => ChargingStationOperator_Id.TryParse(PartyId.EntityId, out var chargingStationOperatorId) &&
                                                     chargingStationOperators.TryGetValue(chargingStationOperatorId, out var chargingStationOperator)
@@ -149,6 +149,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return Party is not null;
 
         }
+
+        #endregion
+
+        #region (private) IsThisRoamingNetwork(RoamingNetworkId)
+
+        /// <summary>
+        /// Whether the given text names this roaming network, as its identification type compares them.
+        /// </summary>
+        private Boolean IsThisRoamingNetwork(String? RoamingNetworkId)
+
+            => RoamingNetworkId is not null &&
+               RoamingNetwork_Id.TryParse(RoamingNetworkId, out var roamingNetworkId) &&
+               roamingNetworkId == Id;
 
         #endregion
 
@@ -323,7 +336,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (PartyTypes.Contains(Change.EntityType))
             {
 
-                var party = new POIPartyId(Change.EntityType, Change.EntityId);
+                // The party as its keys name it: a change may name it in every spelling its identification type considers equal.
+                var party = TryGetParty(new POIPartyId(Change.EntityType, Change.EntityId), out var namedParty)
+                                ? Parties.First(knownParty => ReferenceEquals(knownParty.Party, namedParty)).Id
+                                : new POIPartyId(Change.EntityType, Change.EntityId);
 
                 // Signing keys are rotated by the signing keys they replace, or by an identity key when none of them
                 // can sign any more; identity keys only by an identity key. The roaming network operator recovers both.

@@ -513,7 +513,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
 
                     if (change.ParentEntityType is not null &&
-                       (change.ParentEntityType != nameof(POI.RoamingNetwork) || change.ParentEntityId != Id.ToString()))
+                       (change.ParentEntityType != nameof(POI.RoamingNetwork) || !IsThisRoamingNetwork(change.ParentEntityId)))
                     {
                         ErrorResponse = $"Change {index}: a charging station operator of this roaming network belongs to RoamingNetwork '{Id}', not to {change.ParentEntityType} '{change.ParentEntityId}'!";
                         return false;
@@ -660,7 +660,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region The roaming network itself
 
                 else if (change.EntityType == nameof(POI.RoamingNetwork) &&
-                         change.EntityId   == Id.ToString()              &&
+                         IsThisRoamingNetwork(change.EntityId)           &&
                          change.ParentEntityType is null)
                 {
 

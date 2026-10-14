@@ -337,6 +337,40 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Parties_are_named_in_every_spelling_of_their_identification()
+
+        /// <summary>
+        /// A change names a party, or the roaming network, in any spelling its identification type considers equal,
+        /// and needs the signature of that party, as with the spelling it is kept with.
+        /// </summary>
+        [Test]
+        public void Parties_are_named_in_every_spelling_of_their_identification()
+        {
+
+            var rn1       = NewNetwork();
+
+            var operator1 = Change(rn1, RoamingNetworkChange.UpdateProperty("ChargingStationOperator", "degef", "telephone",  null, "+49 30 1234567", "RoamingNetwork", "RN1"));
+            var network   = Change(rn1, RoamingNetworkChange.UpdateProperty("RoamingNetwork",          "RN1",   "dataSource", null, "v2"));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn1.TryApplyChangeSet(operator1.SignedBy(TestParties.Party(GEF)), out var rn2, out var error),  Is.True, error);
+                Assert.That(rn2!.GetChargingStationOperatorById(GEF)!.Telephone?.ToString(),                                   Is.EqualTo("+49 30 1234567"));
+
+                Assert.That(rn1.TryApplyChangeSet(network.SignedBy(TestParties.Party(rn1)), out var rn3, out error),         Is.True, error);
+                Assert.That(rn3!.DataSource,                                                                                   Is.EqualTo("v2"));
+
+                // Still only by its own keys.
+                Assert.That(Apply(rn1, operator1.SignedBy(TestParties.Party(EXA))).Error,
+                            Does.Contain("needs a signature by a signing key of the ChargingStationOperator 'DE*GEF'"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Keys_are_valid_for_their_time()
 
         [Test]
