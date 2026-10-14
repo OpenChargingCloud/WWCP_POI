@@ -363,6 +363,11 @@ JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json
 | `GET ~/RNs/{RN_Id}/GOs/{GO_Id}[/GCPs/{GCP_Id}]` | a grid operator, or one of its grid connection points |
 | `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer or parking operator |
 
+Versions are immutable and their runtime status is no part of these representations, so each one is calculated
+once per version and format and kept as long as the version is referenced; an entity a commit does not change is
+the same object in the new version and keeps its representations. A 304 costs a lookup. Only an expanded view is
+calculated for every request.
+
 Submitting is refused unless `AuthorizeChangeSetSubmission` decides who may submit;
 what a change set may change, its owners' signatures decide. Pushing commits is refused unless
 `AuthorizeCommitPush` decides who may push, e.g. other servers; they are checked as every commit.

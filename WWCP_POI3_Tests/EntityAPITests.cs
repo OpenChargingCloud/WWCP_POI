@@ -322,6 +322,109 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
         #endregion
 
+        #region Kept_representations_follow_the_versions()
+
+        [Test]
+        public async Task Kept_representations_follow_the_versions()
+        {
+
+            var paths   = new[] { RN, RN + "/EMPs", EM, CSO, CP, CP + "?expand=gridConnectionPoint", GO, GC, "RNs" };
+
+            async Task<Dictionary<String, (String ETag, Byte[] Content)>> GetAll()
+            {
+                var all = new Dictionary<String, (String, Byte[])>();
+                foreach (var path in paths)
+                {
+                    var (response, content) = await Send(HttpMethod.Get, path);
+                    Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK), path);
+                    all[path] = (HeaderOf(response, "ETag")!, content);
+                }
+                return all;
+            }
+
+            var before  = await GetAll();
+            var again   = await GetAll();
+
+            var rn1     = history!.Head.RoamingNetwork;
+            rn1.TryGetEMobilityProviderById(EMP, out var emp);
+            rn1.TryGetGridConnectionPoint  (GCP, out _, out var gcp);
+
+            // A new name of the e-mobility provider, and a new rating of the grid connection point.
+            history.Commit(
+                rn1.CreateSignedChangeSet(
+                    [
+                        RoamingNetworkChange.UpdateProperty(emp!, "name",                  null, new JObject(new JProperty("en", "Another Mobility"))),
+                        RoamingNetworkChange.UpdateProperty(gcp!, "contractedImportPower", null, 200000)
+                    ],
+                    CreatedAt: DateTimeOffset.Parse("2026-10-14T12:00:00Z")
+                )
+            );
+
+            var after   = await GetAll();
+
+            poiAPI!.AddRoamingNetwork(NewNetwork("rn0"), EventTracking_Id.New);
+
+            var (roamingNetworks, roamingNetworksContent) = await Send(HttpMethod.Get, "RNs");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // Asked again: the very same content and ETags.
+                foreach (var path in paths)
+                {
+                    Assert.That(again[path].ETag,     Is.EqualTo(before[path].ETag),     path);
+                    Assert.That(again[path].Content,  Is.EqualTo(before[path].Content),  path);
+                }
+
+                // Changed: the roaming network, the e-mobility provider and their list, the grid connection point,
+                // its grid operator and the view of the pool embedding it.
+                foreach (var path in new[] { RN, RN + "/EMPs", EM, GC, GO, CP + "?expand=gridConnectionPoint" })
+                    Assert.That(after[path].ETag,     Is.Not.EqualTo(before[path].ETag), path);
+
+                // Unchanged: the operator and its pool, and the names of the roaming networks.
+                foreach (var path in new[] { CSO, CP, "RNs" })
+                    Assert.That(after[path].ETag,     Is.EqualTo(before[path].ETag),     path);
+
+                // Every ETag is still the one of the content.
+                foreach (var path in paths.Where(path => path != RN))
+                    Assert.That(after[path].ETag,     Is.EqualTo(ETagOf("json", after[path].Content)), path);
+
+                Assert.That(ParseJSON(after[EM].Content)["name"]!["en"]!.Value<String>(),                                    Is.EqualTo("Another Mobility"));
+                Assert.That(ParseJSON(after[CP + "?expand=gridConnectionPoint"].Content)["gridConnectionPoint"]!["contractedImportPower"]!.Value<Decimal>(),
+                            Is.EqualTo(200000m));
+
+                // Another roaming network served: another list.
+                Assert.That(HeaderOf(roamingNetworks, "ETag"),                                                                Is.Not.EqualTo(after["RNs"].ETag));
+                Assert.That(JArray.Parse(System.Text.Encoding.UTF8.GetString(roamingNetworksContent)).Count,                  Is.EqualTo(2));
+
+            }
+
+        }
+
+        #endregion
+
+        #region JSON_and_CBOR_are_kept_apart()
+
+        [Test]
+        public async Task JSON_and_CBOR_are_kept_apart()
+        {
+
+            var (json, jsonContent)  = await Send(HttpMethod.Get, EV);
+            var (cbor, cborContent)  = await Send(HttpMethod.Get, EV, Accept: "application/cbor");
+            var (list, listContent)  = await Send(HttpMethod.Get, RN + "/GOs", Accept: "application/cbor");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(HeaderOf(json, "ETag"),                        Is.EqualTo(ETagOf("json", jsonContent)));
+                Assert.That(HeaderOf(cbor, "ETag"),                        Is.EqualTo(ETagOf("cbor", cborContent)));
+                Assert.That(cbor.Content.Headers.ContentType?.MediaType,   Is.EqualTo("application/cbor"));
+                Assert.That(HeaderOf(list, "ETag"),                        Is.EqualTo(ETagOf("cbor", listContent)));
+            }
+
+        }
+
+        #endregion
+
         #region A_charging_pool_embeds_its_grid_connection_point_on_request()
 
         [Test]
