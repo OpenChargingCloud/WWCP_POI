@@ -248,6 +248,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.Add(NewTariff(t3))),
                             Throws.ArgumentException.With.Message.Contains("already exists"));
 
+                // What a tariff needs can be changed, but not removed.
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.RemoveProperty(changedT1, "currency")),
+                            Throws.ArgumentException.With.Message.Contains("the property 'currency' of a charging tariff can not be removed, only changed"));
+
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.RemoveProperty(changedT1, "elements")),
+                            Throws.ArgumentException.With.Message.Contains("the property 'elements' of a charging tariff can not be removed, only changed"));
+
             }
 
         }

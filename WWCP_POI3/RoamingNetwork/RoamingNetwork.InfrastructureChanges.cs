@@ -154,7 +154,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }.ToImmutableDictionary();
 
         /// <summary>
-        /// The properties of a charging tariff a change set can update or remove.
+        /// The properties of a charging tariff a change set can update, and remove unless they are required.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableChargingTariffProperties = [
             "name",
@@ -165,6 +165,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "elements",
             "energyMix",
             "customData"
+        ];
+
+        /// <summary>
+        /// The properties of a charging tariff a change set can update, but not remove: a tariff needs them.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> RequiredChargingTariffProperties = [
+            "currency",
+            "elements"
         ];
 
         #endregion
@@ -305,6 +313,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (Change.Kind == RoamingNetworkChangeKind.RemoveProperty)
                     {
+
+                        if (Change.EntityType == nameof(ChargingTariff) && RequiredChargingTariffProperties.Contains(propertyName))
+                        {
+                            ErrorResponse = $"Change {Index}: the property '{propertyName}' of a {description} can not be removed, only changed!";
+                            return false;
+                        }
 
                         if (CurrentValue is null)
                         {
