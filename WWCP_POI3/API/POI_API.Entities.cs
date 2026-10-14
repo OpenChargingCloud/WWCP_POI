@@ -36,16 +36,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// each with the ETag of its representation, readable from every origin.
     /// </summary>
     /// <remarks>
+    /// GET ~/RNs                                                                  the roaming networks, in short
     /// GET ~/RNs/{RN_Id}                                                          the roaming network
+    /// GET ~/RNs/{RN_Id}/CSOs                                                     its charging station operators, in short
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}                                            a charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}                    a charging station
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}    an EVSE
+    /// GET ~/RNs/{RN_Id}/GOs                                                      its grid operators, in short
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}                                              a grid operator
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}                                a grid connection point of the grid operator
+    /// GET ~/RNs/{RN_Id}/EMPs                                                     its e-mobility providers, in short
     /// GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}                                            an e-mobility provider
+    /// GET ~/RNs/{RN_Id}/CSMs                                                     its charging station manufacturers, in short
+    /// GET ~/RNs/{RN_Id}/CSMs/{CSM_Id}                                            a charging station manufacturer
+    /// GET ~/RNs/{RN_Id}/POs                                                      its parking operators, in short
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}                                              a parking operator
     ///
     /// The roaming network is the head of its history, when served with one, else the one added.
+    /// A list is an array of { "@id", "name", "description" } in the order of the identifications,
+    /// with the ETag of the list.
     /// An entity is the representation its roaming network embeds, so its ETag is the one of that
     /// part of the roaming network: SHA-256 over its canonical JSON or canonical CBOR, which is also
     /// the content of the response. The roaming network carries its own ETags, calculated without them.
@@ -82,12 +92,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var chargingStationPath          = chargingPoolPath            + "/CSs/{chargingStationId}";
             var gridOperatorPath             = roamingNetworkPath          + "/GOs/{gridOperatorId}";
 
+            #region ~/RNs
+
+            AddEntityHandlers(HTTPPath.Root + "RNs",
+                              request => EntityResponse(request, EntitySummaries(RoamingNetworksServed())));
+
+            #endregion
+
             #region ~/RNs/{RN_Id}
 
             AddEntityHandlers(roamingNetworkPath,
                               request => TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse)
                                              ? RoamingNetworkResponse(request, roamingNetwork)
                                              : errorResponse);
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/CSOs, GOs, EMPs, CSMs, POs
+
+            AddListHandlers(roamingNetworkPath + "/CSOs",  roamingNetwork => EntitySummaries(roamingNetwork.ChargingStationOperators));
+            AddListHandlers(roamingNetworkPath + "/GOs",   roamingNetwork => EntitySummaries(roamingNetwork.GridOperators));
+            AddListHandlers(roamingNetworkPath + "/EMPs",  roamingNetwork => EntitySummaries(roamingNetwork.EMobilityProviders));
+            AddListHandlers(roamingNetworkPath + "/CSMs",  roamingNetwork => EntitySummaries(roamingNetwork.ChargingStationManufacturers));
+            AddListHandlers(roamingNetworkPath + "/POs",   roamingNetwork => EntitySummaries(roamingNetwork.ParkingOperators));
 
             #endregion
 
@@ -193,6 +220,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region ~/RNs/{RN_Id}/CSMs/{CSM_Id}
+
+            AddEntityHandlers(roamingNetworkPath + "/CSMs/{chargingStationManufacturerId}",
+                              request => {
+
+                                  if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
+                                      return errorResponse;
+
+                                  if (!ChargingStationManufacturer_Id.TryParse(request.ParsedURLParameters[1], out var chargingStationManufacturerId))
+                                      return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid charging station manufacturer identification!");
+
+                                  return roamingNetwork.TryGetChargingStationManufacturerById(chargingStationManufacturerId, out var chargingStationManufacturer)
+                                             ? EntityResponse     (request, chargingStationManufacturer.ToJSON())
+                                             : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The charging station manufacturer '{chargingStationManufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+
+                              });
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/POs/{PO_Id}
+
+            AddEntityHandlers(roamingNetworkPath + "/POs/{parkingOperatorId}",
+                              request => {
+
+                                  if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
+                                      return errorResponse;
+
+                                  if (!ParkingOperator_Id.TryParse(request.ParsedURLParameters[1], out var parkingOperatorId))
+                                      return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid parking operator identification!");
+
+                                  return roamingNetwork.TryGetParkingOperatorById(parkingOperatorId, out var parkingOperator)
+                                             ? EntityResponse     (request, parkingOperator.ToJSON())
+                                             : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The parking operator '{parkingOperatorId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+
+                              });
+
+            #endregion
+
         }
 
         #endregion
@@ -228,6 +293,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (private) AddListHandlers(Path, List)
+
+        /// <summary>
+        /// Answer GET with the list of the roaming network named in the path, HEAD by Hermod from it, and OPTIONS.
+        /// </summary>
+        private void AddListHandlers(HTTPPath                       Path,
+                                     Func<RoamingNetwork, JArray>   List)
+
+            => AddEntityHandlers(Path,
+                                 request => TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse)
+                                                ? EntityResponse(request, List(roamingNetwork))
+                                                : errorResponse);
+
+        #endregion
+
+
+        #region (private) RoamingNetworksServed()
+
+        /// <summary>
+        /// The roaming networks served: the heads of the histories, and the ones added without a history.
+        /// </summary>
+        private IEnumerable<RoamingNetwork> RoamingNetworksServed()
+
+            => roamingNetworkHistories.Values.
+                   Select(history => history.Head.RoamingNetwork).
+                   Concat(roamingNetworks.Values.Where(roamingNetwork => !roamingNetworkHistories.ContainsKey(roamingNetwork.Id)));
+
+        #endregion
 
         #region (private) TryGetRequestedRoamingNetwork         (Request, out RoamingNetwork,                       out ErrorResponse)
 
@@ -419,14 +513,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private static) EntitySummaries       (Entities)
+
+        /// <summary>
+        /// A list of the given entities: { "@id", "name", "description" } in the order of their identifications,
+        /// without an empty name or description.
+        /// </summary>
+        private static JArray EntitySummaries<TId, TAdminStatus, TStatus>(IEnumerable<AImmutableEMobilityEntity<TId, TAdminStatus, TStatus>> Entities)
+
+            where TId          : IId
+            where TAdminStatus : IComparable
+            where TStatus      : IComparable
+
+            => new (Entities.
+                        OrderBy(entity => entity.Id.ToString(), StringComparer.Ordinal).
+                        Select (entity => {
+
+                            var json = new JObject(
+                                           new JProperty("@id", entity.Id.ToString())
+                                       );
+
+                            if (entity.Name.IsNotNullOrEmpty())
+                                json.Add("name",         entity.Name.ToJSON());
+
+                            if (entity.Description.IsNotNullOrEmpty())
+                                json.Add("description",  entity.Description.ToJSON());
+
+                            return json;
+
+                        }));
+
+        #endregion
+
         #region (private static) EntityResponse        (Request, JSON)
 
         /// <summary>
-        /// The given entity in canonical JSON, or in canonical CBOR with the keys and values of the JSON
+        /// The given entity or list in canonical JSON, or in canonical CBOR with the keys and values of the JSON
         /// when the request prefers it. The HTTP ETag is the SHA-256 of the content.
         /// </summary>
         private static HTTPResponse EntityResponse(HTTPRequest  Request,
-                                                   JObject      JSON)
+                                                   JToken       JSON)
         {
 
             var cbor     = WantsCBOR(Request);

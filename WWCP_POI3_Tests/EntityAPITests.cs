@@ -63,6 +63,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
         private const String GO   = RN  + "/GOs/DE*NET";
         private const String GC   = GO  + "/GCPs/connection-42";
         private const String EM   = RN  + "/EMPs/DE*EMP";
+        private const String CM   = RN  + "/CSMs/ACME";
+        private const String PO   = RN  + "/POs/DE*PAR";
 
         private HTTPServer?             httpServer;
         private POI_API?                poiAPI;
@@ -118,6 +120,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
             => new RoamingNetwork(RoamingNetwork_Id.Parse(Id),
                     Created:                   Created,
+                    ChargingStationManufacturers:  [ new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("ACME"),
+                                                                                     I18NString.Create(Languages.en, "ACME Chargers"),
+                                                                                     Created: Created) ],
+                    ParkingOperators:          [ new ParkingOperator(ParkingOperator_Id.Parse("DE*PAR"),
+                                                                     Created:        Created,
+                                                                     ParkingSpaces:  [ new ParkingSpace(ParkingSpace_Id.Parse("space-1"), Created: Created) ]) ],
                     EMobilityProviders:        [ new EMobilityProvider(EMP,
                                                                        I18NString.Create(Languages.en, "Example Mobility"),
                                                                        Created: Created) ],
@@ -213,7 +221,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                            (EV,  "DE*GEF*E1*1"),
                                            (GO,  "DE*NET"),
                                            (GC,  "connection-42"),
-                                           (EM,  "DE*EMP")
+                                           (EM,  "DE*EMP"),
+                                           (CM,  "ACME"),
+                                           (PO,  "DE*PAR")
                                        })
             {
 
@@ -227,6 +237,84 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                     Assert.That(HeaderOf(response, "Access-Control-Allow-Origin"),              Is.EqualTo("*"), path);
                     Assert.That(HeaderOf(response, "Access-Control-Expose-Headers"),            Is.EqualTo("ETag"), path);
                     Assert.That(ParseJSON((content))["@id"]!.Value<String>(),  Is.EqualTo(id), path);
+                }
+
+            }
+
+        }
+
+        #endregion
+
+        #region The_lists_name_the_roaming_networks_and_their_operators()
+
+        [Test]
+        public async Task The_lists_name_the_roaming_networks_and_their_operators()
+        {
+
+            poiAPI!.AddRoamingNetwork(NewNetwork("rn0"), EventTracking_Id.New);
+
+            var (roamingNetworks,          roamingNetworksContent)           = await Send(HttpMethod.Get, "RNs");
+            var (chargingStationOperators, chargingStationOperatorsContent)  = await Send(HttpMethod.Get, RN + "/CSOs");
+            var (unknown,                  _)                                = await Send(HttpMethod.Get, "RNs/rn2/CSOs");
+            var (options,                  _)                                = await Send(HttpMethod.Options, "RNs");
+
+            var roamingNetworksJSON           = JArray.Parse(System.Text.Encoding.UTF8.GetString(roamingNetworksContent));
+            var chargingStationOperatorsJSON  = JArray.Parse(System.Text.Encoding.UTF8.GetString(chargingStationOperatorsContent));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(roamingNetworks.StatusCode,                                         Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(HeaderOf(roamingNetworks, "ETag"),                                  Is.EqualTo(ETagOf("json", roamingNetworksContent)));
+                Assert.That(HeaderOf(roamingNetworks, "Access-Control-Allow-Origin"),           Is.EqualTo("*"));
+                Assert.That(roamingNetworksJSON.Select(entry => entry["@id"]!.Value<String>()), Is.EqualTo(new[] { "rn0", "rn1" }));
+                Assert.That(roamingNetworksJSON[1]["chargingStationOperators"],                 Is.Null);
+
+                Assert.That(chargingStationOperators.StatusCode,                                Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(HeaderOf(chargingStationOperators, "ETag"),                         Is.EqualTo(ETagOf("json", chargingStationOperatorsContent)));
+                Assert.That(chargingStationOperatorsJSON.Count,                                 Is.EqualTo(1));
+                Assert.That(chargingStationOperatorsJSON[0]["@id"]!.Value<String>(),            Is.EqualTo("DE*GEF"));
+                Assert.That(chargingStationOperatorsJSON[0]["name"]!["en"]!.Value<String>(),    Is.EqualTo("GraphDefined"));
+                Assert.That(chargingStationOperatorsJSON[0]["chargingPools"],                   Is.Null);
+
+                Assert.That(unknown.StatusCode,                                                 Is.EqualTo(HttpStatusCode.NotFound));
+                Assert.That(options.StatusCode,                                                 Is.EqualTo(HttpStatusCode.NoContent));
+                Assert.That(HeaderOf(options, "Access-Control-Allow-Origin"),                   Is.EqualTo("*"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Every_collection_of_the_roaming_network_is_listed()
+
+        [Test]
+        public async Task Every_collection_of_the_roaming_network_is_listed()
+        {
+
+            foreach (var (path, ids) in new[] {
+                                            (RN + "/CSOs",  new[] { "DE*GEF" }),
+                                            (RN + "/GOs",   new[] { "DE*NE2", "DE*NET" }),
+                                            (RN + "/EMPs",  new[] { "DE*EMP" }),
+                                            (RN + "/CSMs",  new[] { "ACME" }),
+                                            (RN + "/POs",   new[] { "DE*PAR" })
+                                        })
+            {
+
+                var (response, content) = await Send(HttpMethod.Get, path);
+                var (unknown,  _)       = await Send(HttpMethod.Get, path.Replace("rn1", "rn2"));
+
+                var list = JArray.Parse(System.Text.Encoding.UTF8.GetString(content));
+
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(response.StatusCode,                                 Is.EqualTo(HttpStatusCode.OK), path);
+                    Assert.That(HeaderOf(response, "ETag"),                          Is.EqualTo(ETagOf("json", content)), path);
+                    Assert.That(HeaderOf(response, "Access-Control-Allow-Origin"),   Is.EqualTo("*"), path);
+                    Assert.That(list.Select(entry => entry["@id"]!.Value<String>()), Is.EqualTo(ids), path);
+                    Assert.That(list.All(entry => ((JObject) entry).Properties().All(property => property.Name is "@id" or "name" or "description")),  Is.True, path);
+                    Assert.That(unknown.StatusCode,                                  Is.EqualTo(HttpStatusCode.NotFound), path);
                 }
 
             }
@@ -398,7 +486,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                      RN  + "/GOs/DE*XYZ",
                                      RN  + "/GOs/DE*NE2/GCPs/connection-42",   // another grid operator's connection point
                                      GO  + "/GCPs/connection-43",
-                                     RN  + "/EMPs/DE*XYZ"
+                                     RN  + "/EMPs/DE*XYZ",
+                                     RN  + "/CSMs/ZAP",
+                                     RN  + "/POs/DE*XYZ"
                                  })
             {
 
