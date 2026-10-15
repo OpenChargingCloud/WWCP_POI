@@ -238,15 +238,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String  JSONLDContext                                               = "https://open.charging.cloud/contexts/wwcp+json/chargingStationOperator";
 
-        /// <summary>
-        /// The default max size of the charging station operator admin status list.
-        /// </summary>
-        public const UInt16  DefaultMaxChargingStationOperatorAdminStatusScheduleSize    = 15;
-
-        /// <summary>
-        /// The default max size of the charging station operator (aggregated charging station) status list.
-        /// </summary>
-        public const UInt16  DefaultMaxChargingStationOperatorStatusScheduleSize         = 15;
 
         #endregion
 
@@ -700,8 +691,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    // Since its creation, unless told otherwise.
                    InitialAdminStatus         ?? new Timestamped<ChargingStationOperatorAdminStatusType>(Created ?? Timestamp.Now, ChargingStationOperatorAdminStatusType.Operational),
                    InitialStatus              ?? new Timestamped<ChargingStationOperatorStatusType>     (Created ?? Timestamp.Now, ChargingStationOperatorStatusType.Available),
-                   MaxAdminStatusScheduleSize ?? DefaultMaxChargingStationOperatorAdminStatusScheduleSize,
-                   MaxStatusScheduleSize      ?? DefaultMaxChargingStationOperatorStatusScheduleSize,
+                   MaxAdminStatusScheduleSize ?? DefaultMaxAdminStatusScheduleSize,
+                   MaxStatusScheduleSize      ?? DefaultMaxStatusScheduleSize,
 
                    DataSource,
                    Created,
@@ -904,11 +895,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region OnData/(Admin)StatusChanged
 
-        /// <summary>
-        /// An event fired whenever the static data changed.
-        /// </summary>
-        public event OnChargingStationOperatorDataChangedDelegate?         OnDataChanged;
-
         private readonly Lock                                                statusEventsLock  = new ();
         private          OnChargingStationOperatorAdminStatusChangedDelegate?  onAdminStatusChanged;
         private          OnChargingStationOperatorStatusChangedDelegate?       onStatusChanged;
@@ -986,38 +972,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (internal) UpdateData       (Timestamp, EventTrackingId, Sender, PropertyName, NewValue, OldValue, DataSource)
-
-        /// <summary>
-        /// Update the static data.
-        /// </summary>
-        /// <param name="Timestamp">The timestamp when this change was detected.</param>
-        /// <param name="EventTrackingId">An optional event tracking identification for correlating this request with other events.</param>
-        /// <param name="Sender">The changed Charging Station Operator.</param>
-        /// <param name="PropertyName">The name of the changed property.</param>
-        /// <param name="OldValue">The old value of the changed property.</param>
-        /// <param name="NewValue">The new value of the changed property.</param>
-        internal async Task UpdateData(DateTimeOffset    Timestamp,
-                                       EventTracking_Id  EventTrackingId,
-                                       Object            Sender,
-                                       String            PropertyName,
-                                       Object?           OldValue,
-                                       Object?           NewValue)
-        {
-
-            var onDataChanged = OnDataChanged;
-            if (onDataChanged is not null)
-                await onDataChanged(Timestamp,
-                                    EventTrackingId,
-                                    Sender as ChargingStationOperator,
-                                    PropertyName,
-                                    OldValue,
-                                    NewValue);
-
-        }
-
-        #endregion
-
         #region (internal) UpdateAdminStatus(Timestamp, EventTrackingId, NewStatus, OldStatus, DataSource)
 
         /// <summary>
@@ -1087,12 +1041,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               InfoStatus                                                 ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandBrandIds                            = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.Expanded,
-                              CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null,
-                              //CustomJObjectSerializerDelegate<ChargingPool>?             CustomChargingPoolSerializer              = null,
-                              //CustomJObjectSerializerDelegate<ChargingStation>?          CustomChargingStationSerializer           = null,
-                              //CustomJObjectSerializerDelegate<EVSE>?                     CustomEVSESerializer                      = null,
-                              //CustomJObjectSerializerDelegate<ChargingConnector>?        CustomChargingConnectorSerializer         = null,
-                              InfoStatus                                                 ExpandChargingTariffIds                   = InfoStatus.Expanded)
+                              CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null)
         {
 
             try
@@ -1102,11 +1051,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                      new JProperty("@id",                 Id.ToString()),
 
-                               //ExpandChargingTariffIds != InfoStatus.Hidden && ChargingTariffs.Any()
-                               //    ? ExpandChargingTariffIds.Switch(
-                               //          () => new JProperty("chargingTariffIds", new JArray(ChargingTariffs.OrderBy(tariff => tariff.Id.ToString(), StringComparer.Ordinal).Select(tariff => tariff.Id.ToString()))),
-                               //          () => new JProperty("chargingTariffs", new JArray(ChargingTariffs.OrderBy(tariff => tariff.Id.ToString(), StringComparer.Ordinal).Select(tariff => tariff.ToJSON(Embedded: true, ExpandBrandIds: ExpandBrandIds, ExpandDataLicenses: ExpandDataLicenses)))))
-                               //    : null,
 
                                !Embedded
                                    ? new JProperty("@context",            JSONLDContext)

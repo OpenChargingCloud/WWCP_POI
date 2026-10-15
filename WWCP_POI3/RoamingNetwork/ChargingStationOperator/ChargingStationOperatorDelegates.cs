@@ -44,22 +44,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
-    /// A delegate called whenever the static data of the charging station operator changed.
-    /// </summary>
-    /// <param name="Timestamp">The timestamp when this change was detected.</param>
-    /// <param name="EventTrackingId">An optional event tracking identification for correlating this request with other events.</param>
-    /// <param name="ChargingStationOperator">The updated charging station operator operator.</param>
-    /// <param name="PropertyName">The name of the changed property.</param>
-    /// <param name="OldValue">The old value of the changed property.</param>
-    /// <param name="NewValue">The new value of the changed property.</param>
-    public delegate Task OnChargingStationOperatorDataChangedDelegate(DateTimeOffset            Timestamp,
-                                                                      EventTracking_Id          EventTrackingId,
-                                                                      ChargingStationOperator  ChargingStationOperator,
-                                                                      String                    PropertyName,
-                                                                      Object?                   OldValue,
-                                                                      Object?                   NewValue);
-
-    /// <summary>
     /// A delegate called whenever the admin status of the charging station operator changed.
     /// </summary>
     /// <param name="Timestamp">The timestamp when this change was detected.</param>
