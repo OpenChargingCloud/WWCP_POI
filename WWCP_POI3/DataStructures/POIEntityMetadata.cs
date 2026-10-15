@@ -112,8 +112,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region TryParse        (JSON, out CustomData, out ErrorResponse)
 
         /// <summary>
-        /// Try to read the custom data of a POI object without timestamps, e.g. a brand or a parking product.
-        /// Timestamps it is given must be valid, but are not kept.
+        /// Try to read the custom data of a POI object without timestamps, e.g. a brand, a grid connection point
+        /// or a parking product. Timestamps are refused: they would be lost, and its representation would not be
+        /// the one it was read from.
         /// </summary>
         public static Boolean TryParse(JObject                           JSON,
                                        out CustomDataNew?                CustomData,
@@ -122,11 +123,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             CustomData = null;
 
-            if (!TryParseTimestamp(JSON["created"],     "creation timestamp",     out _,  out ErrorResponse) ||
-                !TryParseTimestamp(JSON["lastChange"],  "last change timestamp",  out _,  out ErrorResponse))
-            {
-                return false;
-            }
+            foreach (var timestamp in new[] { "created", "lastChange" })
+                if (JSON[timestamp] is not null)
+                {
+                    ErrorResponse = $"'{JSON["@id"]}' has no timestamps: '{timestamp}' is not allowed!";
+                    return false;
+                }
 
             return TryParseCustomData(JSON, out CustomData, out ErrorResponse);
 

@@ -192,7 +192,7 @@ and by the `brandIds` of the RFID `authenticationModes` of charging pools.
 | `homepage` | URL | update/remove | |
 | `customData` | object | update/remove | Omitted when empty. |
 
-`created` and `lastChange` are neither written nor kept. `RoamingNetworkChange.Add(brand)`, `Remove(brandId)`,
+It has no timestamps: `created` and `lastChange` are refused. `RoamingNetworkChange.Add(brand)`, `Remove(brandId)`,
 `UpdateProperty(brand, …)`/`RemoveProperty(brand, …)`, signed by the RNO. A brand still named can not be removed.
 
 

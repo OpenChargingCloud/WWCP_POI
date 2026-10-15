@@ -131,7 +131,7 @@ JSON key `parkingProducts`, ordered by identification (ordinal).
 - `RoamingNetworkChange.Add(product, parkingOperatorId)`, `Remove(productId)`, `UpdateProperty(product, …)`,
   `RemoveProperty(product, …)`, owned by the parking operator. Its changes set no timestamps.
 - A product that a garage, space or space group names can not be removed.
-- `created` and `lastChange` are read (and must be timestamps) but dropped.
+- It has no timestamps: `created` and `lastChange` are refused.
 
 
 ## Keys

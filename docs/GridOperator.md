@@ -99,7 +99,7 @@ C# class `GridConnectionPoint` — [source](../WWCP_POI3/RoamingNetwork/GridOper
 | `maintainedBy` | `{entityType, entityId}` | update/remove (see below) | The party maintaining it: a `ChargingStationOperator` or `ParkingOperator` of the network; absent: the grid operator itself. |
 | `customData` | object | update/remove | Written only when it has values. |
 
-`created` and `lastChange` are read without error but neither kept nor written; the grid operator embeds it
+It has no timestamps: `created` and `lastChange` are refused; the grid operator embeds it
 without naming itself, so `gridOperatorId` and `gridOperator` are refused.
 
 ### Maintainer

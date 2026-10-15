@@ -136,8 +136,8 @@ Reading JSON or CBOR, `created` is mandatory and `lastChange` is the creation un
 read without its creation would be created *now*, and everyone reading the same representation, e.g. of a change
 set, would get another version with other ETags. The one exception is the entity a change set adds: unless given,
 its creation is the `createdAt` of the change set. Its embedded children, e.g. the EVSEs of an added charging
-station, need their own. Objects without timestamps (brands, grid connection points, parking products) accept
-them, but do not keep them.
+station, need their own. Objects without timestamps (brands, grid connection points, parking products) refuse
+them.
 
 A change set names the property by its JSON key: `name`, `description`, `dataSource` and `customData`
 can be updated and removed for every entity type, `@id`, `created` and `lastChange` for none. Which further

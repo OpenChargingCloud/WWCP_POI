@@ -300,6 +300,44 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Objects_without_timestamps_refuse_them()
+
+        /// <summary>
+        /// Brands, grid connection points and parking products have no timestamps: given ones would be lost,
+        /// and their representation would not be the one they were read from, so they are refused.
+        /// </summary>
+        [Test]
+        public void Objects_without_timestamps_refuse_them()
+        {
+
+            var point    = NewNetwork().GridOperators.Single().GridConnectionPoints.Single().ToJSON();
+            var product  = new ParkingProduct(ParkingProduct_Id.Parse("hourly")).ToJSON();
+            var brand    = new Brand(Brand_Id.Parse("brand-1"), new ImmutableI18NString(I18NString.Create(Languages.en, "Brand 1"))).ToJSON();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(GridConnectionPoint.TryParse(point,   out _, out var error0),  Is.True, error0);
+                Assert.That(ParkingProduct.     TryParse(product, out _, out var error1),  Is.True, error1);
+                Assert.That(Brand.              TryParse(brand,   out _, out var error2),  Is.True, error2);
+
+                point  ["created"]     = "2026-01-01T00:00:00.000Z";
+                product["lastChange"]  = "2026-01-01T00:00:00.000Z";
+                brand  ["created"]     = "2026-01-01T00:00:00.000Z";
+
+                Assert.That(GridConnectionPoint.TryParse(point,   out _, out var error3),  Is.False);
+                Assert.That(error3,                                                      Does.Contain("has no timestamps: 'created' is not allowed"));
+                Assert.That(ParkingProduct.     TryParse(product, out _, out var error4),  Is.False);
+                Assert.That(error4,                                                      Does.Contain("has no timestamps: 'lastChange' is not allowed"));
+                Assert.That(Brand.              TryParse(brand,   out _, out var error5),  Is.False);
+                Assert.That(error5,                                                      Does.Contain("has no timestamps: 'created' is not allowed"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Energy_meter_manufacturers_are_named_and_changed()
 
         [Test]
