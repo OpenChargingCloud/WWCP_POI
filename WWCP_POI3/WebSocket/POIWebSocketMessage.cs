@@ -376,7 +376,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public String ToJSONText()
 
-            => ToJSON().ToString(Formatting.None);
+            => POIJSON.ToText(ToJSON());
 
         #endregion
 

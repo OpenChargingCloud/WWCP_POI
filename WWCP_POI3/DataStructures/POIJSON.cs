@@ -19,6 +19,7 @@
 
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 using Newtonsoft.Json.Linq;
 
@@ -46,6 +47,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     internal static class POIJSON
     {
+
+        #region ToText              (JSON)
+
+        /// <summary>
+        /// The JSON text of the given JSON, every number as it is: for a store, a response and a WebSocket message,
+        /// whatever is read again.
+        /// </summary>
+        /// <remarks>
+        /// Decimals are read as decimals, keeping their decimal places, and the canonical JSON and CBOR the ETags and
+        /// signatures are calculated over keep them as well. Newtonsoft writes a decimal without decimal places with
+        /// one, 150000 as 150000.0, which reads back as another decimal: a roaming network read again would not have
+        /// the ETags it was written with. Written so, the text is canonical JSON, with its properties ordinally sorted.
+        /// </remarks>
+        public static String ToText(JToken JSON)
+
+            => CanonicalJSON.Serialize(JSON);
+
+        #endregion
 
         #region TryParseI18N        (JSON, PropertyName, PropertyDescription, out Value, out ErrorResponse)
 
@@ -239,7 +258,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!GeoCoordinate.TryParse(geoLocationObject, out var geoLocation, out var geoLocationError))
+            if (!TryParseGeoCoordinate(geoLocationObject, out var geoLocation, out var geoLocationError))
             {
                 ErrorResponse = $"Invalid {PropertyDescription}: " + geoLocationError;
                 return false;
@@ -248,6 +267,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
             GeoLocation    = geoLocation;
             ErrorResponse  = null;
             return true;
+
+        }
+
+        #endregion
+
+        #region TryParseGeoCoordinate(JSON, out GeoCoordinate, out ErrorResponse)
+
+        /// <summary>
+        /// A geographical coordinate, its numbers the doubles their texts are.
+        /// </summary>
+        /// <remarks>
+        /// Read as decimals, as the POI JSON is, a coordinate's numbers are exactly their texts, but a decimal cast to
+        /// a double is not always the double its text is: 51.050599999999996, the sum of two doubles, became 51.0506,
+        /// and the roaming network read again would not have the ETags it was written with. Parsed from their texts,
+        /// they are the doubles that were written.
+        /// </remarks>
+        public static Boolean TryParseGeoCoordinate(JObject                           JSON,
+                                                    out GeoCoordinate                 GeoCoordinate,
+                                                    [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            var exact = (JObject) JSON.DeepClone();
+
+            foreach (var number in exact.Properties().Select(property => property.Value).OfType<JValue>().Where(value => value.Value is Decimal))
+                number.Value = Double.Parse(((Decimal) number.Value!).ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
+
+            return org.GraphDefined.Vanaheimr.Aegir.GeoCoordinate.TryParse(exact, out GeoCoordinate, out ErrorResponse);
 
         }
 

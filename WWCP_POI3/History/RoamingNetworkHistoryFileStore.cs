@@ -237,7 +237,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public void Append(RoamingNetworkHistoryLogEntry Entry)
         {
 
-            var bytes = utf8.GetBytes(Entry.ToJSON().ToString(Formatting.None) + "\n");
+            var bytes = utf8.GetBytes(POIJSON.ToText(Entry.ToJSON()) + "\n");
 
             lock (storeLock)
             {
@@ -345,13 +345,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             System.IO.Directory.CreateDirectory(directory);
 
-            WriteSynced(Path.Combine(directory, BaseFileName), utf8.GetBytes(Snapshot.ToString(Formatting.None)));
+            WriteSynced(Path.Combine(directory, BaseFileName), utf8.GetBytes(POIJSON.ToText(Snapshot)));
 
             using (var logStream = new FileStream(Path.Combine(directory, LogFileName), FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
 
                 foreach (var entry in Entries)
-                    logStream.Write(utf8.GetBytes(entry.ToJSON().ToString(Formatting.None) + "\n"));
+                    logStream.Write(utf8.GetBytes(POIJSON.ToText(entry.ToJSON()) + "\n"));
 
                 logStream.Flush(true);
 

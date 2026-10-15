@@ -102,7 +102,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (baseText is not null)
                     throw new InvalidOperationException("The store is not empty!");
 
-                baseText = Snapshot.ToString(Newtonsoft.Json.Formatting.None);
+                baseText = POIJSON.ToText(Snapshot);
 
             }
 
@@ -115,7 +115,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             lock (storeLock)
             {
                 BeforeWrite?.Invoke(Entry.Type.ToString());
-                lines.Add(Entry.ToJSON().ToString(Newtonsoft.Json.Formatting.None));
+                lines.Add(POIJSON.ToText(Entry.ToJSON()));
             }
 
         }
@@ -125,14 +125,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<RoamingNetworkHistoryLogEntry>  Entries)
         {
 
-            var newLines = Entries.Select(entry => entry.ToJSON().ToString(Newtonsoft.Json.Formatting.None)).ToList();
+            var newLines = Entries.Select(entry => POIJSON.ToText(entry.ToJSON())).ToList();
 
             lock (storeLock)
             {
 
                 BeforeWrite?.Invoke("compact");
 
-                baseText = Snapshot.ToString(Newtonsoft.Json.Formatting.None);
+                baseText = POIJSON.ToText(Snapshot);
                 lines.Clear();
                 lines.AddRange(newLines);
 

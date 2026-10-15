@@ -21,7 +21,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -518,7 +517,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     var commitJSON = announcement.Commit.ToJSON();
 
-                    if (Encoding.UTF8.GetByteCount(commitJSON.ToString(Formatting.None)) <= MaxPushedCommitSize)
+                    if (Encoding.UTF8.GetByteCount(POIJSON.ToText(commitJSON)) <= MaxPushedCommitSize)
                         WebSocketServer.Push(CommitsTopic, commitJSON);
 
                     else

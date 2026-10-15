@@ -701,7 +701,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    : new HTTPResponse.Builder(Request) {
                          HTTPStatusCode  = StatusCode,
                          ContentType     = HTTPContentType.Application.JSON_UTF8,
-                         Content         = Encoding.UTF8.GetBytes(JSON.ToString(Formatting.None)),
+                         Content         = Encoding.UTF8.GetBytes(POIJSON.ToText(JSON)),
                          CacheControl    = "no-store",
                          Vary            = "Accept"
                      }.AsImmutable;

@@ -23,7 +23,6 @@ using System.Text;
 
 using Microsoft.Extensions.Logging;
 
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -352,7 +351,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 // Measured once, and only when anybody listens.
                 if (size < 0)
-                    size = Encoding.UTF8.GetByteCount(Payload.ToString(Formatting.None));
+                    size = Encoding.UTF8.GetByteCount(POIJSON.ToText(Payload));
 
                 String? overload = null;
 

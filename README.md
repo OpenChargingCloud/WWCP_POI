@@ -326,6 +326,9 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
 - **Files:** `CURRENT` names a generation `gen-NNNNNN` with `base.json` and `log.jsonl`. A last line written
   only partly by a crash is dropped when loading; compacting writes a new generation completely before
   `CURRENT` names it. The file `LOCK` keeps a second store from the directory.
+- **Numbers:** written as canonical JSON, as the API's responses and the WebSocket messages are, so every
+  number is read back as it was: a decimal with exactly its decimal places (`150000`, not `150000.0`, which
+  canonical JSON and CBOR, and so the ETags, would tell apart) and a coordinate as the double it was.
 - **Loading:** `TryLoad` checks every commit again (owners' signatures, merges calculated again, ETags) and
   merges the tips afterwards, e.g. when a crash came before a merge commit was written.
 - **Retention:** a history keeps the versions of its root, its tips, every `VersionCheckpointInterval`-th

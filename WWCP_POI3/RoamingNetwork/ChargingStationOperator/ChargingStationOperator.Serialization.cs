@@ -197,7 +197,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                    if (!GeoCoordinate.TryParse(geoLocationObject, out var parsedGeoLocation, out var geoLocationError))
+                    if (!POIJSON.TryParseGeoCoordinate(geoLocationObject, out var parsedGeoLocation, out var geoLocationError))
                     {
                         ErrorResponse = "Invalid geo location: " + geoLocationError;
                         return false;
