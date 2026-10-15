@@ -67,7 +67,8 @@ members as a whole; `RemoveProperty(group, "chargingTariffIds")` leaves none.
 
 ## Runtime status
 
-See [README.md](README.md#runtime-status). Runtime status entity type: `ChargingTariffGroup`.
+See [README.md](README.md#runtime-status). Runtime status entity type: `ChargingTariffGroup`. Its status is set manually,
+or calculated by a delegate from the status of its members, see [Calculated status of groups](README.md#calculated-status-of-groups).
 
 - **Admin status** `ChargingTariffGroupAdminStatusType`: `unknown`, `unspecified`, `planned`, `inDeployment`,
   `operational`, `internalUse`, `outOfService`. Initially `operational` since `created`.

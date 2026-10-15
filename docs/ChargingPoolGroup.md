@@ -60,7 +60,7 @@ The group itself is added with `RoamingNetworkChange.Add(chargingPoolGroup)`, as
 ## Runtime status
 
 See [Runtime status](README.md#runtime-status). A group has an admin status and a status, no energy status; both
-initially as of its creation. Its status is set, not derived from its members.
+initially as of its creation. Its status is set manually, or calculated by a delegate from the status of its members, see [Calculated status of groups](README.md#calculated-status-of-groups).
 
 | | Type | Initial | Predefined values |
 |---|---|---|---|

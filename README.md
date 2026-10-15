@@ -302,6 +302,9 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   the same value `Unchanged`, a later one than now `Scheduled`. `OnStatusUpdate` tells of every change,
   also of one set at the entity, and of a planned status when it is due. A status update of another server,
   `TryUpdate(statusUpdate, …)`, is taken with its timestamp.
+- **Group status:** the status of a group is set manually, or calculated by a delegate from the status of its
+  members, e.g. `history.RuntimeStatus.CalculateStatus(groupId, POIGroupStatus.OfEVSEs)`; then the delegate has
+  the say, and every other status of the group is refused. See [docs/](docs/README.md#calculated-status-of-groups).
 
 ### Persistence and retention
 

@@ -55,7 +55,7 @@ RoamingNetworkChange.Remove        (groupId)
 ## Runtime status
 
 Mechanism: [Runtime status](README.md#runtime-status). In a history it is addressed with the entity type
-`ParkingSpaceGroup`.
+`ParkingSpaceGroup`. Its status is set manually, or calculated by a delegate from the status of its members, see [Calculated status of groups](README.md#calculated-status-of-groups).
 
 | Type | Predefined values | Initial |
 |---|---|---|

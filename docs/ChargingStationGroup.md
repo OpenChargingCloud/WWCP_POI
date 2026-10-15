@@ -69,8 +69,8 @@ Nothing else names a charging station group, so it can always be removed.
 
 ## Runtime status
 
-See [runtime status](README.md#runtime-status) for the mechanism. The group's status is set on its own; it is
-not calculated from the status of its members.
+See [runtime status](README.md#runtime-status) for the mechanism. The group's status is set manually, or
+calculated by a delegate from the status of its members, see [Calculated status of groups](README.md#calculated-status-of-groups).
 
 - **Admin status** `ChargingStationGroupAdminStatusType`, initially `Operational` since its creation:
   `Unknown` (`unknown`), `Unspecified` (`unspecified`), `Planned` (`planned`), `InDeployment` (`inDeployment`),

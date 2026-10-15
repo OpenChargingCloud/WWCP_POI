@@ -80,7 +80,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// The same status again keeps its timestamp: since when the entity has it. A status update of another
     /// server, TryUpdate(StatusUpdate, …), is taken as it is, though: its "since" counts, and the latest one wins.
     /// </remarks>
-    public sealed class RoamingNetworkRuntimeStatus
+    public sealed partial class RoamingNetworkRuntimeStatus
     {
 
         #region (private class) POIStatusContext
@@ -199,6 +199,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region (private) Update(Kind, EntityType, EntityId, Value, Timestamp, Authoritative, out StatusUpdate, out ErrorResponse, DataSource)
 
+        /// <summary>
+        /// Set a status, unless a delegate calculates it, and calculate the status of the groups it changes afterwards,
+        /// outside of the status schedule lock of the entity.
+        /// </summary>
         private POIStatusUpdateResult Update(POIRuntimeStatusKind  Kind,
                                              String                EntityType,
                                              String                EntityId,
@@ -208,6 +212,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              out POIStatusUpdate?  StatusUpdate,
                                              out String?           ErrorResponse,
                                              String?               DataSource)
+        {
+
+            if (IsRefusedAsCalculated(Kind, EntityType, EntityId, out var refused))
+            {
+                StatusUpdate   = null;
+                ErrorResponse  = refused;
+                return POIStatusUpdateResult.Refused;
+            }
+
+            updateDepth++;
+
+            try
+            {
+                return UpdateEntity(Kind, EntityType, EntityId, Value, Timestamp, Authoritative, out StatusUpdate, out ErrorResponse, DataSource);
+            }
+            finally
+            {
+                if (--updateDepth == 0)
+                    CalculateNow();
+            }
+
+        }
+
+        #endregion
+
+        #region (private) UpdateEntity(Kind, EntityType, EntityId, Value, Timestamp, Authoritative, out StatusUpdate, out ErrorResponse, DataSource)
+
+        private POIStatusUpdateResult UpdateEntity(POIRuntimeStatusKind  Kind,
+                                                   String                EntityType,
+                                                   String                EntityId,
+                                                   String                Value,
+                                                   DateTimeOffset        Timestamp,
+                                                   Boolean               Authoritative,
+                                                   out POIStatusUpdate?  StatusUpdate,
+                                                   out String?           ErrorResponse,
+                                                   String?               DataSource)
         {
 
             StatusUpdate = null;
@@ -918,6 +958,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Take the given statuses of another server as they are, e.g. those of a snapshot.
         /// A status of an unknown entity or an invalid one refuses all after it.
+        /// The status of a group a delegate calculates here is left out: the delegate has the say.
         /// </summary>
         internal Boolean TryTake(IEnumerable<POIStatusUpdate>      StatusUpdates,
                                  [NotNullWhen(false)] out String?  ErrorResponse)
@@ -925,6 +966,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var statusUpdate in StatusUpdates)
             {
+
+                if (statusUpdate.Kind == POIRuntimeStatusKind.Status &&
+                    IsCalculated(statusUpdate.EntityType, statusUpdate.EntityId))
+                {
+                    continue;
+                }
+
                 if (TryUpdate(statusUpdate, out var error) == POIStatusUpdateResult.Refused)
                 {
                     ErrorResponse = error ?? "Invalid runtime status!";
@@ -1065,6 +1113,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             SchedulePlannedStatus();
+
+            // Its groups may have other members now.
+            HeadChanged(RoamingNetwork);
 
         }
 
@@ -1630,6 +1681,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 catch
                 { }
             }
+
+            // The groups it is a member of may have another status now.
+            if (Kind == POIRuntimeStatusKind.Status)
+                MemberStatusChanged(EntityType, EntityId, statusUpdate.Timestamp);
 
         }
 

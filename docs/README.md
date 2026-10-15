@@ -179,6 +179,58 @@ Every `Set…` takes an optional `Context` as the data source of the update, pas
   part of a snapshot unless `runtimeStatus=false`; see [History and sync](../README.md#history-and-sync).
 
 
+### Calculated status of groups
+
+The status of an EVSE, charging station, charging pool, charging tariff or parking space group is set manually,
+or calculated by a delegate from the status of its members. The delegate is local configuration of a history,
+not content:
+
+```csharp
+history.RuntimeStatus.CalculateStatus(EVSEGroup_Id.Parse("DE*GEF*EG1"), POIGroupStatus.OfEVSEs);   // one group
+history.RuntimeStatus.CalculateStatusOfAllEVSEGroups(POIGroupStatus.OfEVSEs);                       // every other one
+history.RuntimeStatus.SetStatusManually(EVSEGroup_Id.Parse("DE*GEF*EG2"));                           // except this one
+```
+
+A delegate gets the group and the current status of its members, with since when they have it, and returns the
+status of the group. The same exists for every kind of group; `CalculateStatusOfAll…Groups(null)` sets them all
+manually again, `IsCalculated(groupType, groupId)` tells.
+
+- **When:** whenever the status of a member changes, since that status; whenever a new head version may have
+  changed the members, since its last change; and when a delegate is set. Never since before the current status
+  of the group.
+- **A status like every other one:** the calculated status is kept, told of by `OnStatusUpdate`, after the status
+  that caused it, and sent to peers.
+- **The delegate has the say:** every other status of a calculated group is refused, also one of another server,
+  as *"calculated by a delegate, which has the say here"*; a snapshot leaves it out. The admin status of a group
+  is always set manually.
+- **Outside of locks:** a calculation runs once the status that caused it is set, outside of the status schedule
+  lock of the member; set at the member itself rather than through `history.RuntimeStatus`, on another thread.
+
+`POIGroupStatus` has the default delegates. For EVSE, charging station and charging pool groups, members are
+*free* (`available`, `waitingForPlugin`, and `partialAvailable` of stations and pools), *busy* (`charging`,
+`pluggedIn`, `occupied`), *reserved*, *down* (`offline`, `error`, `unavailable`, `inoperative`, `outOfService`,
+`outOfOrder`, `blocked`, `doorNotClosed`) or *not yet there* (`planned`, `inDeployment`); `removed`, `unknown`,
+`unspecified` and values not known yet are left out. The first rule that holds decides:
+
+| Members | Group |
+|---|---|
+| none left | `unknown` |
+| all free | `available` |
+| one free | `partialAvailable` |
+| one busy | `charging` |
+| one reserved | `reserved` |
+| all `offline` | `offline` |
+| all `outOfService` | `outOfService` |
+| all down | `error` |
+| all `planned` | `planned` |
+| all not yet there | `inDeployment` |
+| else | `unknown` |
+
+Charging tariff groups are `active` when one tariff is, else `planned` when one is, else `expired` when all are.
+Parking space groups are `available` when one space is, else `inUse`, else `reserved` when one is, else `blocked`,
+`planned` or `inDeployment` when all are.
+
+
 ### ETags
 
 An ETag names a version of an entity by the digest of its content: SHA-256 (or SHA-384, SHA-512) over its
