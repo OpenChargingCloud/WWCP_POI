@@ -29,33 +29,55 @@ using org.GraphDefined.Vanaheimr.Styx.Arrows;
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
-    public partial class POI_API : HTTPExtAPI
+    /// <summary>
+    /// A delegate answering a request for the HTML view of a resource, e.g. with the page of a web frontend.
+    /// </summary>
+    /// <param name="Request">The HTTP request, preferring text/html.</param>
+    public delegate Task<HTTPResponse> HTMLViewDelegate(HTTPRequest Request);
+
+
+    public partial class POI_API : HTTPAPI
     {
 
         #region Properties
 
-        public TimeProvider  TimeProvider { get; }
+        public TimeProvider       TimeProvider    { get; }
+
+        /// <summary>
+        /// Answers the requests for the HTML view of the lists, e.g. with the page of a web frontend,
+        /// when a request prefers text/html to JSON and CBOR. Without it, every request gets JSON or CBOR.
+        /// </summary>
+        public HTMLViewDelegate?  HTMLView        { get; }
 
         #endregion
 
         #region Constructor(s)
 
         /// <summary>
-        /// Create a new 'FastData' attribute.
+        /// Create a new API of roaming networks: their histories for synchronization, and their entities and lists to query.
         /// </summary>
-        public POI_API(HTTPServer     HTTPServer,
-                       TimeProvider?  TimeProvider   = null)
+        /// <param name="HTTPServer">The HTTP server.</param>
+        /// <param name="TimeProvider">The time provider.</param>
+        /// <param name="RootPath">The path of the API on the HTTP server, e.g. /poi; / by default.</param>
+        /// <param name="HTMLView">Answers the requests for the HTML view of the lists, e.g. with the page of a web frontend.</param>
+        public POI_API(HTTPServer         HTTPServer,
+                       TimeProvider?      TimeProvider   = null,
+                       HTTPPath?          RootPath       = null,
+                       HTMLViewDelegate?  HTMLView       = null)
 
-            : base(HTTPServer)
+            : base(HTTPServer,
+                   RootPath: RootPath)
 
         {
 
             this.TimeProvider            = TimeProvider ?? TimeProvider.System;
+            this.HTMLView                = HTMLView;
 
             this.roamingNetworkAddition  = new VotingNotificator<POI_API, RoamingNetwork, Boolean>(() => new VetoVote(), true);
             this.roamingNetworkRemoval   = new VotingNotificator<POI_API, RoamingNetwork, Boolean>(() => new VetoVote(), true);
 
             RegisterEntityURLTemplates();
+            RegisterQueryURLTemplates();
             RegisterHistoryURLTemplates();
             RegisterPeerURLTemplates();
             RegisterWebSocketURLTemplates();

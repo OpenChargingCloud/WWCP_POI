@@ -144,7 +144,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region ~/RNs
 
             AddEntityHandlers(HTTPPath.Root + "RNs",
-                              RoamingNetworksResponse);
+                              RoamingNetworksResponse,
+                              HasHTMLView: true);
 
             #endregion
 
@@ -342,15 +343,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Answer GET with the given delegate, HEAD by Hermod from it, and OPTIONS with the methods
-        /// and the CORS permissions of every origin.
+        /// and the CORS permissions of every origin. With an HTML view, a request preferring text/html
+        /// to JSON and CBOR, e.g. of a browser opening the URL, gets the HTML view instead.
         /// </summary>
         private void AddEntityHandlers(HTTPPath                         Path,
-                                       Func<HTTPRequest, HTTPResponse>  GET)
+                                       Func<HTTPRequest, HTTPResponse>  GET,
+                                       Boolean                          HasHTMLView   = false)
         {
 
             AddHandler(Path,
                        HTTPMethod:    HTTPMethod.GET,
-                       HTTPDelegate:  request => Task.FromResult(GET(request)));
+                       HTTPDelegate:  request => HasHTMLView && HTMLView is not null && WantsHTML(request)
+                                                     ? HTMLView(request)
+                                                     : Task.FromResult(GET(request)));
 
             AddHandler(Path,
                        HTTPMethod:    HTTPMethod.OPTIONS,
@@ -374,7 +379,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Answer GET of ~/RNs/{RN_Id}/{Name} with the list of the given collection of the roaming network named
-        /// in the path, in short, kept with the collection; HEAD by Hermod from it, and OPTIONS.
+        /// in the path, in short, searched and paged by the query of the request; the whole list kept with the
+        /// collection. HEAD by Hermod from it, and OPTIONS.
         /// </summary>
         private void AddListHandlers<TId, TEntity>(HTTPPath                                               RoamingNetworkPath,
                                                    String                                                 Name,
@@ -387,20 +393,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => AddEntityHandlers(RoamingNetworkPath + "/" + Name,
                                  request => {
 
-                                     if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
+                                     if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse) ||
+                                         !TryParseListQuery(request, [], out var query, out errorResponse))
+                                     {
                                          return errorResponse;
+                                     }
 
-                                     var collection  = Collection(roamingNetwork);
-                                     var format      = FormatOf(request);
+                                     var collection = Collection(roamingNetwork);
 
-                                     return EntityResponse(request,
-                                                           format,
-                                                           collection.Representation(SummariesView, format, () => Summaries(collection)));
+                                     return QueryResponse<JObject>(request,
+                                                                   query,
+                                                                   () => [.. Summaries(collection).Cast<JObject>()],
+                                                                   SearchText,
+                                                                   entries => new JArray(entries),
+                                                                   format => collection.Representation(SummariesView, format, () => Summaries(collection)),
+                                                                   collection.Count);
 
-                                 });
+                                 },
+                                 HasHTMLView: true);
 
         #endregion
 
+
+        #region RoamingNetworks
+
+        /// <summary>
+        /// The roaming networks served: the heads of the histories, and the ones added without a history.
+        /// </summary>
+        public IEnumerable<RoamingNetwork> RoamingNetworks
+            => RoamingNetworksServed();
+
+        #endregion
 
         #region (private) RoamingNetworksServed()
 
@@ -581,6 +604,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private HTTPResponse RoamingNetworksResponse(HTTPRequest Request)
         {
 
+            if (!TryParseListQuery(Request, [], out var query, out var errorResponse))
+                return errorResponse;
+
             var versions  = RoamingNetworksServed().
                                 OrderBy(roamingNetwork => roamingNetwork.Id.ToString(), StringComparer.Ordinal).
                                 ToArray();
@@ -591,11 +617,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (served is null || !Enumerable.SequenceEqual<RoamingNetwork>(served, versions, ReferenceEqualityComparer.Instance))
                 roamingNetworksServed = served = new (versions, roamingNetwork => roamingNetwork.Id, "roaming network");
 
-            var format    = FormatOf(Request);
-
-            return EntityResponse(Request,
-                                  format,
-                                  served.Representation(SummariesView, format, () => EntitySummaries(served)));
+            return QueryResponse<JObject>(Request,
+                                          query,
+                                          () => [.. EntitySummaries(served).Cast<JObject>()],
+                                          SearchText,
+                                          entries => new JArray(entries),
+                                          format => served.Representation(SummariesView, format, () => EntitySummaries(served)),
+                                          served.Count);
 
         }
 
@@ -675,6 +703,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private static) WantsHTML             (Request)
+
+        /// <summary>
+        /// Whether the request prefers text/html to JSON and CBOR by its Accept header field, e.g. a browser
+        /// opening the URL. Not without an Accept header field, and not for */*: then JSON, as for every client.
+        /// </summary>
+        private static Boolean WantsHTML(HTTPRequest Request)
+
+            => Request.Accept.BestMatchingContentType(HTTPContentType.Application.JSON_UTF8,
+                                                      HTTPContentType.Application.CBOR,
+                                                      HTTPContentType.Text.HTML_UTF8) == HTTPContentType.Text.HTML_UTF8;
+
+        #endregion
+
         #region (private static) FormatOf              (Request)
 
         /// <summary>
@@ -735,9 +777,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// 200 OK with the given representation and its ETag, or 304 Not Modified when the If-None-Match
         /// of the request names the ETag. Caches revalidate it; every origin may read it and its ETag.
         /// </summary>
-        private static HTTPResponse EntityResponse(HTTPRequest        Request,
-                                                   ETagFormat         Format,
-                                                   POIRepresentation  Representation)
+        private static HTTPResponse EntityResponse(HTTPRequest                    Request,
+                                                   ETagFormat                     Format,
+                                                   POIRepresentation              Representation,
+                                                   Action<HTTPResponse.Builder>?  Headers   = null)
         {
 
             var eTag         = $"\"{Representation.ETag.ToString(ETagDigestEncoding.HEX)}\"";
@@ -762,8 +805,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 response.Content      = Representation.Content;
             }
 
-            // Not a CORS-safelisted response header: scripts of other origins see it only when exposed.
-            response.Set("Access-Control-Expose-Headers", "ETag");
+            Headers?.Invoke(response);
+
+            // Not CORS-safelisted response headers: scripts of other origins see them only when exposed.
+            response.Set("Access-Control-Expose-Headers", Headers is null
+                                                              ? "ETag"
+                                                              : "ETag, X-Total-Count, X-Filtered-Count, Link");
 
             return response.AsImmutable;
 

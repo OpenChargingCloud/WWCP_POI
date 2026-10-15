@@ -371,6 +371,29 @@ once per version and format and kept as long as the version is referenced; an en
 the same object in the new version and keeps its representations. A 304 costs a lookup. Only an expanded view is
 calculated for every request.
 
+### Query
+
+The lists are the QUERY interface, beside the synchronization above: `GET ~/RNs/{RN_Id}/CPs` lists the charging
+pools of all charging station operators of a roaming network, each as its operator embeds it, with
+`chargingStationOperator: {@id, name}`. Every list, `~/RNs` and `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` as well,
+takes:
+
+| Parameter | |
+|---|---|
+| `match` | words separated by spaces, each contained in a text of an entry, case-insensitively; a word starting with `!` must not be |
+| `operatorId` | `CPs` only: the charging pools of one charging station operator |
+| `offset`, `limit` | the part of the matching entries; all of them without `limit` |
+
+Entries are in the ordinal order of their identifications. `X-Total-Count` says how many entries the list has,
+`X-Filtered-Count` how many match, and `Link` names the `next` and the `prev` page; the `ETag` is the one of the
+returned content. A list without any of them is kept with its version, as above.
+
+`new POI_API(HTTPServer, RootPath: "/poi", HTMLView: …)` serves all of it below a path of its own, e.g. beside a web
+interface. With an `HTMLView`, a request for a list that prefers `text/html` to JSON and CBOR - a browser opening its
+URL - is answered by it, e.g. with the page of a web frontend that asks the same URL for the data; every other
+request, also one without an `Accept` header field or with `*/*`, gets JSON or CBOR. The RoamingHub serves its
+roaming networks so, below `/poi`.
+
 Submitting is refused unless `AuthorizeChangeSetSubmission` decides who may submit;
 what a change set may change, its owners' signatures decide. Pushing commits is refused unless
 `AuthorizeCommitPush` decides who may push, e.g. other servers; they are checked as every commit.
