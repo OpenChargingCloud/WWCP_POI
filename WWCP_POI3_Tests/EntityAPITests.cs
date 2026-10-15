@@ -328,7 +328,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
         public async Task Kept_representations_follow_the_versions()
         {
 
-            var paths   = new[] { RN, RN + "/EMPs", EM, CSO, CP, CP + "?expand=gridConnectionPoint", GO, GC, "RNs" };
+            var paths   = new[] { RN, RN + "/EMPs", EM, CSO, CSO + "?without=chargingPools", CP, CP + "?expand=gridConnectionPoint", GO, GC, "RNs" };
 
             async Task<Dictionary<String, (String ETag, Byte[] Content)>> GetAll()
             {
@@ -381,8 +381,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 foreach (var path in new[] { RN, RN + "/EMPs", EM, GC, GO, CP + "?expand=gridConnectionPoint" })
                     Assert.That(after[path].ETag,     Is.Not.EqualTo(before[path].ETag), path);
 
-                // Unchanged: the operator and its pool, and the names of the roaming networks.
-                foreach (var path in new[] { CSO, CP, "RNs" })
+                // Unchanged: the operator, also without its pools, and its pool, and the names of the roaming networks.
+                foreach (var path in new[] { CSO, CSO + "?without=chargingPools", CP, "RNs" })
                     Assert.That(after[path].ETag,     Is.EqualTo(before[path].ETag),     path);
 
                 // Every ETag is still the one of the content.
@@ -454,6 +454,46 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 // Another representation: its own ETag, of its own content.
                 Assert.That(HeaderOf(expanded, "ETag"),                                Is.EqualTo(ETagOf("json", expandedContent)));
                 Assert.That(HeaderOf(expanded, "ETag"),                                Is.Not.EqualTo(HeaderOf(named, "ETag")));
+
+                Assert.That(unknown.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
+
+            }
+
+        }
+
+        #endregion
+
+        #region An_operator_leaves_out_its_charging_pools_on_request()
+
+        [Test]
+        public async Task An_operator_leaves_out_its_charging_pools_on_request()
+        {
+
+            var (whole,   wholeContent)  = await Send(HttpMethod.Get, CSO);
+            var (slim,    slimContent)   = await Send(HttpMethod.Get, CSO + "?without=chargingPools");
+            var (again,   _)             = await Send(HttpMethod.Get, CSO + "?without=chargingPools");
+            var (unknown, _)             = await Send(HttpMethod.Get, CSO + "?without=chargingTariffs");
+
+            var wholeJSON  = ParseJSON(wholeContent);
+            var slimJSON   = ParseJSON(slimContent);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(wholeJSON["chargingPools"],                                Is.Not.Null);
+
+                Assert.That(slim.StatusCode,                                           Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(slimJSON["chargingPools"],                                 Is.Null);
+                Assert.That(slimJSON["@id"]!.Value<String>(),                          Is.EqualTo("DE*GEF"));
+
+                // Everything else as the whole operator has it.
+                wholeJSON.Remove("chargingPools");
+                Assert.That(JToken.DeepEquals(slimJSON, wholeJSON),                    Is.True);
+
+                // Another representation: its own ETag, of its own content, kept with the version.
+                Assert.That(HeaderOf(slim, "ETag"),                                    Is.EqualTo(ETagOf("json", slimContent)));
+                Assert.That(HeaderOf(slim, "ETag"),                                    Is.Not.EqualTo(HeaderOf(whole, "ETag")));
+                Assert.That(HeaderOf(again, "ETag"),                                   Is.EqualTo(HeaderOf(slim, "ETag")));
 
                 Assert.That(unknown.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
 

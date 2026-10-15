@@ -41,7 +41,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs                                                                  the roaming networks, in short
     /// GET ~/RNs/{RN_Id}                                                          the roaming network
     /// GET ~/RNs/{RN_Id}/CSOs                                                     its charging station operators, in short
-    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}                                            a charging station operator
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}                                            a charging station operator;
+    ///     ?without=chargingPools leaves out its charging pools, which ~/RNs/{RN_Id}/CPs?operatorId=… lists
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool;
     ///     ?expand=gridConnectionPoint embeds its grid connection point instead of naming it
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}                    a charging station
@@ -61,14 +62,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// with the ETag of the list.
     /// An entity is the representation its roaming network embeds, so its ETag is the one of that
     /// part of the roaming network: SHA-256 over its canonical JSON or canonical CBOR, which is also
-    /// the content of the response. An expanded view is another representation with its own ETag. The roaming network carries its own ETags, calculated without them.
+    /// the content of the response. An expanded or a slimmer view is another representation with its own ETag. The roaming network carries its own ETags, calculated without them.
     /// The HTTP ETag is the POI ETag of the format of the response, e.g. "json:sha256:hex:…";
     /// an If-None-Match naming it is answered with 304 Not Modified.
     ///
     /// Versions are immutable, and their runtime status is no part of their representations:
     /// so the content and the ETag of every representation are calculated once per version and format,
     /// and kept as long as the version is. An entity unchanged by a commit is the same object in the
-    /// new version, and keeps its representations. A list is kept with its collection, a POICollection
+    /// new version, and keeps its representations, a slimmer view as well. A list is kept with its collection, a POICollection
     /// of the version; the list of the roaming networks while the same versions are served. Only an
     /// expanded view, which depends on more than one version, is calculated for every request.
     /// HEAD is answered by Hermod from GET; OPTIONS answers the CORS preflights of every origin.
@@ -171,9 +172,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}
 
             AddEntityHandlers(chargingStationOperatorPath,
-                              request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
-                                             ? CachedEntityResponse(request, chargingStationOperator, chargingStationOperator.ToEmbeddedJSON)
-                                             : errorResponse);
+                              request => {
+
+                                  if (!TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse))
+                                      return errorResponse;
+
+                                  if (request.QueryString.GetString("without") is not String without)
+                                      return CachedEntityResponse(request, chargingStationOperator, chargingStationOperator.ToEmbeddedJSON);
+
+                                  // Its charging pools are what makes an operator large: thousands of them, each with its
+                                  // stations and EVSEs. Without them, the operator is what it says of itself.
+                                  foreach (var omission in without.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                      if (omission != "chargingPools")
+                                          return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Unknown omission '{omission}'; a charging station operator leaves out only 'chargingPools'!");
+
+                                  return CachedEntityResponse(request,
+                                                              chargingStationOperator,
+                                                              () => {
+                                                                  var json = chargingStationOperator.ToEmbeddedJSON();
+                                                                  json.Remove("chargingPools");
+                                                                  return json;
+                                                              },
+                                                              View: "without=chargingPools");
+
+                              });
 
             #endregion
 
@@ -729,15 +751,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private)        CachedEntityResponse  (Request, Version, JSON)
+        #region (private)        CachedEntityResponse  (Request, Version, JSON, View = "")
 
         /// <summary>
         /// The given immutable version of an entity in JSON or in CBOR as the request prefers,
-        /// calculated once per version and format.
+        /// calculated once per version, view and format.
         /// </summary>
+        /// <param name="View">The view of the entity, e.g. without its charging pools; its whole representation by default.</param>
         private HTTPResponse CachedEntityResponse(HTTPRequest   Request,
                                                   Object        Version,
-                                                  Func<JToken>  JSON)
+                                                  Func<JToken>  JSON,
+                                                  String        View   = "")
         {
 
             var format = FormatOf(Request);
@@ -745,7 +769,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return EntityResponse(Request,
                                   format,
                                   representationCache.GetValue(Version, _ => new Representations()).
-                                                      GetOrAdd("", format, () => POIRepresentation.Of(JSON(), format)));
+                                                      GetOrAdd(View, format, () => POIRepresentation.Of(JSON(), format)));
 
         }
 

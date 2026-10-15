@@ -378,8 +378,9 @@ calculated for every request.
 
 The lists are the QUERY interface, beside the synchronization above: `GET ~/RNs/{RN_Id}/CPs` lists the charging
 pools of all charging station operators of a roaming network, each as its operator embeds it, with
-`chargingStationOperator: {@id, name}`. Every list, `~/RNs` and `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` as well,
-takes:
+`chargingStationOperator: {@id, name}`; `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}?without=chargingPools` is the operator
+without them, so that a large one is not read whole to show what it says of itself. Every list, `~/RNs` and
+`~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` as well, takes:
 
 | Parameter | |
 |---|---|
