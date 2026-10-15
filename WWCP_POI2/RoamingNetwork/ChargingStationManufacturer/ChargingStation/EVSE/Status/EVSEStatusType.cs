@@ -259,12 +259,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             = new ("error");
 
         /// <summary>
-        /// The EVSE is not ready for charging because a fault has occurred.
-        /// </summary>
-        public static EVSEStatusType  Faulted             { get; }
-            = new ("faulted");
-
-        /// <summary>
         /// The EVSE is not ready for charging because it is under maintenance.
         /// </summary>
         public static EVSEStatusType  Unavailable         { get; }
@@ -300,12 +294,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public static EVSEStatusType  Removed             { get; }
             = new ("removed");
-
-        /// <summary>
-        /// The EVSE is in an unknown state.
-        /// </summary>
-        public static EVSEStatusType  Other               { get; }
-            = new ("other");
 
         #endregion
 

@@ -203,11 +203,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static readonly EVSEGroupStatusType InDeployment     = new ("inDeployment");
 
         /// <summary>
-        /// The EVSE group is out of service.
-        /// </summary>
-        public static readonly EVSEGroupStatusType OutOfService     = new ("outOfService");
-
-        /// <summary>
         /// The EVSE group is currently offline.
         /// </summary>
         public static readonly EVSEGroupStatusType Offline          = new ("offline");
@@ -233,14 +228,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static readonly EVSEGroupStatusType Charging         = new ("charging");
 
         /// <summary>
-        /// The members of the EVSE group are faulted.
+        /// The EVSE group is out of service.
         /// </summary>
-        public static readonly EVSEGroupStatusType Faulted          = new ("faulted");
+        public static readonly EVSEGroupStatusType OutOfService     = new ("outOfService");
 
         /// <summary>
-        /// Another status of the EVSE group.
+        /// An error occurred within the EVSE group.
         /// </summary>
-        public static readonly EVSEGroupStatusType Other            = new ("other");
+        public static readonly EVSEGroupStatusType Error            = new ("error");
 
         #endregion
 

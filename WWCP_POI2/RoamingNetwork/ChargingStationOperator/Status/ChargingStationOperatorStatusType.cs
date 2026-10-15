@@ -185,32 +185,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown status of the charging station operator.
         /// </summary>
-        public static readonly ChargingStationOperatorStatusType Unknown       = new("unknown");
+        public static readonly ChargingStationOperatorStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear status of the charging station operator.
         /// </summary>
-        public static readonly ChargingStationOperatorStatusType Unspecified   = new("unspecified");
+        public static readonly ChargingStationOperatorStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
         /// The charging station operator is currently offline.
         /// </summary>
-        public static readonly ChargingStationOperatorStatusType Offline       = new("offline");
+        public static readonly ChargingStationOperatorStatusType Offline      = new ("offline");
 
         /// <summary>
         /// The charging station operator is not fully operational yet.
         /// </summary>
-        public static readonly ChargingStationOperatorStatusType InDeployment  = new("inDeployment");
+        public static readonly ChargingStationOperatorStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The charging station operator is available.
         /// </summary>
-        public static readonly ChargingStationOperatorStatusType Available     = new("available");
+        public static readonly ChargingStationOperatorStatusType Available    = new ("available");
 
         /// <summary>
         /// A fatal error has occurred within the charging station operator.
         /// </summary>
-        public static readonly ChargingStationOperatorStatusType Error         = new("error");
+        public static readonly ChargingStationOperatorStatusType Error        = new ("error");
 
         #endregion
 

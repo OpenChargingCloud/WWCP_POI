@@ -58,8 +58,8 @@ Mechanism: [Runtime status](README.md#runtime-status). In a history it is addres
 
 | Type | Predefined values | Initial |
 |---|---|---|
-| `ParkingSensorAdminStatusType` | `unknown`, `unspecified`, `outOfService`, `operational`, `internalUse` | `operational` since `created` |
-| `ParkingSensorStatusType` | `unknown`, `unspecified`, `planned`, `inDeployment`, `blocked`, `available` | `available` since `created` |
+| `ParkingSensorAdminStatusType` | `unknown`, `unspecified`, `planned`, `inDeployment`, `operational`, `internalUse`, `outOfService` | `operational` since `created` |
+| `ParkingSensorStatusType` | `unknown`, `unspecified`, `planned`, `inDeployment`, `offline`, `available`, `blocked`, `error` | `available` since `created` |
 
 Any other non-empty text parses as well. No energy status. A change of the sensor or of anything else of its
 parking operator keeps its runtime status.

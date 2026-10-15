@@ -185,37 +185,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown status of the roaming network.
         /// </summary>
-        public static RoamingNetworkStatusType  Unknown         { get; }
+        public static RoamingNetworkStatusType  Unknown             { get; }
             = new ("unknown");
 
         /// <summary>
         /// Unclear status of the roaming network.
         /// </summary>
-        public static RoamingNetworkStatusType  Unspecified     { get; }
+        public static RoamingNetworkStatusType  Unspecified         { get; }
             = new ("unspecified");
 
         /// <summary>
         /// The roaming network is currently offline.
         /// </summary>
-        public static RoamingNetworkStatusType  Offline         { get; }
+        public static RoamingNetworkStatusType  Offline             { get; }
             = new ("offline");
 
         /// <summary>
         /// The roaming network is not fully operational yet.
         /// </summary>
-        public static RoamingNetworkStatusType  InDeployment    { get; }
+        public static RoamingNetworkStatusType  InDeployment        { get; }
             = new ("inDeployment");
 
         /// <summary>
         /// The roaming network is available.
         /// </summary>
-        public static RoamingNetworkStatusType  Available       { get; }
+        public static RoamingNetworkStatusType  Available           { get; }
             = new ("available");
 
         /// <summary>
         /// A fatal error has occurred within the roaming network.
         /// </summary>
-        public static RoamingNetworkStatusType  Error           { get; }
+        public static RoamingNetworkStatusType  Error               { get; }
             = new ("error");
 
         #endregion

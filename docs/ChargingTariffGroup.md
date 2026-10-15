@@ -69,9 +69,9 @@ members as a whole; `RemoveProperty(group, "chargingTariffIds")` leaves none.
 
 See [README.md](README.md#runtime-status). Runtime status entity type: `ChargingTariffGroup`.
 
-- **Admin status** `ChargingTariffGroupAdminStatusType`: `unknown`, `unspecified`, `outOfService`, `operational`,
-  `internalUse`. Initially `operational` since `created`.
-- **Status** `ChargingTariffGroupStatusType`: `unknown`, `unspecified`, `planned`, `active`, `expired`, `other`.
+- **Admin status** `ChargingTariffGroupAdminStatusType`: `unknown`, `unspecified`, `planned`, `inDeployment`,
+  `operational`, `internalUse`, `outOfService`. Initially `operational` since `created`.
+- **Status** `ChargingTariffGroupStatusType`: `unknown`, `unspecified`, `planned`, `active`, `expired`.
   Initially `active` since `created`.
 - No energy status.
 - Events: `OnAdminStatusChanged` (`OnChargingTariffGroupAdminStatusChangedDelegate`) and `OnStatusChanged`

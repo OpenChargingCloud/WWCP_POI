@@ -64,8 +64,8 @@ initially as of its creation. Its status is set, not derived from its members.
 
 | | Type | Initial | Predefined values |
 |---|---|---|---|
-| Admin status | `ChargingPoolGroupAdminStatusType` | `Operational` | `unknown`, `unspecified`, `outOfService`, `operational`, `internalUse` |
-| Status | `ChargingPoolGroupStatusType` | `Available` | `unknown`, `unspecified`, `planned`, `inDeployment`, `outOfService`, `offline`, `available`, `partialAvailable`, `reserved`, `charging`, `faulted`, `other` |
+| Admin status | `ChargingPoolGroupAdminStatusType` | `Operational` | `unknown`, `unspecified`, `planned`, `inDeployment`, `operational`, `internalUse`, `outOfService` |
+| Status | `ChargingPoolGroupStatusType` | `Available` | `unknown`, `unspecified`, `planned`, `inDeployment`, `offline`, `available`, `partialAvailable`, `reserved`, `charging`, `outOfService`, `error` |
 
 Events: `OnAdminStatusChanged` (`OnChargingPoolGroupAdminStatusChangedDelegate`) and `OnStatusChanged`
 (`OnChargingPoolGroupStatusChangedDelegate`), with the old and new timestamped status. In a history,

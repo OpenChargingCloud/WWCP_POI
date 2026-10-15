@@ -183,46 +183,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Static members
 
         /// <summary>
-        /// Unclear admin status of the charging station.
-        /// </summary>
-        public static ChargingStationAdminStatusType  Unspecified     { get; }
-            = new ("unspecified");
-
-        /// <summary>
         /// Unknown admin status of the charging station.
         /// </summary>
-        public static ChargingStationAdminStatusType  Unknown         { get; }
+        public static ChargingStationAdminStatusType  Unknown             { get; }
             = new ("unknown");
+
+        /// <summary>
+        /// Unclear admin status of the charging station.
+        /// </summary>
+        public static ChargingStationAdminStatusType  Unspecified         { get; }
+            = new ("unspecified");
 
         /// <summary>
         /// The charging station is planned for the future.
         /// </summary>
-        public static ChargingStationAdminStatusType  Planned         { get; }
+        public static ChargingStationAdminStatusType  Planned             { get; }
             = new ("planned");
 
         /// <summary>
         /// The charging station is currently in deployment, but not fully operational yet.
         /// </summary>
-        public static ChargingStationAdminStatusType  InDeployment    { get; }
+        public static ChargingStationAdminStatusType  InDeployment        { get; }
             = new ("inDeployment");
+
+        /// <summary>
+        /// The charging station is operational.
+        /// </summary>
+        public static ChargingStationAdminStatusType  Operational         { get; }
+            = new ("operational");
 
         /// <summary>
         /// Private or internal use.
         /// </summary>
-        public static ChargingStationAdminStatusType  InternalUse     { get; }
+        public static ChargingStationAdminStatusType  InternalUse         { get; }
             = new ("internalUse");
 
         /// <summary>
         /// The charging station is under maintenance.
         /// </summary>
-        public static ChargingStationAdminStatusType  OutOfService    { get; }
+        public static ChargingStationAdminStatusType  OutOfService        { get; }
             = new ("outOfService");
-
-        /// <summary>
-        /// The charging station is operational.
-        /// </summary>
-        public static ChargingStationAdminStatusType  Operational     { get; }
-            = new ("operational");
 
         #endregion
 

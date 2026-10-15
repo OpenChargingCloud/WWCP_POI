@@ -185,27 +185,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the parking space group.
         /// </summary>
-        public static readonly ParkingSpaceGroupAdminStatusType Unknown       = new ("unknown");
+        public static readonly ParkingSpaceGroupAdminStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear admin status of the parking space group.
         /// </summary>
-        public static readonly ParkingSpaceGroupAdminStatusType Unspecified   = new ("unspecified");
+        public static readonly ParkingSpaceGroupAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// The parking space group is under maintenance.
+        /// The parking space group is planned for the future.
         /// </summary>
-        public static readonly ParkingSpaceGroupAdminStatusType OutOfService  = new ("outOfService");
+        public static readonly ParkingSpaceGroupAdminStatusType Planned      = new ("planned");
+
+        /// <summary>
+        /// The parking space group is being deployed, not fully operational yet.
+        /// </summary>
+        public static readonly ParkingSpaceGroupAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The parking space group is operational.
         /// </summary>
-        public static readonly ParkingSpaceGroupAdminStatusType Operational   = new ("operational");
+        public static readonly ParkingSpaceGroupAdminStatusType Operational  = new ("operational");
 
         /// <summary>
         /// Private or internal use.
         /// </summary>
-        public static readonly ParkingSpaceGroupAdminStatusType InternalUse   = new ("internalUse");
+        public static readonly ParkingSpaceGroupAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The parking space group is under maintenance.
+        /// </summary>
+        public static readonly ParkingSpaceGroupAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

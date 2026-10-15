@@ -193,9 +193,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static readonly EVSEGroupAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// The EVSE group is under maintenance.
+        /// The EVSE group is planned for the future.
         /// </summary>
-        public static readonly EVSEGroupAdminStatusType OutOfService = new ("outOfService");
+        public static readonly EVSEGroupAdminStatusType Planned      = new ("planned");
+
+        /// <summary>
+        /// The EVSE group is being deployed, not fully operational yet.
+        /// </summary>
+        public static readonly EVSEGroupAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The EVSE group is operational.
@@ -206,6 +211,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Private or internal use.
         /// </summary>
         public static readonly EVSEGroupAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The EVSE group is under maintenance.
+        /// </summary>
+        public static readonly EVSEGroupAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

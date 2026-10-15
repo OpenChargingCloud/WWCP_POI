@@ -128,10 +128,9 @@ The array is ordered by `transparencySoftwareId` (ordinal) whatever the given or
 See [README.md](README.md#runtime-status). Runtime status entity type: `EnergyMeter`, addressed by its identification
 (e.g. `history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, "EnergyMeter", "grid-meter", "offline", …)`).
 
-- **Admin status** `EnergyMeterAdminStatusType`: `unspecified`, `unknown`, `planned`, `inDeployment`, `internalUse`,
-  `outOfService`, `operational`. Initially `operational` since `created`.
-- **Status** `EnergyMeterStatusType`: `unknown`, `unspecified`, `offline`, `inDeployment`, `reserved`, `available`,
-  `partialAvailable`, `waitingForPlugin`, `pluggedIn`, `charging`, `doorNotClosed`, `error`, `outOfService`.
+- **Admin status** `EnergyMeterAdminStatusType`: `unknown`, `unspecified`, `planned`, `inDeployment`, `operational`,
+  `internalUse`, `outOfService`. Initially `operational` since `created`.
+- **Status** `EnergyMeterStatusType`: `unknown`, `unspecified`, `inDeployment`, `offline`, `available`, `error`.
   Initially `available` since `created`.
 - No energy status.
 - Events: `OnAdminStatusChanged` (`OnEnergyMeterAdminStatusChangedDelegate`) and `OnStatusChanged`

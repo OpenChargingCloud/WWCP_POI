@@ -169,7 +169,7 @@ Mechanism: [Runtime status](README.md#runtime-status). In a history it is addres
 
 | Type | Predefined values | Initial |
 |---|---|---|
-| `GridOperatorAdminStatusType` | `unknown`, `unspecified`, `outOfService`, `operational`, `internalUse` | `operational` since `created` |
+| `GridOperatorAdminStatusType` | `unknown`, `unspecified`, `planned`, `inDeployment`, `operational`, `internalUse`, `outOfService` | `operational` since `created` |
 | `GridOperatorStatusType` | `unknown`, `unspecified`, `offline`, `inDeployment`, `available`, `error` | `available` since `created` |
 
 Any other non-empty text parses as well. No energy status.

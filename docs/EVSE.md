@@ -158,15 +158,14 @@ See [runtime status](README.md#runtime-status) for the mechanism.
 
 - **Admin status** `EVSEAdminStatusType`, initially `Operational` since its creation:
   `Unknown` (`unknown`), `Unspecified` (`unspecified`), `Planned` (`planned`), `InDeployment` (`inDeployment`),
-  `OutOfService` (`outOfService`), `Blocked` (`blocked`), `Operational` (`operational`), `Deleted` (`deleted`),
-  `InternalUse` (`internalUse`), `UnknownEVSE` (`unknownEVSE`).
+  `Operational` (`operational`), `InternalUse` (`internalUse`), `OutOfService` (`outOfService`),
+  `Blocked` (`blocked`).
 - **Status** `EVSEStatusType`, initially `Available` since its creation:
   `Unknown` (`unknown`), `Unspecified` (`unspecified`), `Offline` (`offline`), `InDeployment` (`inDeployment`),
   `Reserved` (`reserved`), `Available` (`available`), `WaitingForPlugin` (`waitingForPlugin`),
   `PluggedIn` (`pluggedIn`), `Charging` (`charging`), `Occupied` (`occupied`), `DoorNotClosed` (`doorNotClosed`),
-  `Error` (`error`), `Faulted` (`faulted`), `Unavailable` (`unavailable`), `Inoperative` (`inoperative`),
-  `OutOfService` (`outOfService`), `OutOfOrder` (`outOfOrder`), `Blocked` (`blocked`), `Removed` (`removed`),
-  `Other` (`other`).
+  `Error` (`error`), `Unavailable` (`unavailable`), `Inoperative` (`inoperative`), `OutOfService` (`outOfService`),
+  `OutOfOrder` (`outOfOrder`), `Blocked` (`blocked`), `Removed` (`removed`).
 - **Energy status:** see [Energy status](#energy-status).
 - **Events:** `OnAdminStatusChanged`, `OnStatusChanged` `(timestamp, eventTrackingId, evse, oldStatus, newStatus)`,
   `OnEnergyStatusChanged`.

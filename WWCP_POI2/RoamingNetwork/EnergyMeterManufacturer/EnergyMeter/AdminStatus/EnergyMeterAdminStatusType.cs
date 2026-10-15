@@ -183,39 +183,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Static members
 
         /// <summary>
-        /// Unclear admin status of the energy meter.
-        /// </summary>
-        public static readonly EnergyMeterAdminStatusType Unspecified   = new("unspecified");
-
-        /// <summary>
         /// Unknown admin status of the energy meter.
         /// </summary>
-        public static readonly EnergyMeterAdminStatusType Unknown        = new("unknown");
+        public static readonly EnergyMeterAdminStatusType Unknown      = new ("unknown");
+
+        /// <summary>
+        /// Unclear admin status of the energy meter.
+        /// </summary>
+        public static readonly EnergyMeterAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
         /// The energy meter is planned for the future.
         /// </summary>
-        public static readonly EnergyMeterAdminStatusType Planned       = new("planned");
+        public static readonly EnergyMeterAdminStatusType Planned      = new ("planned");
 
         /// <summary>
         /// The energy meter is currently in deployment, but not fully operational yet.
         /// </summary>
-        public static readonly EnergyMeterAdminStatusType InDeployment  = new("inDeployment");
-
-        /// <summary>
-        /// Private or internal use.
-        /// </summary>
-        public static readonly EnergyMeterAdminStatusType InternalUse   = new("internalUse");
-
-        /// <summary>
-        /// The energy meter is under maintenance.
-        /// </summary>
-        public static readonly EnergyMeterAdminStatusType OutOfService  = new("outOfService");
+        public static readonly EnergyMeterAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The energy meter is operational.
         /// </summary>
-        public static readonly EnergyMeterAdminStatusType Operational   = new("operational");
+        public static readonly EnergyMeterAdminStatusType Operational  = new ("operational");
+
+        /// <summary>
+        /// Private or internal use.
+        /// </summary>
+        public static readonly EnergyMeterAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The energy meter is under maintenance.
+        /// </summary>
+        public static readonly EnergyMeterAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

@@ -185,27 +185,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the charging station operator.
         /// </summary>
-        public static readonly ChargingStationOperatorAdminStatusType Unknown       = new ("unknown");
+        public static readonly ChargingStationOperatorAdminStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear admin status of the charging station operator.
         /// </summary>
-        public static readonly ChargingStationOperatorAdminStatusType Unspecified   = new ("unspecified");
+        public static readonly ChargingStationOperatorAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// The charging station operator is under maintenance.
+        /// The charging station operator is planned for the future.
         /// </summary>
-        public static readonly ChargingStationOperatorAdminStatusType OutOfService  = new ("outOfService");
+        public static readonly ChargingStationOperatorAdminStatusType Planned      = new ("planned");
+
+        /// <summary>
+        /// The charging station operator is being deployed, not fully operational yet.
+        /// </summary>
+        public static readonly ChargingStationOperatorAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The charging station operator is operational.
         /// </summary>
-        public static readonly ChargingStationOperatorAdminStatusType Operational   = new ("operational");
+        public static readonly ChargingStationOperatorAdminStatusType Operational  = new ("operational");
 
         /// <summary>
         /// Private or internal use.
         /// </summary>
-        public static readonly ChargingStationOperatorAdminStatusType InternalUse   = new ("internalUse");
+        public static readonly ChargingStationOperatorAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The charging station operator is under maintenance.
+        /// </summary>
+        public static readonly ChargingStationOperatorAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

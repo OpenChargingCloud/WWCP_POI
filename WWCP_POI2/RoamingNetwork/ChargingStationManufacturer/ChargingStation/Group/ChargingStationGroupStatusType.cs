@@ -203,11 +203,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static readonly ChargingStationGroupStatusType InDeployment     = new ("inDeployment");
 
         /// <summary>
-        /// The charging station group is out of service.
-        /// </summary>
-        public static readonly ChargingStationGroupStatusType OutOfService     = new ("outOfService");
-
-        /// <summary>
         /// The charging station group is currently offline.
         /// </summary>
         public static readonly ChargingStationGroupStatusType Offline          = new ("offline");
@@ -233,14 +228,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static readonly ChargingStationGroupStatusType Charging         = new ("charging");
 
         /// <summary>
-        /// The members of the charging station group are faulted.
+        /// The charging station group is out of service.
         /// </summary>
-        public static readonly ChargingStationGroupStatusType Faulted          = new ("faulted");
+        public static readonly ChargingStationGroupStatusType OutOfService     = new ("outOfService");
 
         /// <summary>
-        /// Another status of the charging station group.
+        /// An error occurred within the charging station group.
         /// </summary>
-        public static readonly ChargingStationGroupStatusType Other            = new ("other");
+        public static readonly ChargingStationGroupStatusType Error            = new ("error");
 
         #endregion
 

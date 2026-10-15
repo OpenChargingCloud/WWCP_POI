@@ -193,13 +193,12 @@ meters is part of the [energy meters](EnergyMeter.md).
 See [runtime status](README.md#runtime-status) for the mechanism.
 
 - **Admin status** `ChargingStationAdminStatusType`, initially `Operational` since its creation:
-  `Unspecified` (`unspecified`), `Unknown` (`unknown`), `Planned` (`planned`), `InDeployment` (`inDeployment`),
-  `InternalUse` (`internalUse`), `OutOfService` (`outOfService`), `Operational` (`operational`).
+  `Unknown` (`unknown`), `Unspecified` (`unspecified`), `Planned` (`planned`), `InDeployment` (`inDeployment`),
+  `Operational` (`operational`), `InternalUse` (`internalUse`), `OutOfService` (`outOfService`).
 - **Status** `ChargingStationStatusType`, initially `Available` since its creation:
-  `Unknown` (`unknown`), `Unspecified` (`unspecified`), `Offline` (`offline`), `InDeployment` (`inDeployment`),
-  `Reserved` (`reserved`), `Available` (`available`), `PartialAvailable` (`partialAvailable`),
-  `WaitingForPlugin` (`waitingForPlugin`), `PluggedIn` (`pluggedIn`), `Charging` (`charging`),
-  `DoorNotClosed` (`doorNotClosed`), `Error` (`error`), `Removed` (`removed`), `OutOfService` (`outOfService`).
+  `Unknown` (`unknown`), `Unspecified` (`unspecified`), `Planned` (`planned`), `InDeployment` (`inDeployment`),
+  `Offline` (`offline`), `Available` (`available`), `PartialAvailable` (`partialAvailable`), `Reserved` (`reserved`),
+  `Charging` (`charging`), `OutOfService` (`outOfService`), `Error` (`error`), `Removed` (`removed`).
 - **Energy status:** see [Energy status](#energy-status).
 - **Events:** `OnAdminStatusChanged`, `OnStatusChanged` `(timestamp, eventTrackingId, chargingStation, oldStatus, newStatus)`,
   `OnEnergyStatusChanged`.

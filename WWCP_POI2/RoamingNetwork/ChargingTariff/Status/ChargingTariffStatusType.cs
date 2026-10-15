@@ -207,11 +207,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public static readonly ChargingTariffStatusType Expired     = new ("expired");
 
-        /// <summary>
-        /// Another status of the charging tariff.
-        /// </summary>
-        public static readonly ChargingTariffStatusType Other       = new ("other");
-
         #endregion
 
 

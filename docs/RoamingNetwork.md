@@ -313,7 +313,7 @@ The registries (brands, energy meter manufacturers, transparency software and ce
 
 | | Type | Predefined values | Initially |
 |---|---|---|---|
-| Admin status | `RoamingNetworkAdminStatusType` | `unknown`, `unspecified`, `outOfService`, `operational`, `internalUse` | `operational` |
+| Admin status | `RoamingNetworkAdminStatusType` | `unknown`, `unspecified`, `planned`, `inDeployment`, `operational`, `internalUse`, `outOfService` | `operational` |
 | Status | `RoamingNetworkStatusType` | `unknown`, `unspecified`, `offline`, `inDeployment`, `available`, `error` | `available` |
 
 - Both since `created`, unless the constructor is given `InitialAdminStatus`/`InitialStatus`; each schedule keeps

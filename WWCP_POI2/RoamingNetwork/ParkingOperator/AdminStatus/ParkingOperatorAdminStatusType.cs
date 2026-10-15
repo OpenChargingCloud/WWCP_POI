@@ -185,27 +185,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the parking operator.
         /// </summary>
-        public static readonly ParkingOperatorAdminStatusType Unknown       = new ("unknown");
+        public static readonly ParkingOperatorAdminStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear admin status of the parking operator.
         /// </summary>
-        public static readonly ParkingOperatorAdminStatusType Unspecified   = new ("unspecified");
+        public static readonly ParkingOperatorAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// The parking operator is under maintenance.
+        /// The parking operator is planned for the future.
         /// </summary>
-        public static readonly ParkingOperatorAdminStatusType OutOfService  = new ("outOfService");
+        public static readonly ParkingOperatorAdminStatusType Planned      = new ("planned");
+
+        /// <summary>
+        /// The parking operator is being deployed, not fully operational yet.
+        /// </summary>
+        public static readonly ParkingOperatorAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The parking operator is operational.
         /// </summary>
-        public static readonly ParkingOperatorAdminStatusType Operational   = new ("operational");
+        public static readonly ParkingOperatorAdminStatusType Operational  = new ("operational");
 
         /// <summary>
         /// Private or internal use.
         /// </summary>
-        public static readonly ParkingOperatorAdminStatusType InternalUse   = new ("internalUse");
+        public static readonly ParkingOperatorAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The parking operator is under maintenance.
+        /// </summary>
+        public static readonly ParkingOperatorAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

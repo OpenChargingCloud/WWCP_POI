@@ -222,11 +222,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public static readonly ParkingSpaceGroupStatusType InUse        = new ("inUse");
 
-        /// <summary>
-        /// Another status of the parking space group.
-        /// </summary>
-        public static readonly ParkingSpaceGroupStatusType Other        = new ("other");
-
         #endregion
 
 

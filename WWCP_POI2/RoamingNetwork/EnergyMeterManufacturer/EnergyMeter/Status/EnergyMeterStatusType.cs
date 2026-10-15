@@ -183,74 +183,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Static members
 
         /// <summary>
-        /// Unknown status of the EnergyMeter.
+        /// Unknown status of the energy meter.
         /// </summary>
-        public static readonly EnergyMeterStatusType Unknown           = new("unknown");
+        public static readonly EnergyMeterStatusType Unknown      = new ("unknown");
 
         /// <summary>
-        /// Unclear status of the EnergyMeter.
+        /// Unclear status of the energy meter.
         /// </summary>
-        public static readonly EnergyMeterStatusType Unspecified       = new("unspecified");
+        public static readonly EnergyMeterStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// Currently no communication with the EnergyMeter possible,
-        /// but charging in offline mode might be available.
+        /// The energy meter is being deployed, not fully operational yet.
         /// </summary>
-        public static readonly EnergyMeterStatusType Offline           = new("offline");
+        public static readonly EnergyMeterStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
-        /// The EnergyMeter is not fully operational yet.
+        /// Currently no communication with the energy meter is possible.
         /// </summary>
-        public static readonly EnergyMeterStatusType InDeployment      = new("inDeployment");
+        public static readonly EnergyMeterStatusType Offline      = new ("offline");
 
         /// <summary>
-        /// The EnergyMeter is reserved for future charging.
+        /// The energy meter is available.
         /// </summary>
-        public static readonly EnergyMeterStatusType Reserved          = new("reserved");
+        public static readonly EnergyMeterStatusType Available    = new ("available");
 
         /// <summary>
-        /// The EnergyMeter is available for charging.
+        /// An error occurred within the energy meter.
         /// </summary>
-        public static readonly EnergyMeterStatusType Available         = new("available");
-
-        /// <summary>
-        /// Some ongoing charging sessions or reservations, but still ready to charge.
-        /// </summary>
-        public static readonly EnergyMeterStatusType PartialAvailable  = new("partialAvailable");
-
-        /// <summary>
-        /// The door of a charging locker is open, the EnergyMeter is unlocked
-        /// and is waiting for the customer to plugin.
-        /// </summary>
-        public static readonly EnergyMeterStatusType WaitingForPlugin  = new("waitingForPlugin");
-
-        /// <summary>
-        /// A cable is plugged into the socket or a vehicle is connected
-        /// to the cable, but both without any further action.
-        /// </summary>
-        public static readonly EnergyMeterStatusType PluggedIn         = new("pluggedIn");
-
-        /// <summary>
-        /// An ongoing charging process.
-        /// </summary>
-        public static readonly EnergyMeterStatusType Charging          = new("charging");
-
-        /// <summary>
-        /// The EnergyMeter has a mechanical door, e.g. an e-bike charging locker,
-        /// which was not closed after the customer took the battery out.
-        /// </summary>
-        public static readonly EnergyMeterStatusType DoorNotClosed     = new("doorNotClosed");
-
-        /// <summary>
-        /// A fatal error has occurred within the EnergyMeter.
-        /// </summary>
-        public static readonly EnergyMeterStatusType Error             = new("error");
-
-        /// <summary>
-        /// The EnergyMeter is not ready for charging because it is under maintenance
-        /// or was disabled by the energy meter operator.
-        /// </summary>
-        public static readonly EnergyMeterStatusType OutOfService      = new("outOfService");
+        public static readonly EnergyMeterStatusType Error        = new ("error");
 
         #endregion
 

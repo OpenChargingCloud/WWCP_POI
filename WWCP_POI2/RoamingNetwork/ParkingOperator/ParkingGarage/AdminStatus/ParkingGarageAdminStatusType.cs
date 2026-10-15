@@ -185,27 +185,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the parking garage.
         /// </summary>
-        public static readonly ParkingGarageAdminStatusType Unknown       = new ("unknown");
+        public static readonly ParkingGarageAdminStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear admin status of the parking garage.
         /// </summary>
-        public static readonly ParkingGarageAdminStatusType Unspecified   = new ("unspecified");
+        public static readonly ParkingGarageAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// The parking garage is under maintenance.
+        /// The parking garage is planned for the future.
         /// </summary>
-        public static readonly ParkingGarageAdminStatusType OutOfService  = new ("outOfService");
+        public static readonly ParkingGarageAdminStatusType Planned      = new ("planned");
+
+        /// <summary>
+        /// The parking garage is being deployed, not fully operational yet.
+        /// </summary>
+        public static readonly ParkingGarageAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The parking garage is operational.
         /// </summary>
-        public static readonly ParkingGarageAdminStatusType Operational   = new ("operational");
+        public static readonly ParkingGarageAdminStatusType Operational  = new ("operational");
 
         /// <summary>
         /// Private or internal use.
         /// </summary>
-        public static readonly ParkingGarageAdminStatusType InternalUse   = new ("internalUse");
+        public static readonly ParkingGarageAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The parking garage is under maintenance.
+        /// </summary>
+        public static readonly ParkingGarageAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

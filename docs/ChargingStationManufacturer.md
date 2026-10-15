@@ -98,10 +98,10 @@ or certificate can not name an unknown one.
 
 See [README.md](README.md#runtime-status). Runtime status entity type: `ChargingStationManufacturer`.
 
-- **Admin status** `ChargingStationManufacturerAdminStatusType`: `unknown`, `outOfService`, `operational`.
-  Initially `operational` since `created`.
-- **Status** `ChargingStationManufacturerStatusType`: `unknown`, `offline`, `available`. Initially `available`
-  since `created`.
+- **Admin status** `ChargingStationManufacturerAdminStatusType`: `unknown`, `unspecified`, `planned`, `inDeployment`,
+  `operational`, `internalUse`, `outOfService`. Initially `operational` since `created`.
+- **Status** `ChargingStationManufacturerStatusType`: `unknown`, `unspecified`, `offline`, `inDeployment`,
+  `available`, `error`. Initially `available` since `created`.
 - No energy status.
 - Events: `OnAdminStatusChanged` (`OnChargingStationManufacturerAdminStatusChangedDelegate`) and `OnStatusChanged`
   (`OnChargingStationManufacturerStatusChangedDelegate`).

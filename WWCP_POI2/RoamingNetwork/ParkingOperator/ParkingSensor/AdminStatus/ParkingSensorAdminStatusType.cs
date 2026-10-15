@@ -185,27 +185,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the parking sensor.
         /// </summary>
-        public static readonly ParkingSensorAdminStatusType Unknown       = new ("unknown");
+        public static readonly ParkingSensorAdminStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear admin status of the parking sensor.
         /// </summary>
-        public static readonly ParkingSensorAdminStatusType Unspecified   = new ("unspecified");
+        public static readonly ParkingSensorAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// The parking sensor is under maintenance.
+        /// The parking sensor is planned for the future.
         /// </summary>
-        public static readonly ParkingSensorAdminStatusType OutOfService  = new ("outOfService");
+        public static readonly ParkingSensorAdminStatusType Planned      = new ("planned");
+
+        /// <summary>
+        /// The parking sensor is being deployed, not fully operational yet.
+        /// </summary>
+        public static readonly ParkingSensorAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The parking sensor is operational.
         /// </summary>
-        public static readonly ParkingSensorAdminStatusType Operational   = new ("operational");
+        public static readonly ParkingSensorAdminStatusType Operational  = new ("operational");
 
         /// <summary>
         /// Private or internal use.
         /// </summary>
-        public static readonly ParkingSensorAdminStatusType InternalUse   = new ("internalUse");
+        public static readonly ParkingSensorAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The parking sensor is under maintenance.
+        /// </summary>
+        public static readonly ParkingSensorAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

@@ -203,14 +203,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static readonly ParkingSensorStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
-        /// The parking sensor is currently blocked.
+        /// Currently no communication with the parking sensor is possible.
         /// </summary>
-        public static readonly ParkingSensorStatusType Blocked      = new ("blocked");
+        public static readonly ParkingSensorStatusType Offline      = new ("offline");
 
         /// <summary>
         /// The parking sensor is available.
         /// </summary>
         public static readonly ParkingSensorStatusType Available    = new ("available");
+
+        /// <summary>
+        /// The parking sensor is currently blocked.
+        /// </summary>
+        public static readonly ParkingSensorStatusType Blocked      = new ("blocked");
+
+        /// <summary>
+        /// An error occurred within the parking sensor.
+        /// </summary>
+        public static readonly ParkingSensorStatusType Error        = new ("error");
 
         #endregion
 

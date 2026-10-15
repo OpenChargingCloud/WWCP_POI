@@ -245,7 +245,7 @@ both initially as of its creation. It does not aggregate the status of its pools
 
 | | Type | Initial | Predefined values |
 |---|---|---|---|
-| Admin status | `ChargingStationOperatorAdminStatusType` | `Operational` | `unknown`, `unspecified`, `outOfService`, `operational`, `internalUse` |
+| Admin status | `ChargingStationOperatorAdminStatusType` | `Operational` | `unknown`, `unspecified`, `planned`, `inDeployment`, `operational`, `internalUse`, `outOfService` |
 | Status | `ChargingStationOperatorStatusType` | `Available` | `unknown`, `unspecified`, `offline`, `inDeployment`, `available`, `error` |
 
 Events: `OnAdminStatusChanged`, `OnStatusChanged`, with the old and new timestamped status. `OnDataChanged` exists

@@ -185,32 +185,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown status of the grid operator.
         /// </summary>
-        public static readonly GridOperatorStatusType Unknown       = new("unknown");
+        public static readonly GridOperatorStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear status of the grid operator.
         /// </summary>
-        public static readonly GridOperatorStatusType Unspecified   = new("unspecified");
+        public static readonly GridOperatorStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
         /// The grid operator is currently offline.
         /// </summary>
-        public static readonly GridOperatorStatusType Offline       = new("offline");
+        public static readonly GridOperatorStatusType Offline      = new ("offline");
 
         /// <summary>
         /// The grid operator is not fully operational yet.
         /// </summary>
-        public static readonly GridOperatorStatusType InDeployment  = new("inDeployment");
+        public static readonly GridOperatorStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The grid operator is available.
         /// </summary>
-        public static readonly GridOperatorStatusType Available     = new("available");
+        public static readonly GridOperatorStatusType Available    = new ("available");
 
         /// <summary>
         /// A fatal error has occurred within the grid operator.
         /// </summary>
-        public static readonly GridOperatorStatusType Error         = new("error");
+        public static readonly GridOperatorStatusType Error        = new ("error");
 
         #endregion
 

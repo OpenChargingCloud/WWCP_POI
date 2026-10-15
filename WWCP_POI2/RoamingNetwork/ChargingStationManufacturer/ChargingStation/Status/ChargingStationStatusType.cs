@@ -185,91 +185,76 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown status of the ChargingStation.
         /// </summary>
-        public static ChargingStationStatusType Unknown             { get; }
+        public static ChargingStationStatusType  Unknown             { get; }
             = new ("unknown");
 
         /// <summary>
         /// Unclear status of the ChargingStation.
         /// </summary>
-        public static ChargingStationStatusType Unspecified         { get; }
+        public static ChargingStationStatusType  Unspecified         { get; }
             = new ("unspecified");
+
+        /// <summary>
+        /// The charging station is planned for the future.
+        /// </summary>
+        public static ChargingStationStatusType  Planned             { get; }
+            = new ("planned");
+
+        /// <summary>
+        /// The ChargingStation is not fully operational yet.
+        /// </summary>
+        public static ChargingStationStatusType  InDeployment        { get; }
+            = new ("inDeployment");
 
         /// <summary>
         /// Currently no communication with the ChargingStation possible,
         /// but charging in offline mode might be available.
         /// </summary>
-        public static ChargingStationStatusType Offline             { get; }
+        public static ChargingStationStatusType  Offline             { get; }
             = new ("offline");
-
-        /// <summary>
-        /// The ChargingStation is not fully operational yet.
-        /// </summary>
-        public static ChargingStationStatusType InDeployment        { get; }
-            = new ("inDeployment");
-
-        /// <summary>
-        /// The ChargingStation is reserved for future charging.
-        /// </summary>
-        public static ChargingStationStatusType Reserved            { get; }
-            = new ("reserved");
 
         /// <summary>
         /// The ChargingStation is available for charging.
         /// </summary>
-        public static ChargingStationStatusType Available           { get; }
+        public static ChargingStationStatusType  Available           { get; }
             = new ("available");
 
         /// <summary>
         /// Some ongoing charging sessions or reservations, but still ready to charge.
         /// </summary>
-        public static ChargingStationStatusType PartialAvailable    { get; }
+        public static ChargingStationStatusType  PartialAvailable    { get; }
             = new ("partialAvailable");
 
         /// <summary>
-        /// The door of a charging locker is open, the ChargingStation is unlocked
-        /// and is waiting for the customer to plugin.
+        /// The ChargingStation is reserved for future charging.
         /// </summary>
-        public static ChargingStationStatusType WaitingForPlugin    { get; }
-            = new ("waitingForPlugin");
-
-        /// <summary>
-        /// A cable is plugged into the socket or a vehicle is connected
-        /// to the cable, but both without any further action.
-        /// </summary>
-        public static ChargingStationStatusType PluggedIn           { get; }
-            = new ("pluggedIn");
+        public static ChargingStationStatusType  Reserved            { get; }
+            = new ("reserved");
 
         /// <summary>
         /// An ongoing charging process.
         /// </summary>
-        public static ChargingStationStatusType Charging            { get; }
+        public static ChargingStationStatusType  Charging            { get; }
             = new ("charging");
-
-        /// <summary>
-        /// The ChargingStation has a mechanical door, e.g. an e-bike charging locker,
-        /// which was not closed after the customer took the battery out.
-        /// </summary>
-        public static ChargingStationStatusType DoorNotClosed       { get; }
-            = new ("doorNotClosed");
-
-        /// <summary>
-        /// A fatal error has occurred within the ChargingStation.
-        /// </summary>
-        public static ChargingStationStatusType Error               { get; }
-            = new ("error");
-
-        /// <summary>
-        /// The charging station was removed.
-        /// </summary>
-        public static ChargingStationStatusType  Removed            { get; }
-            = new ("removed");
 
         /// <summary>
         /// The charging station is not ready for charging because it is under maintenance
         /// or was disabled by the charging station operator.
         /// </summary>
-        public static ChargingStationStatusType OutOfService        { get; }
+        public static ChargingStationStatusType  OutOfService        { get; }
             = new ("outOfService");
+
+        /// <summary>
+        /// A fatal error has occurred within the ChargingStation.
+        /// </summary>
+        public static ChargingStationStatusType  Error               { get; }
+            = new ("error");
+
+        /// <summary>
+        /// The charging station was removed.
+        /// </summary>
+        public static ChargingStationStatusType  Removed             { get; }
+            = new ("removed");
 
         #endregion
 

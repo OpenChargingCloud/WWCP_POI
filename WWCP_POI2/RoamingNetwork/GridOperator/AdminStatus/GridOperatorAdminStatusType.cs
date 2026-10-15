@@ -185,27 +185,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the grid operator.
         /// </summary>
-        public static readonly GridOperatorAdminStatusType Unknown       = new ("unknown");
+        public static readonly GridOperatorAdminStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear admin status of the grid operator.
         /// </summary>
-        public static readonly GridOperatorAdminStatusType Unspecified   = new ("unspecified");
+        public static readonly GridOperatorAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// The grid operator is under maintenance.
+        /// The grid operator is planned for the future.
         /// </summary>
-        public static readonly GridOperatorAdminStatusType OutOfService  = new ("outOfService");
+        public static readonly GridOperatorAdminStatusType Planned      = new ("planned");
+
+        /// <summary>
+        /// The grid operator is being deployed, not fully operational yet.
+        /// </summary>
+        public static readonly GridOperatorAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The grid operator is operational.
         /// </summary>
-        public static readonly GridOperatorAdminStatusType Operational   = new ("operational");
+        public static readonly GridOperatorAdminStatusType Operational  = new ("operational");
 
         /// <summary>
         /// Private or internal use.
         /// </summary>
-        public static readonly GridOperatorAdminStatusType InternalUse   = new ("internalUse");
+        public static readonly GridOperatorAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The grid operator is under maintenance.
+        /// </summary>
+        public static readonly GridOperatorAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

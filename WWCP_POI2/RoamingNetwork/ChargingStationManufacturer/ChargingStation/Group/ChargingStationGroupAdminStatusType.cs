@@ -193,9 +193,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static readonly ChargingStationGroupAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// The charging station group is under maintenance.
+        /// The charging station group is planned for the future.
         /// </summary>
-        public static readonly ChargingStationGroupAdminStatusType OutOfService = new ("outOfService");
+        public static readonly ChargingStationGroupAdminStatusType Planned      = new ("planned");
+
+        /// <summary>
+        /// The charging station group is being deployed, not fully operational yet.
+        /// </summary>
+        public static readonly ChargingStationGroupAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The charging station group is operational.
@@ -206,6 +211,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Private or internal use.
         /// </summary>
         public static readonly ChargingStationGroupAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The charging station group is under maintenance.
+        /// </summary>
+        public static readonly ChargingStationGroupAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

@@ -185,55 +185,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the EVSE.
         /// </summary>
-        public static readonly EVSEAdminStatusType Unknown        = new("unknown");
+        public static readonly EVSEAdminStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear admin status of the EVSE.
         /// </summary>
-        public static readonly EVSEAdminStatusType Unspecified   = new("unspecified");
+        public static readonly EVSEAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
         /// Planned for the future.
         /// </summary>
-        public static readonly EVSEAdminStatusType Planned       = new("planned");
+        public static readonly EVSEAdminStatusType Planned      = new ("planned");
 
         /// <summary>
         /// The EVSE is currently in deployment, but not fully operational yet.
         /// </summary>
-        public static readonly EVSEAdminStatusType InDeployment  = new("inDeployment");
+        public static readonly EVSEAdminStatusType InDeployment = new ("inDeployment");
+
+        /// <summary>
+        /// The EVSE is operational.
+        /// </summary>
+        public static readonly EVSEAdminStatusType Operational  = new ("operational");
+
+        /// <summary>
+        /// Private or internal use.
+        /// </summary>
+        public static readonly EVSEAdminStatusType InternalUse  = new ("internalUse");
 
         /// <summary>
         /// The EVSE is under maintenance.
         /// </summary>
-        public static readonly EVSEAdminStatusType OutOfService  = new("outOfService");
+        public static readonly EVSEAdminStatusType OutOfService = new ("outOfService");
 
         /// <summary>
         /// The EVSE not accessible because of a physical barrier,
         /// i.e. a car, a construction area or a city festival in front
         /// of the EVSE.
         /// </summary>
-        public static readonly EVSEAdminStatusType Blocked       = new("blocked");
-
-        /// <summary>
-        /// The EVSE is operational.
-        /// </summary>
-        public static readonly EVSEAdminStatusType Operational   = new("operational");
-
-        /// <summary>
-        /// The EVSE does no longer exist.
-        /// </summary>
-        public static readonly EVSEAdminStatusType Deleted       = new("deleted");
-
-        /// <summary>
-        /// Private or internal use.
-        /// </summary>
-        public static readonly EVSEAdminStatusType InternalUse   = new("internalUse");
-
-        /// <summary>
-        /// The EVSE was not found!
-        /// (Only valid within batch-processing)
-        /// </summary>
-        public static readonly EVSEAdminStatusType UnknownEVSE   = new("unknownEVSE");
+        public static readonly EVSEAdminStatusType Blocked      = new ("blocked");
 
         #endregion
 

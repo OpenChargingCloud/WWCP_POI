@@ -185,27 +185,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the parking space.
         /// </summary>
-        public static readonly ParkingSpaceAdminStatusType Unknown       = new ("unknown");
+        public static readonly ParkingSpaceAdminStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear admin status of the parking space.
         /// </summary>
-        public static readonly ParkingSpaceAdminStatusType Unspecified   = new ("unspecified");
+        public static readonly ParkingSpaceAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// The parking space is under maintenance.
+        /// The parking space is planned for the future.
         /// </summary>
-        public static readonly ParkingSpaceAdminStatusType OutOfService  = new ("outOfService");
+        public static readonly ParkingSpaceAdminStatusType Planned      = new ("planned");
+
+        /// <summary>
+        /// The parking space is being deployed, not fully operational yet.
+        /// </summary>
+        public static readonly ParkingSpaceAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The parking space is operational.
         /// </summary>
-        public static readonly ParkingSpaceAdminStatusType Operational   = new ("operational");
+        public static readonly ParkingSpaceAdminStatusType Operational  = new ("operational");
 
         /// <summary>
         /// Private or internal use.
         /// </summary>
-        public static readonly ParkingSpaceAdminStatusType InternalUse   = new ("internalUse");
+        public static readonly ParkingSpaceAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The parking space is under maintenance.
+        /// </summary>
+        public static readonly ParkingSpaceAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

@@ -198,9 +198,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static readonly ChargingTariffAdminStatusType Planned      = new ("planned");
 
         /// <summary>
-        /// The charging tariff is under maintenance.
+        /// The charging tariff is being deployed, not fully operational yet.
         /// </summary>
-        public static readonly ChargingTariffAdminStatusType OutOfService = new ("outOfService");
+        public static readonly ChargingTariffAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The charging tariff is operational.
@@ -211,6 +211,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Private or internal use.
         /// </summary>
         public static readonly ChargingTariffAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The charging tariff is under maintenance.
+        /// </summary>
+        public static readonly ChargingTariffAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

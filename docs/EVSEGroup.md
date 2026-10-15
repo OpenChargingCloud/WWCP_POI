@@ -73,13 +73,12 @@ See [runtime status](README.md#runtime-status) for the mechanism. The group's st
 not calculated from the status of its members.
 
 - **Admin status** `EVSEGroupAdminStatusType`, initially `Operational` since its creation:
-  `Unknown` (`unknown`), `Unspecified` (`unspecified`), `OutOfService` (`outOfService`),
-  `Operational` (`operational`), `InternalUse` (`internalUse`).
+  `Unknown` (`unknown`), `Unspecified` (`unspecified`), `Planned` (`planned`), `InDeployment` (`inDeployment`),
+  `Operational` (`operational`), `InternalUse` (`internalUse`), `OutOfService` (`outOfService`).
 - **Status** `EVSEGroupStatusType`, initially `Available` since its creation:
   `Unknown` (`unknown`), `Unspecified` (`unspecified`), `Planned` (`planned`), `InDeployment` (`inDeployment`),
-  `OutOfService` (`outOfService`), `Offline` (`offline`), `Available` (`available`),
-  `PartialAvailable` (`partialAvailable`), `Reserved` (`reserved`), `Charging` (`charging`),
-  `Faulted` (`faulted`), `Other` (`other`).
+  `Offline` (`offline`), `Available` (`available`), `PartialAvailable` (`partialAvailable`), `Reserved` (`reserved`),
+  `Charging` (`charging`), `OutOfService` (`outOfService`), `Error` (`error`).
 - **Events:** `OnAdminStatusChanged`, `OnStatusChanged` `(timestamp, eventTrackingId, evseGroup, oldStatus, newStatus)`.
 
 In a history it is set and read by `history.RuntimeStatus` with the entity type `EVSEGroup`. It has no energy status.

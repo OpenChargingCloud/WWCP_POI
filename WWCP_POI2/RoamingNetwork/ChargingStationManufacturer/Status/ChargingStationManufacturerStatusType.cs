@@ -183,23 +183,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Static members
 
         /// <summary>
-        /// Unknown status of the ChargingStationManufacturer.
+        /// Unknown status of the charging station manufacturer.
         /// </summary>
-        public static ChargingStationManufacturerStatusType Unknown             { get; }
+        public static ChargingStationManufacturerStatusType  Unknown             { get; }
             = new ("unknown");
 
         /// <summary>
-        /// Currently no communication with the ChargingStationManufacturer possible,
-        /// but charging in offline mode might be available.
+        /// Unclear status of the charging station manufacturer.
         /// </summary>
-        public static ChargingStationManufacturerStatusType Offline             { get; }
+        public static ChargingStationManufacturerStatusType  Unspecified         { get; }
+            = new ("unspecified");
+
+        /// <summary>
+        /// Currently no communication with the charging station manufacturer is possible.
+        /// </summary>
+        public static ChargingStationManufacturerStatusType  Offline             { get; }
             = new ("offline");
 
         /// <summary>
-        /// The ChargingStationManufacturer is available for charging.
+        /// The charging station manufacturer is being deployed, not fully operational yet.
         /// </summary>
-        public static ChargingStationManufacturerStatusType Available           { get; }
+        public static ChargingStationManufacturerStatusType  InDeployment        { get; }
+            = new ("inDeployment");
+
+        /// <summary>
+        /// The charging station manufacturer is available.
+        /// </summary>
+        public static ChargingStationManufacturerStatusType  Available           { get; }
             = new ("available");
+
+        /// <summary>
+        /// An error occurred within the charging station manufacturer.
+        /// </summary>
+        public static ChargingStationManufacturerStatusType  Error               { get; }
+            = new ("error");
 
         #endregion
 

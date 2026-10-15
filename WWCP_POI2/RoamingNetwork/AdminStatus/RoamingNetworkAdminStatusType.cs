@@ -185,32 +185,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the roaming network.
         /// </summary>
-        public static RoamingNetworkAdminStatusType  Unknown         { get; }
+        public static RoamingNetworkAdminStatusType  Unknown             { get; }
             = new ("unknown");
 
         /// <summary>
         /// Unclear admin status of the roaming network.
         /// </summary>
-        public static RoamingNetworkAdminStatusType  Unspecified     { get; }
+        public static RoamingNetworkAdminStatusType  Unspecified         { get; }
             = new ("unspecified");
 
         /// <summary>
-        /// The roaming network is under maintenance.
+        /// The roaming network is planned for the future.
         /// </summary>
-        public static RoamingNetworkAdminStatusType  OutOfService    { get; }
-            = new ("outOfService");
+        public static RoamingNetworkAdminStatusType  Planned             { get; }
+            = new ("planned");
+
+        /// <summary>
+        /// The roaming network is being deployed, not fully operational yet.
+        /// </summary>
+        public static RoamingNetworkAdminStatusType  InDeployment        { get; }
+            = new ("inDeployment");
 
         /// <summary>
         /// The roaming network is operational.
         /// </summary>
-        public static RoamingNetworkAdminStatusType  Operational     { get; }
+        public static RoamingNetworkAdminStatusType  Operational         { get; }
             = new ("operational");
 
         /// <summary>
         /// Private or internal use.
         /// </summary>
-        public static RoamingNetworkAdminStatusType  InternalUse     { get; }
+        public static RoamingNetworkAdminStatusType  InternalUse         { get; }
             = new ("internalUse");
+
+        /// <summary>
+        /// The roaming network is under maintenance.
+        /// </summary>
+        public static RoamingNetworkAdminStatusType  OutOfService        { get; }
+            = new ("outOfService");
 
         #endregion
 

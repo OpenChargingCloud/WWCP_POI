@@ -222,8 +222,8 @@ initially as of its creation. Its status is set, not derived from its stations.
 
 | | Type | Initial | Predefined values |
 |---|---|---|---|
-| Admin status | `ChargingPoolAdminStatusType` | `Operational` | `unspecified`, `unknown`, `planned`, `inDeployment`, `internalUse`, `outOfService`, `operational` |
-| Status | `ChargingPoolStatusType` | `Available` | `unknown`, `unspecified`, `offline`, `inDeployment`, `partialAvailable`, `available`, `reserved`, `charging`, `removed`, `error` |
+| Admin status | `ChargingPoolAdminStatusType` | `Operational` | `unknown`, `unspecified`, `planned`, `inDeployment`, `operational`, `internalUse`, `outOfService` |
+| Status | `ChargingPoolStatusType` | `Available` | `unknown`, `unspecified`, `planned`, `inDeployment`, `offline`, `available`, `partialAvailable`, `reserved`, `charging`, `outOfService`, `error`, `removed` |
 
 Events: `OnAdminStatusChanged` (`OnChargingPoolAdminStatusChangedDelegate`) and `OnStatusChanged`
 (`OnChargingPoolStatusChangedDelegate`), with the old and new timestamped status. In a history,

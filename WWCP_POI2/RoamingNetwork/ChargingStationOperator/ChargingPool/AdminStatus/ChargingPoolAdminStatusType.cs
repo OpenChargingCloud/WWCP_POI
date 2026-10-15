@@ -183,39 +183,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Static members
 
         /// <summary>
-        /// Unclear admin status of the charging pool.
-        /// </summary>
-        public static readonly ChargingPoolAdminStatusType Unspecified   = new("unspecified");
-
-        /// <summary>
         /// Unknown admin status of the charging pool.
         /// </summary>
-        public static readonly ChargingPoolAdminStatusType Unknown        = new("unknown");
+        public static readonly ChargingPoolAdminStatusType Unknown      = new ("unknown");
+
+        /// <summary>
+        /// Unclear admin status of the charging pool.
+        /// </summary>
+        public static readonly ChargingPoolAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
         /// The charging pool is planned for the future.
         /// </summary>
-        public static readonly ChargingPoolAdminStatusType Planned       = new("planned");
+        public static readonly ChargingPoolAdminStatusType Planned      = new ("planned");
 
         /// <summary>
         /// The charging pool is currently in deployment, but not fully operational yet.
         /// </summary>
-        public static readonly ChargingPoolAdminStatusType InDeployment  = new("inDeployment");
-
-        /// <summary>
-        /// Private or internal use.
-        /// </summary>
-        public static readonly ChargingPoolAdminStatusType InternalUse   = new("internalUse");
-
-        /// <summary>
-        /// The charging pool is under maintenance.
-        /// </summary>
-        public static readonly ChargingPoolAdminStatusType OutOfService  = new("outOfService");
+        public static readonly ChargingPoolAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The charging pool is operational.
         /// </summary>
-        public static readonly ChargingPoolAdminStatusType Operational   = new("operational");
+        public static readonly ChargingPoolAdminStatusType Operational  = new ("operational");
+
+        /// <summary>
+        /// Private or internal use.
+        /// </summary>
+        public static readonly ChargingPoolAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The charging pool is under maintenance.
+        /// </summary>
+        public static readonly ChargingPoolAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

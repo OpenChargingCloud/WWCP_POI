@@ -59,8 +59,8 @@ Mechanism: [Runtime status](README.md#runtime-status). In a history it is addres
 
 | Type | Predefined values | Initial |
 |---|---|---|
-| `ParkingSpaceGroupAdminStatusType` | `unknown`, `unspecified`, `outOfService`, `operational`, `internalUse` | `operational` since `created` |
-| `ParkingSpaceGroupStatusType` | `unknown`, `unspecified`, `planned`, `inDeployment`, `blocked`, `available`, `reserved`, `inUse`, `other` | `available` since `created` |
+| `ParkingSpaceGroupAdminStatusType` | `unknown`, `unspecified`, `planned`, `inDeployment`, `operational`, `internalUse`, `outOfService` | `operational` since `created` |
+| `ParkingSpaceGroupStatusType` | `unknown`, `unspecified`, `planned`, `inDeployment`, `blocked`, `available`, `reserved`, `inUse` | `available` since `created` |
 
 Any other non-empty text parses as well. No energy status. A change of the group or of anything else of its
 parking operator keeps its runtime status.

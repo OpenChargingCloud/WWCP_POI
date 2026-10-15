@@ -185,20 +185,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the charging station manufacturer.
         /// </summary>
-        public static ChargingStationManufacturerAdminStatusType  Unknown         { get; }
+        public static ChargingStationManufacturerAdminStatusType  Unknown             { get; }
             = new ("unknown");
 
         /// <summary>
-        /// The charging station manufacturer is under maintenance.
+        /// Unclear status of the charging station manufacturer.
         /// </summary>
-        public static ChargingStationManufacturerAdminStatusType  OutOfService    { get; }
-            = new ("outOfService");
+        public static ChargingStationManufacturerAdminStatusType  Unspecified         { get; }
+            = new ("unspecified");
+
+        /// <summary>
+        /// The charging station manufacturer is planned for the future.
+        /// </summary>
+        public static ChargingStationManufacturerAdminStatusType  Planned             { get; }
+            = new ("planned");
+
+        /// <summary>
+        /// The charging station manufacturer is being deployed, not fully operational yet.
+        /// </summary>
+        public static ChargingStationManufacturerAdminStatusType  InDeployment        { get; }
+            = new ("inDeployment");
 
         /// <summary>
         /// The charging station manufacturer is operational.
         /// </summary>
-        public static ChargingStationManufacturerAdminStatusType  Operational     { get; }
+        public static ChargingStationManufacturerAdminStatusType  Operational         { get; }
             = new ("operational");
+
+        /// <summary>
+        /// The charging station manufacturer is for internal use only, e.g. for tests.
+        /// </summary>
+        public static ChargingStationManufacturerAdminStatusType  InternalUse         { get; }
+            = new ("internalUse");
+
+        /// <summary>
+        /// The charging station manufacturer is under maintenance.
+        /// </summary>
+        public static ChargingStationManufacturerAdminStatusType  OutOfService        { get; }
+            = new ("outOfService");
 
         #endregion
 

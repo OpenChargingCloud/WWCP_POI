@@ -185,32 +185,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown status of the e-mobility provider.
         /// </summary>
-        public static readonly EMobilityProviderStatusType Unknown       = new("unknown");
+        public static readonly EMobilityProviderStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear status of the e-mobility provider.
         /// </summary>
-        public static readonly EMobilityProviderStatusType Unspecified   = new("unspecified");
+        public static readonly EMobilityProviderStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
         /// The e-mobility provider is currently offline.
         /// </summary>
-        public static readonly EMobilityProviderStatusType Offline       = new("offline");
+        public static readonly EMobilityProviderStatusType Offline      = new ("offline");
 
         /// <summary>
         /// The e-mobility provider is not fully operational yet.
         /// </summary>
-        public static readonly EMobilityProviderStatusType InDeployment  = new("inDeployment");
+        public static readonly EMobilityProviderStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The e-mobility provider is available.
         /// </summary>
-        public static readonly EMobilityProviderStatusType Available     = new("available");
+        public static readonly EMobilityProviderStatusType Available    = new ("available");
 
         /// <summary>
         /// A fatal error has occurred within the e-mobility provider.
         /// </summary>
-        public static readonly EMobilityProviderStatusType Error         = new("error");
+        public static readonly EMobilityProviderStatusType Error        = new ("error");
 
         #endregion
 

@@ -185,27 +185,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Unknown admin status of the e-mobility provider.
         /// </summary>
-        public static readonly EMobilityProviderAdminStatusType Unknown       = new ("unknown");
+        public static readonly EMobilityProviderAdminStatusType Unknown      = new ("unknown");
 
         /// <summary>
         /// Unclear admin status of the e-mobility provider.
         /// </summary>
-        public static readonly EMobilityProviderAdminStatusType Unspecified   = new ("unspecified");
+        public static readonly EMobilityProviderAdminStatusType Unspecified  = new ("unspecified");
 
         /// <summary>
-        /// The e-mobility provider is under maintenance.
+        /// The e-mobility provider is planned for the future.
         /// </summary>
-        public static readonly EMobilityProviderAdminStatusType OutOfService  = new ("outOfService");
+        public static readonly EMobilityProviderAdminStatusType Planned      = new ("planned");
+
+        /// <summary>
+        /// The e-mobility provider is being deployed, not fully operational yet.
+        /// </summary>
+        public static readonly EMobilityProviderAdminStatusType InDeployment = new ("inDeployment");
 
         /// <summary>
         /// The e-mobility provider is operational.
         /// </summary>
-        public static readonly EMobilityProviderAdminStatusType Operational   = new ("operational");
+        public static readonly EMobilityProviderAdminStatusType Operational  = new ("operational");
 
         /// <summary>
         /// Private or internal use.
         /// </summary>
-        public static readonly EMobilityProviderAdminStatusType InternalUse   = new ("internalUse");
+        public static readonly EMobilityProviderAdminStatusType InternalUse  = new ("internalUse");
+
+        /// <summary>
+        /// The e-mobility provider is under maintenance.
+        /// </summary>
+        public static readonly EMobilityProviderAdminStatusType OutOfService = new ("outOfService");
 
         #endregion
 

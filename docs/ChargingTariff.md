@@ -157,9 +157,9 @@ it is named, and no longer be named before it is removed.
 
 See [README.md](README.md#runtime-status). Runtime status entity type: `ChargingTariff`.
 
-- **Admin status** `ChargingTariffAdminStatusType`: `unknown`, `unspecified`, `planned`, `outOfService`,
-  `operational`, `internalUse`. Initially `operational` since `created`.
-- **Status** `ChargingTariffStatusType`: `unknown`, `unspecified`, `planned`, `active`, `expired`, `other`.
+- **Admin status** `ChargingTariffAdminStatusType`: `unknown`, `unspecified`, `planned`, `inDeployment`,
+  `operational`, `internalUse`, `outOfService`. Initially `operational` since `created`.
+- **Status** `ChargingTariffStatusType`: `unknown`, `unspecified`, `planned`, `active`, `expired`.
   Initially `active` since `created`.
 - No energy status.
 - Events: `OnAdminStatusChanged` (`OnChargingTariffAdminStatusChangedDelegate`) and `OnStatusChanged`
