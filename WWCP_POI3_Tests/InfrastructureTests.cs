@@ -246,6 +246,43 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_station_delivers_at_most_what_its_EVSEs_do()
+
+        /// <summary>
+        /// The maximum power of a charging station is what it can deliver at once: with load management often
+        /// less than the sum of its EVSEs, never more, where all its EVSEs tell theirs.
+        /// </summary>
+        [Test]
+        public void A_station_delivers_at_most_what_its_EVSEs_do()
+        {
+
+            var rn1  = NewNetwork();
+            var s1   = rn1.GetChargingStationOperatorById(GEF)!.ChargingStations.Single();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // Two EVSEs of 22 kW each.
+                Assert.That(Apply(rn1, RoamingNetworkChange.UpdateProperty(s1, "maxPower", null, 22000)).
+                                GetChargingStationOperatorById(GEF)!.ChargingStations.Single().MaxPower,   Is.EqualTo(Watt.FromW(22000)));
+
+                Assert.That(Apply(rn1, RoamingNetworkChange.UpdateProperty(s1, "maxPower", null, 44000)).
+                                GetChargingStationOperatorById(GEF)!.ChargingStations.Single().MaxPower,   Is.EqualTo(Watt.FromW(44000)));
+
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.UpdateProperty(s1, "maxPower", null, 50000)),
+                            Throws.ArgumentException.With.Message.Contains("must not exceed the 44000 W of all its EVSEs together"));
+
+                // Not checked, where an EVSE does not tell its maximum power.
+                Assert.That(new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S9"),
+                                                EVSEs:     [ NewEVSE(EVSE_Id.Parse("DE*GEF*E9*1")), new EVSE(EVSE_Id.Parse("DE*GEF*E9*2")) ],
+                                                MaxPower:  Watt.FromW(50000)).MaxPower,                    Is.EqualTo(Watt.FromW(50000)));
+
+            }
+
+        }
+
+        #endregion
+
         #region Entities_are_read_only_with_their_creation()
 
         /// <summary>

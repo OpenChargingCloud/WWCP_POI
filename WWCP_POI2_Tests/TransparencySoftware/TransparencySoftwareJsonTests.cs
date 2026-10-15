@@ -51,7 +51,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
             => new(TransparencySoftware_Id.Parse("verifier"), I18NString.Create("Verifier"), TransparencySoftwareVersion.Parse(version), licenses, "Vendor");
 
         private static TransparencySoftwareCertificate Certificate(string id = "certificate-1", DateTimeOffset? start = null)
-            => new(TransparencySoftwareCertificate_Id.Parse(id), "issuer-a", "station-model", "1.0",
+            => new(TransparencySoftwareCertificate_Id.Parse(id), "issuer-a", ChargingStationModel_Id.Parse("station-model"), "1.0",
                 [Software("2.0").Id, Software("3.0").Id, Software("4.0").Id],
                 NotBefore: start ?? DateTimeOffset.Parse("2026-01-01T12:30:00.1234567+02:00", CultureInfo.InvariantCulture),
                 NotAfter: DateTimeOffset.Parse("2027-01-01T12:30:00.7654321+02:00", CultureInfo.InvariantCulture));

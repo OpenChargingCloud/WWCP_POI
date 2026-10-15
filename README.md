@@ -86,7 +86,7 @@ parking product ids compare case-sensitively.
   `CreditCard`, `SMS`; a type only once, in the order of the types). RFID may name card types and brands
   of the network; SMS and PhoneCall need their `number`.
 - **Charging station:** `address` and `geoLocation` when they differ from its pool's, `accessibility`, `vehicleTypes`
-  and `features` (sets of names), `calibrationInfo`/`certificationInfo` (URLs), `maxPower` (W) of all its EVSEs,
+  and `features` (sets of names), `calibrationInfo`/`certificationInfo` (URLs), `maxPower` (W) it delivers at once, at most that of its EVSEs together,
   `manufacturerId`/`modelId`, and the `parkingSpaceIds` of the network it charges at.
 - **EVSE:** `currentTypes`, `chargingModes` (arrays of names), `maxVoltage` (V), `maxCurrent` (A),
   `maxPower` (W), `geoLocation` when it differs from its station's, `maxReservationDuration` (s),

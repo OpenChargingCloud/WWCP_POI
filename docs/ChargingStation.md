@@ -61,7 +61,7 @@ See [common properties](README.md#common-properties). A charging station does no
 | `features` | `Features` | `ImmutableArray<ChargingStationFeature>` | update/remove | Each once, in the ordinal order of their names. Predefined: `StatusInfoAvailable`, `EnergyInfoAvailable`, `GermanCalibrationLaw`, `EuropeanCalibrationLaw`, `Reservable`, `AuthenticationBeforePlugIn`, `ChargingProfilesSupported`, `ChargingPreferencesSupported`, `TokenGroupsSupported`, `CSOUnlockSupported`, `HubjectCompatible`, `START_SESSION_CONNECTOR_REQUIRED`; other nonempty texts are read as well. |
 | `calibrationInfo` | `CalibrationInfo` | `URL?` | update/remove | Where to find information on the calibration of its energy meters; see [Calibration and certification](#calibration-and-certification). |
 | `certificationInfo` | `CertificationInfo` | `URL?` | update/remove | Where to find information on its certification, e.g. its conformity with calibration law. |
-| `maxPower` | `MaxPower` | `Watt?` | update/remove | The maximum power of all its EVSEs together, in W, not negative. It is given, not calculated, and not checked against the EVSEs. |
+| `maxPower` | `MaxPower` | `Watt?` | update/remove | The power it can deliver at once, in W, not negative: with load management often less than the sum of its EVSEs, never more. It is given, not calculated. |
 | `parkingSpaceIds` | `ParkingSpaceIds` | `ImmutableArray<ParkingSpace_Id>` | update/remove | The parking spaces it charges at; see [parkingSpaceIds](#parkingspaceids). |
 
 Absent values are left out; empty arrays are not written.
@@ -209,7 +209,7 @@ The station's status is set on its own; it is not calculated from the status of 
 ## Validation
 
 - `@id` is mandatory and a valid charging station identification.
-- `maxPower` must not be negative.
+- `maxPower` must not be negative, and not exceed the `maxPower` of all its EVSEs together, where all of them have one.
 - Every EVSE must belong to the operator of the station; an EVSE must not be given twice.
 - An energy meter must not be given twice; energy meter identifications are unique in the roaming network.
 - `brandIds`, `vehicleTypes`, `features` and `parkingSpaceIds` must not name a value twice; an image URL must

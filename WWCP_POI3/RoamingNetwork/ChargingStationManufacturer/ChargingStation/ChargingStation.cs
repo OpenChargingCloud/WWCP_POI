@@ -169,7 +169,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public URL?                                    CertificationInfo     { get; }
 
         /// <summary>
-        /// The maximum power of all its EVSEs together.
+        /// The power it can deliver at once, to all its EVSEs together: with load management often
+        /// less than the sum of theirs, never more.
         /// </summary>
         public Watt?                                   MaxPower              { get; }
 
@@ -249,6 +250,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var evse in evses)
                 if (evse.Id.OperatorId != Id.OperatorId)
                     throw new ArgumentException($"The EVSE '{evse.Id}' does not belong to the operator '{Id.OperatorId}' of the charging station '{Id}'!", nameof(EVSEs));
+
+            // It can not deliver more than all its EVSEs together, where all of them tell theirs.
+            if (MaxPower.HasValue && evses.Length > 0 && evses.All(evse => evse.MaxPower.HasValue))
+            {
+
+                var evsesMaxPower = evses.Sum(evse => evse.MaxPower!.Value.Value);
+
+                if (MaxPower.Value.Value > evsesMaxPower)
+                    throw new ArgumentException($"The maximum power of the charging station '{Id}', {MaxPower.Value.Value} W, must not exceed the {evsesMaxPower} W of all its EVSEs together!", nameof(MaxPower));
+
+            }
 
             this.PhysicalReference   = PhysicalReference;
             this.Address             = Address;

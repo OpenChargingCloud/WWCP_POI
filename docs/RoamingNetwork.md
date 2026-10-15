@@ -253,7 +253,7 @@ is an error.
 |---|---|---|---|
 | `@id` | string | — | `TransparencySoftwareCertificate_Id`: opaque, case-sensitive, no surrounding whitespace. |
 | `issuer` | string | update | Mandatory: the issuing organization. |
-| `chargingStationModel` | string | update | Mandatory. |
+| `chargingStationModel` | string | update | Mandatory: a `ChargingStationModel_Id`, as charging stations name their model by `modelId`, compared case-insensitively. |
 | `chargingStationModelVersion` | string | update | Mandatory. |
 | `verifiedTransparencySoftwareIds` | string[] | update/remove | Releases officially checked with this model/version; always written, ordered (ordinal). |
 | `compatibleTransparencySoftwareIds` | string[] | update/remove | Further compatible releases, without a claim of verification; always written, ordered (ordinal). |

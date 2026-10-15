@@ -73,7 +73,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             => new (Id,
                     "PTB",
-                    "Wallbox-22",
+                    ChargingStationModel_Id.Parse("Wallbox-22"),
                     "1.0",
                     Verified,
                     Compatible,
@@ -172,7 +172,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var certificate  = new TransparencySoftwareCertificate(Cert1,
                                                                    "PTB",
-                                                                   "Wallbox-22",
+                                                                   ChargingStationModel_Id.Parse("Wallbox-22"),
                                                                    "1.0",
                                                                    [ Chargy10 ],
                                                                    [],

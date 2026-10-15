@@ -53,10 +53,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public String                                   Issuer                               { get; }
 
         /// <summary>
-        /// The charging station model to which this document applies.
+        /// The charging station model to which this document applies,
+        /// as charging stations name it by their modelId.
         /// </summary>
         [Mandatory]
-        public String                                   ChargingStationModel                 { get; }
+        public ChargingStationModel_Id                  ChargingStationModel                 { get; }
 
         /// <summary>
         /// The charging station model version to which this document applies.
@@ -126,7 +127,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NotAfter">The optional end of the validity of this document.</param>
         public TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id     Id,
                                                String                                 Issuer,
-                                               String                                 ChargingStationModel,
+                                               ChargingStationModel_Id                ChargingStationModel,
                                                String                                 ChargingStationModelVersion,
                                                IEnumerable<TransparencySoftware_Id>?  VerifiedTransparencySoftwareIds     = null,
                                                IEnumerable<TransparencySoftware_Id>?  CompatibleTransparencySoftwareIds   = null,
@@ -141,7 +142,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("A certificate document identifier is required.", nameof(Id));
 
             ArgumentException.ThrowIfNullOrWhiteSpace(Issuer);
-            ArgumentException.ThrowIfNullOrWhiteSpace(ChargingStationModel);
+            if (ChargingStationModel.IsNullOrEmpty)
+                throw new ArgumentException("A charging station model is required.", nameof(ChargingStationModel));
+
             ArgumentException.ThrowIfNullOrWhiteSpace(ChargingStationModelVersion);
 
             if (ChargingStationManufacturerId is { } manufacturerId && manufacturerId.IsNullOrEmpty)
@@ -225,7 +228,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Certificate = new TransparencySoftwareCertificate(
                                   Id:                                 TransparencySoftwareCertificate_Id.Parse(StrictJSON.RequiredText(JSON, "@id")),
                                   Issuer:                             StrictJSON.RequiredText(JSON, "issuer"),
-                                  ChargingStationModel:               StrictJSON.RequiredText(JSON, "chargingStationModel"),
+                                  ChargingStationModel:               ChargingStationModel_Id.Parse(StrictJSON.RequiredText(JSON, "chargingStationModel")),
                                   ChargingStationModelVersion:        StrictJSON.RequiredText(JSON, "chargingStationModelVersion"),
                                   VerifiedTransparencySoftwareIds:    StrictJSON.Array(JSON, "verifiedTransparencySoftwareIds",
                                                                                              token => TransparencySoftware_Id.Parse(StrictJSON.Identifier(token))),
@@ -267,7 +270,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                  new JProperty("@id",                                Id.ToString()),
                                  new JProperty("issuer",                             Issuer),
-                                 new JProperty("chargingStationModel",               ChargingStationModel),
+                                 new JProperty("chargingStationModel",               ChargingStationModel.ToString()),
                                  new JProperty("chargingStationModelVersion",        ChargingStationModelVersion),
                                  new JProperty("verifiedTransparencySoftwareIds",    new JArray(VerifiedTransparencySoftwareIds.  Select(id => id.ToString()).Order(StringComparer.Ordinal))),
                                  new JProperty("compatibleTransparencySoftwareIds",  new JArray(CompatibleTransparencySoftwareIds.Select(id => id.ToString()).Order(StringComparer.Ordinal))),
