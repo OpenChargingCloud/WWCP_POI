@@ -117,7 +117,7 @@ the release and the certificate are embedded in the roaming network (`transparen
 | JSON key | Type | Description |
 |---|---|---|
 | `transparencySoftwareId` | string | Mandatory: a `TransparencySoftware_Id` of the network, opaque text without surrounding whitespace. At most once per meter. |
-| `legalStatus` | string | Mandatory: a `LegalStatus`, compared case-insensitively; predefined `ForInformationOnly`, `verified`, `GermanCalibrationLaw`, any other nonempty text accepted. |
+| `legalStatus` | string | Mandatory: a `LegalStatus`; predefined `forInformationOnly`, `verified`, `germanCalibrationLaw`, read in any case and written so, any other nonempty text accepted. |
 | `certificateId` | string | Optional: a `TransparencySoftwareCertificate_Id` of the network. The certificate must cover the release, i.e. name it among its verified or compatible releases. |
 
 The array is ordered by `transparencySoftwareId` (ordinal) whatever the given order.
@@ -164,7 +164,7 @@ An EVSE's meter, as `energyMeter`:
   "hardwareVersion": "1.2",
   "firmwareVersion": "4.7.1",
   "transparencySoftwareStatus": [
-    { "transparencySoftwareId": "chargy-1.5.0", "legalStatus": "GermanCalibrationLaw", "certificateId": "PTB-2026-001" }
+    { "transparencySoftwareId": "chargy-1.5.0", "legalStatus": "germanCalibrationLaw", "certificateId": "PTB-2026-001" }
   ],
   "created": "2026-01-01T00:00:00.000Z",
   "lastChange": "2026-01-01T00:00:00.000Z"

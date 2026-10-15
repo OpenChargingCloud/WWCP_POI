@@ -486,6 +486,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
 
         }
 
+        [TestCase("GermanCalibrationLaw",  "germanCalibrationLaw")]
+        [TestCase("FORINFORMATIONONLY",    "forInformationOnly")]
+        [TestCase(" Verified ",            "verified")]
+        [TestCase("future-Status",         "future-Status")]
+        public void Predefined_legal_statuses_are_read_in_any_case_and_written_in_theirs(string text, string written)
+        {
+
+            // The content, and its ETags, do not depend on how a predefined legal status was written.
+            Assert.That(LegalStatus.Parse(text).ToString(), Is.EqualTo(written));
+            Assert.That(ParseStatus(new JObject(Status().ToJSON()) { ["legalStatus"] = text }).LegalStatus.ToString(), Is.EqualTo(written));
+
+        }
+
         [Test]
         public void Legal_status_hashes_are_culture_independent_and_null_parse_is_safe()
         {

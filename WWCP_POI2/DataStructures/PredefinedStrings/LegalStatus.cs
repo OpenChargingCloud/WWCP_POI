@@ -147,6 +147,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Text = Text?.Trim() ?? "";
 
+            // A predefined legal status in any case is the predefined one, so that the content,
+            // and its ETags, do not depend on how it was written.
+            foreach (var predefined in new[] { ForInformationOnly, Verified, GermanCalibrationLaw })
+                if (String.Equals(predefined.InternalId, Text, StringComparison.OrdinalIgnoreCase))
+                {
+                    LegalStatus = predefined;
+                    return true;
+                }
+
             if (Text.IsNotNullOrEmpty())
             {
                 try
@@ -185,7 +194,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The transparency software is not legally binding, but it can be used for information purposes.
         /// </summary>
         public static LegalStatus ForInformationOnly
-            => new ("ForInformationOnly");
+            => new ("forInformationOnly");
 
         /// <summary>
         /// The transparency software is not legally binding, but verified by the given entity.
@@ -197,7 +206,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The status is legally binding under the German Calibration Law.
         /// </summary>
         public static LegalStatus GermanCalibrationLaw
-            => new ("GermanCalibrationLaw");
+            => new ("germanCalibrationLaw");
 
         #endregion
 
