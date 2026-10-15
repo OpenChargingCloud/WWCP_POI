@@ -72,6 +72,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// of the version; the list of the roaming networks while the same versions are served. Only an
     /// expanded view, which depends on more than one version, is calculated for every request.
     /// HEAD is answered by Hermod from GET; OPTIONS answers the CORS preflights of every origin.
+    /// With an HTML view, a browser opening any of these URLs gets it instead, e.g. the page of a web frontend.
     /// </remarks>
     public partial class POI_API
     {
@@ -144,8 +145,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region ~/RNs
 
             AddEntityHandlers(HTTPPath.Root + "RNs",
-                              RoamingNetworksResponse,
-                              HasHTMLView: true);
+                              RoamingNetworksResponse);
 
             #endregion
 
@@ -344,16 +344,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Answer GET with the given delegate, HEAD by Hermod from it, and OPTIONS with the methods
         /// and the CORS permissions of every origin. With an HTML view, a request preferring text/html
-        /// to JSON and CBOR, e.g. of a browser opening the URL, gets the HTML view instead.
+        /// to JSON and CBOR, e.g. of a browser opening the URL, gets the HTML view instead: of a list
+        /// as of a single entity.
         /// </summary>
         private void AddEntityHandlers(HTTPPath                         Path,
-                                       Func<HTTPRequest, HTTPResponse>  GET,
-                                       Boolean                          HasHTMLView   = false)
+                                       Func<HTTPRequest, HTTPResponse>  GET)
         {
 
             AddHandler(Path,
                        HTTPMethod:    HTTPMethod.GET,
-                       HTTPDelegate:  request => HasHTMLView && HTMLView is not null && WantsHTML(request)
+                       HTTPDelegate:  request => HTMLView is not null && WantsHTML(request)
                                                      ? HTMLView(request)
                                                      : Task.FromResult(GET(request)));
 
@@ -409,8 +409,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                    format => collection.Representation(SummariesView, format, () => Summaries(collection)),
                                                                    collection.Count);
 
-                                 },
-                                 HasHTMLView: true);
+                                 });
 
         #endregion
 

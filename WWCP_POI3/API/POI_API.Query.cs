@@ -205,8 +205,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                        format => index.Representations.GetOrAdd("pools", format, () => POIRepresentation.Of(new JArray(index.Entries.Select(PoolQueryJSON)), format)),
                                                        index.Entries.Count);
 
-                              },
-                              HasHTMLView: true);
+                              });
 
             #endregion
 

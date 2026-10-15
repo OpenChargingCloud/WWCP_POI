@@ -31,7 +31,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 {
 
     /// <summary>
-    /// An API under a path of its own, whose lists a browser gets as the page of a web frontend.
+    /// An API under a path of its own, whose lists and entities a browser gets as the page of a web frontend.
     /// </summary>
     [TestFixture]
     public class HTMLViewTests
@@ -133,6 +133,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
             var anything  = await Get("poi/RNs/rn1/CPs",  "*/*");
             var none      = await Get("poi/RNs/rn1/CPs");
             var entity    = await Get("poi/RNs/rn1/CSOs/DE*GEF", BrowserAccept);
+            var entityJSON = await Get("poi/RNs/rn1/CSOs/DE*GEF", "application/json");
+            var network   = await Get("poi/RNs/rn1",      BrowserAccept);
             var unprefixed = await Get("RNs/rn1/CPs",     "application/json");
 
             using (Assert.EnterMultipleScope())
@@ -149,8 +151,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(anything.ContentType,   Is.EqualTo("application/json"));
                 Assert.That(none.ContentType,       Is.EqualTo("application/json"));
 
-                // A single entity has no HTML view yet.
-                Assert.That(entity.ContentType,     Is.EqualTo("application/json"));
+                // A single entity as well, and its data for everybody else.
+                Assert.That(entity.ContentType,     Is.EqualTo("text/html"));
+                Assert.That(entity.Text,            Is.EqualTo(Page));
+                Assert.That(network.Text,           Is.EqualTo(Page));
+                Assert.That(entityJSON.ContentType, Is.EqualTo("application/json"));
+                Assert.That(entityJSON.Text,        Does.Contain("\"@id\":\"DE*GEF\""));
 
                 Assert.That(unprefixed.StatusCode,  Is.EqualTo(HttpStatusCode.NotFound));
 

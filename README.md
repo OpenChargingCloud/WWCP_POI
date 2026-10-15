@@ -389,8 +389,8 @@ Entries are in the ordinal order of their identifications. `X-Total-Count` says 
 returned content. A list without any of them is kept with its version, as above.
 
 `new POI_API(HTTPServer, RootPath: "/poi", HTMLView: …)` serves all of it below a path of its own, e.g. beside a web
-interface. With an `HTMLView`, a request for a list that prefers `text/html` to JSON and CBOR - a browser opening its
-URL - is answered by it, e.g. with the page of a web frontend that asks the same URL for the data; every other
+interface. With an `HTMLView`, a request for a list or an entity that prefers `text/html` to JSON and CBOR - a browser opening
+its URL - is answered by it, e.g. with the page of a web frontend that asks the same URL for the data; every other
 request, also one without an `Accept` header field or with `*/*`, gets JSON or CBOR. The RoamingHub serves its
 roaming networks so, below `/poi`.
 

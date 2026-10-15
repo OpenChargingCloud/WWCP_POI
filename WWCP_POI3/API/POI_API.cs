@@ -44,7 +44,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public TimeProvider       TimeProvider    { get; }
 
         /// <summary>
-        /// Answers the requests for the HTML view of the lists, e.g. with the page of a web frontend,
+        /// Answers the requests for the HTML view of the lists and the entities, e.g. with the page of a web frontend,
         /// when a request prefers text/html to JSON and CBOR. Without it, every request gets JSON or CBOR.
         /// </summary>
         public HTMLViewDelegate?  HTMLView        { get; }
@@ -59,7 +59,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="HTTPServer">The HTTP server.</param>
         /// <param name="TimeProvider">The time provider.</param>
         /// <param name="RootPath">The path of the API on the HTTP server, e.g. /poi; / by default.</param>
-        /// <param name="HTMLView">Answers the requests for the HTML view of the lists, e.g. with the page of a web frontend.</param>
+        /// <param name="HTMLView">Answers the requests for the HTML view of the lists and the entities, e.g. with the page of a web frontend.</param>
         public POI_API(HTTPServer         HTTPServer,
                        TimeProvider?      TimeProvider   = null,
                        HTTPPath?          RootPath       = null,
