@@ -47,9 +47,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region NewTariff(Id, Price = 0.39)
+        #region NewTariff(Id, Price = 0.39, WithTypeAndLimits = false)
 
-        private static ChargingTariff NewTariff(ChargingTariff_Id Id, Decimal Price = 0.39m)
+        private static ChargingTariff NewTariff(ChargingTariff_Id  Id,
+                                                Decimal            Price               = 0.39m,
+                                                Boolean            WithTypeAndLimits   = false)
 
             => new (Id,
                     Currency.NOK,
@@ -67,7 +69,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                  DaysOfWeek:  [ DayOfWeek.Sunday, DayOfWeek.Monday ]))
                     ],
                     I18NString.Create(Languages.en, "Standard"),
-                    Created: Created);
+                    TariffType:  WithTypeAndLimits ? ChargingTariffType.REGULAR             : null,
+                    MinPrice:    WithTypeAndLimits ? new ChargingPriceLimit(2.5m, 2.98m)   : null,
+                    MaxPrice:    WithTypeAndLimits ? new ChargingPriceLimit(50)             : null,
+                    Created:     Created);
 
         #endregion
 
@@ -79,7 +84,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     Created:                   Created,
                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                              Created:          Created,
-                                                                             ChargingTariffs:  [ NewTariff(T1), NewTariff(T2, 0.49m) ],
+                                                                             ChargingTariffs:  [ NewTariff(T1, WithTypeAndLimits: true), NewTariff(T2, 0.49m) ],
                                                                              ChargingPools:    [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
                                                                                                                   Created:           Created,
                                                                                                                   ChargingStations:  [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
@@ -126,10 +131,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(fromText.CalcETags(),                                         Is.EqualTo(rn1.CalcETags()));
 
                 Assert.That(tariff["currency"]!.ToString(),                               Is.EqualTo("NOK"));
+                Assert.That(tariff["tariffType"]!.ToString(),                             Is.EqualTo("REGULAR"));
+                Assert.That(tariff["minPrice"]!.ToString(Newtonsoft.Json.Formatting.None), Is.EqualTo("""{"excludingVAT":2.5,"includingVAT":2.98}"""));
+                Assert.That(tariff["maxPrice"]!.ToString(Newtonsoft.Json.Formatting.None), Is.EqualTo("""{"excludingVAT":50.0}"""));
+                Assert.That(json["chargingStationOperators"]![0]!["chargingTariffs"]![1]!["tariffType"], Is.Null);
                 Assert.That(tariff["elements"]![0]!["priceComponents"]![0]!["type"]!.ToString(),  Is.EqualTo("ENERGY"));
                 Assert.That(restrictions["startTime"]!.ToString(),                        Is.EqualTo("22:00"));
                 Assert.That(restrictions["endTime"]!.ToString(),                          Is.EqualTo("06:30"));
                 Assert.That(restrictions["daysOfWeek"]!.Values<String>(),                 Is.EqualTo(new[] { "MONDAY", "SUNDAY" }));
+
+                Assert.That(fromCBOR.TryGetChargingTariffById(T1, out var t1),            Is.True);
+                Assert.That(t1!.TariffType,                                               Is.EqualTo(ChargingTariffType.REGULAR));
+                Assert.That(t1.MinPrice,                                                  Is.EqualTo(new ChargingPriceLimit(2.5m, 2.98m)));
+                Assert.That(t1.MaxPrice,                                                  Is.EqualTo(new ChargingPriceLimit(50)));
 
                 Assert.That(fromJSON.TryGetChargingTariffById(T2, out var t2),            Is.True);
                 Assert.That(t2!.Elements[0].PriceComponents[0].Price,                     Is.EqualTo(0.49m));
@@ -175,6 +189,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                    "start and end times of a charging tariff restriction must differ"),
                 ("empty date range",     Changed(network => { Restrictions(network)["startDate"] = "2026-06-01"; Restrictions(network)["endDate"] = "2026-06-01"; }),
                                                                                                                                                    "start date of a charging tariff restriction must be before its end date"),
+                ("unknown type",         Changed(network => Tariff(network)["tariffType"] = "regular"),                                            "charging tariff type"),
+                ("negative limit",       Changed(network => Tariff(network)["minPrice"]!["excludingVAT"] = -1),                                   "must not be negative"),
+                ("gross below net",      Changed(network => Tariff(network)["minPrice"]!["includingVAT"] = 2),                                    "must not be less than the one excluding VAT"),
+                ("limit without net",    Changed(network => ((JObject) Tariff(network)["maxPrice"]!).Remove("excludingVAT")),                     "maximum price"),
+                ("minimum above max",    Changed(network => Tariff(network)["maxPrice"]!["excludingVAT"] = 1),                                    "must not exceed its maximum price"),
+                ("minimum above max VAT",Changed(network => Tariff(network)["maxPrice"] = new ChargingPriceLimit(2.5m, 2.97m).ToJSON()),          "must not exceed its maximum price"),
                 ("foreign tariff",       Changed(network => Tariff(network)["@id"] = "DE*XYZ*T1"),                                                 "does not belong to the operator"),
                 ("unknown tariff",       Changed(network => network["chargingStationOperators"]![0]!["chargingPools"]![0]!["chargingStations"]![0]!["EVSEs"]![0]!["chargingTariffIds"] = new JArray("DE*GEF*T9")),
                                                                                                                                                    "charging tariff 'DE*GEF*T9' of the EVSE")
@@ -213,6 +233,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var cs       = rn1.CreateSignedChangeSet([
                                RoamingNetworkChange.Add           (NewTariff(t3, 0.29m)),
                                RoamingNetworkChange.UpdateProperty(t1!, "elements",          null, elements),
+                               RoamingNetworkChange.UpdateProperty(t1!, "tariffType",        "REGULAR", "AD_HOC_PAYMENT"),
+                               RoamingNetworkChange.RemoveProperty(t1!, "maxPrice"),
                                RoamingNetworkChange.UpdateProperty(e1,  "chargingTariffIds", null, new JArray(t3.ToString())),
                                RoamingNetworkChange.Remove        (T2)
                            ], CreatedAt: T0.AddMinutes(1));
@@ -232,7 +254,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(gef2.EVSEs.Single().ChargingTariffIds,                                Is.EqualTo(new[] { t3 }));
 
                 // Old values for a later check.
-                Assert.That(cs.Changes[3].OldValue!["@id"]!.ToString(),                           Is.EqualTo("DE*GEF*T2"));
+                Assert.That(cs.Changes[5].OldValue!["@id"]!.ToString(),                           Is.EqualTo("DE*GEF*T2"));
+
+                // The type and the price limits.
+                Assert.That(changedT1.TariffType,                                                Is.EqualTo(ChargingTariffType.AD_HOC_PAYMENT));
+                Assert.That(changedT1.MinPrice,                                                  Is.EqualTo(new ChargingPriceLimit(2.5m, 2.98m)));
+                Assert.That(changedT1.MaxPrice,                                                  Is.Null);
 
                 // The status of the tariff survived its change.
                 Assert.That(history.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, nameof(ChargingTariff), T1.ToString(), out var tariffStatus),  Is.True);
@@ -244,6 +271,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(changedT1, "currency", null, "XXX")),
                             Throws.ArgumentException.With.Message.Contains("ISO 4217"));
+
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(changedT1, "maxPrice", null, new ChargingPriceLimit(1).ToJSON())),
+                            Throws.ArgumentException.With.Message.Contains("must not exceed its maximum price"));
 
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.Add(NewTariff(t3))),
                             Throws.ArgumentException.With.Message.Contains("already exists"));

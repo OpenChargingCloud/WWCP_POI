@@ -107,7 +107,9 @@ parking product ids compare case-sensitively.
   `chargingStationIds` of the network. All have admin status and status. Parking products (`minDuration`,
   `stopParkingAfterTime` in s, without status and timestamps) are named by `parkingProductIds` of garages,
   spaces and space groups of the same operator; they offer, they do not calculate prices.
-- **Charging tariff:** as in OCPI: `currency` (ISO 4217), `tariffURL` and `elements`, each with
+- **Charging tariff:** as in OCPI: `currency` (ISO 4217), `tariffType` (`AD_HOC_PAYMENT`, `PROFILE_CHEAP`,
+  `PROFILE_FAST`, `PROFILE_GREEN`, `REGULAR`), `tariffURL`, `minPrice`/`maxPrice` (`{excludingVAT, includingVAT?}`)
+  and `elements`, each with
   `priceComponents` (`{type, price, vat?, stepSize}`, `type` one of `ENERGY`, `FLAT`, `MAX_CURRENT`,
   `MIN_CURRENT`, `PARKING_TIME`, `TIME`; `stepSize` in Wh, A or s, positive, for every type but `FLAT`,
   which has none) and optional `restrictions` (`startTime`/`endTime` as `HH:mm`, `startDate`/`endDate` as `yyyy-MM-dd`, `min/maxEnergy` (Wh),

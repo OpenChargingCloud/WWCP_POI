@@ -161,8 +161,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "description",
             "dataSource",
             "currency",
+            "tariffType",
             "tariffURL",
             "elements",
+            "minPrice",
+            "maxPrice",
             "energyMix",
             "customData"
         ];

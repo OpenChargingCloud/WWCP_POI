@@ -69,6 +69,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Currency                               Currency     { get; }
 
         /// <summary>
+        /// For which charging sessions it is; for every one, unless given.
+        /// </summary>
+        public ChargingTariffType?                    TariffType   { get; }
+
+        /// <summary>
         /// A web page about it, e.g. for EV drivers.
         /// </summary>
         public URL?                                   TariffURL    { get; }
@@ -77,6 +82,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The elements, in their given order; at least one.
         /// </summary>
         public ImmutableArray<ChargingTariffElement>  Elements     { get; }
+
+        /// <summary>
+        /// The least a charging session costs: a session costing less costs this.
+        /// </summary>
+        public ChargingPriceLimit?                    MinPrice     { get; }
+
+        /// <summary>
+        /// The most a charging session costs: a session costing more costs this.
+        /// </summary>
+        public ChargingPriceLimit?                    MaxPrice     { get; }
 
 
         /// <summary>
@@ -98,6 +113,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               I18NString?                                    Description                  = null,
                               URL?                                           TariffURL                    = null,
                               EnergyMix?                                     EnergyMix                    = null,
+                              ChargingTariffType?                            TariffType                   = null,
+                              ChargingPriceLimit?                            MinPrice                     = null,
+                              ChargingPriceLimit?                            MaxPrice                     = null,
 
                               Timestamped<ChargingTariffAdminStatusType>?    InitialAdminStatus           = null,
                               Timestamped<ChargingTariffStatusType>?         InitialStatus                = null,
@@ -137,10 +155,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (elements.Length == 0 || elements.Any(element => element is null))
                 throw new ArgumentException($"The charging tariff '{Id}' needs at least one element, and no null entries!", nameof(Elements));
 
-            this.Currency   = Currency;
-            this.TariffURL  = TariffURL;
-            this.EnergyMix  = EnergyMix;
-            this.Elements   = [.. elements];
+            if (ValidatePriceLimits(Id, MinPrice, MaxPrice) is String error)
+                throw new ArgumentException(error, nameof(MinPrice));
+
+            this.Currency    = Currency;
+            this.TariffType  = TariffType;
+            this.TariffURL   = TariffURL;
+            this.EnergyMix   = EnergyMix;
+            this.Elements    = [.. elements];
+            this.MinPrice    = MinPrice;
+            this.MaxPrice    = MaxPrice;
+
+        }
+
+        #endregion
+
+
+        #region (private static) ValidatePriceLimits(Id, MinPrice, MaxPrice)
+
+        /// <summary>
+        /// The error, when the given price limits are invalid each, or the minimum exceeds the maximum.
+        /// </summary>
+        private static String? ValidatePriceLimits(ChargingTariff_Id    Id,
+                                                   ChargingPriceLimit?  MinPrice,
+                                                   ChargingPriceLimit?  MaxPrice)
+        {
+
+            if (MinPrice?.Validate() is String minError)
+                return $"The minimum price of the charging tariff '{Id}' is invalid: {minError}";
+
+            if (MaxPrice?.Validate() is String maxError)
+                return $"The maximum price of the charging tariff '{Id}' is invalid: {maxError}";
+
+            if (MinPrice is not null && MaxPrice is not null &&
+               (MinPrice.ExcludingVAT > MaxPrice.ExcludingVAT ||
+                MinPrice.IncludingVAT > MaxPrice.IncludingVAT))
+            {
+                return $"The minimum price of the charging tariff '{Id}' must not exceed its maximum price!";
+            }
+
+            return null;
 
         }
 
@@ -221,10 +275,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             json.Add("currency",         Currency.ISOCode);
 
+            if (TariffType.HasValue)
+                json.Add("tariffType",   TariffType.Value.ToString());
+
             if (TariffURL.HasValue)
                 json.Add("tariffURL",    TariffURL.Value.ToString());
 
             json.Add("elements",         new JArray(Elements.Select(element => element.ToJSON())));
+
+            if (MinPrice is not null)
+                json.Add("minPrice",     MinPrice.ToJSON());
+
+            if (MaxPrice is not null)
+                json.Add("maxPrice",     MaxPrice.ToJSON());
 
             if (EnergyMix is not null)
                 json.Add("energyMix",    EnergyMix.ToJSON(Embedded: true));
@@ -306,6 +369,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseObject<EnergyMix>(JSON, "energyMix", "energy mix", (JObject json, out EnergyMix? energyMix, out String? error) => POI.EnergyMix.TryParse(json, out energyMix, out error), out var energyMix, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseEnum(JSON, "tariffType", "charging tariff type", out ChargingTariffType? tariffType, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseObject<ChargingPriceLimit>(JSON, "minPrice", "minimum price", ChargingPriceLimit.TryParse, out var minPrice, out ErrorResponse) ||
+                    !POIJSON.TryParseObject<ChargingPriceLimit>(JSON, "maxPrice", "maximum price", ChargingPriceLimit.TryParse, out var maxPrice, out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (ValidatePriceLimits(id, minPrice, maxPrice) is String priceLimitsError)
+                {
+                    ErrorResponse = priceLimitsError;
+                    return false;
+                }
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -322,6 +400,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     description,
                                                     tariffURL,
                                                     energyMix,
+                                                    tariffType,
+                                                    minPrice,
+                                                    maxPrice,
                                                     DataSource:  dataSource,
                                                     Created:     created,
                                                     LastChange:  lastChange,

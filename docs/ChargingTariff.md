@@ -47,8 +47,11 @@ See [README.md](README.md#common-properties). No `eTags`.
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
 | `currency` | `Currency` | string | update | Mandatory: the ISO 4217 code of all its prices, e.g. `EUR`; an unknown code such as `XXX` is refused. Removing it is refused. |
+| `tariffType` | `TariffType` | string | update/remove | For which charging sessions it is, as in OCPI: `ChargingTariffType` `AD_HOC_PAYMENT` (paid ad hoc, without a contract), `PROFILE_CHEAP`, `PROFILE_FAST`, `PROFILE_GREEN` (drivers preferring to charge cheaply, fast or green), `REGULAR` (with a contract, without a preference); upper case only. Absent: for every charging session. An EVSE may name several tariffs, one per type. |
 | `tariffURL` | `TariffURL` | URL | update/remove | A web page about the tariff, e.g. for EV drivers. |
 | `elements` | `Elements` | [ChargingTariffElement](#elements)[] | update | Mandatory, at least one, in their given order. Changed as a whole; removing it is refused. |
+| `minPrice` | `MinPrice` | [ChargingPriceLimit](#minprice-and-maxprice) | update/remove | The least a charging session costs: one costing less costs this. Not a flat fee, which every session pays. |
+| `maxPrice` | `MaxPrice` | [ChargingPriceLimit](#minprice-and-maxprice) | update/remove | The most a charging session costs: one costing more costs this. |
 | `energyMix` | `EnergyMix` | [EnergyMix](#energymix) | update/remove | The mix of the energy it delivers. |
 
 The tariff is changed only through its operator's change sets: `RoamingNetworkChange.Add(tariff)` (no parent
@@ -89,6 +92,20 @@ what is billed, an immutable value.
 | `MIN_CURRENT` | the minimum current | A | A |
 | `PARKING_TIME` | the time not charging | hour | s |
 | `TIME` | the time charging | hour | s |
+
+
+## minPrice and maxPrice
+
+`ChargingPriceLimit` ([source](../WWCP_POI3/RoamingNetwork/ChargingTariff/ChargingPriceLimit.cs)): an amount in
+the tariff's currency, an immutable value, as OCPI's `price_limit`. Unlike price components, which give a VAT
+rate, it gives the amounts as they are, so that OCPI's are taken without rounding.
+
+| JSON key | Type | Description |
+|---|---|---|
+| `excludingVAT` | decimal | Mandatory, ≥ 0: the amount excluding VAT. |
+| `includingVAT` | decimal | Optional, not less than `excludingVAT`: the amount including VAT; absent means unknown. |
+
+`minPrice` must not exceed `maxPrice`, neither excluding VAT nor, where both give it, including VAT.
 
 
 ## restrictions
