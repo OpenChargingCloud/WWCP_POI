@@ -366,6 +366,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            // The parking operator embedding it changed with it, at the time of the change set.
+            operatorJSON["lastChange"] = CreatedAt.ToISO8601();
+
             #region The changed parking operator must still be a valid one
 
             if (!ParkingOperator.TryParse(operatorJSON, out var changedOperator, out var changedOperatorError))

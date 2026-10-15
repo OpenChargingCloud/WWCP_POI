@@ -22,6 +22,8 @@ using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -88,13 +90,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) TryApplyGridConnectionPointChange(Change, Index, GridOperators, out CurrentValue, out ErrorResponse)
+        #region (private static) TryApplyGridConnectionPointChange(Change, Index, CreatedAt, GridOperators, out CurrentValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of a grid connection point to the given grid operators.
         /// </summary>
         private static Boolean TryApplyGridConnectionPointChange(RoamingNetworkChange                       Change,
                                                                  Int32                                      Index,
+                                                                 DateTimeOffset                             CreatedAt,
                                                                  Dictionary<GridOperator_Id, GridOperator>  GridOperators,
                                                                  out JToken?                                CurrentValue,
                                                                  [NotNullWhen(false)] out String?           ErrorResponse)
@@ -254,6 +257,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
 
             }
+
+            // The grid operator embedding it changed with it, at the time of the change set.
+            operatorJSON["lastChange"] = CreatedAt.ToISO8601();
 
             #region The changed grid operator must still be a valid one
 

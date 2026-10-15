@@ -33,7 +33,7 @@ See [Common properties](README.md#common-properties).
 | `description` | update/remove | |
 | `dataSource` | update/remove | |
 | `created` | — | Set to the change set's `createdAt` when added without one. |
-| `lastChange` | — | Set to the change set's `createdAt` by every change of the pool's own properties and when it is added; not by changes of its stations or EVSEs. |
+| `lastChange` | — | Set to the change set's `createdAt` by every change of the pool's own properties, of its stations and their EVSEs, and when it is added. |
 | `customData` | update/remove | |
 
 The pool writes no `eTags` and no `@context`.

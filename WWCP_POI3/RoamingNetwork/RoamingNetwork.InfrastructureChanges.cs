@@ -362,6 +362,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
+                    // The parent it is added to: its operator, charging pool or charging station.
+                    parentType  = Change.ParentEntityType ?? nameof(ChargingStationOperator);
+                    parentId    = StoredId(currentOperator, parentType, Change.ParentEntityId ?? currentOperator.Id.ToString());
+
                     // The change set's timestamp is the last change and, unless given, the creation,
                     // so that its after ETags are deterministic.
                     var added = (JObject) newEntity.DeepClone();
@@ -392,6 +396,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            // What embeds it changed with it, at the time of the change set.
+            TouchParents(operatorJSON, parentType, parentId, CreatedAt);
+
             #region The changed operator must still be a valid one
 
             if (!ChargingStationOperator.TryParse(operatorJSON, out var changedOperator, out var changedOperatorError))
@@ -409,6 +416,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ErrorResponse = null;
             return true;
+
+        }
+
+        #endregion
+
+        #region (private static) TouchParents(OperatorJSON, ParentType, ParentId, CreatedAt)
+
+        /// <summary>
+        /// Set the last change of what embeds a changed entity, up to its operator: the charging station of an EVSE,
+        /// the charging pool of a charging station, and the operator of everything, as a change of an embedded entity
+        /// is a change of the content of everything embedding it.
+        /// </summary>
+        private static void TouchParents(JObject         OperatorJSON,
+                                         String?         ParentType,
+                                         String?         ParentId,
+                                         DateTimeOffset  CreatedAt)
+        {
+
+            var lastChange = CreatedAt.ToISO8601();
+
+            while (ParentType is nameof(ChargingStation) or nameof(ChargingPool) && ParentId is not null)
+            {
+
+                var (parent, _, grandParentType, grandParentId) = Find(OperatorJSON, ParentType, ParentId);
+
+                if (parent is null)
+                    break;
+
+                parent["lastChange"]  = lastChange;
+                ParentType            = grandParentType;
+                ParentId              = grandParentId;
+
+            }
+
+            OperatorJSON["lastChange"] = lastChange;
 
         }
 

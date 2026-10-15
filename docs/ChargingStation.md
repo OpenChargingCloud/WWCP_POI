@@ -37,7 +37,7 @@ See [common properties](README.md#common-properties). A charging station does no
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — |
-| `lastChange` | — (set to the change set's `createdAt`) |
+| `lastChange` | — (set to the change set's `createdAt` by every change of the station and of its EVSEs) |
 | `customData` | update/remove |
 
 

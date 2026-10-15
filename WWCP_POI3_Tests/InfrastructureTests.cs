@@ -246,6 +246,51 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_change_is_one_of_everything_embedding_it()
+
+        /// <summary>
+        /// A change of an embedded entity is a change of the content of everything embedding it:
+        /// its charging station, its charging pool and its operator get the creation of the change set as their last change.
+        /// </summary>
+        [Test]
+        public void A_change_is_one_of_everything_embedding_it()
+        {
+
+            var rn1      = NewNetwork();
+            var e1       = rn1.GetChargingStationOperatorById(GEF)!.EVSEs.First(evse => evse.Id == E1);
+
+            var changed  = Apply(rn1, RoamingNetworkChange.UpdateProperty(e1, "maxPower", null, 11000)).GetChargingStationOperatorById(GEF)!;
+            var removed  = Apply(rn1, RoamingNetworkChange.Remove(E2)).                                 GetChargingStationOperatorById(GEF)!;
+            var added    = Apply(rn1, RoamingNetworkChange.Add(new ChargingTariff(ChargingTariff_Id.Parse("DE*GEF*T1"),
+                                                                                  Currency.EUR,
+                                                                                  [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.FLAT, 1m) ]) ],
+                                                                                  Created: Created))).
+                               GetChargingStationOperatorById(GEF)!;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                foreach (var (name, gef) in new[] { ("changed", changed), ("removed", removed) })
+                {
+                    Assert.That(gef.LastChangeDate,                                Is.EqualTo(T0), $"{name}: the operator.");
+                    Assert.That(gef.ChargingPools.Single().LastChangeDate,         Is.EqualTo(T0), $"{name}: the charging pool.");
+                    Assert.That(gef.ChargingStations.Single().LastChangeDate,      Is.EqualTo(T0), $"{name}: the charging station.");
+                    Assert.That(gef.Created,                                       Is.EqualTo(Created));
+                }
+
+                Assert.That(changed.EVSEs.First(evse => evse.Id == E1).LastChangeDate,  Is.EqualTo(T0));
+                Assert.That(changed.EVSEs.First(evse => evse.Id == E2).LastChangeDate,  Is.EqualTo(Created), "Its sibling did not change.");
+
+                // A tariff is embedded in the operator only.
+                Assert.That(added.LastChangeDate,                                  Is.EqualTo(T0));
+                Assert.That(added.ChargingPools.Single().LastChangeDate,           Is.EqualTo(Created));
+
+            }
+
+        }
+
+        #endregion
+
         #region A_station_delivers_at_most_what_its_EVSEs_do()
 
         /// <summary>

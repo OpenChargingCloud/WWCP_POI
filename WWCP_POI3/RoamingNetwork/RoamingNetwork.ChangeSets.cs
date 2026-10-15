@@ -829,7 +829,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(GridConnectionPoint))
                 {
-                    if (!TryApplyGridConnectionPointChange(change, index, gridOps, out currentValue, out ErrorResponse))
+                    if (!TryApplyGridConnectionPointChange(change, index, ChangeSet.CreatedAt, gridOps, out currentValue, out ErrorResponse))
                         return false;
                 }
 

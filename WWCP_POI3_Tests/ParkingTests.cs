@@ -284,6 +284,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(rn2.TryGetParkingSensorById(sn2, out var addedSensor),                   Is.True);
                 Assert.That(addedSensor!.Name[Languages.en],                                         Is.EqualTo("Sensor 2"));
 
+                // A change of its parking data is a change of the parking operator.
+                Assert.That(parking.LastChangeDate,                                                  Is.EqualTo(T0));
+
                 // Another parking operator is still another one.
                 Assert.That(() => Apply(rn1, RoamingNetworkChange.UpdateProperty("ParkingSpace", "SPACE-1", "parkingSensorIds", null, new JArray(), "ParkingOperator", "DE*XYZ")),
                             Throws.ArgumentException.With.Message.Contains("belongs to ParkingOperator 'DE*PAR'"));

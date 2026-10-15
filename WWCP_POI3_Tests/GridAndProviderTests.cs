@@ -285,6 +285,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(GCP)),
                             Throws.ArgumentException.With.Message.Contains("grid connection point 'connection-42' of the charging pool 'DE*GEF*P1' is unknown"));
 
+                // A change of a grid connection point is a change of its grid operator.
+                var point2 = rn2.GridOperators.Single().GridConnectionPoints.Single();
+                Assert.That(Apply(rn2, RoamingNetworkChange.UpdateProperty(point2, "contractedImportPower", null, 300000)).
+                                GridOperators.Single().LastChangeDate,                          Is.EqualTo(T0));
+
                 // A meter given twice by a change is refused.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(pool2, "energyMeters", null, new JArray(new EnergyMeter(GridMeter).ToJSON()))),
                             Throws.ArgumentException.With.Message.Contains("energy meter"));
