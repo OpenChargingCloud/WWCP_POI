@@ -4,8 +4,8 @@
 
 This file explains the purpose of three things you will find in this
 repository that are not source code: provenance trailers on commits, the
-decision log in `DECISIONS.md`, and the generated "Use of generative AI"
-section in `README.md`. It is written for contributors, for users who want
+decision log in `DECISIONS.md`, and the "Use of generative AI" section in
+`README.md`. It is written for contributors, for users who want
 to judge whether this project is worth depending on, and for the reviewers
 at [NLnet](https://nlnet.nl), who fund this work.
 
@@ -106,20 +106,34 @@ typically in the README, and for provenance of generated content per
 contribution, typically in commit messages. It explicitly accepts
 alternative methods with equivalent results.
 
-**What follows from this.** The generated section in `README.md` is our
-broad description. It is produced by a script from the commit trailers,
-so it is a snapshot of the repository as it is now rather than a
-statement that was once true. It reports how much of the current code was
-last touched by commits with and without AI involvement, in which roles,
-and in which areas no AI tool was used at all. At each funding milestone
-we add a few hand-written notes: the decisions that required domain
-knowledge, and the AI suggestions that were rejected and why. Those notes
-are the evidence for principle 3; the trailers are the evidence for
-principles 1 and 2.
+**What follows from this.** The section "Use of generative AI" in
+`README.md` is our broad description. It says how AI tools are used in
+this project — who decides, what the tools write, and what their output
+is checked against — and gives an overview of the core decisions: what
+was decided, between which alternatives, and on what grounds, together
+with the AI suggestions that were rejected and why. It is written by the
+maintainers and brought up to date at each funding milestone. It is the
+evidence for principle 3; the trailers are the evidence for principles 1
+and 2.
+
+**Why no percentages.** From the trailers one could compute how much of
+the current code was last touched by commits with and without AI
+involvement, and such a figure may carry a little information. More
+often it is window dressing: what does "50 %" or "80 % AI-generated code"
+actually mean? `git blame` knows which commit last touched a line, not
+who thought of it. A line last touched by an AI-assisted commit may be a
+rename in a design worked out by a human; a line last touched by hand may
+be reformatted generated code. A published percentage also invites
+optimising the number instead of the project — splitting, squashing or
+rewording commits until the figure looks right — which would make it
+counterproductive as well as meaningless. An overview of the decisions
+cannot be improved that way: each one has to name its grounds (see "The
+one rule for every why" below), and anyone can check them. Whoever still
+wants a number can compute it from the trailers, with these caveats.
 
 We do more than the policy's minimum because the minimum — one sentence
 saying that AI was used for documentation and tests — would tell nobody
-anything they could check.
+anything they could check, and a percentage would not either.
 
 ---
 
@@ -173,8 +187,7 @@ alternative failed.
 | Provenance of committed text | Commit trailers (`AI-Tool`, `AI-Model`, `AI-Role`, …) and raw commits for generated content | Whoever writes the commit; enforced by a `commit-msg` hook |
 | Reasoning behind a specific change | Body of the commit that made it | The author |
 | Decisions that constrain the codebase, including what was not built | `DECISIONS.md` | Maintainers, append-only |
-| Broad description of AI use, current snapshot | `README.md`, section "Use of generative AI" | Generated in CI from the trailers |
-| Milestone notes: domain decisions, rejected suggestions | `README.md`, same section, hand-written part | Maintainers, per milestone |
+| Broad description of AI use, overview of the core decisions and rejected suggestions | `README.md`, section "Use of generative AI" | Maintainers, per milestone |
 | Rules for contributors | `CONTRIBUTING.md` | Maintainers |
 
 ---
