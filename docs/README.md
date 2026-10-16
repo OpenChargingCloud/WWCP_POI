@@ -160,7 +160,9 @@ timestamped values, newest first, with past entries as history and future entrie
 | `SetAdminStatus(list, ChangeMethods)`, `SetStatus(list, ChangeMethods)` | `Replace` (default) the whole schedule by the list, or `Insert` the list into it. |
 | `DefaultMaxAdminStatusScheduleSize`, `DefaultMaxStatusScheduleSize` | 50 entries each, unless the constructor is given another size; older entries are dropped. |
 
-Every `Set…` takes an optional `Context` as the data source of the update, passed to the events.
+Every `Set…` takes an optional `Context` as the data source of the update, passed to the events: every
+`On…StatusChanged` event has it as its last parameter, and a history names it as the `dataSource` of its status
+update, e.g. `calculated` for the status of a group its delegate calculates.
 
 - **Inserting** a value equal to the one in effect right before its timestamp changes nothing, unless it
   replaces an entry with the same timestamp. An entry with the same timestamp is replaced.

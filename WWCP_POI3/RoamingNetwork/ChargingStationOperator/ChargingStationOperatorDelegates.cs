@@ -55,7 +55,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                              EventTracking_Id                                      EventTrackingId,
                                                                              ChargingStationOperator                              ChargingStationOperator,
                                                                              Timestamped<ChargingStationOperatorAdminStatusType>  OldStatus,
-                                                                             Timestamped<ChargingStationOperatorAdminStatusType>  NewStatus);
+                                                                             Timestamped<ChargingStationOperatorAdminStatusType>  NewStatus,
+                                                                             Context?                                             DataSource);
 
     /// <summary>
     /// A delegate called whenever the dynamic status of the charging station operator changed.
@@ -69,7 +70,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                         EventTracking_Id                                 EventTrackingId,
                                                                         ChargingStationOperator                         ChargingStationOperator,
                                                                         Timestamped<ChargingStationOperatorStatusType>  OldStatus,
-                                                                        Timestamped<ChargingStationOperatorStatusType>  NewStatus);
+                                                                        Timestamped<ChargingStationOperatorStatusType>  NewStatus,
+                                                                        Context?                                        DataSource);
 
 
 

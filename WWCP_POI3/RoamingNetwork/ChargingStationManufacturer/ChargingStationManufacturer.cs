@@ -37,7 +37,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                  EventTracking_Id                                          EventTrackingId,
                                                                                  ChargingStationManufacturer                               ChargingStationManufacturer,
                                                                                  Timestamped<ChargingStationManufacturerAdminStatusType>   OldStatus,
-                                                                                 Timestamped<ChargingStationManufacturerAdminStatusType>   NewStatus);
+                                                                                 Timestamped<ChargingStationManufacturerAdminStatusType>   NewStatus,
+                                                                                 Context?                                                  DataSource);
 
     /// <summary>
     /// The status of a charging station manufacturer changed.
@@ -46,7 +47,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                             EventTracking_Id                                     EventTrackingId,
                                                                             ChargingStationManufacturer                          ChargingStationManufacturer,
                                                                             Timestamped<ChargingStationManufacturerStatusType>   OldStatus,
-                                                                            Timestamped<ChargingStationManufacturerStatusType>   NewStatus);
+                                                                            Timestamped<ChargingStationManufacturerStatusType>   NewStatus,
+                                                                            Context?                                             DataSource);
 
 
     /// <summary>
@@ -164,7 +166,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
             var onAdminStatusChanged = this.onAdminStatusChanged;
             if (onAdminStatusChanged is not null)
-                await onAdminStatusChanged(Timestamp, EventTrackingId, this, OldStatus, NewStatus);
+                await onAdminStatusChanged(Timestamp, EventTrackingId, this, OldStatus, NewStatus, DataSource);
         }
 
         /// <inheritdoc/>
@@ -176,7 +178,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
             var onStatusChanged = this.onStatusChanged;
             if (onStatusChanged is not null)
-                await onStatusChanged(Timestamp, EventTrackingId, this, OldStatus, NewStatus);
+                await onStatusChanged(Timestamp, EventTrackingId, this, OldStatus, NewStatus, DataSource);
         }
 
         #endregion

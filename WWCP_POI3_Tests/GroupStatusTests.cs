@@ -136,6 +136,50 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(groupUpdates.Select(update => update.Timestamp),                                 Is.EqualTo(new[] { T0, T0.AddMinutes(1), T0.AddMinutes(2) }));
                 Assert.That(updates.Select(update => update.EntityType),                                     Is.EqualTo(new[] { nameof(EVSE), nameof(EVSEGroup), nameof(EVSE), nameof(EVSEGroup), nameof(EVSE), nameof(EVSEGroup) }));
 
+                // A calculated status names its source.
+                Assert.That(groupUpdates.Select(update => update.DataSource),                                Is.All.EqualTo("calculated"));
+                Assert.That(updates.Where(update => update.EntityType == nameof(EVSE)).Select(update => update.DataSource),
+                                                                                                             Is.All.Null);
+
+            }
+
+        }
+
+        #endregion
+
+        #region Status_updates_name_their_source()
+
+        /// <summary>
+        /// The source a status is set with goes along with its status update, for every kind of entity.
+        /// </summary>
+        [Test]
+        public void Status_updates_name_their_source()
+        {
+
+            var history  = NewHistory();
+            var updates  = new List<POIStatusUpdate>();
+
+            history.RuntimeStatus.OnStatusUpdate += updates.Add;
+
+            POIStatusUpdateResult Set(POIRuntimeStatusKind Kind, String EntityType, Object EntityId, String Value, String DataSource)
+                => history.RuntimeStatus.TryUpdate(Kind, EntityType, EntityId.ToString()!, Value, T0, out _, out _, DataSource);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(Set(POIRuntimeStatusKind.Status,      nameof(EVSE),                    E1,     "charging",     "ocpi"),      Is.EqualTo(POIStatusUpdateResult.Updated));
+                Assert.That(Set(POIRuntimeStatusKind.Status,      nameof(ChargingStationOperator), GEF,    "offline",      "backend"),   Is.EqualTo(POIStatusUpdateResult.Updated));
+                Assert.That(Set(POIRuntimeStatusKind.AdminStatus, nameof(EVSE),                    E2,     "outOfService", "operator"),  Is.EqualTo(POIStatusUpdateResult.Updated));
+                Assert.That(Set(POIRuntimeStatusKind.Status,      nameof(ParkingSpace),            Space1, "inUse",        "sensor"),    Is.EqualTo(POIStatusUpdateResult.Updated));
+
+                Assert.That(updates.Select(update => (update.EntityType, update.DataSource)),
+                            Is.EqualTo(new[] {
+                                (nameof(EVSE),                    "ocpi"),
+                                (nameof(ChargingStationOperator), "backend"),
+                                (nameof(EVSE),                    "operator"),
+                                (nameof(ParkingSpace),            "sensor")
+                            }));
+
             }
 
         }
