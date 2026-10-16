@@ -328,7 +328,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
         public async Task Kept_representations_follow_the_versions()
         {
 
-            var paths   = new[] { RN, RN + "/EMPs", EM, CSO, CSO + "?without=chargingPools", CP, CP + "?expand=gridConnectionPoint", GO, GC, "RNs" };
+            var paths   = new[] { RN, RN + "/EMPs", EM, CSO, CSO + "?without=chargingPools", CP, CP + "?expand=gridConnectionPoint", GO, GO + "?without=gridConnectionPoints", GO + "/GCPs", GC, "RNs" };
 
             async Task<Dictionary<String, (String ETag, Byte[] Content)>> GetAll()
             {
@@ -377,8 +377,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 }
 
                 // Changed: the roaming network, the e-mobility provider and their list, the grid connection point,
-                // its grid operator and the view of the pool embedding it.
-                foreach (var path in new[] { RN, RN + "/EMPs", EM, GC, GO, CP + "?expand=gridConnectionPoint" })
+                // its grid operator - also without them, as its last change is the one of its grid connection point -
+                // and their list, and the view of the pool embedding it.
+                foreach (var path in new[] { RN, RN + "/EMPs", EM, GC, GO, GO + "?without=gridConnectionPoints", GO + "/GCPs", CP + "?expand=gridConnectionPoint" })
                     Assert.That(after[path].ETag,     Is.Not.EqualTo(before[path].ETag), path);
 
                 // Unchanged: the operator, also without its pools, and its pool, and the names of the roaming networks.
@@ -496,6 +497,55 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(HeaderOf(again, "ETag"),                                   Is.EqualTo(HeaderOf(slim, "ETag")));
 
                 Assert.That(unknown.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_grid_operator_leaves_out_its_grid_connection_points_which_are_listed()
+
+        [Test]
+        public async Task A_grid_operator_leaves_out_its_grid_connection_points_which_are_listed()
+        {
+
+            var (whole,    wholeContent)  = await Send(HttpMethod.Get, GO);
+            var (slim,     slimContent)   = await Send(HttpMethod.Get, GO + "?without=gridConnectionPoints");
+            var (unknown,  _)             = await Send(HttpMethod.Get, GO + "?without=chargingPools");
+            var (list,     listContent)   = await Send(HttpMethod.Get, GO + "/GCPs");
+            var (found,    foundContent)  = await Send(HttpMethod.Get, GO + "/GCPs?match=connection-42&limit=1");
+            var (none,     noneContent)   = await Send(HttpMethod.Get, GO + "/GCPs?match=nowhere");
+            var (nobody,   _)             = await Send(HttpMethod.Get, RN + "/GOs/DE*XXX/GCPs");
+
+            var wholeJSON  = ParseJSON(wholeContent);
+            var slimJSON   = ParseJSON(slimContent);
+            var listJSON   = JArray.Parse(System.Text.Encoding.UTF8.GetString(listContent));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(slim.StatusCode,                                           Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(slimJSON["gridConnectionPoints"],                          Is.Null);
+                Assert.That(HeaderOf(slim, "ETag"),                                    Is.EqualTo(ETagOf("json", slimContent)));
+                Assert.That(HeaderOf(slim, "ETag"),                                    Is.Not.EqualTo(HeaderOf(whole, "ETag")));
+                Assert.That(unknown.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
+
+                // The list is what the grid operator embeds, and the rest of it is the slim grid operator.
+                Assert.That(JToken.DeepEquals(listJSON, wholeJSON["gridConnectionPoints"]),  Is.True);
+                wholeJSON.Remove("gridConnectionPoints");
+                Assert.That(JToken.DeepEquals(slimJSON, wholeJSON),                    Is.True);
+
+                Assert.That(list.StatusCode,                                           Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(HeaderOf(list, "X-Total-Count"),                           Is.EqualTo("1"));
+                Assert.That(HeaderOf(list, "ETag"),                                    Is.EqualTo(ETagOf("json", listContent)));
+
+                Assert.That(JArray.Parse(System.Text.Encoding.UTF8.GetString(foundContent))[0]["@id"]!.Value<String>(),  Is.EqualTo("connection-42"));
+                Assert.That(HeaderOf(found, "X-Filtered-Count"),                       Is.EqualTo("1"));
+                Assert.That(JArray.Parse(System.Text.Encoding.UTF8.GetString(noneContent)),                               Is.Empty);
+                Assert.That(HeaderOf(none, "X-Filtered-Count"),                        Is.EqualTo("0"));
+
+                Assert.That(nobody.StatusCode,                                         Is.EqualTo(HttpStatusCode.NotFound));
 
             }
 

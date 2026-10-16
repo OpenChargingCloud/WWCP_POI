@@ -48,7 +48,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}                    a charging station
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}    an EVSE
     /// GET ~/RNs/{RN_Id}/GOs                                                      its grid operators, in short
-    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}                                              a grid operator
+    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}                                              a grid operator;
+    ///     ?without=gridConnectionPoints leaves out its grid connection points, which ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs lists
+    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs                                         its grid connection points, as it embeds them
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}                                a grid connection point of the grid operator
     /// GET ~/RNs/{RN_Id}/EMPs                                                     its e-mobility providers, in short
     /// GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}                                            an e-mobility provider
@@ -94,6 +96,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The view of a collection as a list of its children in short.
         /// </summary>
         private const           String       SummariesView        = "summaries";
+
+        /// <summary>
+        /// The view of a collection as a list of its children as their parent embeds them.
+        /// </summary>
+        private const           String       EmbeddedView         = "embedded";
 
         /// <summary>
         /// The representations of versions of roaming networks and of the entities they embed,
@@ -171,31 +178,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}
 
+            // Its charging pools are what makes an operator large: thousands of them, each with its
+            // stations and EVSEs. Without them, the operator is what it says of itself.
             AddEntityHandlers(chargingStationOperatorPath,
-                              request => {
-
-                                  if (!TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse))
-                                      return errorResponse;
-
-                                  if (request.QueryString.GetString("without") is not String without)
-                                      return CachedEntityResponse(request, chargingStationOperator, chargingStationOperator.ToEmbeddedJSON);
-
-                                  // Its charging pools are what makes an operator large: thousands of them, each with its
-                                  // stations and EVSEs. Without them, the operator is what it says of itself.
-                                  foreach (var omission in without.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                                      if (omission != "chargingPools")
-                                          return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Unknown omission '{omission}'; a charging station operator leaves out only 'chargingPools'!");
-
-                                  return CachedEntityResponse(request,
-                                                              chargingStationOperator,
-                                                              () => {
-                                                                  var json = chargingStationOperator.ToEmbeddedJSON();
-                                                                  json.Remove("chargingPools");
-                                                                  return json;
-                                                              },
-                                                              View: "without=chargingPools");
-
-                              });
+                              request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                                             ? CachedEntityResponseWithout(request,
+                                                                           chargingStationOperator,
+                                                                           chargingStationOperator.ToEmbeddedJSON,
+                                                                           "chargingPools",
+                                                                           "a charging station operator")
+                                             : errorResponse);
 
             #endregion
 
@@ -276,8 +268,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddEntityHandlers(gridOperatorPath,
                               request => TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse)
-                                             ? CachedEntityResponse(request, gridOperator, gridOperator.ToJSON)
+                                             ? CachedEntityResponseWithout(request,
+                                                                           gridOperator,
+                                                                           gridOperator.ToJSON,
+                                                                           "gridConnectionPoints",
+                                                                           "a grid operator")
                                              : errorResponse);
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs
+
+            AddEntityHandlers(gridOperatorPath + "/GCPs",
+                              request => {
+
+                                  if (!TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse) ||
+                                      !TryParseListQuery(request, [], out var query, out errorResponse))
+                                  {
+                                      return errorResponse;
+                                  }
+
+                                  var gridConnectionPoints = gridOperator.GridConnectionPoints;
+
+                                  return QueryResponse(request,
+                                                       query,
+                                                       () => gridConnectionPoints,
+                                                       gridConnectionPoint => SearchTextOf(gridConnectionPoint, gridConnectionPoint.ToJSON),
+                                                       entries => new JArray(entries.Select(gridConnectionPoint => gridConnectionPoint.ToJSON())),
+                                                       format => gridConnectionPoints.Representation(EmbeddedView, format, () => new JArray(gridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.ToJSON()))),
+                                                       gridConnectionPoints.Count);
+
+                              });
 
             #endregion
 
@@ -770,6 +791,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   format,
                                   representationCache.GetValue(Version, _ => new Representations()).
                                                       GetOrAdd(View, format, () => POIRepresentation.Of(JSON(), format)));
+
+        }
+
+        #endregion
+
+        #region (private)        CachedEntityResponseWithout(Request, Version, JSON, Omittable, Description)
+
+        /// <summary>
+        /// The given immutable version of an entity as CachedEntityResponse(…) answers it, or, with
+        /// ?without={Omittable}, without that part of it: another view, with its own ETag, kept as well.
+        /// Anything else to leave out is refused.
+        /// </summary>
+        /// <param name="Omittable">The property the entity may leave out, e.g. its children with a list of their own.</param>
+        /// <param name="Description">What the entity is, e.g. "a grid operator", for a refusal.</param>
+        private HTTPResponse CachedEntityResponseWithout(HTTPRequest    Request,
+                                                         Object         Version,
+                                                         Func<JObject>  JSON,
+                                                         String         Omittable,
+                                                         String         Description)
+        {
+
+            if (Request.QueryString.GetString("without") is not String without)
+                return CachedEntityResponse(Request, Version, JSON);
+
+            foreach (var omission in without.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                if (omission != Omittable)
+                    return EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Unknown omission '{omission}'; {Description} leaves out only '{Omittable}'!");
+
+            return CachedEntityResponse(Request,
+                                        Version,
+                                        () => {
+                                            var json = JSON();
+                                            json.Remove(Omittable);
+                                            return json;
+                                        },
+                                        View: "without=" + Omittable);
 
         }
 
