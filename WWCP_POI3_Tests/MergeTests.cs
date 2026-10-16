@@ -175,6 +175,55 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region The_same_party_in_another_spelling_is_the_same_entity()
+
+        /// <summary>
+        /// An e-mobility provider both versions added, once as 'DE-ABC' and once as 'DE*ABC', is the same one, as its
+        /// identification type compares them: added alike, the merge keeps it as the first version writes it;
+        /// added with different properties, they conflict on them.
+        /// </summary>
+        [Test]
+        public void The_same_party_in_another_spelling_is_the_same_entity()
+        {
+
+            var rn1       = NewNetwork();
+            var provider  = new EMobilityProvider(EMobilityProvider_Id.Parse("DE-ABC"),
+                                                  I18NString.Create(Languages.en, "ABC Mobility"),
+                                                  Created: Created).WithKeys().ToJSON();
+
+            RoamingNetwork Added(String Id, String Name)
+            {
+                var json      = (JObject) provider.DeepClone();
+                json["@id"]   = Id;
+                json["name"]  = new JObject(new JProperty("en", Name));
+                return rn1.ApplyChangeSet(rn1.CreateChangeSet([ RoamingNetworkChange.Add(nameof(EMobilityProvider), Id, json) ], CreatedAt: T0).
+                                              SignedBy(TestParties.Party(rn1)));
+            }
+
+            var left      = Added("DE-ABC", "ABC Mobility");
+            var right     = Added("DE*ABC", "ABC Mobility");
+            var other     = Added("DEABC",  "Other Mobility");
+
+            var merged    = RoamingNetwork.TryMerge(rn1, left, right, ChangeSet_Id.Parse("merge-1"), out var merge, out var changeSet, out var conflicts1);
+            var refused   = RoamingNetwork.TryMerge(rn1, left, other, ChangeSet_Id.Parse("merge-2"), out _,         out _,             out var conflicts2);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(merged,                                          Is.True, String.Join(" ", conflicts1.Select(conflict => conflict.Description)));
+                Assert.That(changeSet!.Changes,                              Is.Empty);
+                Assert.That(merge!.EMobilityProviders.Single().Id.ToString(), Is.EqualTo("DE-ABC"));
+
+                Assert.That(refused,                                         Is.False);
+                Assert.That(conflicts2.Single().Kind,                        Is.EqualTo(RoamingNetworkMergeConflictKind.AddAdd));
+                Assert.That(conflicts2.Single().PropertyName,                Is.EqualTo("name"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Additions_on_both_sides_are_merged()
 
         [Test]

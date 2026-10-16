@@ -135,18 +135,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (internal) MergeEntity
 
         /// <summary>
+        /// The key of an entity, as the merge finds it in every version: its entity type and its identification,
+        /// compared as its identification type compares them, e.g. an e-mobility provider 'DE-ABC' as 'DE*ABC',
+        /// most without case; a text its type does not read, ordinally.
+        /// </summary>
+        /// <param name="Type">The entity type.</param>
+        /// <param name="Id">The typed identification, or the text its type does not read.</param>
+        internal readonly record struct MergeKey(String  Type,
+                                                 Object  Id)
+        {
+
+            /// <summary>
+            /// The key of the entity of the given type with the given identification.
+            /// </summary>
+            /// <param name="Type">An entity type.</param>
+            /// <param name="Id">The text of its identification.</param>
+            internal static MergeKey Of(String  Type,
+                                        String  Id)
+
+                => new (Type, TypedId(Type, Id) ?? Id);
+
+        }
+
+        /// <summary>
         /// An entity of a version, as the merge compares it.
         /// </summary>
         /// <param name="Type">Its entity type.</param>
-        /// <param name="Id">Its identification.</param>
-        /// <param name="Parent">The type and identification of the entity embedding it, unless it is the roaming network itself.</param>
-        /// <param name="Own">Its properties, without its embedded children and without its last change.</param>
+        /// <param name="Id">Its identification, as this version writes it.</param>
+        /// <param name="Parent">The key of the entity embedding it, unless it is the roaming network itself.</param>
+        /// <param name="Own">Its properties, without its identification, its embedded children and its last change.</param>
         /// <param name="Full">Its complete JSON representation, with its embedded children.</param>
         internal sealed record MergeEntity(String                            Type,
                                            String                            Id,
-                                           (String Type, String Id)?         Parent,
+                                           MergeKey?                         Parent,
                                            JObject                           Own,
-                                           JObject                           Full);
+                                           JObject                           Full)
+        {
+
+            /// <summary>
+            /// Its key, as the merge finds it in every version.
+            /// </summary>
+            internal MergeKey Key { get; } = MergeKey.Of(Type, Id);
+
+        }
 
         #endregion
 
@@ -167,9 +198,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// <summary>
             /// Its entities, by their type and identification.
             /// </summary>
-            internal Dictionary<(String Type, String Id), MergeEntity>  Entities  { get; }
+            internal Dictionary<MergeKey, MergeEntity>  Entities  { get; }
 
-            private MergeBase(Dictionary<(String Type, String Id), MergeEntity> Entities)
+            private MergeBase(Dictionary<MergeKey, MergeEntity> Entities)
             {
                 this.Entities = Entities;
             }
@@ -397,15 +428,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The entities of the given version, in the order of its JSON representation: parents before their children.
         /// </summary>
-        private static Dictionary<(String Type, String Id), MergeEntity> Flatten(RoamingNetwork RoamingNetwork)
+        private static Dictionary<MergeKey, MergeEntity> Flatten(RoamingNetwork RoamingNetwork)
         {
 
-            var entities = new Dictionary<(String, String), MergeEntity>();
+            var entities = new Dictionary<MergeKey, MergeEntity>();
 
-            void Walk(String                     Type,
-                      String                     Id,
-                      (String Type, String Id)?  Parent,
-                      JObject                    JSON)
+            void Walk(String     Type,
+                      String     Id,
+                      MergeKey?  Parent,
+                      JObject    JSON)
             {
 
                 var own       = (JObject) JSON.DeepClone();
@@ -414,14 +445,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var (key, _) in children)
                     own.Remove(key);
 
+                // Its identification is its key: another spelling of it is the same entity.
+                own.Remove("@id");
                 own.Remove("lastChange");
                 own.Remove("eTags");
 
-                entities[(Type, Id)] = new MergeEntity(Type, Id, Parent, own, JSON);
+                var entity = new MergeEntity(Type, Id, Parent, own, JSON);
+
+                entities[entity.Key] = entity;
 
                 foreach (var (key, childType) in children)
                     foreach (var child in (JSON[key] as JArray ?? []).OfType<JObject>())
-                        Walk(childType, child["@id"]!.Value<String>()!, (Type, Id), child);
+                        Walk(childType, child["@id"]!.Value<String>()!, entity.Key, child);
 
             }
 
@@ -438,9 +473,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The changes leading from the left version to the merge, or the conflicts.
         /// </summary>
-        private static List<RoamingNetworkChange> MergeChanges(Dictionary<(String Type, String Id), MergeEntity>  Base,
-                                                               Dictionary<(String Type, String Id), MergeEntity>  Left,
-                                                               Dictionary<(String Type, String Id), MergeEntity>  Right,
+        private static List<RoamingNetworkChange> MergeChanges(Dictionary<MergeKey, MergeEntity>  Base,
+                                                               Dictionary<MergeKey, MergeEntity>  Left,
+                                                               Dictionary<MergeKey, MergeEntity>  Right,
                                                                List<RoamingNetworkMergeConflict>                  Conflicts)
         {
 
@@ -449,14 +484,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var replaces  = new List<RoamingNetworkChange>();
             var removes   = new List<RoamingNetworkChange>();
 
-            var added     = new HashSet<(String, String)>();
-            var removed   = new HashSet<(String, String)>();
-            var replaced  = new HashSet<(String, String)>();
+            var added     = new HashSet<MergeKey>();
+            var removed   = new HashSet<MergeKey>();
+            var replaced  = new HashSet<MergeKey>();
 
             void Conflict(RoamingNetworkMergeConflictKind Kind, MergeEntity Entity, String? PropertyName, JToken? BaseValue, JToken? LeftValue, JToken? RightValue, String Description)
                 => Conflicts.Add(new (Kind, Entity.Type, Entity.Id, PropertyName, BaseValue, LeftValue, RightValue, Description));
 
-            Boolean UnderAny(MergeEntity Entity, HashSet<(String, String)> Keys, Dictionary<(String Type, String Id), MergeEntity> Version)
+            Boolean UnderAny(MergeEntity Entity, HashSet<MergeKey> Keys, Dictionary<MergeKey, MergeEntity> Version)
             {
                 var parent = Entity.Parent;
                 while (parent.HasValue)
@@ -493,7 +528,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (b is null)
                     {
 
-                        var parentKept = r!.Parent is not (String, String) parent ||
+                        var parentKept = r!.Parent is not MergeKey parent ||
                                          (Left.ContainsKey(parent) && !removed.Contains(parent)) ||
                                          added.Contains(parent);
 
@@ -507,7 +542,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         added.Add(key);
 
                         if (!UnderAny(r, added, Right))
-                            adds.Add(RoamingNetworkChange.Add(r.Type, r.Id, (JObject) r.Full.DeepClone(), ParentType(r), r.Parent?.Id));
+                            adds.Add(RoamingNetworkChange.Add(r.Type, r.Id, (JObject) r.Full.DeepClone(), ParentType(r), ParentId(r, Right)));
 
                         continue;
 
@@ -573,7 +608,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     {
                         replaced.Add(key);
                         replaces.Add(RoamingNetworkChange.Remove(l.Type, l.Id));
-                        replaces.Add(RoamingNetworkChange.Add(r.Type, r.Id, (JObject) r.Full.DeepClone(), ParentType(r), r.Parent?.Id));
+                        replaces.Add(RoamingNetworkChange.Add(r.Type, r.Id, (JObject) r.Full.DeepClone(), ParentType(r), ParentId(r, Right)));
                         continue;
                     }
 
@@ -659,7 +694,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
                     replaced.Add(key);
                     replaces.Add(RoamingNetworkChange.Remove(l.Type, l.Id));
-                    replaces.Add(RoamingNetworkChange.Add(r.Type, r.Id, (JObject) r.Full.DeepClone(), ParentType(r), r.Parent?.Id));
+                    replaces.Add(RoamingNetworkChange.Add(r.Type, r.Id, (JObject) r.Full.DeepClone(), ParentType(r), ParentId(r, Right)));
                     continue;
                 }
 
@@ -686,9 +721,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// a property both changed differently has it as its value; an entity one removed and the other changed,
         /// or one both moved, or moved by one and changed by the other, has it as its only property.
         /// </summary>
-        private static Dictionary<(String Type, String Id), MergeEntity> MergeVirtual(Dictionary<(String Type, String Id), MergeEntity>  Base,
-                                                                                      Dictionary<(String Type, String Id), MergeEntity>  Left,
-                                                                                      Dictionary<(String Type, String Id), MergeEntity>  Right)
+        private static Dictionary<MergeKey, MergeEntity> MergeVirtual(Dictionary<MergeKey, MergeEntity>  Base,
+                                                                                      Dictionary<MergeKey, MergeEntity>  Left,
+                                                                                      Dictionary<MergeKey, MergeEntity>  Right)
         {
 
             static Boolean Unchanged(MergeEntity Entity, MergeEntity BaseEntity)
@@ -700,7 +735,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return new MergeEntity(Entity.Type, Entity.Id, Entity.Parent, own, own);
             }
 
-            var entities  = new Dictionary<(String Type, String Id), MergeEntity>();
+            var entities  = new Dictionary<MergeKey, MergeEntity>();
 
             var keys      = Left.Keys.
                                 Concat(Right.Keys.Where(key => !Left.ContainsKey(key))).
@@ -868,17 +903,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private static Boolean SameSubtree(MergeEntity                                         Entity,
                                            MergeEntity                                         BaseEntity,
-                                           Dictionary<(String Type, String Id), MergeEntity>  Version,
-                                           Dictionary<(String Type, String Id), MergeEntity>  BaseVersion)
+                                           Dictionary<MergeKey, MergeEntity>  Version,
+                                           Dictionary<MergeKey, MergeEntity>  BaseVersion)
         {
 
-            static IEnumerable<MergeEntity> Subtree(MergeEntity Root, Dictionary<(String Type, String Id), MergeEntity> Version)
+            static IEnumerable<MergeEntity> Subtree(MergeEntity Root, Dictionary<MergeKey, MergeEntity> Version)
 
                 => Version.Values.Where(entity => {
                        var parent = entity.Parent;
                        while (parent.HasValue)
                        {
-                           if (parent.Value == (Root.Type, Root.Id))
+                           if (parent.Value == Root.Key)
                                return true;
                            parent = Version.TryGetValue(parent.Value, out var parentEntity) ? parentEntity.Parent : null;
                        }
@@ -888,13 +923,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!JToken.DeepEquals(Entity.Own, BaseEntity.Own))
                 return false;
 
-            var subtree      = Subtree(Entity,     Version).    ToDictionary(entity => (entity.Type, entity.Id));
-            var baseSubtree  = Subtree(BaseEntity, BaseVersion).ToDictionary(entity => (entity.Type, entity.Id));
+            var subtree      = Subtree(Entity,     Version).    ToDictionary(entity => entity.Key);
+            var baseSubtree  = Subtree(BaseEntity, BaseVersion).ToDictionary(entity => entity.Key);
 
             return subtree.Count == baseSubtree.Count &&
                    subtree.All(entry => baseSubtree.TryGetValue(entry.Key, out var baseEntity) &&
                                         entry.Value.Parent == baseEntity.Parent &&
                                         JToken.DeepEquals(entry.Value.Own, baseEntity.Own));
+
+        }
+
+        #endregion
+
+        #region (private static) ParentId(Entity, Version)
+
+        /// <summary>
+        /// The identification of the entity embedding the given one, as the given version writes it.
+        /// </summary>
+        private static String? ParentId(MergeEntity                         Entity,
+                                        Dictionary<MergeKey, MergeEntity>  Version)
+
+            => Entity.Parent is MergeKey parent
+                   ? Version.TryGetValue(parent, out var parentEntity)
+                         ? parentEntity.Id
+                         : parent.Id.ToString()
+                   : null;
+
+        #endregion
+
+        #region (private static) TypedId(EntityType, EntityId)
+
+        /// <summary>
+        /// The identification of the given entity type the given text names, compared as its type compares it;
+        /// null for a text its type does not read.
+        /// </summary>
+        private static Object? TypedId(String  EntityType,
+                                       String  EntityId)
+        {
+
+            Object? id = EntityType switch {
+                nameof(RoamingNetwork)                   => RoamingNetwork_Id.                 TryParse(EntityId, out var roamingNetworkId)  ? roamingNetworkId  : null,
+                nameof(ChargingStationOperator)          => ChargingStationOperator_Id.        TryParse(EntityId, out var operatorId)        ? operatorId        : null,
+                nameof(ChargingStationManufacturer)      => ChargingStationManufacturer_Id.    TryParse(EntityId, out var manufacturerId)    ? manufacturerId    : null,
+                nameof(EMobilityProvider)                => EMobilityProvider_Id.              TryParse(EntityId, out var providerId)        ? providerId        : null,
+                nameof(GridOperator)                     => GridOperator_Id.                   TryParse(EntityId, out var gridOperatorId)    ? gridOperatorId    : null,
+                nameof(ParkingOperator)                  => ParkingOperator_Id.                TryParse(EntityId, out var parkingOperatorId) ? parkingOperatorId : null,
+                nameof(Brand)                            => Brand_Id.                          TryParse(EntityId, out var brandId)           ? brandId           : null,
+                nameof(EnergyMeterManufacturer)          => EnergyMeterManufacturer_Id.        TryParse(EntityId, out var meterMakerId)      ? meterMakerId      : null,
+                nameof(TransparencySoftware)             => TransparencySoftware_Id.           TryParse(EntityId, out var softwareId)        ? softwareId        : null,
+                nameof(TransparencySoftwareCertificate)  => TransparencySoftwareCertificate_Id.TryParse(EntityId, out var certificateId)     ? certificateId     : null,
+                nameof(ChargingTariff)                   => ChargingTariff_Id.                 TryParse(EntityId, out var tariffId)          ? tariffId          : null,
+                nameof(ChargingPool)                     => ChargingPool_Id.                   TryParse(EntityId, out var poolId)            ? poolId            : null,
+                nameof(ChargingStation)                  => ChargingStation_Id.                TryParse(EntityId, out var stationId)         ? stationId         : null,
+                nameof(EVSE)                             => EVSE_Id.                           TryParse(EntityId, out var evseId)            ? evseId            : null,
+                nameof(EVSEGroup)                        => EVSEGroup_Id.                      TryParse(EntityId, out var evseGroupId)       ? evseGroupId       : null,
+                nameof(ChargingStationGroup)             => ChargingStationGroup_Id.           TryParse(EntityId, out var stationGroupId)    ? stationGroupId    : null,
+                nameof(ChargingPoolGroup)                => ChargingPoolGroup_Id.              TryParse(EntityId, out var poolGroupId)       ? poolGroupId       : null,
+                nameof(ChargingTariffGroup)              => ChargingTariffGroup_Id.            TryParse(EntityId, out var tariffGroupId)     ? tariffGroupId     : null,
+                nameof(GridConnectionPoint)              => GridConnectionPoint_Id.            TryParse(EntityId, out var pointId)           ? pointId           : null,
+                _                                        => ParkingId(EntityType, EntityId)
+            };
+
+            return id;
 
         }
 

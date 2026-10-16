@@ -240,7 +240,10 @@ there unless both tips have the same:
 
 The three-way merge compares every entity a change set addresses (section 4.1), by its type and
 identification, without its embedded children and without `lastChange`, property by property,
-absent being a value of its own:
+absent being a value of its own. Identifications are compared as their type compares them, not as
+texts: `DE-ABC` and `DE*ABC` are the same e-mobility provider, most identifications are the same
+without case; `@id` itself is therefore not compared, an entity keeps it as the first version writes
+it, and an added entity names its parent as the second version writes it:
 
 - a property only one version changed takes that change; both changed it alike, it is kept once;
   both changed it differently, they **conflict**, unless it is an array of identified elements (section 4)
