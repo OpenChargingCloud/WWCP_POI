@@ -229,7 +229,7 @@ of [EnergyMeter](EnergyMeter.md)s. Read strictly: an unknown property is an erro
 
 | JSON key | Type | Change set | Description |
 |---|---|---|---|
-| `@id` | string | — | `TransparencySoftware_Id`: opaque, case-sensitive, no surrounding whitespace. |
+| `@id` | string | — | `TransparencySoftware_Id`: any text, compared case-insensitively, surrounding whitespace trimmed. |
 | `name` | I18N text | update | Mandatory; a nonempty text in each language. |
 | `version` | string | update | Mandatory `TransparencySoftwareVersion`, e.g. `1.4.0`. |
 | `openSourceLicenses` | object[] | update | Mandatory, at least one: `{@id, description?, URLs}` (Hermod `OpenSourceLicense`, embedded without `@context`); an `@id` only once (case-insensitive); in a canonical order (`@id` upper case, description, URLs). |
@@ -253,7 +253,7 @@ is an error.
 
 | JSON key | Type | Change set | Description |
 |---|---|---|---|
-| `@id` | string | — | `TransparencySoftwareCertificate_Id`: opaque, case-sensitive, no surrounding whitespace. |
+| `@id` | string | — | `TransparencySoftwareCertificate_Id`: any text, compared case-insensitively, surrounding whitespace trimmed. |
 | `issuer` | string | update | Mandatory: the issuing organization. |
 | `chargingStationModel` | string | update | Mandatory: a `ChargingStationModel_Id`, as charging stations name their model by `modelId`, compared case-insensitively. |
 | `chargingStationModelVersion` | string | update | Mandatory. |

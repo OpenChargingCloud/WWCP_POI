@@ -50,7 +50,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The unique identification of a transparency software certificate,
     /// e.g. a model or version approval document:
-    /// opaque and case-sensitive, without surrounding whitespace.
+    /// compared case-insensitively, surrounding whitespace trimmed away.
     /// </summary>
     public readonly struct TransparencySoftwareCertificate_Id : IId<TransparencySoftwareCertificate_Id>
     {
@@ -170,8 +170,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static Boolean TryParse(String Text, out TransparencySoftwareCertificate_Id TransparencySoftwareCertificateId)
         {
 
-            // Opaque and case-sensitive: surrounding whitespace is an error, not trimmed away.
-            if (!String.IsNullOrWhiteSpace(Text) && Text == Text.Trim())
+            Text = Text?.Trim() ?? "";
+
+            if (Text.IsNotNullOrEmpty())
             {
                 try
                 {
@@ -324,7 +325,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => String.Compare(InternalId,
                               TransparencySoftwareCertificateId.InternalId,
-                              StringComparison.Ordinal);
+                              StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -355,7 +356,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => String.Equals(InternalId,
                              TransparencySoftwareCertificateId.InternalId,
-                             StringComparison.Ordinal);
+                             StringComparison.OrdinalIgnoreCase);
 
         #endregion
 
@@ -368,7 +369,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override Int32 GetHashCode()
 
-            => InternalId is null ? 0 : StringComparer.Ordinal.GetHashCode(InternalId);
+            => InternalId is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(InternalId);
 
         #endregion
 

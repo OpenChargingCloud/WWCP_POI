@@ -177,21 +177,23 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Ids
 
         #endregion
 
-        #region Opaque_software_and_certificate_identifications_keep_their_case()
+        #region Software_and_certificate_identifications_compare_without_case()
 
         /// <summary>
-        /// Transparency software and certificate identifications are opaque:
-        /// they keep their case and reject surrounding whitespace.
+        /// Transparency software and certificate identifications compare as brands do:
+        /// without case, surrounding whitespace trimmed away; they keep the case they were written with.
         /// </summary>
         [Test]
-        public void Opaque_software_and_certificate_identifications_keep_their_case()
+        public void Software_and_certificate_identifications_compare_without_case()
         {
 
-            AssertDifferent(TransparencySoftware_Id.           Parse("Release-1"),  TransparencySoftware_Id.           Parse("release-1"));
-            AssertDifferent(TransparencySoftwareCertificate_Id.Parse("PTB-1"),      TransparencySoftwareCertificate_Id.Parse("ptb-1"));
-            AssertSame     (TransparencySoftwareCertificate_Id.Parse("PTB-1"),      TransparencySoftwareCertificate_Id.Parse("PTB-1"));
+            AssertSame(TransparencySoftware_Id.           Parse("Release-1"),  TransparencySoftware_Id.           Parse("release-1"));
+            AssertSame(TransparencySoftwareCertificate_Id.Parse("PTB-1"),      TransparencySoftwareCertificate_Id.Parse("ptb-1"));
+            AssertSame(TransparencySoftwareCertificate_Id.Parse("PTB-1"),      TransparencySoftwareCertificate_Id.Parse(" PTB-1 "));
 
-            Assert.That(TransparencySoftwareCertificate_Id.TryParse(" PTB-1", out _),  Is.False);
+            Assert.That(TransparencySoftwareCertificate_Id.Parse(" PTB-1 ").ToString(),  Is.EqualTo("PTB-1"));
+            Assert.That(TransparencySoftware_Id.           Parse("Release-1").ToString(), Is.EqualTo("Release-1"));
+            Assert.That(TransparencySoftwareCertificate_Id.TryParse("   ",    out _),  Is.False);
             Assert.That(TransparencySoftwareCertificate_Id.TryParse("",       out _),  Is.False);
             Assert.That(TransparencySoftwareCertificate_Id.New,                         Is.Not.EqualTo(TransparencySoftwareCertificate_Id.New));
 

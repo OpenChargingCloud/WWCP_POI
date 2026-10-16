@@ -116,7 +116,7 @@ the release and the certificate are embedded in the roaming network (`transparen
 
 | JSON key | Type | Description |
 |---|---|---|
-| `transparencySoftwareId` | string | Mandatory: a `TransparencySoftware_Id` of the network, opaque text without surrounding whitespace. At most once per meter. |
+| `transparencySoftwareId` | string | Mandatory: a `TransparencySoftware_Id` of the network, compared case-insensitively. At most once per meter. |
 | `legalStatus` | string | Mandatory: a `LegalStatus`; predefined `forInformationOnly`, `verified`, `germanCalibrationLaw`, read in any case and written so, any other nonempty text accepted. |
 | `certificateId` | string | Optional: a `TransparencySoftwareCertificate_Id` of the network. The certificate must cover the release, i.e. name it among its verified or compatible releases. |
 
