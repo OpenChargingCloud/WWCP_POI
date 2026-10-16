@@ -285,9 +285,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.parkingOperators = new (ParkingOperators, entity => entity.Id, "parking operator");
 
-            // Parking garages, spaces, sensors, space groups and products are unique within the network;
-            // the charging stations they name are ones of this network, and so are the parking spaces charging stations name.
-            if ((DuplicateParking      (parkingOperators) ??
+            // Parking garages, spaces, sensors, space groups and products are unique within the network, the parking spaces
+            // of charging station operators as well; the charging stations they name are ones of this network, and so are
+            // the parking spaces charging stations name.
+            if ((DuplicateParking      (parkingOperators, chargingStationOperators) ??
                  UnknownChargingStation(parkingOperators, chargingStationOperators.Index) ??
                  UnknownParkingSpace   (chargingStationOperators, parkingOperators)) is String parkingError)
             {
@@ -328,6 +329,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     parkingSpaceGroups.TryAdd(parkingSpaceGroup.Id, parkingSpaceGroup);
 
             }
+
+            // The parking spaces charging station operators define where no parking operator does.
+            foreach (var chargingStationOperator in chargingStationOperators)
+                foreach (var parkingSpace in chargingStationOperator.ParkingSpaces)
+                    parkingSpaces.TryAdd(parkingSpace.Id, parkingSpace);
 
             #endregion
 
@@ -1708,9 +1714,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The error, when two of the given parking operators have a parking garage, space, sensor, space group or product
-        /// with the same identification.
+        /// with the same identification, or a parking space of a parking operator or charging station operator has the
+        /// identification of another.
         /// </summary>
-        internal static String? DuplicateParking(IEnumerable<ParkingOperator> ParkingOperators)
+        internal static String? DuplicateParking(IEnumerable<ParkingOperator>           ParkingOperators,
+                                                 IEnumerable<ChargingStationOperator>   ChargingStationOperators)
         {
 
             var garages = new HashSet<ParkingGarage_Id>();
@@ -1744,12 +1752,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            foreach (var parkingSpace in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ParkingSpaces))
+                if (!spaces.Add(parkingSpace.Id))
+                    return $"The parking space '{parkingSpace.Id}' must not be given twice in the roaming network!";
+
             return null;
 
         }
 
         /// <summary>
-        /// The error, when a parking garage, space or sensor names a charging station the given operators do not have.
+        /// The error, when a parking garage, space or sensor names a charging station the given operators do not have,
+        /// or a parking space of a charging station operator does.
         /// </summary>
         internal static String? UnknownChargingStation(IEnumerable<ParkingOperator>                                              ParkingOperators,
                                                        IReadOnlyDictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators)
@@ -1773,18 +1786,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            foreach (var parkingSpace in ChargingStationOperators.Values.SelectMany(chargingStationOperator => chargingStationOperator.ParkingSpaces))
+                foreach (var chargingStationId in parkingSpace.ChargingStationIds)
+                    if (!Exists(chargingStationId))
+                        return $"The charging station '{chargingStationId}' of the parking space '{parkingSpace.Id}' is unknown in the roaming network!";
+
             return null;
 
         }
 
         /// <summary>
-        /// The error, when a charging station names a parking space the given parking operators do not have.
+        /// The error, when a charging station names a parking space neither the given parking operators nor the given
+        /// charging station operators have.
         /// </summary>
         internal static String? UnknownParkingSpace(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
                                                     IEnumerable<ParkingOperator>          ParkingOperators)
         {
 
             var parkingSpaceIds = ParkingOperators.SelectMany(parkingOperator => parkingOperator.ParkingSpaces).
+                                                   Concat    (ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ParkingSpaces)).
                                                    Select    (parkingSpace    => parkingSpace.Id).
                                                    ToHashSet();
 

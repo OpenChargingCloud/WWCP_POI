@@ -506,6 +506,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => ChargingTariffGroups.TryGet(ChargingTariffGroupId, out ChargingTariffGroup);
 
         /// <summary>
+        /// The parking spaces it defines itself, where no parking operator does: embedded completely, in the order of
+        /// their identifications. They are in no parking garage, and have no parking sensors or parking products.
+        /// </summary>
+        public POICollection<ParkingSpace_Id, ParkingSpace>  ParkingSpaces  { get; } = POICollection<ParkingSpace_Id, ParkingSpace>.Empty;
+
+        /// <summary>
+        /// Try to return the parking space it defines with the given identification.
+        /// </summary>
+        public Boolean TryGetParkingSpace(ParkingSpace_Id  ParkingSpaceId,
+                                          [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ParkingSpace?  ParkingSpace)
+
+            => ParkingSpaces.TryGet(ParkingSpaceId, out ParkingSpace);
+
+        /// <summary>
         /// The charging tariffs, embedded completely, in the order of their identifications.
         /// </summary>
         public POICollection<ChargingTariff_Id, ChargingTariff>  ChargingTariffs  { get; } = POICollection<ChargingTariff_Id, ChargingTariff>.Empty;
@@ -618,6 +632,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Previous.TryGetChargingTariffGroup(chargingTariffGroup.Id, out var previousChargingTariffGroup))
                     chargingTariffGroup.ShareRuntimeOf(previousChargingTariffGroup);
 
+            foreach (var parkingSpace in ParkingSpaces)
+                if (Previous.TryGetParkingSpace(parkingSpace.Id, out var previousParkingSpace))
+                    parkingSpace.ShareRuntimeOf(previousParkingSpace);
+
         }
 
         #endregion
@@ -669,6 +687,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        IEnumerable<ChargingStationGroup>?                    ChargingStationGroups                   = null,
                                        IEnumerable<ChargingPoolGroup>?                       ChargingPoolGroups                      = null,
                                        IEnumerable<ChargingTariffGroup>?                     ChargingTariffGroups                    = null,
+                                       IEnumerable<ParkingSpace>?                            ParkingSpaces                           = null,
                                        IEnumerable<POIPublicKey>?                            SigningKeys                             = null,
                                        IEnumerable<POIPublicKey>?                            IdentityKeys                            = null,
 
@@ -881,6 +900,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             throw new ArgumentException($"The member '{memberId}' of the group '{chargingTariffGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffGroups));
 
                 }
+
+            }
+
+            {
+
+                var parkingSpaces = (ParkingSpaces ?? []).ToArray();
+
+                if (parkingSpaces.Any(parkingSpace => parkingSpace is null))
+                    throw new ArgumentException("Parking spaces must not contain null entries!", nameof(ParkingSpaces));
+
+                this.ParkingSpaces = new (parkingSpaces, parkingSpace => parkingSpace.Id, "parking space", $"the operator '{Id}'");
+
+                // Garages, sensors and products are those of parking operators.
+                foreach (var parkingSpace in this.ParkingSpaces)
+                    if (parkingSpace.ParkingGarageId.HasValue || parkingSpace.ParkingSensorIds.Length > 0 || parkingSpace.ParkingProductIds.Length > 0)
+                        throw new ArgumentException($"The parking space '{parkingSpace.Id}' of the operator '{Id}' can be in no parking garage, and have no parking sensors or parking products: only those of a parking operator can!", nameof(ParkingSpaces));
 
             }
 
@@ -1231,6 +1266,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (ChargingTariffGroups.Count > 0)
                     json.Add("chargingTariffGroups", new JArray(ChargingTariffGroups.Select(group => group.ToJSON())));
+
+                if (ParkingSpaces.Count > 0)
+                    json.Add("parkingSpaces", new JArray(ParkingSpaces.Select(parkingSpace => parkingSpace.ToJSON())));
 
                 POIPartyKeys.AddTo(json, this);
 

@@ -151,7 +151,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The embedded children a party must not be added with, by its entity type.
         /// </summary>
         internal static readonly Dictionary<String, String[]> PartyChildren = new () {
-            { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups" ] },
+            { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups", "parkingSpaces" ] },
             { nameof(EMobilityProvider),       [] },
             { nameof(GridOperator),            [ "gridConnectionPoints" ] },
             { nameof(ParkingOperator),         [ "parkingGarages", "parkingSpaces", "parkingSensors", "parkingSpaceGroups", "parkingProducts" ] }
@@ -312,7 +312,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Parking entities added by an earlier change of this change set, by their parking operator;
             // keyed by their typed identifications, so that a later change may name them in another spelling.
-            var addedParking = new Dictionary<(String, Object), String>();
+            var addedParking = new Dictionary<(String, Object), POIPartyId>();
 
             // Grid connection points added by an earlier change of this change set: their grid operator and maintainer.
             var addedGridConnectionPoints = new Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>();
@@ -386,7 +386,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The parties and kinds of keys of which one must sign the given change.
         /// </summary>
         private Boolean TryGetOwners(RoamingNetworkChange                                                                    Change,
-                                     Dictionary<(String, Object), String>                                                    AddedParking,
+                                     Dictionary<(String, Object), POIPartyId>                                                AddedParking,
                                      Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>  AddedGridConnectionPoints,
                                      [NotNullWhen(true)]  out (POIPartyId, POIKeyKind)[]?                                    Owners,
                                      [NotNullWhen(false)] out String?                                                        ErrorResponse)
@@ -547,7 +547,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region The parking data of a parking operator
+            #region The parking data of a parking operator, or the parking spaces of a charging station operator
 
             if (IsParking(Change.EntityType))
             {
@@ -558,37 +558,63 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                String? parkingOperatorId = null;
+                POIPartyId? owner = null;
 
                 if (Change.Kind == RoamingNetworkChangeKind.Add)
                 {
 
-                    if (Change.ParentEntityType != nameof(ParkingOperator) || Change.ParentEntityId is null)
+                    // A parking space defined where no parking operator does.
+                    if (Change.EntityType == nameof(ParkingSpace) &&
+                        Change.ParentEntityType == nameof(ChargingStationOperator) && Change.ParentEntityId is not null)
                     {
-                        ErrorResponse = $"adding the {Change.EntityType} '{Change.EntityId}' needs its ParkingOperator as its parent!";
+                        // The charging station operator as the keys of the parties name it.
+                        owner = new POIPartyId(nameof(ChargingStationOperator),
+                                               ChargingStationOperator_Id.TryParse(Change.ParentEntityId, out var operatorId) &&
+                                               chargingStationOperators.TryGet(operatorId, out var parentOperator)
+                                                   ? parentOperator.Id.ToString()
+                                                   : Change.ParentEntityId);
+                    }
+
+                    else if (Change.ParentEntityType != nameof(ParkingOperator) || Change.ParentEntityId is null)
+                    {
+                        ErrorResponse = Change.EntityType == nameof(ParkingSpace)
+                                            ? $"adding the {Change.EntityType} '{Change.EntityId}' needs its ParkingOperator or ChargingStationOperator as its parent!"
+                                            : $"adding the {Change.EntityType} '{Change.EntityId}' needs its ParkingOperator as its parent!";
                         return false;
                     }
 
-                    // The parking operator as the keys of the parties name it.
-                    parkingOperatorId = ParkingOperator_Id.TryParse(Change.ParentEntityId, out var parentId) &&
-                                        parkingOperators.TryGet(parentId, out var parent)
-                                            ? parent.Id.ToString()
-                                            : Change.ParentEntityId;
+                    else
+                    {
+                        // The parking operator as the keys of the parties name it.
+                        owner = new POIPartyId(nameof(ParkingOperator),
+                                               ParkingOperator_Id.TryParse(Change.ParentEntityId, out var parentId) &&
+                                               parkingOperators.TryGet(parentId, out var parent)
+                                                   ? parent.Id.ToString()
+                                                   : Change.ParentEntityId);
+                    }
 
-                    AddedParking[(Change.EntityType, parkingId)] = parkingOperatorId;
+                    AddedParking[(Change.EntityType, parkingId)] = owner.Value;
 
                 }
 
-                else if (!AddedParking.TryGetValue((Change.EntityType, parkingId), out parkingOperatorId))
-                    parkingOperatorId = parkingOperators.FirstOrDefault(parkingOperator => ParkingStoredId(parkingOperator, Change.EntityType, Change.EntityId) is not null)?.Id.ToString();
+                else if (AddedParking.TryGetValue((Change.EntityType, parkingId), out var addedOwner))
+                    owner = addedOwner;
 
-                if (parkingOperatorId is null)
+                else if (parkingOperators.FirstOrDefault(parkingOperator => ParkingStoredId(parkingOperator, Change.EntityType, Change.EntityId) is not null) is ParkingOperator parkingOperator)
+                    owner = new POIPartyId(nameof(ParkingOperator), parkingOperator.Id.ToString());
+
+                else if (OperatorParkingSpace(chargingStationOperators, Change.EntityType, Change.EntityId) is ChargingStationOperator chargingStationOperator)
+                    owner = new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString());
+
+                if (!owner.HasValue)
                 {
-                    ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' belongs to no parking operator!";
+                    ErrorResponse = Change.EntityType == nameof(ParkingSpace)
+                                        ? $"the {Change.EntityType} '{Change.EntityId}' belongs to no parking operator and no charging station operator!"
+                                        : $"the {Change.EntityType} '{Change.EntityId}' belongs to no parking operator!";
                     return false;
                 }
 
-                Owners = [ (new POIPartyId(nameof(ParkingOperator), parkingOperatorId), POIKeyKind.Signing) ];
+                Owners = [ (owner.Value, POIKeyKind.Signing) ];
                 return true;
 
             }

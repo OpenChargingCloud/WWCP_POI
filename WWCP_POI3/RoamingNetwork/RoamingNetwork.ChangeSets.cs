@@ -883,7 +883,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (IsParking(change.EntityType))
                 {
-                    if (!TryApplyParkingChange(change, index, ChangeSet.CreatedAt, parkingOps, out currentValue, out ErrorResponse))
+                    if (!TryApplyParkingChange(change, index, ChangeSet.CreatedAt, parkingOps, operators, out currentValue, out ErrorResponse))
                         return false;
                 }
 
@@ -975,7 +975,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  UnknownGridConnectionPoint(operators.Values, gridOps.Values) ??
                  UnknownMaintainer(gridOps.Values, operators, parkingOps) ??
                  DuplicateEnergyMeter(allEnergyMeters)                 ??
-                 DuplicateParking    (parkingOps.Values)               ??
+                 DuplicateParking    (parkingOps.Values, operators.Values) ??
                  UnknownChargingStation(parkingOps.Values, operators)  ??
                  UnknownParkingSpace(operators.Values, parkingOps.Values) ??
                  UnknownTransparencyReference(allEnergyMeters, softwares, certificates, manufacturers) ??

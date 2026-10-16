@@ -74,6 +74,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "parkingProductIds",
             "parkingRestrictions",
             "euVehicleCategories",
+            "physicalReference",
+            "vehicleTypes",
+            "restrictedToVehicleTypes",
+            "maxVehicleWeight",
+            "maxVehicleHeight",
+            "maxVehicleLength",
+            "maxVehicleWidth",
+            "length",
+            "width",
+            "evsePosition",
+            "direction",
+            "surface",
+            "slope",
+            "driveThrough",
+            "reservationRequired",
+            "timeLimit",
+            "roofed",
+            "illuminated",
+            "refrigerationOutlet",
+            "dangerousGoodsAllowed",
+            "protectedArea",
+            "apdsReference",
+            "standards",
+            "images",
             "customData"
         ];
 
@@ -172,18 +196,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) TryApplyParkingChange(Change, Index, CreatedAt, ParkingOperators, out CurrentValue, out ErrorResponse)
+        #region (private static) OperatorParkingSpace(ChargingStationOperators, EntityType, EntityId)
+
+        /// <summary>
+        /// The charging station operator defining the named parking space itself, where no parking operator does;
+        /// null for any other entity type, or one no charging station operator has.
+        /// </summary>
+        private static ChargingStationOperator? OperatorParkingSpace(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
+                                                                     String                                EntityType,
+                                                                     String                                EntityId)
+
+            => EntityType == nameof(ParkingSpace) && ParkingSpace_Id.TryParse(EntityId, out var spaceId)
+                   ? ChargingStationOperators.FirstOrDefault(chargingStationOperator => chargingStationOperator.TryGetParkingSpace(spaceId, out _))
+                   : null;
+
+        #endregion
+
+        #region (private static) TryApplyParkingChange(Change, Index, CreatedAt, ParkingOperators, ChargingStationOperators, out CurrentValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of a parking garage, parking space, parking sensor, parking space group or parking product
-        /// to the given parking operators.
+        /// to the given parking operators; of a parking space a charging station operator defines, to the given
+        /// charging station operators.
         /// </summary>
-        private static Boolean TryApplyParkingChange(RoamingNetworkChange                             Change,
-                                                     Int32                                            Index,
-                                                     DateTimeOffset                                   CreatedAt,
-                                                     Dictionary<ParkingOperator_Id, ParkingOperator>  ParkingOperators,
-                                                     out JToken?                                      CurrentValue,
-                                                     [NotNullWhen(false)] out String?                 ErrorResponse)
+        private static Boolean TryApplyParkingChange(RoamingNetworkChange                                             Change,
+                                                     Int32                                                            Index,
+                                                     DateTimeOffset                                                   CreatedAt,
+                                                     Dictionary<ParkingOperator_Id, ParkingOperator>                  ParkingOperators,
+                                                     Dictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators,
+                                                     out JToken?                                                      CurrentValue,
+                                                     [NotNullWhen(false)] out String?                                 ErrorResponse)
         {
 
             CurrentValue = null;
@@ -201,7 +243,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // Parking products have no timestamps.
             var timestamps  = Change.EntityType != nameof(ParkingProduct);
 
-            #region The parking operator: the one having it, or the parent of a new one
+            #region The parking operator: the one having it, or the parent of a new one; or a charging station operator
 
             if (ParkingId(Change.EntityType, entityId) is null)
             {
@@ -209,22 +251,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            var owner = ParkingOperators.Values.FirstOrDefault(parkingOperator => ParkingStoredId(parkingOperator, Change.EntityType, entityId) is not null);
+            var owner          = ParkingOperators.Values.FirstOrDefault(parkingOperator => ParkingStoredId(parkingOperator, Change.EntityType, entityId) is not null);
+            // A parking space defined where no parking operator does.
+            var operatorOwner  = OperatorParkingSpace(ChargingStationOperators.Values, Change.EntityType, entityId);
 
             if (Change.Kind == RoamingNetworkChangeKind.Add)
             {
 
-                if (owner is not null)
+                if (owner is not null || operatorOwner is not null)
                 {
                     ErrorResponse = $"Change {Index}: the {description} '{entityId}' already exists!";
                     return false;
                 }
 
-                if (Change.ParentEntityType != nameof(ParkingOperator) ||
-                    !ParkingOperator_Id.TryParse(Change.ParentEntityId ?? "", out var parentId) ||
-                    !ParkingOperators.TryGetValue(parentId, out owner))
+                if (Change.EntityType == nameof(ParkingSpace) &&
+                    Change.ParentEntityType == nameof(ChargingStationOperator))
                 {
-                    ErrorResponse = $"Change {Index}: the {description} '{entityId}' to add needs its ParkingOperator, an existing one!";
+                    if (!ChargingStationOperator_Id.TryParse(Change.ParentEntityId ?? "", out var operatorId) ||
+                        !ChargingStationOperators.TryGetValue(operatorId, out operatorOwner))
+                    {
+                        ErrorResponse = $"Change {Index}: the {description} '{entityId}' to add needs its ChargingStationOperator, an existing one!";
+                        return false;
+                    }
+                }
+
+                else if (Change.ParentEntityType != nameof(ParkingOperator) ||
+                         !ParkingOperator_Id.TryParse(Change.ParentEntityId ?? "", out var parentId) ||
+                         !ParkingOperators.TryGetValue(parentId, out owner))
+                {
+                    ErrorResponse = Change.EntityType == nameof(ParkingSpace)
+                                        ? $"Change {Index}: the {description} '{entityId}' to add needs its ParkingOperator or ChargingStationOperator, an existing one!"
+                                        : $"Change {Index}: the {description} '{entityId}' to add needs its ParkingOperator, an existing one!";
                     return false;
                 }
 
@@ -233,13 +290,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             else
             {
 
-                if (owner is null)
+                if (owner is null && operatorOwner is null)
                 {
                     ErrorResponse = $"Change {Index}: the {description} '{entityId}' does not exist!";
                     return false;
                 }
 
-                if (Change.ParentEntityType is not null &&
+                if (owner is not null &&
+                    Change.ParentEntityType is not null &&
                    (Change.ParentEntityType != nameof(ParkingOperator)                         ||
                     !ParkingOperator_Id.TryParse(Change.ParentEntityId ?? "", out var namedParentId) ||
                     namedParentId != owner.Id))
@@ -248,13 +306,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (operatorOwner is not null &&
+                    Change.ParentEntityType is not null &&
+                   (Change.ParentEntityType != nameof(ChargingStationOperator)                           ||
+                    !ChargingStationOperator_Id.TryParse(Change.ParentEntityId ?? "", out var namedOperatorId) ||
+                    namedOperatorId != operatorOwner.Id))
+                {
+                    ErrorResponse = $"Change {Index}: the {description} '{entityId}' belongs to ChargingStationOperator '{operatorOwner.Id}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
+                    return false;
+                }
+
             }
 
-            var operatorJSON  = owner.ToJSON();
+            var operatorJSON  = owner is not null
+                                    ? owner.        ToJSON()
+                                    : operatorOwner!.ToEmbeddedJSON();
             var children      = operatorJSON[arrayName] as JArray;
             // Found under the identification it is kept with: the change may name it in every spelling
             // its identification type considers equal, e.g. without case for garages, with case for products.
-            var storedId      = ParkingStoredId(owner, Change.EntityType, entityId);
+            var storedId      = owner is not null
+                                    ? ParkingStoredId(owner, Change.EntityType, entityId)
+                                    : ParkingSpace_Id.TryParse(entityId, out var operatorSpaceId) && operatorOwner!.TryGetParkingSpace(operatorSpaceId, out var operatorSpace)
+                                          ? operatorSpace.Id.ToString()
+                                          : null;
             var entityJSON    = Change.Kind == RoamingNetworkChangeKind.Add
                                     ? null
                                     : children?.OfType<JObject>().FirstOrDefault(child => child["@id"]?.Value<String>() == storedId);
@@ -377,21 +451,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            // The parking operator embedding it changed with it, at the time of the change set.
+            // The operator embedding it changed with it, at the time of the change set.
             operatorJSON["lastChange"] = CreatedAt.ToISO8601();
 
-            #region The changed parking operator must still be a valid one
+            #region The changed operator must still be a valid one
 
-            if (!ParkingOperator.TryParse(operatorJSON, out var changedOperator, out var changedOperatorError))
+            if (owner is not null)
             {
-                ErrorResponse = $"Change {Index}: {changedOperatorError}";
-                return false;
+
+                if (!ParkingOperator.TryParse(operatorJSON, out var changedOperator, out var changedOperatorError))
+                {
+                    ErrorResponse = $"Change {Index}: {changedOperatorError}";
+                    return false;
+                }
+
+                // Admin status, status and internal data are not content: they go along, at every level.
+                changedOperator.ShareRuntimeOfAll(owner);
+
+                ParkingOperators[owner.Id] = changedOperator;
+
             }
 
-            // Admin status, status and internal data are not content: they go along, at every level.
-            changedOperator.ShareRuntimeOfAll(owner);
+            else
+            {
 
-            ParkingOperators[owner.Id] = changedOperator;
+                if (!ChargingStationOperator.TryParse(operatorJSON, out var changedOperator, out var changedOperatorError))
+                {
+                    ErrorResponse = $"Change {Index}: {changedOperatorError}";
+                    return false;
+                }
+
+                changedOperator.ShareRuntimeOfAll(operatorOwner!);
+
+                ChargingStationOperators[operatorOwner!.Id] = changedOperator;
+
+            }
 
             #endregion
 

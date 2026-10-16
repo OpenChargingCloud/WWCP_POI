@@ -61,6 +61,7 @@ The operator writes no `eTags`.
 | `chargingStationGroups` | `ChargingStationGroups` | `POICollection<ChargingStationGroup_Id, ChargingStationGroup>` | add/remove | See [Groups](#groups). |
 | `chargingPoolGroups` | `ChargingPoolGroups` | `POICollection<ChargingPoolGroup_Id, ChargingPoolGroup>` | add/remove | See [Groups](#groups). |
 | `chargingTariffGroups` | `ChargingTariffGroups` | `POICollection<ChargingTariffGroup_Id, ChargingTariffGroup>` | add/remove | See [Groups](#groups). |
+| `parkingSpaces` | `ParkingSpaces` | `POICollection<ParkingSpace_Id, ParkingSpace>` | add/remove | The [parking spaces](ParkingSpace.md) it defines itself where no parking operator does: in no parking garage, without parking sensors or parking products; identifications unique within the network, parking operators' as well. |
 
 Children are written only when there are any; collections in the ordinal order of their identifications.
 

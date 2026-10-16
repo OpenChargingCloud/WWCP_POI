@@ -294,6 +294,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseChildren<ChargingTariffGroup>(JSON, "chargingTariffGroups", "chargingTariffGroupIds", "ChargingTariffGroups", ChargingTariffGroup.TryParse, out var chargingTariffGroups, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseChildren<ParkingSpace>(JSON, "parkingSpaces", "parkingSpaceIds", "parking spaces", ParkingSpace.TryParse, out var parkingSpaces, out ErrorResponse))
+                    return false;
+
                 #endregion
 
                 #region Parse ChargingTariffs          [optional]
@@ -351,6 +354,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               ChargingStationGroups: chargingStationGroups,
                                               ChargingPoolGroups: chargingPoolGroups,
                                               ChargingTariffGroups: chargingTariffGroups,
+                                              ParkingSpaces:        parkingSpaces,
                                               SigningKeys:  signingKeys,
                                               IdentityKeys: identityKeys,
                                               DataSource:  dataSource,

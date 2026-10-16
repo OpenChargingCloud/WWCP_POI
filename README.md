@@ -112,7 +112,11 @@ parking product ids compare case-sensitively.
   vehicles (`euVehicleCategories`) may park there; garages, spaces and sensors may name
   `chargingStationIds` of the network. All have admin status and status. Parking products (`minDuration`,
   `stopParkingAfterTime` in s, without status and timestamps) are named by `parkingProductIds` of garages,
-  spaces and space groups of the same operator; they offer, they do not calculate prices.
+  spaces and space groups of the same operator; they offer, they do not calculate prices. A space also tells what an
+  OCPI 2.3 `Parking` does: `vehicleTypes`, maximum vehicle measures (kg, m), its `length`/`width`, `evsePosition`,
+  `direction`, `surface`, `slope`, `timeLimit`, `roofed`, `illuminated` and further flags, `standards` and `images`.
+  Where no parking operator defines the spaces of a charging station, its charging station operator can, as
+  `parkingSpaces` of its own.
 - **Charging tariff:** as in OCPI: `currency` (ISO 4217), `tariffType` (`AD_HOC_PAYMENT`, `PROFILE_CHEAP`,
   `PROFILE_FAST`, `PROFILE_GREEN`, `REGULAR`), `tariffURL`, `minPrice`/`maxPrice` (`{excludingVAT, includingVAT?}`),
   `paymentMeans` (e.g. `CREDIT_CARD`, `QR_CODE`) and `paymentBrands` (e.g. `VISA`), sets of names, `validFrom`/`validUntil`

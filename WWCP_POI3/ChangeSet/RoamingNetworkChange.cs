@@ -701,6 +701,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => Add(nameof(POI.ParkingSpace),  ParkingSpace. Id.ToString(), ParkingSpace. ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
 
         /// <summary>
+        /// Add the given parking space to the given charging station operator, which defines it where no parking operator does.
+        /// </summary>
+        public static RoamingNetworkChange Add(ParkingSpace                ParkingSpace,
+                                               ChargingStationOperator_Id  ChargingStationOperatorId)
+
+            => Add(nameof(POI.ParkingSpace),  ParkingSpace. Id.ToString(), ParkingSpace. ToJSON(), nameof(POI.ChargingStationOperator), ChargingStationOperatorId.ToString());
+
+        /// <summary>
         /// Add the given parking sensor to the given parking operator.
         /// </summary>
         public static RoamingNetworkChange Add(ParkingSensor       ParkingSensor,
