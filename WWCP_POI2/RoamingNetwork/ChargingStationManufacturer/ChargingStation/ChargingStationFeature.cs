@@ -266,6 +266,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static ChargingStationFeature Roofed
             => new("Roofed");
 
+        /// <summary>
+        /// Parking for charging near the charging station is illuminated at night.
+        /// </summary>
+        public static ChargingStationFeature IlluminatedParkingNearby
+            => new("IlluminatedParkingNearby");
+
+        /// <summary>
+        /// Parking for charging near the charging station is roofed.
+        /// </summary>
+        public static ChargingStationFeature RoofedParkingNearby
+            => new("RoofedParkingNearby");
+
         #endregion
 
 
