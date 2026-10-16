@@ -502,6 +502,63 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 dotnet test WWCP_POI3_Tests/WWCP_POI3_Tests.csproj
 ```
 
+## Use of generative AI
+
+*Why this section exists: [RATIONALE.md](RATIONALE.md).*
+
+POI3 is built by one maintainer working with an AI coding agent, Claude Code
+(model Claude Opus 5.5), since 2026-10-10. Every commit the agent wrote part of
+names it in a `Co-Authored-By` trailer.
+
+**The maintainer decides what is built and how.** The requirements come from
+the maintainer's work on e-mobility roaming: which data a roaming network
+needs, which standards it has to map to (OCPI, DATEX II under AFIR, the
+OCPP-J framing of the WebSocket API), and which parties own which data.
+Where several designs would work, the agent lays out the alternatives and
+what each would break, and the maintainer chooses. The choices so far are
+listed below.
+
+**The agent writes most of the text.** From these decisions, the agent
+implements POI3 in short iterations: entities, change sets, signatures,
+history, sync, the HTTP and WebSocket APIs, their tests, `docs/` and
+`SPECIFICATION.md`. Each iteration ends with a commit the maintainer
+reviews and pushes.
+
+**Tests and the specification are the check, not the agent's word.**
+Behaviour is pinned by the tests in `WWCP_POI3_Tests` and by
+`SPECIFICATION.md`, and the adapters to OCPI 2.3.0 and DATEX II 3.7 have
+their own tests in both directions.
+
+**Without AI:** the data structures of `WWCP_POI2` were carried over from
+[WWCP_Core](https://github.com/OpenChargingCloud/WWCP_Core), where they were
+written over many years. *[Confirm: written without AI tools?]*
+
+### Decisions
+
+Decisions taken by the maintainer between alternatives the agent laid out:
+
+- **2026-10-13 – POI3 has no leader.** Every server commits; the history is a
+  graph of commits with deterministic merges, instead of one server ordering
+  every commit (built first, in `5bfd15c`). *[Grounds needed, see "The one
+  rule for every why" in RATIONALE.md]*
+- **2026-10-13 – Owners sign their own data.** A change set is valid only
+  when signed by the owner of everything it changes, with the owners' keys in
+  the network data itself, not in an external trust configuration.
+- **2026-10-14 – Grid connection points have exactly one maintainer,** not
+  shared ownership. Distribution system operators are the actual source of
+  contracted grid capacity and MaLo/MeLo identifiers, but few will take part
+  at first, so charging station operators must keep publishing these data.
+- **2026-10-14 – DATEX II: the existing model migrated to 3.7,** not a second
+  model next to it, because AFIR requires DATEX II from 2026-04-14 and the
+  German NAP takes the Mobilithek profile 01-00-00 only as JSON.
+- **2026-10-16 – Tariff price limits as net price plus optional gross price,**
+  so that OCPI's price limits are taken without rounding.
+
+### Rejected suggestions
+
+- *[to be filled in: what the agent suggested, why it was rejected, what
+  that rests on]*
+
 ## License
 
 Affero GPL 3.0, see `LICENSE`. Contributions under the `Contributor License Agreement.txt`.
