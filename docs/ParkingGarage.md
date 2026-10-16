@@ -16,7 +16,7 @@ case-insensitively, e.g. `PRK-G1`, unique within the roaming network (not only w
 | Status | `ParkingGarageStatusType`, initially `available` |
 | Embedded in | [ParkingOperator](ParkingOperator.md) as `parkingGarages` |
 | Owner | its parking operator (signing key) |
-| HTTP | — (served within its parking operator, `GET ~/RNs/{RN_Id}/POs/{PO_Id}`) |
+| HTTP | — (served within its parking operator, `GET ~/RNs/{RN_Id}/POs/{PO_Id}`, and listed by `GET ~/RNs/{RN_Id}/POs/{PO_Id}/PGs`) |
 
 
 ## Common properties

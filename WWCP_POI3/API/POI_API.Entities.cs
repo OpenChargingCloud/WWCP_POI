@@ -57,7 +57,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSMs                                                     its charging station manufacturers, in short
     /// GET ~/RNs/{RN_Id}/CSMs/{CSM_Id}                                            a charging station manufacturer
     /// GET ~/RNs/{RN_Id}/POs                                                      its parking operators, in short
-    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}                                              a parking operator
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}                                              a parking operator;
+    ///     ?without=parkingGarages,parkingSpaces,parkingSpaceGroups,parkingSensors,parkingProducts, or any of them,
+    ///     leaves them out, which ~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs} list
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PGs                                          its parking garages, as it embeds them
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs                                          its parking spaces, as it embeds them
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSGs                                         its parking space groups, as it embeds them
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSNs                                         its parking sensors, as it embeds them
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs                                          its parking products, as it embeds them
     ///
     /// The roaming network is the head of its history, when served with one, else the one added.
     /// A list is an array of { "@id", "name", "description" } in the order of the identifications,
@@ -149,6 +156,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var chargingPoolPath             = chargingStationOperatorPath + "/CPs/{chargingPoolId}";
             var chargingStationPath          = chargingPoolPath            + "/CSs/{chargingStationId}";
             var gridOperatorPath             = roamingNetworkPath          + "/GOs/{gridOperatorId}";
+            var parkingOperatorPath          = roamingNetworkPath          + "/POs/{parkingOperatorId}";
 
             #region ~/RNs
 
@@ -185,7 +193,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            chargingStationOperator,
                                                                            chargingStationOperator.ToEmbeddedJSON,
-                                                                           "chargingPools",
+                                                                           [ "chargingPools" ],
                                                                            "a charging station operator")
                                              : errorResponse);
 
@@ -271,7 +279,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            gridOperator,
                                                                            gridOperator.ToJSON,
-                                                                           "gridConnectionPoints",
+                                                                           [ "gridConnectionPoints" ],
                                                                            "a grid operator")
                                              : errorResponse);
 
@@ -279,26 +287,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs
 
-            AddEntityHandlers(gridOperatorPath + "/GCPs",
-                              request => {
-
-                                  if (!TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse) ||
-                                      !TryParseListQuery(request, [], out var query, out errorResponse))
-                                  {
-                                      return errorResponse;
-                                  }
-
-                                  var gridConnectionPoints = gridOperator.GridConnectionPoints;
-
-                                  return QueryResponse(request,
-                                                       query,
-                                                       () => gridConnectionPoints,
-                                                       gridConnectionPoint => SearchTextOf(gridConnectionPoint, gridConnectionPoint.ToJSON),
-                                                       entries => new JArray(entries.Select(gridConnectionPoint => gridConnectionPoint.ToJSON())),
-                                                       format => gridConnectionPoints.Representation(EmbeddedView, format, () => new JArray(gridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.ToJSON()))),
-                                                       gridConnectionPoints.Count);
-
-                              });
+            AddEmbeddedListHandlers<GridConnectionPoint_Id, GridConnectionPoint>(
+                gridOperatorPath + "/GCPs",
+                request => TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse)
+                               ? (gridOperator.GridConnectionPoints, null)
+                               : (null, errorResponse),
+                gridConnectionPoint => gridConnectionPoint.ToJSON());
 
             #endregion
 
@@ -361,20 +355,55 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region ~/RNs/{RN_Id}/POs/{PO_Id}
 
-            AddEntityHandlers(roamingNetworkPath + "/POs/{parkingOperatorId}",
-                              request => {
+            // Its parking spaces and their sensors are what makes a parking operator large: one each for every
+            // space of every garage. Without them, or without anything else it embeds, a list of their own each.
+            AddEntityHandlers(parkingOperatorPath,
+                              request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                                             ? CachedEntityResponseWithout(request,
+                                                                           parkingOperator,
+                                                                           parkingOperator.ToJSON,
+                                                                           [ "parkingGarages", "parkingSpaces", "parkingSpaceGroups", "parkingSensors", "parkingProducts" ],
+                                                                           "a parking operator")
+                                             : errorResponse);
 
-                                  if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
-                                      return errorResponse;
+            #endregion
 
-                                  if (!ParkingOperator_Id.TryParse(request.ParsedURLParameters[1], out var parkingOperatorId))
-                                      return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid parking operator identification!");
+            #region ~/RNs/{RN_Id}/POs/{PO_Id}/PGs, PSs, PSGs, PSNs, PPs
 
-                                  return roamingNetwork.TryGetParkingOperatorById(parkingOperatorId, out var parkingOperator)
-                                             ? CachedEntityResponse(request, parkingOperator, parkingOperator.ToJSON)
-                                             : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The parking operator '{parkingOperatorId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+            AddEmbeddedListHandlers<ParkingGarage_Id, ParkingGarage>(
+                parkingOperatorPath + "/PGs",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingGarages, null)
+                               : (null, errorResponse),
+                parkingGarage => parkingGarage.ToJSON());
 
-                              });
+            AddEmbeddedListHandlers<ParkingSpace_Id, ParkingSpace>(
+                parkingOperatorPath + "/PSs",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingSpaces, null)
+                               : (null, errorResponse),
+                parkingSpace => parkingSpace.ToJSON());
+
+            AddEmbeddedListHandlers<ParkingSpaceGroup_Id, ParkingSpaceGroup>(
+                parkingOperatorPath + "/PSGs",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingSpaceGroups, null)
+                               : (null, errorResponse),
+                parkingSpaceGroup => parkingSpaceGroup.ToJSON());
+
+            AddEmbeddedListHandlers<ParkingSensor_Id, ParkingSensor>(
+                parkingOperatorPath + "/PSNs",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingSensors, null)
+                               : (null, errorResponse),
+                parkingSensor => parkingSensor.ToJSON());
+
+            AddEmbeddedListHandlers<ParkingProduct_Id, ParkingProduct>(
+                parkingOperatorPath + "/PPs",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingProducts, null)
+                               : (null, errorResponse),
+                parkingProduct => parkingProduct.ToJSON());
 
             #endregion
 
@@ -457,6 +486,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (private) AddEmbeddedListHandlers(Path, Collection, ToJSON)
+
+        /// <summary>
+        /// Answer GET of the given path with the children of an entity as it embeds them, searched and paged
+        /// by the query of the request; the whole list kept with their collection. HEAD by Hermod from it,
+        /// and OPTIONS.
+        /// </summary>
+        /// <param name="Path">The path of the list, below the one of the entity.</param>
+        /// <param name="Collection">The children of the entity the path names, or why there are none.</param>
+        /// <param name="ToJSON">A child, as the entity embeds it.</param>
+        private void AddEmbeddedListHandlers<TId, TEntity>(HTTPPath                                                                          Path,
+                                                           Func<HTTPRequest, (POICollection<TId, TEntity>? Collection, HTTPResponse? ErrorResponse)>  Collection,
+                                                           Func<TEntity, JObject>                                                            ToJSON)
+
+            where TId     : notnull
+            where TEntity : class
+
+            => AddEntityHandlers(Path,
+                                 request => {
+
+                                     var (collection, errorResponse) = Collection(request);
+
+                                     if (collection is null)
+                                         return errorResponse!;
+
+                                     if (!TryParseListQuery(request, [], out var query, out errorResponse))
+                                         return errorResponse;
+
+                                     return QueryResponse<TEntity>(request,
+                                                                   query,
+                                                                   () => collection,
+                                                                   child => SearchTextOf(child, () => ToJSON(child)),
+                                                                   entries => new JArray(entries.Select(ToJSON)),
+                                                                   format => collection.Representation(EmbeddedView, format, () => new JArray(collection.Select(ToJSON))),
+                                                                   collection.Count);
+
+                                 });
+
+        #endregion
+
+
         #region RoamingNetworks
 
         /// <summary>
@@ -477,6 +547,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => roamingNetworkHistories.Values.
                    Select(history => history.Head.RoamingNetwork).
                    Concat(roamingNetworks.Values.Where(roamingNetwork => !roamingNetworkHistories.ContainsKey(roamingNetwork.Id)));
+
+        #endregion
+
+        #region (private) TryGetRequestedParkingOperator        (Request, out ParkingOperator,                      out ErrorResponse)
+
+        private Boolean TryGetRequestedParkingOperator(HTTPRequest                                Request,
+                                                       [NotNullWhen(true)]  out ParkingOperator?  ParkingOperator,
+                                                       [NotNullWhen(false)] out HTTPResponse?     ErrorResponse)
+        {
+
+            ParkingOperator = null;
+
+            if (!TryGetRequestedRoamingNetwork(Request, out var roamingNetwork, out ErrorResponse))
+                return false;
+
+            if (!ParkingOperator_Id.TryParse(Request.ParsedURLParameters[1], out var parkingOperatorId))
+            {
+                ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid parking operator identification!");
+                return false;
+            }
+
+            if (!roamingNetwork.TryGetParkingOperatorById(parkingOperatorId, out ParkingOperator))
+            {
+                ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The parking operator '{parkingOperatorId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+                return false;
+            }
+
+            return true;
+
+        }
 
         #endregion
 
@@ -796,37 +896,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private)        CachedEntityResponseWithout(Request, Version, JSON, Omittable, Description)
+        #region (private)        CachedEntityResponseWithout(Request, Version, JSON, Omittables, Description)
 
         /// <summary>
         /// The given immutable version of an entity as CachedEntityResponse(…) answers it, or, with
-        /// ?without={Omittable}, without that part of it: another view, with its own ETag, kept as well.
-        /// Anything else to leave out is refused.
+        /// ?without=…, without the parts named, separated by commas or each in a parameter of its own:
+        /// another view, with its own ETag, kept as well, whatever the order they are named in. Anything
+        /// else to leave out is refused.
         /// </summary>
-        /// <param name="Omittable">The property the entity may leave out, e.g. its children with a list of their own.</param>
+        /// <param name="Omittables">The properties the entity may leave out, e.g. its children with a list of their own.</param>
         /// <param name="Description">What the entity is, e.g. "a grid operator", for a refusal.</param>
         private HTTPResponse CachedEntityResponseWithout(HTTPRequest    Request,
                                                          Object         Version,
                                                          Func<JObject>  JSON,
-                                                         String         Omittable,
+                                                         String[]       Omittables,
                                                          String         Description)
         {
 
-            if (Request.QueryString.GetString("without") is not String without)
-                return CachedEntityResponse(Request, Version, JSON);
+            // Hermod splits a value at its commas: GetString(…) would be the last part only.
+            var omissions = Request.QueryString.GetStrings("without").
+                                    SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).
+                                    Distinct().
+                                    Order(StringComparer.Ordinal).
+                                    ToArray();
 
-            foreach (var omission in without.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                if (omission != Omittable)
-                    return EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Unknown omission '{omission}'; {Description} leaves out only '{Omittable}'!");
+            foreach (var omission in omissions)
+                if (!Omittables.Contains(omission))
+                    return EntityErrorResponse(Request,
+                                               HTTPStatusCode.BadRequest,
+                                               $"Unknown omission '{omission}'; {Description} leaves out only {String.Join(", ", Omittables.Select(omittable => $"'{omittable}'"))}!");
+
+            if (omissions.Length == 0)
+                return CachedEntityResponse(Request, Version, JSON);
 
             return CachedEntityResponse(Request,
                                         Version,
                                         () => {
                                             var json = JSON();
-                                            json.Remove(Omittable);
+                                            foreach (var omission in omissions)
+                                                json.Remove(omission);
                                             return json;
                                         },
-                                        View: "without=" + Omittable);
+                                        View: "without=" + String.Join(",", omissions));
 
         }
 

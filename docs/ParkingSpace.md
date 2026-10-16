@@ -18,7 +18,7 @@ case-insensitively, e.g. `PRK-G1-S001`, unique within the roaming network (not o
 | Status | `ParkingSpaceStatusType`, initially `available` |
 | Embedded in | [ParkingOperator](ParkingOperator.md) as `parkingSpaces` |
 | Owner | its parking operator (signing key) |
-| HTTP | — (served within its parking operator, `GET ~/RNs/{RN_Id}/POs/{PO_Id}`) |
+| HTTP | — (served within its parking operator, `GET ~/RNs/{RN_Id}/POs/{PO_Id}`, and listed by `GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs`) |
 
 
 ## Common properties

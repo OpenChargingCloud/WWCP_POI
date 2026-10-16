@@ -20,7 +20,7 @@ The pools, stations, EVSEs, tariffs and groups it embeds all begin with it: `DE*
 | Status | `ChargingStationOperatorStatusType`, initially `Available` |
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `chargingStationOperators` |
 | Owner | itself (a signing key; its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO); added and removed by the RNO |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs` (all, as `{@id, name, description}`), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs` (all, as `{@id, name, description}`), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` (`?without=chargingPools` without its charging pools, which `GET ~/RNs/{RN_Id}/CPs?operatorId={CSO_Id}` lists) |
 
 
 ## Common properties

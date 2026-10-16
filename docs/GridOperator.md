@@ -24,7 +24,7 @@ unique within the roaming network.
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `gridOperators` |
 | Owner | itself (signing key), or the RNO while it has no signing keys; its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO; added and removed by the RNO |
 | Embeds | its grid connection points, `gridConnectionPoints`, each owned by its maintainer |
-| HTTP | `GET ~/RNs/{RN_Id}/GOs`, `GET ~/RNs/{RN_Id}/GOs/{GO_Id}`, `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/GOs`, `GET ~/RNs/{RN_Id}/GOs/{GO_Id}` (`?without=gridConnectionPoints` without its grid connection points), `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs` (them, searched and paged), `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}` |
 
 
 ## Common properties

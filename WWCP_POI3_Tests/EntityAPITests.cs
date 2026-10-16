@@ -191,10 +191,29 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
         /// </summary>
         private static JObject ParseJSON(Byte[] Content)
 
-            => (JObject) JToken.ReadFrom(new JsonTextReader(new StringReader(System.Text.Encoding.UTF8.GetString(Content))) {
-                                             DateParseHandling   = DateParseHandling.None,
-                                             FloatParseHandling  = FloatParseHandling.Decimal
-                                         });
+            => (JObject) ParseToken(Content);
+
+        #endregion
+
+        #region (static) ParseList(Content)
+
+        /// <summary>
+        /// The JSON array as it was sent: timestamps stay text, numbers decimals.
+        /// </summary>
+        private static JArray ParseList(Byte[] Content)
+
+            => (JArray) ParseToken(Content);
+
+        #endregion
+
+        #region (static) ParseToken(Content)
+
+        private static JToken ParseToken(Byte[] Content)
+
+            => JToken.ReadFrom(new JsonTextReader(new StringReader(System.Text.Encoding.UTF8.GetString(Content))) {
+                                   DateParseHandling   = DateParseHandling.None,
+                                   FloatParseHandling  = FloatParseHandling.Decimal
+                               });
 
         #endregion
 
@@ -544,6 +563,54 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(HeaderOf(found, "X-Filtered-Count"),                       Is.EqualTo("1"));
                 Assert.That(JArray.Parse(System.Text.Encoding.UTF8.GetString(noneContent)),                               Is.Empty);
                 Assert.That(HeaderOf(none, "X-Filtered-Count"),                        Is.EqualTo("0"));
+
+                Assert.That(nobody.StatusCode,                                         Is.EqualTo(HttpStatusCode.NotFound));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_parking_operator_leaves_out_what_it_embeds_which_is_listed()
+
+        [Test]
+        public async Task A_parking_operator_leaves_out_what_it_embeds_which_is_listed()
+        {
+
+            var (whole,     wholeContent)  = await Send(HttpMethod.Get, PO);
+            var (slim,      slimContent)   = await Send(HttpMethod.Get, PO + "?without=parkingSpaces,parkingGarages");
+            var (reversed,  _)             = await Send(HttpMethod.Get, PO + "?without=parkingGarages&without=parkingSpaces");
+            var (encoded,   _)             = await Send(HttpMethod.Get, PO + "?without=parkingGarages%2CparkingSpaces");
+            var (unknown,   _)             = await Send(HttpMethod.Get, PO + "?without=chargingPools");
+            var (spaces,    spacesContent) = await Send(HttpMethod.Get, PO + "/PSs");
+            var (garages,   garagesContent)= await Send(HttpMethod.Get, PO + "/PGs?limit=10");
+            var (nobody,    _)             = await Send(HttpMethod.Get, RN + "/POs/DE*XXX/PSs");
+
+            var wholeJSON  = ParseJSON(wholeContent);
+            var slimJSON   = ParseJSON(slimContent);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(slim.StatusCode,                                           Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(slimJSON["parkingSpaces"],                                 Is.Null);
+                Assert.That(slimJSON["parkingGarages"],                                Is.Null);
+                Assert.That(HeaderOf(slim, "ETag"),                                    Is.EqualTo(ETagOf("json", slimContent)));
+                Assert.That(HeaderOf(slim, "ETag"),                                    Is.Not.EqualTo(HeaderOf(whole, "ETag")));
+                Assert.That(HeaderOf(reversed, "ETag"),                                Is.EqualTo(HeaderOf(slim, "ETag")), "the same view, whatever the order");
+                Assert.That(HeaderOf(encoded,  "ETag"),                                Is.EqualTo(HeaderOf(slim, "ETag")), "the same view, its comma encoded");
+                Assert.That(unknown.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
+
+                // The list is what the parking operator embeds, and the rest of it is the slim parking operator.
+                Assert.That(JToken.DeepEquals(ParseList(spacesContent), wholeJSON["parkingSpaces"]),  Is.True);
+                wholeJSON.Remove("parkingSpaces");
+                Assert.That(JToken.DeepEquals(slimJSON, wholeJSON),                    Is.True);
+
+                Assert.That(HeaderOf(spaces, "X-Total-Count"),                         Is.EqualTo("1"));
+                Assert.That(garages.StatusCode,                                        Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(ParseList(garagesContent),                                 Is.Empty);
+                Assert.That(HeaderOf(garages, "X-Total-Count"),                        Is.EqualTo("0"));
 
                 Assert.That(nobody.StatusCode,                                         Is.EqualTo(HttpStatusCode.NotFound));
 
