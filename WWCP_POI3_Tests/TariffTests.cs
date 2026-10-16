@@ -304,6 +304,84 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Validity_and_reservation_survive_and_are_checked()
+
+        [Test]
+        public void Validity_and_reservation_survive_and_are_checked()
+        {
+
+            var reserving = new ChargingTariff(T1,
+                                               Currency.EUR,
+                                               [
+                                                   new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.39m, StepSize: 1) ]),
+                                                   new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.TIME,   2,     StepSize: 60) ],
+                                                                             new ChargingTariffRestrictions(Reservation: ChargingReservationRestriction.RESERVATION)),
+                                                   new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.FLAT,   5) ],
+                                                                             new ChargingTariffRestrictions(Reservation: ChargingReservationRestriction.RESERVATION_EXPIRES))
+                                               ],
+                                               ValidFrom:   DateTimeOffset.Parse("2026-11-01T00:00:00.1234Z"),
+                                               ValidUntil:  DateTimeOffset.Parse("2027-01-01T00:00:00Z"),
+                                               Created:     Created);
+
+            var rn1   = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
+                                           Created:                   Created,
+                                           ChargingStationOperators:  [ new ChargingStationOperator(GEF, Created: Created, ChargingTariffs: [ reserving ]) ]).WithKeys();
+
+            var json  = rn1.ToJSON();
+            var t1    = (JObject) json["chargingStationOperators"]![0]!["chargingTariffs"]![0]!;
+
+            Assert.That(RoamingNetwork.TryParse(json,                             out var fromJSON, out var errorJSON),  Is.True, errorJSON);
+            Assert.That(RoamingNetwork.TryParse(JObject.Parse(json.ToString()),   out var fromText, out var errorText),  Is.True, errorText);
+            Assert.That(RoamingNetwork.TryParse(rn1.ToCBOR(),                     out var fromCBOR, out var errorCBOR),  Is.True, errorCBOR);
+
+            JObject Changed(Action<JObject> Change)
+            {
+                var changed = (JObject) json.DeepClone();
+                Change((JObject) changed["chargingStationOperators"]![0]!["chargingTariffs"]![0]!);
+                return changed;
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(fromJSON!.ToJSON().ToString(),                               Is.EqualTo(json.ToString()));
+                Assert.That(fromText!.ToJSON().ToString(),                               Is.EqualTo(json.ToString()));
+                Assert.That(fromCBOR!.ToJSON().ToString(),                               Is.EqualTo(json.ToString()));
+                Assert.That(fromText.CalcETags(),                                        Is.EqualTo(rn1.CalcETags()));
+
+                // To the millisecond, as every timestamp of the content.
+                Assert.That(t1["validFrom"]!.Value<String>(),                            Is.EqualTo("2026-11-01T00:00:00.123Z"));
+                Assert.That(t1["validUntil"]!.Value<String>(),                           Is.EqualTo("2027-01-01T00:00:00.000Z"));
+                Assert.That(t1["elements"]![1]!["restrictions"]!["reservation"]!.Value<String>(),  Is.EqualTo("RESERVATION"));
+                Assert.That(t1["elements"]![2]!["restrictions"]!["reservation"]!.Value<String>(),  Is.EqualTo("RESERVATION_EXPIRES"));
+                Assert.That(t1["elements"]![0]!["restrictions"],                          Is.Null);
+
+                Assert.That(fromCBOR.TryGetChargingTariffById(T1, out var parsed),       Is.True);
+                Assert.That(parsed!.ValidUntil,                                          Is.EqualTo(DateTimeOffset.Parse("2027-01-01T00:00:00Z")));
+                Assert.That(parsed.Elements[2].Restrictions?.Reservation,                Is.EqualTo(ChargingReservationRestriction.RESERVATION_EXPIRES));
+
+                // Invalid ones are refused.
+                Assert.That(RoamingNetwork.TryParse(Changed(tariff => tariff["validUntil"] = "2026-11-01T00:00:00.123Z"), out _, out var equalError),     Is.False);
+                Assert.That(equalError,                                                  Does.Contain("must be valid from before it is valid until"));
+                Assert.That(RoamingNetwork.TryParse(Changed(tariff => tariff["validFrom"]  = "soon"),                     out _, out var textError),      Is.False);
+                Assert.That(textError,                                                   Does.Contain("start of the validity"));
+                Assert.That(RoamingNetwork.TryParse(Changed(tariff => tariff["elements"]![1]!["restrictions"]!["reservation"] = "reservation"), out _, out var caseError), Is.False);
+                Assert.That(caseError,                                                   Does.Contain("reservation restriction"));
+
+                // ...and change sets change them.
+                var rn2 = Apply(rn1, RoamingNetworkChange.RemoveProperty(parsed, "validUntil"),
+                                     RoamingNetworkChange.UpdateProperty(parsed, "validFrom", null, "2026-12-01T00:00:00.000Z"));
+
+                Assert.That(rn2.TryGetChargingTariffById(T1, out var changed),           Is.True);
+                Assert.That(changed!.ValidUntil,                                         Is.Null);
+                Assert.That(changed.ValidFrom,                                           Is.EqualTo(DateTimeOffset.Parse("2026-12-01T00:00:00Z")));
+
+            }
+
+        }
+
+        #endregion
+
         #region The_runtime_status_reaches_tariffs()
 
         [Test]

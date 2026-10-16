@@ -225,6 +225,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<AdditionalGeoLocation>     RelatedLocations       { get; }
 
+        /// <summary>
+        /// The services offered there, e.g. accessible charging or assistance, in the order of their names.
+        /// </summary>
+        public ImmutableArray<LocationService>           Services                   { get; }
+
+        /// <summary>
+        /// How to get assistance there: how to reach it, when, and what kind of support it offers.
+        /// </summary>
+        public ImmutableI18NString                       AssistanceServiceDetails   { get; }
+
+        /// <summary>
+        /// The standards it conforms to, e.g. PAS 1899:2022 for accessible charging, in the order of their names.
+        /// </summary>
+        public ImmutableArray<Standard>                  Standards                  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -263,6 +278,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             Boolean?                                     ChargingWhenClosed           = null,
                             IEnumerable<ParkingRestrictionGroup>?        ParkingRestrictions          = null,
                             IEnumerable<AdditionalGeoLocation>?          RelatedLocations             = null,
+                            IEnumerable<LocationService>?                Services                     = null,
+                            I18NString?                                  AssistanceServiceDetails     = null,
+                            IEnumerable<Standard>?                       Standards                    = null,
 
                             Timestamped<ChargingPoolAdminStatusType>?    InitialAdminStatus           = null,
                             Timestamped<ChargingPoolStatusType>?         InitialStatus                = null,
@@ -341,6 +359,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ChargingWhenClosed   = ChargingWhenClosed;
             this.ParkingRestrictions  = POIJSON.OrderedIds(ParkingRestrictions, $"parking restriction of the charging pool '{Id}'");
             this.RelatedLocations     = POIJSON.Distinct  (RelatedLocations,    relatedLocation => relatedLocation.ToJSON().ToString(Newtonsoft.Json.Formatting.None), $"related location of the charging pool '{Id}'");
+            this.Services                  = POIJSON.OrderedIds(Services,   $"service of the charging pool '{Id}'");
+            this.AssistanceServiceDetails  = AssistanceServiceDetails ?? ImmutableI18NString.Empty;
+            this.Standards                 = POIJSON.OrderedIds(Standards,  $"standard of the charging pool '{Id}'");
 
         }
 
@@ -517,6 +538,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (RelatedLocations.Length > 0)
                 json.Add("relatedLocations",     new JArray(RelatedLocations.Select(relatedLocation => relatedLocation.ToJSON())));
 
+            if (Services.Length > 0)
+                json.Add("services",                  POIJSON.IdsToJSON(Services));
+
+            if (AssistanceServiceDetails.IsNotNullOrEmpty())
+                json.Add("assistanceServiceDetails",  AssistanceServiceDetails.ToJSON());
+
+            if (Standards.Length > 0)
+                json.Add("standards",                 POIJSON.IdsToJSON(Standards));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -628,7 +658,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseGeoLocation(JSON, "exitLocation",         "exit location",                                                     out var exitLocation,                                           out ErrorResponse) ||
                     !POIJSON.TryParseI18N       (JSON, "arrivalInstructions",  "arrival instructions",                                              out var arrivalInstructions,                                    out ErrorResponse) ||
                     !POIJSON.TryParseIds        (JSON, "parkingRestrictions",  "parking restriction",     ParkingRestrictionGroup.TryParse,         out ImmutableArray<ParkingRestrictionGroup> parkingRestrictions,  out ErrorResponse) ||
-                    !POIJSON.TryParseObjects    (JSON, "relatedLocations",     "related location",        AdditionalGeoLocation.TryParse,           out ImmutableArray<AdditionalGeoLocation>   relatedLocations,     out ErrorResponse))
+                    !POIJSON.TryParseObjects    (JSON, "relatedLocations",     "related location",        AdditionalGeoLocation.TryParse,           out ImmutableArray<AdditionalGeoLocation>   relatedLocations,     out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "services",             "location service",        LocationService.TryParse,                 out ImmutableArray<LocationService>         services,             out ErrorResponse) ||
+                    !POIJSON.TryParseI18N       (JSON, "assistanceServiceDetails", "assistance service details",                                    out var assistanceServiceDetails,                               out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "standards",            "standard",                Standard.TryParse,                        out ImmutableArray<Standard>                standards,            out ErrorResponse))
                 {
                     return false;
                 }
@@ -676,6 +709,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 chargingWhenClosed,
                                                 parkingRestrictions,
                                                 relatedLocations,
+                                                services,
+                                                assistanceServiceDetails,
+                                                standards,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,

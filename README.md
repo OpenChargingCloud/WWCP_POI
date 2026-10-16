@@ -84,13 +84,18 @@ parking product ids compare case-sensitively.
   `locationLanguages` (in their given order), `relatedLocations` (`{geoLocation, name?}`, in their given order) and
   `authenticationModes` (`{type, cardTypes?, brandIds?, number?, stationCode?}` with the types of WWCP, e.g. `RFID`,
   `CreditCard`, `SMS`; a type only once, in the order of the types). RFID may name card types and brands
-  of the network; SMS and PhoneCall need their `number`.
+  of the network; SMS and PhoneCall need their `number`. Their accessibility, as the OCPI Accessibility Extension:
+  `services` (e.g. `ACCESSIBLE_CHARGING`, `ASSISTANCE`) and `standards` (e.g. `PAS 1899:2022`), sets of names,
+  and `assistanceServiceDetails`.
 - **Charging station:** `address` and `geoLocation` when they differ from its pool's, `accessibility`, `vehicleTypes`,
   `euVehicleCategories` (e.g. `M1`) and `features` (sets of names), `calibrationInfo`/`certificationInfo` (URLs), `maxPower` (W) it delivers at once, at most that of its EVSEs together,
   `manufacturerId`/`modelId`, and the `parkingSpaceIds` of the network it charges at.
 - **EVSE:** `currentTypes`, `chargingModes` (arrays of names), `maxVoltage` (V), `maxCurrent` (A),
   `maxPower` (W), `geoLocation` when it differs from its station's, `maxReservationDuration` (s),
-  `physicalReference` and `chargingConnectors` (`{@id, type, lockable?}`).
+  `physicalReference` and `chargingConnectors` (`{@id, type, lockable?, format?, cableLength?, cableWeight?,
+  cableManagementSystem?, standards?, images?}`, `format` `SOCKET` or `CABLE`, a cable in m and kg, none for a
+  socket). Their accessibility: `reachDistance` (m), `operationTimeout` (s), `extendedOperationTimeout` and
+  `standards`.
 - **Grid connection point:** a description without status, embedded in its grid operator; pools name it by
   `gridConnectionPointId`: `voltageLevel`, `connectionType`,
   `nominalVoltage` (V), `nominalFrequency` (Hz), `contractedImport/ExportPower` (W),
@@ -109,11 +114,12 @@ parking product ids compare case-sensitively.
   spaces and space groups of the same operator; they offer, they do not calculate prices.
 - **Charging tariff:** as in OCPI: `currency` (ISO 4217), `tariffType` (`AD_HOC_PAYMENT`, `PROFILE_CHEAP`,
   `PROFILE_FAST`, `PROFILE_GREEN`, `REGULAR`), `tariffURL`, `minPrice`/`maxPrice` (`{excludingVAT, includingVAT?}`),
-  `paymentMeans` (e.g. `CREDIT_CARD`, `QR_CODE`) and `paymentBrands` (e.g. `VISA`), sets of names, and `elements`, each with
+  `paymentMeans` (e.g. `CREDIT_CARD`, `QR_CODE`) and `paymentBrands` (e.g. `VISA`), sets of names, `validFrom`/`validUntil`
+  (timestamps) and `elements`, each with
   `priceComponents` (`{type, price, vat?, stepSize}`, `type` one of `ENERGY`, `FLAT`, `MAX_CURRENT`,
   `MIN_CURRENT`, `PARKING_TIME`, `TIME`; `stepSize` in Wh, A or s, positive, for every type but `FLAT`,
   which has none) and optional `restrictions` (`startTime`/`endTime` as `HH:mm`, `startDate`/`endDate` as `yyyy-MM-dd`, `min/maxEnergy` (Wh),
-  `min/maxCurrent` (A), `min/maxPower` (W), `min/maxDuration` (s), `daysOfWeek`). EVSEs name
+  `min/maxCurrent` (A), `min/maxPower` (W), `min/maxDuration` (s), `daysOfWeek`, `reservation`). EVSEs name
   `chargingTariffIds` of their operator.
 - **Brands:** embedded in the network, so that operators can share them, without status and timestamps:
   `name`, `description`, `logo`, `homepage`. Charging pools, stations and EVSEs name `brandIds`.

@@ -54,6 +54,8 @@ See [README.md](README.md#common-properties). No `eTags`.
 | `maxPrice` | `MaxPrice` | [ChargingPriceLimit](#minprice-and-maxprice) | update/remove | The most a charging session costs: one costing more costs this. |
 | `paymentMeans` | `PaymentMeans` | `ImmutableArray<PaymentMeans>` | update/remove | The means it can be paid with, each once, in the ordinal order of their names. Predefined: `CREDIT_CARD`, `DEBIT_CARD`, `VALUE_CARD` (a prepaid card), `CASH` (coins and bills), `CASH_COINS`, `CASH_BILLS`, `MOBILE_ACCOUNT`, `TOLL_TAG`, `PREPAY`, `NFC` (contactless), `EMV` (a card with a chip), `QR_CODE`, `WEBSITE`; other nonempty texts are read as well. |
 | `paymentBrands` | `PaymentBrands` | `ImmutableArray<PaymentBrand>` | update/remove | The payment brands it can be paid with, each once, in the ordinal order of their names. Predefined: `AMERICAN_EXPRESS`, `APPLE_PAY`, `CIRRUS`, `DINERS_CLUB`, `DISCOVER`, `GIROCARD`, `MAESTRO`, `MASTERCARD`, `VISA`, `VPAY`; other nonempty texts, e.g. `Google Pay`, are read as well. |
+| `validFrom` | `ValidFrom` | timestamp | update/remove | From when it is valid, inclusive, as OCPI's `start_date_time`; absent: always since. Written as every timestamp of the content (`yyyy-MM-ddTHH:mm:ss.fffZ`), to the millisecond. |
+| `validUntil` | `ValidUntil` | timestamp | update/remove | Until when it is valid, exclusive, as OCPI's `end_date_time`; absent: for good. After `validFrom`. |
 | `energyMix` | `EnergyMix` | [EnergyMix](#energymix) | update/remove | The mix of the energy it delivers. |
 
 The tariff is changed only through its operator's change sets: `RoamingNetworkChange.Add(tariff)` (no parent
@@ -127,6 +129,7 @@ omitted when absent (an empty object is allowed). Times are local times of the l
 | `minPower` / `maxPower` | decimal | Power, in W. |
 | `minDuration` / `maxDuration` | decimal | Duration of the session so far, in s. |
 | `daysOfWeek` | string[] | `MONDAY` … `SUNDAY`, upper case only, each at most once; written from Monday to Sunday whatever the given order. Omitted when empty. |
+| `reservation` | string | `ChargingReservationRestriction`, upper case only: the element prices a reservation rather than charging; `RESERVATION` the reservation until the charging starts (e.g. `TIME` per hour reserved, or a `FLAT` fee), `RESERVATION_EXPIRES` a reservation no charging session followed. |
 
 Every minimum and maximum is ≥ 0, and a minimum must not exceed its maximum.
 `startTime`/`endTime` and `startDate`/`endDate` are also read from JSON date tokens (text read with

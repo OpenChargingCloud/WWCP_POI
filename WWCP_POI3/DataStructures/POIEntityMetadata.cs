@@ -174,12 +174,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) TryParseTimestamp(JSON, Description, out Timestamp, out ErrorResponse)
+        #region (internal static) TryParseTimestamp(JSON, Description, out Timestamp, out ErrorResponse)
 
-        private static Boolean TryParseTimestamp(JToken?                           JSON,
-                                                 String                            Description,
-                                                 out DateTimeOffset?               Timestamp,
-                                                 [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseTimestamp(JToken?                           JSON,
+                                                  String                            Description,
+                                                  out DateTimeOffset?               Timestamp,
+                                                  [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Timestamp = null;

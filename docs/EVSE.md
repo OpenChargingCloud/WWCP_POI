@@ -55,6 +55,10 @@ See [common properties](README.md#common-properties). An EVSE does not write `eT
 | `images` | `Images` | `ImmutableArray<Image>` | update/remove | Its images, in their given order; see [images](#images). |
 | `geoLocation` | `GeoLocation` | `GeoCoordinate?` | update/remove | `{lat, lng, alt?}`, only when it differs from the one of its station. |
 | `maxReservationDuration` | `MaxReservationDuration` | `TimeSpan?` | update/remove | How long it can be reserved at most, in s (a decimal), not negative. |
+| `reachDistance` | `ReachDistance` | `Meter?` | update/remove | The least distance a driver has to reach between obstacles and its connector, cable, display and controls, in m (a decimal), not negative; as the OCPI Accessibility Extension. |
+| `operationTimeout` | `OperationTimeout` | `TimeSpan?` | update/remove | The longest time allowed between the steps of a charging process before it expires or is cancelled, in s (a decimal), not negative. |
+| `extendedOperationTimeout` | `ExtendedOperationTimeout` | `Boolean?` | update/remove | Whether a driver can extend its timeouts, if known. |
+| `standards` | `Standards` | `ImmutableArray<Standard>` | update/remove | The standards it conforms to, e.g. `PAS 1899:2022`; a set of names, each once, in their ordinal order. |
 
 Absent values are left out; empty arrays and empty flags are not written.
 
@@ -91,6 +95,15 @@ changed only by updating or removing the EVSE's `chargingConnectors` as a whole,
 | `@id` | `ChargingConnector_Id` | Mandatory; any nonempty text (trimmed), e.g. `"1"`. Unique within its EVSE, compared case-insensitively. |
 | `type` | `ChargingConnectorType` | Mandatory; any nonempty text. Predefined: `CHADEMO`, `CHAOJI`, `DOMESTIC_A` … `DOMESTIC_O`, `GBT_AC`, `GBT_DC`, `IEC_60309_2_single_16`, `IEC_60309_2_three_16`, `IEC_60309_2_three_32`, `IEC_60309_2_three_64`, `IEC_62196_T1`, `IEC_62196_T1_COMBO`, `IEC_62196_T2`, `IEC_62196_T2_COMBO`, `IEC_62196_T3A`, `IEC_62196_T3C`, `NEMA_5_20`, `NEMA_6_30`, `NEMA_6_50`, `NEMA_10_30`, `NEMA_10_50`, `NEMA_14_30`, `NEMA_14_50`, `PANTOGRAPH_BOTTOM_UP`, `PANTOGRAPH_TOP_DOWN`, `TESLA_R`, `TESLA_S`. |
 | `lockable` | boolean | Optional; whether the connector can be locked, if known. |
+| `format` | string | Optional, `ChargingConnectorFormat`: `SOCKET` (the driver brings the cable) or `CABLE` (attached to the station); upper case only. |
+| `cableLength` | decimal | Optional; the length of its attached cable, in m, positive. |
+| `cableWeight` | decimal | Optional; the weight of its attached cable as a driver handles it, in kg, positive. |
+| `cableManagementSystem` | boolean | Optional; whether a system helps to store, lift or guide its cable, if known. |
+| `standards` | string[] | Optional; the standards it conforms to, e.g. `PAS 1899:2022`, each once, in their ordinal order. |
+| `images` | Image[] | Optional; images of it, e.g. photos, each URL once, in their given order. |
+
+A connector whose `format` is `SOCKET` has no cable of its own: `cableLength`, `cableWeight` and
+`cableManagementSystem` are refused for it. Connectors are equal when their JSON representations are.
 
 The connectors must be given completely: a JSON object naming `chargingConnectorIds` instead is refused.
 

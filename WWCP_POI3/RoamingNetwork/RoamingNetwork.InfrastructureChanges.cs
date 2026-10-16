@@ -79,6 +79,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "chargingWhenClosed",
             "parkingRestrictions",
             "relatedLocations",
+            "services",
+            "assistanceServiceDetails",
+            "standards",
             "customData"
         ];
 
@@ -130,6 +133,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "images",
             "geoLocation",
             "maxReservationDuration",
+            "reachDistance",
+            "operationTimeout",
+            "extendedOperationTimeout",
+            "standards",
             "customData"
         ];
 
@@ -169,6 +176,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "maxPrice",
             "paymentMeans",
             "paymentBrands",
+            "validFrom",
+            "validUntil",
             "energyMix",
             "customData"
         ];

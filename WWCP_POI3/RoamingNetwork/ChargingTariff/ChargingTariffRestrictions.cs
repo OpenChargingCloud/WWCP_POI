@@ -31,6 +31,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
+    /// Which part of a reservation a charging tariff element prices, as in OCPI.
+    /// </summary>
+    public enum ChargingReservationRestriction
+    {
+
+        /// <summary>
+        /// The reservation, from its start until the charging starts; e.g. with TIME per hour reserved, or a FLAT fee.
+        /// </summary>
+        RESERVATION,
+
+        /// <summary>
+        /// A reservation that expired: no charging session followed it.
+        /// </summary>
+        RESERVATION_EXPIRES
+
+    }
+
+
+    /// <summary>
     /// When a charging tariff element applies, as in OCPI: an immutable value without an identification.
     /// All given restrictions must hold. Times are local times of the location ("HH:mm"), dates are "yyyy-MM-dd";
     /// energy is in Wh, current in A, power in W, durations in seconds.
@@ -105,6 +124,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<DayOfWeek>   DaysOfWeek     { get; }
 
+        /// <summary>
+        /// Whether the element prices a reservation rather than charging, and which part of it.
+        /// </summary>
+        public ChargingReservationRestriction?  Reservation  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -124,7 +148,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           Decimal?                 MaxPower      = null,
                                           Decimal?                 MinDuration   = null,
                                           Decimal?                 MaxDuration   = null,
-                                          IEnumerable<DayOfWeek>?  DaysOfWeek    = null)
+                                          IEnumerable<DayOfWeek>?  DaysOfWeek    = null,
+                                          ChargingReservationRestriction?  Reservation  = null)
         {
 
             CheckRange(MinEnergy,   MaxEnergy,   "energy");
@@ -165,6 +190,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.MaxDuration  = MaxDuration;
             // From Monday to Sunday.
             this.DaysOfWeek   = [.. daysOfWeek.OrderBy(day => ((Int32) day + 6) % 7)];
+            this.Reservation  = Reservation;
 
         }
 
@@ -219,6 +245,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (DaysOfWeek.Length > 0)
                 json.Add("daysOfWeek",   new JArray(DaysOfWeek.Select(day => day.ToString().ToUpperInvariant())));
+
+            if (Reservation.HasValue)
+                json.Add("reservation",  Reservation.Value.ToString());
 
             return json;
 
@@ -295,6 +324,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
+                if (!POIJSON.TryParseEnum(JSON, "reservation", "reservation restriction", out ChargingReservationRestriction? reservation, out ErrorResponse))
+                    return false;
+
                 ChargingTariffRestrictions = new ChargingTariffRestrictions(startTime,
                                                                             endTime,
                                                                             startDate,
@@ -307,7 +339,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                             values["maxPower"],
                                                                             values["minDuration"],
                                                                             values["maxDuration"],
-                                                                            daysOfWeek);
+                                                                            daysOfWeek,
+                                                                            reservation);
 
                 ErrorResponse = null;
                 return true;

@@ -73,6 +73,9 @@ All optional; absent values and empty arrays are not written.
 | `chargingWhenClosed` | `ChargingWhenClosed` | `Boolean?` | update/remove | Whether a vehicle may go on charging while it is closed; absent means unknown. |
 | `parkingRestrictions` | `ParkingRestrictions` | `ImmutableArray<ParkingRestrictionGroup>` | update/remove | Who may park there: `EMPLOYEES`, `EV_ONLY`, `PLUGGED`, `DISABLED`, `CUSTOMERS`, `TAXI`, `TENANTS`; ordinal order, each once. |
 | `relatedLocations` | `RelatedLocations` | `ImmutableArray<AdditionalGeoLocation>` | update/remove | Further related places, see [Related locations](#related-locations). |
+| `services` | `Services` | `ImmutableArray<LocationService>` | update/remove | The services offered there, as the OCPI Accessibility Extension; a set of names, each once, in their ordinal order. Predefined: `ACCESSIBLE_CHARGING`, `ACCESSIBLE_TOILETS`, `ASSISTANCE`, `CAMERA_SURVEILLANCE`, `EMERGENCY_ASSISTANCE`, `EMERGENCY_CALL`, `PERIMETER_FENCE`; any other nonempty text is accepted. |
+| `assistanceServiceDetails` | `AssistanceServiceDetails` | I18N text | update/remove | How to get assistance there: how to reach it, when, and what kind of support it offers. Omitted when empty. |
+| `standards` | `Standards` | `ImmutableArray<Standard>` | update/remove | The standards it conforms to, e.g. `PAS 1899:2022` for accessible charging; a set of names as `services`. |
 
 The values of `parkingType`, `accessibility`, `facilities`, `uiFeatures`, `features` and `parkingRestrictions`
 are open sets of names: the ones listed are predefined, others are read as given. `paymentOptions` and

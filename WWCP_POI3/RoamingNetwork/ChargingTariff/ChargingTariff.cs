@@ -103,6 +103,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<PaymentBrand>           PaymentBrands  { get; }
 
+        /// <summary>
+        /// From when it is valid, inclusive; always since, unless given.
+        /// </summary>
+        public DateTimeOffset?                        ValidFrom      { get; }
+
+        /// <summary>
+        /// Until when it is valid, exclusive; for good, unless given.
+        /// </summary>
+        public DateTimeOffset?                        ValidUntil     { get; }
+
 
         /// <summary>
         /// The mix of the energy it delivers.
@@ -128,6 +138,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               ChargingPriceLimit?                            MaxPrice                     = null,
                               IEnumerable<PaymentMeans>?                     PaymentMeans                 = null,
                               IEnumerable<PaymentBrand>?                     PaymentBrands                = null,
+                              DateTimeOffset?                                ValidFrom                    = null,
+                              DateTimeOffset?                                ValidUntil                   = null,
 
                               Timestamped<ChargingTariffAdminStatusType>?    InitialAdminStatus           = null,
                               Timestamped<ChargingTariffStatusType>?         InitialStatus                = null,
@@ -170,6 +182,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ValidatePriceLimits(Id, MinPrice, MaxPrice) is String error)
                 throw new ArgumentException(error, nameof(MinPrice));
 
+            // To the millisecond, as every timestamp of the content.
+            ValidFrom  = ValidFrom. HasValue ? POIEntityMetadata.Timestamp(ValidFrom. Value) : null;
+            ValidUntil = ValidUntil.HasValue ? POIEntityMetadata.Timestamp(ValidUntil.Value) : null;
+
+            if (ValidFrom >= ValidUntil)
+                throw new ArgumentException($"The charging tariff '{Id}' must be valid from before it is valid until!", nameof(ValidFrom));
+
             this.Currency       = Currency;
             this.TariffType     = TariffType;
             this.TariffURL      = TariffURL;
@@ -179,6 +198,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.MaxPrice       = MaxPrice;
             this.PaymentMeans   = POIJSON.OrderedIds(PaymentMeans,  $"payment means of the charging tariff '{Id}'");
             this.PaymentBrands  = POIJSON.OrderedIds(PaymentBrands, $"payment brand of the charging tariff '{Id}'");
+            this.ValidFrom      = ValidFrom;
+            this.ValidUntil     = ValidUntil;
 
         }
 
@@ -309,6 +330,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (PaymentBrands.Length > 0)
                 json.Add("paymentBrands",  POIJSON.IdsToJSON(PaymentBrands));
 
+            if (ValidFrom.HasValue)
+                json.Add("validFrom",      ValidFrom. Value.ToISO8601());
+
+            if (ValidUntil.HasValue)
+                json.Add("validUntil",     ValidUntil.Value.ToISO8601());
+
             if (EnergyMix is not null)
                 json.Add("energyMix",    EnergyMix.ToJSON(Embedded: true));
 
@@ -410,6 +437,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIEntityMetadata.TryParseTimestamp(JSON["validFrom"],   "start of the validity", out var validFrom,  out ErrorResponse) ||
+                    !POIEntityMetadata.TryParseTimestamp(JSON["validUntil"],  "end of the validity",   out var validUntil, out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (validFrom >= validUntil)
+                {
+                    ErrorResponse = $"The charging tariff '{id}' must be valid from before it is valid until!";
+                    return false;
+                }
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -431,6 +470,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     maxPrice,
                                                     paymentMeans,
                                                     paymentBrands,
+                                                    validFrom,
+                                                    validUntil,
                                                     DataSource:  dataSource,
                                                     Created:     created,
                                                     LastChange:  lastChange,

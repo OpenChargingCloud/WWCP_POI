@@ -151,6 +151,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public TimeSpan?       MaxReservationDuration    { get; }
 
+        /// <summary>
+        /// The least distance a driver has to reach between obstacles and its connector, cable, display and controls.
+        /// </summary>
+        public Meter?                    ReachDistance              { get; }
+
+        /// <summary>
+        /// The longest time allowed between the steps of a charging process before it expires or is cancelled.
+        /// </summary>
+        public TimeSpan?                 OperationTimeout           { get; }
+
+        /// <summary>
+        /// Whether a driver can extend its timeouts, unless unknown.
+        /// </summary>
+        public Boolean?                  ExtendedOperationTimeout   { get; }
+
+        /// <summary>
+        /// The standards it conforms to, e.g. accessibility or ergonomic ones, in the order of their names.
+        /// </summary>
+        public ImmutableArray<Standard>  Standards                  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -174,6 +194,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     IEnumerable<Image>?                  Images                       = null,
                     GeoCoordinate?                       GeoLocation                  = null,
                     TimeSpan?                            MaxReservationDuration       = null,
+                    Meter?                               ReachDistance                = null,
+                    TimeSpan?                            OperationTimeout             = null,
+                    Boolean?                             ExtendedOperationTimeout     = null,
+                    IEnumerable<Standard>?               Standards                    = null,
 
                     Timestamped<EVSEAdminStatusType>?    InitialAdminStatus           = null,
                     Timestamped<EVSEStatusType>?         InitialStatus                = null,
@@ -212,6 +236,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (MaxReservationDuration < TimeSpan.Zero)
                 throw new ArgumentException($"The maximum reservation duration of the EVSE '{Id}' must not be negative!", nameof(MaxReservationDuration));
 
+            if (ReachDistance?.m < 0)
+                throw new ArgumentException($"The reach distance of the EVSE '{Id}' must not be negative!", nameof(ReachDistance));
+
+            if (OperationTimeout < TimeSpan.Zero)
+                throw new ArgumentException($"The operation timeout of the EVSE '{Id}' must not be negative!", nameof(OperationTimeout));
+
             var chargingConnectors = (ChargingConnectors ?? []).ToArray();
 
             if (chargingConnectors.Any(chargingConnector => chargingConnector is null))
@@ -219,6 +249,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (chargingConnectors.Select(chargingConnector => chargingConnector.Id).Distinct().Count() != chargingConnectors.Length)
                 throw new ArgumentException($"A charging connector of the EVSE '{Id}' must not be given twice!", nameof(ChargingConnectors));
+
+            foreach (var chargingConnector in chargingConnectors)
+                if (chargingConnector.Validate() is String error)
+                    throw new ArgumentException(error, nameof(ChargingConnectors));
 
             this.PhysicalReference   = PhysicalReference;
             this.CurrentTypes        = CurrentTypes  ?? POI.CurrentTypes. Unspecified;
@@ -233,6 +267,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the EVSE '{Id}'");
             this.GeoLocation             = GeoLocation;
             this.MaxReservationDuration  = MaxReservationDuration;
+            this.ReachDistance             = ReachDistance;
+            this.OperationTimeout          = OperationTimeout;
+            this.ExtendedOperationTimeout  = ExtendedOperationTimeout;
+            this.Standards                 = POIJSON.OrderedIds(Standards, $"standard of the EVSE '{Id}'");
             this.energyStatus        = new EnergyStatusRuntime(RaiseEnergyStatusChanged);
 
         }
@@ -420,6 +458,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (MaxReservationDuration.HasValue)
                 json.Add("maxReservationDuration",  POIJSON.Seconds(MaxReservationDuration.Value));
 
+            if (ReachDistance.HasValue)
+                json.Add("reachDistance",             ReachDistance.Value.m);
+
+            if (OperationTimeout.HasValue)
+                json.Add("operationTimeout",          POIJSON.Seconds(OperationTimeout.Value));
+
+            if (ExtendedOperationTimeout.HasValue)
+                json.Add("extendedOperationTimeout",  ExtendedOperationTimeout.Value);
+
+            if (Standards.Length > 0)
+                json.Add("standards",                 POIJSON.IdsToJSON(Standards));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -499,10 +549,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!POIJSON.TryParseGeoLocation(JSON,                            out var geoLocation,             out ErrorResponse) ||
                     !POIJSON.TryParseSeconds    (JSON, "maxReservationDuration",
-                                                       "maximum reservation duration", out var maxReservationDuration,  out ErrorResponse))
+                                                       "maximum reservation duration", out var maxReservationDuration,  out ErrorResponse) ||
+                    !POIJSON.TryParseSeconds    (JSON, "operationTimeout",
+                                                       "operation timeout",            out var operationTimeout,        out ErrorResponse) ||
+                    !POIJSON.TryParseNonNegative(JSON, "reachDistance",
+                                                       "reach distance",               out var reachDistance,           out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "standards", "standard", Standard.TryParse, out ImmutableArray<Standard> standards, out ErrorResponse))
                 {
                     return false;
                 }
+
+                if (JSON.ParseOptional("extendedOperationTimeout", "extended operation timeout", out Boolean? extendedOperationTimeout, out ErrorResponse))
+                    if (ErrorResponse is not null) return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
@@ -529,6 +587,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 images,
                                 geoLocation,
                                 maxReservationDuration,
+                                reachDistance.HasValue ? Meter.From_m(reachDistance.Value) : null,
+                                operationTimeout,
+                                extendedOperationTimeout,
+                                standards,
                                 DataSource:  dataSource,
                                 Created:     created,
                                 LastChange:  lastChange,

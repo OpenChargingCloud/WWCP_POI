@@ -333,6 +333,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TryParseNonNegative (JSON, PropertyName, PropertyDescription, out Value, out ErrorResponse)
+
+        /// <summary>
+        /// An optional number, not negative, e.g. a distance in meters.
+        /// </summary>
+        public static Boolean TryParseNonNegative(JObject                           JSON,
+                                                  String                            PropertyName,
+                                                  String                            PropertyDescription,
+                                                  out Decimal?                      Value,
+                                                  [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Value = null;
+
+            if (JSON.ParseOptional(PropertyName, PropertyDescription, out Decimal? number, out ErrorResponse) &&
+                ErrorResponse is not null)
+            {
+                return false;
+            }
+
+            if (number < 0)
+            {
+                ErrorResponse = $"The {PropertyDescription} must not be negative!";
+                return false;
+            }
+
+            Value          = number;
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
         #region Seconds             (Duration)
 
         /// <summary>
