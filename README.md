@@ -434,7 +434,7 @@ the lists of what an operator embeds as well, takes:
 
 | Parameter | |
 |---|---|
-| `match` | words separated by spaces, each contained in a text of an entry, case-insensitively; a word starting with `!` must not be |
+| `match` | words separated by spaces or commas, each contained in a text of an entry, case-insensitively; a word starting with `!` must not be; given more than once, all of them |
 | `operatorId` | `CPs` only: the charging pools of one charging station operator |
 | `offset`, `limit` | the part of the matching entries; all of them without `limit` |
 

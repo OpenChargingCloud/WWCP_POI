@@ -329,13 +329,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       return errorResponse;
                                   }
 
-                                  if (request.QueryString.GetString("expand") is not String expand)
+                                  // Every part: Hermod splits a value at its commas, and GetString(…) would be the last part only.
+                                  var expansions = request.QueryString.GetStrings("expand").
+                                                       SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).
+                                                       ToArray();
+
+                                  if (expansions.Length == 0)
                                       return CachedEntityResponse(request, chargingPool, chargingPool.ToJSON);
 
                                   // An expanded view depends on the version of the pool and on the one of its grid connection point.
                                   var json = chargingPool.ToJSON();
 
-                                  foreach (var expansion in expand.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                  foreach (var expansion in expansions)
                                       if (expansion != "gridConnectionPoint")
                                           return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Unknown expansion '{expansion}'; a charging pool expands only 'gridConnectionPoint'!");
 

@@ -218,6 +218,42 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
         #endregion
 
+        #region A_search_takes_every_word_also_after_a_comma()
+
+        /// <summary>
+        /// Words separated by commas, as people write them, or in parameters of their own: every one of them searched for.
+        /// Hermod splits a value at its commas, so the words before the last comma were lost.
+        /// </summary>
+        [Test]
+        public async Task A_search_takes_every_word_also_after_a_comma()
+        {
+
+            var (comma,     _, commaList)      = await Get("RNs/rn1/CPs?match=paradies,jena");
+            var (encoded,   _, encodedList)    = await Get("RNs/rn1/CPs?match=paradies%2C%20jena");
+            var (form,      _, formList)       = await Get("RNs/rn1/CPs?match=paradies%2C+jena");
+            var (repeated,  _, repeatedList)   = await Get("RNs/rn1/CPs?match=nord&match=jena");
+            var (negated,   _, negatedList)    = await Get("RNs/rn1/CPs?match=jena,!nord&limit=1");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(Ids(commaList),                             Is.EqualTo(new[] { "DE*GEF*P1" }));
+                Assert.That(Ids(encodedList),                           Is.EqualTo(new[] { "DE*GEF*P1" }));
+                Assert.That(Ids(formList),                              Is.EqualTo(new[] { "DE*GEF*P1" }));
+                Assert.That(Ids(repeatedList),                          Is.EqualTo(new[] { "DE*EXA*P1" }));
+                Assert.That(Ids(negatedList),                           Is.EqualTo(new[] { "DE*GEF*P1" }));
+                Assert.That(HeaderOf(comma, "X-Filtered-Count"),        Is.EqualTo("1"));
+
+                // The next page keeps every word.
+                Assert.That(HeaderOf(negated, "X-Filtered-Count"),      Is.EqualTo("1"));
+                Assert.That(HeaderOf(repeated, "Link"),                 Is.Null);
+
+            }
+
+        }
+
+        #endregion
+
         #region Charging_pools_are_paged()
 
         [Test]

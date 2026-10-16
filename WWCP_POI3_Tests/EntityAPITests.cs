@@ -454,6 +454,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
             var (named,    namedContent)     = await Send(HttpMethod.Get, CP);
             var (expanded, expandedContent)  = await Send(HttpMethod.Get, CP + "?expand=gridConnectionPoint");
             var (unknown,  _)                = await Send(HttpMethod.Get, CP + "?expand=chargingStations");
+            var (unknownFirst, _)            = await Send(HttpMethod.Get, CP + "?expand=chargingStations,gridConnectionPoint");
 
             var namedJSON     = ParseJSON(namedContent);
             var expandedJSON  = ParseJSON(expandedContent);
@@ -476,6 +477,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(HeaderOf(expanded, "ETag"),                                Is.Not.EqualTo(HeaderOf(named, "ETag")));
 
                 Assert.That(unknown.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
+
+                // Also before a comma: Hermod splits the value there.
+                Assert.That(unknownFirst.StatusCode,                                   Is.EqualTo(HttpStatusCode.BadRequest));
 
             }
 

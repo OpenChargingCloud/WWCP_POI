@@ -40,7 +40,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CPs?match=…&amp;operatorId=…&amp;offset=…&amp;limit=…    the charging pools of all its operators
     ///
     /// Every list of the roaming networks, ~/RNs and ~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs} as well, takes
-    /// - match:   words separated by spaces, each contained in a text of an entry, case-insensitively;
+    /// - match:   words separated by spaces or commas, each contained in a text of an entry, case-insensitively;
     ///            a word starting with "!" must not be contained,
     /// - offset:  the number of matching entries to skip,
     /// - limit:   the maximum number of entries to return.
@@ -66,7 +66,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         IReadOnlyList<(String Name, String Value)>  Further)
         {
 
-            private readonly String[] terms = (Match ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            private readonly String[] terms = (Match ?? "").Split([ ' ', ',' ], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
             /// <summary>
             /// Whether it neither searches nor pages: the whole list.
@@ -336,7 +336,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            Query = new ListQuery(Request.QueryString.GetString("match"),
+            // Every part: Hermod splits a value at its commas, and GetString(…) would be the last part only,
+            // e.g. "nord" of "jena, nord". A comma separates words as a space does.
+            var match = String.Join(" ", Request.QueryString.GetStrings("match"));
+
+            Query = new ListQuery(match.Length > 0 ? match : null,
                                   offset,
                                   limit,
                                   Further);
