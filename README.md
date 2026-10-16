@@ -229,7 +229,9 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
   a key of a party. Nobody else's signature counts, there is no external trust configuration.
   - The **RNO** owns the roaming network itself, brands, manufacturers, energy meter manufacturers and
     transparency software, and adds and removes parties: with their keys (a grid operator not taking part
-    without, then the RNO signs in its place until it gives it keys), without their children. The RNO decides
+    without, then the RNO signs in its place until it gives it keys), without their children:
+    `RoamingNetworkChange.Add(party)` leaves them out, `AddChildren(party)` gives the changes the party then
+    signs to add them. The RNO decides
     who is a member: removing a party removes all its data with it, without the party's signature; the history
     keeps the versions before.
   - A **charging station operator** owns its properties, pools, stations, EVSEs, tariffs and groups,

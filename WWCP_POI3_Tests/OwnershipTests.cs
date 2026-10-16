@@ -249,7 +249,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(Apply(rn1, Change(rn1, RoamingNetworkChange.Add(withoutKeys)).SignedBy(TestParties.Party(rn1))).Error,
                             Does.Contain("must be added with its signingKeys"));
 
-                Assert.That(Apply(rn1, Change(rn1, RoamingNetworkChange.Add(withPool)).SignedBy(TestParties.Party(rn1))).Error,
+                Assert.That(Apply(rn1, Change(rn1, RoamingNetworkChange.Add(nameof(ChargingStationOperator), "DE*NEW", withPool.ToEmbeddedJSON())).SignedBy(TestParties.Party(rn1))).Error,
                             Does.Contain("must be added without its chargingPools"));
 
                 // Removed by the roaming network operator only.
@@ -257,6 +257,107 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                             Does.Contain("needs a signature by a signing key of the roaming network operator"));
                 Assert.That(Apply(rn1, Change(rn1, RoamingNetworkChange.Remove(EXA)).SignedBy(TestParties.Party(rn1))).Applied,
                             Is.True);
+
+            }
+
+        }
+
+        #endregion
+
+        #region Operators_are_added_without_their_children_which_they_add_themselves()
+
+        /// <summary>
+        /// Add(operator) leaves the children out, AddChildren(operator) adds them in a change set of their owner.
+        /// </summary>
+        [Test]
+        public void Operators_are_added_without_their_children_which_they_add_themselves()
+        {
+
+            var rn1   = NewNetwork();
+            var NEW   = ChargingStationOperator_Id.Parse("DE*NEW");
+            var PRK   = ParkingOperator_Id.        Parse("DE*PRK");
+            var NE9   = GridOperator_Id.           Parse("DE*NE9");
+            var T1    = ChargingTariff_Id.         Parse("DE*NEW*T1");
+            var E1    = EVSE_Id.                   Parse("DE*NEW*E1*1");
+            var S1    = ParkingSpace_Id.           Parse("space-91");
+
+            var cso   = new ChargingStationOperator(NEW,
+                                                    Created:               Created,
+                                                    ChargingTariffs:       [ new ChargingTariff(T1,
+                                                                                                Currency.EUR,
+                                                                                                [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.39m, StepSize: 1) ]) ],
+                                                                                                Created: Created) ],
+                                                    ChargingPools:         [ new ChargingPool(ChargingPool_Id.Parse("DE*NEW*P1"),
+                                                                                              Created:           Created,
+                                                                                              ChargingStations:  [ new ChargingStation(ChargingStation_Id.Parse("DE*NEW*S1"),
+                                                                                                                                       Created:  Created,
+                                                                                                                                       EVSEs:    [ new EVSE(E1, Created: Created) ]) ]) ],
+                                                    EVSEGroups:            [ new EVSEGroup          (EVSEGroup_Id.          Parse("DE*NEW*EG1"), EVSEIds:           [ E1 ], Created: Created) ],
+                                                    ChargingTariffGroups:  [ new ChargingTariffGroup(ChargingTariffGroup_Id.Parse("DE*NEW*TG1"), ChargingTariffIds: [ T1 ], Created: Created) ]).WithKeys();
+
+            var prk   = new ParkingOperator(PRK,
+                                            Created:             Created,
+                                            ParkingGarages:      [ new ParkingGarage    (ParkingGarage_Id.    Parse("garage-91"), Created: Created) ],
+                                            ParkingSpaces:       [ new ParkingSpace     (S1,                                      Created: Created) ],
+                                            ParkingSpaceGroups:  [ new ParkingSpaceGroup(ParkingSpaceGroup_Id.Parse("level-91"),  ParkingSpaceIds: [ S1 ], Created: Created) ]).WithKeys();
+
+            var grid  = new GridOperator(NE9,
+                                         GridConnectionPoints:  [ new GridConnectionPoint(GridConnectionPoint_Id.Parse("connection-91")) ],
+                                         Created:               Created).WithKeys();
+
+            var added = Change(rn1, RoamingNetworkChange.Add(cso),
+                                    RoamingNetworkChange.Add(prk),
+                                    RoamingNetworkChange.Add(grid)).SignedBy(TestParties.Party(rn1));
+
+            Assert.That(rn1.TryApplyChangeSet(added, out var rn2, out var error), Is.True, error);
+
+            var children = Change(rn2!, [ .. RoamingNetworkChange.AddChildren(cso),
+                                          .. RoamingNetworkChange.AddChildren(prk),
+                                          .. RoamingNetworkChange.AddChildren(grid) ]);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn2!.GetChargingStationOperatorById(NEW)!.ChargingPools.Count,  Is.Zero);
+                Assert.That(rn2. ParkingOperators.Single(o => o.Id == PRK).ParkingSpaces.Count,  Is.Zero);
+                Assert.That(rn2. GridOperators.   Single(o => o.Id == NE9).GridConnectionPoints.Count,  Is.Zero);
+
+                Assert.That(children.Changes.Select(change => change.EntityType),
+                            Is.EqualTo(new[] { "ChargingTariff", "ChargingPool", "EVSEGroup", "ChargingTariffGroup",
+                                               "ParkingGarage", "ParkingSpace", "ParkingSpaceGroup", "GridConnectionPoint" }));
+
+                // Children are their owners' to add.
+                Assert.That(Apply(rn2, children.SignedBy(TestParties.Party(rn1))).Error,  Does.Contain("needs a signature by a signing key of the ChargingStationOperator 'DE*NEW'"));
+
+            }
+
+            Assert.That(rn2.TryApplyChangeSet(children.SignedBy(TestParties.Party(NEW)).
+                                                       SignedBy(TestParties.Party(PRK)).
+                                                       SignedBy(TestParties.Party(NE9)), out var rn3, out error),  Is.True, error);
+
+            var cso3  = rn3!.GetChargingStationOperatorById(NEW)!.ToEmbeddedJSON();
+            var prk3  = rn3. ParkingOperators.Single(o => o.Id == PRK).ToJSON();
+            var grid3 = rn3. GridOperators.   Single(o => o.Id == NE9).ToJSON();
+
+            // The children are as they were, changed last when they were added.
+            static JToken? Content(JToken? Children)
+            {
+                var content = Children?.DeepClone();
+                foreach (var lastChange in content?.SelectTokens("$..lastChange").ToArray() ?? [])
+                    lastChange.Parent!.Remove();
+                return content;
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                foreach (var key in new[] { "chargingTariffs", "chargingPools", "EVSEGroups", "chargingTariffGroups" })
+                    Assert.That(Content(cso3[key]),  Is.EqualTo(Content(cso.ToEmbeddedJSON()[key])).Using<JToken>(JToken.DeepEquals), key);
+                foreach (var key in new[] { "parkingGarages", "parkingSpaces", "parkingSpaceGroups" })
+                    Assert.That(Content(prk3[key]),  Is.EqualTo(Content(prk.ToJSON()[key])).       Using<JToken>(JToken.DeepEquals), key);
+                Assert.That(Content(grid3["gridConnectionPoints"]),  Is.EqualTo(Content(grid.ToJSON()["gridConnectionPoints"])).Using<JToken>(JToken.DeepEquals));
+
+                Assert.That(cso3["chargingPools"]![0]!["lastChange"]?.Value<String>(),  Is.EqualTo("2026-10-13T12:00:00.000Z"));
 
             }
 

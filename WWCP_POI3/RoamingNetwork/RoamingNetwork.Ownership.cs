@@ -150,7 +150,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The embedded children a party must not be added with, by its entity type.
         /// </summary>
-        private static readonly Dictionary<String, String[]> PartyChildren = new () {
+        internal static readonly Dictionary<String, String[]> PartyChildren = new () {
             { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups" ] },
             { nameof(EMobilityProvider),       [] },
             { nameof(GridOperator),            [ "gridConnectionPoints" ] },

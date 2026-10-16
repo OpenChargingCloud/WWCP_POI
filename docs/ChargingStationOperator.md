@@ -80,7 +80,7 @@ Children are written only when there are any; collections in the ordinal order o
 
 | Method | Writes |
 |---|---|
-| `ToEmbeddedJSON()` | The content, as the roaming network embeds it: no `@context`, `dataLicenses` complete. Change sets compare and edit this representation, `RoamingNetworkChange.Add(operator)` sends it, and `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` serves it. |
+| `ToEmbeddedJSON()` | The content, as the roaming network embeds it: no `@context`, `dataLicenses` complete. Change sets compare and edit this representation, `RoamingNetworkChange.Add(operator)` sends it without children, and `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` serves it. |
 | `ToCBOR(Embedded = false)` | The keys and values of `ToJSON(Embedded, ExpandDataLicenses: Expanded)`. |
 | `ToJSON(Embedded = false, …)` | With its defaults: `@context` (`https://open.charging.cloud/contexts/wwcp+json/chargingStationOperator`) unless embedded, and `dataLicenses` complete; `ExpandDataLicenses: ShowIdOnly` writes `dataLicenseIds` instead, which reads again only for well-known licenses. |
 
@@ -197,7 +197,9 @@ Each key:
 - A key signs only a change set whose `createdAt` lies within its validity, and only in the version the change set
   is applied to.
 - **Add:** the RNO adds the operator with at least one key of each kind and without charging pools, tariffs or
-  groups: those are the operator's own to add.
+  groups: those are the operator's own to add. `RoamingNetworkChange.Add(operator)` leaves them out;
+  `RoamingNetworkChange.AddChildren(operator)` gives the changes adding them, tariffs first and groups last, for a
+  change set the operator signs once it is a member.
 - **Remove:** the RNO removes the operator with its pools, stations, EVSEs, tariffs and groups, with one of its
   signing keys and without the operator's signature: the RNO decides who is a member of the roaming network.
   The history keeps the versions before.

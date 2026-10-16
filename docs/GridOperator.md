@@ -60,7 +60,8 @@ A change set names the properties above by their JSON keys (`GridOperatorRegistr
 [RoamingNetwork.RegistryChanges.cs](../WWCP_POI3/RoamingNetwork/RoamingNetwork.RegistryChanges.cs)):
 
 ```csharp
-RoamingNetworkChange.Add           (gridOperator)                                           // signed by the RNO, with or without keys
+RoamingNetworkChange.Add           (gridOperator)                                           // signed by the RNO, with or without keys, without its points
+RoamingNetworkChange.AddChildren   (gridOperator)                                           // its points, signed by their maintainers or the grid operator
 RoamingNetworkChange.UpdateProperty(gridOperator, "homepage", null, "https://netz.example.org")  // signed by the grid operator, or the RNO while it has no signing keys
 RoamingNetworkChange.Remove        (gridOperatorId)                                         // signed by the RNO
 ```

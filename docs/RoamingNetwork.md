@@ -144,8 +144,9 @@ The public keys of the RNO (`POIPublicKey`, [source](../WWCP_POI3/DataStructures
 
 The [ChargingStationOperator](ChargingStationOperator.md)s, parties with their pools, stations, EVSEs, tariffs and
 groups, under `chargingStationOperators`, ordered by `@id` (ordinal). Added by the RNO with
-`RoamingNetworkChange.Add(chargingStationOperator)` (its embedded JSON) and removed with
-`RoamingNetworkChange.Remove(chargingStationOperatorId)`; see [below](#change-sets-of-the-rno).
+`RoamingNetworkChange.Add(chargingStationOperator)` (its embedded JSON without its children) and removed with
+`RoamingNetworkChange.Remove(chargingStationOperatorId)`; see [below](#change-sets-of-the-rno). The operator then
+adds its children itself, e.g. with `RoamingNetworkChange.AddChildren(chargingStationOperator)`.
 
 
 ## chargingStationManufacturers
@@ -165,15 +166,16 @@ The [EMobilityProvider](EMobilityProvider.md)s, parties without children, under 
 ## gridOperators
 
 The [GridOperator](GridOperator.md)s, parties named by the `gridOperatorId` of grid connection points, under
-`gridOperators`, ordered by `@id` (ordinal). Added and removed by the RNO: `RoamingNetworkChange.Add(gridOperator)`,
-`Remove(gridOperatorId)`.
+`gridOperators`, ordered by `@id` (ordinal). Added and removed by the RNO: `RoamingNetworkChange.Add(gridOperator)`
+(without its grid connection points, see `AddChildren(gridOperator)`), `Remove(gridOperatorId)`.
 
 
 ## parkingOperators
 
 The [ParkingOperator](ParkingOperator.md)s, parties with their parking garages, spaces, sensors, space groups and
 products, under `parkingOperators`, ordered by `@id` (ordinal). Added and removed by the RNO:
-`RoamingNetworkChange.Add(parkingOperator)`, `Remove(parkingOperatorId)`.
+`RoamingNetworkChange.Add(parkingOperator)` (without its parking data, see `AddChildren(parkingOperator)`),
+`Remove(parkingOperatorId)`.
 
 
 ## brands

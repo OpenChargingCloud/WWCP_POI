@@ -225,14 +225,58 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Add                   (ChargingStationOperator)
 
         /// <summary>
-        /// Add the given charging station operator to its roaming network.
+        /// Add the given charging station operator to its roaming network, without its charging pools,
+        /// tariffs and groups: they are its own to add, see AddChildren(ChargingStationOperator).
         /// </summary>
         /// <param name="ChargingStationOperator">The new charging station operator.</param>
         public static RoamingNetworkChange Add(ChargingStationOperator ChargingStationOperator)
 
             => Add(nameof(POI.ChargingStationOperator),
                    ChargingStationOperator.Id.ToString(),
-                   ChargingStationOperator.ToEmbeddedJSON());
+                   WithoutChildren(nameof(POI.ChargingStationOperator),
+                                   ChargingStationOperator.ToEmbeddedJSON()));
+
+        #endregion
+
+        #region AddChildren           (ChargingStationOperator)
+
+        /// <summary>
+        /// Add the charging tariffs, charging pools and groups of the given charging station operator,
+        /// in this order, to the operator once added: a change set the operator signs.
+        /// </summary>
+        /// <param name="ChargingStationOperator">The charging station operator with its children.</param>
+        public static IReadOnlyList<RoamingNetworkChange> AddChildren(ChargingStationOperator ChargingStationOperator)
+
+            => [
+                   .. ChargingStationOperator.ChargingTariffs.      Select(chargingTariff       => Add(chargingTariff)),
+                   .. ChargingStationOperator.ChargingPools.        Select(chargingPool         => Add(chargingPool)),
+                   .. ChargingStationOperator.EVSEGroups.           Select(evseGroup            => Add(evseGroup)),
+                   .. ChargingStationOperator.ChargingStationGroups.Select(chargingStationGroup => Add(chargingStationGroup)),
+                   .. ChargingStationOperator.ChargingPoolGroups.   Select(chargingPoolGroup    => Add(chargingPoolGroup)),
+                   .. ChargingStationOperator.ChargingTariffGroups. Select(chargingTariffGroup  => Add(chargingTariffGroup))
+               ];
+
+        #endregion
+
+        #region (private static) WithoutChildren(EntityType, Party)
+
+        /// <summary>
+        /// The given JSON representation of a party without the embedded children
+        /// it must not be added with.
+        /// </summary>
+        /// <param name="EntityType">The entity type of the party.</param>
+        /// <param name="Party">The JSON representation of the party, changed in place.</param>
+        private static JObject WithoutChildren(String   EntityType,
+                                               JObject  Party)
+        {
+
+            if (RoamingNetwork.PartyChildren.TryGetValue(EntityType, out var children))
+                foreach (var child in children)
+                    Party.Remove(child);
+
+            return Party;
+
+        }
 
         #endregion
 
@@ -511,14 +555,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Add                   (GridOperator)
 
         /// <summary>
-        /// Add the given grid operator to its roaming network.
+        /// Add the given grid operator to its roaming network, without its grid connection points:
+        /// they are added on their own, see AddChildren(GridOperator).
         /// </summary>
         /// <param name="GridOperator">The new grid operator.</param>
         public static RoamingNetworkChange Add(GridOperator GridOperator)
 
             => Add(nameof(POI.GridOperator),
                    GridOperator.Id.ToString(),
-                   GridOperator.ToJSON());
+                   WithoutChildren(nameof(POI.GridOperator),
+                                   GridOperator.ToJSON()));
+
+        /// <summary>
+        /// Add the grid connection points of the given grid operator to the operator once added:
+        /// a change set their maintainers or the grid operator sign.
+        /// </summary>
+        /// <param name="GridOperator">The grid operator with its grid connection points.</param>
+        public static IReadOnlyList<RoamingNetworkChange> AddChildren(GridOperator GridOperator)
+
+            => [ .. GridOperator.GridConnectionPoints.Select(gridConnectionPoint => Add(gridConnectionPoint, GridOperator.Id)) ];
 
         /// <summary>
         /// Remove the given grid operator, optionally checking its complete previous JSON representation.
@@ -554,14 +609,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Add                   (ParkingOperator)
 
         /// <summary>
-        /// Add the given parking operator to its roaming network.
+        /// Add the given parking operator to its roaming network, without its parking data:
+        /// it is its own to add, see AddChildren(ParkingOperator).
         /// </summary>
         /// <param name="ParkingOperator">The new parking operator.</param>
         public static RoamingNetworkChange Add(ParkingOperator ParkingOperator)
 
             => Add(nameof(POI.ParkingOperator),
                    ParkingOperator.Id.ToString(),
-                   ParkingOperator.ToJSON());
+                   WithoutChildren(nameof(POI.ParkingOperator),
+                                   ParkingOperator.ToJSON()));
+
+        /// <summary>
+        /// Add the parking garages, spaces, sensors, space groups and products of the given parking operator,
+        /// in this order, to the operator once added: a change set the operator signs.
+        /// </summary>
+        /// <param name="ParkingOperator">The parking operator with its parking data.</param>
+        public static IReadOnlyList<RoamingNetworkChange> AddChildren(ParkingOperator ParkingOperator)
+
+            => [
+                   .. ParkingOperator.ParkingGarages.    Select(parkingGarage     => Add(parkingGarage,     ParkingOperator.Id)),
+                   .. ParkingOperator.ParkingSpaces.     Select(parkingSpace      => Add(parkingSpace,      ParkingOperator.Id)),
+                   .. ParkingOperator.ParkingSensors.    Select(parkingSensor     => Add(parkingSensor,     ParkingOperator.Id)),
+                   .. ParkingOperator.ParkingSpaceGroups.Select(parkingSpaceGroup => Add(parkingSpaceGroup, ParkingOperator.Id)),
+                   .. ParkingOperator.ParkingProducts.   Select(parkingProduct    => Add(parkingProduct,    ParkingOperator.Id))
+               ];
 
         /// <summary>
         /// Remove the given parking operator, optionally checking its complete previous JSON representation.

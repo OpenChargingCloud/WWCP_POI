@@ -188,7 +188,9 @@ Events: `OnAdminStatusChanged` (`OnParkingOperatorAdminStatusChangedDelegate`) a
   every `parkingSpaceIds` of a charging station names a parking space of the network.
 - `Add` of a parking operator: with at least one signing and one identity key and without any non-empty
   `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups` or `parkingProducts`, as its parking
-  data is its own to add. A change names no parent but the roaming network.
+  data is its own to add. A change names no parent but the roaming network. `RoamingNetworkChange.Add(parkingOperator)`
+  leaves the parking data out; `RoamingNetworkChange.AddChildren(parkingOperator)` gives the changes adding it, for a
+  change set the parking operator signs once it is a member.
 
 
 ## Example
