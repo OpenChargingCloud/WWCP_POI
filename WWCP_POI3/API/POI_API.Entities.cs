@@ -42,7 +42,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}                                                          the roaming network
     /// GET ~/RNs/{RN_Id}/CSOs                                                     its charging station operators, in short
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}                                            a charging station operator;
-    ///     ?without=chargingPools leaves out its charging pools, which ~/RNs/{RN_Id}/CPs?operatorId=… lists
+    ///     ?without=chargingPools leaves out its charging pools, which ~/RNs/{RN_Id}/CPs?operatorId=… lists;
+    ///     ?without=chargingTariffs,chargingTariffGroups,chargingPoolGroups,chargingStationGroups,EVSEGroups,
+    ///     or any of them, leaves them out, which ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs} list
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs                                        its charging tariffs, as it embeds them
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs/{CT_Id}                                a charging tariff of the charging station operator
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs                                       its charging tariff groups, as it embeds them
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs/{CTG_Id}                              a charging tariff group of the charging station operator
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPGs                                       its charging pool groups, as it embeds them
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPGs/{CPG_Id}                              a charging pool group of the charging station operator
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CSGs                                       its charging station groups, as it embeds them
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CSGs/{CSG_Id}                              a charging station group of the charging station operator
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EVSEGs                                     its EVSE groups, as it embeds them
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EVSEGs/{EVSEG_Id}                          an EVSE group of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool;
     ///     ?expand=gridConnectionPoint embeds its grid connection point instead of naming it
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}                    a charging station
@@ -198,9 +210,94 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            chargingStationOperator,
                                                                            chargingStationOperator.ToEmbeddedJSON,
-                                                                           [ "chargingPools" ],
+                                                                           [ "chargingPools", "chargingTariffs", "chargingTariffGroups", "chargingPoolGroups", "chargingStationGroups", "EVSEGroups" ],
                                                                            "a charging station operator")
                                              : errorResponse);
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs, CTGs, CPGs, CSGs, EVSEGs, and each of them below
+
+            // Its charging tariffs and its groups: a list each, and each of them on its own.
+            AddEmbeddedListHandlers<ChargingTariff_Id, ChargingTariff>(
+                chargingStationOperatorPath + "/CTs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingTariffs, null)
+                               : (null, errorResponse),
+                chargingTariff => chargingTariff.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingTariff_Id, ChargingTariff>(
+                chargingStationOperatorPath + "/CTs/{chargingTariffId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingTariffs, null)
+                               : (null, errorResponse),
+                ChargingTariff_Id.TryParse,
+                "charging tariff",
+                chargingTariff => chargingTariff.ToJSON());
+
+            AddEmbeddedListHandlers<ChargingTariffGroup_Id, ChargingTariffGroup>(
+                chargingStationOperatorPath + "/CTGs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingTariffGroups, null)
+                               : (null, errorResponse),
+                chargingTariffGroup => chargingTariffGroup.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingTariffGroup_Id, ChargingTariffGroup>(
+                chargingStationOperatorPath + "/CTGs/{chargingTariffGroupId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingTariffGroups, null)
+                               : (null, errorResponse),
+                ChargingTariffGroup_Id.TryParse,
+                "charging tariff group",
+                chargingTariffGroup => chargingTariffGroup.ToJSON());
+
+            AddEmbeddedListHandlers<ChargingPoolGroup_Id, ChargingPoolGroup>(
+                chargingStationOperatorPath + "/CPGs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingPoolGroups, null)
+                               : (null, errorResponse),
+                chargingPoolGroup => chargingPoolGroup.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingPoolGroup_Id, ChargingPoolGroup>(
+                chargingStationOperatorPath + "/CPGs/{chargingPoolGroupId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingPoolGroups, null)
+                               : (null, errorResponse),
+                ChargingPoolGroup_Id.TryParse,
+                "charging pool group",
+                chargingPoolGroup => chargingPoolGroup.ToJSON());
+
+            AddEmbeddedListHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
+                chargingStationOperatorPath + "/CSGs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingStationGroups, null)
+                               : (null, errorResponse),
+                chargingStationGroup => chargingStationGroup.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
+                chargingStationOperatorPath + "/CSGs/{chargingStationGroupId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingStationGroups, null)
+                               : (null, errorResponse),
+                ChargingStationGroup_Id.TryParse,
+                "charging station group",
+                chargingStationGroup => chargingStationGroup.ToJSON());
+
+            AddEmbeddedListHandlers<EVSEGroup_Id, EVSEGroup>(
+                chargingStationOperatorPath + "/EVSEGs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.EVSEGroups, null)
+                               : (null, errorResponse),
+                eVSEGroup => eVSEGroup.ToJSON());
+
+            AddEmbeddedEntityHandlers<EVSEGroup_Id, EVSEGroup>(
+                chargingStationOperatorPath + "/EVSEGs/{EVSEGroupId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.EVSEGroups, null)
+                               : (null, errorResponse),
+                EVSEGroup_Id.TryParse,
+                "EVSE group",
+                eVSEGroup => eVSEGroup.ToJSON());
 
             #endregion
 

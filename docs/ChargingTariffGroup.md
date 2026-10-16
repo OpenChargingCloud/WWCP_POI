@@ -21,7 +21,7 @@ before `TG` is optional. Ids are unique within the operator and compared case-in
 | Status | `ChargingTariffGroupStatusType`, initially `active` |
 | Embedded in | [ChargingStationOperator](ChargingStationOperator.md) as `chargingTariffGroups` |
 | Owner | the charging station operator named by the identification (its signing keys) |
-| HTTP | no route of its own; embedded in `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs/{CTG_Id}`; embedded in its charging station operator, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}`, and listed by `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs` |
 
 
 ## Common properties

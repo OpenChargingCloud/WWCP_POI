@@ -402,7 +402,10 @@ pools of all charging station operators of a roaming network, each as its operat
 `chargingStationOperator: {@id, name}`; `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}?without=chargingPools` is the operator
 without them, so that a large one is not read whole to show what it says of itself. So is
 `GET ~/RNs/{RN_Id}/GOs/{GO_Id}?without=gridConnectionPoints`, and `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs` lists them as
-the grid operator embeds them; and a parking operator without any of `parkingGarages`, `parkingSpaces`,
+the grid operator embeds them; a charging station operator without any of `chargingTariffs`, `chargingTariffGroups`,
+`chargingPoolGroups`, `chargingStationGroups` and `EVSEGroups` as well, listed by
+`~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs}`, each of them below it, e.g. `…/CTs/{CT_Id}`; and a
+parking operator without any of `parkingGarages`, `parkingSpaces`,
 `parkingSpaceGroups`, `parkingSensors` and `parkingProducts`, e.g. `?without=parkingSpaces,parkingSensors`, listed by
 `~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs}`, each of them below it, e.g. `…/PSs/{PS_Id}`. Every list, `~/RNs`,
 `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` and

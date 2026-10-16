@@ -24,7 +24,7 @@ The identification is a `ChargingTariff_Id`: the operator identification, `*T` a
 | Status | `ChargingTariffStatusType`, initially `active` |
 | Embedded in | [ChargingStationOperator](ChargingStationOperator.md) as `chargingTariffs` |
 | Owner | the charging station operator named by the identification (its signing keys) |
-| HTTP | no route of its own; embedded in `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs/{CT_Id}`; embedded in its charging station operator, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}`, and listed by `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs` |
 
 
 ## Common properties

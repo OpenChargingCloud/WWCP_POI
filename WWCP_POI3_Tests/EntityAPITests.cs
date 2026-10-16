@@ -492,7 +492,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
             var (whole,   wholeContent)  = await Send(HttpMethod.Get, CSO);
             var (slim,    slimContent)   = await Send(HttpMethod.Get, CSO + "?without=chargingPools");
             var (again,   _)             = await Send(HttpMethod.Get, CSO + "?without=chargingPools");
-            var (unknown, _)             = await Send(HttpMethod.Get, CSO + "?without=chargingTariffs");
+            var (unknown, _)             = await Send(HttpMethod.Get, CSO + "?without=gridConnectionPoints");
 
             var wholeJSON  = ParseJSON(wholeContent);
             var slimJSON   = ParseJSON(slimContent);
