@@ -66,32 +66,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The currency of all its prices, by its ISO 4217 code.
         /// </summary>
-        public Currency                               Currency     { get; }
+        public Currency                               Currency       { get; }
 
         /// <summary>
         /// For which charging sessions it is; for every one, unless given.
         /// </summary>
-        public ChargingTariffType?                    TariffType   { get; }
+        public ChargingTariffType?                    TariffType     { get; }
 
         /// <summary>
         /// A web page about it, e.g. for EV drivers.
         /// </summary>
-        public URL?                                   TariffURL    { get; }
+        public URL?                                   TariffURL      { get; }
 
         /// <summary>
         /// The elements, in their given order; at least one.
         /// </summary>
-        public ImmutableArray<ChargingTariffElement>  Elements     { get; }
+        public ImmutableArray<ChargingTariffElement>  Elements       { get; }
 
         /// <summary>
         /// The least a charging session costs: a session costing less costs this.
         /// </summary>
-        public ChargingPriceLimit?                    MinPrice     { get; }
+        public ChargingPriceLimit?                    MinPrice       { get; }
 
         /// <summary>
         /// The most a charging session costs: a session costing more costs this.
         /// </summary>
-        public ChargingPriceLimit?                    MaxPrice     { get; }
+        public ChargingPriceLimit?                    MaxPrice       { get; }
+
+        /// <summary>
+        /// The means it can be paid with, e.g. a credit card, in the order of their names.
+        /// </summary>
+        public ImmutableArray<PaymentMeans>           PaymentMeans   { get; }
+
+        /// <summary>
+        /// The payment brands it can be paid with, e.g. Visa, in the order of their names.
+        /// </summary>
+        public ImmutableArray<PaymentBrand>           PaymentBrands  { get; }
 
 
         /// <summary>
@@ -116,6 +126,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               ChargingTariffType?                            TariffType                   = null,
                               ChargingPriceLimit?                            MinPrice                     = null,
                               ChargingPriceLimit?                            MaxPrice                     = null,
+                              IEnumerable<PaymentMeans>?                     PaymentMeans                 = null,
+                              IEnumerable<PaymentBrand>?                     PaymentBrands                = null,
 
                               Timestamped<ChargingTariffAdminStatusType>?    InitialAdminStatus           = null,
                               Timestamped<ChargingTariffStatusType>?         InitialStatus                = null,
@@ -158,13 +170,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ValidatePriceLimits(Id, MinPrice, MaxPrice) is String error)
                 throw new ArgumentException(error, nameof(MinPrice));
 
-            this.Currency    = Currency;
-            this.TariffType  = TariffType;
-            this.TariffURL   = TariffURL;
-            this.EnergyMix   = EnergyMix;
-            this.Elements    = [.. elements];
-            this.MinPrice    = MinPrice;
-            this.MaxPrice    = MaxPrice;
+            this.Currency       = Currency;
+            this.TariffType     = TariffType;
+            this.TariffURL      = TariffURL;
+            this.EnergyMix      = EnergyMix;
+            this.Elements       = [.. elements];
+            this.MinPrice       = MinPrice;
+            this.MaxPrice       = MaxPrice;
+            this.PaymentMeans   = POIJSON.OrderedIds(PaymentMeans,  $"payment means of the charging tariff '{Id}'");
+            this.PaymentBrands  = POIJSON.OrderedIds(PaymentBrands, $"payment brand of the charging tariff '{Id}'");
 
         }
 
@@ -289,6 +303,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (MaxPrice is not null)
                 json.Add("maxPrice",     MaxPrice.ToJSON());
 
+            if (PaymentMeans.Length > 0)
+                json.Add("paymentMeans",   POIJSON.IdsToJSON(PaymentMeans));
+
+            if (PaymentBrands.Length > 0)
+                json.Add("paymentBrands",  POIJSON.IdsToJSON(PaymentBrands));
+
             if (EnergyMix is not null)
                 json.Add("energyMix",    EnergyMix.ToJSON(Embedded: true));
 
@@ -378,6 +398,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIJSON.TryParseIds(JSON, "paymentMeans",  "payment means", POI.PaymentMeans.TryParse, out ImmutableArray<PaymentMeans> paymentMeans,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds(JSON, "paymentBrands", "payment brand", POI.PaymentBrand.TryParse, out ImmutableArray<PaymentBrand> paymentBrands, out ErrorResponse))
+                {
+                    return false;
+                }
+
                 if (ValidatePriceLimits(id, minPrice, maxPrice) is String priceLimitsError)
                 {
                     ErrorResponse = priceLimitsError;
@@ -403,6 +429,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     tariffType,
                                                     minPrice,
                                                     maxPrice,
+                                                    paymentMeans,
+                                                    paymentBrands,
                                                     DataSource:  dataSource,
                                                     Created:     created,
                                                     LastChange:  lastChange,

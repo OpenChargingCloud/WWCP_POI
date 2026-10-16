@@ -52,6 +52,8 @@ See [README.md](README.md#common-properties). No `eTags`.
 | `elements` | `Elements` | [ChargingTariffElement](#elements)[] | update | Mandatory, at least one, in their given order. Changed as a whole; removing it is refused. |
 | `minPrice` | `MinPrice` | [ChargingPriceLimit](#minprice-and-maxprice) | update/remove | The least a charging session costs: one costing less costs this. Not a flat fee, which every session pays. |
 | `maxPrice` | `MaxPrice` | [ChargingPriceLimit](#minprice-and-maxprice) | update/remove | The most a charging session costs: one costing more costs this. |
+| `paymentMeans` | `PaymentMeans` | `ImmutableArray<PaymentMeans>` | update/remove | The means it can be paid with, each once, in the ordinal order of their names. Predefined: `CREDIT_CARD`, `DEBIT_CARD`, `VALUE_CARD` (a prepaid card), `CASH` (coins and bills), `CASH_COINS`, `CASH_BILLS`, `MOBILE_ACCOUNT`, `TOLL_TAG`, `PREPAY`, `NFC` (contactless), `EMV` (a card with a chip), `QR_CODE`, `WEBSITE`; other nonempty texts are read as well. |
+| `paymentBrands` | `PaymentBrands` | `ImmutableArray<PaymentBrand>` | update/remove | The payment brands it can be paid with, each once, in the ordinal order of their names. Predefined: `AMERICAN_EXPRESS`, `APPLE_PAY`, `CIRRUS`, `DINERS_CLUB`, `DISCOVER`, `GIROCARD`, `MAESTRO`, `MASTERCARD`, `VISA`, `VPAY`; other nonempty texts, e.g. `Google Pay`, are read as well. |
 | `energyMix` | `EnergyMix` | [EnergyMix](#energymix) | update/remove | The mix of the energy it delivers. |
 
 The tariff is changed only through its operator's change sets: `RoamingNetworkChange.Add(tariff)` (no parent
@@ -194,6 +196,7 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
   but `FLAT`, absent for `FLAT`.
 - Restrictions: `HH:mm` and `yyyy-MM-dd` exactly; times in whole minutes, `startTime` ≠ `endTime`; `startDate` < `endDate`; minima and maxima ≥ 0,
   minimum ≤ maximum; `daysOfWeek` upper-case day names, each at most once.
+- `paymentMeans` and `paymentBrands` must not name a value twice (case-insensitively).
 - `energyMix`, when given, a valid [energy mix](#energymix).
 - Network level: every `chargingTariffIds`/`chargingTariffId` of the operator's EVSEs and groups names one of its tariffs.
 
@@ -227,6 +230,8 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
       ]
     }
   ],
+  "paymentMeans": [ "CREDIT_CARD", "NFC", "QR_CODE" ],
+  "paymentBrands": [ "MASTERCARD", "VISA" ],
   "energyMix": {
     "energySources": [ [ "Wind", "60 %" ], [ "Sun", "40 %" ] ],
     "environmentalImpacts": [],

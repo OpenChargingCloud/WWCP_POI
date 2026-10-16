@@ -100,6 +100,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "openingTimes",
             "images",
             "vehicleTypes",
+            "euVehicleCategories",
             "accessibility",
             "features",
             "calibrationInfo",
@@ -166,6 +167,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "elements",
             "minPrice",
             "maxPrice",
+            "paymentMeans",
+            "paymentBrands",
             "energyMix",
             "customData"
         ];

@@ -149,6 +149,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<VehicleType>             VehicleTypes          { get; }
 
         /// <summary>
+        /// The EU vehicle categories it charges, e.g. M1 for passenger cars, in the order of their names.
+        /// </summary>
+        public ImmutableArray<EUVehicleCategory>       EUVehicleCategories   { get; }
+
+        /// <summary>
         /// Who may use it, when it differs from its charging pool, e.g. FreePubliclyAccessible.
         /// </summary>
         public AccessibilityType?                      Accessibility         { get; }
@@ -207,6 +212,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                URL?                                            CertificationInfo            = null,
                                Watt?                                           MaxPower                     = null,
                                IEnumerable<ParkingSpace_Id>?                   ParkingSpaceIds              = null,
+                               IEnumerable<EUVehicleCategory>?                 EUVehicleCategories          = null,
 
                                Timestamped<ChargingStationAdminStatusType>?    InitialAdminStatus           = null,
                                Timestamped<ChargingStationStatusType>?         InitialStatus                = null,
@@ -274,6 +280,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.OpeningTimes        = OpeningTimes;
             this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the charging station '{Id}'");
             this.VehicleTypes        = POIJSON.OrderedIds(VehicleTypes,    $"vehicle type of the charging station '{Id}'");
+            this.EUVehicleCategories = POIJSON.OrderedIds(EUVehicleCategories, $"EU vehicle category of the charging station '{Id}'");
             this.Accessibility       = Accessibility;
             this.Features            = POIJSON.OrderedIds(Features,        $"feature of the charging station '{Id}'");
             this.CalibrationInfo     = CalibrationInfo;
@@ -488,6 +495,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (VehicleTypes.Length > 0)
                 json.Add("vehicleTypes",       POIJSON.IdsToJSON(VehicleTypes));
 
+            if (EUVehicleCategories.Length > 0)
+                json.Add("euVehicleCategories", POIJSON.IdsToJSON(EUVehicleCategories));
+
             if (Accessibility.HasValue)
                 json.Add("accessibility",      Accessibility.Value.ToString());
 
@@ -586,6 +596,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
 
                 if (!POIJSON.TryParseIds (JSON, "vehicleTypes",       "vehicle type",               VehicleType.           TryParse, out ImmutableArray<VehicleType>             vehicleTypes,       out ErrorResponse) ||
+                    !POIJSON.TryParseIds (JSON, "euVehicleCategories", "EU vehicle category",       EUVehicleCategory.     TryParse, out ImmutableArray<EUVehicleCategory>       euVehicleCategories, out ErrorResponse) ||
                     !POIJSON.TryParseText(JSON, "accessibility",      "accessibility",              AccessibilityType.     TryParse, out AccessibilityType?                      accessibility,      out ErrorResponse) ||
                     !POIJSON.TryParseIds (JSON, "features",           "charging station feature",   ChargingStationFeature.TryParse, out ImmutableArray<ChargingStationFeature>  features,           out ErrorResponse) ||
                     !POIJSON.TryParseText(JSON, "calibrationInfo",    "calibration information",    URL.                   TryParse, out URL?                                    calibrationInfo,    out ErrorResponse) ||
@@ -628,6 +639,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       certificationInfo,
                                                       maxPower,
                                                       parkingSpaceIds,
+                                                      euVehicleCategories,
                                                       DataSource:  dataSource,
                                                       Created:     created,
                                                       LastChange:  lastChange,

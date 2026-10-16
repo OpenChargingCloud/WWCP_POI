@@ -72,6 +72,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     TariffType:  WithTypeAndLimits ? ChargingTariffType.REGULAR             : null,
                     MinPrice:    WithTypeAndLimits ? new ChargingPriceLimit(2.5m, 2.98m)   : null,
                     MaxPrice:    WithTypeAndLimits ? new ChargingPriceLimit(50)             : null,
+                    PaymentMeans:   WithTypeAndLimits ? [ PaymentMeans.QR_CODE, PaymentMeans.CREDIT_CARD ]      : null,
+                    PaymentBrands:  WithTypeAndLimits ? [ PaymentBrand.VISA, PaymentBrand.Parse("Google Pay") ] : null,
                     Created:     Created);
 
         #endregion
@@ -135,6 +137,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(tariff["minPrice"]!.ToString(Newtonsoft.Json.Formatting.None), Is.EqualTo("""{"excludingVAT":2.5,"includingVAT":2.98}"""));
                 Assert.That(tariff["maxPrice"]!.ToString(Newtonsoft.Json.Formatting.None), Is.EqualTo("""{"excludingVAT":50.0}"""));
                 Assert.That(json["chargingStationOperators"]![0]!["chargingTariffs"]![1]!["tariffType"], Is.Null);
+                Assert.That(tariff["paymentMeans"]!.Values<String>(),                     Is.EqualTo(new[] { "CREDIT_CARD", "QR_CODE" }));
+                Assert.That(tariff["paymentBrands"]!.Values<String>(),                    Is.EqualTo(new[] { "Google Pay", "VISA" }));
+                Assert.That(json["chargingStationOperators"]![0]!["chargingTariffs"]![1]!["paymentMeans"], Is.Null);
                 Assert.That(tariff["elements"]![0]!["priceComponents"]![0]!["type"]!.ToString(),  Is.EqualTo("ENERGY"));
                 Assert.That(restrictions["startTime"]!.ToString(),                        Is.EqualTo("22:00"));
                 Assert.That(restrictions["endTime"]!.ToString(),                          Is.EqualTo("06:30"));
@@ -144,6 +149,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(t1!.TariffType,                                               Is.EqualTo(ChargingTariffType.REGULAR));
                 Assert.That(t1.MinPrice,                                                  Is.EqualTo(new ChargingPriceLimit(2.5m, 2.98m)));
                 Assert.That(t1.MaxPrice,                                                  Is.EqualTo(new ChargingPriceLimit(50)));
+                Assert.That(t1.PaymentMeans,                                              Is.EqualTo(new[] { PaymentMeans.CREDIT_CARD, PaymentMeans.QR_CODE }));
+                Assert.That(t1.PaymentBrands,                                             Is.EqualTo(new[] { PaymentBrand.Parse("google pay"), PaymentBrand.VISA }));
 
                 Assert.That(fromJSON.TryGetChargingTariffById(T2, out var t2),            Is.True);
                 Assert.That(t2!.Elements[0].PriceComponents[0].Price,                     Is.EqualTo(0.49m));
@@ -195,6 +202,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 ("limit without net",    Changed(network => ((JObject) Tariff(network)["maxPrice"]!).Remove("excludingVAT")),                     "maximum price"),
                 ("minimum above max",    Changed(network => Tariff(network)["maxPrice"]!["excludingVAT"] = 1),                                    "must not exceed its maximum price"),
                 ("minimum above max VAT",Changed(network => Tariff(network)["maxPrice"] = new ChargingPriceLimit(2.5m, 2.97m).ToJSON()),          "must not exceed its maximum price"),
+                ("payment means twice",  Changed(network => Tariff(network)["paymentMeans"]  = new JArray("NFC", "nfc")),                                 "must not be given twice"),
+                ("payment brand no text",Changed(network => Tariff(network)["paymentBrands"] = new JArray(42)),                                           "payment brand '42'"),
                 ("foreign tariff",       Changed(network => Tariff(network)["@id"] = "DE*XYZ*T1"),                                                 "does not belong to the operator"),
                 ("unknown tariff",       Changed(network => network["chargingStationOperators"]![0]!["chargingPools"]![0]!["chargingStations"]![0]!["EVSEs"]![0]!["chargingTariffIds"] = new JArray("DE*GEF*T9")),
                                                                                                                                                    "charging tariff 'DE*GEF*T9' of the EVSE")
@@ -235,6 +244,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                RoamingNetworkChange.UpdateProperty(t1!, "elements",          null, elements),
                                RoamingNetworkChange.UpdateProperty(t1!, "tariffType",        "REGULAR", "AD_HOC_PAYMENT"),
                                RoamingNetworkChange.RemoveProperty(t1!, "maxPrice"),
+                               RoamingNetworkChange.UpdateProperty(t1!, "paymentMeans",      null, new JArray("EMV", "WEBSITE")),
+                               RoamingNetworkChange.RemoveProperty(t1!, "paymentBrands"),
                                RoamingNetworkChange.UpdateProperty(e1,  "chargingTariffIds", null, new JArray(t3.ToString())),
                                RoamingNetworkChange.Remove        (T2)
                            ], CreatedAt: T0.AddMinutes(1));
@@ -254,12 +265,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(gef2.EVSEs.Single().ChargingTariffIds,                                Is.EqualTo(new[] { t3 }));
 
                 // Old values for a later check.
-                Assert.That(cs.Changes[5].OldValue!["@id"]!.ToString(),                           Is.EqualTo("DE*GEF*T2"));
+                Assert.That(cs.Changes[7].OldValue!["@id"]!.ToString(),                           Is.EqualTo("DE*GEF*T2"));
 
                 // The type and the price limits.
                 Assert.That(changedT1.TariffType,                                                Is.EqualTo(ChargingTariffType.AD_HOC_PAYMENT));
                 Assert.That(changedT1.MinPrice,                                                  Is.EqualTo(new ChargingPriceLimit(2.5m, 2.98m)));
                 Assert.That(changedT1.MaxPrice,                                                  Is.Null);
+                Assert.That(changedT1.PaymentMeans,                                              Is.EqualTo(new[] { PaymentMeans.EMV, PaymentMeans.WEBSITE }));
+                Assert.That(changedT1.PaymentBrands,                                             Is.Empty);
 
                 // The status of the tariff survived its change.
                 Assert.That(history.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, nameof(ChargingTariff), T1.ToString(), out var tariffStatus),  Is.True);

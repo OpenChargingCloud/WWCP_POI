@@ -85,6 +85,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                 Created:              Created,
                                                                                                                 ChargingStations:     [ new ChargingStation(S1,
                                                                                                                                                             VehicleTypes:       [ VehicleType.VAN, VehicleType.MOTORCYCLE ],
+                                                                                                                                                            EUVehicleCategories: [ EUVehicleCategory.M1, EUVehicleCategory.L3 ],
                                                                                                                                                             Accessibility:      AccessibilityType.RestrictedAccess,
                                                                                                                                                             Features:           [ ChargingStationFeature.StatusInfoAvailable ],
                                                                                                                                                             CalibrationInfo:    URL.Parse("https://gef.example/calibration"),
@@ -173,6 +174,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(pool["relatedLocations"]![0]!["name"]!["en"]!.Value<String>(),   Is.EqualTo("Walkway"));
 
                 Assert.That(station["vehicleTypes"]!.Values<String>(),                       Is.EqualTo(new[] { "MOTORCYCLE", "VAN" }));
+                Assert.That(station["euVehicleCategories"]!.Values<String>(),                Is.EqualTo(new[] { "L3", "M1" }));
                 Assert.That(station["accessibility"]!.Value<String>(),                       Is.EqualTo("RestrictedAccess"));
                 Assert.That(station["features"]!.Values<String>(),                           Is.EqualTo(new[] { "StatusInfoAvailable" }));
                 Assert.That(station["calibrationInfo"]!.Value<String>(),                     Is.EqualTo("https://gef.example/calibration"));
@@ -231,6 +233,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 ("chargingWhenClosed text",   Changed(network => Pool(network)["chargingWhenClosed"] = "no"),                                                 "charging when closed"),
                 ("entrance not an object",    Changed(network => Pool(network)["entranceLocation"]   = "here"),                                               "entrance location"),
                 ("related without location",  Changed(network => ((JObject) Pool(network)["relatedLocations"]![0]!).Remove("geoLocation")),                   "related location"),
+                ("EU category twice",         Changed(network => Station(network)["euVehicleCategories"] = new JArray("M1", "m1")),                           "must not be given twice"),
+                ("empty EU category",         Changed(network => Station(network)["euVehicleCategories"] = new JArray(" ")),                                  "EU vehicle category ' '"),
                 ("negative station power",    Changed(network => Station(network)["maxPower"]        = -1),                                                   "must not be negative"),
                 ("unknown parking space",     Changed(network => Station(network)["parkingSpaceIds"] = new JArray("space-9")),                                "parking space 'space-9' of the charging station 'DE*GEF*S1'"),
                 ("invalid calibration URL",   Changed(network => Station(network)["calibrationInfo"] = 42),                                                   "calibration information"),
@@ -268,6 +272,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                  RoamingNetworkChange.RemoveProperty(pool,     "relatedLocations"),
                                  RoamingNetworkChange.UpdateProperty(station,  "parkingSpaceIds",         null, new JArray("space-2")),
                                  RoamingNetworkChange.UpdateProperty(station,  "maxPower",                null, 22000),
+                                 RoamingNetworkChange.UpdateProperty(station,  "euVehicleCategories",     null, new JArray("N1", "M1")),
                                  RoamingNetworkChange.UpdateProperty(evse,     "maxReservationDuration",  null, 900),
                                  RoamingNetworkChange.RemoveProperty(evse,     "geoLocation"));
 
@@ -284,6 +289,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(pool2.RelatedLocations,        Is.Empty);
                 Assert.That(station2.ParkingSpaceIds,      Is.EqualTo(new[] { SP2 }));
                 Assert.That(station2.MaxPower?.Value,      Is.EqualTo(22000m));
+                Assert.That(station2.EUVehicleCategories,  Is.EqualTo(new[] { EUVehicleCategory.M1, EUVehicleCategory.N1 }));
                 Assert.That(evse2.MaxReservationDuration,  Is.EqualTo(TimeSpan.FromMinutes(15)));
                 Assert.That(evse2.GeoLocation,             Is.Null);
 

@@ -57,6 +57,7 @@ See [common properties](README.md#common-properties). A charging station does no
 | `openingTimes` | `OpeningTimes` | `ImmutableOpeningTimes?` | update/remove | When it is open; always, unless given. See [openingTimes](#openingtimes). |
 | `images` | `Images` | `ImmutableArray<Image>` | update/remove | Its images, in their given order; see [images](#images). |
 | `vehicleTypes` | `VehicleTypes` | `ImmutableArray<VehicleType>` | update/remove | The types of vehicles it charges, each once, in the ordinal order of their names. Predefined: `MOTORCYCLE`, `PERSONAL_VEHICLE`, `PERSONAL_VEHICLE_WITH_TRAILER`, `VAN`, `SEMI_TRACTOR`, `RIGID`, `TRUCK_WITH_TRAILER`, `BUS`, `DISABLED`; other nonempty texts are read as well. |
+| `euVehicleCategories` | `EUVehicleCategories` | `ImmutableArray<EUVehicleCategory>` | update/remove | The EU vehicle categories it charges, as in the type-approval regulations (EU) 2018/858, 167/2013 and 168/2013, each once, in the ordinal order of their names. Predefined: `L`, `L1`…`L7` (category L1e…L7e), `M`, `M1`…`M3`, `N`, `N1`…`N3`, `O`, `O1`…`O4`, `R`, `R1`…`R4`, `T`, `T1`…`T4`; other nonempty texts are read as well. |
 | `accessibility` | `Accessibility` | `AccessibilityType?` | update/remove | Who may use it, only when it differs from its pool. Predefined: `Unspecified`, `FreePubliclyAccessible`, `RestrictedAccess`, `PayingPubliclyAccessible`, `TestStation`, `TestPool`. |
 | `features` | `Features` | `ImmutableArray<ChargingStationFeature>` | update/remove | Each once, in the ordinal order of their names. Predefined: `StatusInfoAvailable`, `EnergyInfoAvailable`, `GermanCalibrationLaw`, `EuropeanCalibrationLaw`, `Reservable`, `AuthenticationBeforePlugIn`, `ChargingProfilesSupported`, `ChargingPreferencesSupported`, `TokenGroupsSupported`, `CSOUnlockSupported`, `HubjectCompatible`, `START_SESSION_CONNECTOR_REQUIRED`; other nonempty texts are read as well. |
 | `calibrationInfo` | `CalibrationInfo` | `URL?` | update/remove | Where to find information on the calibration of its energy meters; see [Calibration and certification](#calibration-and-certification). |
@@ -213,7 +214,7 @@ The station's status is set on its own; it is not calculated from the status of 
 - `maxPower` must not be negative, and not exceed the `maxPower` of all its EVSEs together, where all of them have one.
 - Every EVSE must belong to the operator of the station; an EVSE must not be given twice.
 - An energy meter must not be given twice; energy meter identifications are unique in the roaming network.
-- `brandIds`, `vehicleTypes`, `features` and `parkingSpaceIds` must not name a value twice; an image URL must
+- `brandIds`, `vehicleTypes`, `euVehicleCategories`, `features` and `parkingSpaceIds` must not name a value twice; an image URL must
   not be given twice.
 - `EVSEs` and `energyMeters` must be given completely; `EVSEIds` and `energyMeterIds` are refused.
 - In its operator: the station belongs to the operator of its pool, and is unique within the operator across all
@@ -276,6 +277,7 @@ The station's status is set on its own; it is not calculated from the status of 
     }
   ],
   "vehicleTypes":      [ "MOTORCYCLE", "PERSONAL_VEHICLE" ],
+  "euVehicleCategories": [ "L3", "M1" ],
   "features":          [ "EuropeanCalibrationLaw", "Reservable" ],
   "calibrationInfo":   "https://charging.example/calibration/S1",
   "maxPower":          44000,
