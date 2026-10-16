@@ -21,7 +21,7 @@ compared case-insensitively, e.g. `DE*PRK`, unique within the roaming network.
 | Status | `ParkingOperatorStatusType`, initially `available` |
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `parkingOperators` |
 | Owner | itself (signing key), also for everything it embeds; its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO; added and removed by the RNO |
-| HTTP | `GET ~/RNs/{RN_Id}/POs/{PO_Id}` (with everything it embeds, or `?without=` any of `parkingGarages`, `parkingSpaces`, `parkingSpaceGroups`, `parkingSensors`, `parkingProducts`), `GET ~/RNs/{RN_Id}/POs/{PO_Id}/{PGs\|PSs\|PSGs\|PSNs\|PPs}` (each of them, searched and paged) |
+| HTTP | `GET ~/RNs/{RN_Id}/POs/{PO_Id}` (with everything it embeds, or `?without=` any of `parkingGarages`, `parkingSpaces`, `parkingSpaceGroups`, `parkingSensors`, `parkingProducts`), `GET ~/RNs/{RN_Id}/POs/{PO_Id}/{PGs\|PSs\|PSGs\|PSNs\|PPs}` (each of them, searched and paged), and one of them below it, e.g. `…/PSs/{PS_Id}` |
 
 
 ## Common properties

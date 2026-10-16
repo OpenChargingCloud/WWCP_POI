@@ -61,10 +61,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///     ?without=parkingGarages,parkingSpaces,parkingSpaceGroups,parkingSensors,parkingProducts, or any of them,
     ///     leaves them out, which ~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs} list
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PGs                                          its parking garages, as it embeds them
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PGs/{PG_Id}                                  a parking garage of the parking operator
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs                                          its parking spaces, as it embeds them
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs/{PS_Id}                                  a parking space of the parking operator
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSGs                                         its parking space groups, as it embeds them
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSGs/{PSG_Id}                                a parking space group of the parking operator
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSNs                                         its parking sensors, as it embeds them
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSNs/{PSN_Id}                                a parking sensor of the parking operator
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs                                          its parking products, as it embeds them
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs/{PP_Id}                                  a parking product of the parking operator
     ///
     /// The roaming network is the head of its history, when served with one, else the one added.
     /// A list is an array of { "@id", "name", "description" } in the order of the identifications,
@@ -407,6 +412,55 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region ~/RNs/{RN_Id}/POs/{PO_Id}/PGs/{PG_Id}, PSs/{PS_Id}, PSGs/{PSG_Id}, PSNs/{PSN_Id}, PPs/{PP_Id}
+
+            AddEmbeddedEntityHandlers<ParkingGarage_Id, ParkingGarage>(
+                parkingOperatorPath + "/PGs/{parkingGarageId}",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingGarages, null)
+                               : (null, errorResponse),
+                ParkingGarage_Id.TryParse,
+                "parking garage",
+                parkingGarage => parkingGarage.ToJSON());
+
+            AddEmbeddedEntityHandlers<ParkingSpace_Id, ParkingSpace>(
+                parkingOperatorPath + "/PSs/{parkingSpaceId}",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingSpaces, null)
+                               : (null, errorResponse),
+                ParkingSpace_Id.TryParse,
+                "parking space",
+                parkingSpace => parkingSpace.ToJSON());
+
+            AddEmbeddedEntityHandlers<ParkingSpaceGroup_Id, ParkingSpaceGroup>(
+                parkingOperatorPath + "/PSGs/{parkingSpaceGroupId}",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingSpaceGroups, null)
+                               : (null, errorResponse),
+                ParkingSpaceGroup_Id.TryParse,
+                "parking space group",
+                parkingSpaceGroup => parkingSpaceGroup.ToJSON());
+
+            AddEmbeddedEntityHandlers<ParkingSensor_Id, ParkingSensor>(
+                parkingOperatorPath + "/PSNs/{parkingSensorId}",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingSensors, null)
+                               : (null, errorResponse),
+                ParkingSensor_Id.TryParse,
+                "parking sensor",
+                parkingSensor => parkingSensor.ToJSON());
+
+            AddEmbeddedEntityHandlers<ParkingProduct_Id, ParkingProduct>(
+                parkingOperatorPath + "/PPs/{parkingProductId}",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingProducts, null)
+                               : (null, errorResponse),
+                ParkingProduct_Id.TryParse,
+                "parking product",
+                parkingProduct => parkingProduct.ToJSON());
+
+            #endregion
+
         }
 
         #endregion
@@ -521,6 +575,53 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                    entries => new JArray(entries.Select(ToJSON)),
                                                                    format => collection.Representation(EmbeddedView, format, () => new JArray(collection.Select(ToJSON))),
                                                                    collection.Count);
+
+                                 });
+
+        #endregion
+
+
+        #region (private) AddEmbeddedEntityHandlers(Path, Collection, TryParseId, Description, ToJSON)
+
+        /// <summary>
+        /// Parses the identification of an entity from the text of its path.
+        /// </summary>
+        private delegate Boolean TryParseIdDelegate<TId>(String Text, out TId Id);
+
+        /// <summary>
+        /// Answer GET of the given path with one child of an entity, the last parameter of the path, as the
+        /// entity embeds it: kept with its version, as every entity is. HEAD by Hermod from it, and OPTIONS.
+        /// </summary>
+        /// <param name="Path">The path of the child, below the one of the list of the children.</param>
+        /// <param name="Collection">The children of the entity the path names, or why there are none.</param>
+        /// <param name="TryParseId">Parses the identification of a child.</param>
+        /// <param name="Description">What a child is, e.g. "parking space", for a refusal.</param>
+        /// <param name="ToJSON">A child, as the entity embeds it.</param>
+        private void AddEmbeddedEntityHandlers<TId, TEntity>(HTTPPath                                                                          Path,
+                                                             Func<HTTPRequest, (POICollection<TId, TEntity>? Collection, HTTPResponse? ErrorResponse)>  Collection,
+                                                             TryParseIdDelegate<TId>                                                           TryParseId,
+                                                             String                                                                            Description,
+                                                             Func<TEntity, JObject>                                                            ToJSON)
+
+            where TId     : notnull
+            where TEntity : class
+
+            => AddEntityHandlers(Path,
+                                 request => {
+
+                                     var (collection, errorResponse) = Collection(request);
+
+                                     if (collection is null)
+                                         return errorResponse!;
+
+                                     var text = request.ParsedURLParameters[^1];
+
+                                     if (!TryParseId(text, out var id))
+                                         return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Invalid {Description} identification '{text}'!");
+
+                                     return collection.TryGet(id, out var child)
+                                                ? CachedEntityResponse(request, child, () => ToJSON(child))
+                                                : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The {Description} '{id}' is unknown here!");
 
                                  });
 

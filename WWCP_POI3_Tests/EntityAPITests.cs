@@ -620,6 +620,39 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
         #endregion
 
+        #region What_a_parking_operator_embeds_is_served_one_by_one()
+
+        [Test]
+        public async Task What_a_parking_operator_embeds_is_served_one_by_one()
+        {
+
+            var (parkingOperator, operatorContent)  = await Send(HttpMethod.Get, PO);
+            var (space,           spaceContent)     = await Send(HttpMethod.Get, PO + "/PSs/space-1");
+            var (again,           _)                = await Send(HttpMethod.Get, PO + "/PSs/space-1");
+            var (unknown,         _)                = await Send(HttpMethod.Get, PO + "/PSs/space-2");
+            var (noGarage,        _)                = await Send(HttpMethod.Get, PO + "/PGs/garage-1");
+            var (nobody,          _)                = await Send(HttpMethod.Get, RN + "/POs/DE*XXX/PSs/space-1");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(space.StatusCode,                                          Is.EqualTo(HttpStatusCode.OK));
+
+                // The part of the parking operator it is, with the ETag of its content, kept with its version.
+                Assert.That(JToken.DeepEquals(ParseJSON(spaceContent), ParseJSON(operatorContent)["parkingSpaces"]![0]),  Is.True);
+                Assert.That(HeaderOf(space, "ETag"),                                   Is.EqualTo(ETagOf("json", spaceContent)));
+                Assert.That(HeaderOf(again, "ETag"),                                   Is.EqualTo(HeaderOf(space, "ETag")));
+
+                Assert.That(unknown.StatusCode,                                        Is.EqualTo(HttpStatusCode.NotFound));
+                Assert.That(noGarage.StatusCode,                                       Is.EqualTo(HttpStatusCode.NotFound));
+                Assert.That(nobody.StatusCode,                                         Is.EqualTo(HttpStatusCode.NotFound));
+
+            }
+
+        }
+
+        #endregion
+
         #region An_entity_is_the_part_its_roaming_network_embeds()
 
         [Test]

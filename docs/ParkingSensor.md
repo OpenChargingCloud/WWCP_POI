@@ -16,7 +16,7 @@ case-insensitively, e.g. `PRK-SEN-001`, unique within the roaming network (not o
 | Status | `ParkingSensorStatusType`, initially `available` |
 | Embedded in | [ParkingOperator](ParkingOperator.md) as `parkingSensors` |
 | Owner | its parking operator (signing key) |
-| HTTP | — (served within its parking operator, `GET ~/RNs/{RN_Id}/POs/{PO_Id}`, and listed by `GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSNs`) |
+| HTTP | `GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSNs/{PSN_Id}`; embedded in its parking operator, `GET ~/RNs/{RN_Id}/POs/{PO_Id}`, and listed by `GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSNs` |
 
 
 ## Common properties
