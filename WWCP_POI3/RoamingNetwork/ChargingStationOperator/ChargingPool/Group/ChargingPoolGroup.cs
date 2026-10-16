@@ -73,6 +73,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ChargingTariff_Id?               ChargingTariffId  { get; }
 
+        /// <summary>
+        /// Its priority over the other groups of a member, where they give it different values: the higher wins;
+        /// 0, unless given. Groups of the same member with the same priority must not give it different values.
+        /// </summary>
+        public Int32?  Priority  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -85,6 +91,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  I18NString?                                      Description                  = null,
                                  IEnumerable<ChargingPool_Id>?                    ChargingPoolIds              = null,
                                  ChargingTariff_Id?                               ChargingTariffId             = null,
+                                 Int32?                                           Priority                     = null,
 
                                  Timestamped<ChargingPoolGroupAdminStatusType>?   InitialAdminStatus           = null,
                                  Timestamped<ChargingPoolGroupStatusType>?        InitialStatus                = null,
@@ -119,6 +126,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.ChargingPoolIds   = POIJSON.OrderedIds(ChargingPoolIds, $"member of the charging pool group '{Id}'");
             this.ChargingTariffId  = ChargingTariffId;
+            this.Priority          = Priority;
 
         }
 
@@ -203,6 +211,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingTariffId.HasValue)
                 json.Add("chargingTariffId",  ChargingTariffId.Value.ToString());
 
+            if (Priority.HasValue)
+                json.Add("priority",  Priority.Value);
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -247,6 +258,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIJSON.TryParseInteger(JSON, "priority", "priority of the charging pool group", out var priority, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -261,6 +275,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           description,
                                                           members,
                                                           chargingTariffId,
+                                                          Priority:    priority,
                                                           DataSource:  dataSource,
                                                           Created:     created,
                                                           LastChange:  lastChange,

@@ -37,7 +37,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// of all charging station operators of a roaming network.
     /// </summary>
     /// <remarks>
-    /// GET ~/RNs/{RN_Id}/CPs?match=…&amp;operatorId=…&amp;offset=…&amp;limit=…    the charging pools of all its operators
+    /// GET ~/RNs/{RN_Id}/CPs?match=…&amp;operatorId=…&amp;offset=…&amp;limit=…    the charging pools of all its operators,
+    ///                                                                         with their effective charging stations
     ///
     /// Every list of the roaming networks, ~/RNs and ~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs} as well, takes
     /// - match:   words separated by spaces or commas, each contained in a text of an entry, case-insensitively;
@@ -217,13 +218,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) PoolsOf(RoamingNetwork)
 
         /// <summary>
-        /// The charging pools of all charging station operators of the given roaming network,
-        /// in the ordinal order of their identifications.
+        /// The charging pools of all charging station operators of the given roaming network, with their effective
+        /// charging stations, which have the properties their groups give them, in the ordinal order of their identifications.
         /// </summary>
         private static PoolIndex PoolsOf(RoamingNetwork RoamingNetwork)
 
             => new ([.. RoamingNetwork.ChargingStationOperators.
-                            SelectMany(chargingStationOperator => chargingStationOperator.ChargingPools.Select(chargingPool => new PoolEntry(chargingStationOperator, chargingPool))).
+                            SelectMany(chargingStationOperator => chargingStationOperator.EffectiveChargingPools.Select(chargingPool => new PoolEntry(chargingStationOperator, chargingPool))).
                             OrderBy   (entry => entry.Pool.Id.ToString(), StringComparer.Ordinal)]);
 
         #endregion
@@ -231,7 +232,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) PoolQueryJSON(Entry)
 
         /// <summary>
-        /// A charging pool as its operator embeds it, with { "@id", "name" } of its operator.
+        /// A charging pool as its operator embeds it, but with its effective charging stations, and with { "@id", "name" } of its operator.
         /// </summary>
         private static JObject PoolQueryJSON(PoolEntry Entry)
         {

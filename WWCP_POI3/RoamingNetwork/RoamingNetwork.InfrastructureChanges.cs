@@ -153,13 +153,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }.ToImmutableDictionary();
 
         /// <summary>
-        /// The properties of a group a change set can update or remove, by the group type.
+        /// The properties of a charging station a charging station group can give its members:
+        /// all but its identification, name, description, data source, custom data, EVSEs and energy meters.
+        /// </summary>
+        internal static readonly ImmutableArray<String> ChargingStationGroupStationProperties = [
+            "physicalReference",
+            "address",
+            "geoLocation",
+            "hotline",
+            "manufacturerId",
+            "modelId",
+            "brands",
+            "openingTimes",
+            "images",
+            "vehicleTypes",
+            "euVehicleCategories",
+            "accessibility",
+            "features",
+            "calibrationInfo",
+            "certificationInfo",
+            "maxPower",
+            "parkingSpaceIds"
+        ];
+
+        /// <summary>
+        /// The properties of a group a change set can update or remove, by the group type:
+        /// a charging station group also those of a charging station it gives its members.
         /// </summary>
         private static readonly ImmutableDictionary<String, ImmutableHashSet<String>> ChangeableGroupProperties = new Dictionary<String, ImmutableHashSet<String>> {
-            { nameof(EVSEGroup),            [ "name", "description", "dataSource", "EVSEIds",            "chargingTariffId", "customData" ] },
-            { nameof(ChargingStationGroup), [ "name", "description", "dataSource", "chargingStationIds", "chargingTariffId", "customData" ] },
-            { nameof(ChargingPoolGroup),    [ "name", "description", "dataSource", "chargingPoolIds",    "chargingTariffId", "customData" ] },
-            { nameof(ChargingTariffGroup),  [ "name", "description", "dataSource", "chargingTariffIds",                      "customData" ] }
+            { nameof(EVSEGroup),            [ "name", "description", "dataSource", "EVSEIds",            "chargingTariffId", "priority", "customData" ] },
+            { nameof(ChargingStationGroup), [ "name", "description", "dataSource", "chargingStationIds", "chargingTariffId", "priority", "customData",
+                                              .. ChargingStationGroupStationProperties ] },
+            { nameof(ChargingPoolGroup),    [ "name", "description", "dataSource", "chargingPoolIds",    "chargingTariffId", "priority", "customData" ] },
+            { nameof(ChargingTariffGroup),  [ "name", "description", "dataSource", "chargingTariffIds",                      "priority", "customData" ] }
         }.ToImmutableDictionary();
 
         /// <summary>

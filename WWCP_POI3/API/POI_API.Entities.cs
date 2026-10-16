@@ -57,8 +57,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CSGs/{CSG_Id}                              a charging station group of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EVSEGs                                     its EVSE groups, as it embeds them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EVSEGs/{EVSEG_Id}                          an EVSE group of the charging station operator
-    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool;
-    ///     ?expand=gridConnectionPoint embeds its grid connection point instead of naming it
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool, with its effective charging stations;
+    ///     ?expand=gridConnectionPoint embeds its grid connection point instead of naming it,
+    ///     ?view=stored serves it, and everything below, as its operator embeds it
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands                         the brands of the charging pool, its own
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands/{Brand_Id}              a brand of the charging pool
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}                    a charging station
@@ -95,6 +96,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSNs/{PSN_Id}                                a parking sensor of the parking operator
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs                                          its parking products, as it embeds them
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs/{PP_Id}                                  a parking product of the parking operator
+    ///
+    /// A charging station is served as it is at runtime, the effective charging station of its operator: with the
+    /// properties of a charging station its groups give it, see ChargingStationOperator.EffectiveChargingStations;
+    /// a charging pool with them, also in ~/RNs/{RN_Id}/CPs, searched with them. A charging station operator and the
+    /// roaming network embed them as they are given, with their groups. ?view=stored serves a charging
+    /// pool, and what it embeds, as its operator embeds it, with the ETag a precondition of a change set names.
     ///
     /// Brands are embedded in what they are a brand of, and mean something of their own on every level: a charging
     /// station operator is a white-label solution for its brands, a charging pool, charging station or EVSE also
@@ -142,6 +149,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The view of a collection as a list of its children as their parent embeds them.
         /// </summary>
         private const           String       EmbeddedView         = "embedded";
+
+        /// <summary>
+        /// The view of a charging pool, and of what it embeds, as its operator embeds it: its charging stations
+        /// without the properties their groups give them.
+        /// </summary>
+        private const           String       StoredView           = "stored";
 
         /// <summary>
         /// The representations of versions of roaming networks and of the entities they embed,
@@ -945,6 +958,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region (private) TryGetRequestedChargingPool           (Request, out ChargingPool,                         out ErrorResponse)
 
+        /// <summary>
+        /// The requested charging pool with its effective charging stations, which have the properties their groups
+        /// give them; with ?view=stored as its operator embeds it, the representation whose ETag a precondition names.
+        /// </summary>
         private Boolean TryGetRequestedChargingPool(HTTPRequest                             Request,
                                                     [NotNullWhen(true)]  out ChargingPool?  ChargingPool,
                                                     [NotNullWhen(false)] out HTTPResponse?  ErrorResponse)
@@ -961,7 +978,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!chargingStationOperator.TryGetChargingPool(chargingPoolId, out ChargingPool))
+            // Every part: Hermod splits a value at its commas, and GetString(…) would be the last part only.
+            var views = Request.QueryString.GetStrings("view").
+                                SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).
+                                Distinct().
+                                ToArray();
+
+            foreach (var view in views)
+                if (view != StoredView)
+                {
+                    ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Unknown view '{view}'; a charging pool, charging station or EVSE has only the view '{StoredView}'!");
+                    return false;
+                }
+
+            if (!(views.Length > 0
+                      ? chargingStationOperator.TryGetChargingPool         (chargingPoolId, out ChargingPool)
+                      : chargingStationOperator.TryGetEffectiveChargingPool(chargingPoolId, out ChargingPool)))
             {
                 ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The charging pool '{chargingPoolId}' is unknown at the charging station operator '{chargingStationOperator.Id}'!");
                 return false;

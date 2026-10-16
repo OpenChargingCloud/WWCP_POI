@@ -1763,8 +1763,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The error, when a charging station names a parking space neither the given parking operators nor the given
-        /// charging station operators have.
+        /// The error, when a charging station, also by its groups, or a charging station group names a parking space
+        /// neither the given parking operators nor the given charging station operators have.
         /// </summary>
         internal static String? UnknownParkingSpace(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
                                                     IEnumerable<ParkingOperator>          ParkingOperators)
@@ -1774,6 +1774,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    Concat    (ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ParkingSpaces)).
                                                    Select    (parkingSpace    => parkingSpace.Id).
                                                    ToHashSet();
+
+            foreach (var chargingStationGroup in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationGroups))
+                foreach (var parkingSpaceId in chargingStationGroup.ParkingSpaceIds)
+                    if (!parkingSpaceIds.Contains(parkingSpaceId))
+                        return $"The parking space '{parkingSpaceId}' of the charging station group '{chargingStationGroup.Id}' is unknown in the roaming network!";
 
             foreach (var chargingStation in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStations))
                 foreach (var parkingSpaceId in chargingStation.ParkingSpaceIds)
@@ -2115,7 +2120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => chargingStationManufacturers.TryGet(ChargingStationManufacturerId, out ChargingStationManufacturer);
 
         /// <summary>
-        /// The error, when a charging station names a manufacturer the given ones do not have.
+        /// The error, when a charging station or a charging station group names a manufacturer the given ones do not have.
         /// </summary>
         internal static String? UnknownManufacturer(IEnumerable<ChargingStationOperator>                                              ChargingStationOperators,
                                                     IReadOnlyDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>  ChargingStationManufacturers)
@@ -2126,6 +2131,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !ChargingStationManufacturers.ContainsKey(chargingStation.ManufacturerId.Value))
                 {
                     return $"The manufacturer '{chargingStation.ManufacturerId}' of the charging station '{chargingStation.Id}' is unknown in the roaming network!";
+                }
+
+            foreach (var chargingStationGroup in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationGroups))
+                if (chargingStationGroup.ManufacturerId.HasValue &&
+                    !ChargingStationManufacturers.ContainsKey(chargingStationGroup.ManufacturerId.Value))
+                {
+                    return $"The manufacturer '{chargingStationGroup.ManufacturerId}' of the charging station group '{chargingStationGroup.Id}' is unknown in the roaming network!";
                 }
 
             return null;

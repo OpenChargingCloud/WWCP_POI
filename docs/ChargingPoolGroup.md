@@ -44,6 +44,7 @@ The group writes no `eTags` and no `@context`.
 |---|---|---|---|---|
 | `chargingPoolIds` | `ChargingPoolIds` | `ImmutableArray<ChargingPool_Id>` | update/remove | The members: [charging pools](ChargingPool.md) of the same operator, in the ordinal order of their identifications, each once. Written only when not empty; a group may be empty. |
 | `chargingTariffId` | `ChargingTariffId` | `ChargingTariff_Id?` | update/remove | A [charging tariff](ChargingTariff.md) of the same operator for all members, unless their own apply. |
+| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-charging-stations). |
 
 
 ## Members

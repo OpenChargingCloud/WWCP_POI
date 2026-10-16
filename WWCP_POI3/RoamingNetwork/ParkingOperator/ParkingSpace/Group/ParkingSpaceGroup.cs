@@ -75,6 +75,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ParkingProduct_Id>  ParkingProductIds  { get; }
 
+        /// <summary>
+        /// Its priority over the other groups of a member, where they give it different values: the higher wins;
+        /// 0, unless given. Groups of the same member with the same priority must not give it different values.
+        /// </summary>
+        public Int32?  Priority  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -87,6 +93,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  I18NString?                                      Description                  = null,
                                  IEnumerable<ParkingSpace_Id>?                    ParkingSpaceIds              = null,
                                  IEnumerable<ParkingProduct_Id>?                  ParkingProductIds            = null,
+                                 Int32?                                           Priority                     = null,
 
                                  Timestamped<ParkingSpaceGroupAdminStatusType>?   InitialAdminStatus           = null,
                                  Timestamped<ParkingSpaceGroupStatusType>?        InitialStatus                = null,
@@ -121,6 +128,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.ParkingSpaceIds  = POIJSON.OrderedIds(ParkingSpaceIds, $"member of the parking space group '{Id}'");
             this.ParkingProductIds = POIJSON.OrderedIds(ParkingProductIds, $"parking product of the parking space group '{Id}'");
+            this.Priority          = Priority;
 
         }
 
@@ -205,6 +213,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ParkingProductIds.Length > 0)
                 json.Add("parkingProductIds",  POIJSON.IdsToJSON(ParkingProductIds));
 
+            if (Priority.HasValue)
+                json.Add("priority",  Priority.Value);
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -251,6 +262,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseIds(JSON, "parkingProductIds", "parking product identification", ParkingProduct_Id.TryParse, out ImmutableArray<ParkingProduct_Id> parkingProductIds, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseInteger(JSON, "priority", "priority of the parking space group", out var priority, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -265,6 +279,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           description,
                                                           members,
                                                           parkingProductIds,
+                                                          Priority:    priority,
                                                           DataSource:  dataSource,
                                                           Created:     created,
                                                           LastChange:  lastChange,

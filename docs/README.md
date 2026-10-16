@@ -43,7 +43,7 @@ flowchart TD
 | [EVSE](EVSE.md) | charging station, `EVSEs` | its operator | One charging point: power, voltage, current, connectors, tariffs, energy status. |
 | [ChargingTariff](ChargingTariff.md) | operator, `chargingTariffs` | its operator | A price, as in OCPI: currency, elements, price components, restrictions. |
 | [EVSEGroup](EVSEGroup.md) | operator, `EVSEGroups` | its operator | EVSEs of the operator, optionally with a common tariff. |
-| [ChargingStationGroup](ChargingStationGroup.md) | operator, `chargingStationGroups` | its operator | Charging stations of the operator, optionally with a common tariff. |
+| [ChargingStationGroup](ChargingStationGroup.md) | operator, `chargingStationGroups` | its operator | Charging stations of the operator, optionally with a common tariff and properties they take at runtime. |
 | [ChargingPoolGroup](ChargingPoolGroup.md) | operator, `chargingPoolGroups` | its operator | Charging pools of the operator, optionally with a common tariff. |
 | [ChargingTariffGroup](ChargingTariffGroup.md) | operator, `chargingTariffGroups` | its operator | Charging tariffs of the operator. |
 | [EnergyMeter](EnergyMeter.md) | pool, grid connection point, station, EVSE | whoever owns or maintains what embeds it | A meter with its role, manufacturer, model, versions and transparency software. |
@@ -232,6 +232,30 @@ manually again, `IsCalculated(groupType, groupId)` tells.
 Charging tariff groups are `active` when one tariff is, else `planned` when one is, else `expired` when all are.
 Parking space groups are `available` when one space is, else `inUse`, else `reserved` when one is, else `blocked`,
 `planned` or `inDeployment` when all are.
+
+
+### Group priority and effective charging stations
+
+Every group, of EVSEs, charging stations, charging pools, charging tariffs or parking spaces, has an optional
+`priority`, an integer, 0 unless given. Where groups of a member give it different values, the one with the higher
+priority decides; groups of the same member with the same priority must not give it different values that decide.
+
+So far charging station groups give their members properties: any property of a charging station but its
+identification, name, description, EVSEs and energy meters. The network keeps them in the group, so that e.g. the
+model, the hotline and the features of a thousand stations are given once; the stations take them at runtime, as
+the effective charging stations of their operator (`EffectiveChargingStations`, `TryGetEffectiveChargingStation`,
+`EffectiveChargingPools`). A single value is the station's own, else the one of its group with the highest
+priority; an array is its own united with those of all its groups, of brands of the same identification and of
+images of the same URL its own, else the one of the higher priority. An operator whose groups disagree with the
+same priority, or make a station invalid, e.g. by a `maxPower` above its EVSEs, is refused, and so is a change set.
+An effective charging station shares the runtime status, the EVSEs and the energy meters of the station; it is
+calculated once per version of the operator. Its `lastChange` is the latest of the station and its groups giving
+properties, so that a publisher sees a group's change in every member.
+
+POI_API serves a charging station, and a charging pool with its stations, as they are at runtime, and searches the
+charging pools with them; `?view=stored` serves them as the operator embeds them, with the ETag a precondition names.
+The operator and the roaming network embed the properties where they are given; so do their ETags, change sets and
+merges. See [ChargingStationGroup](ChargingStationGroup.md#properties-of-its-members).
 
 
 ### ETags

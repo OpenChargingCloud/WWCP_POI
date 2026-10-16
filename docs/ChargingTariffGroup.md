@@ -44,6 +44,7 @@ See [README.md](README.md#common-properties). No `eTags`.
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
 | `chargingTariffIds` | `ChargingTariffIds` | `ChargingTariff_Id`[] | update/remove | Its members: tariffs of the same operator, ordered by identification (ordinal), each at most once. Omitted when empty; a group may have no members. |
+| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-charging-stations). |
 
 
 ## chargingTariffIds

@@ -634,6 +634,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Previous.TryGetParkingSpace(parkingSpace.Id, out var previousParkingSpace))
                     parkingSpace.ShareRuntimeOf(previousParkingSpace);
 
+            ShareRuntimeOfEffective();
+
         }
 
         #endregion
@@ -919,6 +921,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             this.Brands = new (Brands, brand => brand.Id, "brand", $"the operator '{Id}'");
+
+            #endregion
+
+            #region Effective charging stations, with the properties their groups give them
+
+            this.effectiveChargingStations  = CalculateEffectiveChargingStations();
+            this.effectiveChargingPools     = new (CalculateEffectiveChargingPools);
 
             #endregion
 

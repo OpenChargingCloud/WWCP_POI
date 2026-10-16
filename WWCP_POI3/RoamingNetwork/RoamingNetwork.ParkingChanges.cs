@@ -121,6 +121,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "dataSource",
             "parkingSpaceIds",
             "parkingProductIds",
+            "priority",
             "customData"
         ];
 

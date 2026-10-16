@@ -367,6 +367,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TryParseInteger     (JSON, PropertyName, PropertyDescription, out Value, out ErrorResponse)
+
+        /// <summary>
+        /// An optional integer, e.g. the priority of a group: a JSON number without fraction, neither a text nor 1.0.
+        /// </summary>
+        public static Boolean TryParseInteger(JObject                           JSON,
+                                              String                            PropertyName,
+                                              String                            PropertyDescription,
+                                              out Int32?                        Value,
+                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Value = null;
+
+            if (JSON[PropertyName] is not JToken token)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            if (token.Type != JTokenType.Integer)
+            {
+                ErrorResponse = $"The {PropertyDescription} must be an integer!";
+                return false;
+            }
+
+            try
+            {
+                Value = token.Value<Int32>();
+            }
+            catch (OverflowException)
+            {
+                ErrorResponse = $"The {PropertyDescription} must be an integer from {Int32.MinValue} to {Int32.MaxValue}!";
+                return false;
+            }
+
+            ErrorResponse = null;
+            return true;
+
+        }
+
+        #endregion
+
         #region Seconds             (Duration)
 
         /// <summary>

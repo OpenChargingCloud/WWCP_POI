@@ -14,6 +14,12 @@ operator. The identification is `{operatorId}*S{suffix}`, the suffix 1–30 lett
 differ only in case or in the `*` of the suffix. The station's address, geo location and accessibility are
 those of its pool unless given.
 
+A [ChargingStationGroup](ChargingStationGroup.md) may give its members most of the properties below, so that a
+station has only few of its own: at runtime it takes them, as the effective charging station of its operator,
+`chargingStationOperator.TryGetEffectiveChargingStation(stationId, out var station)`. See
+[properties of its members](ChargingStationGroup.md#properties-of-its-members). POI_API serves the effective
+charging station; `?view=stored` the station as it is given.
+
 | | |
 |---|---|
 | Class | `ChargingStation` — [source](../WWCP_POI3/RoamingNetwork/ChargingStationManufacturer/ChargingStation/ChargingStation.cs) |
@@ -225,6 +231,8 @@ The station's status is set on its own; it is not calculated from the status of 
   may only name stations of the operator.
 - In its roaming network: `manufacturerId` must name a manufacturer and `parkingSpaceIds` parking spaces of the
   network.
+- With the properties its groups give it, it must be valid as well, e.g. their `maxPower`; see
+  [properties of its members](ChargingStationGroup.md#properties-of-its-members).
 - A change set applies each change to the embedded JSON of the operator and reads the operator again, so the
   operator must be valid after every single change (e.g. remove a station from its groups before removing it);
   the references into the network are checked after the last change.

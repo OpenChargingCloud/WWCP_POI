@@ -42,6 +42,7 @@ See [common properties](README.md#common-properties). An EVSE group does not wri
 |---|---|---|---|---|
 | `EVSEIds` | `EVSEIds` | `ImmutableArray<EVSE_Id>` | update/remove | Its members; see [EVSEIds](#evseids). |
 | `chargingTariffId` | `ChargingTariffId` | `ChargingTariff_Id?` | update/remove | The [charging tariff](ChargingTariff.md) of its operator for all its members, unless their own apply; it must exist at the operator. |
+| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-charging-stations). |
 
 Absent values are left out; an empty `EVSEIds` is not written.
 
