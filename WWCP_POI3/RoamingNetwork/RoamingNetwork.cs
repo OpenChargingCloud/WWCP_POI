@@ -1546,7 +1546,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The error, when a charging pool names a grid connection point the given grid operators do not have.
+        /// The error, when a charging pool or a charging pool group names a grid connection point the given grid operators do not have.
         /// </summary>
         internal static String? UnknownGridConnectionPoint(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
                                                            IEnumerable<GridOperator>             GridOperators)
@@ -1559,6 +1559,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !known.Contains(chargingPool.GridConnectionPointId.Value))
                 {
                     return $"The grid connection point '{chargingPool.GridConnectionPointId}' of the charging pool '{chargingPool.Id}' is unknown in the roaming network!";
+                }
+
+            foreach (var chargingPoolGroup in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPoolGroups))
+                if (chargingPoolGroup.GridConnectionPointId.HasValue &&
+                    !known.Contains(chargingPoolGroup.GridConnectionPointId.Value))
+                {
+                    return $"The grid connection point '{chargingPoolGroup.GridConnectionPointId}' of the charging pool group '{chargingPoolGroup.Id}' is unknown in the roaming network!";
                 }
 
             return null;

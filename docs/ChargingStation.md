@@ -15,8 +15,8 @@ differ only in case or in the `*` of the suffix. The station's address, geo loca
 those of its pool unless given.
 
 A [ChargingStationGroup](ChargingStationGroup.md) may give its members most of the properties below, so that a
-station has only few of its own: at runtime it takes them, as the effective charging station of its operator,
-`chargingStationOperator.TryGetEffectiveChargingStation(stationId, out var station)`. See
+station has only few of its own: at runtime it takes them, as the effective charging station of its operator, with
+its effective EVSEs, `chargingStationOperator.TryGetEffectiveChargingStation(stationId, out var station)`. See
 [properties of its members](ChargingStationGroup.md#properties-of-its-members). POI_API serves the effective
 charging station; `?view=stored` the station as it is given.
 

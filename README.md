@@ -145,13 +145,14 @@ parking product ids compare case-sensitively.
   optionally a `chargingTariffId`; parking space groups name `parkingSpaceIds`. Groups may overlap and
   have admin status and status, and a `priority` (0 unless given): where groups of a member give it different
   values, the higher decides, and the same priority must not disagree.
-- **Effective charging stations:** a charging station group may give its members any property of a charging
-  station but their identification, name, description, EVSEs and energy meters, e.g. the model and the hotline of
-  all stations of a model, given once. The stations take them at runtime: `chargingStationOperator.
-  TryGetEffectiveChargingStation(id, out var station)`, `EffectiveChargingPools`. A single value is the station's own,
-  else the one of its group with the highest priority; arrays are united. POI_API serves and searches them, the OCPI
-  and DATEX II publishers publish them; the network, its ETags and change sets keep the properties where they are given.
-  See [docs/](docs/ChargingStationGroup.md#properties-of-its-members).
+- **Effective members:** an EVSE, charging station or charging pool group may give its members any property of
+  theirs but their identification, name, description, what they embed and their energy meters, e.g. the connectors
+  of all EVSEs of a type, the model and the hotline of all stations of a model, the payment options of all pools of a
+  site partner, given once. The members take them at runtime: `chargingStationOperator.EffectiveChargingPools`, with
+  their effective stations and EVSEs, `TryGetEffectiveEVSE(id, out var evse)` and alike. A single value is the member's
+  own, else the one of its group with the highest priority; arrays are united. POI_API serves and searches them, the
+  OCPI and DATEX II publishers publish them, their importers keep in the groups what they give; the network, its ETags
+  and change sets keep the properties where they are given. See [docs/](docs/README.md#group-priority-and-effective-members).
 - **Transparency software:** releases (`TransparencySoftware`, one per version) and their certificates
   are embedded in the network, without status and timestamps. A certificate names the releases it
   verifies or finds compatible, and optionally a manufacturer. An energy meter's `transparencySoftwareStatus`
@@ -187,9 +188,9 @@ a change set can manage:
 | [ChargingStation](docs/ChargingStation.md) | A charger with its EVSEs, manufacturer and model, energy meters and energy status. |
 | [EVSE](docs/EVSE.md) | One charging point: power, voltage, current, connectors, tariffs and energy status. |
 | [ChargingTariff](docs/ChargingTariff.md) | A price as in OCPI: currency, elements with price components and restrictions. |
-| [EVSEGroup](docs/EVSEGroup.md) | EVSEs of one operator, optionally with a common tariff. |
+| [EVSEGroup](docs/EVSEGroup.md) | EVSEs of one operator, optionally with a common tariff and properties they take at runtime. |
 | [ChargingStationGroup](docs/ChargingStationGroup.md) | Charging stations of one operator, optionally with a common tariff and properties they take at runtime. |
-| [ChargingPoolGroup](docs/ChargingPoolGroup.md) | Charging pools of one operator, optionally with a common tariff. |
+| [ChargingPoolGroup](docs/ChargingPoolGroup.md) | Charging pools of one operator, optionally with a common tariff and properties they take at runtime. |
 | [ChargingTariffGroup](docs/ChargingTariffGroup.md) | Charging tariffs of one operator. |
 | [EnergyMeter](docs/EnergyMeter.md) | A meter of a pool, grid connection point, station or EVSE, with its transparency software. |
 | [ChargingStationManufacturer](docs/ChargingStationManufacturer.md) | A maker of charging stations, named by the stations it built. |
@@ -435,9 +436,9 @@ the grid operator embeds them; a charging station operator without any of `charg
 parking operator without any of `parkingGarages`, `parkingSpaces`,
 `parkingSpaceGroups`, `parkingSensors` and `parkingProducts`, e.g. `?without=parkingSpaces,parkingSensors`, listed by
 `~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs}`, each of them below it, e.g. `…/PSs/{PS_Id}`. The parking spaces a
-charging station names, whoever defines them, are listed by `…/CSs/{CS_Id}/PSs`. A charging station, a charging
-pool and `CPs` have the charging stations with the properties their groups give them, the effective ones; a
-charging pool, and what it embeds, with `?view=stored` as its operator embeds it, with the ETag a precondition names. The brands of a charging station
+charging station names, whoever defines them, are listed by `…/CSs/{CS_Id}/PSs`. A charging pool, a charging
+station, an EVSE and `CPs` are served with the properties their groups give them, the effective ones; a charging
+pool, and what it embeds, with `?view=stored` as its operator embeds it, with the ETag a precondition names. The brands of a charging station
 operator, pool, station or EVSE, its own, are listed by `…/Brands` below it, e.g.
 `~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands`, each of them below it, `…/Brands/{Brand_Id}`. Every list, `~/RNs`,
 `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` and

@@ -22,6 +22,7 @@ using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Aegir;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
 
@@ -53,10 +54,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// A group of EVSEs of one charging station operator, embedded completely in it; groups may overlap.
+    /// It may give its members the properties of an EVSE, which they take at runtime, as the effective EVSEs of their
+    /// operator: a value of their own wins, arrays are united, and of the groups of a member the one with the higher
+    /// priority wins.
     /// </summary>
     public sealed class EVSEGroup : AImmutableEMobilityEntity<EVSEGroup_Id,
                                                               EVSEGroupAdminStatusType,
                                                               EVSEGroupStatusType>,
+                                    IPOIPrioritizedGroup,
                                     IEquatable<EVSEGroup>,
                                     IComparable<EVSEGroup>
     {
@@ -69,7 +74,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<EVSE_Id>  EVSEIds           { get; }
 
         /// <summary>
-        /// The charging tariff of its operator for all its members, unless their own apply.
+        /// The charging tariff of its operator for its EVSEs without tariffs of their own, unless more specific groups
+        /// name one: EVSE groups before charging station groups before charging pool groups, of one level the one with the
+        /// highest priority (ChargingStationOperator.EffectiveEVSE(…)).
         /// </summary>
         public ChargingTariff_Id?       ChargingTariffId  { get; }
 
@@ -78,6 +85,97 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// 0, unless given. Groups of the same member with the same priority must not give it different values.
         /// </summary>
         public Int32?  Priority  { get; }
+
+        /// <inheritdoc/>
+        String IPOIPrioritizedGroup.GroupId
+            => Id.ToString();
+
+
+        /// <summary>
+        /// The reference printed on its members, unless they have their own.
+        /// </summary>
+        public String?                            PhysicalReference         { get; }
+
+        /// <summary>
+        /// The current types of its members, unless they tell their own; Unspecified gives none.
+        /// </summary>
+        public CurrentTypes                       CurrentTypes              { get; }
+
+        /// <summary>
+        /// The charging modes of its members, unless they tell their own; Unspecified gives none.
+        /// </summary>
+        public ChargingModes                      ChargingModes             { get; }
+
+        /// <summary>
+        /// The maximum voltage of its members, unless they have their own.
+        /// </summary>
+        public Volt?                              MaxVoltage                { get; }
+
+        /// <summary>
+        /// The maximum current of its members, unless they have their own.
+        /// </summary>
+        public Ampere?                            MaxCurrent                { get; }
+
+        /// <summary>
+        /// The maximum power of its members, unless they have their own.
+        /// </summary>
+        public Watt?                              MaxPower                  { get; }
+
+        /// <summary>
+        /// Charging connectors of its members, besides their own, in the order of their identifications;
+        /// of the same identification their own.
+        /// </summary>
+        public ImmutableArray<ChargingConnector>  ChargingConnectors        { get; }
+
+        /// <summary>
+        /// Brands its members also appear under, besides their own, in the order of their identifications.
+        /// </summary>
+        public POICollection<Brand_Id, Brand>     Brands                    { get; }
+
+        /// <summary>
+        /// Images of its members, besides their own, in their given order.
+        /// </summary>
+        public ImmutableArray<Image>              Images                    { get; }
+
+        /// <summary>
+        /// The geographical location of its members, unless they have their own.
+        /// </summary>
+        public GeoCoordinate?                     GeoLocation               { get; }
+
+        /// <summary>
+        /// The maximum reservation duration of its members, unless they have their own.
+        /// </summary>
+        public TimeSpan?                          MaxReservationDuration    { get; }
+
+        /// <summary>
+        /// The reach distance of its members, unless they have their own.
+        /// </summary>
+        public Meter?                             ReachDistance             { get; }
+
+        /// <summary>
+        /// The operation timeout of its members, unless they have their own.
+        /// </summary>
+        public TimeSpan?                          OperationTimeout          { get; }
+
+        /// <summary>
+        /// Whether its members have an extended operation timeout, unless they tell it themselves.
+        /// </summary>
+        public Boolean?                           ExtendedOperationTimeout  { get; }
+
+        /// <summary>
+        /// Standards of its members, besides their own, in the order of their names.
+        /// </summary>
+        public ImmutableArray<Standard>           Standards                 { get; }
+
+        /// <summary>
+        /// Whether it gives its members any property of an EVSE.
+        /// </summary>
+        public Boolean HasEVSEProperties
+
+            => PhysicalReference is not null    || CurrentTypes  != POI.CurrentTypes. Unspecified || ChargingModes != POI.ChargingModes.Unspecified ||
+               MaxVoltage.HasValue              || MaxCurrent.HasValue           || MaxPower.HasValue                  || ChargingConnectors.Length > 0 ||
+               Brands.Count > 0                 || Images.Length > 0             || GeoLocation.HasValue               || MaxReservationDuration.HasValue ||
+               ReachDistance.HasValue           || OperationTimeout.HasValue     || ExtendedOperationTimeout.HasValue  || Standards.Length > 0;
 
         #endregion
 
@@ -92,6 +190,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          IEnumerable<EVSE_Id>?                    EVSEIds                      = null,
                          ChargingTariff_Id?                       ChargingTariffId             = null,
                          Int32?                                   Priority                     = null,
+
+                         String?                                  PhysicalReference            = null,
+                         CurrentTypes?                            CurrentTypes                 = null,
+                         ChargingModes?                           ChargingModes                = null,
+                         Volt?                                    MaxVoltage                   = null,
+                         Ampere?                                  MaxCurrent                   = null,
+                         Watt?                                    MaxPower                     = null,
+                         IEnumerable<ChargingConnector>?          ChargingConnectors           = null,
+                         IEnumerable<Brand>?                      Brands                       = null,
+                         IEnumerable<Image>?                      Images                       = null,
+                         GeoCoordinate?                           GeoLocation                  = null,
+                         TimeSpan?                                MaxReservationDuration       = null,
+                         Meter?                                   ReachDistance                = null,
+                         TimeSpan?                                OperationTimeout             = null,
+                         Boolean?                                 ExtendedOperationTimeout     = null,
+                         IEnumerable<Standard>?                   Standards                    = null,
 
                          Timestamped<EVSEGroupAdminStatusType>?   InitialAdminStatus           = null,
                          Timestamped<EVSEGroupStatusType>?        InitialStatus                = null,
@@ -124,9 +238,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
-            this.EVSEIds           = POIJSON.OrderedIds(EVSEIds, $"member of the EVSE group '{Id}'");
-            this.ChargingTariffId  = ChargingTariffId;
-            this.Priority          = Priority;
+            if (MaxVoltage?.Value < 0 || MaxCurrent?.Value < 0 || MaxPower?.Value < 0)
+                throw new ArgumentException($"The electrical limits of the EVSE group '{Id}' must not be negative!");
+
+            if (MaxReservationDuration < TimeSpan.Zero)
+                throw new ArgumentException($"The maximum reservation duration of the EVSE group '{Id}' must not be negative!", nameof(MaxReservationDuration));
+
+            if (ReachDistance?.m < 0)
+                throw new ArgumentException($"The reach distance of the EVSE group '{Id}' must not be negative!", nameof(ReachDistance));
+
+            if (OperationTimeout < TimeSpan.Zero)
+                throw new ArgumentException($"The operation timeout of the EVSE group '{Id}' must not be negative!", nameof(OperationTimeout));
+
+            var chargingConnectors = (ChargingConnectors ?? []).ToArray();
+
+            if (chargingConnectors.Any(chargingConnector => chargingConnector is null))
+                throw new ArgumentException("Charging connectors must not contain null entries!", nameof(ChargingConnectors));
+
+            if (chargingConnectors.Select(chargingConnector => chargingConnector.Id).Distinct().Count() != chargingConnectors.Length)
+                throw new ArgumentException($"A charging connector of the EVSE group '{Id}' must not be given twice!", nameof(ChargingConnectors));
+
+            foreach (var chargingConnector in chargingConnectors)
+                if (chargingConnector.Validate() is String error)
+                    throw new ArgumentException(error, nameof(ChargingConnectors));
+
+            this.EVSEIds                   = POIJSON.OrderedIds(EVSEIds, $"member of the EVSE group '{Id}'");
+            this.ChargingTariffId          = ChargingTariffId;
+            this.Priority                  = Priority;
+
+            this.PhysicalReference         = PhysicalReference;
+            this.CurrentTypes              = CurrentTypes  ?? POI.CurrentTypes. Unspecified;
+            this.ChargingModes             = ChargingModes ?? POI.ChargingModes.Unspecified;
+            this.MaxVoltage                = MaxVoltage;
+            this.MaxCurrent                = MaxCurrent;
+            this.MaxPower                  = MaxPower;
+            this.ChargingConnectors        = [.. chargingConnectors.OrderBy(chargingConnector => chargingConnector.Id.ToString(), StringComparer.Ordinal)];
+            this.Brands                    = new (Brands, brand => brand.Id, "brand", $"the EVSE group '{Id}'");
+            this.Images                    = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the EVSE group '{Id}'");
+            this.GeoLocation               = GeoLocation;
+            this.MaxReservationDuration    = MaxReservationDuration;
+            this.ReachDistance             = ReachDistance;
+            this.OperationTimeout          = OperationTimeout;
+            this.ExtendedOperationTimeout  = ExtendedOperationTimeout;
+            this.Standards                 = POIJSON.OrderedIds(Standards, $"standard of the EVSE group '{Id}'");
 
         }
 
@@ -214,6 +368,52 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Priority.HasValue)
                 json.Add("priority",  Priority.Value);
 
+            // The properties of an EVSE, as an EVSE writes them.
+            if (PhysicalReference is not null)
+                json.Add("physicalReference",         PhysicalReference);
+
+            if (CurrentTypes  != POI.CurrentTypes. Unspecified)
+                json.Add("currentTypes",              POIJSON.FlagsToJSON(CurrentTypes));
+
+            if (ChargingModes != POI.ChargingModes.Unspecified)
+                json.Add("chargingModes",             POIJSON.FlagsToJSON(ChargingModes));
+
+            if (MaxVoltage.HasValue)
+                json.Add("maxVoltage",                MaxVoltage.Value.Value);
+
+            if (MaxCurrent.HasValue)
+                json.Add("maxCurrent",                MaxCurrent.Value.Value);
+
+            if (MaxPower.HasValue)
+                json.Add("maxPower",                  MaxPower.Value.Value);
+
+            if (ChargingConnectors.Length > 0)
+                json.Add("chargingConnectors",        new JArray(ChargingConnectors.Select(chargingConnector => chargingConnector.ToJSON())));
+
+            if (Brands.Count > 0)
+                json.Add("brands",                    new JArray(Brands.Select(brand => brand.ToJSON())));
+
+            if (Images.Length > 0)
+                json.Add("images",                    new JArray(Images.Select(image => image.ToJSON())));
+
+            if (GeoLocation.HasValue)
+                json.Add("geoLocation",               GeoLocation.Value.ToJSON(Embedded: true));
+
+            if (MaxReservationDuration.HasValue)
+                json.Add("maxReservationDuration",    POIJSON.Seconds(MaxReservationDuration.Value));
+
+            if (ReachDistance.HasValue)
+                json.Add("reachDistance",             ReachDistance.Value.m);
+
+            if (OperationTimeout.HasValue)
+                json.Add("operationTimeout",          POIJSON.Seconds(OperationTimeout.Value));
+
+            if (ExtendedOperationTimeout.HasValue)
+                json.Add("extendedOperationTimeout",  ExtendedOperationTimeout.Value);
+
+            if (Standards.Length > 0)
+                json.Add("standards",                 POIJSON.IdsToJSON(Standards));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -261,6 +461,55 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseInteger(JSON, "priority", "priority of the EVSE group", out var priority, out ErrorResponse))
                     return false;
 
+                // The properties of an EVSE, as an EVSE reads them.
+                if (!POIJSON.TryParseString(JSON, "physicalReference",  "physical reference",  out var physicalReference,  out ErrorResponse) ||
+                    !POIJSON.TryParseFlags (JSON, "currentTypes",       "current type",        out CurrentTypes  currentTypes,  out ErrorResponse) ||
+                    !POIJSON.TryParseFlags (JSON, "chargingModes",      "charging mode",       out ChargingModes chargingModes, out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (JSON.ParseOptional("maxVoltage", "maximum voltage", out Volt?   maxVoltage, out ErrorResponse))
+                    if (ErrorResponse is not null) return false;
+
+                if (JSON.ParseOptional("maxCurrent", "maximum current", out Ampere? maxCurrent, out ErrorResponse))
+                    if (ErrorResponse is not null) return false;
+
+                if (JSON.ParseOptional("maxPower",   "maximum power",   out Watt?   maxPower,   out ErrorResponse))
+                    if (ErrorResponse is not null) return false;
+
+                if (!POIJSON.TryParseChildren<ChargingConnector>(JSON,
+                                                                 "chargingConnectors",
+                                                                 "chargingConnectorIds",
+                                                                 "charging connectors",
+                                                                 ChargingConnector.TryParse,
+                                                                 out var chargingConnectors,
+                                                                 out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIJSON.TryParseChildren<Brand>(JSON, "brands", "brandIds", "brands", Brand.TryParse, out var brands, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseGeoLocation(JSON,                            out var geoLocation,             out ErrorResponse) ||
+                    !POIJSON.TryParseSeconds    (JSON, "maxReservationDuration",
+                                                       "maximum reservation duration", out var maxReservationDuration,  out ErrorResponse) ||
+                    !POIJSON.TryParseSeconds    (JSON, "operationTimeout",
+                                                       "operation timeout",            out var operationTimeout,        out ErrorResponse) ||
+                    !POIJSON.TryParseNonNegative(JSON, "reachDistance",
+                                                       "reach distance",               out var reachDistance,           out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "standards", "standard", Standard.TryParse, out ImmutableArray<Standard> standards, out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (JSON.ParseOptional("extendedOperationTimeout", "extended operation timeout", out Boolean? extendedOperationTimeout, out ErrorResponse))
+                    if (ErrorResponse is not null) return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -275,7 +524,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           description,
                                           members,
                                           chargingTariffId,
-                                          Priority:    priority,
+                                          priority,
+                                          physicalReference,
+                                          currentTypes,
+                                          chargingModes,
+                                          maxVoltage,
+                                          maxCurrent,
+                                          maxPower,
+                                          chargingConnectors,
+                                          brands,
+                                          images,
+                                          geoLocation,
+                                          maxReservationDuration,
+                                          reachDistance.HasValue ? Meter.From_m(reachDistance.Value) : null,
+                                          operationTimeout,
+                                          extendedOperationTimeout,
+                                          standards,
                                           DataSource:  dataSource,
                                           Created:     created,
                                           LastChange:  lastChange,

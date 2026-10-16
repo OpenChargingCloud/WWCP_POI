@@ -46,8 +46,8 @@ See [common properties](README.md#common-properties). A charging station group d
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
 | `chargingStationIds` | `ChargingStationIds` | `ImmutableArray<ChargingStation_Id>` | update/remove | Its members; see [chargingStationIds](#chargingstationids). |
-| `chargingTariffId` | `ChargingTariffId` | `ChargingTariff_Id?` | update/remove | The [charging tariff](ChargingTariff.md) of its operator for all its members, unless their own apply; it must exist at the operator. |
-| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-charging-stations). |
+| `chargingTariffId` | `ChargingTariffId` | `ChargingTariff_Id?` | update/remove | The [charging tariff](ChargingTariff.md) of its operator for the EVSEs of its members without tariffs of their own: an EVSE takes the one of its EVSE groups, else of the groups of its charging station, else of the groups of its charging pool, of these the one with the highest priority; see [chargingTariffIds](EVSE.md#chargingtariffids). It must exist at the operator. |
+| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-members). |
 
 The properties of a charging station it gives its members, each written and read as a
 [charging station](ChargingStation.md#properties) writes and reads it, and each updated or removed by a change set:

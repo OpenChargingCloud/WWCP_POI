@@ -390,66 +390,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (internal) WithChargingStations(ChargingStations, LastChange)
-
-        /// <summary>
-        /// This charging pool with the given charging stations instead of its own, e.g. its effective ones,
-        /// and the given last change, taking the runtime status of this version.
-        /// </summary>
-        /// <param name="ChargingStations">The charging stations.</param>
-        /// <param name="LastChange">The timestamp of the last change.</param>
-        internal ChargingPool WithChargingStations(IEnumerable<ChargingStation>  ChargingStations,
-                                                   DateTimeOffset                LastChange)
-        {
-
-            var chargingPool = new ChargingPool(Id,
-                                                Name,
-                                                Description,
-                                                Address,
-                                                GeoLocation,
-                                                ParkingType,
-                                                Accessibility,
-                                                HotlinePhoneNumber,
-                                                DataLicenses,
-                                                ChargingStations,
-                                                GridConnectionPointId,
-                                                EnergyMeters,
-                                                Brands,
-                                                OpeningTimes,
-                                                EnergyMix,
-                                                Images,
-                                                TimeZone,
-                                                Facilities,
-                                                PaymentOptions,
-                                                AuthenticationModes,
-                                                UIFeatures,
-                                                Features,
-                                                LocationLanguages,
-                                                EntranceAddress,
-                                                EntranceLocation,
-                                                ExitAddress,
-                                                ExitLocation,
-                                                ArrivalInstructions,
-                                                ChargingWhenClosed,
-                                                ParkingRestrictions,
-                                                RelatedLocations,
-                                                Services,
-                                                AssistanceServiceDetails,
-                                                Standards,
-                                                NUTSCodes,
-                                                DataSource:  DataSource,
-                                                Created:     Created,
-                                                LastChange:  LastChange,
-                                                CustomData:  CustomData);
-
-            chargingPool.ShareRuntimeOf(this);
-
-            return chargingPool;
-
-        }
-
-        #endregion
-
 
         #region Status events
 

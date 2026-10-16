@@ -57,7 +57,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CSGs/{CSG_Id}                              a charging station group of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EVSEGs                                     its EVSE groups, as it embeds them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EVSEGs/{EVSEG_Id}                          an EVSE group of the charging station operator
-    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool, with its effective charging stations;
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool, the effective one;
     ///     ?expand=gridConnectionPoint embeds its grid connection point instead of naming it,
     ///     ?view=stored serves it, and everything below, as its operator embeds it
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands                         the brands of the charging pool, its own
@@ -97,11 +97,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs                                          its parking products, as it embeds them
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs/{PP_Id}                                  a parking product of the parking operator
     ///
-    /// A charging station is served as it is at runtime, the effective charging station of its operator: with the
-    /// properties of a charging station its groups give it, see ChargingStationOperator.EffectiveChargingStations;
-    /// a charging pool with them, also in ~/RNs/{RN_Id}/CPs, searched with them. A charging station operator and the
-    /// roaming network embed them as they are given, with their groups. ?view=stored serves a charging
-    /// pool, and what it embeds, as its operator embeds it, with the ETag a precondition of a change set names.
+    /// A charging pool, a charging station and an EVSE are served as they are at runtime, the effective ones of their
+    /// operator: with the properties their groups give them, see ChargingStationOperator.EffectiveChargingPools; a
+    /// charging pool also in ~/RNs/{RN_Id}/CPs, searched so. A charging station operator and the roaming network embed
+    /// them as they are given, with their groups. ?view=stored serves a charging pool, and what it embeds, as its
+    /// operator embeds it, with the ETag a precondition of a change set names.
     ///
     /// Brands are embedded in what they are a brand of, and mean something of their own on every level: a charging
     /// station operator is a white-label solution for its brands, a charging pool, charging station or EVSE also
@@ -959,8 +959,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) TryGetRequestedChargingPool           (Request, out ChargingPool,                         out ErrorResponse)
 
         /// <summary>
-        /// The requested charging pool with its effective charging stations, which have the properties their groups
-        /// give them; with ?view=stored as its operator embeds it, the representation whose ETag a precondition names.
+        /// The requested charging pool, the effective one, with the properties its groups give it, with its effective
+        /// charging stations and EVSEs; with ?view=stored as its operator embeds it, the representation whose ETag a
+        /// precondition names.
         /// </summary>
         private Boolean TryGetRequestedChargingPool(HTTPRequest                             Request,
                                                     [NotNullWhen(true)]  out ChargingPool?  ChargingPool,

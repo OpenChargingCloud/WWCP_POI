@@ -4,6 +4,11 @@ A charging pool group is a named set of charging pools of one charging station o
 a site partner or a motorway, optionally with a charging tariff for all of them. Groups may overlap: a pool may be
 a member of several groups, or of none.
 
+It may give its members any property of a charging pool but its identification, name, description, charging
+stations and energy meters: e.g. the hotline, the payment options and the facilities of all pools of a site partner,
+given once. The network keeps them in the group; the pools take them at runtime, as the
+[effective charging pools](#properties-of-its-members) of their operator.
+
 It is embedded completely in its [ChargingStationOperator](ChargingStationOperator.md) under `chargingPoolGroups`,
 in the ordinal order of the identifications. It belongs to the operator its identification names, names only
 pools and a tariff of that operator, and only that operator changes it, with one of its signing keys.
@@ -43,8 +48,29 @@ The group writes no `eTags` and no `@context`.
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
 | `chargingPoolIds` | `ChargingPoolIds` | `ImmutableArray<ChargingPool_Id>` | update/remove | The members: [charging pools](ChargingPool.md) of the same operator, in the ordinal order of their identifications, each once. Written only when not empty; a group may be empty. |
-| `chargingTariffId` | `ChargingTariffId` | `ChargingTariff_Id?` | update/remove | A [charging tariff](ChargingTariff.md) of the same operator for all members, unless their own apply. |
-| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-charging-stations). |
+| `chargingTariffId` | `ChargingTariffId` | `ChargingTariff_Id?` | update/remove | A [charging tariff](ChargingTariff.md) of the same operator for the EVSEs of its members without tariffs of their own: an EVSE takes the one of its EVSE groups, else of the groups of its charging station, else of the groups of its charging pool, of these the one with the highest priority; see [chargingTariffIds](EVSE.md#chargingtariffids). |
+| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-members). |
+
+The properties of a charging pool it gives its members, each written and read as a
+[charging pool](ChargingPool.md#properties) writes and reads it, and each updated or removed by a change set. Of
+`address`, `geoLocation`, `parkingType`, `accessibility`, `hotline`, `gridConnectionPointId` (a grid connection point
+of the network), `openingTimes`, `energyMix`, `timeZone`, `entranceAddress`, `entranceLocation`, `exitAddress`,
+`exitLocation`, `arrivalInstructions`, `chargingWhenClosed` and `assistanceServiceDetails` its members take the
+group's value unless they have their own. Of `dataLicenses`, `brands`, `images`, `facilities`, `paymentOptions`,
+`authenticationModes`, `uiFeatures`, `features`, `locationLanguages` (after their own), `parkingRestrictions`,
+`relatedLocations`, `services`, `standards` and `nutsCodes` they take the group's besides their own; of data licenses
+and brands of the same identification, authentication modes of the same type and images of the same URL their own.
+Absent values, empty arrays and empty texts are left out.
+
+
+## Properties of its members
+
+A charging pool takes the properties its groups give it at runtime: its **effective charging pool**, which its
+operator calculates once per version, `chargingStationOperator.TryGetEffectiveChargingPool(poolId, out var pool)`,
+with its effective charging stations and EVSEs. A single value is the pool's own, else the one of its group with the
+highest `priority`; an array is its own united with those of all its groups. Groups of the same priority must not
+give it different values that decide, nor make it invalid. See
+[group priority and effective members](README.md#group-priority-and-effective-members).
 
 
 ## Members
@@ -79,9 +105,12 @@ Events: `OnAdminStatusChanged` (`OnChargingPoolGroupAdminStatusChangedDelegate`)
   group of the operator has it.
 - **Members:** no pool twice; every member a charging pool of the operator.
 - **Tariff:** `chargingTariffId`, if given, a charging tariff of the operator.
+- **Properties of its members:** as a charging pool checks them, e.g. no facility twice; `priority` an integer;
+  `gridConnectionPointId` a grid connection point of the network; every effective charging pool valid, and groups of
+  the same priority agreeing.
 - **Change sets:** `UpdateProperty`/`RemoveProperty` only of `name`, `description`, `dataSource`, `chargingPoolIds`,
-  `chargingTariffId` and `customData`. After every change the whole operator is read again, so the rules above hold
-  for the result; a pool or tariff the group names can not be removed.
+  `chargingTariffId`, `priority`, `customData` and the properties of its members above. After every change the whole
+  operator is read again, so the rules above hold for the result; a pool or tariff the group names can not be removed.
 
 
 ## Example
@@ -93,6 +122,9 @@ Events: `OnAdminStatusChanged` (`OnChargingPoolGroupAdminStatusChangedDelegate`)
   "description": { "en": "All charging pools within the city of Jena" },
   "chargingPoolIds": [ "DE*GEF*P1", "DE*GEF*P2" ],
   "chargingTariffId": "DE*GEF*TAC1",
+  "priority": 10,
+  "hotline": "+49 800 4242424",
+  "paymentOptions": [ "Contract", "Direct" ],
   "created": "2026-01-01T00:00:00.000Z",
   "lastChange": "2026-10-12T12:00:00.000Z"
 }

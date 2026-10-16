@@ -40,7 +40,7 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 |---|---|---|---|---|
 | `parkingSpaceIds` | `ParkingSpaceIds` | `ImmutableArray<ParkingSpace_Id>` | update/remove | Its members, [parking spaces](ParkingSpace.md) of the same parking operator; ordered by identification (ordinal), none twice. |
 | `parkingProductIds` | `ParkingProductIds` | `ImmutableArray<ParkingProduct_Id>` | update/remove | [Parking products](ParkingOperator.md#parking-products) of its parking operator offered here; ordered by identification (ordinal), none twice. |
-| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-charging-stations). |
+| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-members). |
 
 Both arrays are written only when not empty; a group may be empty. A change set names the properties by their
 JSON keys (`ChangeableParkingSpaceGroupProperties` in

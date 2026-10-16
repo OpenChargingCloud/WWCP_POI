@@ -121,7 +121,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                                                                                        ChargingStationIds:  [ S1 ],
                                                                                                        HotlinePhoneNumber:  PhoneNumber.Parse("+49 800 424242"),
                                                                                                        Brands:              [ new Brand(Brand_Id.Parse("blue-charge"), new ImmutableI18NString(I18NString.Create(Languages.en, "Blue Charge"))) ],
-                                                                                                       Created:             Created) ]) ]).WithKeys();
+                                                                                                       Created:             Created) ],
+                                                    EVSEGroups:             [ new EVSEGroup(EVSEGroup_Id.Parse("DE*GEF*EG1"),
+                                                                                            EVSEIds:   [ EVSE_Id.Parse("DE*GEF*E1*1") ],
+                                                                                            MaxPower:  Watt.FromW(22000),
+                                                                                            Created:   Created) ]) ]).WithKeys();
 
         #endregion
 
@@ -170,6 +174,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
             var (_,          _,              storedBrands)  = await Get(CS + "/Brands?view=stored");
             var (unknown,    _,              _)             = await Get(CP + "?view=effective");
             var (_,          _,              found)         = await Get("RNs/rn1/CPs?match=424242");
+            var (_,          _,              evseJSON)      = await Get(CS + "/EVSEs/DE*GEF*E1*1");
+            var (_,          _,              storedEVSE)    = await Get(CS + "/EVSEs/DE*GEF*E1*1?view=stored");
 
             history!.Head.RoamingNetwork.TryGetEntityETag(nameof(ChargingStation), S1.ToString(), out var eTag);
 
@@ -193,6 +199,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(stored.Headers.ETag!.ToString(),                                   Is.EqualTo($"\"{eTag}\""));
 
                 Assert.That(unknown.StatusCode,                                                Is.EqualTo(HttpStatusCode.BadRequest));
+
+                // An EVSE as well.
+                Assert.That(evseJSON!["maxPower"]!.Value<Int32>(),                             Is.EqualTo(22000));
+                Assert.That(stationJSON["EVSEs"]![0]!["maxPower"]!.Value<Int32>(),             Is.EqualTo(22000));
+                Assert.That(storedEVSE!["maxPower"],                                           Is.Null);
 
                 // Found by what its group gives it.
                 Assert.That(found!.Single()["@id"]!.Value<String>(),                           Is.EqualTo("DE*GEF*P1"));

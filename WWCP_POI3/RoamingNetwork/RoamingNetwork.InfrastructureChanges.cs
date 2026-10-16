@@ -177,14 +177,75 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ];
 
         /// <summary>
-        /// The properties of a group a change set can update or remove, by the group type:
-        /// a charging station group also those of a charging station it gives its members.
+        /// The properties of an EVSE an EVSE group can give its members:
+        /// all but its identification, name, description, data source, custom data, energy meter and charging tariffs.
+        /// </summary>
+        internal static readonly ImmutableArray<String> EVSEGroupEVSEProperties = [
+            "physicalReference",
+            "currentTypes",
+            "chargingModes",
+            "maxVoltage",
+            "maxCurrent",
+            "maxPower",
+            "chargingConnectors",
+            "brands",
+            "images",
+            "geoLocation",
+            "maxReservationDuration",
+            "reachDistance",
+            "operationTimeout",
+            "extendedOperationTimeout",
+            "standards"
+        ];
+
+        /// <summary>
+        /// The properties of a charging pool a charging pool group can give its members:
+        /// all but its identification, name, description, data source, custom data, charging stations and energy meters.
+        /// </summary>
+        internal static readonly ImmutableArray<String> ChargingPoolGroupPoolProperties = [
+            "dataLicenses",
+            "address",
+            "geoLocation",
+            "parkingType",
+            "accessibility",
+            "hotline",
+            "gridConnectionPointId",
+            "brands",
+            "openingTimes",
+            "energyMix",
+            "images",
+            "timeZone",
+            "facilities",
+            "paymentOptions",
+            "authenticationModes",
+            "uiFeatures",
+            "features",
+            "locationLanguages",
+            "entranceAddress",
+            "entranceLocation",
+            "exitAddress",
+            "exitLocation",
+            "arrivalInstructions",
+            "chargingWhenClosed",
+            "parkingRestrictions",
+            "relatedLocations",
+            "services",
+            "assistanceServiceDetails",
+            "standards",
+            "nutsCodes"
+        ];
+
+        /// <summary>
+        /// The properties of a group a change set can update or remove, by the group type: an EVSE, charging station or
+        /// charging pool group also those of its members it gives them.
         /// </summary>
         private static readonly ImmutableDictionary<String, ImmutableHashSet<String>> ChangeableGroupProperties = new Dictionary<String, ImmutableHashSet<String>> {
-            { nameof(EVSEGroup),            [ "name", "description", "dataSource", "EVSEIds",            "chargingTariffId", "priority", "customData" ] },
+            { nameof(EVSEGroup),            [ "name", "description", "dataSource", "EVSEIds",            "chargingTariffId", "priority", "customData",
+                                              .. EVSEGroupEVSEProperties ] },
             { nameof(ChargingStationGroup), [ "name", "description", "dataSource", "chargingStationIds", "chargingTariffId", "priority", "customData",
                                               .. ChargingStationGroupStationProperties ] },
-            { nameof(ChargingPoolGroup),    [ "name", "description", "dataSource", "chargingPoolIds",    "chargingTariffId", "priority", "customData" ] },
+            { nameof(ChargingPoolGroup),    [ "name", "description", "dataSource", "chargingPoolIds",    "chargingTariffId", "priority", "customData",
+                                              .. ChargingPoolGroupPoolProperties ] },
             { nameof(ChargingTariffGroup),  [ "name", "description", "dataSource", "chargingTariffIds",                      "priority", "customData" ] }
         }.ToImmutableDictionary();
 

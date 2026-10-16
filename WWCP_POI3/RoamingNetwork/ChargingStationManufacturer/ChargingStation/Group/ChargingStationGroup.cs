@@ -62,6 +62,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class ChargingStationGroup : AImmutableEMobilityEntity<ChargingStationGroup_Id,
                                                                          ChargingStationGroupAdminStatusType,
                                                                          ChargingStationGroupStatusType>,
+                                               IPOIPrioritizedGroup,
                                                IEquatable<ChargingStationGroup>,
                                                IComparable<ChargingStationGroup>
     {
@@ -74,7 +75,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<ChargingStation_Id>  ChargingStationIds  { get; }
 
         /// <summary>
-        /// The charging tariff of its operator for all its members, unless their own apply.
+        /// The charging tariff of its operator for its EVSEs without tariffs of their own, unless more specific groups
+        /// name one: EVSE groups before charging station groups before charging pool groups, of one level the one with the
+        /// highest priority (ChargingStationOperator.EffectiveEVSE(…)).
         /// </summary>
         public ChargingTariff_Id?                  ChargingTariffId    { get; }
 
@@ -83,6 +86,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// 0, unless given. Groups of the same member with the same priority must not give it different values.
         /// </summary>
         public Int32?  Priority  { get; }
+
+        /// <inheritdoc/>
+        String IPOIPrioritizedGroup.GroupId
+            => Id.ToString();
 
 
         /// <summary>

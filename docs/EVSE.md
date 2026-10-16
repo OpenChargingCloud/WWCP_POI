@@ -22,6 +22,12 @@ two identifications are equal when they differ only in case or in the `*` of the
 | Owner | the [ChargingStationOperator](ChargingStationOperator.md) its identification names (signing key) |
 | HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}`, `GET …/EVSEs/{EVSE_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET …/EVSEs/{EVSE_Id}/Brands/{Brand_Id}` |
 
+An [EVSEGroup](EVSEGroup.md) may give its members most of the properties below, so that an EVSE has only few of its
+own: at runtime it takes them, as the effective EVSE of its operator,
+`chargingStationOperator.TryGetEffectiveEVSE(evseId, out var evse)`. See
+[properties of its members](EVSEGroup.md#properties-of-its-members). POI_API serves the effective EVSE;
+`?view=stored` the EVSE as it is given.
+
 
 ## Common properties
 
@@ -123,7 +129,11 @@ It is not an entity of change sets: the EVSE's `energyMeter` is updated or remov
 their identifications. Every one must be a tariff of the same operator (`DE*GEF*T3` for an EVSE of `DE*GEF`);
 a tariff can not be removed while an EVSE names it. [EVSEGroup](EVSEGroup.md),
 [ChargingStationGroup](ChargingStationGroup.md) and [ChargingPoolGroup](ChargingPoolGroup.md) may name a
-`chargingTariffId` for all their members, unless their own apply.
+`chargingTariffId` for the EVSEs of their members. At runtime, as the effective EVSE of its operator, an EVSE has its
+own tariffs; without any, the one of its EVSE groups, else of the charging station groups of its station, else of the
+charging pool groups of its pool: the most specific groups decide, of these the one with the highest `priority`. Groups
+of the same level and priority must not give it different tariffs; the operator is refused. The OCPI and DATEX II
+publishers publish these tariffs.
 
 
 ## images

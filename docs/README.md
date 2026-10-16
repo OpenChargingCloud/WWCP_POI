@@ -42,9 +42,9 @@ flowchart TD
 | [ChargingStation](ChargingStation.md) | charging pool, `chargingStations` | its operator | A charger with its EVSEs, manufacturer and model, energy status. |
 | [EVSE](EVSE.md) | charging station, `EVSEs` | its operator | One charging point: power, voltage, current, connectors, tariffs, energy status. |
 | [ChargingTariff](ChargingTariff.md) | operator, `chargingTariffs` | its operator | A price, as in OCPI: currency, elements, price components, restrictions. |
-| [EVSEGroup](EVSEGroup.md) | operator, `EVSEGroups` | its operator | EVSEs of the operator, optionally with a common tariff. |
+| [EVSEGroup](EVSEGroup.md) | operator, `EVSEGroups` | its operator | EVSEs of the operator, optionally with a common tariff and properties they take at runtime. |
 | [ChargingStationGroup](ChargingStationGroup.md) | operator, `chargingStationGroups` | its operator | Charging stations of the operator, optionally with a common tariff and properties they take at runtime. |
-| [ChargingPoolGroup](ChargingPoolGroup.md) | operator, `chargingPoolGroups` | its operator | Charging pools of the operator, optionally with a common tariff. |
+| [ChargingPoolGroup](ChargingPoolGroup.md) | operator, `chargingPoolGroups` | its operator | Charging pools of the operator, optionally with a common tariff and properties they take at runtime. |
 | [ChargingTariffGroup](ChargingTariffGroup.md) | operator, `chargingTariffGroups` | its operator | Charging tariffs of the operator. |
 | [EnergyMeter](EnergyMeter.md) | pool, grid connection point, station, EVSE | whoever owns or maintains what embeds it | A meter with its role, manufacturer, model, versions and transparency software. |
 | [ChargingStationManufacturer](ChargingStationManufacturer.md) | roaming network, `chargingStationManufacturers` | RNO | A maker of charging stations, named by stations' `manufacturerId`. |
@@ -234,28 +234,42 @@ Parking space groups are `available` when one space is, else `inUse`, else `rese
 `planned` or `inDeployment` when all are.
 
 
-### Group priority and effective charging stations
+### Group priority and effective members
 
 Every group, of EVSEs, charging stations, charging pools, charging tariffs or parking spaces, has an optional
 `priority`, an integer, 0 unless given. Where groups of a member give it different values, the one with the higher
 priority decides; groups of the same member with the same priority must not give it different values that decide.
 
-So far charging station groups give their members properties: any property of a charging station but its
-identification, name, description, EVSEs and energy meters. The network keeps them in the group, so that e.g. the
-model, the hotline and the features of a thousand stations are given once; the stations take them at runtime, as
-the effective charging stations of their operator (`EffectiveChargingStations`, `TryGetEffectiveChargingStation`,
-`EffectiveChargingPools`). A single value is the station's own, else the one of its group with the highest
-priority; an array is its own united with those of all its groups, of brands of the same identification and of
-images of the same URL its own, else the one of the higher priority. An operator whose groups disagree with the
-same priority, or make a station invalid, e.g. by a `maxPower` above its EVSEs, is refused, and so is a change set.
-An effective charging station shares the runtime status, the EVSEs and the energy meters of the station; it is
-calculated once per version of the operator. Its `lastChange` is the latest of the station and its groups giving
-properties, so that a publisher sees a group's change in every member.
+EVSE, charging station and charging pool groups give their members properties: any property of an EVSE, charging
+station or charging pool but its identification, name, description, data source, custom data, what it embeds
+(stations, EVSEs) and its energy meters; an EVSE group not the `chargingTariffIds` of an EVSE either, it names a
+`chargingTariffId` of its own. The network keeps them in the group, so that e.g. the connectors and the power of a
+thousand EVSEs of a type, or the model and the hotline of a thousand stations, are given once; the members take them
+at runtime, as the effective members of their operator (`EffectiveChargingPools`, `EffectiveChargingStations`,
+`EffectiveEVSEs`, `TryGetEffectiveChargingPool`, `TryGetEffectiveChargingStation`, `TryGetEffectiveEVSE`,
+`ChargingPoolGroupsOf`, `ChargingStationGroupsOf`, `EVSEGroupsOf`).
 
-POI_API serves a charging station, and a charging pool with its stations, as they are at runtime, and searches the
-charging pools with them; `?view=stored` serves them as the operator embeds them, with the ETag a precondition names.
-The operator and the roaming network embed the properties where they are given; so do their ETags, change sets and
-merges. See [ChargingStationGroup](ChargingStationGroup.md#properties-of-its-members).
+- A single value is the member's own, else the one of its group with the highest priority.
+- An array is its own united with those of all its groups; of brands, charging connectors and data licenses of the
+  same identification, authentication modes of the same type and images of the same URL its own, else the one of the
+  higher priority.
+- An effective charging station has the effective EVSEs, an effective charging pool the effective charging stations,
+  and each is checked with them: a station must not have a `maxPower` above the one of its effective EVSEs together.
+- The charging tariffs of an EVSE are its own; without any, the `chargingTariffId` of its EVSE groups, else of the
+  groups of its charging station, else of the groups of its charging pool: the most specific groups decide, of these
+  the one with the highest priority.
+
+An operator whose groups disagree with the same priority, or make a member invalid, is refused, and so is a change
+set, already by `CreateChangeSet`. An effective member shares the runtime status of the member, and its energy meters;
+it is calculated once per version of the operator. Its `lastChange` is the latest of the member, its groups giving
+properties and what it embeds, so that a publisher sees a group's change in every member.
+
+POI_API serves a charging pool, a charging station and an EVSE as they are at runtime, and searches the charging pools
+so; `?view=stored` serves them as the operator embeds them, with the ETag a precondition names. The operator and the
+roaming network embed the properties where they are given; so do their ETags, change sets and merges. The OCPI and
+DATEX II publishers publish the effective members; their importers keep in the groups what they give. See
+[EVSEGroup](EVSEGroup.md#properties-of-its-members), [ChargingStationGroup](ChargingStationGroup.md#properties-of-its-members)
+and [ChargingPoolGroup](ChargingPoolGroup.md#properties-of-its-members).
 
 
 ### ETags

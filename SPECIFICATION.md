@@ -45,11 +45,11 @@ A version of a roaming network is identified by its **content**: its JSON repres
 - **Absent values** are left out. Some arrays are written also when empty, as empty means
   something there (e.g. `energySources: []`, unknown); an implementation MUST keep arrays as it
   read them.
-- **Properties given by groups** are part of the content where they are given: a charging station group
-  may give its members the properties of a charging station, which they take at runtime only (the
-  *effective* charging stations; a single value is the station's own, else the one of its group with the
-  highest `priority`, 0 unless given; arrays are united). The content, the ETags of the network and of its
-  entities, change sets and merges know them only in the group. A version whose groups of one station give
+- **Properties given by groups** are part of the content where they are given: an EVSE, charging station
+  or charging pool group may give its members their properties, which they take at runtime only (the
+  *effective* members; a single value is the member's own, else the one of its group with the highest
+  `priority`, 0 unless given; arrays are united). The content, the ETags of the network and of its
+  entities, change sets and merges know them only in the group. A version whose groups of one member give
   it different values with the same priority, where these decide, or make it invalid, is invalid.
 
 

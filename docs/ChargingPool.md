@@ -21,6 +21,12 @@ Its identification is the operator's identification, `*P` and a suffix, e.g. `DE
 | Owner | the charging station operator its identification names (a signing key) |
 | HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands/{Brand_Id}` |
 
+A [ChargingPoolGroup](ChargingPoolGroup.md) may give its members most of the properties below, so that a pool has
+only few of its own: at runtime it takes them, as the effective charging pool of its operator, with its effective
+charging stations and EVSEs, `chargingStationOperator.TryGetEffectiveChargingPool(poolId, out var pool)`. See
+[properties of its members](ChargingPoolGroup.md#properties-of-its-members). POI_API serves the effective charging
+pool; `?view=stored` the pool as it is given.
+
 
 ## Common properties
 
