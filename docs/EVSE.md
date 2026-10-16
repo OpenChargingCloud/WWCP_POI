@@ -138,6 +138,8 @@ shared by all versions of the EVSE. There is none until one is reported.
 | `used` | decimal | The power used, in W, not negative. Mandatory. |
 | `available` | decimal | The power available, in W, not negative. Mandatory. |
 | `storedEnergy` | decimal | The energy stored, in Wh, not negative. Optional. |
+| `currentVoltage` | decimal | The voltage it currently charges with, in V, not negative. Optional; only an EVSE has it. |
+| `remainingChargingTime` | decimal | How long the vehicle will probably still charge, in s, not negative. Optional; only an EVSE has it. |
 
 Other keys are refused ([`POIEnergyStatus`](../WWCP_POI3/DataStructures/POIEnergyStatus.cs)). Its text, e.g. in
 status updates, is this JSON, compact and in this order. The schedule

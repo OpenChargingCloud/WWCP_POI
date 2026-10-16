@@ -140,7 +140,8 @@ parking product ids compare case-sensitively.
   a change set takes them along, with the internal data. New entities are operational and
   available since their creation.
 - **Energy status:** EVSEs and charging stations also have an energy status, `{used, available, storedEnergy?}`
-  in W, W and Wh, kept the same way; there is none until one is reported. Its schedule keeps the last ten.
+  in W, W and Wh, for EVSEs also `currentVoltage?` in V and `remainingChargingTime?` in s, kept the same way;
+  there is none until one is reported. Its schedule keeps the last ten.
 - **Keys:** the roaming network (for its operator, the RNO), charging station operators, e-mobility providers,
   grid operators and parking operators each name 1..n `signingKeys` (a grid operator not taking part none at all), short keys signing their change sets
   (e.g. secp256r1), and 1..n `identityKeys`, long-term keys signing changes of their identity keys (e.g. secp521r1):
@@ -431,7 +432,7 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   answers come when ready and are matched by their id. A connection's requests are cancelled when it closes.
 - **setStatus** `{kind, entityType, entityId, value, timestamp?, dataSource?}` → `{result, description?, current?}`,
   allowed as `AuthorizeStatusUpdate` decides (refused without it).
-  `kind` is `adminStatus`, `status` or `energyStatus`, whose `value` is an object `{used, available, storedEnergy?}`.
+  `kind` is `adminStatus`, `status` or `energyStatus`, whose `value` is an object `{used, available, storedEnergy?, currentVoltage?, remainingChargingTime?}`.
   Status updates come often, e.g. within a minute as the AFIR asks: send them as one batch.
 - **pushStatusUpdates** `{statusUpdates: […]}` → `{results: [{result, description?}, …]}`: status updates of
   another server, as the topics push them, up to `MaxBatchSize`, each allowed as `AuthorizeStatusPush` decides

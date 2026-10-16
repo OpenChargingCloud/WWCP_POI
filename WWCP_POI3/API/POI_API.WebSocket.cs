@@ -85,7 +85,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// adminStatusUpdates     adminStatusUpdate    { kind, entityType, entityId, timestamp, value, oldTimestamp?, oldValue?, dataSource? }
     /// statusUpdates          statusUpdate         the same, for the status
     /// energyStatusUpdates    energyStatusUpdate   the same, for the energy status of EVSEs and charging stations,
-    ///                                             its value { used, available, storedEnergy? } in W, W and Wh
+    ///                                             its value { used, available, storedEnergy?, currentVoltage?,
+    ///                                             remainingChargingTime? } in W, W, Wh, V and s (the last two only of EVSEs)
     /// </remarks>
     public partial class POI_API : IAsyncDisposable
     {
@@ -661,7 +662,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!POIStatusUpdate.TryParseKind(Request.Payload["kind"]?.Type == JTokenType.String ? Request.Payload["kind"]!.Value<String>() : null, out var kind))
                 return Request.Error(POIWebSocketErrorCodes.FormatViolation, "The kind must be adminStatus, status or energyStatus!");
 
-            // The value of an energy status is an object { used, available, storedEnergy? }.
+            // The value of an energy status is an object { used, available, storedEnergy?, currentVoltage?, remainingChargingTime? }.
             if (!Request.Payload.ParseMandatoryText("entityType", "entity type",           out String? entityType, out var errorResponse) ||
                 !Request.Payload.ParseMandatoryText("entityId",   "entity identification", out String? entityId,   out errorResponse) ||
                 !POIStatusUpdate.TryParseValue(kind, Request.Payload["value"], "status",  out String? value,      out errorResponse))

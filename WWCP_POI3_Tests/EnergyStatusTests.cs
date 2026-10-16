@@ -125,6 +125,57 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Only_an_EVSE_has_a_current_voltage_and_a_remaining_charging_time()
+
+        [Test]
+        public void Only_an_EVSE_has_a_current_voltage_and_a_remaining_charging_time()
+        {
+
+            var history   = RoamingNetworkHistory.Start(NewNetwork());
+            var updates   = new List<POIStatusUpdate>();
+
+            history.RuntimeStatus.OnStatusUpdate += updates.Add;
+
+            var charging  = new EnergyInfo(Watt.FromW(11000), Watt.FromW(22000), CurrentVoltage: Volt.FromV(400), RemainingChargingTime: TimeSpan.FromSeconds(1800));
+            var text      = POIEnergyStatus.ToText(charging);
+
+            var evse      = history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.EnergyStatus, nameof(EVSE),            E1.ToString(), text, T0, out _, out _);
+            var station   = history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.EnergyStatus, nameof(ChargingStation), S1.ToString(), text, T0, out _, out var stationError);
+
+            history.RuntimeStatus.TryGet(POIRuntimeStatusKind.EnergyStatus, nameof(EVSE), E1.ToString(), out var evseStatus);
+            history.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!.TryGetEVSE(E1, out var e1);
+            history.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!.TryGetChargingStation(S1, out var s1);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(JObject.Parse(text).Properties().Select(property => property.Name),
+                            Is.EqualTo(new[] { "used", "available", "currentVoltage", "remainingChargingTime" }));
+                Assert.That(evse,                                    Is.EqualTo(POIStatusUpdateResult.Updated));
+                Assert.That(evseStatus!.Value,                       Is.EqualTo(text));
+                Assert.That(e1!.EnergyStatus!.Value.Value,           Is.EqualTo(charging));
+
+                Assert.That(station,                                 Is.EqualTo(POIStatusUpdateResult.Refused));
+                Assert.That(stationError,                            Does.Contain("only an EVSE has them"));
+                Assert.That(s1!.EnergyStatus,                        Is.Null);
+                Assert.That(() => s1.SetEnergyStatus(charging),      Throws.ArgumentException);
+
+                // On the wire, in V and s.
+                var json = updates.Single().ToJSON();
+                Assert.That(json["value"]!["currentVoltage"]!.       Value<Decimal>(),  Is.EqualTo(400));
+                Assert.That(json["value"]!["remainingChargingTime"]!.Value<Decimal>(),  Is.EqualTo(1800));
+                Assert.That(POIStatusUpdate.TryParse(json, out var parsed, out var parseError),  Is.True, parseError);
+                Assert.That(parsed!.Value,                                              Is.EqualTo(text));
+
+                Assert.That(history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.EnergyStatus, nameof(EVSE), E1.ToString(), """{"used":1,"available":2,"currentVoltage":-1}""",        T0, out _, out _),  Is.EqualTo(POIStatusUpdateResult.Refused));
+                Assert.That(history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.EnergyStatus, nameof(EVSE), E1.ToString(), """{"used":1,"available":2,"remainingChargingTime":"1h"}""", T0, out _, out _),  Is.EqualTo(POIStatusUpdateResult.Refused));
+
+            }
+
+        }
+
+        #endregion
+
         #region The_energy_status_survives_changes_and_reaches_followers()
 
         [Test]

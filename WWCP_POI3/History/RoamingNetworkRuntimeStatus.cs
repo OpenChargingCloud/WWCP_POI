@@ -671,6 +671,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (Kind == POIRuntimeStatusKind.EnergyStatus)
                     {
+
+                        // Only an EVSE has a current voltage and a remaining charging time.
+                        if (POIEnergyStatus.TryParseText(Value, out var stationEnergyStatus) && stationEnergyStatus.HasEVSEValues)
+                        {
+                            ErrorResponse = $"The energy status of the charging station '{EntityId}' must not have a current voltage or a remaining charging time: only an EVSE has them!";
+                            return POIStatusUpdateResult.Refused;
+                        }
+
                         result = Set<EnergyInfo>(Value, POIEnergyStatus.TryParseText,
                                                  () => chargingStation.EnergyStatus,
                                                  (energyStatus, timestamp) => chargingStation.SetEnergyStatus (energyStatus, timestamp, context),

@@ -112,7 +112,8 @@ content, without ETags, shared by all versions of the station. There is none unt
 | `available` | decimal | The power available, in W, not negative. Mandatory. |
 | `storedEnergy` | decimal | The energy stored, in Wh, not negative. Optional. |
 
-Other keys are refused ([`POIEnergyStatus`](../WWCP_POI3/DataStructures/POIEnergyStatus.cs)). Its text, e.g. in
+The `currentVoltage` and `remainingChargingTime` of an [EVSE](EVSE.md#energy-status)'s energy status are refused:
+`SetEnergyStatus` throws, a status update is refused. Other keys are refused ([`POIEnergyStatus`](../WWCP_POI3/DataStructures/POIEnergyStatus.cs)). Its text, e.g. in
 status updates, is this JSON, compact and in this order. The schedule
 ([`EnergyStatusRuntime`](../WWCP_POI3/DataStructures/EnergyStatusRuntime.cs)) keeps the last ten entries.
 

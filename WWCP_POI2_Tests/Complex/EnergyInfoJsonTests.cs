@@ -101,6 +101,54 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
 
         #endregion
 
+        #region Current_voltage_and_remaining_charging_time_are_optional_and_keep_their_values()
+
+        [Test]
+        public void Current_voltage_and_remaining_charging_time_are_optional_and_keep_their_values()
+        {
+
+            var withoutThem  = EnergyInfo.Parse(JObject.Parse("""{ "used": "11 kW", "available": "22 kW" }"""));
+            var withThem     = EnergyInfo.Parse(JObject.Parse("""{ "used": "11 kW", "available": "22 kW", "currentVoltage": "400 V", "remainingChargingTime": 1800.5 }"""));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(withoutThem.CurrentVoltage,                                Is.Null);
+                Assert.That(withoutThem.RemainingChargingTime,                         Is.Null);
+                Assert.That(withoutThem.HasEVSEValues,                                 Is.False);
+                Assert.That(withoutThem.ToJSON()["currentVoltage"],                    Is.Null);
+                Assert.That(withoutThem.ToJSON()["remainingChargingTime"],             Is.Null);
+
+                Assert.That(withThem.CurrentVoltage,                                   Is.EqualTo(Volt.ParseV("400")));
+                Assert.That(withThem.RemainingChargingTime,                            Is.EqualTo(TimeSpan.FromMilliseconds(1800500)));
+                Assert.That(withThem.HasEVSEValues,                                    Is.True);
+                Assert.That(withThem,                                                  Is.Not.EqualTo(withoutThem));
+                Assert.That(withThem.ToJSON()["remainingChargingTime"]!.Value<Decimal>(), Is.EqualTo(1800.5m));
+                Assert.That(EnergyInfo.Parse(withThem.ToJSON()),                       Is.EqualTo(withThem));
+                Assert.That(EnergyInfo.Parse(withThem.ToJSON()).GetHashCode(),         Is.EqualTo(withThem.GetHashCode()));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Invalid_current_voltage_or_remaining_charging_time_is_rejected(JSON, Error)
+
+        [TestCase("""{ "used": "11 kW", "available": "22 kW", "currentVoltage": "high" }""",        "current voltage")]
+        [TestCase("""{ "used": "11 kW", "available": "22 kW", "currentVoltage": "-230 V" }""",      "must not be negative")]
+        [TestCase("""{ "used": "11 kW", "available": "22 kW", "remainingChargingTime": "1 h" }""",  "remaining charging time")]
+        [TestCase("""{ "used": "11 kW", "available": "22 kW", "remainingChargingTime": -1 }""",     "remaining charging time")]
+        public void Invalid_current_voltage_or_remaining_charging_time_is_rejected(String JSON, String Error)
+        {
+
+            Assert.That(EnergyInfo.TryParse(JObject.Parse(JSON), out _, out var error),  Is.False);
+            Assert.That(error,                                                           Does.Contain(Error));
+
+        }
+
+        #endregion
+
         #region Invalid_energy_information_is_rejected(JSON, Error)
 
         [TestCase("""{}""",                                    "The given JSON object must not be null or empty!")]

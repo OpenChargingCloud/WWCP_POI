@@ -372,14 +372,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Set the energy status, since the given timestamp or now; a later timestamp plans it.
         /// </summary>
-        /// <param name="EnergyStatus">The power used and available, and the energy stored.</param>
+        /// <param name="EnergyStatus">The power used and available, and the energy stored; without the current voltage
+        /// and the remaining charging time, which only an EVSE has.</param>
         /// <param name="Timestamp">Since when; now, unless given.</param>
         /// <param name="DataSource">An optional source.</param>
         public void SetEnergyStatus(EnergyInfo       EnergyStatus,
                                     DateTimeOffset?  Timestamp    = null,
                                     Context?         DataSource   = null)
 
-            => energyStatus.Set(EnergyStatus, Timestamp ?? org.GraphDefined.Vanaheimr.Illias.Timestamp.Now, DataSource);
+            => energyStatus.Set(WithoutEVSEValues(EnergyStatus), Timestamp ?? org.GraphDefined.Vanaheimr.Illias.Timestamp.Now, DataSource);
 
         /// <summary>
         /// Take the given energy status as it is, also when it repeats the one before.
@@ -388,7 +389,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        DateTimeOffset  Timestamp,
                                        Context?        DataSource)
 
-            => energyStatus.Take(EnergyStatus, Timestamp, DataSource);
+            => energyStatus.Take(WithoutEVSEValues(EnergyStatus), Timestamp, DataSource);
+
+        /// <summary>
+        /// The given energy status, unless it has values only an EVSE has.
+        /// </summary>
+        private EnergyInfo WithoutEVSEValues(EnergyInfo EnergyStatus)
+
+            => EnergyStatus.HasEVSEValues
+                   ? throw new ArgumentException($"The energy status of the charging station '{Id}' must not have a current voltage or a remaining charging time: only an EVSE has them!",
+                                                 nameof(EnergyStatus))
+                   : EnergyStatus;
 
         /// <summary>
         /// An event fired whenever the energy status changed.

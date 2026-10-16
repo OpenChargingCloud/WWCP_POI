@@ -31,7 +31,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// The energy status of EVSEs and charging stations: runtime data like the admin status and the status,
-    /// as JSON { "used": W, "available": W, "storedEnergy"?: Wh } in their base units.
+    /// as JSON { "used": W, "available": W, "storedEnergy"?: Wh, "currentVoltage"?: V, "remainingChargingTime"?: s }
+    /// in their base units; only an EVSE has a current voltage and a remaining charging time.
     /// Its text is that JSON, compact and in this order, so that equal energy statuses have equal texts.
     /// </summary>
     public static class POIEnergyStatus
@@ -51,7 +52,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        );
 
             if (EnergyInfo.StoredEnergy.HasValue)
-                json.Add("storedEnergy", EnergyInfo.StoredEnergy.Value.Value);
+                json.Add("storedEnergy",           EnergyInfo.StoredEnergy.Value.Value);
+
+            if (EnergyInfo.CurrentVoltage.HasValue)
+                json.Add("currentVoltage",         EnergyInfo.CurrentVoltage.Value.Value);
+
+            if (EnergyInfo.RemainingChargingTime.HasValue)
+                json.Add("remainingChargingTime",  POIJSON.Seconds(EnergyInfo.RemainingChargingTime.Value));
 
             return json;
 
@@ -84,27 +91,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (JSON is not JObject json)
             {
-                ErrorResponse = "An energy status must be a JSON object { used, available, storedEnergy? }!";
+                ErrorResponse = "An energy status must be a JSON object { used, available, storedEnergy?, currentVoltage?, remainingChargingTime? }!";
                 return false;
             }
 
             foreach (var property in json.Properties())
-                if (property.Name is not ("used" or "available" or "storedEnergy"))
+                if (property.Name is not ("used" or "available" or "storedEnergy" or "currentVoltage" or "remainingChargingTime"))
                 {
                     ErrorResponse = $"Unknown property '{property.Name}' of an energy status!";
                     return false;
                 }
 
-            if (!TryParseValue(json, "used",          Mandatory: true,  out var used,          out ErrorResponse) ||
-                !TryParseValue(json, "available",     Mandatory: true,  out var available,     out ErrorResponse) ||
-                !TryParseValue(json, "storedEnergy",  Mandatory: false, out var storedEnergy,  out ErrorResponse))
+            if (!TryParseValue(json, "used",                   Mandatory: true,  out var used,                   out ErrorResponse) ||
+                !TryParseValue(json, "available",              Mandatory: true,  out var available,              out ErrorResponse) ||
+                !TryParseValue(json, "storedEnergy",           Mandatory: false, out var storedEnergy,           out ErrorResponse) ||
+                !TryParseValue(json, "currentVoltage",         Mandatory: false, out var currentVoltage,         out ErrorResponse) ||
+                !TryParseValue(json, "remainingChargingTime",  Mandatory: false, out var remainingChargingTime,  out ErrorResponse))
             {
                 return false;
             }
 
             EnergyInfo     = new EnergyInfo(Watt.FromW(used!.Value),
                                             Watt.FromW(available!.Value),
-                                            storedEnergy.HasValue ? WattHour.FromWh(storedEnergy.Value) : null);
+                                            storedEnergy.         HasValue ? WattHour.  FromWh     (storedEnergy.         Value) : null,
+                                            currentVoltage.       HasValue ? Volt.      FromV      (currentVoltage.       Value) : null,
+                                            remainingChargingTime.HasValue ? POIJSON.   FromSeconds(remainingChargingTime.Value) : null);
 
             ErrorResponse  = null;
             return true;

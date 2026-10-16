@@ -35,9 +35,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <param name="Used">The power currently delivered.</param>
     /// <param name="Available">The power a newly arriving vehicle would still get.</param>
     /// <param name="StoredEnergy">The optional energy stored in a battery buffer.</param>
+    /// <param name="CurrentVoltage">The optional voltage an EVSE currently charges with.</param>
+    /// <param name="RemainingChargingTime">The optional time the vehicle at an EVSE will probably still charge.</param>
     public readonly struct EnergyInfo(Watt       Used,
                                       Watt       Available,
-                                      WattHour?  StoredEnergy   = null)
+                                      WattHour?  StoredEnergy            = null,
+                                      Volt?      CurrentVoltage          = null,
+                                      TimeSpan?  RemainingChargingTime   = null)
 
         : IEquatable<EnergyInfo>,
           IComparable<EnergyInfo>,
@@ -59,18 +63,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The power currently delivered.
         /// </summary>
-        public Watt       Used            { get; } = Used;
+        public Watt       Used                     { get; } = Used;
 
         /// <summary>
         /// The power a newly arriving vehicle would still get.
         /// </summary>
-        public Watt       Available       { get; } = Available;
+        public Watt       Available                { get; } = Available;
 
         /// <summary>
         /// The optional energy stored in a battery buffer,
         /// e.g. to estimate how long fast charging beyond the grid connection lasts.
         /// </summary>
-        public WattHour?  StoredEnergy    { get; } = StoredEnergy;
+        public WattHour?  StoredEnergy             { get; } = StoredEnergy;
+
+        /// <summary>
+        /// The optional voltage an EVSE currently charges with.
+        /// </summary>
+        public Volt?      CurrentVoltage           { get; } = CurrentVoltage;
+
+        /// <summary>
+        /// The optional time the vehicle at an EVSE will probably still charge.
+        /// </summary>
+        public TimeSpan?  RemainingChargingTime    { get; } = RemainingChargingTime;
+
+        /// <summary>
+        /// Whether it has values only an EVSE has: the current voltage or the remaining charging time.
+        /// </summary>
+        public Boolean    HasEVSEValues
+            => CurrentVoltage.HasValue || RemainingChargingTime.HasValue;
 
         #endregion
 
@@ -169,11 +189,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse CurrentVoltage  [optional]
+
+                Volt? currentVoltage = null;
+
+                if (JSON.ParseOptionalStruct("currentVoltage",
+                                             "current voltage",
+                                             Volt.TryParse,
+                                             out Volt currentVoltageValue,
+                                             out ErrorResponse))
+                {
+
+                    if (ErrorResponse is not null)
+                        return false;
+
+                    if (currentVoltageValue.Value < 0)
+                    {
+                        ErrorResponse = "The current voltage must not be negative!";
+                        return false;
+                    }
+
+                    currentVoltage = currentVoltageValue;
+
+                }
+
+                #endregion
+
+                #region Parse RemainingChargingTime [optional]
+
+                TimeSpan? remainingChargingTime = null;
+
+                if (JSON["remainingChargingTime"] is JToken remainingChargingTimeToken)
+                {
+
+                    if (remainingChargingTimeToken.Type is not (JTokenType.Integer or JTokenType.Float) ||
+                        remainingChargingTimeToken.Value<Decimal>() < 0)
+                    {
+                        ErrorResponse = "The remaining charging time must be a number of seconds, not negative!";
+                        return false;
+                    }
+
+                    remainingChargingTime = FromSeconds(remainingChargingTimeToken.Value<Decimal>());
+
+                }
+
+                #endregion
+
 
                 EnergyInfo = new EnergyInfo(
                                  used,
                                  available,
-                                 storedEnergy
+                                 storedEnergy,
+                                 currentVoltage,
+                                 remainingChargingTime
                              );
 
 
@@ -199,7 +267,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Return a JSON representation of this object.
-        /// Both values are written culture-invariant with their unit, e.g. "11000 W".
+        /// Powers, energy and voltage are written culture-invariant with their unit, e.g. "11000 W";
+        /// the remaining charging time as a number of seconds.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         public JObject ToJSON(Boolean Embedded = false)
@@ -210,14 +279,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        ? new JProperty("@context",    JSONLDContext)
                        : null,
 
-                         new JProperty("used",           Used.     ToString()),
-                         new JProperty("available",      Available.ToString()),
+                         new JProperty("used",                    Used.     ToString()),
+                         new JProperty("available",               Available.ToString()),
 
                    StoredEnergy.HasValue
-                       ? new JProperty("storedEnergy",   StoredEnergy.Value.ToString())
+                       ? new JProperty("storedEnergy",            StoredEnergy.Value.ToString())
+                       : null,
+
+                   CurrentVoltage.HasValue
+                       ? new JProperty("currentVoltage",          CurrentVoltage.Value.ToString())
+                       : null,
+
+                   RemainingChargingTime.HasValue
+                       ? new JProperty("remainingChargingTime",   Seconds(RemainingChargingTime.Value))
                        : null
 
                );
+
+        #endregion
+
+
+        #region (private static) Seconds    (Duration)
+
+        /// <summary>
+        /// The given duration in seconds, as a decimal.
+        /// </summary>
+        private static Decimal Seconds(TimeSpan Duration)
+
+            => (Decimal) Duration.Ticks / TimeSpan.TicksPerSecond;
+
+        #endregion
+
+        #region (private static) FromSeconds(Seconds)
+
+        /// <summary>
+        /// The duration of the given number of seconds.
+        /// </summary>
+        private static TimeSpan FromSeconds(Decimal Seconds)
+
+            => TimeSpan.FromTicks((Int64) (Seconds * TimeSpan.TicksPerSecond));
 
         #endregion
 
@@ -348,7 +448,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 c = Available.CompareTo(EnergyInfo.Available);
 
             if (c == 0)
-                c = Nullable.Compare(StoredEnergy, EnergyInfo.StoredEnergy);
+                c = Nullable.Compare(StoredEnergy,           EnergyInfo.StoredEnergy);
+
+            if (c == 0)
+                c = Nullable.Compare(CurrentVoltage,         EnergyInfo.CurrentVoltage);
+
+            if (c == 0)
+                c = Nullable.Compare(RemainingChargingTime,  EnergyInfo.RemainingChargingTime);
 
             return c;
 
@@ -381,9 +487,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EnergyInfo">An energy information to compare with.</param>
         public Boolean Equals(EnergyInfo EnergyInfo)
 
-            => Used.        Equals(EnergyInfo.Used)      &&
-               Available.   Equals(EnergyInfo.Available) &&
-               StoredEnergy.Equals(EnergyInfo.StoredEnergy);
+            => Used.                 Equals(EnergyInfo.Used)            &&
+               Available.            Equals(EnergyInfo.Available)       &&
+               StoredEnergy.         Equals(EnergyInfo.StoredEnergy)    &&
+               CurrentVoltage.       Equals(EnergyInfo.CurrentVoltage)  &&
+               RemainingChargingTime.Equals(EnergyInfo.RemainingChargingTime);
 
         #endregion
 
@@ -399,9 +507,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             unchecked
             {
 
-                return Used.         GetHashCode()       * 5 ^
-                       Available.    GetHashCode()       * 3 ^
-                      (StoredEnergy?.GetHashCode() ?? 0);
+                return Used.                  GetHashCode()       * 11 ^
+                       Available.             GetHashCode()       *  7 ^
+                      (StoredEnergy?.         GetHashCode() ?? 0) *  5 ^
+                      (CurrentVoltage?.       GetHashCode() ?? 0) *  3 ^
+                      (RemainingChargingTime?.GetHashCode() ?? 0);
 
             }
         }
@@ -415,7 +525,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"{Used} used, {Available} available{(StoredEnergy.HasValue ? $", {StoredEnergy.Value} stored" : "")}";
+            => $"{Used} used, {Available} available" +
+               (StoredEnergy.         HasValue ? $", {StoredEnergy.Value} stored"                                   : "") +
+               (CurrentVoltage.       HasValue ? $", at {CurrentVoltage.Value}"                                     : "") +
+               (RemainingChargingTime.HasValue ? $", {Seconds(RemainingChargingTime.Value)} s remaining charging time" : "");
 
         #endregion
 
