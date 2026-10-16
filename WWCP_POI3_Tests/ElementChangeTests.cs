@@ -262,6 +262,40 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region One_identified_object_is_added_and_keeps_its_identification()
+
+        /// <summary>
+        /// The energy meter of an EVSE is one identified object: added as itself, not as an array of one, and replaced
+        /// only by one of the same identification.
+        /// </summary>
+        [Test]
+        public void One_identified_object_is_added_and_keeps_its_identification()
+        {
+
+            static JObject Meter(String Id, String Model)
+                => new EnergyMeter(EnergyMeter_Id.Parse(Id), SerialNumber: Model, Created: Created).ToJSON();
+
+            var rn1      = NewNetwork();
+            var rn2      = Apply(rn1, RoamingNetworkChange.AddElement(nameof(EVSE), E2.ToString(), Path("energyMeter", "M1"), Meter("M1", "A")));
+            var rn3      = Apply(rn2, RoamingNetworkChange.ReplaceElement(nameof(EVSE), E2.ToString(), Path("energyMeter", "M1"), null, Meter("M1", "B")));
+
+            var another  = Assert.Throws<ArgumentException>(() => rn2.CreateChangeSet([ RoamingNetworkChange.ReplaceElement(nameof(EVSE), E2.ToString(), Path("energyMeter", "M1"), null, Meter("M2", "A")) ],
+                                                                                     CreatedAt: T0));
+
+            EVSE EVSE2(RoamingNetwork Network)
+                => Network.GetChargingStationOperatorById(GEF)!.EVSEs.Single(evse => evse.Id == E2);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(EVSE2(rn2).EnergyMeter?.Id.ToString(),            Is.EqualTo("M1"));
+                Assert.That(EVSE2(rn3).EnergyMeter?.SerialNumber,              Is.EqualTo("B"));
+                Assert.That(another!.Message,                                  Does.Contain("must keep its identification 'M1'"));
+            }
+
+        }
+
+        #endregion
+
         #region Invalid_element_changes_are_refused()
 
         [Test]

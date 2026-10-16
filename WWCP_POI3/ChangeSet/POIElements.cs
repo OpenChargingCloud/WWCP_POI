@@ -41,6 +41,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The identification types of the elements of a property, by the name of the property:
         /// its elements are the same as their type compares them, e.g. without case.
         /// </summary>
+        /// <summary>
+        /// The properties holding one identified object, not an array of them, e.g. the energy meter of an EVSE.
+        /// </summary>
+        private static readonly HashSet<String> SingleIdentifiedProperties = [
+            "energyMeter"
+        ];
+
         private static readonly Dictionary<String, Func<String, Object?>> ElementIdTypes = new () {
             { "EVSEIds",               text => EVSE_Id.             TryParse(text, out var id) ? id : null },
             { "chargingStationIds",    text => ChargingStation_Id.  TryParse(text, out var id) ? id : null },
@@ -329,8 +336,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             return false;
                         }
 
+                        // An absent array is empty: the first element makes it, but a property of one identified object is set.
                         if (targetArray is null)
-                            holder[last.PropertyName] = new JArray(newElement);
+                            holder[last.PropertyName] = SingleIdentifiedProperties.Contains(last.PropertyName)
+                                                            ? newElement
+                                                            : new JArray(newElement);
 
                         else
                             Insert(targetArray, newElement);
@@ -398,7 +408,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     }
                     else
+                    {
+
+                        // One identified object keeps its identification as well.
+                        if (addressed is JObject && IdOf(addressed) is String addressedId &&
+                            !SameId(last.PropertyName, IdOf(replacement), addressedId))
+                        {
+                            ErrorResponse = $"'{target}' must keep its identification '{addressedId}': another one is removed and added!";
+                            return false;
+                        }
+
                         holder[last.PropertyName] = replacement;
+
+                    }
 
                     break;
 

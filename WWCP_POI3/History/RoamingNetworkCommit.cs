@@ -388,7 +388,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var eTags = ImmutableArray.CreateBuilder<ETag>(eTagsJSON.Count);
 
                 foreach (var eTagJSON in eTagsJSON)
-                    eTags.Add(ETag.Parse(eTagJSON));
+                    eTags.Add(ETag.ParseHex(eTagJSON));
 
                 #endregion
 

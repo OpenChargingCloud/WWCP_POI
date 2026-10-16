@@ -44,7 +44,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// - match:   words separated by spaces or commas, each contained in a text of an entry, case-insensitively;
     ///            a word starting with "!" must not be contained,
     /// - offset:  the number of matching entries to skip,
-    /// - limit:   the maximum number of entries to return.
+    /// - limit:   the maximum number of entries to return, at least 1.
     /// Entries are in the ordinal order of their identifications. X-Total-Count is the number of all entries,
     /// X-Filtered-Count the number of matching ones, and Link names the next and the previous page.
     /// The ETag is the one of the returned content. A list without any of these is kept with its version.
@@ -327,9 +327,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (limitText is not null)
             {
 
-                if (!UInt64.TryParse(limitText, out var parsedLimit))
+                // At least one entry: a page of none would name itself as the next one.
+                if (!UInt64.TryParse(limitText, out var parsedLimit) || parsedLimit == 0)
                 {
-                    ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Invalid limit '{limitText}'!");
+                    ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Invalid limit '{limitText}': it must be at least 1!");
                     return false;
                 }
 
@@ -403,7 +404,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 links.Add($"<{path}{Query.QueryString((UInt64) (offset + limit))}>; rel=\"next\"");
 
             if (offset > 0 && Query.Limit.HasValue)
-                links.Add($"<{path}{Query.QueryString((UInt64) Math.Max(0, offset - (Int32) Query.Limit.Value))}>; rel=\"prev\"");
+                links.Add($"<{path}{Query.QueryString((UInt64) Math.Max(0L, (Int64) offset - (Int64) Math.Min(Query.Limit.Value, (UInt64) Int32.MaxValue)))}>; rel=\"prev\"");
 
             return EntityResponse(Request,
                                   format,

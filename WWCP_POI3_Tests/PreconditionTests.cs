@@ -198,6 +198,45 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region The_ETags_of_a_change_set_are_written_in_hex()
+
+        /// <summary>
+        /// A change set is signed as it is written: its ETags in base64, which it would write in hex again, are refused.
+        /// </summary>
+        [Test]
+        public void The_ETags_of_a_change_set_are_written_in_hex()
+        {
+
+            var rn1        = NewNetwork();
+            var evse       = rn1.GetChargingStationOperatorById(GEF)!.EVSEs.Single();
+            var pool       = rn1.Precondition(nameof(ChargingPool), P1.ToString());
+
+            var changeSet  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(evse, "maxPower", null, 11000) ],
+                                                 CreatedAt:      T0,
+                                                 Preconditions:  [ pool ]).SignedByAll(rn1);
+
+            JObject With(Action<JObject> Change)
+            {
+                var json = changeSet.ToJSON();
+                Change(json);
+                return json;
+            }
+
+            var base64Precondition  = With(json => json["preconditions"]![0]!["eTag"] = pool.ETag.ToJSON(ETagDigestEncoding.Base64));
+            var base64BeforeETag    = With(json => json["beforeETags"]![0]           = changeSet.BeforeETags[0].ToJSON(ETagDigestEncoding.Base64));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(RoamingNetworkChangeSet.TryParse(changeSet.ToJSON(),  out _, out var hexError),          Is.True, hexError);
+                Assert.That(RoamingNetworkChangeSet.TryParse(base64Precondition,  out _, out var preconditionError),  Is.False);
+                Assert.That(RoamingNetworkChangeSet.TryParse(base64BeforeETag,    out _, out var beforeError),        Is.False);
+                Assert.That(beforeError,                                                                               Does.Contain("must be written in hex"));
+            }
+
+        }
+
+        #endregion
+
         #region Preconditions_are_limited()
 
         /// <summary>

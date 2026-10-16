@@ -453,7 +453,7 @@ the lists of what an operator embeds as well, takes:
 |---|---|
 | `match` | words separated by spaces or commas, each contained in a text of an entry, case-insensitively; a word starting with `!` must not be; given more than once, all of them |
 | `operatorId` | `CPs` only: the charging pools of one charging station operator |
-| `offset`, `limit` | the part of the matching entries; all of them without `limit` |
+| `offset`, `limit` | the part of the matching entries; all of them without `limit`, which is at least 1 |
 
 Entries are in the ordinal order of their identifications. `X-Total-Count` says how many entries the list has,
 `X-Filtered-Count` how many match, and `Link` names the `next` and the `prev` page; the `ETag` is the one of the

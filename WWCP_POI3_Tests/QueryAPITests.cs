@@ -264,6 +264,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
             var (second, _, secondList)  = await Get("RNs/rn1/CPs?offset=2&limit=2");
             var (beyond, _, beyondList)  = await Get("RNs/rn1/CPs?offset=5&limit=2");
             var (invalid, _, _)          = await Get("RNs/rn1/CPs?offset=minus");
+            var (none,    _, _)          = await Get("RNs/rn1/CPs?limit=0");
+            var (huge,    _, _)          = await Get("RNs/rn1/CPs?offset=2&limit=18446744073709551615");
             var (unknown, _, _)          = await Get("RNs/rn2/CPs");
 
             using (Assert.EnterMultipleScope())
@@ -278,6 +280,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(beyondList,                                 Is.Empty);
 
                 Assert.That(invalid.StatusCode,                         Is.EqualTo(HttpStatusCode.BadRequest));
+
+                // A page of none would name itself as the next one; a huge limit names the first page as the previous one.
+                Assert.That(none.StatusCode,                            Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(HeaderOf(huge, "Link"),                     Is.EqualTo("</RNs/rn1/CPs?limit=18446744073709551615>; rel=\"prev\""));
                 Assert.That(unknown.StatusCode,                         Is.EqualTo(HttpStatusCode.NotFound));
 
             }

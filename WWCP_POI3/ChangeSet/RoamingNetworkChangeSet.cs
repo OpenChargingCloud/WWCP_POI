@@ -795,7 +795,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 try
                 {
-                    eTags.Add(ETag.Parse(eTagJSON));
+                    eTags.Add(ETag.ParseHex(eTagJSON));
                 }
                 catch (Exception e)
                 {

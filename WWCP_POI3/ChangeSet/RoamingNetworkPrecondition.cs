@@ -60,7 +60,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                Precondition   = new RoamingNetworkPrecondition(entityType, entityId, ETag.Parse(eTagJSON));
+                Precondition   = new RoamingNetworkPrecondition(entityType, entityId, ETag.ParseHex(eTagJSON));
                 ErrorResponse  = null;
                 return true;
 

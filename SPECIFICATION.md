@@ -65,7 +65,9 @@ An ETag is a digest of the content in one of two formats.
 ### 3.1 Representations
 
 - **JSON:** `["json", "sha256", "hex", "<64 lowercase hex digits>"]`; the encoding MAY also be
-  `base64`, with canonical padding.
+  `base64`, with canonical padding, except in change sets (their `beforeETags`, `afterETags` and
+  preconditions) and commits: these MUST write ETags in hex, and a reader MUST refuse others, as their
+  signatures and identifications are calculated over them as written.
 - **CBOR:** `[format, "sha256", h'<digest>']`, e.g. `["cbor", "sha256", h'291e…']`, the digest as a byte string.
 - **Text:** `json:sha256:hex:<digest>`.
 - **Algorithms:** `sha256` (default), `sha384`, `sha512`.

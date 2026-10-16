@@ -272,6 +272,21 @@ public readonly struct ETag : IEquatable<ETag>
     }
 
     /// <summary>
+    /// Parse a JSON array containing format, algorithm, the digest encoding "hex" and the hex digest: an ETag a change
+    /// set, a precondition or a commit names, which their signatures and identifications are calculated over as they
+    /// write it, in hex.
+    /// </summary>
+    public static ETag ParseHex(JToken json)
+    {
+
+        if (json is JArray array && array.Count == 4 && array[2].Type == JTokenType.String && array[2].Value<String>() != "hex")
+            throw new ArgumentException($"An ETag of a change set or a commit must be written in hex, not in '{array[2].Value<String>()}': they are signed as they are written.", nameof(json));
+
+        return Parse(json);
+
+    }
+
+    /// <summary>
     /// Parse a CBOR array containing format, algorithm and a digest byte string.
     /// </summary>
     public static ETag Parse(CBORValue cbor)
