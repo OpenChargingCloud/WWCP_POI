@@ -51,7 +51,8 @@ Absent values are left out; an empty `EVSEIds` is not written.
 `EVSEIds`: the members, each once, in the ordinal order of their identifications. Every one must be an
 [EVSE](EVSE.md) of the same operator, in any of its stations; an EVSE of another operator is unknown there and
 refused. The array is updated or removed as a whole, e.g.
-`RoamingNetworkChange.UpdateProperty(group, "EVSEIds", old, new)`. An EVSE can not be removed while a group
+`RoamingNetworkChange.UpdateProperty(group, "EVSEIds", old, new)`, or [element by element](README.md#element-changes), e.g.
+`AddElement("EVSEGroup", groupId, [ new ("EVSEIds", evseId) ], evseId)`. An EVSE can not be removed while a group
 names it: update the group first, in the same change set.
 
 

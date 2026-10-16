@@ -86,6 +86,25 @@ A change set leads from the version of its `beforeETags` to the version of its `
   "beforeETags": [ … ], "afterETags": [ … ], "signatures": [ … ] }
 ```
 
+**Kinds:** `Add` and `Remove` of an entity; `UpdateProperty` and `RemoveProperty` of a property of an entity;
+and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `UpdateElementProperty` and
+`RemoveElementProperty` of one element of a property, named by `elementPath`, an array of
+`{ "propertyName", "elementId"? }`:
+
+- the first segment names a property of the entity, every further one a property of the value the segment before
+  names. A segment on an array MUST name an element by `elementId`: the `@id` text of an object, a text itself,
+  compared ordinally; every element of the array MUST have one and no two the same, else the change is refused.
+  A segment on any other value MAY name its `@id`, which it then MUST have;
+- `AddElement` names an element that does not exist yet, or an absent property, and its `newValue` MUST have the
+  `elementId` of the segment; it goes where the ordinal order of the identifications puts it, when the array is in
+  that order, otherwise at its end. `ReplaceElement` keeps the identification. `UpdateElementProperty` and
+  `RemoveElementProperty` change `propertyName` of the object named, never `@id`. An array left empty is removed;
+- an element change MUST be checked as the `UpdateProperty`, or `RemoveProperty` when nothing is left, of the
+  property its first segment names: owners (section 4.1), changeable properties, the result. The `signingKeys` and
+  `identityKeys` of a party are not changed element by element;
+- its `oldValue` is the element, or the property of the element, it names (JSON `null`: absent); `AddElement` has
+  none.
+
 **Timestamps:** a change set sets `lastChange` to its `createdAt`: of the roaming network always; of an entity
 when it is added (and `created`, unless given) or when one of its own properties changes; not when only an entity
 it embeds changes. `lastChange` therefore does not tell when anything below an entity last changed: its
@@ -224,17 +243,30 @@ identification, without its embedded children and without `lastChange`, property
 absent being a value of its own:
 
 - a property only one version changed takes that change; both changed it alike, it is kept once;
-  both changed it differently, they **conflict**;
+  both changed it differently, they **conflict**, unless it is an array of identified elements (section 4)
+  in all three, an absent one counting as empty, and its keys are not those of a party: then the merge is
+  the first version's array with the changes of the second one against the base, element by element,
+  taken in the order of the second one: an element it removed is removed, unless the first one changed it; one it
+  added is added (section 4), unless the first one added it differently; one it changed is replaced, unless
+  the first one changed it, too: then objects merge property by property, each as a whole, else they
+  conflict; the second one changing what the first one removed conflicts. A virtual merge base merges
+  arrays the same way;
 - an entity only one version added is added, with what it embeds, unless the other one removed
   where it is added; one removed is removed, unless the other one changed it; both added it with
   different properties, they conflict; moved to another parent by one version only, it is
   removed and added again, unless the other one changed it.
 
 The changes are written in this order: `Add` (of the topmost added entities, with what they
-embed, in the order of the second version), `UpdateProperty`/`RemoveProperty` (in the order of
-the first version, properties in the order of the union of their names), removals and additions
-of moved entities, `Remove` (of the topmost removed entities). Their `oldValue` is the value they
-find. A merge commit MUST be refused unless it is the merge of its parents as calculated here,
+embed, in the order of the second version), the changes of properties (in the order of the first
+version, properties in the order of the union of their names), removals and additions of moved
+entities, `Remove` (of the topmost removed entities). A property whose old and new values are both
+arrays of identified elements (absent counting as empty), except the keys of a party, is changed by
+`RemoveElement` of the removed elements (in their old order), then `AddElement` of the added ones and
+`UpdateElementProperty`/`RemoveElementProperty` of the changed objects, property by property in the
+order of the union of their names, or `ReplaceElement` of other changed elements (in the new order),
+unless these are more than the elements of the new value, or applied in this order they do not give
+exactly the new value; then, as every other property, by `UpdateProperty`/`RemoveProperty`. Their
+`oldValue` is the value they find. A merge commit MUST be refused unless it is the merge of its parents as calculated here,
 exactly. Conflicting tips stay until an owner commits a change set to one of them that resolves
 the conflict, e.g. taking the value of the other one.
 

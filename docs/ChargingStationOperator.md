@@ -224,7 +224,8 @@ each at most once.
 When read, `dataLicenseIds` may instead name well-known licenses by their identification alone: `None`, `PDDL`,
 `ODC-By`, `ODbL`, `dl-de/by-2-0`, `dl-de/zero-2-0`, `GeoLizenz_V1.3`, `CC BY 4.0`, `CC BY-SA 4.0`, `CC BY-ND 4.0`,
 `CC BY-NC 4.0`, `CC BY-NC-SA 4.0`, `CC BY-NC-ND 4.0`. Any other identification must be given completely. A change
-set updates `dataLicenses` as a whole; removing it, or updating it to `[]`, leaves no `dataLicenses`.
+set updates `dataLicenses` as a whole, or [element by element](README.md#element-changes); removing it, or updating it to `[]`, leaves no
+`dataLicenses`.
 
 
 ## Contact

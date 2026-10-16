@@ -330,7 +330,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!owners.Any(owner => signedBy.Contains(owner)))
                 {
-                    ErrorResponse = $"Change {index}: {change.Kind} of the {change.EntityType} '{change.EntityId}'{(change.PropertyName is not null ? $" ('{change.PropertyName}')" : "")} needs a signature by " +
+                    ErrorResponse = $"Change {index}: {change.Kind} of the {change.EntityType} '{change.EntityId}'{(change.EntityPropertyName is not null ? $" ('{change.EntityPropertyName}')" : "")} needs a signature by " +
                                     String.Join(" or ", owners.Select(owner => $"a{(owner.Item2 == POIKeyKind.Identity ? "n identity" : " signing")} key of {owner.Item1}")) + "!";
                     return false;
                 }
@@ -402,9 +402,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (Change.EntityType == nameof(RoamingNetwork))
             {
-                Owners = Change.PropertyName == POIPartyKeys.SigningKeysProperty
+                Owners = Change.EntityPropertyName == POIPartyKeys.SigningKeysProperty
                              ? [ (roamingNetworkOperator, POIKeyKind.Signing), (roamingNetworkOperator, POIKeyKind.Identity) ]
-                             : [ (roamingNetworkOperator, POIPartyKeys.IsKeyProperty(Change.PropertyName) ? POIKeyKind.Identity : POIKeyKind.Signing) ];
+                             : [ (roamingNetworkOperator, POIPartyKeys.IsKeyProperty(Change.EntityPropertyName) ? POIKeyKind.Identity : POIKeyKind.Signing) ];
                 return true;
             }
 
@@ -424,9 +424,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 // can sign any more; identity keys only by an identity key. The roaming network operator recovers both.
                 Owners = !isProperty
                              ? [ (roamingNetworkOperator, POIKeyKind.Signing) ]
-                             : Change.PropertyName == POIPartyKeys.SigningKeysProperty
+                             : Change.EntityPropertyName == POIPartyKeys.SigningKeysProperty
                                    ? [ (party, POIKeyKind.Signing), (party, POIKeyKind.Identity), (roamingNetworkOperator, POIKeyKind.Identity) ]
-                                   : POIPartyKeys.IsKeyProperty(Change.PropertyName)
+                                   : POIPartyKeys.IsKeyProperty(Change.EntityPropertyName)
                                          ? [ (party, POIKeyKind.Identity), (roamingNetworkOperator, POIKeyKind.Identity) ]
                                          : [ SignerOf(party) ];
 
@@ -537,7 +537,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 // Taken over or handed on by its grid operator, handed on by its maintainer, or reassigned by the roaming network operator.
-                Owners = isProperty && Change.PropertyName == MaintainedByProperty
+                Owners = isProperty && Change.EntityPropertyName == MaintainedByProperty
                              ? [ .. new[] { SignerOf(gridOperatorId), (maintainer, POIKeyKind.Signing), (roamingNetworkOperator, POIKeyKind.Identity) }.Distinct() ]
                              : [ SignerOf(maintainer) ];
 

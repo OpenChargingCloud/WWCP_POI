@@ -279,6 +279,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            // An element change is applied as the change of the property it amounts to.
+            var isElementChange = Change.IsElementChange;
+
+            if (!TryResolveElementChange(ref Change, entityJSON, description, out var elementValue, out ErrorResponse))
+            {
+                ErrorResponse = $"Change {Index}: {ErrorResponse}";
+                return false;
+            }
+
             var isProperty = Change.Kind is RoamingNetworkChangeKind.UpdateProperty or RoamingNetworkChangeKind.RemoveProperty;
 
             if (Change.Kind != RoamingNetworkChangeKind.Add && entityJSON is null)
@@ -428,6 +437,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Operators[operatorId.Value] = changedOperator;
 
             #endregion
+
+            // The old value of an element change is the value of what it addresses.
+            if (isElementChange)
+                CurrentValue = elementValue;
 
             ErrorResponse = null;
             return true;

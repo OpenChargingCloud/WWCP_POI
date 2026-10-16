@@ -262,6 +262,46 @@ refused; without `eTags` it is read as before. A representation that is changed 
 therefore written without them, `ToJSON(IncludeETags: false)`.
 
 
+### Element changes
+
+A property holding an array, or an object, is changed as a whole by `UpdateProperty` and `RemoveProperty`, or one
+element at a time by an element change ([POIElements](../WWCP_POI3/ChangeSet/POIElements.cs)):
+
+| Kind | Element path names | Value | Old value |
+|---|---|---|---|
+| `AddElement` | the new element, by its identification, or an absent property | the element | none |
+| `RemoveElement` | an element, or a property | — | the element |
+| `ReplaceElement` | an element, or a property | the element, with the same identification | the element |
+| `UpdateElementProperty` | an object; `propertyName` its property | the property's value | the property's value |
+| `RemoveElementProperty` | an object; `propertyName` its property | — | the property's value |
+
+```csharp
+RoamingNetworkChange.AddElement           ("EVSEGroup", "DE*GEF*EG1",  [ new ("EVSEIds", "DE*GEF*E1*2") ], "DE*GEF*E1*2");
+RoamingNetworkChange.UpdateElementProperty("EVSE",      "DE*GEF*E1*1", [ new ("chargingConnectors", "1") ], "lockable", null, true);
+```
+
+- **Path:** its first segment names a property of the entity itself, every further one a property of what the
+  segment before names. A segment on an array names an element by its identification (`elementId`): the `@id` of an
+  object, a text itself, compared exactly. Every element of such an array must have one, and no two the same:
+  otherwise, e.g. the `elements` of a tariff, the array is changed as a whole. A segment on any other value may name
+  its `@id`, which it must then have. `@id` itself is not changed: another element is removed and added.
+- **Order:** an added element goes where the ordinal order of the identifications puts it, when the array is in that
+  order, otherwise at its end. An array left without elements is removed.
+- **Checks:** an element change amounts to an `UpdateProperty`, or a `RemoveProperty`, of the property of the entity
+  its path starts with, and is checked as that change: by its owners, as a property a change set can change, and by
+  reading the changed entity again. Children that are entities of their own (pools, stations, EVSEs, …) are not
+  elements: they are added and removed as entities. The `signingKeys` and `identityKeys` of a party are changed as a
+  whole.
+- **Old values:** the old value is the element, or the property of the element, the change names; JSON `null` means
+  absent. Concurrent changes of other elements of the same property therefore do not conflict, and a change set of
+  element changes can be rebased onto them.
+- **Merges** compare a property both versions changed element by element, when it is an array of identified
+  elements, and write the changes leading to the merge element by element: `POIElements.Diff` gives the removed
+  elements, then the added and changed ones, a changed object property by property, unless there are more changes
+  than elements, or they would not give the same order; then the property is changed as a whole. The importers
+  commit the difference to what they read this way, see [SPECIFICATION §5.3](../SPECIFICATION.md#53-merges).
+
+
 ### Collections
 
 The children of an entity, and the parties and registries of a roaming network, are `POICollection<TId, TEntity>`

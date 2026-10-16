@@ -97,7 +97,8 @@ Moving an EVSE to another station is a `Remove` and an `Add`. An EVSE named by a
 `energyMeters`: the station's own [energy meters](EnergyMeter.md), 0..n, in the ordinal order of their
 identifications, each once; the meters of its EVSEs are in their `energyMeter`. Energy meter identifications are
 unique within the roaming network. Energy meters are not entities of change sets: the station's `energyMeters`
-is updated or removed as a whole by `RoamingNetworkChange.UpdateProperty(station, "energyMeters", old, new)`.
+is updated or removed as a whole by `RoamingNetworkChange.UpdateProperty(station, "energyMeters", old, new)`, or
+[element by element](README.md#element-changes).
 A meter's `manufacturerId` must name an energy meter manufacturer of the network. A JSON object naming
 `energyMeterIds` instead is refused.
 

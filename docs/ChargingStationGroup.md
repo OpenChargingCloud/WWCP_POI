@@ -51,7 +51,7 @@ Absent values are left out; an empty `chargingStationIds` is not written.
 `chargingStationIds`: the members, each once, in the ordinal order of their identifications. Every one must be
 a [charging station](ChargingStation.md) of the same operator, in any of its pools; a station of another
 operator is unknown there and refused. The array is updated or removed as a whole, e.g.
-`RoamingNetworkChange.UpdateProperty(group, "chargingStationIds", old, new)`. A station can not be removed
+`RoamingNetworkChange.UpdateProperty(group, "chargingStationIds", old, new)`, or [element by element](README.md#element-changes). A station can not be removed
 while a group names it: update the group first, in the same change set.
 
 

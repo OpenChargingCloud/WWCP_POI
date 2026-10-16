@@ -123,7 +123,7 @@ Over HTTP, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}?expand=gridConnectionPoi
 of their identifications; not those of its stations and EVSEs. The meter of its grid connection point belongs to
 the grid connection point, in its grid operator.
 Energy meters have admin status and status, but no change set of their own: they are changed as the pool's property
-`energyMeters`, as a whole. Their identifications are unique within the roaming network; their manufacturers must
+`energyMeters`, as a whole or [element by element](README.md#element-changes). Their identifications are unique within the roaming network; their manufacturers must
 be energy meter manufacturers of the network. `energyMeterIds` alone are refused.
 See [EnergyMeter](EnergyMeter.md).
 

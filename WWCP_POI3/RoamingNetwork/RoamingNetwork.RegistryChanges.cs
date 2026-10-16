@@ -229,6 +229,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Entities.TryGetValue(entityId, out var currentEntity);
 
             var currentJSON  = currentEntity is not null ? Registry.ToJSON(currentEntity) : null;
+
+            // An element change is applied as the change of the property it amounts to.
+            var isElementChange = Change.IsElementChange;
+
+            if (!TryResolveElementChange(ref Change, currentJSON, description, out var elementValue, out ErrorResponse))
+            {
+                ErrorResponse = $"Change {Index}: {ErrorResponse}";
+                return false;
+            }
+
             var isProperty   = Change.Kind is RoamingNetworkChangeKind.UpdateProperty or RoamingNetworkChangeKind.RemoveProperty;
 
             if (Change.Kind != RoamingNetworkChangeKind.Add && currentJSON is null)
@@ -341,6 +351,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
 
             }
+
+            // The old value of an element change is the value of what it addresses.
+            if (isElementChange)
+                CurrentValue = elementValue;
 
             ErrorResponse = null;
             return true;

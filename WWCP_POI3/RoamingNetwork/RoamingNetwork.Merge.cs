@@ -617,6 +617,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         continue;
                     }
 
+                    // Both changed an array of identified elements: element by element.
+                    if (b is not null && TryMergeElements(propertyName, bv, lv, rv, out var mergedValue))
+                    {
+                        if (mergedValue is null)
+                            target.Remove(propertyName);
+                        else
+                            target[propertyName] = mergedValue;
+                        continue;
+                    }
+
                     conflicting = true;
 
                     Conflict(b is null ? RoamingNetworkMergeConflictKind.AddAdd : RoamingNetworkMergeConflictKind.DifferentValues,
@@ -640,9 +650,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (differing.All(changeable.Contains))
                 {
                     foreach (var propertyName in differing)
-                        updates.Add(target[propertyName] is JToken newValue
-                                        ? RoamingNetworkChange.UpdateProperty(l.Type, l.Id, propertyName, null, newValue.DeepClone())
-                                        : RoamingNetworkChange.RemoveProperty(l.Type, l.Id, propertyName));
+                        updates.AddRange(PropertyChanges(l.Type, l.Id, propertyName, l.Own[propertyName], target[propertyName]));
                     continue;
                 }
 
@@ -745,8 +753,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     var lv     = l. Own[propertyName];
                     var rv     = r. Own[propertyName];
 
-                    var value  = Same(lv, rv) || Same(rv, bv) ? lv
-                               : Same(lv, bv)                 ? rv
+                    var value  = Same(lv, rv) || Same(rv, bv)                                            ? lv
+                               : Same(lv, bv)                                                            ? rv
+                               : b is not null && TryMergeElements(propertyName, bv, lv, rv, out var merged)  ? merged
                                : ConflictMarker(bv, lv, rv);
 
                     if (value is not null)
@@ -786,6 +795,54 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 conflict.Add("right",  Right.DeepClone());
 
             return new JObject(new JProperty(ConflictMarkerProperty, conflict));
+
+        }
+
+        #endregion
+
+        #region (private static) TryMergeElements(PropertyName, Base, Left, Right, out Merged)
+
+        /// <summary>
+        /// Merge a property both versions changed differently element by element, when it is an array of
+        /// identified elements (see POIElements.TryMerge). The keys of a party are merged as a whole.
+        /// </summary>
+        private static Boolean TryMergeElements(String       PropertyName,
+                                                JToken?      Base,
+                                                JToken?      Left,
+                                                JToken?      Right,
+                                                out JToken?  Merged)
+        {
+
+            Merged = null;
+
+            return !POIPartyKeys.IsKeyProperty(PropertyName) &&
+                   POIElements.TryMerge(Base, Left, Right, out Merged);
+
+        }
+
+        #endregion
+
+        #region (private static) PropertyChanges(EntityType, EntityId, PropertyName, Value, NewValue)
+
+        /// <summary>
+        /// The changes of a property leading from the value of the left version to the merged one: element by element,
+        /// where they can be (see POIElements.Diff), the keys of a party as a whole; without old values,
+        /// so that they get the values they find.
+        /// </summary>
+        private static IEnumerable<RoamingNetworkChange> PropertyChanges(String   EntityType,
+                                                                         String   EntityId,
+                                                                         String   PropertyName,
+                                                                         JToken?  Value,
+                                                                         JToken?  NewValue)
+        {
+
+            if (POIPartyKeys.IsKeyProperty(PropertyName))
+                return [ NewValue is not null
+                             ? RoamingNetworkChange.UpdateProperty(EntityType, EntityId, PropertyName, null, NewValue.DeepClone())
+                             : RoamingNetworkChange.RemoveProperty(EntityType, EntityId, PropertyName) ];
+
+            return POIElements.Diff(EntityType, EntityId, PropertyName, Value, NewValue).
+                               Select(change => change.WithoutOldValue());
 
         }
 

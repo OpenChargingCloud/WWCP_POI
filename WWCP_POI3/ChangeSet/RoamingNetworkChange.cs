@@ -96,6 +96,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public JToken?                                NewValue
             => newValue?.DeepClone();
 
+        /// <summary>
+        /// Whether this change addresses an element of a property of the entity by its element path.
+        /// </summary>
+        public Boolean                                IsElementChange
+            => !ElementPath.IsDefaultOrEmpty;
+
+        /// <summary>
+        /// The property of the entity itself this change changes: its property name, or for an element change
+        /// the first property of its element path; null for Add and Remove. Owners and changeable properties
+        /// are those of this property.
+        /// </summary>
+        public String?                                EntityPropertyName
+            => IsElementChange
+                   ? ElementPath[0].PropertyName
+                   : PropertyName;
+
         #endregion
 
         #region Constructor(s)
@@ -1880,6 +1896,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public override String ToString()
 
             => $"{Kind} {EntityType} '{EntityId}'{(PropertyName is not null ? $" .{PropertyName}" : "")}";
+
+        #endregion
+
+
+        #region (internal) WithoutOldValue()
+
+        /// <summary>
+        /// This change without its old value: applying it gives it the value it finds.
+        /// </summary>
+        internal RoamingNetworkChange WithoutOldValue()
+
+            => new (Kind,
+                    EntityType,
+                    EntityId,
+                    PropertyName,
+                    null,
+                    newValue,
+                    ParentEntityType,
+                    ParentEntityId,
+                    ElementPath);
 
         #endregion
 

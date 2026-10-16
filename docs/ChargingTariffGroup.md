@@ -53,7 +53,7 @@ operator embeds in `chargingTariffs`. A member still named by a group can not be
 group first, in an earlier change of the same change set or an earlier one.
 
 `UpdateProperty(group, "chargingTariffIds", oldValue, new JArray("DE*GEF*T1", "DE*GEF*T2"))` replaces the
-members as a whole; `RemoveProperty(group, "chargingTariffIds")` leaves none.
+members as a whole, or [element by element](README.md#element-changes); `RemoveProperty(group, "chargingTariffIds")` leaves none.
 
 
 ## Change sets

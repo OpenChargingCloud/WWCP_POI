@@ -397,7 +397,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 for (var index = 0; index < ChangeSet.Changes.Length; index++)
                 {
                     if (ChangeSet.Changes[index].OldValue is null &&
-                        ChangeSet.Changes[index].Kind != RoamingNetworkChangeKind.Add)
+                        ChangeSet.Changes[index].Kind is not (RoamingNetworkChangeKind.Add or RoamingNetworkChangeKind.AddElement))
                     {
                         ErrorResponse = $"Change {index} has no old value, so a rebase could silently overwrite a concurrent change!";
                         return false;
@@ -528,7 +528,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     operators.TryGetValue(operatorId, out var currentOperator);
 
                     var currentOperatorJSON  = currentOperator?.ToEmbeddedJSON();
-                    var operatorProperty     = change.Kind is RoamingNetworkChangeKind.UpdateProperty or RoamingNetworkChangeKind.RemoveProperty;
+
+                    // An element change is applied as the change of the property it amounts to.
+                    var applied              = change;
+
+                    if (!TryResolveElementChange(ref applied, currentOperatorJSON, "charging station operator", out var operatorElementValue, out var operatorElementError))
+                    {
+                        ErrorResponse = $"Change {index}: {operatorElementError}";
+                        return false;
+                    }
+
+                    var operatorProperty     = applied.Kind is RoamingNetworkChangeKind.UpdateProperty or RoamingNetworkChangeKind.RemoveProperty;
 
                     if (operatorProperty && currentOperatorJSON is null)
                     {
@@ -538,19 +548,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     // A property change compares the property, every other change the complete operator.
                     currentValue = operatorProperty
-                                       ? currentOperatorJSON![change.PropertyName!]?.DeepClone()
+                                       ? currentOperatorJSON![applied.PropertyName!]?.DeepClone()
                                        : currentOperatorJSON;
 
-                    if (change.OldValue is JToken expectedOperator &&
+                    if (applied.OldValue is JToken expectedOperator &&
                         !OldValueMatches(expectedOperator, currentValue))
                     {
                         ErrorResponse = operatorProperty
-                                            ? $"Change {index}: the property '{change.PropertyName}' of the charging station operator '{operatorId}' is no longer the expected old value, but '{currentValue?.ToString(Newtonsoft.Json.Formatting.None) ?? "absent"}'!"
+                                            ? $"Change {index}: the property '{applied.PropertyName}' of the charging station operator '{operatorId}' is no longer the expected old value, but '{currentValue?.ToString(Newtonsoft.Json.Formatting.None) ?? "absent"}'!"
                                             : $"Change {index}: the charging station operator '{operatorId}' is no longer the expected old value{(currentValue is null ? ": it does not exist" : "")}!";
                         return false;
                     }
 
-                    switch (change.Kind)
+                    switch (applied.Kind)
                     {
 
                         #region UpdateProperty, RemoveProperty
@@ -558,7 +568,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         case RoamingNetworkChangeKind.UpdateProperty:
                         case RoamingNetworkChangeKind.RemoveProperty:
 
-                            var propertyName = change.PropertyName!;
+                            var propertyName = applied.PropertyName!;
 
                             if (!ChangeableOperatorProperties.Contains(propertyName))
                             {
@@ -566,7 +576,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 return false;
                             }
 
-                            if (change.Kind == RoamingNetworkChangeKind.RemoveProperty)
+                            if (applied.Kind == RoamingNetworkChangeKind.RemoveProperty)
                             {
 
                                 if (propertyName == "name")
@@ -585,7 +595,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                             }
                             else
-                                currentOperatorJSON![propertyName] = change.NewValue;
+                                currentOperatorJSON![propertyName] = applied.NewValue;
 
                             // The change set's timestamp is the last change, so that its after ETags are deterministic.
                             currentOperatorJSON!["lastChange"] = ChangeSet.CreatedAt.ToISO8601();
@@ -617,7 +627,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                             // The change set's timestamp is the last change and, unless given, the creation,
                             // so that its after ETags are deterministic.
-                            var newOperatorJSON = (JObject) change.NewValue!;
+                            var newOperatorJSON = (JObject) applied.NewValue!;
                             newOperatorJSON["created"]    ??= ChangeSet.CreatedAt.ToISO8601();
                             newOperatorJSON["lastChange"]   = ChangeSet.CreatedAt.ToISO8601();
 
@@ -648,10 +658,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             break;
 
                         default:
-                            ErrorResponse = $"Change {index}: {change.Kind} of a charging station operator is not supported yet!";
+                            ErrorResponse = $"Change {index}: {applied.Kind} of a charging station operator is not supported yet!";
                             return false;
 
                     }
+
+                    // The old value of an element change is the value of what it addresses.
+                    if (change.IsElementChange)
+                        currentValue = operatorElementValue;
 
                 }
 
@@ -664,24 +678,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          change.ParentEntityType is null)
                 {
 
-                    var propertyName  = change.PropertyName ?? "";
+                    // An element change is applied as the change of the property it amounts to.
+                    var applied       = change;
+                    JToken? networkElementValue = null;
+
+                    if (change.IsElementChange)
+                    {
+
+                        var networkJSON = new JObject();
+
+                        if (CurrentValue(change.EntityPropertyName!, name, description, dataSource, licenses, customData, signingKeys, identityKeys) is JToken networkPropertyValue)
+                            networkJSON[change.EntityPropertyName!] = networkPropertyValue;
+
+                        if (!TryResolveElementChange(ref applied, networkJSON, "roaming network", out networkElementValue, out var networkElementError))
+                        {
+                            ErrorResponse = $"Change {index}: {networkElementError}";
+                            return false;
+                        }
+
+                    }
+
+                    var propertyName  = applied.PropertyName ?? "";
                     currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses, customData, signingKeys, identityKeys);
 
-                    if (change.OldValue is JToken oldValue &&
+                    if (applied.OldValue is JToken oldValue &&
                         !OldValueMatches(oldValue, currentValue))
                     {
                         ErrorResponse = $"Change {index}: the property '{propertyName}' is no longer the expected old value, but '{currentValue?.ToString(Newtonsoft.Json.Formatting.None) ?? "absent"}'!";
                         return false;
                     }
 
-                    switch (change.Kind)
+                    switch (applied.Kind)
                     {
 
                         #region UpdateProperty
 
                         case RoamingNetworkChangeKind.UpdateProperty:
 
-                            var newValue = change.NewValue!;
+                            var newValue = applied.NewValue!;
 
                             switch (propertyName)
                             {
@@ -798,10 +832,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         #endregion
 
                         default:
-                            ErrorResponse = $"Change {index}: {change.Kind} of the roaming network itself is not supported yet!";
+                            ErrorResponse = $"Change {index}: {applied.Kind} of the roaming network itself is not supported yet!";
                             return false;
 
                     }
+
+                    // The old value of an element change is the value of what it addresses.
+                    if (change.IsElementChange)
+                        currentValue = networkElementValue;
 
                 }
 
@@ -905,9 +943,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Remember the old value
 
-                // Add has no old value; every other change without one gets the value it found,
+                // Add and AddElement have no old value; every other change without one gets the value it found,
                 // or JSON null when it found none: then the value is expected to be absent.
-                changesWithOldValues.Add(change.OldValue is null && change.Kind != RoamingNetworkChangeKind.Add
+                changesWithOldValues.Add(change.OldValue is null && change.Kind is not (RoamingNetworkChangeKind.Add or RoamingNetworkChangeKind.AddElement)
 
                                              ? new RoamingNetworkChange(
                                                    change.Kind,

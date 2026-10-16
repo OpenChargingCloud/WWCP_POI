@@ -227,6 +227,15 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
   to the entity with that id in the version it is applied to.
 - **Old values:** `CreateChangeSet` gives every change the value it finds; JSON `null` means
   "expected absent". A change finding another value conflicts.
+- **Element changes:** `AddElement`, `RemoveElement`, `ReplaceElement`, `UpdateElementProperty` and
+  `RemoveElementProperty` change one element of a property, named by an element path, e.g. a member of a group,
+  `[{"propertyName": "EVSEIds", "elementId": "DE*GEF*E1*2"}]`, or a property of a connector,
+  `[{"propertyName": "chargingConnectors", "elementId": "1"}]` with `propertyName: "lockable"`. Elements of an array
+  are named by their `@id`, texts by themselves; other arrays, e.g. the `elements` of a tariff, and the keys of a
+  party are changed as a whole. An element change is checked as a change of the property it is part of, but its old
+  value is the element: concurrent changes of other elements do not conflict. Merges, and so the differences the
+  importers commit, write changes element by element (`POIElements.Diff`). See
+  [docs/](docs/README.md#element-changes).
 - **Timestamps:** a change set sets `lastChange` to its `CreatedAt`, so its after ETags are deterministic:
   of the roaming network always, of an entity when it is added or its own properties change, not when only what
   it embeds changes. Whether anything below an entity changed shows its ETag, what changed the history.

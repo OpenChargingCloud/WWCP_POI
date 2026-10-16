@@ -374,7 +374,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                             Throws.ArgumentException.With.Message.Contains("not to RoamingNetwork 'rn2'"));
 
                 Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.AddElement("ChargingStationOperator", "DE*GEF", [ new POIElementPathSegment("brands", "b1") ], new JObject()) ]),
-                            Throws.ArgumentException.With.Message.Contains("AddElement of a charging station operator is not supported yet"));
+                            Throws.ArgumentException.With.Message.Contains("The element to add to 'brands' must have the identification 'b1'"));
 
             }
 

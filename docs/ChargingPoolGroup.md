@@ -50,7 +50,7 @@ The group writes no `eTags` and no `@context`.
 
 The members are references, not embedded: the pools stay in the operator's `chargingPools`. A change set changes
 the membership by updating `chargingPoolIds` as a whole, e.g.
-`RoamingNetworkChange.UpdateProperty(group, "chargingPoolIds", oldIds, newIds)`, in ordinal order. A pool can not be
+`RoamingNetworkChange.UpdateProperty(group, "chargingPoolIds", oldIds, newIds)`, in ordinal order, or [element by element](README.md#element-changes). A pool can not be
 removed while a group names it: remove it from the group first, in the same or an earlier change set.
 
 The group itself is added with `RoamingNetworkChange.Add(chargingPoolGroup)`, as `ToJSON()` writes it, and removed with

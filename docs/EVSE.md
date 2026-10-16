@@ -87,8 +87,9 @@ A change set updates or removes each array as a whole; removing it leaves `Unspe
 `chargingConnectors`: the plugs and sockets of the EVSE, 0..n, in the ordinal order of their identifications.
 A `ChargingConnector` ([source](../WWCP_POI3/RoamingNetwork/ChargingStationManufacturer/ChargingStation/EVSE/ChargingConnector/ChargingConnector.cs))
 is not an entity: it is content of its EVSE, without status, timestamps or custom data of its own, and it is
-changed only by updating or removing the EVSE's `chargingConnectors` as a whole, e.g.
-`RoamingNetworkChange.UpdateProperty(evse, "chargingConnectors", old, new)`.
+changed only as the EVSE's `chargingConnectors`: as a whole, e.g.
+`RoamingNetworkChange.UpdateProperty(evse, "chargingConnectors", old, new)`, or [element by element](README.md#element-changes), e.g.
+`UpdateElementProperty("EVSE", evseId, [ new ("chargingConnectors", "1") ], "lockable", null, true)`.
 
 | JSON key | Type | Description |
 |---|---|---|
