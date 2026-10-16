@@ -305,7 +305,8 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
 - **Tips and merges:** the tips are the commits no other one follows, ordered by revision, then by id;
   the head is the first one, its version is `Head.RoamingNetwork`. The first two tips that do not
   conflict are merged into a merge commit with both as `parentIds`: a three-way merge with their best
-  common ancestor, entity by entity and property by property, written as an unsigned change set from
+  common ancestor, entity by entity, found by their identifications as their types compare them
+  (`DE-ABC` and `DE*ABC` are the same e-mobility provider), and property by property, written as an unsigned change set from
   the first one; everyone can calculate it, and `TryAppend` checks it. Conflicting tips stay, with their
   `Conflicts` (`{kind, entityType, entityId, propertyName?, base, left, right}`), until the owner commits
   a change set to one of them that resolves the conflict, e.g. taking the value of the other one.
