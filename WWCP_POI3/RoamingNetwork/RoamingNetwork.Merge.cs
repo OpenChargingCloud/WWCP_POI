@@ -404,6 +404,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            if (!TryCheckPreconditions(ChangeSet.Preconditions, out var preconditionError))
+            {
+                ErrorResponse = $"The change set does not fit this version: {preconditionError}";
+                return false;
+            }
+
             if (!TryApplyChanges(ChangeSet, out var result, out _, out ErrorResponse))
                 return false;
 

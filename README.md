@@ -237,6 +237,10 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
   to the entity with that id in the version it is applied to.
 - **Old values:** `CreateChangeSet` gives every change the value it finds; JSON `null` means
   "expected absent". A change finding another value conflicts.
+- **Preconditions:** a change set may name the ETags entities must still have, e.g. the HTTP `ETag` a client
+  read a charging pool with: `CreateChangeSet(changes, Preconditions: [ version.Precondition("ChargingPool",
+  poolId) ])`. It applies, and is rebased, only while they hold; `TryGetEntityETag(entityType, entityId, …)` tells
+  the ETag of an entity, as POI_API serves it.
 - **Element changes:** `AddElement`, `RemoveElement`, `ReplaceElement`, `UpdateElementProperty` and
   `RemoveElementProperty` change one element of a property, named by an element path, e.g. a member of a group,
   `[{"propertyName": "EVSEIds", "elementId": "DE*GEF*E1*2"}]`, a brand of a pool,

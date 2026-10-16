@@ -104,11 +104,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region CreateChangeSet  (Changes, Description = null, Metadata = null, Id = null, CreatedAt = null)
+        #region CreateChangeSet  (Changes, Description = null, Metadata = null, Id = null, CreatedAt = null, Preconditions = null)
 
         /// <summary>
         /// Prepare an unsigned change set against this version: its before ETags are the ETags of this version,
-        /// its after ETags the ETags of the result. A change without an old value (except Add) gets the value
+        /// its after ETags the ETags of the result. A change without an old value (except Add and AddElement) gets the value
         /// it finds after the changes before it, so a change set prepared concurrently will not silently overwrite it.
         /// This version stays unchanged.
         /// </summary>
@@ -117,12 +117,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Metadata">Optional application metadata.</param>
         /// <param name="Id">An optional change set identification, a random one by default.</param>
         /// <param name="CreatedAt">An optional commit timestamp, now by default.</param>
-        public RoamingNetworkChangeSet CreateChangeSet(IEnumerable<RoamingNetworkChange>  Changes,
-                                                       ImmutableI18NString?               Description   = null,
-                                                       JObject?                           Metadata      = null,
-                                                       ChangeSet_Id?                      Id            = null,
-                                                       DateTimeOffset?                    CreatedAt     = null)
+        /// <param name="Preconditions">Optional ETags entities must still have, e.g. Precondition(entityType, entityId) of the version a client read; they must hold in this version.</param>
+        public RoamingNetworkChangeSet CreateChangeSet(IEnumerable<RoamingNetworkChange>         Changes,
+                                                       ImmutableI18NString?                      Description     = null,
+                                                       JObject?                                  Metadata        = null,
+                                                       ChangeSet_Id?                             Id              = null,
+                                                       DateTimeOffset?                           CreatedAt       = null,
+                                                       IEnumerable<RoamingNetworkPrecondition>?  Preconditions   = null)
         {
+
+            ImmutableArray<RoamingNetworkPrecondition> preconditions = [ .. Preconditions ?? [] ];
+
+            if (!TryCheckPreconditions(preconditions, out var preconditionError))
+                throw new ArgumentException(preconditionError, nameof(Preconditions));
 
             var beforeETags  = CalcETags();
 
@@ -134,7 +141,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    beforeETags,
                                    beforeETags,
                                    Description,
-                                   Metadata
+                                   Metadata,
+                                   Preconditions: preconditions
                                );
 
             if (!TryApplyChanges(pending, out var result, out var changesWithOldValues, out var errorResponse))
@@ -148,7 +156,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        pending.BeforeETags,
                        result.CalcETags(),
                        pending.Description,
-                       pending.Metadata
+                       pending.Metadata,
+                       Preconditions: preconditions
                    );
 
         }
@@ -276,6 +285,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Preconditions
+
+                if (!TryCheckPreconditions(ChangeSet.Preconditions, out var preconditionError))
+                {
+                    ErrorResponse = $"The change set does not fit this version of the roaming network: {preconditionError}";
+                    return false;
+                }
+
+                #endregion
+
                 if (!TryApplyChanges(ChangeSet, out var result, out _, out ErrorResponse))
                     return false;
 
@@ -385,6 +404,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                // The entities it names must still be as it names them.
+                if (!TryCheckPreconditions(ChangeSet.Preconditions, out var preconditionError))
+                {
+                    ErrorResponse = "The change set can not be rebased: " + preconditionError;
+                    return false;
+                }
+
                 // Still fitting: nothing to do.
                 if (MatchETags(ChangeSet.BeforeETags, this, out _))
                 {
@@ -423,7 +449,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        beforeETags,
                                        beforeETags,
                                        ChangeSet.Description,
-                                       metadata
+                                       metadata,
+                                       Preconditions: ChangeSet.Preconditions
                                    );
 
                 if (!TryApplyChanges(pending, out var result, out _, out var applyError))
@@ -440,7 +467,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        pending.BeforeETags,
                                        result.CalcETags(),
                                        pending.Description,
-                                       pending.Metadata
+                                       pending.Metadata,
+                                       Preconditions: pending.Preconditions
                                    );
 
                 ErrorResponse = null;

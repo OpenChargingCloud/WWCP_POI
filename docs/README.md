@@ -264,6 +264,12 @@ roaming network that embeds it, as its HTTP `ETag`.
 refused; without `eTags` it is read as before. A representation that is changed before it is read again is
 therefore written without them, `ToJSON(IncludeETags: false)`.
 
+`roamingNetwork.TryGetEntityETag(entityType, entityId, out eTag, format)` gives the ETag of any entity of a version
+this way, found in every spelling its identification type considers equal. A change set may name such ETags as
+preconditions, `CreateChangeSet(…, Preconditions: [ version.Precondition(entityType, entityId) ])`: it applies, and
+is rebased, only while the entities still have them, e.g. while a charging pool is as the client read it, though
+the changes name only one of its EVSEs.
+
 
 ### Element changes
 

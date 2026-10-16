@@ -84,8 +84,17 @@ A change set leads from the version of its `beforeETags` to the version of its `
   "description": { "en": "…" }, "metadata": { },
   "changes": [ { "kind": "UpdateProperty", "entityType": "EVSE", "entityId": "DE*GEF*E1*1",
                  "propertyName": "maxPower", "oldValue": 22000, "newValue": 11000 } ],
+  "preconditions": [ { "entityType": "ChargingPool", "entityId": "DE*GEF*P1", "eTag": [ "json", "sha256", "hex", "…" ] } ],
   "beforeETags": [ … ], "afterETags": [ … ], "signatures": [ … ] }
 ```
+
+**Preconditions** (optional, written only when there are any, signed with the change set): the ETag an
+entity MUST still have for the change set to apply, or to be rebased onto another version. The ETag of an
+entity is the one of its representation as the roaming network embeds it, with everything it embeds: over
+its canonical JSON (section 1), or the canonical CBOR of its keys and values, with the hash algorithm the
+ETag names; the HTTP `ETag` an entity is served with. The entity is found by its type and identification,
+compared as the type compares it. A change set whose preconditions do not all hold in the version it is
+applied to MUST be refused; a rebased change set keeps them.
 
 **Kinds:** `Add` and `Remove` of an entity; `UpdateProperty` and `RemoveProperty` of a property of an entity;
 and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `UpdateElementProperty` and
@@ -355,5 +364,5 @@ uGmXUXrvziqRwcQIDE5C7ew7Rv1HPJ2vzqHwL+181Z7SWohOuOUEHvDWmrb7HaRyJxsbuFOsruTYOrTL
 
 ## 7. Open points
 
-- The HTTP `ETag` of an entity is the SHA-256 of its canonical representation as the roaming network
-  embeds it; change sets still name only the ETags of whole versions, not of entities.
+None: the HTTP `ETag` of an entity is the SHA-256 of its canonical representation as the roaming network
+embeds it, and change sets name it as a precondition (section 4).

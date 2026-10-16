@@ -94,6 +94,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<RoamingNetworkChangeSetSignature>  Signatures          { get; }
 
+        /// <summary>
+        /// The ETags entities must still have for this change set to apply, or to be rebased; included in the signature.
+        /// </summary>
+        public ImmutableArray<RoamingNetworkPrecondition>        Preconditions       { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -110,15 +115,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Description">An optional multi-language description.</param>
         /// <param name="Metadata">Optional application metadata.</param>
         /// <param name="Signatures">Optional peer signatures.</param>
+        /// <param name="Preconditions">Optional ETags entities must still have.</param>
         public RoamingNetworkChangeSet(ChangeSet_Id                                       Id,
                                        RoamingNetwork_Id                                  RoamingNetworkId,
                                        DateTimeOffset                                     CreatedAt,
                                        ImmutableArray<RoamingNetworkChange>               Changes,
                                        ImmutableArray<ETag>                               BeforeETags,
                                        ImmutableArray<ETag>                               AfterETags,
-                                       ImmutableI18NString?                               Description   = null,
-                                       JObject?                                           Metadata      = null,
-                                       ImmutableArray<RoamingNetworkChangeSetSignature>?  Signatures    = null)
+                                       ImmutableI18NString?                               Description     = null,
+                                       JObject?                                           Metadata        = null,
+                                       ImmutableArray<RoamingNetworkChangeSetSignature>?  Signatures      = null,
+                                       ImmutableArray<RoamingNetworkPrecondition>?        Preconditions   = null)
         {
 
             if (Changes.IsDefault || Changes.Any(change => change is null))
@@ -137,6 +144,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (signatures.Any(signature => signature is null))
                 throw new ArgumentException("Signatures must not contain null entries.", nameof(Signatures));
 
+            var preconditions = Preconditions is { IsDefault: false } givenPreconditions
+                                    ? givenPreconditions
+                                    : [];
+
+            if (preconditions.Any(precondition => precondition is null || !precondition.ETag.IsValid))
+                throw new ArgumentException("Preconditions must not contain null entries or invalid ETags.", nameof(Preconditions));
+
             this.Id                = Id;
             this.RoamingNetworkId  = RoamingNetworkId;
             this.CreatedAt         = DateTimeOffset.FromUnixTimeMilliseconds(CreatedAt.ToUnixTimeMilliseconds());
@@ -146,6 +160,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Description       = Description ?? ImmutableI18NString.Empty;
             this.metadata          = (JObject?) Metadata?.DeepClone() ?? [];
             this.Signatures        = signatures;
+            this.Preconditions     = preconditions;
 
         }
 
@@ -185,7 +200,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     AfterETags,
                     Description,
                     metadata,
-                    Signatures);
+                    Signatures,
+                    Preconditions);
 
         #endregion
 
@@ -586,6 +602,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse Preconditions       [optional]
+
+                var preconditions = ImmutableArray<RoamingNetworkPrecondition>.Empty;
+
+                if (JSON["preconditions"] is JToken preconditionsJSON)
+                {
+
+                    if (preconditionsJSON is not JArray preconditionsArray)
+                    {
+                        ErrorResponse = "The preconditions must be a JSON array!";
+                        return false;
+                    }
+
+                    foreach (var preconditionJSON in preconditionsArray)
+                    {
+
+                        if (preconditionJSON is not JObject preconditionObject ||
+                            !RoamingNetworkPrecondition.TryParse(preconditionObject, out var precondition, out var preconditionError))
+                        {
+                            ErrorResponse = $"Invalid precondition {preconditions.Length}!";
+                            return false;
+                        }
+
+                        preconditions = preconditions.Add(precondition);
+
+                    }
+
+                }
+
+                #endregion
+
                 #region Parse Signatures          [optional]
 
                 var signatures = ImmutableArray<RoamingNetworkChangeSetSignature>.Empty;
@@ -627,7 +674,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 afterETags,
                                 description,
                                 (JObject?) metadata,
-                                signatures
+                                signatures,
+                                preconditions
                             );
 
                 ErrorResponse = null;
@@ -695,6 +743,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                            metadata.HasValues
                                ? new JProperty("metadata",           metadata.DeepClone())
+                               : null,
+
+                           Preconditions.Length > 0
+                               ? new JProperty("preconditions",      new JArray(Preconditions.Select(precondition => precondition.ToJSON())))
                                : null,
 
                            IncludeSignatures && Signatures.Length > 0
