@@ -227,6 +227,41 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Elements_are_named_in_every_spelling_of_their_identification()
+
+        /// <summary>
+        /// The members of a group are EVSE identifications: a change may name them in every spelling
+        /// EVSE_Id considers equal, e.g. without the '*' of their suffix. Other texts, e.g. facilities, are compared as they are.
+        /// </summary>
+        [Test]
+        public void Elements_are_named_in_every_spelling_of_their_identification()
+        {
+
+            var rn1  = NewNetwork();
+            var rn2  = Apply(rn1, RoamingNetworkChange.RemoveElement(nameof(EVSEGroup), EG1.ToString(), Path("EVSEIds", "DE*GEF*E11")),
+                                  RoamingNetworkChange.AddElement   (nameof(EVSEGroup), EG1.ToString(), Path("EVSEIds", "DEGEF*E12"), "DEGEF*E12"));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn2.GetChargingStationOperatorById(GEF)!.EVSEGroups.Single().EVSEIds,  Is.EqualTo(new[] { E2 }));
+
+                Assert.That(() => rn2.CreateChangeSet([ RoamingNetworkChange.AddElement(nameof(EVSEGroup), EG1.ToString(), Path("EVSEIds", "DE*GEF*E12"), "DE*GEF*E12") ], CreatedAt: T0),
+                            Throws.ArgumentException.With.Message.Contains("already exists"));
+
+                Assert.That(POIElements.KeyOf("EVSEIds",    "DE*GEF*E11"),  Is.EqualTo(POIElements.KeyOf("EVSEIds",    E1.ToString())));
+                Assert.That(POIElements.KeyOf("facilities", "parking"),      Is.Not.EqualTo(POIElements.KeyOf("facilities", "PARKING")));
+
+                // The same members in another spelling are no change of an element: each is replaced.
+                Assert.That(POIElements.Diff(nameof(EVSEGroup), EG1.ToString(), "EVSEIds", new JArray(E1.ToString()), new JArray("DE*GEF*E11")).Single().Kind,
+                            Is.EqualTo(RoamingNetworkChangeKind.ReplaceElement));
+
+            }
+
+        }
+
+        #endregion
+
         #region Invalid_element_changes_are_refused()
 
         [Test]

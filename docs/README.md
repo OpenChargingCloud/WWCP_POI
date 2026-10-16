@@ -285,7 +285,9 @@ RoamingNetworkChange.UpdateElementProperty("EVSE",      "DE*GEF*E1*1", [ new ("c
 
 - **Path:** its first segment names a property of the entity itself, every further one a property of what the
   segment before names. A segment on an array names an element by its identification (`elementId`): the `@id` of an
-  object, a text itself, compared exactly. Every element of such an array must have one, and no two the same:
+  object, a text itself, compared as the identification type of the property compares them (`POIElements.KeyOf`),
+  e.g. `DE*GEF*E11` names the member `DE*GEF*E1*1` of `EVSEIds`; any other text, e.g. of `facilities`, exactly.
+  Every element of such an array must have one, and no two the same:
   otherwise, e.g. the `elements` of a tariff, the array is changed as a whole. A segment on any other value may name
   its `@id`, which it must then have. `@id` itself is not changed: another element is removed and added.
 - **Order:** an added element goes where the ordinal order of the identifications puts it, when the array is in that

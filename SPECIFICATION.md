@@ -94,7 +94,8 @@ and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `Update
 
 - the first segment names a property of the entity, every further one a property of the value the segment before
   names. A segment on an array MUST name an element by `elementId`: the `@id` text of an object, a text itself,
-  compared ordinally; every element of the array MUST have one and no two the same, else the change is refused.
+  compared as the identification type of the property compares them, any other ordinally: `EVSEIds`, `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`, `parkingSpaceIds`, `parkingSensorIds`, `parkingProductIds` and `eMobilityProviderIds` hold identifications of their entity types, `brands`, `chargingConnectors` and `energyMeters` objects with identifications of theirs;
+  every element of the array MUST have one and no two the same, else the change is refused.
   A segment on any other value MAY name its `@id`, which it then MUST have;
 - `AddElement` names an element that does not exist yet, or an absent property, and its `newValue` MUST have the
   `elementId` of the segment; it goes where the ordinal order of the identifications puts it, when the array is in

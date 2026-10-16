@@ -851,7 +851,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Merged = null;
 
             return !POIPartyKeys.IsKeyProperty(PropertyName) &&
-                   POIElements.TryMerge(Base, Left, Right, out Merged);
+                   POIElements.TryMerge(PropertyName, Base, Left, Right, out Merged);
 
         }
 

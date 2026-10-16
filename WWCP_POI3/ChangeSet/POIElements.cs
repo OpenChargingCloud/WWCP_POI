@@ -22,7 +22,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <remarks>
     /// <list type="bullet">
     ///   <item>An element of an array is identified by its <c>@id</c> text, a text element by itself.
-    ///         An array is addressed element by element only when every element has an identification and no two the same.</item>
+    ///         An array is addressed element by element only when every element has an identification and no two the same.
+    ///         The identifications of an array of identifications, e.g. <c>EVSEIds</c>, or of identified objects, e.g.
+    ///         <c>chargingConnectors</c>, are the same as their type compares them, e.g. without case; any other ordinally.</item>
     ///   <item>The first segment of an element path names a property of the entity itself, every further one a property
     ///         of the element the segment before addresses. A segment on an array names the element by its identification;
     ///         a segment on any other value may name its <c>@id</c>, which it must then have.</item>
@@ -32,6 +34,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </remarks>
     public static class POIElements
     {
+
+        #region Data
+
+        /// <summary>
+        /// The identification types of the elements of a property, by the name of the property:
+        /// its elements are the same as their type compares them, e.g. without case.
+        /// </summary>
+        private static readonly Dictionary<String, Func<String, Object?>> ElementIdTypes = new () {
+            { "EVSEIds",               text => EVSE_Id.             TryParse(text, out var id) ? id : null },
+            { "chargingStationIds",    text => ChargingStation_Id.  TryParse(text, out var id) ? id : null },
+            { "chargingPoolIds",       text => ChargingPool_Id.     TryParse(text, out var id) ? id : null },
+            { "chargingTariffIds",     text => ChargingTariff_Id.   TryParse(text, out var id) ? id : null },
+            { "brands",                text => Brand_Id.            TryParse(text, out var id) ? id : null },
+            { "parkingSpaceIds",       text => ParkingSpace_Id.     TryParse(text, out var id) ? id : null },
+            { "parkingSensorIds",      text => ParkingSensor_Id.    TryParse(text, out var id) ? id : null },
+            { "parkingProductIds",     text => ParkingProduct_Id.   TryParse(text, out var id) ? id : null },
+            { "eMobilityProviderIds",  text => EMobilityProvider_Id.TryParse(text, out var id) ? id : null },
+            { "chargingConnectors",    text => ChargingConnector_Id.TryParse(text, out var id) ? id : null },
+            { "energyMeters",          text => EnergyMeter_Id.      TryParse(text, out var id) ? id : null }
+        };
+
+        #endregion
+
 
         #region IdOf(Element)
 
@@ -67,6 +92,62 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return true;
 
         }
+
+        #endregion
+
+        #region IsIdentified(PropertyName, Array)
+
+        /// <summary>
+        /// Whether every element of the given array of the given property has an identification,
+        /// and no two the same, as the identification type of the property compares them.
+        /// </summary>
+        /// <param name="PropertyName">The property holding the array.</param>
+        /// <param name="Array">An array.</param>
+        public static Boolean IsIdentified(String  PropertyName,
+                                           JArray  Array)
+        {
+
+            var keys = new HashSet<Object>();
+
+            foreach (var element in Array)
+                if (IdOf(element) is not String id || !keys.Add(KeyOf(PropertyName, id)))
+                    return false;
+
+            return true;
+
+        }
+
+        #endregion
+
+        #region KeyOf(PropertyName, Id)
+
+        /// <summary>
+        /// The given identification of an element of the given property, as its identification type compares it,
+        /// e.g. an EVSE_Id of EVSEIds; the text itself for any other property, or a text its type does not read.
+        /// </summary>
+        /// <param name="PropertyName">The property holding the element.</param>
+        /// <param name="Id">The identification of the element.</param>
+        public static Object KeyOf(String  PropertyName,
+                                   String  Id)
+
+            => ElementIdTypes.TryGetValue(PropertyName, out var typed) && typed(Id) is Object key
+                   ? key
+                   : Id;
+
+        #endregion
+
+        #region (private static) SameId(PropertyName, Id1, Id2)
+
+        /// <summary>
+        /// Whether the given identifications name the same element of the given property.
+        /// </summary>
+        private static Boolean SameId(String   PropertyName,
+                                      String?  Id1,
+                                      String?  Id2)
+
+            => Id1 is not null &&
+               Id2 is not null &&
+               KeyOf(PropertyName, Id1).Equals(KeyOf(PropertyName, Id2));
 
         #endregion
 
@@ -145,17 +226,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                    if (!IsIdentified(array))
+                    if (!IsIdentified(segment.PropertyName, array))
                     {
                         ErrorResponse = $"The elements of '{PathText(path.Take(index).Append(new POIElementPathSegment(segment.PropertyName)))}' have no identifications of their own: it is changed as a whole!";
                         return false;
                     }
 
-                    element = array.FirstOrDefault(item => IdOf(item) == segment.ElementId);
+                    element = array.FirstOrDefault(item => SameId(segment.PropertyName, IdOf(item), segment.ElementId));
 
                 }
                 else
-                    element = value is not null && (segment.ElementId is null || IdOf(value) == segment.ElementId)
+                    element = value is not null && (segment.ElementId is null || SameId(segment.PropertyName, IdOf(value), segment.ElementId))
                                   ? value
                                   : null;
 
@@ -195,14 +276,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!IsIdentified(targetArray))
+                if (!IsIdentified(last.PropertyName, targetArray))
                 {
                     ErrorResponse = $"The elements of '{PathText(path.Take(path.Length - 1).Append(new POIElementPathSegment(last.PropertyName)))}' have no identifications of their own: it is changed as a whole!";
                     return false;
                 }
 
                 for (var index = 0; index < targetArray.Count && elementIndex < 0; index++)
-                    if (IdOf(targetArray[index]) == last.ElementId)
+                    if (SameId(last.PropertyName, IdOf(targetArray[index]), last.ElementId))
                         elementIndex = index;
 
                 addressed = elementIndex >= 0 ? targetArray[elementIndex] : null;
@@ -211,7 +292,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             else if (targetValue is not null)
             {
 
-                if (last.ElementId is not null && IdOf(targetValue) != last.ElementId)
+                if (last.ElementId is not null && !SameId(last.PropertyName, IdOf(targetValue), last.ElementId))
                 {
                     ErrorResponse = $"'{target}' does not exist: the value of '{last.PropertyName}' is not '{last.ElementId}'!";
                     return false;
@@ -242,7 +323,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (targetArray is not null || last.ElementId is not null)
                     {
 
-                        if (IdOf(newElement) != last.ElementId)
+                        if (!SameId(last.PropertyName, IdOf(newElement), last.ElementId))
                         {
                             ErrorResponse = $"The element to add to '{last.PropertyName}' must have the identification '{last.ElementId}'!";
                             return false;
@@ -307,7 +388,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (targetArray is not null)
                     {
 
-                        if (IdOf(replacement) != last.ElementId)
+                        if (!SameId(last.PropertyName, IdOf(replacement), last.ElementId))
                         {
                             ErrorResponse = $"'{target}' must keep its identification: another element is removed and added!";
                             return false;
@@ -414,7 +495,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryMerge(Base, Left, Right, out Merged)
+        #region TryMerge(PropertyName, Base, Left, Right, out Merged)
 
         /// <summary>
         /// Merge the changes of the right value of a property against the base value into the left one, element by element,
@@ -423,11 +504,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// changed it otherwise; an object both changed differently is merged property by property, each as a whole.
         /// Otherwise, or when they conflict, there is no merge.
         /// </summary>
+        /// <param name="PropertyName">The property, whose identification type compares its elements.</param>
         /// <param name="Base">The base value, null when absent.</param>
         /// <param name="Left">The left value, null when absent.</param>
         /// <param name="Right">The right value, null when absent.</param>
         /// <param name="Merged">The merged value, null when absent.</param>
-        public static Boolean TryMerge(JToken?      Base,
+        public static Boolean TryMerge(String       PropertyName,
+                                       JToken?      Base,
                                        JToken?      Left,
                                        JToken?      Right,
                                        out JToken?  Merged)
@@ -435,19 +518,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Merged = null;
 
-            if (!TryIdentified(Base,  out var baseArray)  ||
-                !TryIdentified(Left,  out var leftArray)  ||
-                !TryIdentified(Right, out var rightArray) ||
+            if (!TryIdentified(PropertyName, Base,  out var baseArray)  ||
+                !TryIdentified(PropertyName, Left,  out var leftArray)  ||
+                !TryIdentified(PropertyName, Right, out var rightArray) ||
                 (Base is null && Left is null && Right is null))
             {
                 return false;
             }
 
             var merged      = (JArray) leftArray.DeepClone();
-            var rightIds    = rightArray.Select(element => IdOf(element)!).ToHashSet(StringComparer.Ordinal);
+            var rightKeys   = rightArray.Select(element => KeyOf(PropertyName, IdOf(element)!)).ToHashSet();
 
             JToken? Find(JArray Array, String Id)
-                => Array.FirstOrDefault(element => IdOf(element) == Id);
+                => Array.FirstOrDefault(element => SameId(PropertyName, IdOf(element), Id));
 
             // Removed by the right one: removed, unless the left one changed it.
             foreach (var baseElement in baseArray)
@@ -455,7 +538,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var id = IdOf(baseElement)!;
 
-                if (rightIds.Contains(id))
+                if (rightKeys.Contains(KeyOf(PropertyName, id)))
                     continue;
 
                 var leftElement = Find(merged, id);
@@ -555,27 +638,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Changes = null;
 
-            if (!TryIdentified(OldValue, out var oldArray) ||
-                !TryIdentified(NewValue, out var newArray))
+            if (!TryIdentified(PropertyName, OldValue, out var oldArray) ||
+                !TryIdentified(PropertyName, NewValue, out var newArray))
             {
                 return false;
             }
 
             var changes  = new List<RoamingNetworkChange>();
-            var newIds   = newArray.Select(element => IdOf(element)!).ToHashSet(StringComparer.Ordinal);
+            var newKeys  = newArray.Select(element => KeyOf(PropertyName, IdOf(element)!)).ToHashSet();
 
             ImmutableArray<POIElementPathSegment> PathOf(String Id)
                 => [ new POIElementPathSegment(PropertyName, Id) ];
 
             foreach (var oldElement in oldArray)
-                if (!newIds.Contains(IdOf(oldElement)!))
+                if (!newKeys.Contains(KeyOf(PropertyName, IdOf(oldElement)!)))
                     changes.Add(RoamingNetworkChange.RemoveElement(EntityType, EntityId, PathOf(IdOf(oldElement)!), oldElement));
 
             foreach (var newElement in newArray)
             {
 
                 var id          = IdOf(newElement)!;
-                var oldElement  = oldArray.FirstOrDefault(element => IdOf(element) == id);
+                var oldElement  = oldArray.FirstOrDefault(element => SameId(PropertyName, IdOf(element), id));
 
                 if (oldElement is null)
                     changes.Add(RoamingNetworkChange.AddElement(EntityType, EntityId, PathOf(id), newElement));
@@ -626,14 +709,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The given value as an array of identified elements, an absent value as an empty one.
         /// </summary>
-        private static Boolean TryIdentified(JToken?                         Value,
+        private static Boolean TryIdentified(String                          PropertyName,
+                                             JToken?                         Value,
                                              [NotNullWhen(true)] out JArray?  Array)
         {
 
             Array = Value switch {
-                        null                                   => [],
-                        JArray array when IsIdentified(array)  => array,
-                        _                                      => null
+                        null                                                 => [],
+                        JArray array when IsIdentified(PropertyName, array)  => array,
+                        _                                                    => null
                     };
 
             return Array is not null;
