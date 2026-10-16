@@ -198,9 +198,7 @@ public sealed class SharedDomainModelTests
 
     [TestCase("")]
     [TestCase(" ")]
-    [TestCase(" release")]
-    [TestCase("release ")]
-    public void Opaque_identifiers_reject_empty_or_surrounding_whitespace(String text)
+    public void Identifiers_reject_empty_text(String text)
     {
         Assert.That(TransparencySoftware_Id.TryParse(text, out _), Is.False);
         Assert.That(TransparencySoftwareCertificate_Id.TryParse(text, out _), Is.False);
@@ -208,12 +206,23 @@ public sealed class SharedDomainModelTests
         Assert.Throws<ArgumentException>(() => TransparencySoftwareCertificate_Id.Parse(text));
     }
 
+    [TestCase(" release")]
+    [TestCase("release ")]
+    public void Identifiers_trim_surrounding_whitespace(String text)
+    {
+        Assert.That(TransparencySoftware_Id.Parse(text).ToString(), Is.EqualTo("release"));
+        Assert.That(TransparencySoftwareCertificate_Id.Parse(text).ToString(), Is.EqualTo("release"));
+    }
+
     [Test]
-    public void Identifiers_are_case_sensitive_and_certificate_inputs_are_detached()
+    public void Identifiers_compare_case_insensitively_and_certificate_inputs_are_detached()
     {
         var software = TransparencySoftware_Id.Parse(Software2);
-        Assert.That(software, Is.Not.EqualTo(TransparencySoftware_Id.Parse(Software2.ToUpperInvariant())));
-        Assert.That(TransparencySoftwareCertificate_Id.Parse(Certificate42), Is.Not.EqualTo(TransparencySoftwareCertificate_Id.Parse(Certificate42.ToUpperInvariant())));
+        Assert.That(software, Is.EqualTo(TransparencySoftware_Id.Parse(Software2.ToUpperInvariant())));
+        Assert.That(software, Is.EqualTo(TransparencySoftware_Id.Parse($" {Software2} ")));
+        Assert.That(software.GetHashCode(), Is.EqualTo(TransparencySoftware_Id.Parse(Software2.ToUpperInvariant()).GetHashCode()));
+        Assert.That(TransparencySoftwareCertificate_Id.Parse(Certificate42), Is.EqualTo(TransparencySoftwareCertificate_Id.Parse(Certificate42.ToUpperInvariant())));
+        Assert.That(TransparencySoftwareCertificate_Id.Parse(Certificate42), Is.EqualTo(TransparencySoftwareCertificate_Id.Parse($" {Certificate42} ")));
         var ids = new List<TransparencySoftware_Id> { software };
         var certificate = new TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id.Parse("new-document"), "Issuer", ChargingStationModel_Id.Parse("Model"), "Version", ids);
         var json = certificate.ToJSON().ToString();
