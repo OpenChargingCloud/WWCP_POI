@@ -58,6 +58,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool;
     ///     ?expand=gridConnectionPoint embeds its grid connection point instead of naming it
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}                    a charging station
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs                the parking spaces it names, of parking
+    ///                                                                             operators or of its operator, as they embed them
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs/{PS_Id}        a parking space the charging station names
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}    an EVSE
     /// GET ~/RNs/{RN_Id}/GOs                                                      its grid operators, in short
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}                                              a grid operator;
@@ -352,6 +355,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               request => TryGetRequestedChargingStation(request, out var chargingStation, out var errorResponse)
                                              ? CachedEntityResponse(request, chargingStation, chargingStation.ToJSON)
                                              : errorResponse);
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs, and each of them below
+
+            // The parking spaces a charging station charges at: named by it, defined by parking operators
+            // or by its charging station operator.
+            AddEmbeddedListHandlers<ParkingSpace_Id, ParkingSpace>(
+                chargingStationPath + "/PSs",
+                RequestedParkingSpacesOfChargingStation,
+                parkingSpace => parkingSpace.ToJSON());
+
+            AddEmbeddedEntityHandlers<ParkingSpace_Id, ParkingSpace>(
+                chargingStationPath + "/PSs/{parkingSpaceId}",
+                RequestedParkingSpacesOfChargingStation,
+                ParkingSpace_Id.TryParse,
+                "parking space",
+                parkingSpace => parkingSpace.ToJSON());
 
             #endregion
 
@@ -899,6 +920,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             return true;
+
+        }
+
+        #endregion
+
+        #region (private) RequestedParkingSpacesOfChargingStation(Request)
+
+        /// <summary>
+        /// The parking spaces the requested charging station names, of parking operators or of its charging station operator,
+        /// in the order of their identifications; or why there are none.
+        /// </summary>
+        private (POICollection<ParkingSpace_Id, ParkingSpace>? Collection, HTTPResponse? ErrorResponse) RequestedParkingSpacesOfChargingStation(HTTPRequest Request)
+        {
+
+            if (!TryGetRequestedRoamingNetwork(Request, out var roamingNetwork, out var errorResponse) ||
+                !TryGetRequestedChargingStation(Request, out var chargingStation, out errorResponse))
+            {
+                return (null, errorResponse);
+            }
+
+            return (new POICollection<ParkingSpace_Id, ParkingSpace>(
+                        chargingStation.ParkingSpaceIds.
+                                        Select(parkingSpaceId => roamingNetwork.TryGetParkingSpaceById(parkingSpaceId, out var parkingSpace) ? parkingSpace : null).
+                                        OfType<ParkingSpace>(),
+                        parkingSpace => parkingSpace.Id,
+                        "parking space",
+                        $"the charging station '{chargingStation.Id}'"
+                    ),
+                    null);
 
         }
 

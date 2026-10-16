@@ -23,7 +23,7 @@ those of its pool unless given.
 | Energy status | `EnergyInfo`, none until reported |
 | Embedded in | [ChargingPool](ChargingPool.md) as `chargingStations` |
 | Owner | the [ChargingStationOperator](ChargingStationOperator.md) its identification names (signing key) |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}`; the parking spaces it names, of parking operators or of its operator, `…/CSs/{CS_Id}/PSs[/{PS_Id}]` |
 
 
 ## Common properties

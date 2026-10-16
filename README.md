@@ -391,6 +391,7 @@ JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json
 | `GET ~/RNs/{RN_Id}` | the roaming network, the head of its history |
 | `GET ~/RNs/{RN_Id}/{CSOs\|GOs\|EMPs\|CSMs\|POs}` | its charging station operators, grid operators, e-mobility providers, charging station manufacturers or parking operators, as `{@id, name, description}` |
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}[/CPs/{CP_Id}[/CSs/{CS_Id}[/EVSEs/{EVSE_Id}]]]` | an operator, pool, station or EVSE as its parent embeds it; a pool with `?expand=gridConnectionPoint` |
+| `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs[/{PS_Id}]` | the parking spaces a charging station names, or one of them: of parking operators or of its charging station operator, each as its operator embeds it |
 | `GET ~/RNs/{RN_Id}/GOs/{GO_Id}[/GCPs/{GCP_Id}]` | a grid operator, or one of its grid connection points |
 | `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer or parking operator |
 
@@ -411,7 +412,8 @@ the grid operator embeds them; a charging station operator without any of `charg
 `~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs}`, each of them below it, e.g. `…/CTs/{CT_Id}`; and a
 parking operator without any of `parkingGarages`, `parkingSpaces`,
 `parkingSpaceGroups`, `parkingSensors` and `parkingProducts`, e.g. `?without=parkingSpaces,parkingSensors`, listed by
-`~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs}`, each of them below it, e.g. `…/PSs/{PS_Id}`. Every list, `~/RNs`,
+`~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs}`, each of them below it, e.g. `…/PSs/{PS_Id}`. The parking spaces a
+charging station names, whoever defines them, are listed by `…/CSs/{CS_Id}/PSs`. Every list, `~/RNs`,
 `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` and
 the lists of what an operator embeds as well, takes:
 
