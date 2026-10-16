@@ -129,9 +129,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         /// <summary>
-        /// The brands it is offered under, of the roaming network, in the order of their identifications.
+        /// The brands it also appears under: its own, embedded completely, in the order of their identifications.
+        /// Not those of its operator or of what it embeds; every level has brands of its own.
         /// </summary>
-        public ImmutableArray<Brand_Id>  BrandIds  { get; }
+        public POICollection<Brand_Id, Brand>  Brands  { get; }
 
         /// <summary>
         /// When it is open; always, unless given.
@@ -204,7 +205,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                ChargingStationModel_Id?                        ModelId                      = null,
                                IEnumerable<EVSE>?                              EVSEs                        = null,
                                IEnumerable<EnergyMeter>?                       EnergyMeters                 = null,
-                               IEnumerable<Brand_Id>?                          BrandIds                     = null,
+                               IEnumerable<Brand>?                             Brands                       = null,
                                ImmutableOpeningTimes?                          OpeningTimes                 = null,
                                IEnumerable<Image>?                             Images                       = null,
                                IEnumerable<VehicleType>?                       VehicleTypes                 = null,
@@ -278,7 +279,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ModelId             = ModelId;
             this.EVSEs               = new (evses, evse => evse.Id, "EVSE", $"the charging station '{Id}'");
             this.EnergyMeters        = EnergyMeter.Ordered(EnergyMeters, $"the charging station '{Id}'");
-            this.BrandIds            = POIJSON.OrderedIds(BrandIds, $"brand of the charging station '{Id}'");
+            this.Brands              = new (Brands, brand => brand.Id, "brand", $"the charging station '{Id}'");
             this.OpeningTimes        = OpeningTimes;
             this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the charging station '{Id}'");
             this.VehicleTypes        = POIJSON.OrderedIds(VehicleTypes,    $"vehicle type of the charging station '{Id}'");
@@ -485,8 +486,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (EVSEs.Count > 0)
                 json.Add("EVSEs",              new JArray(EVSEs.Select(evse => evse.ToJSON())));
 
-            if (BrandIds.Length > 0)
-                json.Add("brandIds",      POIJSON.IdsToJSON(BrandIds));
+            if (Brands.Count > 0)
+                json.Add("brands",        new JArray(Brands.Select(brand => brand.ToJSON())));
 
             if (OpeningTimes is not null)
                 json.Add("openingTimes",  OpeningTimes.ToJSON());
@@ -588,7 +589,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseIds(JSON, "brandIds", "brand identification", Brand_Id.TryParse, out ImmutableArray<Brand_Id> brandIds, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<Brand>(JSON, "brands", "brandIds", "brands", Brand.TryParse, out var brands, out ErrorResponse))
                     return false;
 
                 if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, "openingTimes", "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
@@ -631,7 +632,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       modelId,
                                                       evses,
                                                       energyMeters,
-                                                      brandIds,
+                                                      brands,
                                                       openingTimes,
                                                       images,
                                                       vehicleTypes,

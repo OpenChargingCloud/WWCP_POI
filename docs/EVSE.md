@@ -20,7 +20,7 @@ two identifications are equal when they differ only in case or in the `*` of the
 | Energy status | `EnergyInfo`, none until reported |
 | Embedded in | [ChargingStation](ChargingStation.md) as `EVSEs` |
 | Owner | the [ChargingStationOperator](ChargingStationOperator.md) its identification names (signing key) |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}`, `GET …/EVSEs/{EVSE_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET …/EVSEs/{EVSE_Id}/Brands/{Brand_Id}` |
 
 
 ## Common properties
@@ -51,7 +51,7 @@ See [common properties](README.md#common-properties). An EVSE does not write `eT
 | `chargingConnectors` | `ChargingConnectors` | `ImmutableArray<ChargingConnector>` | update/remove | Its plugs and sockets; see [chargingConnectors](#chargingconnectors). |
 | `energyMeter` | `EnergyMeter` | `EnergyMeter?` | update/remove | Its energy meter, 0..1; see [energyMeter](#energymeter). |
 | `chargingTariffIds` | `ChargingTariffIds` | `ImmutableArray<ChargingTariff_Id>` | update/remove | The tariffs of its operator that apply; see [chargingTariffIds](#chargingtariffids). |
-| `brandIds` | `BrandIds` | `ImmutableArray<Brand_Id>` | update/remove | Brands of the roaming network it is offered under, each once, in the ordinal order of their identifications; every brand must exist in the network. |
+| `brands` | `Brands` | `POICollection<Brand_Id, Brand>` | update/remove | The [brands](Brand.md) it also appears under, its own, embedded completely, each once, in the ordinal order of their identifications; not those of its station, pool or operator. Changed as a whole or [brand by brand](Brand.md#change-sets). |
 | `images` | `Images` | `ImmutableArray<Image>` | update/remove | Its images, in their given order; see [images](#images). |
 | `geoLocation` | `GeoLocation` | `GeoCoordinate?` | update/remove | `{lat, lng, alt?}`, only when it differs from the one of its station. |
 | `maxReservationDuration` | `MaxReservationDuration` | `TimeSpan?` | update/remove | How long it can be reserved at most, in s (a decimal), not negative. |
@@ -192,13 +192,13 @@ See [runtime status](README.md#runtime-status) for the mechanism.
 - `@id` is mandatory and a valid EVSE identification.
 - `maxVoltage`, `maxCurrent`, `maxPower` and `maxReservationDuration` must not be negative.
 - A charging connector must not be given twice; each needs `@id` and `type`.
-- `chargingTariffIds` and `brandIds` must not name a value twice; an image URL must not be given twice.
+- `chargingTariffIds` and `brands` must not name a value twice; an image URL must not be given twice. `brands` must
+  be given completely; `brandIds` is refused.
 - `currentTypes` and `chargingModes` accept only the flags above.
 - In its station and operator: the EVSE belongs to the operator of its station; it is unique within the operator
   across all stations; its `chargingTariffIds` must be tariffs of the operator; its energy meter is unique in the
   roaming network.
-- In its roaming network: `brandIds` must name brands of the network, the energy meter's manufacturer an energy
-  meter manufacturer.
+- In its roaming network: the energy meter's manufacturer must be an energy meter manufacturer.
 - A change set applies each change to the embedded JSON of the operator and reads the operator again, so the
   operator must be valid after every single change (e.g. remove an EVSE from its [EVSEGroups](EVSEGroup.md)
   before removing it; add a tariff before naming it); the references into the network are checked after the last change.
@@ -227,7 +227,7 @@ See [runtime status](README.md#runtime-status) for the mechanism.
     "lastChange":  "2026-01-01T00:00:00.000Z"
   },
   "chargingTariffIds":      [ "DE*GEF*T3" ],
-  "brandIds":               [ "blue-charge" ],
+  "brands":                 [ { "@id": "blue-charge", "name": { "en": "Blue Charge" } } ],
   "images": [
     {
       "url":       "https://images.example/evse.png",

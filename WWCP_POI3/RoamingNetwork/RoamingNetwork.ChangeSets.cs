@@ -88,7 +88,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      parkingOperators,
                                      transparencySoftware,
                                      transparencySoftwareCertificates,
-                                     brands,
                                      energyMeterManufacturers,
                                      SigningKeys,
                                      IdentityKeys
@@ -497,7 +496,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var parkingOps            = new Dictionary<ParkingOperator_Id, ParkingOperator>(parkingOperators.Index);
             var softwares             = new Dictionary<TransparencySoftware_Id, TransparencySoftware>(transparencySoftware.Index);
             var certificates          = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(transparencySoftwareCertificates.Index);
-            var brandRegistry         = new Dictionary<Brand_Id, Brand>(brands.Index);
             var meterManufacturers    = new Dictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>(energyMeterManufacturers.Index);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
 
@@ -889,16 +887,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Brands
-
-                else if (change.EntityType == nameof(Brand))
-                {
-                    if (!TryApplyRegistryChange(BrandRegistry, change, index, ChangeSet.CreatedAt, brandRegistry, out currentValue, out ErrorResponse))
-                        return false;
-                }
-
-                #endregion
-
                 #region Energy meter manufacturers
 
                 else if (change.EntityType == nameof(EnergyMeterManufacturer))
@@ -979,7 +967,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  UnknownChargingStation(parkingOps.Values, operators)  ??
                  UnknownParkingSpace(operators.Values, parkingOps.Values) ??
                  UnknownTransparencyReference(allEnergyMeters, softwares, certificates, manufacturers) ??
-                 UnknownBrand(operators.Values, brandRegistry) ??
                  UnknownEnergyMeterManufacturer(allEnergyMeters, meterManufacturers)) is String referenceError)
             {
                 ErrorResponse = referenceError;
@@ -1007,7 +994,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  parkingOps.Values,
                                  softwares.Values,
                                  certificates.Values,
-                                 brandRegistry.Values,
                                  meterManufacturers.Values,
                                  signingKeys,
                                  identityKeys
@@ -1060,6 +1046,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "homepage",
             "hotline",
             "termsAndConditions",
+            "brands",
             "signingKeys",
             "identityKeys",
             "customData"

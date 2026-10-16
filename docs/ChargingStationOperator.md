@@ -6,8 +6,8 @@ signing and identity keys and signs every change of its data itself.
 
 It is embedded completely in its [RoamingNetwork](RoamingNetwork.md) under `chargingStationOperators`, in the
 ordinal order of the identifications, and embeds completely its charging pools (with their stations and EVSEs),
-its charging tariffs and its groups. The roaming network operator (RNO) adds and removes it; everything else of it,
-its properties and all it embeds, the operator changes itself.
+its charging tariffs, its groups and its brands. The roaming network operator (RNO) adds and removes it; everything
+else of it, its properties and all it embeds, the operator changes itself.
 
 Its identification is a country code and three characters, e.g. `DE*GEF`, unique within the roaming network.
 The pools, stations, EVSEs, tariffs and groups it embeds all begin with it: `DE*GEF*P1`, `DE*GEF*S1`, `DE*GEF*TAC1`, …
@@ -20,7 +20,7 @@ The pools, stations, EVSEs, tariffs and groups it embeds all begin with it: `DE*
 | Status | `ChargingStationOperatorStatusType`, initially `Available` |
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `chargingStationOperators` |
 | Owner | itself (a signing key; its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO); added and removed by the RNO |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs` (all, as `{@id, name, description}`), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` (`?without=chargingPools` without its charging pools, which `GET ~/RNs/{RN_Id}/CPs?operatorId={CSO_Id}` lists; `?without=` also any of `chargingTariffs`, `chargingTariffGroups`, `chargingPoolGroups`, `chargingStationGroups`, `EVSEGroups`), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs\|CTGs\|CPGs\|CSGs\|EVSEGs}` (each of them, searched and paged), and one of them below it, e.g. `…/CTs/{CT_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs` (all, as `{@id, name, description}`), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` (`?without=chargingPools` without its charging pools, which `GET ~/RNs/{RN_Id}/CPs?operatorId={CSO_Id}` lists; `?without=` also any of `chargingTariffs`, `chargingTariffGroups`, `chargingPoolGroups`, `chargingStationGroups`, `EVSEGroups`), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs\|CTGs\|CPGs\|CSGs\|EVSEGs}` (each of them, searched and paged), and one of them below it, e.g. `…/CTs/{CT_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands/{Brand_Id}` |
 
 
 ## Common properties
@@ -53,6 +53,7 @@ The operator writes no `eTags`.
 | `homepage` | `Homepage` | `URL?` | update/remove | See [Contact](#contact). |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | See [Contact](#contact). |
 | `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | update/remove | See [Contact](#contact). |
+| `brands` | `Brands` | `POICollection<Brand_Id, Brand>` | update/remove | The [brands](Brand.md) it is a white-label solution for, its own, embedded completely; not those of its pools, stations or EVSEs. Changed as a whole or [brand by brand](Brand.md#change-sets). |
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update | 1..n keys signing its change sets, see [Keys](#signing-and-identity-keys). |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update | 1..n long-term keys signing changes of its identity keys. |
 | `chargingTariffs` | `ChargingTariffs` | `POICollection<ChargingTariff_Id, ChargingTariff>` | add/remove | Its [charging tariffs](#charging-tariffs). |
@@ -268,11 +269,12 @@ the runtime status and internal data of the operator and of everything it embeds
 - **Logos:** an array of at most one object with `uri`.
 - **Children:** given completely: `chargingPoolIds`, `chargingTariffIds`, `EVSEGroupIds`, `chargingStationGroupIds`,
   `chargingPoolGroupIds` and `chargingTariffGroupIds` are refused. No null entries.
+- **Brands:** complete, each `@id` once; `brandIds` is refused. See [Brand](Brand.md#validation).
 - **Belonging:** every pool, tariff and group names this operator in its identification.
 - **Uniqueness within the operator:** pools, stations, EVSEs, energy meters, tariffs and each kind of group.
 - **References within the operator:** every `chargingTariffIds` of an EVSE, every member and `chargingTariffId` of a group exists at it.
 - **References within the network** (when the network is built or a change set applied): station manufacturers,
-  grid operators of grid connection points, brands of pools, stations, EVSEs and RFID authentication modes,
+  grid operators of grid connection points,
   energy meter manufacturers, transparency software and certificates, parking spaces of stations; energy meters
   unique within the network.
 - **Change sets:** `UpdateProperty`/`RemoveProperty` only of the properties marked above; `name` can not be removed;
@@ -282,8 +284,8 @@ the runtime status and internal data of the operator and of everything it embeds
 
 ## Example
 
-`ToEmbeddedJSON()` of an operator with one pool, one tariff and one pool group; the key values are abbreviated,
-real ones are 64 hex digits and the full Base64 of a COSE key.
+`ToEmbeddedJSON()` of an operator with one brand, one pool, one tariff and one pool group; the key values are
+abbreviated, real ones are 64 hex digits and the full Base64 of a COSE key.
 
 ```json
 {
@@ -312,6 +314,9 @@ real ones are 64 hex digits and the full Base64 of a COSE key.
   "homepage": "https://example.org",
   "hotline": "+49 3641 7654321",
   "termsAndConditions": "https://example.org/terms",
+  "brands": [
+    { "@id": "white-charge", "name": { "en": "White Charge" }, "homepage": "https://white.example" }
+  ],
   "chargingTariffs": [
     { "@id": "DE*GEF*TAC1", "currency": "EUR",
       "elements": [ { "priceComponents": [ { "type": "ENERGY", "price": 0.49, "stepSize": 1 } ] } ],

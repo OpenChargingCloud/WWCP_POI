@@ -1247,49 +1247,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Add                   (Brand)
-
-        /// <summary>
-        /// Add the given brand to its roaming network.
-        /// </summary>
-        /// <param name="Brand">The new brand.</param>
-        public static RoamingNetworkChange Add(Brand Brand)
-
-            => Add(nameof(POI.Brand),
-                   Brand.Id.ToString(),
-                   Brand.ToJSON());
-
-        /// <summary>
-        /// Remove the given brand, optionally checking its complete previous JSON representation.
-        /// </summary>
-        public static RoamingNetworkChange Remove(Brand_Id  BrandId,
-                                                  JToken?   OldValue   = null)
-
-            => Remove(nameof(POI.Brand),
-                      BrandId.ToString(),
-                      OldValue);
-
-        /// <summary>
-        /// Update one property of the given brand, optionally asserting its previous value.
-        /// </summary>
-        public static RoamingNetworkChange UpdateProperty(Brand    Brand,
-                                                          String   PropertyName,
-                                                          JToken?  OldValue,
-                                                          JToken   NewValue)
-
-            => UpdateProperty(nameof(POI.Brand), Brand.Id.ToString(), PropertyName, OldValue, NewValue);
-
-        /// <summary>
-        /// Remove one property of the given brand, optionally asserting its previous value.
-        /// </summary>
-        public static RoamingNetworkChange RemoveProperty(Brand    Brand,
-                                                          String   PropertyName,
-                                                          JToken?  OldValue   = null)
-
-            => RemoveProperty(nameof(POI.Brand), Brand.Id.ToString(), PropertyName, OldValue);
-
-        #endregion
-
         #region Add                   (ParkingProduct, ParkingOperatorId)
 
         /// <summary>

@@ -27,7 +27,6 @@ flowchart TD
     RoamingNetwork --> GridOperator
     RoamingNetwork --> ParkingOperator
     RoamingNetwork --> TransparencySoftware
-    RoamingNetwork --> Brand
     RoamingNetwork --> TransparencySoftwareCertificate
     RoamingNetwork --> EnergyMeterManufacturer
     ParkingOperator --> ParkingGarage
@@ -38,6 +37,10 @@ flowchart TD
     ChargingStationOperator --> ChargingTariff
     ChargingStationOperator --> Groups["EVSEGroup, ChargingStationGroup,<br/>ChargingPoolGroup, ChargingTariffGroup"]
     ChargingStationOperator --> ChargingPool
+    ChargingStationOperator --> Brand
+    ChargingPool --> Brand
+    ChargingStation --> Brand
+    EVSE --> Brand
     ChargingPool --> ChargingStation
     GridOperator --> GridConnectionPoint
     ChargingStation --> EVSE
@@ -55,7 +58,6 @@ flowchart TD
     ParkingSpace -. parkingProductIds .-> ParkingProduct
     ChargingStation -. parkingSpaceIds .-> ParkingSpace
     EVSE -. chargingTariffIds .-> ChargingTariff
-    ChargingPool -. brandIds .-> Brand
     EnergyMeter -. manufacturerId .-> EnergyMeterManufacturer
     EnergyMeter -. transparencySoftwareStatus .-> TransparencySoftware
     TransparencySoftwareCertificate -. verified/compatible .-> TransparencySoftware
@@ -65,10 +67,10 @@ flowchart TD
 ```
 
 Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`,
-`gridOperators`, `parkingOperators`, `brands`, `energyMeterManufacturers`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
+`gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
 `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `chargingPools`, `chargingStations`,
 `EVSEs`, `chargingConnectors`, `energyMeters`, `gridConnectionPoints`, `parkingGarages`, `parkingSpaces`, `parkingSensors`,
-`parkingSpaceGroups`, `parkingProducts`), each 0..n
+`parkingSpaceGroups`, `parkingProducts`, `brands`), each 0..n
 in the order of their ids; a grid connection point and an EVSE each have 0..1 `energyMeter`.
 Dotted lines are references, which must exist in the network.
 A pool, station, EVSE, tariff or group belongs to the operator its id names; ids are unique within the operator.
@@ -82,11 +84,11 @@ parking product ids compare case-sensitively.
   `entranceAddress`/`entranceLocation`, `exitAddress`/`exitLocation`, `arrivalInstructions`, `chargingWhenClosed`,
   `facilities`, `paymentOptions`, `uiFeatures`, `features` and `parkingRestrictions` (sets of names, in their order),
   `locationLanguages` (in their given order), `relatedLocations` (`{geoLocation, name?}`, in their given order) and
-  `authenticationModes` (`{type, cardTypes?, brandIds?, number?, stationCode?}` with the types of WWCP, e.g. `RFID`,
-  `CreditCard`, `SMS`; a type only once, in the order of the types). RFID may name card types and brands
-  of the network; SMS and PhoneCall need their `number`. Their accessibility, as the OCPI Accessibility Extension:
-  `services` (e.g. `ACCESSIBLE_CHARGING`, `ASSISTANCE`) and `standards` (e.g. `PAS 1899:2022`), sets of names,
-  and `assistanceServiceDetails`. The NUTS regions it is in: `nutsCodes`, e.g. `DEG`.
+  `authenticationModes` (`{type, cardTypes?, brands?, number?, stationCode?}` with the types of WWCP, e.g. `RFID`,
+  `CreditCard`, `SMS`; a type only once, in the order of the types). RFID may name card types and embed the
+  brands whose cards it takes; SMS and PhoneCall need their `number`. Their accessibility, as the OCPI
+  Accessibility Extension: `services` (e.g. `ACCESSIBLE_CHARGING`, `ASSISTANCE`) and `standards` (e.g.
+  `PAS 1899:2022`), sets of names, and `assistanceServiceDetails`. The NUTS regions it is in: `nutsCodes`, e.g. `DEG`.
 - **Charging station:** `address` and `geoLocation` when they differ from its pool's, `accessibility`, `vehicleTypes`,
   `euVehicleCategories` (e.g. `M1`) and `features` (sets of names), `calibrationInfo`/`certificationInfo` (URLs), `maxPower` (W) it delivers at once, at most that of its EVSEs together,
   `manufacturerId`/`modelId`, and the `parkingSpaceIds` of the network it charges at.
@@ -126,8 +128,11 @@ parking product ids compare case-sensitively.
   which has none) and optional `restrictions` (`startTime`/`endTime` as `HH:mm`, `startDate`/`endDate` as `yyyy-MM-dd`, `min/maxEnergy` (Wh),
   `min/maxCurrent` (A), `min/maxPower` (W), `min/maxDuration` (s), `daysOfWeek`, `reservation`). EVSEs name
   `chargingTariffIds` of their operator.
-- **Brands:** embedded in the network, so that operators can share them, without status and timestamps:
-  `name`, `description`, `logo`, `homepage`. Charging pools, stations and EVSEs name `brandIds`.
+- **Brands:** `brands` (`{@id, name, description?, logo?, homepage?, customData?}`, without status and timestamps),
+  embedded completely in what they are a brand of, meaning something of their own on every level: a charging station
+  operator is a white-label solution for them, a charging pool, station or EVSE also appears under them, an RFID
+  authentication mode takes their cards. The levels are never mixed, and the network has no registry of brands;
+  see [docs/Brand.md](docs/Brand.md).
 - **Opening times:** `openingTimes` of charging pools, charging stations and parking garages, as Styx's
   `OpeningTimes` write them: `24/7`, `regularOpenings` (`[{ "monday": [{ "begin": "07:00", "end": "21:00" }] }]`),
   `exceptionalOpenings`/`exceptionalClosings` (`["begin -> end"]`), `freeText`. Without regular openings it is 24/7.
@@ -222,7 +227,7 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 ```
 
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
-  `Add`/`Remove` of operators, manufacturers, energy meter manufacturers, e-mobility providers, grid operators, parking operators, brands,
+  `Add`/`Remove` of operators, manufacturers, energy meter manufacturers, e-mobility providers, grid operators, parking operators,
   transparency software releases and certificates, pools, tariffs, groups, stations (`Add(station, poolId)`),
   EVSEs (`Add(evse, stationId)`), parking garages, spaces, sensors and space groups
   (`Add(space, parkingOperatorId)`) and grid connection points (`Add(point, gridOperatorId)`). Energy meters
@@ -234,7 +239,8 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
   "expected absent". A change finding another value conflicts.
 - **Element changes:** `AddElement`, `RemoveElement`, `ReplaceElement`, `UpdateElementProperty` and
   `RemoveElementProperty` change one element of a property, named by an element path, e.g. a member of a group,
-  `[{"propertyName": "EVSEIds", "elementId": "DE*GEF*E1*2"}]`, or a property of a connector,
+  `[{"propertyName": "EVSEIds", "elementId": "DE*GEF*E1*2"}]`, a brand of a pool,
+  `[{"propertyName": "brands", "elementId": "blue-charge"}]`, or a property of a connector,
   `[{"propertyName": "chargingConnectors", "elementId": "1"}]` with `propertyName: "lockable"`. Elements of an array
   are named by their `@id`, texts by themselves; other arrays, e.g. the `elements` of a tariff, and the keys of a
   party are changed as a whole. An element change is checked as a change of the property it is part of, but its old
@@ -247,15 +253,16 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 - **Owners:** every change set must be signed by the owner of every change it makes, with a key the owner has
   in the version it is applied to, valid at its `createdAt` (`TryCheckOwnership`); every signature must be one of
   a key of a party. Nobody else's signature counts, there is no external trust configuration.
-  - The **RNO** owns the roaming network itself, brands, manufacturers, energy meter manufacturers and
+  - The **RNO** owns the roaming network itself, manufacturers, energy meter manufacturers and
     transparency software, and adds and removes parties: with their keys (a grid operator not taking part
     without, then the RNO signs in its place until it gives it keys), without their children:
     `RoamingNetworkChange.Add(party)` leaves them out, `AddChildren(party)` gives the changes the party then
     signs to add them. The RNO decides
     who is a member: removing a party removes all its data with it, without the party's signature; the history
     keeps the versions before.
-  - A **charging station operator** owns its properties, pools, stations, EVSEs, tariffs and groups,
-    named by their ids; a **parking operator** its parking data; e-mobility providers and grid operators their properties.
+  - A **charging station operator** owns its properties, brands, pools, stations, EVSEs, tariffs and groups,
+    named by their ids, and the brands embedded in them; a **parking operator** its parking data; e-mobility
+    providers and grid operators their properties.
   - A **grid connection point** is owned by its maintainer: its grid operator, or the charging station operator
     or parking operator its `maintainedBy` names, e.g. while the grid operator does not take part. The grid
     operator takes it over or hands it on by changing `maintainedBy`; the maintainer can hand it on; an identity
@@ -392,6 +399,7 @@ JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json
 | `GET ~/RNs/{RN_Id}/{CSOs\|GOs\|EMPs\|CSMs\|POs}` | its charging station operators, grid operators, e-mobility providers, charging station manufacturers or parking operators, as `{@id, name, description}` |
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}[/CPs/{CP_Id}[/CSs/{CS_Id}[/EVSEs/{EVSE_Id}]]]` | an operator, pool, station or EVSE as its parent embeds it; a pool with `?expand=gridConnectionPoint` |
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs[/{PS_Id}]` | the parking spaces a charging station names, or one of them: of parking operators or of its charging station operator, each as its operator embeds it |
+| `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}[/CPs/{CP_Id}[/CSs/{CS_Id}[/EVSEs/{EVSE_Id}]]]/Brands[/{Brand_Id}]` | the brands of an operator, pool, station or EVSE, its own, or one of them |
 | `GET ~/RNs/{RN_Id}/GOs/{GO_Id}[/GCPs/{GCP_Id}]` | a grid operator, or one of its grid connection points |
 | `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer or parking operator |
 
@@ -413,7 +421,9 @@ the grid operator embeds them; a charging station operator without any of `charg
 parking operator without any of `parkingGarages`, `parkingSpaces`,
 `parkingSpaceGroups`, `parkingSensors` and `parkingProducts`, e.g. `?without=parkingSpaces,parkingSensors`, listed by
 `~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs}`, each of them below it, e.g. `…/PSs/{PS_Id}`. The parking spaces a
-charging station names, whoever defines them, are listed by `…/CSs/{CS_Id}/PSs`. Every list, `~/RNs`,
+charging station names, whoever defines them, are listed by `…/CSs/{CS_Id}/PSs`. The brands of a charging station
+operator, pool, station or EVSE, its own, are listed by `…/Brands` below it, e.g.
+`~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands`, each of them below it, `…/Brands/{Brand_Id}`. Every list, `~/RNs`,
 `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` and
 the lists of what an operator embeds as well, takes:
 

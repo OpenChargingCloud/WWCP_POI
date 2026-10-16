@@ -57,11 +57,12 @@ flowchart TD
 | [ParkingSpaceGroup](ParkingSpaceGroup.md) | parking operator, `parkingSpaceGroups` | its parking operator | Parking spaces of the operator, e.g. one level or zone. |
 
 The documents for these entities also cover what they embed that is no entity of its own, i.e. that has no
-status and no file here:
+status; brands, embedded on several levels, have a file of their own:
 
 | Substructure | Documented in |
 |---|---|
-| Brands, energy meter manufacturers, transparency software and certificates | [RoamingNetwork](RoamingNetwork.md) |
+| Brands, of operators, pools, stations, EVSEs and RFID authentication modes | [Brand](Brand.md) |
+| Energy meter manufacturers, transparency software and certificates | [RoamingNetwork](RoamingNetwork.md) |
 | Signing and identity keys | [RoamingNetwork](RoamingNetwork.md), and each party: [ChargingStationOperator](ChargingStationOperator.md), [EMobilityProvider](EMobilityProvider.md), [GridOperator](GridOperator.md), [ParkingOperator](ParkingOperator.md) |
 | Data licenses | [RoamingNetwork](RoamingNetwork.md), [ChargingStationOperator](ChargingStationOperator.md), [ChargingPool](ChargingPool.md) |
 | Logos, contact data | [ChargingStationOperator](ChargingStationOperator.md) |

@@ -267,13 +267,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Brands
 
-        ///// <summary>
-        ///// All brands registered for this charging station operator.
-        ///// </summary>
-        //private System.Collections.Immutable.ImmutableArray<Brand> immutableBrands = [];
-        //[Optional, SlowData]
-        //public System.Collections.Immutable.ImmutableArray<Brand> Brands
-        //    => ImmutablePOIValues.CopyItems(immutableBrands);
+        /// <summary>
+        /// The brands it is a white-label solution for: its own, embedded completely, in the order of their identifications.
+        /// Not those of its charging pools, charging stations or EVSEs; every level has brands of its own.
+        /// </summary>
+        public POICollection<Brand_Id, Brand>  Brands  { get; } = POICollection<Brand_Id, Brand>.Empty;
 
         #endregion
 
@@ -688,6 +686,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        IEnumerable<ChargingPoolGroup>?                       ChargingPoolGroups                      = null,
                                        IEnumerable<ChargingTariffGroup>?                     ChargingTariffGroups                    = null,
                                        IEnumerable<ParkingSpace>?                            ParkingSpaces                           = null,
+                                       IEnumerable<Brand>?                                   Brands                                  = null,
                                        IEnumerable<POIPublicKey>?                            SigningKeys                             = null,
                                        IEnumerable<POIPublicKey>?                            IdentityKeys                            = null,
 
@@ -918,6 +917,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         throw new ArgumentException($"The parking space '{parkingSpace.Id}' of the operator '{Id}' can be in no parking garage, and have no parking sensors or parking products: only those of a parking operator can!", nameof(ParkingSpaces));
 
             }
+
+            this.Brands = new (Brands, brand => brand.Id, "brand", $"the operator '{Id}'");
 
             #endregion
 
@@ -1228,27 +1229,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                //    : null,
 
 
-                               //ExpandBrandIds != InfoStatus.Hidden && Brands.Any()
-                               //    ? ExpandBrandIds.Switch(
-
-                               //          () => new JProperty("brandIds",
-                               //                              new JArray(Brands.                 Select (brand   => brand.Id).
-                               //                                                                 OrderBy(brandId => brandId).
-                               //                                                                 Select (brandId => brandId.ToString()))),
-
-                               //          () => new JProperty("brands",
-                               //                              new JArray(Brands.
-                               //                                                                 OrderBy(brand => brand).
-                               //                                                                 ToJSON (Embedded:                         true,
-                               //                                                                         ExpandDataLicenses:               InfoStatus.ShowIdOnly))))
-                               //    : null,
-
                                // created, lastChange and customData: see below
                                null
 
                                );
 
                 // Embedded completely, as content.
+                if (Brands.Count > 0)
+                    json.Add("brands", new JArray(Brands.Select(brand => brand.ToJSON())));
+
                 if (ChargingTariffs.Count > 0)
                     json.Add("chargingTariffs", new JArray(ChargingTariffs.Select(chargingTariff => chargingTariff.ToJSON())));
 

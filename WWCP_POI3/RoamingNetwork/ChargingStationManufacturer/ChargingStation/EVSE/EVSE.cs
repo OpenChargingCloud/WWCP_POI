@@ -132,9 +132,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         /// <summary>
-        /// The brands it is offered under, of the roaming network, in the order of their identifications.
+        /// The brands it also appears under: its own, embedded completely, in the order of their identifications.
+        /// Not those of its operator or of what it embeds; every level has brands of its own.
         /// </summary>
-        public ImmutableArray<Brand_Id>  BrandIds  { get; }
+        public POICollection<Brand_Id, Brand>  Brands  { get; }
 
 
         /// <summary>
@@ -192,7 +193,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     IEnumerable<ChargingConnector>?      ChargingConnectors           = null,
                     EnergyMeter?                         EnergyMeter                  = null,
                     IEnumerable<ChargingTariff_Id>?      ChargingTariffIds            = null,
-                    IEnumerable<Brand_Id>?               BrandIds                     = null,
+                    IEnumerable<Brand>?                  Brands                       = null,
                     IEnumerable<Image>?                  Images                       = null,
                     GeoCoordinate?                       GeoLocation                  = null,
                     TimeSpan?                            MaxReservationDuration       = null,
@@ -265,7 +266,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ChargingConnectors  = [.. chargingConnectors.OrderBy(chargingConnector => chargingConnector.Id.ToString(), StringComparer.Ordinal)];
             this.EnergyMeter         = EnergyMeter;
             this.ChargingTariffIds   = POIJSON.OrderedIds(ChargingTariffIds, $"charging tariff of the EVSE '{Id}'");
-            this.BrandIds            = POIJSON.OrderedIds(BrandIds, $"brand of the EVSE '{Id}'");
+            this.Brands              = new (Brands, brand => brand.Id, "brand", $"the EVSE '{Id}'");
             this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the EVSE '{Id}'");
             this.GeoLocation             = GeoLocation;
             this.MaxReservationDuration  = MaxReservationDuration;
@@ -448,8 +449,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingTariffIds.Length > 0)
                 json.Add("chargingTariffIds",  POIJSON.IdsToJSON(ChargingTariffIds));
 
-            if (BrandIds.Length > 0)
-                json.Add("brandIds",      POIJSON.IdsToJSON(BrandIds));
+            if (Brands.Count > 0)
+                json.Add("brands",        new JArray(Brands.Select(brand => brand.ToJSON())));
 
             if (Images.Length > 0)
                 json.Add("images",  new JArray(Images.Select(image => image.ToJSON())));
@@ -543,7 +544,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseIds(JSON, "chargingTariffIds", "charging tariff identification", ChargingTariff_Id.TryParse, out ImmutableArray<ChargingTariff_Id> chargingTariffIds, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseIds(JSON, "brandIds", "brand identification", Brand_Id.TryParse, out ImmutableArray<Brand_Id> brandIds, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<Brand>(JSON, "brands", "brandIds", "brands", Brand.TryParse, out var brands, out ErrorResponse))
                     return false;
 
                 if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
@@ -585,7 +586,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 chargingConnectors,
                                 energyMeter,
                                 chargingTariffIds,
-                                brandIds,
+                                brands,
                                 images,
                                 geoLocation,
                                 maxReservationDuration,

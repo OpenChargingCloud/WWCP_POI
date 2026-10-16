@@ -23,7 +23,7 @@ those of its pool unless given.
 | Energy status | `EnergyInfo`, none until reported |
 | Embedded in | [ChargingPool](ChargingPool.md) as `chargingStations` |
 | Owner | the [ChargingStationOperator](ChargingStationOperator.md) its identification names (signing key) |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}`; the parking spaces it names, of parking operators or of its operator, `…/CSs/{CS_Id}/PSs[/{PS_Id}]` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}`; the parking spaces it names, of parking operators or of its operator, `…/CSs/{CS_Id}/PSs[/{PS_Id}]`; `GET …/CSs/{CS_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET …/CSs/{CS_Id}/Brands/{Brand_Id}` |
 
 
 ## Common properties
@@ -53,7 +53,7 @@ See [common properties](README.md#common-properties). A charging station does no
 | `modelId` | `ModelId` | `ChargingStationModel_Id?` | update/remove | The model as its manufacturer names it, e.g. `"Wallbox-22"`. |
 | `energyMeters` | `EnergyMeters` | `ImmutableArray<EnergyMeter>` | update/remove | Its own energy meters, not those of its EVSEs; see [energyMeters](#energymeters). |
 | `EVSEs` | `EVSEs` | `POICollection<EVSE_Id, EVSE>` | add/remove | Its EVSEs, embedded completely; see [EVSEs](#evses). |
-| `brandIds` | `BrandIds` | `ImmutableArray<Brand_Id>` | update/remove | Brands it is offered under; see [brandIds](#brandids). |
+| `brands` | `Brands` | `POICollection<Brand_Id, Brand>` | update/remove | Brands it also appears under; see [brands](#brands). |
 | `openingTimes` | `OpeningTimes` | `ImmutableOpeningTimes?` | update/remove | When it is open; always, unless given. See [openingTimes](#openingtimes). |
 | `images` | `Images` | `ImmutableArray<Image>` | update/remove | Its images, in their given order; see [images](#images). |
 | `vehicleTypes` | `VehicleTypes` | `ImmutableArray<VehicleType>` | update/remove | The types of vehicles it charges, each once, in the ordinal order of their names. Predefined: `MOTORCYCLE`, `PERSONAL_VEHICLE`, `PERSONAL_VEHICLE_WITH_TRAILER`, `VAN`, `SEMI_TRACTOR`, `RIGID`, `TRUCK_WITH_TRAILER`, `BUS`, `DISABLED`; other nonempty texts are read as well. |
@@ -176,11 +176,13 @@ open. Without regular openings it is 24/7.
 `images` is updated or removed as a whole.
 
 
-## brandIds
+## brands
 
-`brandIds`: the brands the station is offered under, each once, in the ordinal order of their identifications.
-Brands are embedded in the [RoamingNetwork](RoamingNetwork.md) (`brands`), so that operators can share them; a
-station may only name brands of the network, and a brand can not be removed while it is named.
+`brands`: the [brands](Brand.md) the station also appears under, its own, embedded completely, each once, in the
+ordinal order of their identifications. They are not those of its pool, its operator or its EVSEs: every level has
+brands of its own. Changed as a whole, or [brand by brand](Brand.md#change-sets), e.g.
+`AddElement(nameof(ChargingStation), stationId, [ new ("brands", "blue-charge") ], blueCharge.ToJSON())`;
+`brandIds` is refused.
 
 
 ## Calibration and certification
@@ -215,14 +217,14 @@ The station's status is set on its own; it is not calculated from the status of 
 - `maxPower` must not be negative, and not exceed the `maxPower` of all its EVSEs together, where all of them have one.
 - Every EVSE must belong to the operator of the station; an EVSE must not be given twice.
 - An energy meter must not be given twice; energy meter identifications are unique in the roaming network.
-- `brandIds`, `vehicleTypes`, `euVehicleCategories`, `features` and `parkingSpaceIds` must not name a value twice; an image URL must
+- `brands`, `vehicleTypes`, `euVehicleCategories`, `features` and `parkingSpaceIds` must not name a value twice; an image URL must
   not be given twice.
-- `EVSEs` and `energyMeters` must be given completely; `EVSEIds` and `energyMeterIds` are refused.
+- `EVSEs`, `energyMeters` and `brands` must be given completely; `EVSEIds`, `energyMeterIds` and `brandIds` are refused.
 - In its operator: the station belongs to the operator of its pool, and is unique within the operator across all
   pools; its EVSEs' `chargingTariffIds` must be tariffs of the operator; a [ChargingStationGroup](ChargingStationGroup.md)
   may only name stations of the operator.
-- In its roaming network: `manufacturerId` must name a manufacturer, `brandIds` brands and `parkingSpaceIds`
-  parking spaces of the network.
+- In its roaming network: `manufacturerId` must name a manufacturer and `parkingSpaceIds` parking spaces of the
+  network.
 - A change set applies each change to the embedded JSON of the operator and reads the operator again, so the
   operator must be valid after every single change (e.g. remove a station from its groups before removing it);
   the references into the network are checked after the last change.
@@ -266,7 +268,7 @@ The station's status is set on its own; it is not calculated from the status of 
       "lastChange":         "2026-01-01T00:00:00.000Z"
     }
   ],
-  "brandIds":          [ "blue-charge" ],
+  "brands":            [ { "@id": "blue-charge", "name": { "en": "Blue Charge" } } ],
   "images": [
     {
       "url":       "https://images.example/station.png",

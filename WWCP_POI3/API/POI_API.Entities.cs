@@ -45,6 +45,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///     ?without=chargingPools leaves out its charging pools, which ~/RNs/{RN_Id}/CPs?operatorId=… lists;
     ///     ?without=chargingTariffs,chargingTariffGroups,chargingPoolGroups,chargingStationGroups,EVSEGroups,
     ///     or any of them, leaves them out, which ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs} list
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands                                     the brands of the charging station operator, its own
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands/{Brand_Id}                          a brand of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs                                        its charging tariffs, as it embeds them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs/{CT_Id}                                a charging tariff of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs                                       its charging tariff groups, as it embeds them
@@ -57,11 +59,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EVSEGs/{EVSEG_Id}                          an EVSE group of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool;
     ///     ?expand=gridConnectionPoint embeds its grid connection point instead of naming it
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands                         the brands of the charging pool, its own
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands/{Brand_Id}              a brand of the charging pool
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}                    a charging station
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs                the parking spaces it names, of parking
     ///                                                                             operators or of its operator, as they embed them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs/{PS_Id}        a parking space the charging station names
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/Brands             the brands of the charging station, its own
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/Brands/{Brand_Id}  a brand of the charging station
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}    an EVSE
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/Brands
+    ///                                                                            the brands of the EVSE, its own
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/Brands/{Brand_Id}
+    ///                                                                            a brand of the EVSE
     /// GET ~/RNs/{RN_Id}/GOs                                                      its grid operators, in short
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}                                              a grid operator;
     ///     ?without=gridConnectionPoints leaves out its grid connection points, which ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs lists
@@ -85,6 +95,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSNs/{PSN_Id}                                a parking sensor of the parking operator
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs                                          its parking products, as it embeds them
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs/{PP_Id}                                  a parking product of the parking operator
+    ///
+    /// Brands are embedded in what they are a brand of, and mean something of their own on every level: a charging
+    /// station operator is a white-label solution for its brands, a charging pool, charging station or EVSE also
+    /// appears under its brands. The levels are not mixed: the brands of a pool are not those of its operator.
     ///
     /// The roaming network is the head of its history, when served with one, else the one added.
     /// A list is an array of { "@id", "name", "description" } in the order of the identifications,
@@ -379,19 +393,78 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}
 
             AddEntityHandlers(chargingStationPath + "/EVSEs/{evseId}",
-                              request => {
-
-                                  if (!TryGetRequestedChargingStation(request, out var chargingStation, out var errorResponse))
-                                      return errorResponse;
-
-                                  if (!EVSE_Id.TryParse(request.ParsedURLParameters[4], out var evseId))
-                                      return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid EVSE identification!");
-
-                                  return chargingStation.TryGetEVSE(evseId, out var evse)
+                              request => TryGetRequestedEVSE(request, out var evse, out var errorResponse)
                                              ? CachedEntityResponse(request, evse, evse.ToJSON)
-                                             : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The EVSE '{evseId}' is unknown at the charging station '{chargingStation.Id}'!");
+                                             : errorResponse);
 
-                              });
+            #endregion
+
+            #region The brands of a charging station operator, pool, station and EVSE: ~/…/Brands, and each of them below
+
+            // Every level its own brands: the white labels of an operator, the brands a pool, station or EVSE also appears under.
+            AddEmbeddedListHandlers<Brand_Id, Brand>(
+                chargingStationOperatorPath + "/Brands",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.Brands, null)
+                               : (null, errorResponse),
+                brand => brand.ToJSON());
+
+            AddEmbeddedEntityHandlers<Brand_Id, Brand>(
+                chargingStationOperatorPath + "/Brands/{brandId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.Brands, null)
+                               : (null, errorResponse),
+                Brand_Id.TryParse,
+                "brand of the charging station operator",
+                brand => brand.ToJSON());
+
+            AddEmbeddedListHandlers<Brand_Id, Brand>(
+                chargingPoolPath + "/Brands",
+                request => TryGetRequestedChargingPool(request, out var chargingPool, out var errorResponse)
+                               ? (chargingPool.Brands, null)
+                               : (null, errorResponse),
+                brand => brand.ToJSON());
+
+            AddEmbeddedEntityHandlers<Brand_Id, Brand>(
+                chargingPoolPath + "/Brands/{brandId}",
+                request => TryGetRequestedChargingPool(request, out var chargingPool, out var errorResponse)
+                               ? (chargingPool.Brands, null)
+                               : (null, errorResponse),
+                Brand_Id.TryParse,
+                "brand of the charging pool",
+                brand => brand.ToJSON());
+
+            AddEmbeddedListHandlers<Brand_Id, Brand>(
+                chargingStationPath + "/Brands",
+                request => TryGetRequestedChargingStation(request, out var chargingStation, out var errorResponse)
+                               ? (chargingStation.Brands, null)
+                               : (null, errorResponse),
+                brand => brand.ToJSON());
+
+            AddEmbeddedEntityHandlers<Brand_Id, Brand>(
+                chargingStationPath + "/Brands/{brandId}",
+                request => TryGetRequestedChargingStation(request, out var chargingStation, out var errorResponse)
+                               ? (chargingStation.Brands, null)
+                               : (null, errorResponse),
+                Brand_Id.TryParse,
+                "brand of the charging station",
+                brand => brand.ToJSON());
+
+            AddEmbeddedListHandlers<Brand_Id, Brand>(
+                chargingStationPath + "/EVSEs/{evseId}" + "/Brands",
+                request => TryGetRequestedEVSE(request, out var evse, out var errorResponse)
+                               ? (evse.Brands, null)
+                               : (null, errorResponse),
+                brand => brand.ToJSON());
+
+            AddEmbeddedEntityHandlers<Brand_Id, Brand>(
+                chargingStationPath + "/EVSEs/{evseId}" + "/Brands/{brandId}",
+                request => TryGetRequestedEVSE(request, out var evse, out var errorResponse)
+                               ? (evse.Brands, null)
+                               : (null, errorResponse),
+                Brand_Id.TryParse,
+                "brand of the EVSE",
+                brand => brand.ToJSON());
 
             #endregion
 
@@ -886,6 +959,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!chargingStationOperator.TryGetChargingPool(chargingPoolId, out ChargingPool))
             {
                 ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The charging pool '{chargingPoolId}' is unknown at the charging station operator '{chargingStationOperator.Id}'!");
+                return false;
+            }
+
+            return true;
+
+        }
+
+        #endregion
+
+        #region (private) TryGetRequestedEVSE                   (Request, out EVSE,                                 out ErrorResponse)
+
+        private Boolean TryGetRequestedEVSE(HTTPRequest                             Request,
+                                            [NotNullWhen(true)]  out EVSE?          EVSE,
+                                            [NotNullWhen(false)] out HTTPResponse?  ErrorResponse)
+        {
+
+            EVSE = null;
+
+            if (!TryGetRequestedChargingStation(Request, out var chargingStation, out ErrorResponse))
+                return false;
+
+            if (!EVSE_Id.TryParse(Request.ParsedURLParameters[4], out var evseId))
+            {
+                ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid EVSE identification!");
+                return false;
+            }
+
+            if (!chargingStation.TryGetEVSE(evseId, out EVSE))
+            {
+                ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The EVSE '{evseId}' is unknown at the charging station '{chargingStation.Id}'!");
                 return false;
             }
 

@@ -114,11 +114,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// by a key the owner has in the version the change set is applied to, valid at its creation:
     /// a signing key for data and for the signing keys of a party, an identity key for its identity keys.
     /// <list type="bullet">
-    ///   <item>The roaming network operator (the keys of the roaming network) owns the roaming network itself, brands,
+    ///   <item>The roaming network operator (the keys of the roaming network) owns the roaming network itself,
     ///         manufacturers, energy meter manufacturers and transparency software, and adds and removes parties:
     ///         it decides who is a member, so removing a party removes all its data with it, without its signature.</item>
     ///   <item>A charging station operator, e-mobility provider, grid operator or parking operator owns its own properties,
-    ///         a charging station operator its pools, stations, EVSEs, tariffs and groups, a parking operator its parking data.</item>
+    ///         a charging station operator its brands, pools, stations, EVSEs, tariffs and groups, a parking operator its parking data.
+    ///         Brands are embedded in what they are a brand of, and so owned by its owner.</item>
     ///   <item>A grid connection point is owned by its maintainer: its grid operator, or the charging station operator or
     ///         parking operator its maintainedBy names. One of them adds it, with the maintainer it names, or its grid operator.
     ///         Its maintainedBy is changed by its grid operator, taking it over or handing it on, by its maintainer,
@@ -440,7 +441,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (Change.EntityType is nameof(ChargingStationManufacturer)
                                   or nameof(EnergyMeterManufacturer)
-                                  or nameof(Brand)
                                   or nameof(TransparencySoftware)
                                   or nameof(TransparencySoftwareCertificate))
             {

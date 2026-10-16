@@ -131,9 +131,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         /// <summary>
-        /// The brands it is offered under, of the roaming network, in the order of their identifications.
+        /// The brands it also appears under: its own, embedded completely, in the order of their identifications.
+        /// Not those of its operator or of what it embeds; every level has brands of its own.
         /// </summary>
-        public ImmutableArray<Brand_Id>  BrandIds  { get; }
+        public POICollection<Brand_Id, Brand>  Brands  { get; }
 
         /// <summary>
         /// When it is open; always, unless given.
@@ -266,7 +267,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<ChargingStation>?                ChargingStations             = null,
                             GridConnectionPoint_Id?                      GridConnectionPointId        = null,
                             IEnumerable<EnergyMeter>?                    EnergyMeters                 = null,
-                            IEnumerable<Brand_Id>?                       BrandIds                     = null,
+                            IEnumerable<Brand>?                          Brands                       = null,
                             ImmutableOpeningTimes?                       OpeningTimes                 = null,
                             EnergyMix?                                   EnergyMix                    = null,
                             IEnumerable<Image>?                          Images                       = null,
@@ -346,7 +347,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ChargingStations      = new (chargingStations, chargingStation => chargingStation.Id, "charging station", $"the charging pool '{Id}'");
             this.GridConnectionPointId = GridConnectionPointId;
             this.EnergyMeters          = EnergyMeter.Ordered(EnergyMeters, $"the charging pool '{Id}'");
-            this.BrandIds              = POIJSON.OrderedIds(BrandIds, $"brand of the charging pool '{Id}'");
+            this.Brands                = new (Brands, brand => brand.Id, "brand", $"the charging pool '{Id}'");
             this.OpeningTimes          = OpeningTimes;
             this.EnergyMix             = EnergyMix;
             this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the charging pool '{Id}'");
@@ -490,8 +491,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingStations.Count > 0)
                 json.Add("chargingStations",  new JArray(ChargingStations.Select(chargingStation => chargingStation.ToJSON())));
 
-            if (BrandIds.Length > 0)
-                json.Add("brandIds",      POIJSON.IdsToJSON(BrandIds));
+            if (Brands.Count > 0)
+                json.Add("brands",        new JArray(Brands.Select(brand => brand.ToJSON())));
 
             if (OpeningTimes is not null)
                 json.Add("openingTimes",  OpeningTimes.ToJSON());
@@ -645,7 +646,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseIds(JSON, "brandIds", "brand identification", Brand_Id.TryParse, out ImmutableArray<Brand_Id> brandIds, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<Brand>(JSON, "brands", "brandIds", "brands", Brand.TryParse, out var brands, out ErrorResponse))
                     return false;
 
                 if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, "openingTimes", "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
@@ -703,7 +704,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 chargingStations,
                                                 gridConnectionPointId,
                                                 energyMeters,
-                                                brandIds,
+                                                brands,
                                                 openingTimes,
                                                 energyMix,
                                                 images,

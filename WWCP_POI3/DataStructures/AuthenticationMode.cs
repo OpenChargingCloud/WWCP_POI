@@ -43,7 +43,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// an immutable value without an identification.
     /// </summary>
     /// <remarks>
-    /// RFID may name the card types it reads and the brands of the roaming network whose cards it takes;
+    /// RFID may name the card types it reads and the brands whose cards it takes, its own, embedded completely;
     /// SMS and PhoneCall need the number to call, SMS optionally a station code.
     /// Other types are given by their name alone.
     /// </remarks>
@@ -84,9 +84,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<RFIDCardTypes>  CardTypes      { get; }
 
         /// <summary>
-        /// The brands of the roaming network whose RFID cards it takes, in the order of their identifications.
+        /// The brands whose RFID cards it takes: its own, embedded completely, in the order of their identifications.
         /// </summary>
-        public ImmutableArray<Brand_Id>       BrandIds       { get; }
+        public POICollection<Brand_Id, Brand>  Brands         { get; }
 
         /// <summary>
         /// The number to send an SMS to or to call.
@@ -107,12 +107,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Type">The type, e.g. RFID.</param>
         /// <param name="CardTypes">The RFID card types it reads.</param>
-        /// <param name="BrandIds">The brands of the roaming network whose RFID cards it takes.</param>
+        /// <param name="Brands">The brands whose RFID cards it takes.</param>
         /// <param name="Number">The number to send an SMS to or to call.</param>
         /// <param name="StationCode">The code of the station to send by SMS.</param>
         public AuthenticationMode(String                       Type,
                                   IEnumerable<RFIDCardTypes>?  CardTypes     = null,
-                                  IEnumerable<Brand_Id>?       BrandIds      = null,
+                                  IEnumerable<Brand>?          Brands        = null,
                                   String?                      Number        = null,
                                   String?                      StationCode   = null)
         {
@@ -127,11 +127,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.Type         = Type;
             this.CardTypes    = [.. cardTypes.OrderBy(cardType => cardType.ToString(), StringComparer.Ordinal)];
-            this.BrandIds     = POIJSON.OrderedIds(BrandIds, "brand of an RFID authentication mode");
+            this.Brands       = new (Brands, brand => brand.Id, "brand", "an RFID authentication mode");
             this.Number       = Number;
             this.StationCode  = StationCode;
 
-            if ((this.CardTypes.Length > 0 || this.BrandIds.Length > 0) && Type != RFIDType)
+            if ((this.CardTypes.Length > 0 || this.Brands.Count > 0) && Type != RFIDType)
                 throw new ArgumentException($"Only RFID names card types and brands, not '{Type}'!");
 
             if (Type is SMSType or PhoneCallType)
@@ -170,9 +170,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// RFID, optionally with the card types it reads and the brands whose cards it takes.
         /// </summary>
         public static AuthenticationMode RFID(IEnumerable<RFIDCardTypes>?  CardTypes  = null,
-                                              IEnumerable<Brand_Id>?       BrandIds   = null)
+                                              IEnumerable<Brand>?          Brands     = null)
 
-            => new (RFIDType, CardTypes, BrandIds);
+            => new (RFIDType, CardTypes, Brands);
 
         /// <summary>
         /// An SMS to the given number, optionally with the code of the station.
@@ -207,8 +207,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (CardTypes.Length > 0)
                 json.Add("cardTypes",    new JArray(CardTypes.Select(cardType => cardType.ToString())));
 
-            if (BrandIds.Length > 0)
-                json.Add("brandIds",     POIJSON.IdsToJSON(BrandIds));
+            if (Brands.Count > 0)
+                json.Add("brands",       new JArray(Brands.Select(brand => brand.ToJSON())));
 
             if (Number is not null)
                 json.Add("number",       Number);
@@ -239,7 +239,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!POIJSON.TryParseString(JSON, "type",         "authentication mode type",  out var type,         out ErrorResponse) ||
                     !POIJSON.TryParseIds   (JSON, "cardTypes",    "RFID card type",            POIJSON.TryParseName, out ImmutableArray<RFIDCardTypes> cardTypes, out ErrorResponse) ||
-                    !POIJSON.TryParseIds   (JSON, "brandIds",     "brand identification",      Brand_Id.TryParse,    out ImmutableArray<Brand_Id>      brandIds,  out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<Brand>(JSON, "brands", "brandIds", "brands", Brand.TryParse, out var brands, out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, "number",       "number",                    out var number,       out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, "stationCode",  "station code",              out var stationCode,  out ErrorResponse))
                 {
@@ -252,7 +252,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                AuthenticationMode  = new AuthenticationMode(type, cardTypes, brandIds, number, stationCode);
+                AuthenticationMode  = new AuthenticationMode(type, cardTypes, brands, number, stationCode);
                 ErrorResponse       = null;
                 return true;
 

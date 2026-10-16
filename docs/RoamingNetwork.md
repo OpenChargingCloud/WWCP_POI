@@ -2,14 +2,16 @@
 
 A roaming network is the root of all POI data: one shared data set of charging station operators,
 e-mobility providers, grid operators and parking operators (the *parties*), together with the registries
-they share, e.g. charging station and energy meter manufacturers, brands and transparency software.
+they share, e.g. charging station and energy meter manufacturers and transparency software.
 A version of a roaming network with everything it embeds is one immutable data set, named by its
 [ETags](README.md#etags); a change set leads to the next version.
 
 The roaming network is owned by its **roaming network operator (RNO)**, who has no entity of its own:
 the RNO is named by the network's `signingKeys` and `identityKeys`. The RNO signs changes of the network's own
-properties, adds and removes parties, and owns the registries (brands, manufacturers, energy meter manufacturers,
-transparency software releases and certificates). Each party owns its own properties and data.
+properties, adds and removes parties, and owns the registries (manufacturers, energy meter manufacturers,
+transparency software releases and certificates). Each party owns its own properties and data. There is no registry
+of brands: every charging station operator, pool, station, EVSE and RFID authentication mode embeds its own, see
+[Brand](Brand.md).
 
 The identification is a `RoamingNetwork_Id`, any nonempty text without surrounding whitespace, compared
 case-insensitively, e.g. `rn1` or `Prod`. It names the network on a server (`~/RNs/{RN_Id}`) and in every
@@ -56,7 +58,6 @@ See [README.md](README.md#common-properties).
 | `eMobilityProviders` | `EMobilityProviders` | [EMobilityProvider](EMobilityProvider.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `gridOperators` | `GridOperators` | [GridOperator](GridOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `parkingOperators` | `ParkingOperators` | [ParkingOperator](ParkingOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
-| `brands` | `Brands` | [Brand](#brands)[] | add/remove | Ordered by `@id` (ordinal). |
 | `energyMeterManufacturers` | `EnergyMeterManufacturers` | [EnergyMeterManufacturer](#energymetermanufacturers)[] | add/remove | Ordered by `@id` (ordinal). |
 | `transparencySoftware` | `TransparencySoftware` | [TransparencySoftware](#transparencysoftware)[] | add/remove | Releases, one per version of a software, ordered by `@id` (ordinal). |
 | `transparencySoftwareCertificates` | `TransparencySoftwareCertificates` | [TransparencySoftwareCertificate](#transparencysoftwarecertificates)[] | add/remove | Ordered by `@id` (ordinal). |
@@ -65,8 +66,9 @@ See [README.md](README.md#common-properties).
 
 Every collection is omitted when empty. Children are never written or read by their identifications alone:
 `TryParse` refuses `chargingStationOperatorIds`, `chargingStationManufacturerIds`, `eMobilityProviderIds`,
-`gridOperatorIds`, `parkingOperatorIds`, `brandIds`, `energyMeterManufacturerIds`, `transparencySoftwareIds`
-and `transparencySoftwareCertificateIds`.
+`gridOperatorIds`, `parkingOperatorIds`, `energyMeterManufacturerIds`, `transparencySoftwareIds`
+and `transparencySoftwareCertificateIds`. The network has no `brands`: brands are embedded in what they are a brand
+of ([Brand](Brand.md)).
 
 **Views.** `ToJSON(…)` has view options: `Embedded: true` drops `@context`; `ExpandChargingStationOperatorIds`
 other than `Expanded` writes `chargingStationOperatorIds` (or nothing for `Hidden`), which can not be read back;
@@ -83,8 +85,8 @@ with the default view options ([SPECIFICATION.md](../SPECIFICATION.md#2-the-cont
 - `Parties` — the RNO (`POIPartyId("RoamingNetwork", id)`) and every operator and provider, with their keys; `TryGetParty`.
 - `Revision` — a local counter, one more per applied change set; not content.
 - Lookups: `TryGetChargingStationOperatorById`, `TryGetEMobilityProviderById`, `TryGetGridOperatorById`,
-  `TryGetParkingOperatorById`, `TryGetChargingStationManufacturerById`, `TryGetBrandById`,
-  `TryGetEnergyMeterManufacturerById`, `TryGetTransparencySoftwareById`, `TryGetTransparencySoftwareCertificateById`, ….
+  `TryGetParkingOperatorById`, `TryGetChargingStationManufacturerById`, `TryGetEnergyMeterManufacturerById`,
+  `TryGetTransparencySoftwareById`, `TryGetTransparencySoftwareCertificateById`, ….
 
 
 ## @context
@@ -178,26 +180,6 @@ products, under `parkingOperators`, ordered by `@id` (ordinal). Added and remove
 `Remove(parkingOperatorId)`.
 
 
-## brands
-
-Brands under which charging pools, stations and EVSEs are offered, e.g. of a franchise (`Brand`,
-[source](../WWCP_POI3/RoamingNetwork/Brand/Brand.cs)). Embedded in the network, so that operators can share them;
-without runtime status, without timestamps. Named by the `brandIds` of charging pools, charging stations and EVSEs,
-and by the `brandIds` of the RFID `authenticationModes` of charging pools.
-
-| JSON key | Type | Change set | Description |
-|---|---|---|---|
-| `@id` | string | — | `Brand_Id`, nonempty after trimming, compared case-insensitively. |
-| `name` | I18N text | update | Mandatory, at least one language. |
-| `description` | I18N text | update/remove | Omitted when empty. |
-| `logo` | URL | update/remove | |
-| `homepage` | URL | update/remove | |
-| `customData` | object | update/remove | Omitted when empty. |
-
-It has no timestamps: `created` and `lastChange` are refused. `RoamingNetworkChange.Add(brand)`, `Remove(brandId)`,
-`UpdateProperty(brand, …)`/`RemoveProperty(brand, …)`, signed by the RNO. A brand still named can not be removed.
-
-
 ## energyMeterManufacturers
 
 Manufacturers of [EnergyMeter](EnergyMeter.md)s, named by their `manufacturerId` (`EnergyMeterManufacturer`,
@@ -283,7 +265,7 @@ A change set must be signed by the owner of each of its changes ([../README.md](
 | `UpdateProperty` of the network's `identityKeys` | identity key |
 | `Add`/`Remove` of a charging station operator, e-mobility provider, grid operator or parking operator | signing key |
 | `UpdateProperty` of the `signingKeys`/`identityKeys` of such a party (recovery; the party's own keys also count, see its file) | identity key |
-| every change of brands, charging station manufacturers, energy meter manufacturers, transparency software releases and certificates | signing key |
+| every change of charging station manufacturers, energy meter manufacturers, transparency software releases and certificates | signing key |
 
 - A party is added with at least one `signingKeys` and one `identityKeys` entry, and without embedded children
   (`chargingPools`, `chargingTariffs`, the four group arrays; `parkingGarages`, `parkingSpaces`, `parkingSensors`,
@@ -299,8 +281,8 @@ A change set must be signed by the owner of each of its changes ([../README.md](
 ```csharp
 var cs = rn1.CreateChangeSet([
              RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "v2"),
-             RoamingNetworkChange.Add           (new Brand(Brand_Id.Parse("GEF-CHARGE"),
-                                                           new ImmutableI18NString(I18NString.Create(Languages.en, "GEF Charge")))),
+             RoamingNetworkChange.Add           (new EnergyMeterManufacturer(EnergyMeterManufacturer_Id.Parse("EMH"),
+                                                                             new ImmutableI18NString(I18NString.Create(Languages.en, "EMH metering")))),
              RoamingNetworkChange.Add           (newOperator)                       // with its keys, without children
          ]).
          Sign(rnoSigningKey, POIPublicKey.From(rnoSigningKey).Id, COSEAlgorithm.ES256);
@@ -311,7 +293,7 @@ var cs = rn1.CreateChangeSet([
 
 Admin status and status are kept in the status schedules shared by all versions, see
 [README.md](README.md#runtime-status); in a history as `entityType` `RoamingNetwork`. No energy status.
-The registries (brands, energy meter manufacturers, transparency software and certificates) have no runtime status.
+The registries (energy meter manufacturers, transparency software and certificates) have no runtime status.
 
 | | Type | Predefined values | Initially |
 |---|---|---|---|
@@ -330,7 +312,7 @@ Checked by the constructor (so by `TryParse`) and again on the result of every c
 
 - `@id` mandatory; every other property optional.
 - Within each collection an `@id` only once: data licenses, charging station operators, charging station manufacturers,
-  e-mobility providers, grid operators, parking operators, brands, energy meter manufacturers, transparency software
+  e-mobility providers, grid operators, parking operators, energy meter manufacturers, transparency software
   releases and certificates.
 - Keys: `@id` the thumbprint of `key`, canonical Base64, no private parts, `notBefore` ≤ `notAfter`, not twice,
   not both a signing and an identity key.
@@ -340,7 +322,6 @@ Checked by the constructor (so by `TryParse`) and again on the result of every c
   the `manufacturerId` of a charging station (`chargingStationManufacturers`);
   the `gridOperatorId` of a grid connection point (`gridOperators`);
   the `manufacturerId` of an energy meter (`energyMeterManufacturers`);
-  the `brandIds` of pools, stations, EVSEs and RFID authentication modes (`brands`);
   the `chargingStationIds` of parking garages, spaces and sensors; the `parkingSpaceIds` of charging stations;
   the releases and `chargingStationManufacturerId` of certificates;
   the releases and `certificateId` of an energy meter's `transparencySoftwareStatus`, the certificate covering the release.
@@ -379,11 +360,6 @@ Checked when a change set is applied:
       "identityKeys": [ { "@id": "a81d…", "key": "pQECIAMh…" } ],
       "created":    "2026-01-01T00:00:00.000Z",
       "lastChange": "2026-01-01T00:00:00.000Z" }
-  ],
-  "brands": [
-    { "@id": "GEF-CHARGE",
-      "name": { "en": "GEF Charge" },
-      "homepage": "https://charge.example.org" }
   ],
   "energyMeterManufacturers": [
     { "@id": "EMH",

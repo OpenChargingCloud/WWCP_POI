@@ -30,9 +30,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// A brand, under which charging pools, charging stations and EVSEs are offered, e.g. of a franchise.
-    /// Embedded completely in the roaming network, so that several operators can share it;
-    /// without runtime status and timestamps.
+    /// A brand, embedded completely in what it is a brand of, and meaning something of its own on every level:
+    /// a charging station operator is a white-label solution for it, a charging pool, charging station or EVSE
+    /// also appears under it, an RFID authentication mode takes its cards. The levels are not mixed: a brand of an
+    /// operator is no brand of its pools, nor the other way round. Without runtime status and timestamps.
     /// </summary>
     public sealed class Brand : IEquatable<Brand>,
                                 IComparable<Brand>

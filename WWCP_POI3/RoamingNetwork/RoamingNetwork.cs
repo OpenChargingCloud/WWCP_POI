@@ -216,7 +216,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               IEnumerable<ParkingOperator>?              ParkingOperators               = null,
                               IEnumerable<TransparencySoftware>?         TransparencySoftware           = null,
                               IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates  = null,
-                              IEnumerable<Brand>?                        Brands                         = null,
                               IEnumerable<EnergyMeterManufacturer>?      EnergyMeterManufacturers       = null,
                               IEnumerable<POIPublicKey>?                 SigningKeys                    = null,
                               IEnumerable<POIPublicKey>?                 IdentityKeys                   = null)
@@ -302,12 +301,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.transparencySoftware = new (TransparencySoftware, entity => entity.Id, "transparency software release");
 
             this.transparencySoftwareCertificates = new (TransparencySoftwareCertificates, entity => entity.Id, "transparency software certificate");
-
-            this.brands = new (Brands, entity => entity.Id, "brand");
-
-            // Charging pools, stations and EVSEs name brands of this network.
-            if (UnknownBrand(chargingStationOperators, brands.Index) is String brandError)
-                throw new ArgumentException(brandError, nameof(Brands));
 
             // Certificates name releases and manufacturers of this network; energy meters name releases and certificates.
             if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators, gridOperators), transparencySoftware.Index, transparencySoftwareCertificates.Index, chargingStationManufacturers.Index) is String transparencyError)
@@ -641,14 +634,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                  out var transparencySoftwareCertificates,
                                                                  out ErrorResponse) ||
 
-                    !POIJSON.TryParseChildren<Brand>            (JSON,
-                                                                 "brands",
-                                                                 "brandIds",
-                                                                 "brands",
-                                                                 POI.Brand.TryParse,
-                                                                 out var brands,
-                                                                 out ErrorResponse) ||
-
                     !POIJSON.TryParseChildren<EnergyMeterManufacturer>(JSON,
                                                                  "energyMeterManufacturers",
                                                                  "energyMeterManufacturerIds",
@@ -723,7 +708,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ParkingOperators:          parkingOperators,
                                      TransparencySoftware:      transparencySoftware,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
-                                     Brands:                    brands,
                                      EnergyMeterManufacturers:  energyMeterManufacturers,
                                      SigningKeys:               signingKeys,
                                      IdentityKeys:              identityKeys
@@ -948,9 +932,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (!parkingOperators.IsEmpty)
                 JSON.Add("parkingOperators",             new JArray(parkingOperators.Select(parkingOperator => parkingOperator.ToJSON())));
-
-            if (!brands.IsEmpty)
-                JSON.Add("brands",                       new JArray(brands.Select(brand => brand.ToJSON())));
 
             if (!energyMeterManufacturers.IsEmpty)
                 JSON.Add("energyMeterManufacturers",     new JArray(energyMeterManufacturers.Select(energyMeterManufacturer => energyMeterManufacturer.ToJSON())));
@@ -1194,14 +1175,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                        out var transparencySoftwareCertificates,
                                                                        out ErrorResponse) ||
 
-                    !TryParseCBORChildren<Brand>                      (CBOR,
-                                                                       "brands",
-                                                                       "brandIds",
-                                                                       "brands",
-                                                                       POI.Brand.TryParse,
-                                                                       out var brands,
-                                                                       out ErrorResponse) ||
-
                     !TryParseCBORChildren<EnergyMeterManufacturer>    (CBOR,
                                                                        "energyMeterManufacturers",
                                                                        "energyMeterManufacturerIds",
@@ -1270,7 +1243,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ParkingOperators:          parkingOperators,
                                      TransparencySoftware:      transparencySoftware,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
-                                     Brands:                    brands,
                                      EnergyMeterManufacturers:  energyMeterManufacturers,
                                      SigningKeys:               signingKeys,
                                      IdentityKeys:              identityKeys
@@ -1366,11 +1338,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 CBOR.Add(CBORValue.FromText("parkingOperators"),
                          CBORValue.FromArray(parkingOperators.
                                                  Select(parkingOperator => parkingOperator.ToCBOR())));
-
-            if (!brands.IsEmpty)
-                CBOR.Add(CBORValue.FromText("brands"),
-                         CBORValue.FromArray(brands.
-                                                 Select(brand => CBORJSON.ToCBOR(brand.ToJSON()))));
 
             if (!energyMeterManufacturers.IsEmpty)
                 CBOR.Add(CBORValue.FromText("energyMeterManufacturers"),
@@ -1812,53 +1779,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var parkingSpaceId in chargingStation.ParkingSpaceIds)
                     if (!parkingSpaceIds.Contains(parkingSpaceId))
                         return $"The parking space '{parkingSpaceId}' of the charging station '{chargingStation.Id}' is unknown in the roaming network!";
-
-            return null;
-
-        }
-
-        #endregion
-
-
-        #region Brands
-
-        private readonly POICollection<Brand_Id, Brand> brands;
-
-        /// <summary>
-        /// The brands in this immutable network version.
-        /// </summary>
-        public POICollection<Brand_Id, Brand> Brands
-            => brands;
-
-        /// <summary>
-        /// Try to get the brand having the given identification.
-        /// </summary>
-        public Boolean TryGetBrandById(Brand_Id                        BrandId,
-                                       [NotNullWhen(true)] out Brand?  Brand)
-
-            => brands.TryGet(BrandId, out Brand);
-
-        /// <summary>
-        /// The error, when a charging pool, charging station or EVSE names a brand the given ones do not have.
-        /// </summary>
-        internal static String? UnknownBrand(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
-                                             IReadOnlyDictionary<Brand_Id, Brand>  Brands)
-        {
-
-            foreach (var chargingStationOperator in ChargingStationOperators)
-            {
-
-                var named = chargingStationOperator.ChargingPools.   SelectMany(chargingPool    => chargingPool.   BrandIds.Select(brandId => (Kind: "charging pool",    Id: chargingPool.   Id.ToString(), BrandId: brandId))).
-                            Concat(chargingStationOperator.ChargingStations.SelectMany(chargingStation => chargingStation.BrandIds.Select(brandId => (Kind: "charging station", Id: chargingStation.Id.ToString(), BrandId: brandId)))).
-                            Concat(chargingStationOperator.EVSEs.           SelectMany(evse            => evse.           BrandIds.Select(brandId => (Kind: "EVSE",             Id: evse.           Id.ToString(), BrandId: brandId)))).
-                            Concat(chargingStationOperator.ChargingPools.   SelectMany(chargingPool    => chargingPool.   AuthenticationModes.SelectMany(authenticationMode => authenticationMode.BrandIds).
-                                                                                                                                       Select(brandId => (Kind: "RFID authentication of the charging pool", Id: chargingPool.Id.ToString(), BrandId: brandId))));
-
-                foreach (var (kind, id, brandId) in named)
-                    if (!Brands.ContainsKey(brandId))
-                        return $"The brand '{brandId}' of the {kind} '{id}' is unknown in the roaming network!";
-
-            }
 
             return null;
 

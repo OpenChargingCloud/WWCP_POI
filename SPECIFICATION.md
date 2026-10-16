@@ -31,9 +31,10 @@ A version of a roaming network is identified by its **content**: its JSON repres
   (`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork`), `@id`, `name`, `description`,
   `dataSource`, `dataLicenses`, every embedded entity completely (operators with their pools,
   stations, EVSEs, connectors, energy meters, tariffs and groups; manufacturers, e-mobility
-  providers, grid operators with their grid connection points, parking operators, brands, energy meter manufacturers, transparency
-  software releases and certificates), the `signingKeys` and `identityKeys` of the roaming network
-  and of its parties, `created`, `lastChange` and `customData`.
+  providers, grid operators with their grid connection points, parking operators, energy meter
+  manufacturers, transparency software releases and certificates), the brands of operators, pools,
+  stations, EVSEs and RFID authentication modes, the `signingKeys` and `identityKeys` of the
+  roaming network and of its parties, `created`, `lastChange` and `customData`.
 - **Excluded:** `eTags`; the runtime status (admin status, status, energy status); the local
   revision counter; internal data.
 - **Order:** embedded entities in the ordinal order of their identifications; the order of
@@ -109,7 +110,8 @@ and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `Update
 when it is added (and `created`, unless given) or when one of its own properties changes; not when only an entity
 it embeds changes. `lastChange` therefore does not tell when anything below an entity last changed: its
 representation, and so its ETag, changes with everything it embeds, and the history tells what changed.
-Grid connection points, brands and parking products have no timestamps.
+Grid connection points, brands (embedded in operators, pools, stations, EVSEs and RFID authentication modes) and
+parking products have no timestamps.
 
 **Signatures** (profile `wwcp-poi-changeset-json-v3`) of the owners of what it changes
 (section 4.1): `{ algorithm, keyId, value, profile, encoding: "base64" }`.
@@ -147,10 +149,11 @@ Every change has exactly one **owner**:
 
 | Change | Owner |
 |---|---|
-| the roaming network itself, brands, charging station and energy meter manufacturers, transparency software releases and certificates | the RNO |
+| the roaming network itself, charging station and energy meter manufacturers, transparency software releases and certificates | the RNO |
 | `Add` and `Remove` of a charging station operator, e-mobility provider, grid operator or parking operator | the RNO |
 | the other properties of such a party | the party; the RNO for a party without signing keys |
 | pools, stations, EVSEs, tariffs and groups | the charging station operator their identification names |
+| brands | the owner of what embeds them: the charging station operator |
 | parking garages, spaces, sensors, space groups and products | their parking operator (the parent of an `Add`) |
 | a grid connection point | its maintainer: the party its `maintainedBy` names, else its grid operator; an `Add` also its grid operator |
 | `maintainedBy` of a grid connection point | its grid operator, its maintainer, or an identity key of the RNO |

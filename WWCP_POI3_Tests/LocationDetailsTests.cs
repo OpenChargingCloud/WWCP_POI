@@ -60,7 +60,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                   Created,
-                    Brands:                    [ new Brand(Fast, new ImmutableI18NString(I18NString.Create(Languages.en, "Fast Charge"))) ],
                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                              Created:        Created,
                                                                              ChargingPools:  [ new ChargingPool(P1,
@@ -68,7 +67,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                 Facilities:           [ Facility.RESTAURANT, Facility.HOTEL ],
                                                                                                                 PaymentOptions:       [ PaymentOptions.Direct, PaymentOptions.Contract ],
                                                                                                                 AuthenticationModes:  [ AuthenticationMode.SMS("+49 800 1234", "4711"),
-                                                                                                                                        AuthenticationMode.RFID([ RFIDCardTypes.MifareDESFire, RFIDCardTypes.MifareClassic ], [ Fast ]),
+                                                                                                                                        AuthenticationMode.RFID([ RFIDCardTypes.MifareDESFire, RFIDCardTypes.MifareClassic ], [ new Brand(Fast, new ImmutableI18NString(I18NString.Create(Languages.en, "Fast Charge"))) ]),
                                                                                                                                         AuthenticationMode.CreditCard ],
                                                                                                                 UIFeatures:           [ UIFeatures.Screen, UIFeatures.Pinpad ],
                                                                                                                 Features:             [ ChargingPoolFeature.Reservable, ChargingPoolFeature.GermanCalibrationLaw ],
@@ -161,7 +160,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(pool["authenticationModes"]!.Select(mode => mode["type"]!.Value<String>()),
                                                                                              Is.EqualTo(new[] { "CreditCard", "RFID", "SMS" }));
                 Assert.That(pool["authenticationModes"]![1]!["cardTypes"]!.Values<String>(),  Is.EqualTo(new[] { "MifareClassic", "MifareDESFire" }));
-                Assert.That(pool["authenticationModes"]![1]!["brandIds"]!.Values<String>(),   Is.EqualTo(new[] { "fast-charge" }));
+                Assert.That(pool["authenticationModes"]![1]!["brands"]!.Select(brand => brand["@id"]!.ToString()),  Is.EqualTo(new[] { "fast-charge" }));
                 Assert.That(pool["authenticationModes"]![2]!["stationCode"]!.Value<String>(), Is.EqualTo("4711"));
                 Assert.That(pool["uiFeatures"]!.Values<String>(),                            Is.EqualTo(new[] { "Pinpad", "Screen" }));
                 Assert.That(pool["features"]!.Values<String>(),                              Is.EqualTo(new[] { "GermanCalibrationLaw", "Reservable" }));
@@ -231,7 +230,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 ("authentication type twice", Changed(network => ((JArray) Pool(network)["authenticationModes"]!).Add(new JObject(new JProperty("type", "CreditCard")))), "must not be given twice"),
                 ("SMS without number",        Changed(network => ((JObject) Pool(network)["authenticationModes"]![2]!).Remove("number")),                     "needs its number"),
                 ("card types not for RFID",   Changed(network => Pool(network)["authenticationModes"]![0]!["cardTypes"] = new JArray("Calypso")),             "Only RFID"),
-                ("unknown RFID brand",        Changed(network => Pool(network)["authenticationModes"]![1]!["brandIds"]  = new JArray("nobody")),              "brand 'nobody' of the RFID authentication"),
+                ("RFID brand ids",            Changed(network => Pool(network)["authenticationModes"]![1]!["brandIds"]  = new JArray("fast-charge")),         "must be given completely in 'brands', not by 'brandIds'"),
                 ("chargingWhenClosed text",   Changed(network => Pool(network)["chargingWhenClosed"] = "no"),                                                 "charging when closed"),
                 ("entrance not an object",    Changed(network => Pool(network)["entranceLocation"]   = "here"),                                               "entrance location"),
                 ("related without location",  Changed(network => ((JObject) Pool(network)["relatedLocations"]![0]!).Remove("geoLocation")),                   "related location"),

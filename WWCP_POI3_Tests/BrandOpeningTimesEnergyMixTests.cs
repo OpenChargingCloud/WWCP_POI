@@ -17,6 +17,8 @@
 
 #region Usings
 
+using System.Collections.Immutable;
+
 using Newtonsoft.Json.Linq;
 
 using NUnit.Framework;
@@ -50,6 +52,25 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly ChargingTariff_Id           T1         = ChargingTariff_Id.         Parse("DE*GEF*T1");
         private static readonly Brand_Id                    Fast       = Brand_Id.                  Parse("fast-charge");
         private static readonly Brand_Id                    Green      = Brand_Id.                  Parse("green-charge");
+        private static readonly Brand_Id                    White      = Brand_Id.                  Parse("white-charge");
+
+        #endregion
+
+        #region FastBrand(), GreenBrand(), WhiteBrand()
+
+        // A brand is embedded in what it is a brand of: every level has its own, each a copy of its own.
+
+        private static Brand FastBrand()
+
+            => new (Fast,  new ImmutableI18NString(I18NString.Create(Languages.en, "Fast Charge")), Logo: URL.Parse("https://fast.example/logo.png"));
+
+        private static Brand GreenBrand()
+
+            => new (Green, new ImmutableI18NString(I18NString.Create(Languages.en, "Green Charge")));
+
+        private static Brand WhiteBrand()
+
+            => new (White, new ImmutableI18NString(I18NString.Create(Languages.en, "White Charge")));
 
         #endregion
 
@@ -83,25 +104,25 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                   Created,
-                    Brands:                    [ new Brand(Fast,  new ImmutableI18NString(I18NString.Create(Languages.en, "Fast Charge")),  Logo: URL.Parse("https://fast.example/logo.png")),
-                                                 new Brand(Green, new ImmutableI18NString(I18NString.Create(Languages.en, "Green Charge"))) ],
                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                              Created:          Created,
+                                                                             // A white label: the operator charges under this brand.
+                                                                             Brands:           [ WhiteBrand() ],
                                                                              ChargingTariffs:  [ new ChargingTariff(T1,
                                                                                                                     Currency.EUR,
                                                                                                                     [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.39m, StepSize: 1) ]) ],
                                                                                                                     EnergyMix:  NewEnergyMix("Tariff Green"),
                                                                                                                     Created:    Created) ],
                                                                              ChargingPools:    [ new ChargingPool(P1,
-                                                                                                                  BrandIds:          [ Green, Fast ],
+                                                                                                                  Brands:            [ GreenBrand(), FastBrand() ],
                                                                                                                   OpeningTimes:      NewOpeningTimes(),
                                                                                                                   EnergyMix:         NewEnergyMix("Pool Green"),
                                                                                                                   Created:           Created,
                                                                                                                   ChargingStations:  [ new ChargingStation(S1,
-                                                                                                                                                           BrandIds:      [ Fast ],
+                                                                                                                                                           Brands:        [ FastBrand() ],
                                                                                                                                                            OpeningTimes:  new ImmutableOpeningTimes(OpeningTimes.Open24Hours),
                                                                                                                                                            Created:       Created,
-                                                                                                                                                           EVSEs:         [ new EVSE(E1, BrandIds: [ Fast ], Created: Created) ]) ]) ]) ],
+                                                                                                                                                           EVSEs:         [ new EVSE(E1, Brands: [ FastBrand() ], Created: Created) ]) ]) ]) ],
                     ParkingOperators:          [ new ParkingOperator(ParkingOperator_Id.Parse("DE*PAR"),
                                                                      Created:         Created,
                                                                      ParkingGarages:  [ new ParkingGarage(ParkingGarage_Id.Parse("garage-1"),
@@ -133,7 +154,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             Assert.That(RoamingNetwork.TryParse(JObject.Parse(json.ToString()),  out var fromText, out var errorText),  Is.True, errorText);
             Assert.That(RoamingNetwork.TryParse(rn1.ToCBOR(),                    out var fromCBOR, out var errorCBOR),  Is.True, errorCBOR);
 
-            var pool = json["chargingStationOperators"]![0]!["chargingPools"]![0]!;
+            var cso  = json["chargingStationOperators"]![0]!;
+            var pool = cso["chargingPools"]![0]!;
 
             using (Assert.EnterMultipleScope())
             {
@@ -143,15 +165,20 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(fromCBOR!.ToJSON().ToString(),                                     Is.EqualTo(json.ToString()));
                 Assert.That(fromText.CalcETags(),                                              Is.EqualTo(rn1.CalcETags()));
 
-                Assert.That(json["brands"]!.Select(brand => brand["@id"]!.ToString()),          Is.EqualTo(new[] { "fast-charge", "green-charge" }));
-                Assert.That(pool["brandIds"]!.Values<String>(),                                Is.EqualTo(new[] { "fast-charge", "green-charge" }));
+                // Every level its own brands, embedded, in the order of their identifications; none of the network.
+                Assert.That(json["brands"],                                                     Is.Null);
+                Assert.That(cso ["brands"]!.Select(brand => brand["@id"]!.ToString()),          Is.EqualTo(new[] { "white-charge" }));
+                Assert.That(pool["brands"]!.Select(brand => brand["@id"]!.ToString()),          Is.EqualTo(new[] { "fast-charge", "green-charge" }));
+                Assert.That(pool["brandIds"],                                                   Is.Null);
                 Assert.That(pool["openingTimes"]!["24/7"]!.Value<Boolean>(),                    Is.False);
                 Assert.That(pool["openingTimes"]!["exceptionalClosings"]!.Single().ToString(),  Does.StartWith("2026-12-24T12:00:00.000Z"));
                 Assert.That(pool["energyMix"]!["environmentalImpacts"]!.Count(),                Is.Zero, "Unknown impacts are kept as [].");
                 Assert.That(pool["energyMix"]!["@context"],                                     Is.Null, "Embedded, without its context.");
 
-                Assert.That(fromJSON.TryGetBrandById(Fast, out var fast),                       Is.True);
+                var station = fromJSON.GetChargingStationOperatorById(GEF)!.ChargingPools.Single().ChargingStations.Single();
+                Assert.That(station.Brands.TryGet(Fast, out var fast),                          Is.True);
                 Assert.That(fast!.Logo?.ToString(),                                             Is.EqualTo("https://fast.example/logo.png"));
+                Assert.That(fromCBOR.GetChargingStationOperatorById(GEF)!.Brands.Single().Id,  Is.EqualTo(White));
 
                 var p1 = fromCBOR.GetChargingStationOperatorById(GEF)!.ChargingPools.Single();
                 Assert.That(p1.OpeningTimes!.RegularOpenings.Keys,                              Is.EquivalentTo(new[] { DayOfWeek.Monday, DayOfWeek.Friday }));
@@ -186,8 +213,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 => (JObject) Network["chargingStationOperators"]![0]!["chargingPools"]![0]!;
 
             var cases = new (String Name, JObject JSON, String Error)[] {
-                ("unknown brand",     Changed(network => Pool(network)["chargingStations"]![0]!["EVSEs"]![0]!["brandIds"] = new JArray("nobody")),  "brand 'nobody' of the EVSE 'DE*GEF*E1*1'"),
-                ("brand without name",Changed(network => ((JObject) network["brands"]![1]!).Remove("name")),                                     "needs its name"),
+                ("brand ids",         Changed(network => Pool(network)["chargingStations"]![0]!["EVSEs"]![0]!["brandIds"] = new JArray("fast-charge")), "must be given completely in 'brands', not by 'brandIds'"),
+                ("brand without name",Changed(network => ((JObject) Pool(network)["brands"]![1]!).Remove("name")),                               "needs its name"),
+                ("brand twice",       Changed(network => ((JArray) Pool(network)["brands"]!).Add(Pool(network)["brands"]![0]!.DeepClone())),      "The brand 'fast-charge' of the charging pool 'DE*GEF*P1' must not be given twice"),
                 ("24/7 and openings", Changed(network => Pool(network)["openingTimes"]!["24/7"] = true),                                          "opening times"),
                 ("unknown weekday",   Changed(network => Pool(network)["openingTimes"]!["regularOpenings"]![0]!["moonday"] = new JArray()),      "opening times"),
                 ("no supplier",       Changed(network => ((JObject) Pool(network)["energyMix"]!).Remove("supplierName")),                         "energy mix")
@@ -214,34 +242,47 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var rn1     = NewNetwork();
             var pool    = rn1.GetChargingStationOperatorById(GEF)!.ChargingPools.Single();
-            rn1.TryGetBrandById(Green, out var green);
             rn1.TryGetChargingTariffById(T1, out var t1);
 
-            var blue    = Brand_Id.Parse("blue-charge");
+            var blue    = new Brand(Brand_Id.Parse("blue-charge"), new ImmutableI18NString(I18NString.Create(Languages.en, "Blue Charge")));
 
+            ImmutableArray<POIElementPathSegment> BrandPath(String BrandId)
+                => [ new POIElementPathSegment("brands", BrandId) ];
+
+            // A brand of the pool added, one of its brands changed, and the operator charging under one more brand.
             var rn2     = Apply(rn1,
-                                RoamingNetworkChange.Add           (new Brand(blue, new ImmutableI18NString(I18NString.Create(Languages.en, "Blue Charge")))),
-                                RoamingNetworkChange.UpdateProperty(green!, "homepage",      null, "https://green.example"),
-                                RoamingNetworkChange.UpdateProperty(pool,   "brandIds",      null, new JArray("blue-charge")),
-                                RoamingNetworkChange.UpdateProperty(pool,   "openingTimes",  null, OpeningTimes.Open24Hours.ToJSON()),
-                                RoamingNetworkChange.RemoveProperty(t1!,    "energyMix"));
+                                RoamingNetworkChange.AddElement           (nameof(ChargingPool),            P1. ToString(), BrandPath("blue-charge"), blue.ToJSON()),
+                                RoamingNetworkChange.UpdateElementProperty(nameof(ChargingPool),            P1. ToString(), BrandPath("fast-charge"), "homepage", null, "https://fast.example"),
+                                RoamingNetworkChange.AddElement           (nameof(ChargingStationOperator), GEF.ToString(), BrandPath("blue-charge"), blue.ToJSON()),
+                                RoamingNetworkChange.UpdateProperty       (pool,   "openingTimes",  null, OpeningTimes.Open24Hours.ToJSON()),
+                                RoamingNetworkChange.RemoveProperty       (t1!,    "energyMix"));
 
-            var pool2   = rn2.GetChargingStationOperatorById(GEF)!.ChargingPools.Single();
+            var cso2    = rn2.GetChargingStationOperatorById(GEF)!;
+            var pool2   = cso2.ChargingPools.Single();
+            var station = pool2.ChargingStations.Single();
             rn2.TryGetChargingTariffById(T1, out var changedT1);
-            rn2.TryGetBrandById(Green, out var changedGreen);
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(rn2.Brands.Select(brand => brand.Id.ToString()).Order(),  Is.EqualTo(new[] { "blue-charge", "fast-charge", "green-charge" }));
-                Assert.That(changedGreen!.Homepage?.ToString(),                       Is.EqualTo("https://green.example"));
-                Assert.That(pool2.BrandIds,                                           Is.EqualTo(new[] { blue }));
+                Assert.That(pool2.Brands.Select(brand => brand.Id.ToString()),        Is.EqualTo(new[] { "blue-charge", "fast-charge", "green-charge" }));
+                Assert.That(pool2.Brands.TryGet(Fast, out var poolFast),              Is.True);
+                Assert.That(poolFast!.Homepage?.ToString(),                           Is.EqualTo("https://fast.example"));
                 Assert.That(pool2.OpeningTimes!.IsOpen24Hours,                        Is.True);
                 Assert.That(changedT1!.EnergyMix,                                     Is.Null);
 
-                // A brand still named can not be removed.
-                Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(Fast)),
-                            Throws.ArgumentException.With.Message.Contains("brand 'fast-charge' of the charging station 'DE*GEF*S1'"));
+                Assert.That(cso2.Brands.Select(brand => brand.Id.ToString()),         Is.EqualTo(new[] { "blue-charge", "white-charge" }));
+
+                // The levels are not mixed: the brand of the same name of its station is the station's own, unchanged.
+                Assert.That(station.Brands.TryGet(Fast, out var stationFast),        Is.True);
+                Assert.That(stationFast!.Homepage,                                    Is.Null);
+                Assert.That(station.Brands.Count,                                     Is.EqualTo(1));
+
+                // A brand of the pool removed is no brand of the pool, and still one of its station.
+                var rn3     = Apply(rn2, RoamingNetworkChange.RemoveElement(nameof(ChargingPool), P1.ToString(), BrandPath("fast-charge")));
+                var pool3   = rn3.GetChargingStationOperatorById(GEF)!.ChargingPools.Single();
+                Assert.That(pool3.Brands.Select(brand => brand.Id.ToString()),        Is.EqualTo(new[] { "blue-charge", "green-charge" }));
+                Assert.That(pool3.ChargingStations.Single().Brands.Single().Id,       Is.EqualTo(Fast));
 
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(pool2, "openingTimes", null, new JObject(new JProperty("open", true)))),
                             Throws.ArgumentException.With.Message.Contains("opening times"));
@@ -251,6 +292,55 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         }
 
         #endregion
+
+        #region Concurrent_brand_changes_of_a_level_are_merged_brand_by_brand()
+
+        /// <summary>
+        /// Two change sets prepared against the same version, each adding another brand to the same charging pool,
+        /// and one adding a brand to its charging station: merged brand by brand, the levels kept apart.
+        /// </summary>
+        [Test]
+        public void Concurrent_brand_changes_of_a_level_are_merged_brand_by_brand()
+        {
+
+            var rn1       = NewNetwork();
+
+            Brand Named(String Id)
+                => new (Brand_Id.Parse(Id), new ImmutableI18NString(I18NString.Create(Languages.en, Id)));
+
+            ImmutableArray<POIElementPathSegment> BrandPath(String BrandId)
+                => [ new POIElementPathSegment("brands", BrandId) ];
+
+            var blueOfPool     = rn1.CreateSignedChangeSet([ RoamingNetworkChange.AddElement(nameof(ChargingPool),    P1.ToString(), BrandPath("blue-charge"), Named("blue-charge").ToJSON()) ], CreatedAt: T0);
+            var redOfPool      = rn1.CreateSignedChangeSet([ RoamingNetworkChange.AddElement(nameof(ChargingPool),    P1.ToString(), BrandPath("red-charge"),  Named("red-charge"). ToJSON()) ], CreatedAt: T0);
+            var blueOfStation  = rn1.CreateSignedChangeSet([ RoamingNetworkChange.AddElement(nameof(ChargingStation), S1.ToString(), BrandPath("blue-charge"), Named("blue-charge").ToJSON()) ], CreatedAt: T0);
+
+            var rn2       = rn1.ApplyChangeSet(blueOfPool);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn2.TryRebase(redOfPool,     out var rebasedRed,     out var redError),      Is.True, redError);
+                var rn3 = rn2.ApplyChangeSet(rebasedRed!.SignedByAll(rn2));
+
+                Assert.That(rn3.TryRebase(blueOfStation, out var rebasedStation, out var stationError),  Is.True, stationError);
+                var rn4 = rn3.ApplyChangeSet(rebasedStation!.SignedByAll(rn3));
+
+                var pool = rn4.GetChargingStationOperatorById(GEF)!.ChargingPools.Single();
+
+                Assert.That(pool.Brands.Select(brand => brand.Id.ToString()),                          Is.EqualTo(new[] { "blue-charge", "fast-charge", "green-charge", "red-charge" }));
+                Assert.That(pool.ChargingStations.Single().Brands.Select(brand => brand.Id.ToString()), Is.EqualTo(new[] { "blue-charge", "fast-charge" }));
+
+                // The same brand added twice to the same level does conflict.
+                Assert.That(rn3.TryRebase(blueOfPool, out _, out var twiceError),  Is.False);
+                Assert.That(twiceError,                                            Does.Contain("'brands['blue-charge']' already exists"));
+
+            }
+
+        }
+
+        #endregion
+
 
     }
 

@@ -5,8 +5,8 @@ times, access, parking, payment and authentication, energy mix, images, and wher
 It corresponds to a location in OCPI.
 
 It is embedded completely in its [ChargingStationOperator](ChargingStationOperator.md) under `chargingPools`, in the
-ordinal order of the identifications, and itself embeds its charging stations (with their EVSEs) and its own energy
-meters, and names its grid connection point. It belongs to the operator its identification names, and only that operator
+ordinal order of the identifications, and itself embeds its charging stations (with their EVSEs), its own energy
+meters and its own brands, and names its grid connection point. It belongs to the operator its identification names, and only that operator
 changes it, with one of its signing keys.
 
 Its identification is the operator's identification, `*P` and a suffix, e.g. `DE*GEF*P1`, unique within the operator.
@@ -19,7 +19,7 @@ Its identification is the operator's identification, `*P` and a suffix, e.g. `DE
 | Status | `ChargingPoolStatusType`, initially `Available` |
 | Embedded in | [ChargingStationOperator](ChargingStationOperator.md) as `chargingPools` |
 | Owner | the charging station operator its identification names (a signing key) |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands/{Brand_Id}` |
 
 
 ## Common properties
@@ -54,7 +54,7 @@ All optional; absent values and empty arrays are not written.
 | `gridConnectionPointId` | `GridConnectionPointId` | `GridConnectionPoint_Id?` | update/remove | Where it is connected to the public grid: a grid connection point of a grid operator of the network, see [Grid connection point](#grid-connection-point). |
 | `energyMeters` | `EnergyMeters` | `ImmutableArray<EnergyMeter>` | update/remove | Its own energy meters, see [Energy meters](#energy-meters). |
 | `chargingStations` | `ChargingStations` | `POICollection<ChargingStation_Id, ChargingStation>` | add/remove | Its [charging stations](#charging-stations). |
-| `brandIds` | `BrandIds` | `ImmutableArray<Brand_Id>` | update/remove | The brands it is offered under, brands of the roaming network; ordinal order, each once. |
+| `brands` | `Brands` | `POICollection<Brand_Id, Brand>` | update/remove | The [brands](Brand.md) it also appears under, its own, embedded completely; not those of its operator, stations or EVSEs. Ordered by `@id`, each once; changed as a whole or [brand by brand](Brand.md#change-sets). |
 | `openingTimes` | `OpeningTimes` | `ImmutableOpeningTimes?` | update/remove | When it is open, see [Opening times](#opening-times); always, unless given. |
 | `energyMix` | `EnergyMix` | `EnergyMix?` | update/remove | The mix of the energy it delivers, see [Energy mix](#energy-mix). |
 | `images` | `Images` | `ImmutableArray<Image>` | update/remove | See [Images](#images). |
@@ -138,11 +138,11 @@ A type only once, in the ordinal order of the types. Source: [AuthenticationMode
 |---|---|---|
 | `type` | text | Mandatory, without surrounding whitespace: `Free Charging`, `RFID`, `PINPAD`, `ISO/IEC 15118 PLC`, `ISO/IEC 15118 Over-the-Air`, `REMOTE`, `CreditCard`, `DebitCard`, `PrepaidCard`, `NFC`, `Bluetooth`, `WLAN`, `No authentication required`, `DirectPayment`, `SMS`, `PhoneCall`, or another name. |
 | `cardTypes` | array of texts | RFID only: the card types it reads, `MifareClassic`, `MifareDESFire`, `Calypso`; ordinal order, each once. |
-| `brandIds` | array of texts | RFID only: the brands of the roaming network whose cards it takes; ordinal order, each once; must exist in the network. |
+| `brands` | array of objects | RFID only: the [brands](Brand.md) whose cards it takes, its own, embedded completely; ordered by `@id`, each once. `brandIds` is refused. |
 | `number` | text | Mandatory for `SMS` and `PhoneCall`, the number to send an SMS to or to call; refused for other types. |
 | `stationCode` | text | `SMS` only: the code of the station to send. |
 
-C#: `AuthenticationMode.RFID(cardTypes, brandIds)`, `AuthenticationMode.SMS(number, stationCode)`,
+C#: `AuthenticationMode.RFID(cardTypes, brands)`, `AuthenticationMode.SMS(number, stationCode)`,
 `AuthenticationMode.PhoneCall(number)`, and static instances for the others, e.g. `AuthenticationMode.CreditCard`.
 
 
@@ -243,13 +243,13 @@ Events: `OnAdminStatusChanged` (`OnChargingPoolAdminStatusChangedDelegate`) and 
   meters of grid connection points, stations and EVSEs).
 - **Grid connection point:** `gridConnectionPointId` names a grid connection point of the roaming network;
   an embedded `gridConnectionPoint` is refused.
-- **Collections:** no null entry and nothing twice in `dataLicenses`, `brandIds`, `facilities`, `paymentOptions`,
+- **Collections:** no null entry and nothing twice in `dataLicenses`, `brands`, `facilities`, `paymentOptions`,
   `uiFeatures`, `features`, `locationLanguages`, `parkingRestrictions`; `images` by URL; `authenticationModes` by
   type; `relatedLocations` by their JSON.
 - **Authentication modes:** card types and brands only for `RFID`; `number` exactly for `SMS` and `PhoneCall`;
   `stationCode` only for `SMS`.
-- **References within the network:** `brandIds` of the pool and of its RFID authentication modes are brands of the
-  roaming network; what its stations, EVSEs and energy meters name must exist, too.
+- **Brands:** given completely in `brands`, of the pool and of its RFID authentication modes; `brandIds` is refused.
+- **References within the network:** what its stations, EVSEs and energy meters name must exist.
 - **Removal:** a pool a charging pool group names, or whose stations or EVSEs a group names, can not be removed.
 - **Change sets:** `UpdateProperty`/`RemoveProperty` only of the properties marked above; a given parent must be the
   actual one. After every change, the whole operator is read again (`ChargingStationOperator.TryParse`), so all rules
