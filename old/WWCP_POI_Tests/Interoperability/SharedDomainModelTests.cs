@@ -121,7 +121,8 @@ public sealed class SharedDomainModelTests
             Assert.That(restored.ToCanonicalCBOR(), Is.EqualTo(source.ToCanonicalCBOR()));
             Assert.That(restored.Revision, Is.EqualTo(source.Revision));
             AssertShared(restored);
-            Assert.That(restored.TransparencySoftwareCertificates.Single().NotBefore!.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(1234567));
+            // Certificates are valid to the millisecond: .1234567 becomes .123.
+            Assert.That(restored.TransparencySoftwareCertificates.Single().NotBefore!.Value.Ticks % TimeSpan.TicksPerSecond, Is.EqualTo(1230000));
             Assert.That(restored.ParkingOperators.Single().GetAvailableParkingProducts(ParkingSpace_Id.Parse("space-1"))
                 .Select(product => product.Id.ToString()), Is.EqualTo(new[] { "long-stay", "short-stay" }));
             Assert.That(restored.GridOperators.Single().Status.Value == GridOperatorStatusType.Offline, Is.EqualTo(runtime));
@@ -214,7 +215,7 @@ public sealed class SharedDomainModelTests
         Assert.That(software, Is.Not.EqualTo(TransparencySoftware_Id.Parse(Software2.ToUpperInvariant())));
         Assert.That(TransparencySoftwareCertificate_Id.Parse(Certificate42), Is.Not.EqualTo(TransparencySoftwareCertificate_Id.Parse(Certificate42.ToUpperInvariant())));
         var ids = new List<TransparencySoftware_Id> { software };
-        var certificate = new TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id.Parse("new-document"), "Issuer", "Model", "Version", ids);
+        var certificate = new TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id.Parse("new-document"), "Issuer", ChargingStationModel_Id.Parse("Model"), "Version", ids);
         var json = certificate.ToJSON().ToString();
         ids.Clear();
         Assert.That(certificate.VerifiedTransparencySoftwareIds, Is.EqualTo(new[] { software }));
