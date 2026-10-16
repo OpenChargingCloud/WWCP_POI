@@ -55,6 +55,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The energy status of an EVSE changed.
     /// </summary>
+    /// <summary>
+    /// A delegate called whenever the price status of an EVSE changed.
+    /// </summary>
+    public delegate Task OnEVSEPriceStatusChangedDelegate(DateTimeOffset                Timestamp,
+                                                          EventTracking_Id              EventTrackingId,
+                                                          EVSE                          EVSE,
+                                                          Timestamped<ChargingPrices>   OldPriceStatus,
+                                                          Timestamped<ChargingPrices>   NewPriceStatus,
+                                                          Context?                      DataSource);
+
     public delegate Task OnEVSEEnergyStatusChangedDelegate(DateTimeOffset            Timestamp,
                                                         EventTracking_Id          EventTrackingId,
                                                         EVSE                      EVSE,
@@ -275,6 +285,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ExtendedOperationTimeout  = ExtendedOperationTimeout;
             this.Standards                 = POIJSON.OrderedIds(Standards, $"standard of the EVSE '{Id}'");
             this.energyStatus        = new EnergyStatusRuntime(RaiseEnergyStatusChanged);
+            this.priceStatus         = new PriceStatusRuntime (RaisePriceStatusChanged);
 
         }
 
@@ -331,6 +342,67 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region Price status
+
+        private readonly PriceStatusRuntime                priceStatus;
+        private          OnEVSEPriceStatusChangedDelegate?  onPriceStatusChanged;
+
+        /// <summary>
+        /// The current price status: the new prices of charging tariffs of its operator, e.g. ad hoc prices following
+        /// the electricity market; runtime data like the admin status and the status, unless none was reported yet.
+        /// </summary>
+        public Timestamped<ChargingPrices>?  PriceStatus
+            => priceStatus.Current;
+
+        /// <summary>
+        /// The next planned price status.
+        /// </summary>
+        internal Timestamped<ChargingPrices>?  NextPriceStatus
+            => priceStatus.Next;
+
+        /// <summary>
+        /// Set the price status, since the given timestamp or now; a later timestamp plans it.
+        /// </summary>
+        /// <param name="PriceStatus">The new prices of charging tariffs of its operator.</param>
+        /// <param name="Timestamp">Since when; now, unless given.</param>
+        /// <param name="DataSource">An optional source.</param>
+        public void SetPriceStatus(ChargingPrices   PriceStatus,
+                                   DateTimeOffset?  Timestamp    = null,
+                                   Context?         DataSource   = null)
+
+            => priceStatus.Set(PriceStatus, Timestamp ?? org.GraphDefined.Vanaheimr.Illias.Timestamp.Now, DataSource);
+
+        /// <summary>
+        /// Take the given price status as it is, also when it repeats the one before.
+        /// </summary>
+        internal void TakePriceStatus(ChargingPrices  PriceStatus,
+                                      DateTimeOffset  Timestamp,
+                                      Context?        DataSource)
+
+            => priceStatus.Take(PriceStatus, Timestamp, DataSource);
+
+        /// <summary>
+        /// An event fired whenever the price status changed.
+        /// </summary>
+        public event OnEVSEPriceStatusChangedDelegate? OnPriceStatusChanged
+        {
+            add    { lock (statusEventsLock) { onPriceStatusChanged += value; priceStatus.Listen(onPriceStatusChanged is not null); } }
+            remove { lock (statusEventsLock) { onPriceStatusChanged -= value; priceStatus.Listen(onPriceStatusChanged is not null); } }
+        }
+
+        private async Task RaisePriceStatusChanged(DateTimeOffset               Timestamp,
+                                                   EventTracking_Id             EventTrackingId,
+                                                   Timestamped<ChargingPrices>  NewPriceStatus,
+                                                   Timestamped<ChargingPrices>  OldPriceStatus,
+                                                   Context?                     DataSource)
+        {
+            var onPriceStatusChanged = this.onPriceStatusChanged;
+            if (onPriceStatusChanged is not null)
+                await onPriceStatusChanged(Timestamp, EventTrackingId, this, OldPriceStatus, NewPriceStatus, DataSource);
+        }
+
+        #endregion
 
         #region Energy status
 
@@ -395,7 +467,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         protected override void ShareFurtherRuntimeOf(AImmutableEMobilityEntity<EVSE_Id, EVSEAdminStatusType, EVSEStatusType> Previous)
         {
             if (Previous is EVSE previousEVSE)
+            {
                 energyStatus.ShareOf(previousEVSE.energyStatus);
+                priceStatus. ShareOf(previousEVSE.priceStatus);
+            }
         }
 
         #endregion

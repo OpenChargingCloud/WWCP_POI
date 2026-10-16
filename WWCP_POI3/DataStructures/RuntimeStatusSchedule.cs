@@ -29,7 +29,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The operational schedule being updated.
     /// </summary>
-    public enum POIRuntimeStatusKind { Status, AdminStatus, EnergyStatus }
+    public enum POIRuntimeStatusKind { Status, AdminStatus, EnergyStatus, PriceStatus }
 
     /// <summary>
     /// Insert a status entry or explicitly replace its entire history with one entry.

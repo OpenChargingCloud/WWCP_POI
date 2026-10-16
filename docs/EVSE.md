@@ -178,6 +178,33 @@ In a history, it is set and read by `history.RuntimeStatus` with the kind `energ
 `EVSE`, and pushed on the WebSocket topic `energyStatusUpdates`.
 
 
+## Price status
+
+An EVSE has a price status beside its admin status and status: new prices of charging tariffs of its operator at
+runtime, e.g. ad hoc prices following the electricity market, without a commit; runtime data, not content, without
+ETags, shared by all versions of the EVSE. There is none until one is reported.
+
+| JSON key | Type | Description |
+|---|---|---|
+| `prices` | array | Mandatory, possibly empty: `{chargingTariffId, elements}`, each charging tariff of the operator at most once. Its `elements` (as those of a [charging tariff](ChargingTariff.md#elements), at least one) replace those of the tariff; the currency is the tariff's. No prices: the tariffs apply as they are. |
+
+Other keys are refused ([`ChargingPrices`](../WWCP_POI3/DataStructures/POIPriceStatus.cs)); so is a tariff the
+operator does not have. Its text, e.g. in status updates, is this JSON, compact, the prices in the order of their
+tariffs. The schedule ([`PriceStatusRuntime`](../WWCP_POI3/DataStructures/PriceStatusRuntime.cs)) keeps the last ten
+entries; a later timestamp plans a price status, and `OnStatusPlanned` tells of it.
+
+- `PriceStatus`: the current `Timestamped<ChargingPrices>?`, `null` before the first one.
+- `SetPriceStatus(priceStatus, timestamp?, dataSource?)`: since the given timestamp or now; a later timestamp
+  plans it. A value repeating the one in effect before it is ignored.
+- `OnPriceStatusChanged`: `(timestamp, eventTrackingId, evse, oldPriceStatus, newPriceStatus, dataSource)`.
+- `ChargingPrices.Effective(chargingPool, chargingStation, evse)`: the prices in effect at an EVSE: for every
+  charging tariff, those of the most specific price status naming it, the EVSE's before its station's before its
+  pool's.
+
+In a history, it is set and read by `history.RuntimeStatus` with the kind `priceStatus` and the entity type
+`EVSE`, and pushed on the WebSocket topic `priceStatusUpdates`.
+
+
 ## Runtime status
 
 See [runtime status](README.md#runtime-status) for the mechanism.

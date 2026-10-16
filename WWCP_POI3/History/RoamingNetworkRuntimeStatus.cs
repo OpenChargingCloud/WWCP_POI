@@ -276,6 +276,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return POIStatusUpdateResult.Refused;
             }
 
+            if (Kind == POIRuntimeStatusKind.PriceStatus &&
+                EntityType is not (nameof(EVSE) or nameof(ChargingStation) or nameof(ChargingPool)))
+            {
+                ErrorResponse = $"The entity type '{EntityType}' has no price status!";
+                return POIStatusUpdateResult.Refused;
+            }
+
             switch (EntityType)
             {
 
@@ -653,6 +660,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return Unknown(EntityType, EntityId, out ErrorResponse);
                     }
 
+                    if (Kind == POIRuntimeStatusKind.PriceStatus)
+                    {
+
+                        if (PriceError(Value, chargingPoolOperator, out var chargingPoolPriceError))
+                        {
+                            ErrorResponse = chargingPoolPriceError;
+                            return POIStatusUpdateResult.Refused;
+                        }
+
+                        result = Set<ChargingPrices>(Value, TryParsePrices,
+                                                     () => chargingPool.PriceStatus,
+                                                     (priceStatus, timestamp) => chargingPool.SetPriceStatus (priceStatus, timestamp, context),
+                                                     (priceStatus, timestamp) => chargingPool.TakePriceStatus(priceStatus, timestamp, context),
+                                                     Authoritative, at, out normalized, out oldTimestamp, out oldValue,
+                                                     ChargingPrices.ToText);
+                        break;
+
+                    }
+
                     result = Kind == POIRuntimeStatusKind.AdminStatus
 
                                  ? Set<ChargingPoolAdminStatusType>(Value, ChargingPoolAdminStatusType.TryParse,
@@ -675,6 +701,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         !chargingStationOwner.TryGetChargingStation(chargingStationId, out var chargingStation))
                     {
                         return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    if (Kind == POIRuntimeStatusKind.PriceStatus)
+                    {
+
+                        if (PriceError(Value, chargingStationOwner, out var chargingStationPriceError))
+                        {
+                            ErrorResponse = chargingStationPriceError;
+                            return POIStatusUpdateResult.Refused;
+                        }
+
+                        result = Set<ChargingPrices>(Value, TryParsePrices,
+                                                     () => chargingStation.PriceStatus,
+                                                     (priceStatus, timestamp) => chargingStation.SetPriceStatus (priceStatus, timestamp, context),
+                                                     (priceStatus, timestamp) => chargingStation.TakePriceStatus(priceStatus, timestamp, context),
+                                                     Authoritative, at, out normalized, out oldTimestamp, out oldValue,
+                                                     ChargingPrices.ToText);
+                        break;
+
                     }
 
                     if (Kind == POIRuntimeStatusKind.EnergyStatus)
@@ -718,6 +763,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         !evseOperator.TryGetEVSE(evseId, out var evse))
                     {
                         return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    if (Kind == POIRuntimeStatusKind.PriceStatus)
+                    {
+
+                        if (PriceError(Value, evseOperator, out var evsePriceError))
+                        {
+                            ErrorResponse = evsePriceError;
+                            return POIStatusUpdateResult.Refused;
+                        }
+
+                        result = Set<ChargingPrices>(Value, TryParsePrices,
+                                                     () => evse.PriceStatus,
+                                                     (priceStatus, timestamp) => evse.SetPriceStatus (priceStatus, timestamp, context),
+                                                     (priceStatus, timestamp) => evse.TakePriceStatus(priceStatus, timestamp, context),
+                                                     Authoritative, at, out normalized, out oldTimestamp, out oldValue,
+                                                     ChargingPrices.ToText);
+                        break;
+
                     }
 
                     if (Kind == POIRuntimeStatusKind.EnergyStatus)
@@ -930,6 +994,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     {
                         Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingPool),    chargingPool.Id.ToString(),    chargingPool.CurrentAdminStatus);
                         Add(statuses, POIRuntimeStatusKind.Status,      nameof(ChargingPool),    chargingPool.Id.ToString(),    chargingPool.CurrentStatus);
+                        Add(statuses, POIRuntimeStatusKind.PriceStatus, nameof(ChargingPool),    chargingPool.Id.ToString(),    chargingPool.PriceStatus, ChargingPrices.ToText);
                     }
 
                     foreach (var chargingStation in chargingStationOperator.ChargingStations)
@@ -937,6 +1002,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingStation), chargingStation.Id.ToString(), chargingStation.CurrentAdminStatus);
                         Add(statuses, POIRuntimeStatusKind.Status,      nameof(ChargingStation), chargingStation.Id.ToString(), chargingStation.CurrentStatus);
                         Add(statuses, POIRuntimeStatusKind.EnergyStatus, nameof(ChargingStation), chargingStation.Id.ToString(), chargingStation.EnergyStatus, POIEnergyStatus.ToText);
+                        Add(statuses, POIRuntimeStatusKind.PriceStatus,  nameof(ChargingStation), chargingStation.Id.ToString(), chargingStation.PriceStatus,  ChargingPrices.ToText);
                     }
 
                     foreach (var evse in chargingStationOperator.EVSEs)
@@ -944,6 +1010,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(EVSE),            evse.Id.ToString(),            evse.CurrentAdminStatus);
                         Add(statuses, POIRuntimeStatusKind.Status,      nameof(EVSE),            evse.Id.ToString(),            evse.CurrentStatus);
                         Add(statuses, POIRuntimeStatusKind.EnergyStatus, nameof(EVSE),           evse.Id.ToString(),            evse.EnergyStatus, POIEnergyStatus.ToText);
+                        Add(statuses, POIRuntimeStatusKind.PriceStatus,  nameof(EVSE),           evse.Id.ToString(),            evse.PriceStatus,  ChargingPrices.ToText);
                     }
 
                 }
@@ -1558,12 +1625,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return Task.CompletedTask;
             };
 
+            OnChargingPoolPriceStatusChangedDelegate onPriceStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.PriceStatus, nameof(ChargingPool), entity.Id.ToString(), newStatus, oldStatus, dataSource, ChargingPrices.ToText);
+                return Task.CompletedTask;
+            };
+
             Entity.OnAdminStatusChanged  += onAdminStatusChanged;
             Entity.OnStatusChanged       += onStatusChanged;
+            Entity.OnPriceStatusChanged  += onPriceStatusChanged;
 
             return () => {
                 Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
                 Entity.OnStatusChanged       -= onStatusChanged;
+                Entity.OnPriceStatusChanged  -= onPriceStatusChanged;
             };
 
         }
@@ -1590,14 +1664,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return Task.CompletedTask;
             };
 
+            OnChargingStationPriceStatusChangedDelegate onPriceStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.PriceStatus, nameof(ChargingStation), entity.Id.ToString(), newStatus, oldStatus, dataSource, ChargingPrices.ToText);
+                return Task.CompletedTask;
+            };
+
             Entity.OnAdminStatusChanged   += onAdminStatusChanged;
             Entity.OnStatusChanged        += onStatusChanged;
             Entity.OnEnergyStatusChanged  += onEnergyStatusChanged;
+            Entity.OnPriceStatusChanged   += onPriceStatusChanged;
 
             return () => {
                 Entity.OnAdminStatusChanged   -= onAdminStatusChanged;
                 Entity.OnStatusChanged        -= onStatusChanged;
                 Entity.OnEnergyStatusChanged  -= onEnergyStatusChanged;
+                Entity.OnPriceStatusChanged   -= onPriceStatusChanged;
             };
 
         }
@@ -1624,14 +1705,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return Task.CompletedTask;
             };
 
+            OnEVSEPriceStatusChangedDelegate onPriceStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.PriceStatus, nameof(EVSE), entity.Id.ToString(), newStatus, oldStatus, dataSource, ChargingPrices.ToText);
+                return Task.CompletedTask;
+            };
+
             Entity.OnAdminStatusChanged   += onAdminStatusChanged;
             Entity.OnStatusChanged        += onStatusChanged;
             Entity.OnEnergyStatusChanged  += onEnergyStatusChanged;
+            Entity.OnPriceStatusChanged   += onPriceStatusChanged;
 
             return () => {
                 Entity.OnAdminStatusChanged   -= onAdminStatusChanged;
                 Entity.OnStatusChanged        -= onStatusChanged;
                 Entity.OnEnergyStatusChanged  -= onEnergyStatusChanged;
+                Entity.OnPriceStatusChanged   -= onPriceStatusChanged;
             };
 
         }
@@ -1708,6 +1796,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (private static) TryParsePrices(Text, out Prices) / PriceError(Value, Operator, out ErrorResponse)
+
+        private static Boolean TryParsePrices(String Text, out ChargingPrices Prices)
+        {
+            var parsed = ChargingPrices.TryParseText(Text, out var prices);
+            Prices = prices!;
+            return parsed;
+        }
+
+        /// <summary>
+        /// Whether the given price status names a charging tariff the given operator does not have: the prices of a
+        /// charging pool, station or EVSE are those of tariffs of its operator.
+        /// </summary>
+        private static Boolean PriceError(String                                     Value,
+                                          ChargingStationOperator                    Operator,
+                                          [NotNullWhen(true)] out String?            ErrorResponse)
+        {
+
+            ErrorResponse = null;
+
+            if (!ChargingPrices.TryParseText(Value, out var prices))
+                return false;
+
+            foreach (var price in prices.Prices)
+                if (!Operator.ChargingTariffs.Any(tariff => tariff.Id == price.ChargingTariffId))
+                {
+                    ErrorResponse = $"The charging tariff '{price.ChargingTariffId}' of the price status is no tariff of the charging station operator '{Operator.Id}'!";
+                    return true;
+                }
+
+            return false;
+
+        }
+
+        #endregion
+
         #region (private) RaisePlanned(StatusUpdate)
 
         /// <summary>
@@ -1746,9 +1870,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                chargingStationOperator.NextAdminStatus?.Timestamp,
                                chargingStationOperator.NextStatus?.     Timestamp
                            }.
-                           Concat(chargingStationOperator.ChargingPools.   SelectMany(chargingPool    => new[] { chargingPool.   NextAdminStatus?.Timestamp, chargingPool.   NextStatus?.Timestamp })).
-                           Concat(chargingStationOperator.ChargingStations.SelectMany(chargingStation => new[] { chargingStation.NextAdminStatus?.Timestamp, chargingStation.NextStatus?.Timestamp, chargingStation.NextEnergyStatus?.Timestamp })).
-                           Concat(chargingStationOperator.EVSEs.           SelectMany(evse            => new[] { evse.           NextAdminStatus?.Timestamp, evse.           NextStatus?.Timestamp, evse.           NextEnergyStatus?.Timestamp })))).
+                           Concat(chargingStationOperator.ChargingPools.   SelectMany(chargingPool    => new[] { chargingPool.   NextAdminStatus?.Timestamp, chargingPool.   NextStatus?.Timestamp, chargingPool.   NextPriceStatus?.Timestamp })).
+                           Concat(chargingStationOperator.ChargingStations.SelectMany(chargingStation => new[] { chargingStation.NextAdminStatus?.Timestamp, chargingStation.NextStatus?.Timestamp, chargingStation.NextEnergyStatus?.Timestamp, chargingStation.NextPriceStatus?.Timestamp })).
+                           Concat(chargingStationOperator.EVSEs.           SelectMany(evse            => new[] { evse.           NextAdminStatus?.Timestamp, evse.           NextStatus?.Timestamp, evse.           NextEnergyStatus?.Timestamp, evse.           NextPriceStatus?.Timestamp })))).
                            Concat(network.EMobilityProviders.SelectMany(eMobilityProvider => new[] { eMobilityProvider.NextAdminStatus?.Timestamp, eMobilityProvider.NextStatus?.Timestamp })).
                            Concat(network.GridOperators.SelectMany(gridOperator => new[] { gridOperator.NextAdminStatus?.Timestamp, gridOperator.NextStatus?.Timestamp })).
                            Concat(network.EnergyMeters.SelectMany(energyMeter => new[] { energyMeter.NextAdminStatus?.Timestamp, energyMeter.NextStatus?.Timestamp })).
@@ -1903,6 +2027,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     {
                         _ = chargingPool.AdminStatus;
                         _ = chargingPool.Status;
+                        _ = chargingPool.PriceStatus;
                     }
 
                     foreach (var chargingStation in chargingStationOperator.ChargingStations)
@@ -1910,6 +2035,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         _ = chargingStation.AdminStatus;
                         _ = chargingStation.Status;
                         _ = chargingStation.EnergyStatus;
+                        _ = chargingStation.PriceStatus;
                     }
 
                     foreach (var evse in chargingStationOperator.EVSEs)
@@ -1917,6 +2043,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         _ = evse.AdminStatus;
                         _ = evse.Status;
                         _ = evse.EnergyStatus;
+                        _ = evse.PriceStatus;
                     }
 
                 }

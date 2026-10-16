@@ -159,6 +159,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Kind == POIRuntimeStatusKind.EnergyStatus && POIEnergyStatus.TryParseText(Value, out var energyStatus))
                 return POIEnergyStatus.ToJSON(energyStatus);
 
+            if (Kind == POIRuntimeStatusKind.PriceStatus && ChargingPrices.TryParseText(Value, out var priceStatus))
+                return priceStatus.ToJSON();
+
             return Value;
 
         }
@@ -191,6 +194,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            if (Kind == POIRuntimeStatusKind.PriceStatus)
+            {
+
+                if (!ChargingPrices.TryParse(JSON, out var priceStatus, out ErrorResponse))
+                    return false;
+
+                Value = priceStatus.Text;
+                return true;
+
+            }
+
             if (JSON?.Type != JTokenType.String || String.IsNullOrWhiteSpace(JSON.Value<String>()))
             {
                 ErrorResponse = $"Missing or invalid {Description}!";
@@ -215,6 +229,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => Kind switch {
                    POIRuntimeStatusKind.AdminStatus   => "adminStatus",
                    POIRuntimeStatusKind.EnergyStatus  => "energyStatus",
+                   POIRuntimeStatusKind.PriceStatus   => "priceStatus",
                    _                                  => "status"
                };
 
@@ -238,6 +253,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 case "energyStatus":
                     Kind = POIRuntimeStatusKind.EnergyStatus;
+                    return true;
+
+                case "priceStatus":
+                    Kind = POIRuntimeStatusKind.PriceStatus;
                     return true;
 
                 case "status":

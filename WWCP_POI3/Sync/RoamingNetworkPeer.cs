@@ -333,6 +333,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region SetPriceStatusAsync(EntityType, EntityId, PriceStatus, Timestamp = null, DataSource = null, CancellationToken = default)
+
+        /// <summary>
+        /// Set the price status of a charging pool, charging station or EVSE at the leader; it comes back as a price status update.
+        /// </summary>
+        /// <returns>The answer of the leader: { result, description?, current? }.</returns>
+        public Task<JObject> SetPriceStatusAsync(String             EntityType,
+                                                 String             EntityId,
+                                                 ChargingPrices     PriceStatus,
+                                                 DateTimeOffset?    Timestamp           = null,
+                                                 String?            DataSource          = null,
+                                                 CancellationToken  CancellationToken   = default)
+
+            => SetStatusAsync(POIRuntimeStatusKind.PriceStatus,
+                              EntityType,
+                              EntityId,
+                              PriceStatus.Text,
+                              Timestamp,
+                              DataSource,
+                              CancellationToken);
+
+        #endregion
+
         #region SetEnergyStatusAsync(EntityType, EntityId, EnergyStatus, Timestamp = null, DataSource = null, CancellationToken = default)
 
         /// <summary>
@@ -486,6 +509,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 topics.Add(POI_API.AdminStatusUpdatesTopic);
                 topics.Add(POI_API.StatusUpdatesTopic);
                 topics.Add(POI_API.EnergyStatusUpdatesTopic);
+                topics.Add(POI_API.PriceStatusUpdatesTopic);
             }
 
             await Expect(Connection, "subscribe", new JObject(new JProperty("topics", topics)), CancellationToken);
@@ -563,6 +587,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         case "statusUpdate":
                         case "adminStatusUpdate":
                         case "energyStatusUpdate":
+                        case "priceStatusUpdate":
                             TakeStatusUpdate(payload);
                             break;
 

@@ -167,6 +167,10 @@ parking product ids compare case-sensitively.
 - **Energy status:** EVSEs and charging stations also have an energy status, `{used, available, storedEnergy?}`
   in W, W and Wh, for EVSEs also `currentVoltage?` in V and `remainingChargingTime?` in s, kept the same way;
   there is none until one is reported. Its schedule keeps the last ten.
+- **Price status:** charging pools, charging stations and EVSEs also have a price status, `{prices: [{chargingTariffId,
+  elements}, …]}`: new prices of charging tariffs of their operator at runtime, e.g. ad hoc prices following the
+  electricity market, without a commit, kept the same way. For every tariff, the most specific one applies at an EVSE:
+  its own before its station's before its pool's (`ChargingPrices.Effective`).
 - **Keys:** the roaming network (for its operator, the RNO), charging station operators, e-mobility providers,
   grid operators and parking operators each name 1..n `signingKeys` (a grid operator not taking part none at all), short keys signing their change sets
   (e.g. secp256r1), and 1..n `identityKeys`, long-term keys signing changes of their identity keys (e.g. secp521r1):
@@ -491,7 +495,8 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   answers come when ready and are matched by their id. A connection's requests are cancelled when it closes.
 - **setStatus** `{kind, entityType, entityId, value, timestamp?, dataSource?}` → `{result, description?, current?}`,
   allowed as `AuthorizeStatusUpdate` decides (refused without it).
-  `kind` is `adminStatus`, `status` or `energyStatus`, whose `value` is an object `{used, available, storedEnergy?, currentVoltage?, remainingChargingTime?}`.
+  `kind` is `adminStatus`, `status`, `energyStatus`, whose `value` is an object `{used, available, storedEnergy?, currentVoltage?, remainingChargingTime?}`,
+  or `priceStatus`, whose `value` is an object `{prices: [{chargingTariffId, elements}, …]}`.
   Status updates come often, e.g. within a minute as the AFIR asks: send them as one batch.
 - **pushStatusUpdates** `{statusUpdates: […]}` → `{results: [{result, description?}, …]}`: status updates of
   another server, as the topics push them, up to `MaxBatchSize`, each allowed as `AuthorizeStatusPush` decides

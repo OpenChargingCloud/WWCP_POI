@@ -87,6 +87,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// energyStatusUpdates    energyStatusUpdate   the same, for the energy status of EVSEs and charging stations,
     ///                                             its value { used, available, storedEnergy?, currentVoltage?,
     ///                                             remainingChargingTime? } in W, W, Wh, V and s (the last two only of EVSEs)
+    /// priceStatusUpdates     priceStatusUpdate    the same, for the price status of charging pools, stations and EVSEs,
+    ///                                             its value { prices: [ { chargingTariffId, elements }, … ] }
     /// </remarks>
     public partial class POI_API : IAsyncDisposable
     {
@@ -127,6 +129,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The topic of energy status updates.
         /// </summary>
         public const String EnergyStatusUpdatesTopic  = "energyStatusUpdates";
+
+        /// <summary>
+        /// The topic of price status updates.
+        /// </summary>
+        public const String PriceStatusUpdatesTopic   = "priceStatusUpdates";
 
         private readonly ConcurrentDictionary<RoamingNetwork_Id, POIWebSocketServer>  historyWebSocketServers  = [];
         private readonly ConcurrentDictionary<RoamingNetwork_Id, Action>              historyDisconnects       = [];
@@ -489,6 +496,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                            "energyStatusUpdate",
                                                            "Every change of the energy status of EVSEs and charging stations: the power used and available, and the energy stored."));
 
+            webSocketServer.AddTopic(new POIWebSocketTopic(PriceStatusUpdatesTopic,
+                                                           "priceStatusUpdate",
+                                                           "Every change of the price status of charging pools, charging stations and EVSEs: the new prices of charging tariffs."));
+
             #endregion
 
             return webSocketServer;
@@ -539,6 +550,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 WebSocketServer.Push(statusUpdate.Kind switch {
                                          POIRuntimeStatusKind.AdminStatus   => AdminStatusUpdatesTopic,
                                          POIRuntimeStatusKind.EnergyStatus  => EnergyStatusUpdatesTopic,
+                                         POIRuntimeStatusKind.PriceStatus   => PriceStatusUpdatesTopic,
                                          _                                  => StatusUpdatesTopic
                                      },
                                      statusUpdate.ToJSON());
@@ -660,9 +672,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region Parse the status update
 
             if (!POIStatusUpdate.TryParseKind(Request.Payload["kind"]?.Type == JTokenType.String ? Request.Payload["kind"]!.Value<String>() : null, out var kind))
-                return Request.Error(POIWebSocketErrorCodes.FormatViolation, "The kind must be adminStatus, status or energyStatus!");
+                return Request.Error(POIWebSocketErrorCodes.FormatViolation, "The kind must be adminStatus, status, energyStatus or priceStatus!");
 
-            // The value of an energy status is an object { used, available, storedEnergy?, currentVoltage?, remainingChargingTime? }.
+            // The value of an energy status is an object { used, available, storedEnergy?, currentVoltage?, remainingChargingTime? },
+            // that of a price status { prices: [ { chargingTariffId, elements }, … ] }.
             if (!Request.Payload.ParseMandatoryText("entityType", "entity type",           out String? entityType, out var errorResponse) ||
                 !Request.Payload.ParseMandatoryText("entityId",   "entity identification", out String? entityId,   out errorResponse) ||
                 !POIStatusUpdate.TryParseValue(kind, Request.Payload["value"], "status",  out String? value,      out errorResponse))
