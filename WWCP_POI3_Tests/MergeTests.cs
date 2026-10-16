@@ -253,6 +253,90 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region Preconditions_hold_also_for_the_head_a_change_set_is_merged_into()
+
+        /// <summary>
+        /// A change of an EVSE, prepared while its charging pool had a certain ETag, committed after the head moved on:
+        /// refused when the head changed the pool, merged when it changed something else.
+        /// </summary>
+        [Test]
+        public void Preconditions_hold_also_for_the_head_a_change_set_is_merged_into()
+        {
+
+            var (server1, _) = Servers();
+            var v1           = server1.Head.RoamingNetwork;
+
+            RoamingNetworkChangeSet Guarded(Int32 Minutes)
+                => v1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(EVSE(v1), "maxPower", null, 11000) ],
+                                      CreatedAt:      T0.AddMinutes(Minutes),
+                                      Preconditions:  [ v1.Precondition(nameof(POI.ChargingPool), Pool(v1).Id.ToString()) ]).SignedByAll(v1);
+
+            var forOther  = Guarded(2);
+            var forPool   = Guarded(3);
+
+            // The head changes another operator: the change set made for v1 is merged into it.
+            Change(server1, 1, network => [ RoamingNetworkChange.UpdateProperty(network.GetChargingStationOperatorById(EXA)!, "telephone", null, "+49 30 1") ]);
+
+            var merged    = server1.Commit(forOther);
+
+            // The head changes the charging pool: a change set made for the version before is refused.
+            Change(server1, 4, network => [ RoamingNetworkChange.UpdateProperty(Pool(network), "hotline", null, "+49 800 1234") ]);
+
+            var refused   = server1.Commit(forPool);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(merged.Status,                                       Is.EqualTo(RoamingNetworkCommitStatus.Committed), merged.ErrorResponse);
+                Assert.That(server1.Tips,                                        Has.Count.EqualTo(1));
+                Assert.That(EVSE(server1.Head.RoamingNetwork).MaxPower?.Value,   Is.EqualTo(11000m));
+                Assert.That(refused.Status,                                      Is.EqualTo(RoamingNetworkCommitStatus.Refused));
+                Assert.That(refused.ErrorResponse,                               Does.Contain($"The ChargingPool '{Pool(v1).Id}' the change set requires").And.Contain("Prepare it again for the head!"));
+            }
+
+        }
+
+        #endregion
+
+        #region A_peer_change_set_whose_preconditions_the_other_tip_broke_conflicts()
+
+        /// <summary>
+        /// One server changes an EVSE while its charging pool is as it read it, the other one changes the pool meanwhile:
+        /// the tips are not merged, they conflict, until the owner decides.
+        /// </summary>
+        [Test]
+        public void A_peer_change_set_whose_preconditions_the_other_tip_broke_conflicts()
+        {
+
+            var (server1, server2) = Servers();
+
+            var v1 = server2.Head.RoamingNetwork;
+
+            Assert.That(server2.Commit(v1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(EVSE(v1), "maxPower", null, 11000) ],
+                                                          CreatedAt:      T0.AddMinutes(2),
+                                                          Preconditions:  [ v1.Precondition(nameof(POI.ChargingPool), Pool(v1).Id.ToString()) ]).SignedByAll(v1)).Status,
+                        Is.EqualTo(RoamingNetworkCommitStatus.Committed));
+
+            Change(server1, 1, network => [ RoamingNetworkChange.UpdateProperty(Pool(network), "hotline", null, "+49 800 1234") ]);
+
+            Exchange(server1, server2);
+            Exchange(server2, server1);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(server1.Tips,                                Has.Count.EqualTo(2));
+                Assert.That(server2.Tips,                                Has.Count.EqualTo(2));
+
+                var conflict = server1.Conflicts.Single();
+                Assert.That(conflict.Kind,                               Is.EqualTo(RoamingNetworkMergeConflictKind.Precondition));
+                Assert.That(conflict.EntityType,                         Is.EqualTo(nameof(POI.ChargingPool)));
+                Assert.That(conflict.Description,                        Does.Contain("changed it since their common ancestor"));
+                Assert.That(server2.Conflicts.Single().Kind,             Is.EqualTo(RoamingNetworkMergeConflictKind.Precondition));
+            }
+
+        }
+
+        #endregion
+
         #region Conflicts_stay_until_the_owner_resolves_them()
 
         [Test]

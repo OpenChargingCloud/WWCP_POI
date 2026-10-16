@@ -491,6 +491,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (JSON["preconditions"] is JArray preconditionsToCount && preconditionsToCount.Count > Limits.MaxPreconditions)
+                {
+                    ErrorResponse = $"The change set exceeds the limit of {Limits.MaxPreconditions} preconditions!";
+                    return false;
+                }
+
                 #endregion
 
                 #region Parse Id                  [mandatory]
@@ -604,7 +610,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Preconditions       [optional]
 
-                var preconditions = ImmutableArray<RoamingNetworkPrecondition>.Empty;
+                var preconditions = ImmutableArray.CreateBuilder<RoamingNetworkPrecondition>();
 
                 if (JSON["preconditions"] is JToken preconditionsJSON)
                 {
@@ -621,11 +627,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         if (preconditionJSON is not JObject preconditionObject ||
                             !RoamingNetworkPrecondition.TryParse(preconditionObject, out var precondition, out var preconditionError))
                         {
-                            ErrorResponse = $"Invalid precondition {preconditions.Length}!";
+                            ErrorResponse = $"Invalid precondition {preconditions.Count}!";
                             return false;
                         }
 
-                        preconditions = preconditions.Add(precondition);
+                        preconditions.Add(precondition);
 
                     }
 
@@ -675,7 +681,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 description,
                                 (JObject?) metadata,
                                 signatures,
-                                preconditions
+                                preconditions.ToImmutable()
                             );
 
                 ErrorResponse = null;

@@ -58,7 +58,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The merge is invalid as a whole, e.g. it names an entity one of them removed.
         /// </summary>
-        InvalidResult
+        InvalidResult,
+
+        /// <summary>
+        /// A change set of one names an entity as it must still be, by a precondition, and the other changed or removed it.
+        /// </summary>
+        Precondition
 
     }
 

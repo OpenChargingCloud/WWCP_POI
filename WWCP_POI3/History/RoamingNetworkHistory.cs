@@ -638,6 +638,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!parentVersion.TryApplyChangeSet(ChangeSet, out var roamingNetwork, out var applyError, VerifySignature))
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: applyError);
 
+                // Made for an older version: its preconditions must also hold for the tips it will be merged with.
+                if (BrokenPreconditionOf(ChangeSet, parent.Id) is String preconditionError)
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: preconditionError);
+
                 var commit = SignedBy(Signers, RoamingNetworkCommit.Next(parent, ChangeSet, roamingNetwork));
 
                 try
@@ -1169,6 +1173,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            // A change set of one branch naming an entity as it must still be, which the other branch changed.
+            var broken = BrokenPreconditions(Left.Id, Right.Id, mergeBase, leftVersion, rightVersion);
+
+            if (broken.Count > 0)
+            {
+                Conflicts = broken;
+                return false;
+            }
+
             return POI.RoamingNetwork.TryMerge(mergeBase,
                                                leftVersion,
                                                rightVersion,
@@ -1176,6 +1189,99 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                out RoamingNetwork,
                                                out ChangeSet,
                                                out Conflicts);
+
+        }
+
+        #endregion
+
+        #region (private) BrokenPreconditions(Left, Right, MergeBase, LeftVersion, RightVersion)
+
+        /// <summary>
+        /// The preconditions of the change sets of each branch since the merge base the other branch broke, as conflicts:
+        /// a change set applies only while the entities it names are as it read them, also when it is merged.
+        /// </summary>
+        private List<RoamingNetworkMergeConflict> BrokenPreconditions(RoamingNetworkCommit_Id         Left,
+                                                                      RoamingNetworkCommit_Id         Right,
+                                                                      POI.RoamingNetwork.MergeBase    MergeBase,
+                                                                      POI.RoamingNetwork              LeftVersion,
+                                                                      POI.RoamingNetwork              RightVersion)
+        {
+
+            var conflicts       = new List<RoamingNetworkMergeConflict>();
+            var leftAncestors   = Ancestors(Left);
+            var rightAncestors  = Ancestors(Right);
+
+            void Check(IEnumerable<RoamingNetworkCommit_Id>  BranchOnly,
+                       POI.RoamingNetwork                    Other,
+                       String                                OtherName)
+            {
+
+                IReadOnlyDictionary<POI.RoamingNetwork.MergeKey, POI.RoamingNetwork.MergeEntity>? otherEntities = null;
+
+                foreach (var commitId in BranchOnly.OrderBy(commitId => commitId.ToString(), StringComparer.Ordinal))
+                {
+
+                    if (commits[commitIndex[commitId]].ChangeSet is not RoamingNetworkChangeSet changeSet ||
+                        changeSet.Preconditions.IsDefaultOrEmpty)
+                    {
+                        continue;
+                    }
+
+                    otherEntities ??= POI.RoamingNetwork.EntitiesOf(Other);
+
+                    foreach (var (precondition, what) in POI.RoamingNetwork.BrokenPreconditions(changeSet.Preconditions, MergeBase, otherEntities))
+                        conflicts.Add(new RoamingNetworkMergeConflict(RoamingNetworkMergeConflictKind.Precondition,
+                                                                      precondition.EntityType,
+                                                                      precondition.EntityId,
+                                                                      null,
+                                                                      null,
+                                                                      null,
+                                                                      null,
+                                                                      $"The change set '{changeSet.Id}' requires the {precondition.EntityType} '{precondition.EntityId}' to have the ETag {precondition.ETag}, but the {OtherName} version {what} since their common ancestor!"));
+
+                }
+
+            }
+
+            Check(rightAncestors.Where(commitId => !leftAncestors. Contains(commitId)), LeftVersion,  "left");
+            Check(leftAncestors. Where(commitId => !rightAncestors.Contains(commitId)), RightVersion, "right");
+
+            return conflicts;
+
+        }
+
+        #endregion
+
+        #region (private) BrokenPreconditionOf(ChangeSet, ParentId)
+
+        /// <summary>
+        /// Why the preconditions of the given change set, made for the given commit, do not hold for a tip it will be
+        /// merged with: one that changed or removed an entity it names since their common ancestor; none when they hold.
+        /// </summary>
+        private String? BrokenPreconditionOf(RoamingNetworkChangeSet  ChangeSet,
+                                             RoamingNetworkCommit_Id  ParentId)
+        {
+
+            if (ChangeSet.Preconditions.IsDefaultOrEmpty)
+                return null;
+
+            var parentAncestors = Ancestors(ParentId);
+
+            foreach (var tip in tips.Where(tip => !parentAncestors.Contains(tip)))
+            {
+
+                if (!TryGetMergeBase(ParentId, tip, 0, out var mergeBase, out var mergeBaseError) ||
+                    !TryGetVersion  (tip, out var tipVersion, out mergeBaseError))
+                {
+                    return mergeBaseError;
+                }
+
+                foreach (var (precondition, what) in POI.RoamingNetwork.BrokenPreconditions(ChangeSet.Preconditions, mergeBase, POI.RoamingNetwork.EntitiesOf(tipVersion)))
+                    return $"The {precondition.EntityType} '{precondition.EntityId}' the change set requires to have the ETag {precondition.ETag} is no longer as it was: the version '{tip}' {what} since the one the change set was made for. Prepare it again for the head!";
+
+            }
+
+            return null;
 
         }
 

@@ -98,9 +98,12 @@ A change set leads from the version of its `beforeETags` to the version of its `
 entity MUST still have for the change set to apply, or to be rebased onto another version. The ETag of an
 entity is the one of its representation as the roaming network embeds it, with everything it embeds: over
 its canonical JSON (section 1), or the canonical CBOR of its keys and values, with the hash algorithm the
-ETag names; the HTTP `ETag` an entity is served with. The entity is found by its type and identification,
-compared as the type compares it. A change set whose preconditions do not all hold in the version it is
-applied to MUST be refused; a rebased change set keeps them.
+ETag names; the HTTP `ETag` an entity is served with as it is given (POI_API: `?view=stored` for charging
+pools, stations and EVSEs, which it serves with the properties their groups give them by default). The entity
+is found by its type and identification, compared as the type compares it. A change set whose preconditions
+do not all hold in the version it is applied to MUST be refused; a rebased change set keeps them. They hold
+in a merge as well (section 5.3): a change set committed for a version older than a tip it will be merged
+with MUST be refused where that tip changed or removed an entity it names since their common ancestor.
 
 **Kinds:** `Add` and `Remove` of an entity; `UpdateProperty` and `RemoveProperty` of a property of an entity;
 and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `UpdateElementProperty` and
@@ -241,6 +244,11 @@ first two tips that do not conflict, again and again. Their **merge commit**:
 - its changes follow from a three-way merge with the **merge base**, the best common ancestor
   (one no other common ancestor follows); several best common ancestors form a **virtual merge
   base** (below).
+
+Two tips also conflict where a change set of the one since the merge base has a precondition
+(section 4) naming an entity the other one changed or removed since the merge base: its full
+representation is other than in the merge base, or it is gone. Such a change set applied only while
+the entity was as it read it; the owner decides, with a change set on one of the tips.
 
 Several best common ancestors, in the order of tips, are merged one after the other: the first
 with the second, with their own merge base (calculated the same way), the result with the third,

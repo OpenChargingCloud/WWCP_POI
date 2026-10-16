@@ -34,9 +34,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     /// <remarks>
     /// The ETag of an entity is the one of its representation as its roaming network embeds it, with everything it
-    /// embeds: SHA-256 over its canonical JSON or canonical CBOR, the HTTP ETag POI_API serves it with. A change set
-    /// may name the ETags entities must still have: it applies, and is rebased onto another version, only while they
-    /// do, e.g. while the charging pool a client read and changed is as the client read it.
+    /// embeds: SHA-256 over its canonical JSON or canonical CBOR, the HTTP ETag POI_API serves it with as it is given,
+    /// with ?view=stored for charging pools, stations and EVSEs. A change set may name the ETags entities must still
+    /// have: it applies, is rebased onto another version and merged with another tip only while they do, e.g. while
+    /// the charging pool a client read and changed is as the client read it.
     /// </remarks>
     public sealed partial class RoamingNetwork
     {
@@ -90,6 +91,60 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (internal static) EntitiesOf(Version)
+
+        /// <summary>
+        /// The entities of the given version, by their type and identification, as preconditions and merges find them.
+        /// </summary>
+        internal static IReadOnlyDictionary<MergeKey, MergeEntity> EntitiesOf(RoamingNetwork Version)
+
+            => Flatten(Version);
+
+        #endregion
+
+        #region (internal static) BrokenPreconditions(Preconditions, Base, Other)
+
+        /// <summary>
+        /// The given preconditions of a change set of one branch the other branch broke: they name an entity the other
+        /// branch changed or removed since the merge base of both, with what it did. A precondition holds in a merge only
+        /// while the other branch leaves the entity as the merge base has it.
+        /// </summary>
+        /// <param name="Preconditions">The preconditions of a change set of one branch.</param>
+        /// <param name="Base">The merge base of both branches.</param>
+        /// <param name="Other">The entities of the version of the other branch.</param>
+        internal static IEnumerable<(RoamingNetworkPrecondition Precondition, String What)> BrokenPreconditions(ImmutableArray<RoamingNetworkPrecondition>   Preconditions,
+                                                                                                              MergeBase                                    Base,
+                                                                                                              IReadOnlyDictionary<MergeKey, MergeEntity>   Other)
+        {
+
+            if (Preconditions.IsDefaultOrEmpty)
+                yield break;
+
+            var compared = new HashSet<MergeKey>();
+
+            foreach (var precondition in Preconditions)
+            {
+
+                var key = MergeKey.Of(precondition.EntityType, precondition.EntityId);
+
+                // An entity named again is compared once.
+                if (!compared.Add(key))
+                    continue;
+
+                Base.Entities.TryGetValue(key, out var before);
+
+                if (!Other.TryGetValue(key, out var after))
+                    yield return (precondition, "removed it");
+
+                else if (before is null || !JToken.DeepEquals(before.Full, after.Full))
+                    yield return (precondition, "changed it");
+
+            }
+
+        }
+
+        #endregion
+
         #region (private) TryCheckPreconditions(Preconditions, out ErrorResponse)
 
         /// <summary>
@@ -106,20 +161,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Preconditions.IsDefaultOrEmpty)
                 return true;
 
-            var entities = Flatten(this);
+            var entities  = Flatten(this);
+
+            // An ETag once per entity, format and hash algorithm: an entity named again costs nothing.
+            var eTags     = new Dictionary<(MergeKey Key, ETagFormat Format, ETagHashAlgorithm HashAlgorithm), ETag>();
 
             for (var index = 0; index < Preconditions.Length; index++)
             {
 
-                var precondition = Preconditions[index];
+                var precondition  = Preconditions[index];
+                var key           = MergeKey.Of(precondition.EntityType, precondition.EntityId);
 
-                if (!entities.TryGetValue(MergeKey.Of(precondition.EntityType, precondition.EntityId), out var entity))
+                if (!entities.TryGetValue(key, out var entity))
                 {
                     ErrorResponse = $"Precondition {index}: the {precondition.EntityType} '{precondition.EntityId}' does not exist!";
                     return false;
                 }
 
-                if (!EntityETag(entity.Full, precondition.ETag.Format, precondition.ETag.HashAlgorithm).Equals(precondition.ETag))
+                var eTagKey = (key, precondition.ETag.Format, precondition.ETag.HashAlgorithm);
+
+                if (!eTags.TryGetValue(eTagKey, out var eTag))
+                {
+                    eTag = EntityETag(entity.Full, precondition.ETag.Format, precondition.ETag.HashAlgorithm);
+                    eTags.Add(eTagKey, eTag);
+                }
+
+                if (!eTag.Equals(precondition.ETag))
                 {
                     ErrorResponse = $"Precondition {index}: the {precondition.EntityType} '{precondition.EntityId}' changed, it no longer has the ETag {precondition.ETag}!";
                     return false;

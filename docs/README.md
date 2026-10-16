@@ -306,7 +306,10 @@ therefore written without them, `ToJSON(IncludeETags: false)`.
 this way, found in every spelling its identification type considers equal. A change set may name such ETags as
 preconditions, `CreateChangeSet(…, Preconditions: [ version.Precondition(entityType, entityId) ])`: it applies, and
 is rebased, only while the entities still have them, e.g. while a charging pool is as the client read it, though
-the changes name only one of its EVSEs.
+the changes name only one of its EVSEs. They hold in merges as well: `history.Commit` refuses a change set made for
+an older version when a tip it would be merged with changed or removed such an entity since ("prepare it again for
+the head"), and tips whose change sets name entities the other tip changed conflict (`Precondition`) instead of
+being merged, e.g. when a peer's commit arrives.
 
 
 ### Element changes

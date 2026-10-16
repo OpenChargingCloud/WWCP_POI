@@ -198,6 +198,39 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Preconditions_are_limited()
+
+        /// <summary>
+        /// A change set read names at most 1,000 preconditions; an entity named again is checked with the ETag calculated once.
+        /// </summary>
+        [Test]
+        public void Preconditions_are_limited()
+        {
+
+            var rn1        = NewNetwork();
+            var evse       = rn1.GetChargingStationOperatorById(GEF)!.EVSEs.Single();
+            var pool       = rn1.Precondition(nameof(ChargingPool), P1.ToString());
+
+            // 1,000 times the same entity: calculated once, and fine.
+            var manyTimes  = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(evse, "maxPower", null, 11000) ],
+                                                 CreatedAt:      T0,
+                                                 Preconditions:  Enumerable.Repeat(pool, 1_000)).SignedByAll(rn1);
+
+            var json       = manyTimes.ToJSON();
+            ((JArray) json["preconditions"]!).Add(pool.ToJSON());
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(rn1.TryApplyChangeSet(manyTimes, out _, out var applyError),                         Is.True, applyError);
+                Assert.That(RoamingNetworkChangeSet.TryParse(manyTimes.ToJSON(), out _, out var parseError),      Is.True, parseError);
+                Assert.That(RoamingNetworkChangeSet.TryParse(json, out _, out var limitError),                   Is.False);
+                Assert.That(limitError,                                                                           Does.Contain("exceeds the limit of 1000 preconditions"));
+            }
+
+        }
+
+        #endregion
+
     }
 
 }

@@ -252,8 +252,9 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
   "expected absent". A change finding another value conflicts.
 - **Preconditions:** a change set may name the ETags entities must still have, e.g. the HTTP `ETag` a client
   read a charging pool with: `CreateChangeSet(changes, Preconditions: [ version.Precondition("ChargingPool",
-  poolId) ])`. It applies, and is rebased, only while they hold; `TryGetEntityETag(entityType, entityId, …)` tells
-  the ETag of an entity, as POI_API serves it.
+  poolId) ])`. It applies, is rebased and merged only while they hold: a change set made for an older version is
+  refused when the head changed such an entity since, and tips conflict where the other one did;
+  `TryGetEntityETag(entityType, entityId, …)` tells the ETag of an entity, as POI_API serves it with `?view=stored`.
 - **Element changes:** `AddElement`, `RemoveElement`, `ReplaceElement`, `UpdateElementProperty` and
   `RemoveElementProperty` change one element of a property, named by an element path, e.g. a member of a group,
   `[{"propertyName": "EVSEIds", "elementId": "DE*GEF*E1*2"}]`, a brand of a pool,
@@ -295,7 +296,7 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
   the rebased change set is unsigned, its owners sign it again.
 - **Signatures:** `Sign(…)` and `VerifySignature(…)` over canonical JSON (COSE algorithms of Styx);
   an optional `VerifyChangeSetSignature` checks them in addition.
-- **Wire:** JSON and CBOR; `RoamingNetworkChangeSetLimits` bound bytes, depth, changes and signatures.
+- **Wire:** JSON and CBOR; `RoamingNetworkChangeSetLimits` bound bytes, depth, changes, signatures and preconditions (by default 16 MiB, 32, 10,000, 16 and 1,000).
 
 ## History and sync
 

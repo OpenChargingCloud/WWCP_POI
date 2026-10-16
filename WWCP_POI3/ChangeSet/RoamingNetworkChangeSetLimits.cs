@@ -47,12 +47,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public Int32  MaxSignatures    { get; init; } = 16;
 
+        /// <summary>
+        /// The maximum number of preconditions.
+        /// </summary>
+        public Int32  MaxPreconditions { get; init; } = 1_000;
+
         #endregion
 
         #region Default
 
         /// <summary>
-        /// The default limits: 16 MiB, a depth of 32, 10,000 changes and 16 signatures.
+        /// The default limits: 16 MiB, a depth of 32, 10,000 changes, 16 signatures and 1,000 preconditions.
         /// </summary>
         public static RoamingNetworkChangeSetLimits Default { get; } = new ();
 
