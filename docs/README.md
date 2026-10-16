@@ -257,6 +257,10 @@ differs from its own. The roaming network calculates and writes its ETags (see
 [RoamingNetwork](RoamingNetwork.md)); POI_API serves every embedded entity with the ETag of the part of the
 roaming network that embeds it, as its HTTP `ETag`.
 
+`RoamingNetwork.TryParse` checks declared `eTags` itself: they must be the ETags of the network read, else it is
+refused; without `eTags` it is read as before. A representation that is changed before it is read again is
+therefore written without them, `ToJSON(IncludeETags: false)`.
+
 
 ### Collections
 

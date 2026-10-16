@@ -42,7 +42,7 @@ See [README.md](README.md#common-properties).
 | `created` | — | |
 | `lastChange` | — | set to the `createdAt` of the change set |
 | `customData` | update/remove | a JSON object |
-| `eTags` | — | written by `ToJSON()`/`ToCBOR()` unless `IncludeETags: false`; not read by `TryParse` |
+| `eTags` | — | written by `ToJSON()`/`ToCBOR()` unless `IncludeETags: false`; when given, `TryParse` refuses the network unless they are its ETags |
 
 
 ## Properties
@@ -90,7 +90,7 @@ with the default view options ([SPECIFICATION.md](../SPECIFICATION.md#2-the-cont
 ## @context
 
 `https://open.charging.cloud/contexts/wwcp+json/roamingNetwork`, written by `ToJSON()` and `ToCBOR()` unless
-`Embedded: true`. It is part of the content, so of the ETags. `TryParse` does not read or check it.
+`Embedded: true`. It is part of the content, so of the ETags. `TryParse` refuses another one; it may be left out.
 
 
 ## dataLicenses

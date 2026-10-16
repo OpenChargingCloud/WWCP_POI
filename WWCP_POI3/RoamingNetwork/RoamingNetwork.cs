@@ -494,6 +494,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Check JSON-LD context [optional]
+
+                if (JSON["@context"] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the roaming network '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Name           [optional]
 
                 if (JSON.ParseOptionalJSON("name",
@@ -711,6 +722,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      SigningKeys:               signingKeys,
                                      IdentityKeys:              identityKeys
                                  );
+
+                #region Check ETags          [optional]
+
+                if (JSON["eTags"] is JToken eTagsJSON &&
+                    !TryCheckETags(RoamingNetwork,
+                                   eTagsJSON is JArray eTagsArray
+                                       ? [ .. eTagsArray.Select(eTag => ETag.Parse(eTag)) ]
+                                       : [],
+                                   out ErrorResponse))
+                {
+                    RoamingNetwork = null;
+                    return false;
+                }
+
+                #endregion
 
                 if (CustomRoamingNetworkParser is not null)
                     RoamingNetwork = CustomRoamingNetworkParser(JSON,
@@ -1007,6 +1033,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Check JSON-LD context [optional]
+
+                if (CBOR.TryGetValue(CBORValue.FromText("@context"), out var contextCBOR) &&
+                    !(contextCBOR.TryGetText(out var context) && context == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the roaming network '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Name           [optional]
 
                 if (CBOR.ParseOptional("name",
@@ -1233,6 +1270,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      IdentityKeys:              identityKeys
                                  );
 
+                #region Check ETags          [optional]
+
+                if (CBOR.TryGetValue(CBORValue.FromText("eTags"), out var eTagsCBOR) &&
+                    !TryCheckETags(RoamingNetwork,
+                                   eTagsCBOR.Kind == CBORValueKind.Array
+                                       ? [ .. eTagsCBOR.AsArray().Select(eTag => ETag.Parse(eTag)) ]
+                                       : [],
+                                   out ErrorResponse))
+                {
+                    RoamingNetwork = null;
+                    return false;
+                }
+
+                #endregion
+
                 if (CustomRoamingNetworkParser is not null)
                     RoamingNetwork = CustomRoamingNetworkParser(CBOR,
                                                                 RoamingNetwork);
@@ -1348,6 +1400,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (private static) TryCheckETags(RoamingNetwork, DeclaredETags, out ErrorResponse)
+
+        /// <summary>
+        /// The ETags a representation declares must be the ETags of the roaming network read from it:
+        /// stale or wrong ETags are refused, not ignored.
+        /// </summary>
+        /// <param name="RoamingNetwork">The roaming network read from the representation.</param>
+        /// <param name="DeclaredETags">The ETags the representation declares.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        private static Boolean TryCheckETags(RoamingNetwork                    RoamingNetwork,
+                                             ImmutableArray<ETag>              DeclaredETags,
+                                             [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            if (MatchETags(DeclaredETags, RoamingNetwork, out var error))
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            ErrorResponse = $"The ETags of the roaming network '{RoamingNetwork.Id}' do not match its content: {error}";
+            return false;
+
+        }
+
+        #endregion
 
         #region CalcETags()
 

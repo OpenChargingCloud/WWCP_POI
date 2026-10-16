@@ -63,6 +63,8 @@ An ETag is a digest of the content in one of two formats.
 - **Text:** `json:sha256:hex:<digest>`.
 - **Algorithms:** `sha256` (default), `sha384`, `sha512`.
 - A roaming network lists its ETags in `eTags`, ordered by format: `json`, then `cbor`.
+- A reader MUST refuse a roaming network whose `eTags` are not the ETags of its content, and one with another
+  `@context`. Both MAY be left out.
 
 ### 3.2 The CBOR ETag
 

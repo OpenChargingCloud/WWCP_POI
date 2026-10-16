@@ -310,10 +310,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (Snapshot["roamingNetwork"] is not JObject roamingNetworkJSON ||
-                    !RoamingNetwork.TryParse(roamingNetworkJSON, out var roamingNetwork, out var roamingNetworkError))
+                if (Snapshot["roamingNetwork"] is not JObject roamingNetworkJSON)
                 {
-                    ErrorResponse = "Missing or invalid roaming network of the snapshot!";
+                    ErrorResponse = "Missing roaming network of the snapshot!";
+                    return false;
+                }
+
+                if (!RoamingNetwork.TryParse(roamingNetworkJSON, out var roamingNetwork, out var roamingNetworkError))
+                {
+                    ErrorResponse = "Invalid roaming network of the snapshot: " + roamingNetworkError;
                     return false;
                 }
 
@@ -511,10 +516,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!Snapshot.TryGetValue(CBORValue.FromText("roamingNetwork"), out var roamingNetworkCBOR) ||
-                    !RoamingNetwork.TryParse(roamingNetworkCBOR, out var roamingNetwork, out var roamingNetworkError))
+                if (!Snapshot.TryGetValue(CBORValue.FromText("roamingNetwork"), out var roamingNetworkCBOR))
                 {
-                    ErrorResponse = "Missing or invalid roaming network of the snapshot!";
+                    ErrorResponse = "Missing roaming network of the snapshot!";
+                    return false;
+                }
+
+                if (!RoamingNetwork.TryParse(roamingNetworkCBOR, out var roamingNetwork, out var roamingNetworkError))
+                {
+                    ErrorResponse = "Invalid roaming network of the snapshot: " + roamingNetworkError;
                     return false;
                 }
 

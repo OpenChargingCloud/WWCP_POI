@@ -267,11 +267,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(follower.TryAppend(commit1, out var error4),                    Is.True, error4);
                 Assert.That(follower.TryAppend(commit2, out var error5),                    Is.True, error5);
 
-                // A snapshot whose network does not have the ETags of its commit.
+                // A snapshot whose network does not have its own ETags.
                 var snapshot = leader.ToSnapshotJSON();
                 snapshot["roamingNetwork"]!["dataSource"] = "forged";
                 Assert.That(RoamingNetworkHistory.TryFromSnapshot(snapshot, out _, out var error6),  Is.False);
-                Assert.That(error6,                                                                  Does.Contain("does not have the ETags of the commit"));
+                Assert.That(error6,                                                                  Does.Contain("do not match its content"));
+
+                // A snapshot whose network does not have the ETags of its commit.
+                ((JObject) snapshot["roamingNetwork"]!).Remove("eTags");
+                Assert.That(RoamingNetworkHistory.TryFromSnapshot(snapshot, out _, out var error7),  Is.False);
+                Assert.That(error7,                                                                  Does.Contain("does not have the ETags of the commit"));
 
             }
 

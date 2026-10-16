@@ -84,7 +84,7 @@ Children are written only when there are any; collections in the ordinal order o
 | `ToCBOR(Embedded = false)` | The keys and values of `ToJSON(Embedded, ExpandDataLicenses: Expanded)`. |
 | `ToJSON(Embedded = false, …)` | With its defaults: `@context` (`https://open.charging.cloud/contexts/wwcp+json/chargingStationOperator`) unless embedded, and `dataLicenses` complete; `ExpandDataLicenses: ShowIdOnly` writes `dataLicenseIds` instead, which reads again only for well-known licenses. |
 
-`TryParse(JSON)` reads all of them: it ignores `@context` and `roamingNetworkId`, and reads `dataLicenseIds` only
+`TryParse(JSON)` reads all of them: it refuses an `@context` other than its own, ignores `roamingNetworkId`, and reads `dataLicenseIds` only
 for well-known licenses. `TryParse(CBOR)` reads the CBOR map as JSON.
 
 

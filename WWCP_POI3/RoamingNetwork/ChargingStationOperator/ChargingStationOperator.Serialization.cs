@@ -108,6 +108,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Check JSON-LD context           [optional]
+
+                if (JSON["@context"] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the charging station operator '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Name                     [optional]
 
                 if (JSON.ParseOptionalJSON("name",
