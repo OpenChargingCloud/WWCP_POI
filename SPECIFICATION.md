@@ -263,9 +263,14 @@ there unless both tips have the same:
 - an entity one of them removed and the other one changed, or moved by both, or moved by one and
   changed by the other, has the conflict marker of its properties as its only property, under the
   parent of the first one having it;
-- otherwise an entity both have under the same parent takes the merged properties; one moved by
-  one of them only, unchanged by the other, is as the one that moved it has it; one only one of
-  them has is kept, unless the other one removed it unchanged.
+- otherwise an entity both have under the same parent takes the merged properties, unless it is a
+  conflict marker as a whole in their own merge base: then it is one again, unless both have it the
+  same; one moved by one of them only, unchanged by the other, is as the one that moved it has it; one
+  only one of them has is kept, unless the other one removed it unchanged.
+
+An entity that is a conflict marker as a whole in the merge base conflicts as a whole: the tips
+conflict there, unless both have it the same, and it is merged neither property by property nor
+element by element, as the absent properties of the marker are no values of the common ancestors.
 
 The three-way merge compares every entity a change set addresses (section 4.1), by its type and
 identification, without its embedded children and without `lastChange`, property by property,
@@ -276,7 +281,8 @@ it, and an added entity names its parent as the second version writes it:
 
 - a property only one version changed takes that change; both changed it alike, it is kept once;
   both changed it differently, they **conflict**, unless it is an array of identified elements (section 4)
-  in all three, an absent one counting as empty, and its keys are not those of a party: then the merge is
+  in all three, an absent one counting as empty (but not in an entity that is a conflict marker as a whole,
+  see above), and its keys are not those of a party: then the merge is
   the first version's array with the changes of the second one against the base, element by element,
   taken in the order of the second one: an element it removed is removed, unless the first one changed it; one it
   added is added (section 4), unless the first one added it differently; one it changed is replaced, unless

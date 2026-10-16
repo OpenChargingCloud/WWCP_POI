@@ -635,6 +635,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Conflicted in the virtual merge base: as a whole
+
+                // Its common ancestors conflict at it: the versions conflict, unless both have it the same; neither
+                // property by property nor element by element, as an absent property of the marker is no value of theirs.
+                if (IsConflicted(b))
+                {
+
+                    if (!JToken.DeepEquals(l.Own, r.Own))
+                        Conflict(RoamingNetworkMergeConflictKind.DifferentValues, l, null, b!.Own, l.Own, r.Own,
+                                 $"The common ancestors of both versions conflict at the {l.Type} '{l.Id}', and the versions have it differently!");
+
+                    continue;
+
+                }
+
+                #endregion
+
                 #region Property by property
 
                 var target         = (JObject) l.Own.DeepClone();
@@ -786,6 +803,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
+                // Conflicted in their own merge base: as a whole, unless both have it the same.
+                if (IsConflicted(b))
+                {
+
+                    entities[key] = JToken.DeepEquals(l.Own, r.Own)
+                                        ? l
+                                        : Conflicted(l, b, l, r);
+
+                    continue;
+
+                }
+
                 var own            = new JObject();
                 var propertyNames  = l.Own.Properties().Select(property => property.Name).
                                          Union(r.Own.Properties().Select(property => property.Name)).
@@ -816,6 +845,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return entities;
 
         }
+
+        #endregion
+
+        #region (private static) IsConflicted(Entity)
+
+        /// <summary>
+        /// Whether the given entity of a virtual merge base is a conflict marker as a whole: its common ancestors conflict at it.
+        /// </summary>
+        private static Boolean IsConflicted(MergeEntity? Entity)
+
+            => Entity?.Own[ConflictMarkerProperty] is not null;
 
         #endregion
 

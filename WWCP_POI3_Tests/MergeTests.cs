@@ -514,6 +514,81 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         #endregion
 
 
+        #region An_entity_its_common_ancestors_conflict_at_conflicts_as_a_whole()
+
+        /// <summary>
+        /// GEF removes its EVSE group on server 1, and adds an EVSE to it on server 2: they conflict. Both servers decide
+        /// on the version without it, adding it again with other members, and merge. The merges have both conflicting
+        /// commits as their common ancestors, whose virtual merge base has the group as a conflict marker as a whole:
+        /// the merges conflict there, their members are not united.
+        /// </summary>
+        [Test]
+        public void An_entity_its_common_ancestors_conflict_at_conflicts_as_a_whole()
+        {
+
+            var e2       = EVSE_Id.     Parse("DE*GEF*E1*2");
+            var e3       = EVSE_Id.     Parse("DE*GEF*E1*3");
+            var group    = EVSEGroup_Id.Parse("DE*GEF*EG1");
+
+            var network  = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
+                                              Created:                   Created,
+                                              ChargingStationOperators:  [ new ChargingStationOperator(GEF,
+                                                                                                       Created:        Created,
+                                                                                                       ChargingPools:  [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
+                                                                                                                                          Created:           Created,
+                                                                                                                                          ChargingStations:  [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
+                                                                                                                                                                                   Created:  Created,
+                                                                                                                                                                                   EVSEs:    [ new EVSE(E1, Created: Created),
+                                                                                                                                                                                               new EVSE(e2, Created: Created),
+                                                                                                                                                                                               new EVSE(e3, Created: Created) ]) ]) ],
+                                                                                                       EVSEGroups:     [ new EVSEGroup(group, EVSEIds: [ E1 ], Created: Created) ]) ]).WithKeys();
+
+            var server1  = RoamingNetworkHistory.Start(network);
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(server1.ToSnapshotJSON(), out var server2, out var error), Is.True, error);
+
+            EVSEGroup GroupOf(RoamingNetwork Network)
+                => Network.GetChargingStationOperatorById(GEF)!.EVSEGroups.Single();
+
+            var x = Change(server1,  1, network => [ RoamingNetworkChange.Remove(group) ]);
+            var y = Change(server2!, 2, network => [ RoamingNetworkChange.UpdateProperty(GroupOf(network), "EVSEIds", null, new JArray(E1.ToString(), e2.ToString())) ]);
+
+            Exchange(server1,  server2!);
+            Exchange(server2!, server1);
+
+            Assert.That(server1.Conflicts.Single().Kind,  Is.EqualTo(RoamingNetworkMergeConflictKind.DeleteModify));
+
+            // Both decide on the version without it, each adding it again with other members, and merge.
+            ChangeAt(server1,  x, 3, network => [ RoamingNetworkChange.Add(new EVSEGroup(group, EVSEIds: [ E1, e3 ], Created: Created)) ]);
+            ChangeAt(server2!, x, 4, network => [ RoamingNetworkChange.Add(new EVSEGroup(group, EVSEIds: [ E1 ],     Created: Created)) ]);
+
+            Assert.That(server1. Tips,  Has.Count.EqualTo(1));
+            Assert.That(server2!.Tips,  Has.Count.EqualTo(1));
+            Assert.That(GroupOf(server1. Head.RoamingNetwork).EVSEIds,  Is.EquivalentTo(new[] { E1, e2, e3 }));
+            Assert.That(GroupOf(server2!.Head.RoamingNetwork).EVSEIds,  Is.EquivalentTo(new[] { E1, e2 }));
+
+            Exchange(server1,  server2!);
+            Exchange(server2!, server1);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(server1.Tips,                                       Has.Count.EqualTo(2));
+                Assert.That(server2!.Head.Commit.Id,                            Is.EqualTo(server1.Head.Commit.Id));
+
+                var conflict = server1.Conflicts.Single();
+                Assert.That(conflict.Kind,                                      Is.EqualTo(RoamingNetworkMergeConflictKind.DifferentValues));
+                Assert.That(conflict.EntityType,                                Is.EqualTo(nameof(EVSEGroup)));
+                Assert.That(conflict.EntityId,                                  Is.EqualTo(group.ToString()));
+                Assert.That(conflict.PropertyName,                              Is.Null);
+                Assert.That(conflict.Base?[RoamingNetwork.ConflictMarkerProperty],  Is.Not.Null);
+                Assert.That(conflict.Description,                               Does.Contain("The common ancestors of both versions conflict"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Conflicting_common_ancestors_resolved_alike_merge()
 
         [Test]
