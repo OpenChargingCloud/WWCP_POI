@@ -71,10 +71,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                           ChargingStationIds:  [ S1 ],
                                                                                                           Created:             Created) ],
                                                                      ParkingSpaces:   [ new ParkingSpace(SP1,
-                                                                                                         ParkingGarageId:     G1,
-                                                                                                         ParkingSensorIds:    [ SN1 ],
-                                                                                                         ChargingStationIds:  [ S1 ],
-                                                                                                         Created:             Created),
+                                                                                                         ParkingGarageId:      G1,
+                                                                                                         ParkingSensorIds:     [ SN1 ],
+                                                                                                         ChargingStationIds:   [ S1 ],
+                                                                                                         ParkingRestrictions:  [ ParkingRestrictionGroup.EV_ONLY, ParkingRestrictionGroup.DISABLED ],
+                                                                                                         EUVehicleCategories:  [ EUVehicleCategory.M1 ],
+                                                                                                         Created:              Created),
                                                                                         new ParkingSpace(SP2,
                                                                                                          ParkingGarageId:     G1,
                                                                                                          Created:             Created) ],
@@ -117,6 +119,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(parking["parkingSpaces"]!.Select(space => space["@id"]!.ToString()),      Is.EqualTo(new[] { "space-1", "space-2" }));
                 Assert.That(parking["parkingSpaces"]![0]!["parkingGarageId"]!.ToString(),            Is.EqualTo("garage-1"));
                 Assert.That(parking["parkingSpaces"]![0]!["parkingSensorIds"]!.Values<String>(),     Is.EqualTo(new[] { "sensor-1" }));
+                Assert.That(parking["parkingSpaces"]![0]!["parkingRestrictions"]!.Values<String>(),  Is.EqualTo(new[] { "DISABLED", "EV_ONLY" }));
+                Assert.That(parking["parkingSpaces"]![0]!["euVehicleCategories"]!.Values<String>(),  Is.EqualTo(new[] { "M1" }));
+                Assert.That(parking["parkingSpaces"]![1]!["parkingRestrictions"],                    Is.Null);
 
                 Assert.That(fromJSON.TryGetParkingOperatorById(PAR, out _),                 Is.True);
                 Assert.That(fromJSON.TryGetParkingSpaceById(SP2, out var sp2),              Is.True);
@@ -152,6 +157,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var unknownSensor   = Changed(network => Parking(network)["parkingSpaces"]![0]!["parkingSensorIds"] = new JArray("sensor-9"));
             var unknownStation  = Changed(network => Parking(network)["parkingGarages"]![0]!["chargingStationIds"] = new JArray("DE*GEF*S9"));
             var spaceTwice      = Changed(network => Parking(network)["parkingSpaces"]![1]!["@id"] = "SPACE-1");
+            var restrictionTwice = Changed(network => Parking(network)["parkingSpaces"]![0]!["parkingRestrictions"] = new JArray("DISABLED", "DISABLED"));
 
             // The same sensor at two parking operators.
             var otherOperator   = Changed(network => ((JArray) network["parkingOperators"]!).Add(
@@ -169,6 +175,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(RoamingNetwork.TryParse(unknownStation,  out _, out var error3),  Is.False);
                 Assert.That(error3,                                                           Does.Contain("charging station 'DE*GEF*S9'"));
                 Assert.That(RoamingNetwork.TryParse(spaceTwice,      out _, out _),           Is.False);
+                Assert.That(RoamingNetwork.TryParse(restrictionTwice, out _, out var error6), Is.False);
+                Assert.That(error6,                                                           Does.Contain("must not be given twice"));
                 Assert.That(RoamingNetwork.TryParse(otherOperator,   out _, out var error5),  Is.False);
                 Assert.That(error5,                                                           Does.Contain("'sensor-1' must not be given twice in the roaming network"));
             }
@@ -195,6 +203,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var cs        = rn1.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add           (new ParkingSensor(sn2), PAR),
                                 RoamingNetworkChange.UpdateProperty(sp1!,     "parkingSensorIds", null, new JArray("sensor-1", "sensor-2")),
+                                RoamingNetworkChange.UpdateProperty(sp1!,     "euVehicleCategories", null, new JArray("N1", "M1")),
+                                RoamingNetworkChange.RemoveProperty(sp1!,     "parkingRestrictions"),
                                 RoamingNetworkChange.Remove        (SP2),
                                 RoamingNetworkChange.UpdateProperty(parking,  "homepage",         null, "https://parking.example")
                             ], CreatedAt: T0.AddMinutes(1));
@@ -214,7 +224,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(rn2.ParkingOperators.Single().Homepage?.ToString(),                            Is.EqualTo("https://parking.example"));
 
                 // Old values for a later check.
-                Assert.That(cs.Changes[2].OldValue!["@id"]!.ToString(),                                    Is.EqualTo("space-2"));
+                Assert.That(cs.Changes[4].OldValue!["@id"]!.ToString(),                                    Is.EqualTo("space-2"));
+                Assert.That(changedSP1.EUVehicleCategories,                                               Is.EqualTo(new[] { EUVehicleCategory.M1, EUVehicleCategory.N1 }));
+                Assert.That(changedSP1.ParkingRestrictions,                                               Is.Empty);
 
                 // The status of the space survived its change, and that of its operator.
                 Assert.That(history.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, nameof(ParkingSpace), "space-1", out var spaceStatus),  Is.True);

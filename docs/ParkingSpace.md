@@ -45,6 +45,8 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `parkingSensorIds` | `ParkingSensorIds` | `ImmutableArray<ParkingSensor_Id>` | update/remove | The [parking sensors](ParkingSensor.md) watching it, of the same parking operator; ordered by identification (ordinal), none twice. |
 | `chargingStationIds` | `ChargingStationIds` | `ImmutableArray<ChargingStation_Id>` | update/remove | Charging stations reachable from it, of any operator of the network; ordered by identification (ordinal), none twice; each must exist. |
 | `parkingProductIds` | `ParkingProductIds` | `ImmutableArray<ParkingProduct_Id>` | update/remove | [Parking products](ParkingOperator.md#parking-products) of its parking operator offered here; ordered by identification (ordinal), none twice. |
+| `parkingRestrictions` | `ParkingRestrictions` | `ImmutableArray<ParkingRestrictionGroup>` | update/remove | Who may park there, as for a [charging pool](ChargingPool.md): `EMPLOYEES`, `EV_ONLY`, `PLUGGED`, `DISABLED` (persons with disabilities), `CUSTOMERS`, `TAXI`, `TENANTS`; ordinal order, each once. |
+| `euVehicleCategories` | `EUVehicleCategories` | `ImmutableArray<EUVehicleCategory>` | update/remove | The EU vehicle categories it is for, as for a [charging station](ChargingStation.md), e.g. `M1`; ordinal order, each once. |
 
 The arrays are written only when not empty. A change set names the properties by their JSON keys
 (`ChangeableParkingSpaceProperties` in

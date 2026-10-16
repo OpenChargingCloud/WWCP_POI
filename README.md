@@ -86,7 +86,7 @@ parking product ids compare case-sensitively.
   `CreditCard`, `SMS`; a type only once, in the order of the types). RFID may name card types and brands
   of the network; SMS and PhoneCall need their `number`. Their accessibility, as the OCPI Accessibility Extension:
   `services` (e.g. `ACCESSIBLE_CHARGING`, `ASSISTANCE`) and `standards` (e.g. `PAS 1899:2022`), sets of names,
-  and `assistanceServiceDetails`.
+  and `assistanceServiceDetails`. The NUTS regions it is in: `nutsCodes`, e.g. `DEG`.
 - **Charging station:** `address` and `geoLocation` when they differ from its pool's, `accessibility`, `vehicleTypes`,
   `euVehicleCategories` (e.g. `M1`) and `features` (sets of names), `calibrationInfo`/`certificationInfo` (URLs), `maxPower` (W) it delivers at once, at most that of its EVSEs together,
   `manufacturerId`/`modelId`, and the `parkingSpaceIds` of the network it charges at.
@@ -108,7 +108,8 @@ parking product ids compare case-sensitively.
   Its manufacturer is an energy meter manufacturer of the network (`name`, `description`, `address`,
   `homepage`, `hotline`, timestamps, without status).
 - **Parking:** a parking operator owns its garages, spaces and sensors directly. A space may name a
-  `parkingGarageId` and `parkingSensorIds` of the same operator; garages, spaces and sensors may name
+  `parkingGarageId` and `parkingSensorIds` of the same operator, and who (`parkingRestrictions`, e.g. `DISABLED`) and which
+  vehicles (`euVehicleCategories`) may park there; garages, spaces and sensors may name
   `chargingStationIds` of the network. All have admin status and status. Parking products (`minDuration`,
   `stopParkingAfterTime` in s, without status and timestamps) are named by `parkingProductIds` of garages,
   spaces and space groups of the same operator; they offer, they do not calculate prices.

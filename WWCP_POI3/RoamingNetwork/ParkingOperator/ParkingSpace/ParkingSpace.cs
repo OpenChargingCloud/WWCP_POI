@@ -90,6 +90,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ParkingProduct_Id>  ParkingProductIds  { get; }
 
+        /// <summary>
+        /// Who may park there, e.g. DISABLED for persons with disabilities, in the order of their names.
+        /// </summary>
+        public ImmutableArray<ParkingRestrictionGroup>  ParkingRestrictions  { get; }
+
+        /// <summary>
+        /// The EU vehicle categories it is for, e.g. M1 for passenger cars, in the order of their names.
+        /// </summary>
+        public ImmutableArray<EUVehicleCategory>        EUVehicleCategories  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -105,6 +115,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<ParkingSensor_Id>?               ParkingSensorIds             = null,
                             IEnumerable<ChargingStation_Id>?             ChargingStationIds           = null,
                             IEnumerable<ParkingProduct_Id>?              ParkingProductIds            = null,
+                            IEnumerable<ParkingRestrictionGroup>?        ParkingRestrictions          = null,
+                            IEnumerable<EUVehicleCategory>?              EUVehicleCategories          = null,
 
                             Timestamped<ParkingSpaceAdminStatusType>?    InitialAdminStatus           = null,
                             Timestamped<ParkingSpaceStatusType>?         InitialStatus                = null,
@@ -142,6 +154,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ParkingSensorIds    = POIJSON.OrderedIds(ParkingSensorIds,   $"parking sensor of the parking space '{Id}'");
             this.ChargingStationIds  = POIJSON.OrderedIds(ChargingStationIds, $"charging station of the parking space '{Id}'");
             this.ParkingProductIds = POIJSON.OrderedIds(ParkingProductIds, $"parking product of the parking space '{Id}'");
+            this.ParkingRestrictions  = POIJSON.OrderedIds(ParkingRestrictions, $"parking restriction of the parking space '{Id}'");
+            this.EUVehicleCategories  = POIJSON.OrderedIds(EUVehicleCategories, $"EU vehicle category of the parking space '{Id}'");
 
         }
 
@@ -235,6 +249,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ParkingProductIds.Length > 0)
                 json.Add("parkingProductIds",  POIJSON.IdsToJSON(ParkingProductIds));
 
+            if (ParkingRestrictions.Length > 0)
+                json.Add("parkingRestrictions",  POIJSON.IdsToJSON(ParkingRestrictions));
+
+            if (EUVehicleCategories.Length > 0)
+                json.Add("euVehicleCategories",  POIJSON.IdsToJSON(EUVehicleCategories));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -281,8 +301,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseIds(JSON, "parkingProductIds", "parking product identification", ParkingProduct_Id.TryParse, out ImmutableArray<ParkingProduct_Id> parkingProductIds, out ErrorResponse))
+                if (!POIJSON.TryParseIds(JSON, "parkingProductIds",   "parking product identification", ParkingProduct_Id.      TryParse, out ImmutableArray<ParkingProduct_Id>       parkingProductIds,    out ErrorResponse) ||
+                    !POIJSON.TryParseIds(JSON, "parkingRestrictions", "parking restriction",            ParkingRestrictionGroup.TryParse, out ImmutableArray<ParkingRestrictionGroup> parkingRestrictions,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds(JSON, "euVehicleCategories", "EU vehicle category",            EUVehicleCategory.      TryParse, out ImmutableArray<EUVehicleCategory>       euVehicleCategories,  out ErrorResponse))
+                {
                     return false;
+                }
 
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
@@ -301,6 +325,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 parkingSensorIds,
                                                 chargingStationIds,
                                                 parkingProductIds,
+                                                parkingRestrictions,
+                                                euVehicleCategories,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,

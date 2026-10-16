@@ -72,6 +72,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "parkingSensorIds",
             "chargingStationIds",
             "parkingProductIds",
+            "parkingRestrictions",
+            "euVehicleCategories",
             "customData"
         ];
 

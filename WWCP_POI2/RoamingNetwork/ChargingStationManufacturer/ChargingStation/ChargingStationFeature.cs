@@ -254,6 +254,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static ChargingStationFeature START_SESSION_CONNECTOR_REQUIRED
             => new("START_SESSION_CONNECTOR_REQUIRED");
 
+        /// <summary>
+        /// The charging station is illuminated at night.
+        /// </summary>
+        public static ChargingStationFeature Illuminated
+            => new("Illuminated");
+
+        /// <summary>
+        /// The charging station is roofed.
+        /// </summary>
+        public static ChargingStationFeature Roofed
+            => new("Roofed");
+
         #endregion
 
 

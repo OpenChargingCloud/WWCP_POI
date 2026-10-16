@@ -82,6 +82,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "services",
             "assistanceServiceDetails",
             "standards",
+            "nutsCodes",
             "customData"
         ];
 

@@ -240,6 +240,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<Standard>                  Standards                  { get; }
 
+        /// <summary>
+        /// The NUTS regions it is in, e.g. DEG (NUTS 1) and DEG03 (NUTS 3), in the order of their codes.
+        /// </summary>
+        public ImmutableArray<NUTSCode>                  NUTSCodes                  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -281,6 +286,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<LocationService>?                Services                     = null,
                             I18NString?                                  AssistanceServiceDetails     = null,
                             IEnumerable<Standard>?                       Standards                    = null,
+                            IEnumerable<NUTSCode>?                       NUTSCodes                    = null,
 
                             Timestamped<ChargingPoolAdminStatusType>?    InitialAdminStatus           = null,
                             Timestamped<ChargingPoolStatusType>?         InitialStatus                = null,
@@ -362,6 +368,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Services                  = POIJSON.OrderedIds(Services,   $"service of the charging pool '{Id}'");
             this.AssistanceServiceDetails  = AssistanceServiceDetails ?? ImmutableI18NString.Empty;
             this.Standards                 = POIJSON.OrderedIds(Standards,  $"standard of the charging pool '{Id}'");
+            this.NUTSCodes                 = POIJSON.OrderedIds(NUTSCodes,  $"NUTS code of the charging pool '{Id}'");
 
         }
 
@@ -547,6 +554,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Standards.Length > 0)
                 json.Add("standards",                 POIJSON.IdsToJSON(Standards));
 
+            if (NUTSCodes.Length > 0)
+                json.Add("nutsCodes",                 POIJSON.IdsToJSON(NUTSCodes));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -661,7 +671,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseObjects    (JSON, "relatedLocations",     "related location",        AdditionalGeoLocation.TryParse,           out ImmutableArray<AdditionalGeoLocation>   relatedLocations,     out ErrorResponse) ||
                     !POIJSON.TryParseIds        (JSON, "services",             "location service",        LocationService.TryParse,                 out ImmutableArray<LocationService>         services,             out ErrorResponse) ||
                     !POIJSON.TryParseI18N       (JSON, "assistanceServiceDetails", "assistance service details",                                    out var assistanceServiceDetails,                               out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "standards",            "standard",                Standard.TryParse,                        out ImmutableArray<Standard>                standards,            out ErrorResponse))
+                    !POIJSON.TryParseIds        (JSON, "standards",            "standard",                Standard.TryParse,                        out ImmutableArray<Standard>                standards,            out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "nutsCodes",            "NUTS code",               NUTSCode.TryParse,                        out ImmutableArray<NUTSCode>                nutsCodes,            out ErrorResponse))
                 {
                     return false;
                 }
@@ -712,6 +723,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 services,
                                                 assistanceServiceDetails,
                                                 standards,
+                                                nutsCodes,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,

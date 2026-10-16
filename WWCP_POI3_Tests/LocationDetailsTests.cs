@@ -82,12 +82,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                 ParkingRestrictions:  [ ParkingRestrictionGroup.EV_ONLY, ParkingRestrictionGroup.CUSTOMERS ],
                                                                                                                 RelatedLocations:     [ new AdditionalGeoLocation(GeoCoordinate.Parse(50.9280, 11.5900), new ImmutableI18NString(I18NString.Create(Languages.en, "Walkway"))),
                                                                                                                                         new AdditionalGeoLocation(GeoCoordinate.Parse(50.9260, 11.5880)) ],
+                                                                                                                NUTSCodes:            [ NUTSCode.Parse("deg03"), NUTSCode.Parse("DEG") ],
                                                                                                                 Created:              Created,
                                                                                                                 ChargingStations:     [ new ChargingStation(S1,
                                                                                                                                                             VehicleTypes:       [ VehicleType.VAN, VehicleType.MOTORCYCLE ],
                                                                                                                                                             EUVehicleCategories: [ EUVehicleCategory.M1, EUVehicleCategory.L3 ],
                                                                                                                                                             Accessibility:      AccessibilityType.RestrictedAccess,
-                                                                                                                                                            Features:           [ ChargingStationFeature.StatusInfoAvailable ],
+                                                                                                                                                            Features:           [ ChargingStationFeature.StatusInfoAvailable, ChargingStationFeature.Roofed ],
                                                                                                                                                             CalibrationInfo:    URL.Parse("https://gef.example/calibration"),
                                                                                                                                                             CertificationInfo:  URL.Parse("https://gef.example/certification"),
                                                                                                                                                             MaxPower:           Watt.FromW(44000),
@@ -176,7 +177,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(station["vehicleTypes"]!.Values<String>(),                       Is.EqualTo(new[] { "MOTORCYCLE", "VAN" }));
                 Assert.That(station["euVehicleCategories"]!.Values<String>(),                Is.EqualTo(new[] { "L3", "M1" }));
                 Assert.That(station["accessibility"]!.Value<String>(),                       Is.EqualTo("RestrictedAccess"));
-                Assert.That(station["features"]!.Values<String>(),                           Is.EqualTo(new[] { "StatusInfoAvailable" }));
+                Assert.That(station["features"]!.Values<String>(),                           Is.EqualTo(new[] { "Roofed", "StatusInfoAvailable" }));
+                Assert.That(pool["nutsCodes"]!.Values<String>(),                             Is.EqualTo(new[] { "DEG", "DEG03" }));
                 Assert.That(station["calibrationInfo"]!.Value<String>(),                     Is.EqualTo("https://gef.example/calibration"));
                 Assert.That(station["maxPower"]!.Value<Decimal>(),                           Is.EqualTo(44000m));
                 Assert.That(station["parkingSpaceIds"]!.Values<String>(),                    Is.EqualTo(new[] { "space-1", "space-2" }));
@@ -235,6 +237,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 ("related without location",  Changed(network => ((JObject) Pool(network)["relatedLocations"]![0]!).Remove("geoLocation")),                   "related location"),
                 ("EU category twice",         Changed(network => Station(network)["euVehicleCategories"] = new JArray("M1", "m1")),                           "must not be given twice"),
                 ("empty EU category",         Changed(network => Station(network)["euVehicleCategories"] = new JArray(" ")),                                  "EU vehicle category ' '"),
+                ("NUTS code too long",        Changed(network => Pool(network)["nutsCodes"] = new JArray("DEG0301")),                                       "NUTS code 'DEG0301'"),
+                ("NUTS code without country", Changed(network => Pool(network)["nutsCodes"] = new JArray("1")),                                             "NUTS code '1'"),
                 ("negative station power",    Changed(network => Station(network)["maxPower"]        = -1),                                                   "must not be negative"),
                 ("unknown parking space",     Changed(network => Station(network)["parkingSpaceIds"] = new JArray("space-9")),                                "parking space 'space-9' of the charging station 'DE*GEF*S1'"),
                 ("invalid calibration URL",   Changed(network => Station(network)["calibrationInfo"] = 42),                                                   "calibration information"),
@@ -269,6 +273,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                  RoamingNetworkChange.UpdateProperty(pool,     "timeZone",                null, "Europe/Paris"),
                                  RoamingNetworkChange.UpdateProperty(pool,     "paymentOptions",          null, new JArray("Free")),
                                  RoamingNetworkChange.UpdateProperty(pool,     "chargingWhenClosed",      null, true),
+                                 RoamingNetworkChange.UpdateProperty(pool,     "nutsCodes",               null, new JArray("DEG")),
                                  RoamingNetworkChange.RemoveProperty(pool,     "relatedLocations"),
                                  RoamingNetworkChange.UpdateProperty(station,  "parkingSpaceIds",         null, new JArray("space-2")),
                                  RoamingNetworkChange.UpdateProperty(station,  "maxPower",                null, 22000),
@@ -286,6 +291,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(pool2.TimeZone,                Is.EqualTo(Time_Zone.Parse("Europe/Paris")));
                 Assert.That(pool2.PaymentOptions,          Is.EqualTo(new[] { PaymentOptions.Free }));
                 Assert.That(pool2.ChargingWhenClosed,      Is.True);
+                Assert.That(pool2.NUTSCodes,               Is.EqualTo(new[] { NUTSCode.Parse("DEG") }));
+                Assert.That(pool2.NUTSCodes.Single().Level, Is.EqualTo(1));
                 Assert.That(pool2.RelatedLocations,        Is.Empty);
                 Assert.That(station2.ParkingSpaceIds,      Is.EqualTo(new[] { SP2 }));
                 Assert.That(station2.MaxPower?.Value,      Is.EqualTo(22000m));
