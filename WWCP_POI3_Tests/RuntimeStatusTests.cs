@@ -305,6 +305,34 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region A_planned_status_is_told_of_when_it_is_planned()
+
+        [Test]
+        public void A_planned_status_is_told_of_when_it_is_planned()
+        {
+
+            var history  = NewHistory();
+            var planned  = new List<POIStatusUpdate>();
+            var updates  = new List<POIStatusUpdate>();
+
+            history.RuntimeStatus.OnStatusPlanned += planned.Add;
+            history.RuntimeStatus.OnStatusUpdate  += updates.Add;
+
+            var due      = Timestamp.Now.AddHours(1);
+            var result   = history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, Operator, "DE*GEF", "outOfService", due, out _, out _);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result,                     Is.EqualTo(POIStatusUpdateResult.Scheduled));
+                Assert.That(Describe(planned),          Is.EqualTo(new[] { $"{Operator} DE*GEF AdminStatus outOfService {DateTimeOffset.FromUnixTimeMilliseconds(due.ToUnixTimeMilliseconds()):O}" }));
+                Assert.That(updates,                    Is.Empty, "It is not the current status yet.");
+                Assert.That(GEFOf(history).AdminStatus.Value,  Is.EqualTo(ChargingStationOperatorAdminStatusType.Operational));
+            }
+
+        }
+
+        #endregion
+
         #region Describe(Statuses)
 
         private static String[] Describe(IEnumerable<POIStatusUpdate> Statuses)

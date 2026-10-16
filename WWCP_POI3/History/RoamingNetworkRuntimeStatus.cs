@@ -72,7 +72,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// The admin status and status of the entities of the head version of a history, by their names:
     /// for the WebSocket and for followers. The status itself is kept by the entities, typed, in their
     /// status schedules, which all versions of an entity share. Setting it here or at the entity is the same:
-    /// either way OnStatusUpdate tells of it. A planned status is told of when it becomes the current one.
+    /// either way OnStatusUpdate tells of it. A planned status is told of when it becomes the current one, and
+    /// OnStatusPlanned tells that it is planned.
     /// </summary>
     /// <remarks>
     /// An update with an earlier timestamp than the current status goes into the history of the entity only,
@@ -123,6 +124,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// while the status schedule of the entity is locked: return quickly and do not set a status from there.
         /// </summary>
         public event OnPOIStatusUpdateDelegate? OnStatusUpdate;
+
+        /// <summary>
+        /// Called for every admin status, status or energy status planned by TryUpdate, with the timestamp it will be
+        /// due at, e.g. a reservation or an announced maintenance; OnStatusUpdate tells of it again when it is due.
+        /// Return quickly and do not set a status from there.
+        /// </summary>
+        public event OnPOIStatusUpdateDelegate? OnStatusPlanned;
 
         #endregion
 
@@ -758,6 +766,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 case POIStatusUpdateResult.Scheduled:
                     ErrorResponse = null;
                     SchedulePlannedStatus();
+                    RaisePlanned(new POIStatusUpdate(Kind, EntityType, EntityId, at, normalized!, oldTimestamp, oldValue, DataSource));
                     break;
 
                 case POIStatusUpdateResult.Updated:
@@ -1698,6 +1707,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (private) RaisePlanned(StatusUpdate)
+
+        /// <summary>
+        /// Tell of a planned status; one failing subscriber must neither fail the update nor keep it from the others.
+        /// </summary>
+        private void RaisePlanned(POIStatusUpdate StatusUpdate)
+        {
+            foreach (var subscriber in OnStatusPlanned?.GetInvocationList().Cast<OnPOIStatusUpdateDelegate>() ?? [])
+            {
+                try
+                {
+                    subscriber(StatusUpdate);
+                }
+                catch
+                { }
+            }
+        }
+
+        #endregion
 
         #region (private) SchedulePlannedStatus()
 
