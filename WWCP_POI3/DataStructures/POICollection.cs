@@ -83,6 +83,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly ImmutableArray<TId>                                                           ids;
         private readonly ImmutableDictionary<TId, TEntity>                                             index;
         private readonly ConcurrentDictionary<(String View, ETagFormat Format), Lazy<POIRepresentation>>  representations = new ();
+        private          ImmutableArray<TEntity>?                                                      inNaturalOrder;
 
         #endregion
 
@@ -98,6 +99,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<TEntity>             Items
             => items;
+
+        /// <summary>
+        /// The children in the natural order of their identifications, for a list to read: P1, P2, P10.
+        /// Calculated the first time only; not the order of the representations.
+        /// </summary>
+        public ImmutableArray<TEntity>             InNaturalOrder
+            => inNaturalOrder ??= [.. Enumerable.Range(0, items.Length).
+                                          OrderBy(position => ids[position].ToString(), POINaturalOrder.Instance).
+                                          Select (position => items[position])];
 
         /// <summary>
         /// The identifications of the children, in their order.

@@ -39,7 +39,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     /// <remarks>
     /// GET ~/RNs                                                                  the roaming networks, in short
-    /// GET ~/RNs/{RN_Id}                                                          the roaming network
+    /// GET ~/RNs/{RN_Id}                                                          the roaming network;
+    ///                                                                             ?without=chargingStationOperators,… without what
+    ///                                                                             it holds, each of them with a list of its own
     /// GET ~/RNs/{RN_Id}/CSOs                                                     its charging station operators, in short
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}                                            a charging station operator;
     ///     ?without=chargingPools leaves out its charging pools, which ~/RNs/{RN_Id}/CPs?operatorId=… lists;
@@ -107,9 +109,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// station operator is a white-label solution for its brands, a charging pool, charging station or EVSE also
     /// appears under its brands. The levels are not mixed: the brands of a pool are not those of its operator.
     ///
-    /// The roaming network is the head of its history, when served with one, else the one added.
-    /// A list is an array of { "@id", "name", "description" } in the order of the identifications,
-    /// with the ETag of the list.
+    /// The roaming network is the head of its history, when served with one, else the one added. Without what it
+    /// holds, it is what it says of itself, with its ETags, the ones of all of it.
+    /// A list is an array of { "@id", "name", "description" } in the natural order of the identifications, P1, P2,
+    /// P10, with the ETag of the list; so is a list of what an entity embeds, which embeds them in their ordinal order.
     /// An entity is the representation its roaming network embeds, so its ETag is the one of that
     /// part of the roaming network: SHA-256 over its canonical JSON or canonical CBOR, which is also
     /// the content of the response. An expanded or a slimmer view is another representation with its own ETag. The roaming network carries its own ETags, calculated without them.
@@ -144,6 +147,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The view of a collection as a list of its children in short.
         /// </summary>
         private const           String       SummariesView        = "summaries";
+
+        /// <summary>
+        /// What a roaming network may leave out: what it holds, each of them with a list of its own.
+        /// </summary>
+        private static readonly String[]     RoamingNetworkOmittables = [ "chargingStationManufacturers", "chargingStationOperators", "eMobilityProviders", "gridOperators", "parkingOperators" ];
 
         /// <summary>
         /// The view of a collection as a list of its children as their parent embeds them.
@@ -342,7 +350,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       return errorResponse;
                                   }
 
-                                  // Every part: Hermod splits a value at its commas, and GetString(…) would be the last part only.
+                                  // Every part of every parameter of its name: a list, separated by commas or given more than once.
                                   var expansions = request.QueryString.GetStrings("expand").
                                                        SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).
                                                        ToArray();
@@ -777,12 +785,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      if (!TryParseListQuery(request, [], out var query, out errorResponse))
                                          return errorResponse;
 
+                                     // In the natural order of their identifications, not in the one their entity embeds them in.
                                      return QueryResponse<TEntity>(request,
                                                                    query,
-                                                                   () => collection,
+                                                                   () => collection.InNaturalOrder,
                                                                    child => SearchTextOf(child, () => ToJSON(child)),
                                                                    entries => new JArray(entries.Select(ToJSON)),
-                                                                   format => collection.Representation(EmbeddedView, format, () => new JArray(collection.Select(ToJSON))),
+                                                                   format => collection.Representation(EmbeddedView, format, () => new JArray(collection.InNaturalOrder.Select(ToJSON))),
                                                                    collection.Count);
 
                                  });
@@ -979,7 +988,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            // Every part: Hermod splits a value at its commas, and GetString(…) would be the last part only.
+            // Every part of every parameter of its name: a list, separated by commas or given more than once.
             var views = Request.QueryString.GetStrings("view").
                                 SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).
                                 Distinct().
@@ -1139,7 +1148,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return errorResponse;
 
             var versions  = RoamingNetworksServed().
-                                OrderBy(roamingNetwork => roamingNetwork.Id.ToString(), StringComparer.Ordinal).
+                                OrderBy(roamingNetwork => roamingNetwork.Id.ToString(), POINaturalOrder.Instance).
                                 ToArray();
 
             var served    = roamingNetworksServed;
@@ -1171,10 +1180,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     RoamingNetwork  RoamingNetwork)
         {
 
+            if (!TryParseOmissions(Request, RoamingNetworkOmittables, "a roaming network", out var omissions, out var errorResponse))
+                return errorResponse;
+
             var format      = FormatOf(Request);
             var cbor        = format == ETagFormat.CBOR;
             var eTags       = RoamingNetwork.ETags.IsDefault ? [] : RoamingNetwork.ETags;
             var stored      = eTags.Where(eTag => eTag.Format == format).ToArray();
+
+            // Without what it holds: what it says of itself, with the ETags of all of it, kept as every other view.
+            // Its ETags may be calculated after it was served: a view of each number of them.
+            if (omissions.Length > 0)
+                return CachedEntityResponse(Request,
+                                            RoamingNetwork,
+                                            () => {
+                                                var json = RoamingNetwork.ToJSON();
+                                                foreach (var omission in omissions)
+                                                    json.Remove(omission);
+                                                return json;
+                                            },
+                                            View: $"without={String.Join(",", omissions)};eTags={eTags.Length}");
 
             if (stored.Length > 0)
                 return EntityResponse(Request,
@@ -1205,8 +1230,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) EntitySummaries       (Entities)
 
         /// <summary>
-        /// A list of the given entities: { "@id", "name", "description" } in the order of their identifications,
-        /// without an empty name or description.
+        /// A list of the given entities: { "@id", "name", "description" } in the natural order of their
+        /// identifications, without an empty name or description.
         /// </summary>
         private static JArray EntitySummaries<TId, TAdminStatus, TStatus>(IEnumerable<AImmutableEMobilityEntity<TId, TAdminStatus, TStatus>> Entities)
 
@@ -1215,7 +1240,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             where TStatus      : IComparable
 
             => new (Entities.
-                        OrderBy(entity => entity.Id.ToString(), StringComparer.Ordinal).
+                        OrderBy(entity => entity.Id.ToString(), POINaturalOrder.Instance).
                         Select (entity => {
 
                             var json = new JObject(
@@ -1302,18 +1327,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                          String         Description)
         {
 
-            // Hermod splits a value at its commas: GetString(…) would be the last part only.
-            var omissions = Request.QueryString.GetStrings("without").
-                                    SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).
-                                    Distinct().
-                                    Order(StringComparer.Ordinal).
-                                    ToArray();
-
-            foreach (var omission in omissions)
-                if (!Omittables.Contains(omission))
-                    return EntityErrorResponse(Request,
-                                               HTTPStatusCode.BadRequest,
-                                               $"Unknown omission '{omission}'; {Description} leaves out only {String.Join(", ", Omittables.Select(omittable => $"'{omittable}'"))}!");
+            if (!TryParseOmissions(Request, Omittables, Description, out var omissions, out var errorResponse))
+                return errorResponse;
 
             if (omissions.Length == 0)
                 return CachedEntityResponse(Request, Version, JSON);
@@ -1327,6 +1342,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             return json;
                                         },
                                         View: "without=" + String.Join(",", omissions));
+
+        }
+
+        #endregion
+
+        #region (private static) TryParseOmissions     (Request, Omittables, Description, out Omissions, out ErrorResponse)
+
+        /// <summary>
+        /// The parts ?without=… names, separated by commas or each in a parameter of its own, each once and in
+        /// ordinal order, whatever the order they are named in; or the refusal of one the entity cannot leave out.
+        /// </summary>
+        /// <param name="Omittables">The properties the entity may leave out, e.g. its children with a list of their own.</param>
+        /// <param name="Description">What the entity is, e.g. "a grid operator", for a refusal.</param>
+        private static Boolean TryParseOmissions(HTTPRequest                             Request,
+                                                 String[]                                Omittables,
+                                                 String                                  Description,
+                                                 out String[]                            Omissions,
+                                                 [NotNullWhen(false)] out HTTPResponse?  ErrorResponse)
+        {
+
+            Omissions = [.. Request.QueryString.GetStrings("without").
+                                    SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).
+                                    Distinct().
+                                    Order(StringComparer.Ordinal)];
+
+            foreach (var omission in Omissions)
+                if (!Omittables.Contains(omission))
+                {
+                    ErrorResponse = EntityErrorResponse(Request,
+                                                        HTTPStatusCode.BadRequest,
+                                                        $"Unknown omission '{omission}'; {Description} leaves out only {String.Join(", ", Omittables.Select(omittable => $"'{omittable}'"))}!");
+                    return false;
+                }
+
+            ErrorResponse = null;
+            return true;
 
         }
 

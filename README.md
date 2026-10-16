@@ -415,13 +415,19 @@ JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json
 | Request | Returns |
 |---|---|
 | `GET ~/RNs` | the roaming networks, as `{@id, name, description}` |
-| `GET ~/RNs/{RN_Id}` | the roaming network, the head of its history |
+| `GET ~/RNs/{RN_Id}` | the roaming network, the head of its history; with `?without=chargingStationOperators,…` without what it holds |
 | `GET ~/RNs/{RN_Id}/{CSOs\|GOs\|EMPs\|CSMs\|POs}` | its charging station operators, grid operators, e-mobility providers, charging station manufacturers or parking operators, as `{@id, name, description}` |
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}[/CPs/{CP_Id}[/CSs/{CS_Id}[/EVSEs/{EVSE_Id}]]]` | an operator, pool, station or EVSE as its parent embeds it; a pool with `?expand=gridConnectionPoint` |
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs[/{PS_Id}]` | the parking spaces a charging station names, or one of them: of parking operators or of its charging station operator, each as its operator embeds it |
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}[/CPs/{CP_Id}[/CSs/{CS_Id}[/EVSEs/{EVSE_Id}]]]/Brands[/{Brand_Id}]` | the brands of an operator, pool, station or EVSE, its own, or one of them |
 | `GET ~/RNs/{RN_Id}/GOs/{GO_Id}[/GCPs/{GCP_Id}]` | a grid operator, or one of its grid connection points |
 | `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer or parking operator |
+| `GET ~/RNs/{RN_Id}/{CPs\|CSs\|EVSEs}/{Id}` | `307 Temporary Redirect` to where a charging pool, station or EVSE is, below its operator, the query kept |
+
+What names a charging station or an EVSE names it by its identification only: a group of its operator, a parking
+garage, space or sensor of a parking operator. `~/RNs/{RN_Id}/CSs/{CS_Id}` finds it in the roaming network, e.g. for
+a link, and redirects to `~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}`, a browser as well; temporarily, as a
+station may move to another pool of its operator. One not there is `404`.
 
 Versions are immutable and their runtime status is no part of these representations, so each one is calculated
 once per version and format and kept as long as the version is referenced; an entity a commit does not change is
@@ -433,7 +439,10 @@ calculated for every request.
 The lists are the QUERY interface, beside the synchronization above: `GET ~/RNs/{RN_Id}/CPs` lists the charging
 pools of all charging station operators of a roaming network, each as its operator embeds it, with
 `chargingStationOperator: {@id, name}`; `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}?without=chargingPools` is the operator
-without them, so that a large one is not read whole to show what it says of itself. So is
+without them, so that a large one is not read whole to show what it says of itself. So is the roaming network
+without any of `chargingStationOperators`, `gridOperators`, `eMobilityProviders`, `chargingStationManufacturers` and
+`parkingOperators`, each listed by `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}`, with its `eTags`, the ones of all of it;
+and
 `GET ~/RNs/{RN_Id}/GOs/{GO_Id}?without=gridConnectionPoints`, and `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs` lists them as
 the grid operator embeds them; a charging station operator without any of `chargingTariffs`, `chargingTariffGroups`,
 `chargingPoolGroups`, `chargingStationGroups` and `EVSEGroups` as well, listed by
@@ -455,7 +464,9 @@ the lists of what an operator embeds as well, takes:
 | `operatorId` | `CPs` only: the charging pools of one charging station operator |
 | `offset`, `limit` | the part of the matching entries; all of them without `limit`, which is at least 1 |
 
-Entries are in the ordinal order of their identifications. `X-Total-Count` says how many entries the list has,
+Entries are in the natural order of their identifications, a run of digits by its number: `P1`, `P2`, `P10`. What
+an entity embeds stays in their ordinal order, the one of its canonical JSON and its ETag. `X-Total-Count` says how
+many entries the list has,
 `X-Filtered-Count` how many match, and `Link` names the `next` and the `prev` page; the `ETag` is the one of the
 returned content. A list without any of them is kept with its version, as above.
 

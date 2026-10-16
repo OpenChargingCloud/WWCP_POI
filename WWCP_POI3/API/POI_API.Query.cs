@@ -45,7 +45,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///            a word starting with "!" must not be contained,
     /// - offset:  the number of matching entries to skip,
     /// - limit:   the maximum number of entries to return, at least 1.
-    /// Entries are in the ordinal order of their identifications. X-Total-Count is the number of all entries,
+    /// Entries are in the natural order of their identifications, a run of digits by its number: P1, P2, P10.
+    /// X-Total-Count is the number of all entries,
     /// X-Filtered-Count the number of matching ones, and Link names the next and the previous page.
     /// The ETag is the one of the returned content. A list without any of these is kept with its version.
     /// </remarks>
@@ -137,7 +138,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         ChargingPool             Pool);
 
         /// <summary>
-        /// The charging pools of all charging station operators of one version of a roaming network, in the ordinal
+        /// The charging pools of all charging station operators of one version of a roaming network, in the natural
         /// order of their identifications, with the representations of the whole list.
         /// </summary>
         private sealed class PoolIndex(IReadOnlyList<PoolEntry> Entries)
@@ -219,13 +220,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The charging pools of all charging station operators of the given roaming network, the effective ones, with the
-        /// properties their groups give them, in the ordinal order of their identifications.
+        /// properties their groups give them, in the natural order of their identifications.
         /// </summary>
         private static PoolIndex PoolsOf(RoamingNetwork RoamingNetwork)
 
             => new ([.. RoamingNetwork.ChargingStationOperators.
                             SelectMany(chargingStationOperator => chargingStationOperator.EffectiveChargingPools.Select(chargingPool => new PoolEntry(chargingStationOperator, chargingPool))).
-                            OrderBy   (entry => entry.Pool.Id.ToString(), StringComparer.Ordinal)]);
+                            OrderBy   (entry => entry.Pool.Id.ToString(), POINaturalOrder.Instance)]);
 
         #endregion
 
@@ -338,8 +339,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            // Every part: Hermod splits a value at its commas, and GetString(…) would be the last part only,
-            // e.g. "nord" of "jena, nord". A comma separates words as a space does.
+            // Every part of every match: a comma separates words as a space does, and a word given in a match of
+            // its own is one more word, e.g. ?match=jena,nord&amp;match=!süd.
             var match = String.Join(" ", Request.QueryString.GetStrings("match"));
 
             Query = new ListQuery(match.Length > 0 ? match : null,
