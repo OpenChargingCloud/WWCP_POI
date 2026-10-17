@@ -7,8 +7,8 @@ one whose data it changes:
 | Revision | Signed by | Commit |
 |---|---|---|
 | 0 | the hub, as the roaming network operator (RNO) | Genesis: the roaming network `QA`, operated by the hub |
-| 1 | the hub, as the RNO | `Add` of the charging station operator `DE*QAC`, with the public halves of its keys |
-| 2 | `DE*QAC` | `Add` of the charging pool `DE*QAC*P1` with the charging station `DE*QAC*S1` and the EVSEs `DE*QAC*E1*1` and `DE*QAC*E1*2` |
+| 1 | the hub, as the RNO | `Add` of the charging station operator `DE*GEF`, with the public halves of its keys |
+| 2 | `DE*GEF` | `Add` of the charging pool `DE*GEF*P1` with the charging station `DE*GEF*S1` and the EVSEs `DE*GEF*E1*1` and `DE*GEF*E1*2` |
 
 The hub is the [RoamingNetworkOperator](../docs/RoamingNetworkOperator.md) of every roaming network it makes: it
 makes its keys at its first start, and its signing key signs the change sets that are the RNO's - the network itself,
@@ -35,11 +35,11 @@ A first start, beside an empty `configuration.json` or none, makes up what the h
 - **no roaming network**: `poi/` stays empty until one is made.
 
 ```
-15:38:51.445 [notice poi security] This hub is the roaming network operator 'RNO-103B0540' now: its signing key 784c5f9e6ae32260… and its identity key 103b0540a41fb6c0… were made in '…\roamingNetworkOperator'. Keep a copy of them where nobody else can read it: without its identity key, the keys of the roaming networks it operates can never be replaced.
+20:16:08.050 [notice poi security] This hub is the roaming network operator 'RNO-67BDC1FC' now: its signing key 882bbf1af577e9dd… and its identity key 67bdc1fcdf7c9816… were made in '…\roamingNetworkOperator'. Keep a copy of them where nobody else can read it: without its identity key, the keys of the roaming networks it operates can never be replaced.
 …
-15:38:51.662 [info poi] The points of interest are at http://127.0.0.1:2356/poi/RNs (0 roaming network(s)).
+20:16:09.353 [info poi] The points of interest are at http://127.0.0.1:2356/poi/RNs (0 roaming network(s)).
 …
-  RNO             this hub is the roaming network operator 'RNO-103B0540', made now, its keys in …\roamingNetworkOperator; 0 roaming network(s) operated
+  RNO             this hub is the roaming network operator 'RNO-67BDC1FC', made now, its keys in …\roamingNetworkOperator; 0 roaming network(s) operated
 ```
 
 Its identification is `RNO-` and the first eight hex digits of its identity key, unless the configuration file names
@@ -59,13 +59,13 @@ At the prompt, or over SSH, the hub says who it is, with the public halves of it
 
 ```
 RoamingHub> roamingNetworkOperator
-This hub is the roaming network operator 'RNO-103B0540', since 2026-10-17T13:38:51.443Z.
-  signing key   784c5f9e6ae322609643dc8b9b70945eb03daf90abf83e6b2f9d9c14835e30d4  pAECIAEhWCAxcg8YFtfTUWXEXoQQIaalzXEO…
-  identity key  103b0540a41fb6c0c12edfc65da0b4f9b75f4028320ad1fc35c5fdc0bb6b20d3  pAECIAMhWEIByCvzPoUTwLnJnuUfg14i0vaU…
+This hub is the roaming network operator 'RNO-67BDC1FC', since 2026-10-17T18:16:07.776Z.
+  signing key   882bbf1af577e9ddc8e3d34f7bc9d2a6545a0dab550fb29997341adb14696f0b  pAECIAEhWCAbOtp6vLF9O5vtI3DcT+RW+AqE…
+  identity key  67bdc1fcdf7c9816854d4a0a1213879b8ef72a7bf748be99158ffa6a6cc634db  pAECIAMhWEIA6+39oKTPVUAl1v42uBNpUy6M…
   its private keys are kept in '…\roamingNetworkOperator'
   it operates no roaming network yet: 'roamingNetworks add <id> [<name>]' makes one
 RoamingHub> roamingNetworks
-This hub serves no roaming network yet: 'roamingNetworks add <id> [<name>]' makes one, operated by this hub, 'RNO-103B0540'.
+This hub serves no roaming network yet: 'roamingNetworks add <id> [<name>]' makes one, operated by this hub, 'RNO-67BDC1FC'.
 ```
 
 `GET /api/v1/poi/roamingNetworkOperator` answers with `operator.json`, public as it is in every roaming network the
@@ -73,11 +73,11 @@ hub operates:
 
 ```json
 {
-  "@id":          "RNO-103B0540",
-  "signingKeys":  [ { "@id": "784c5f9e…", "key": "pAECIAEh…" } ],
-  "identityKeys": [ { "@id": "103b0540…", "key": "pAECIAMh…" } ],
-  "created":      "2026-10-17T13:38:51.443Z",
-  "lastChange":   "2026-10-17T13:38:51.443Z"
+  "@id":          "RNO-67BDC1FC",
+  "signingKeys":  [ { "@id": "882bbf1a…", "key": "pAECIAEh…" } ],
+  "identityKeys": [ { "@id": "67bdc1fc…", "key": "pAECIAMh…" } ],
+  "created":      "2026-10-17T18:16:07.776Z",
+  "lastChange":   "2026-10-17T18:16:07.776Z"
 }
 ```
 
@@ -88,7 +88,7 @@ By an administrator (`poi:edit`), with nothing but its identification and its na
 
 ```
 RoamingHub> roamingNetworks add QA Quality assurance
-The roaming network 'QA' was made, at revision 0, commit 4d99ddd0…, operated by this hub, 'RNO-103B0540'. Its parties are added now, with change sets this hub signs.
+The roaming network 'QA' was made, at revision 0, commit 1d728939…, operated by this hub, 'RNO-67BDC1FC'. Its parties are added now, with change sets this hub signs.
 Next: 'roamingNetworks QA add chargingStationOperator <id> signingKey <key> identityKey <key> [<name>]'.
 http://127.0.0.1:2356/poi/RNs/QA
 ```
@@ -104,14 +104,14 @@ its operator with its keys; it has none of its own:
   "@id":        "QA",
   "name":       { "en": "Quality assurance" },
   "roamingNetworkOperator": {
-    "@id":          "RNO-103B0540",
-    "signingKeys":  [ { "@id": "784c5f9e…", "key": "pAECIAEh…" } ],
-    "identityKeys": [ { "@id": "103b0540…", "key": "pAECIAMh…" } ],
-    "created":      "2026-10-17T13:38:51.443Z",
-    "lastChange":   "2026-10-17T13:38:51.443Z"
+    "@id":          "RNO-67BDC1FC",
+    "signingKeys":  [ { "@id": "882bbf1a…", "key": "pAECIAEh…" } ],
+    "identityKeys": [ { "@id": "67bdc1fc…", "key": "pAECIAMh…" } ],
+    "created":      "2026-10-17T18:16:07.776Z",
+    "lastChange":   "2026-10-17T18:16:07.776Z"
   },
-  "created":    "2026-10-17T13:38:52.114Z",
-  "lastChange": "2026-10-17T13:38:52.114Z",
+  "created":    "2026-10-17T18:16:11.065Z",
+  "lastChange": "2026-10-17T18:16:11.065Z",
   "eTags": [ [ "json", "sha256", "hex", "…" ], [ "cbor", "sha256", "hex", "…" ] ]
 }
 ```
@@ -121,18 +121,18 @@ roaming network operator - as every commit the hub makes of a roaming network it
 
 ```json
 {
-  "@id":              "4d99ddd0…",
+  "@id":              "1d728939…",
   "roamingNetworkId": "QA",
   "revision":         0,
-  "eTags":            [ [ "json", "sha256", "hex", "248ebf99…" ], [ "cbor", "sha256", "hex", "222794eb…" ] ],
+  "eTags":            [ [ "json", "sha256", "hex", "30e444f0…" ], [ "cbor", "sha256", "hex", "f8ca0e26…" ] ],
   "signatures": [
     {
       "role":      "roamingNetworkOperator",
-      "signer":    "RNO-103B0540",
-      "signedAt":  "2026-10-17T13:38:52.160Z",
+      "signer":    "RNO-67BDC1FC",
+      "signedAt":  "2026-10-17T18:16:11.230Z",
       "algorithm": "ES256",
-      "keyId":     "784c5f9e…",
-      "value":     "u2X+7gWA…",
+      "keyId":     "882bbf1a…",
+      "value":     "bcPUbnak…",
       "profile":   "wwcp-poi-commit-signature-v1",
       "encoding":  "base64"
     }
@@ -141,9 +141,9 @@ roaming network operator - as every commit the hub makes of a roaming network it
 ```
 
 
-## 3. The first charging station operator: `DE*QAC`
+## 3. The first charging station operator: `DE*GEF`
 
-`DE*QAC` makes its own keys and keeps them; the hub gets only their public halves. A console project with
+`DE*GEF` makes its own keys and keeps them; the hub gets only their public halves. A console project with
 WWCP_POI3, e.g. in `examples/Example1/`, the same program as in step 4:
 
 ```xml
@@ -186,24 +186,32 @@ static ECPrivateKeyParameters NewKey(COSECurve Curve)
     return (ECPrivateKeyParameters) generator.GenerateKeyPair().Private;
 }
 
-// The keys of DE*QAC: kept here, and only their public halves, the Base64 of their COSE keys, given to the hub.
-var qacSigningKey   = NewKey(COSECurve.P256);
-var qacIdentityKey  = NewKey(COSECurve.P521);
+// The keys of DE*GEF: kept here, and only their public halves, the Base64 of their COSE keys, given to the hub.
+var gefSigningKey   = NewKey(COSECurve.P256);
+var gefIdentityKey  = NewKey(COSECurve.P521);
 
-Console.WriteLine($"signingKey  {POIPublicKey.From(qacSigningKey). ToJSON()["key"]}");
-Console.WriteLine($"identityKey {POIPublicKey.From(qacIdentityKey).ToJSON()["key"]}");
+Console.WriteLine($"signingKey  {POIPublicKey.From(gefSigningKey). ToJSON()["key"]}");
+Console.WriteLine($"identityKey {POIPublicKey.From(gefIdentityKey).ToJSON()["key"]}");
+Console.WriteLine("Add DE*GEF with these keys at the hub, then press Enter.");
+Console.ReadLine();
+```
+
+```
+signingKey  pAECIAEhWCB5Vy8gs2bOr0hjZtbdc/XbBab5nzh3mkRz7A9iGuDKISJY…
+identityKey pAECIAMhWEIB4zA7f9XhNrIzPv42Zza3sqVlH+RfPf3ukr4R7y5nrh0H…
+Add DE*GEF with these keys at the hub, then press Enter.
 ```
 
 An administrator adds it, and the hub signs it as the RNO: adding a party is the RNO's.
 
 ```
-RoamingHub> roamingNetworks QA add chargingStationOperator DE*QAC signingKey pAECIAEhWCATKrct… identityKey pAECIAMhWEIBQLmZ… QA Charging
-The ChargingStationOperator 'DE*QAC' was added to the roaming network 'QA', at revision 1, commit d403e4d9…. It adds its data now, with change sets it signs.
+RoamingHub> roamingNetworks QA add chargingStationOperator DE*GEF signingKey pAECIAEhWCB5Vy8g… identityKey pAECIAMhWEIB4zA7… GraphDefined
+The ChargingStationOperator 'DE*GEF' was added to the roaming network 'QA', at revision 1, commit adcb769c…. It adds its data now, with change sets it signs.
 RoamingHub> roamingNetworks QA
-QA  revision 1, commit d403e4d9…  Quality assurance
-  operated by 'RNO-103B0540', this hub
-  RoamingNetworkOperator RNO-103B0540  signing key(s) 784c5f9e6ae32260…, identity key(s) 103b0540a41fb6c0…
-  ChargingStationOperator DE*QAC  signing key(s) f64385e056011b22…, identity key(s) c0dc20a6328a2956…
+QA  revision 1, commit adcb769c…  Quality assurance
+  operated by 'RNO-67BDC1FC', this hub
+  RoamingNetworkOperator RNO-67BDC1FC  signing key(s) 882bbf1af577e9dd…, identity key(s) 67bdc1fcdf7c9816…
+  ChargingStationOperator DE*GEF  signing key(s) a3fec322ff2c43e0…, identity key(s) 62756187531ce24f…
 http://127.0.0.1:2356/poi/RNs/QA
 ```
 
@@ -212,10 +220,10 @@ Base64 of its COSE key or `{"key": …}`:
 
 ```json
 {
-  "@id":          "DE*QAC",
-  "name":         { "en": "QA Charging" },
-  "signingKeys":  [ "pAECIAEhWCATKrct…" ],
-  "identityKeys": [ "pAECIAMhWEIBQLmZ…" ]
+  "@id":          "DE*GEF",
+  "name":         { "en": "GraphDefined" },
+  "signingKeys":  [ "pAECIAEhWCB5Vy8g…" ],
+  "identityKeys": [ "pAECIAMhWEIB4zA7…" ]
 }
 ```
 
@@ -226,29 +234,29 @@ its own to add. E-mobility providers, grid operators and parking operators are a
 `…/parkingOperators` over HTTP; a grid operator not taking part without keys.
 
 
-## 4. `DE*QAC` commits its first charging pool
+## 4. `DE*GEF` commits its first charging pool
 
 One `Add` of the pool, with its station and both EVSEs embedded, signed with the operator's signing key, made for
 the version the operator read from the hub and submitted to it - by anybody, without signing in: whether a change set
-may change what it changes, its signatures decide. The same program as in step 3:
+may change what it changes, its signatures decide. The same program as in step 3, after Enter:
 
 ```csharp
-using var http      = new HttpClient { BaseAddress = new Uri("http://127.0.0.1:2356/poi/") };
+using var http      = new HttpClient { BaseAddress = new Uri((args.FirstOrDefault() ?? "http://127.0.0.1:2356/") + "poi/") };
 
 // The head of QA, as the hub serves it: checked against its ETags as it is read.
 if (!RoamingNetwork.TryParse(JObject.Parse(await http.GetStringAsync("RNs/QA")), out var head, out var error))
     throw new InvalidOperationException(error);
 
 var pool            = new ChargingPool(
-                          ChargingPool_Id.Parse("DE*QAC*P1"),
-                          Name:              I18NString.Create(Languages.en, "QA Pool 1"),
+                          ChargingPool_Id.Parse("DE*GEF*P1"),
+                          Name:              I18NString.Create(Languages.en, "Jena Paradies"),
                           GeoLocation:       GeoCoordinate.Parse(50.9271, 11.5892),
                           ChargingStations:  [
                               new ChargingStation(
-                                  ChargingStation_Id.Parse("DE*QAC*S1"),
+                                  ChargingStation_Id.Parse("DE*GEF*S1"),
                                   EVSEs: [
-                                      new EVSE(EVSE_Id.Parse("DE*QAC*E1*1"), MaxPower: Watt.FromW(11000)),
-                                      new EVSE(EVSE_Id.Parse("DE*QAC*E1*2"), MaxPower: Watt.FromW(11000))
+                                      new EVSE(EVSE_Id.Parse("DE*GEF*E1*1"), MaxPower: Watt.FromW(11000)),
+                                      new EVSE(EVSE_Id.Parse("DE*GEF*E1*2"), MaxPower: Watt.FromW(11000))
                                   ]
                               )
                           ]
@@ -256,7 +264,7 @@ var pool            = new ChargingPool(
 
 var addPool         = head.CreateChangeSet([ RoamingNetworkChange.Add(pool) ],
                                            Description: new ImmutableI18NString(I18NString.Create(Languages.en, "The first charging pool"))).
-                           Sign(qacSigningKey, POIPublicKey.From(qacSigningKey).Id, COSEAlgorithm.ES256);
+                           Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);
 
 using var request   = new HttpRequestMessage(new HttpMethod("COMMIT"), "RNs/QA/history/changeSets") {
                           Content = new StringContent(addPool.ToJSON().ToString(), Encoding.UTF8, "application/json")
@@ -271,27 +279,27 @@ using var response  = await http.SendAsync(request);   // 201 Created
 ```json
 {
   "status":          "Committed",
-  "@id":             "e2e6fe42…",
+  "@id":             "2d2a60b9…",
   "revision":        2,
-  "parentIds":       [ "d403e4d9…" ],
-  "changeSetId":     "bjS8G6tth41fpSv1f9p2W6tKUWWj7C3b",
-  "createdAt":       "2026-10-17T13:38:53.249Z",
+  "parentIds":       [ "adcb769c…" ],
+  "changeSetId":     "MSQ5AtSUtAG8542fS12Yh6rCW7x8xv2G",
+  "createdAt":       "2026-10-17T18:16:17.709Z",
   "description":     { "en": "The first charging pool" },
   "numberOfChanges": 1,
-  "signatureKeyIds": [ "f64385e0…" ],
-  "eTags":           [ [ "json", "sha256", "hex", "1f3aa569…" ], [ "cbor", "sha256", "hex", "ebf4371a…" ] ],
-  "head":            { "@id": "e2e6fe42…", "revision": 2, … }
+  "signatureKeyIds": [ "a3fec322…" ],
+  "eTags":           [ [ "json", "sha256", "hex", "faf55b2e…" ], [ "cbor", "sha256", "hex", "23340139…" ] ],
+  "head":            { "@id": "2d2a60b9…", "revision": 2, … }
 }
 ```
 
 ```
 RoamingHub> roamingNetworks
-QA  revision 2  Quality assurance  (operated by 'RNO-103B0540', this hub, 1 charging station operator(s), 1 charging pool(s))
+QA  revision 2  Quality assurance  (operated by 'RNO-67BDC1FC', this hub, 1 charging station operator(s), 1 charging pool(s))
 ```
 
 The pool is the operator's alone: the same change set signed by the hub, or by any key of no party, is `422` with
-the reason, e.g. `Change 0: Add of the ChargingPool 'DE*QAC*P1' needs a signature by a signing key of the
-ChargingStationOperator 'DE*QAC'!`, and nothing changes. With curl, the change set written to a file:
+the reason, e.g. `Change 0: Add of the ChargingPool 'DE*GEF*P1' needs a signature by a signing key of the
+ChargingStationOperator 'DE*GEF'!`, and nothing changes. With curl, the change set written to a file:
 
 ```bash
 curl -X COMMIT -H "Content-Type: application/json" --data-binary @addPool.json http://127.0.0.1:2356/poi/RNs/QA/history/changeSets
@@ -300,9 +308,9 @@ curl -X COMMIT -H "Content-Type: application/json" --data-binary @addPool.json h
 | Request | Returns |
 |---|---|
 | `GET /poi/RNs` | `[{"@id":"QA","name":{"en":"Quality assurance"}}]` |
-| `GET /poi/RNs/QA/CSOs` | `[{"@id":"DE*QAC","name":{"en":"QA Charging"}}]` |
-| `GET /poi/RNs/QA/CSOs/DE*QAC/CPs/DE*QAC*P1` | the pool, its keys in canonical order, its `lastChange` the `createdAt` of its change set |
-| `GET /poi/RNs/QA/EVSEs/DE*QAC*E1*2` | `307` to `/poi/RNs/QA/CSOs/DE*QAC/CPs/DE*QAC*P1/CSs/DE*QAC*S1/EVSEs/DE*QAC*E1*2` |
+| `GET /poi/RNs/QA/CSOs` | `[{"@id":"DE*GEF","name":{"en":"GraphDefined"}}]` |
+| `GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1` | the pool, its keys in canonical order, its `lastChange` the `createdAt` of its change set |
+| `GET /poi/RNs/QA/EVSEs/DE*GEF*E1*2` | `307` to `/poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/EVSEs/DE*GEF*E1*2` |
 | `GET /poi/RNs/QA/history/head` | the head commit: `revision` 2, its `parentIds`, `eTags` and `signatureKeyIds` |
 
 Stations and EVSEs can also be added one by one, `RoamingNetworkChange.Add(station, poolId)` and
@@ -343,22 +351,22 @@ var qa       = new RoamingNetwork(
 var store    = new RoamingNetworkHistoryFileStore("poi/QA");
 var history  = RoamingNetworkHistory.Start(qa, Store: store);
 
-// The RNO adds DE*QAC with the public halves of its keys: adding a party is the RNO's.
-var qac      = new ChargingStationOperator(
-                   ChargingStationOperator_Id.Parse("DE*QAC"),
-                   Name:          I18NString.Create(Languages.en, "QA Charging"),
-                   SigningKeys:   [ POIPublicKey.From(qacSigningKey)  ],
-                   IdentityKeys:  [ POIPublicKey.From(qacIdentityKey) ]
+// The RNO adds DE*GEF with the public halves of its keys: adding a party is the RNO's.
+var gef      = new ChargingStationOperator(
+                   ChargingStationOperator_Id.Parse("DE*GEF"),
+                   Name:          I18NString.Create(Languages.en, "GraphDefined"),
+                   SigningKeys:   [ POIPublicKey.From(gefSigningKey)  ],
+                   IdentityKeys:  [ POIPublicKey.From(gefIdentityKey) ]
                );
 
 history.Commit(history.Head.RoamingNetwork.
-                   CreateChangeSet([ RoamingNetworkChange.Add(qac) ]).
+                   CreateChangeSet([ RoamingNetworkChange.Add(gef) ]).
                    Sign(rnoSigningKey, POIPublicKey.From(rnoSigningKey).Id, COSEAlgorithm.ES256));   // revision 1
 
-// DE*QAC adds its pool: the pool of step 4.
+// DE*GEF adds its pool: the pool of step 4.
 history.Commit(history.Head.RoamingNetwork.
                    CreateChangeSet([ RoamingNetworkChange.Add(pool) ]).
-                   Sign(qacSigningKey, POIPublicKey.From(qacSigningKey).Id, COSEAlgorithm.ES256));   // revision 2
+                   Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256));   // revision 2
 ```
 
 `Start(qa, Signers: [ new RoamingNetworkCommitSigner(rnoSigningKey, …, RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator) ], …)`
@@ -388,6 +396,8 @@ if (!RoamingNetworkHistory.TryLoad(store, out var history, out var error))
 
 ## Next
 
+- [Example 2](example2.md): two pools of a DC and an AC station each, and the stations and EVSEs grouped by their
+  current, the groups giving them their power and their connectors.
 - More of the pool, the station and the EVSEs: address, opening times, connectors, tariffs, in
   [ChargingPool](../docs/ChargingPool.md), [ChargingStation](../docs/ChargingStation.md), [EVSE](../docs/EVSE.md).
 - Changing a property: `RoamingNetworkChange.UpdateProperty(evse, "maxPower", null, 22000)`, `CreateChangeSet`
