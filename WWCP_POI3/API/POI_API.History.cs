@@ -142,13 +142,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const Int32 MaxCommitsPerRequest = RoamingNetworkHistory.DefaultMaxCommits;
 
         /// <summary>
-        /// Commit a change set to a history. Not safe, as it changes the history;
-        /// idempotent, as committing the same change set again returns the same commit.
+        /// Commit a change set to a history: Hermod's COMMIT. Not safe, as it changes the history;
+        /// idempotent, as committing the same change set again returns the same commit. A client
+        /// of Hermod sends one by HTTPClient.COMMIT(path, content, contentType).
         /// </summary>
-        public static readonly HTTPMethod COMMIT = HTTPMethod.Register("COMMIT",
-                                                                       IsSafe:        false,
-                                                                       IsIdempotent:  true,
-                                                                       Description:   "Commit a change set to a history");
+        public static readonly HTTPMethod COMMIT = HTTPMethod.COMMIT;
 
         private readonly ConcurrentDictionary<RoamingNetwork_Id, RoamingNetworkHistory> roamingNetworkHistories = [];
 

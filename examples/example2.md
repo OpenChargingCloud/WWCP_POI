@@ -118,7 +118,7 @@ Everything after Enter is the operator's own, in change sets it signs, made for 
 hub - by anybody, without signing in. Two helpers do that for every step: `Head()` reads the head as the hub serves it,
 checked against its ETags as it is read, and `Commit(…)` makes a change set of it, signs it with the signing key of
 `DE*GEF` and submits it. Both talk to the hub with the `HTTPClient` of Hermod; a change set goes by the method
-`COMMIT`, which `POI_API.COMMIT` names.
+`COMMIT`, `http.COMMIT(…)`.
 
 ```csharp
 await using var http  = new HTTPClient(URL.Parse(args.FirstOrDefault() ?? "http://127.0.0.1:2356"));
@@ -137,10 +137,9 @@ async Task Commit(String Description, params RoamingNetworkChange[] Changes)
     var changeSet = (await Head()).CreateChangeSet(Changes, Description: new ImmutableI18NString(I18NString.Create(Languages.en, Description))).
                                    Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);
 
-    var response  = await http.RunRequest(POI_API.COMMIT,
-                                          HTTPPath.Root + "poi/RNs/QA/history/changeSets",
-                                          Content:      changeSet.ToJSON().ToString().ToUTF8Bytes(),
-                                          ContentType:  HTTPContentType.Application.JSON_UTF8);
+    var response  = await http.COMMIT(HTTPPath.Root + "poi/RNs/QA/history/changeSets",
+                                      Content:      changeSet.ToJSON().ToString().ToUTF8Bytes(),
+                                      ContentType:  HTTPContentType.Application.JSON_UTF8);
 
     var answer    = JObject.Parse(response.HTTPBodyAsUTF8String!);
 

@@ -239,7 +239,7 @@ its own to add. E-mobility providers, grid operators and parking operators are a
 One `Add` of the pool, with its station and both EVSEs embedded, signed with the operator's signing key, made for
 the version the operator read from the hub and submitted to it - by anybody, without signing in: whether a change set
 may change what it changes, its signatures decide. The same program as in step 3, after Enter, with the `HTTPClient`
-of Hermod; a change set goes by the method `COMMIT`, which `POI_API.COMMIT` names:
+of Hermod; a change set goes by the method `COMMIT`, `http.COMMIT(…)`:
 
 ```csharp
 await using var http  = new HTTPClient(URL.Parse(args.FirstOrDefault() ?? "http://127.0.0.1:2356"));
@@ -267,10 +267,9 @@ var addPool         = head.CreateChangeSet([ RoamingNetworkChange.Add(pool) ],
                                            Description: new ImmutableI18NString(I18NString.Create(Languages.en, "The first charging pool"))).
                            Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);
 
-var response        = await http.RunRequest(POI_API.COMMIT,
-                                            HTTPPath.Root + "poi/RNs/QA/history/changeSets",
-                                            Content:      addPool.ToJSON().ToString().ToUTF8Bytes(),
-                                            ContentType:  HTTPContentType.Application.JSON_UTF8);   // 201 Created
+var response        = await http.COMMIT(HTTPPath.Root + "poi/RNs/QA/history/changeSets",
+                                        Content:      addPool.ToJSON().ToString().ToUTF8Bytes(),
+                                        ContentType:  HTTPContentType.Application.JSON_UTF8);   // 201 Created
 ```
 
 `CreateChangeSet` makes it for the version it is called on: its `beforeETags` are those of revision 1, its
