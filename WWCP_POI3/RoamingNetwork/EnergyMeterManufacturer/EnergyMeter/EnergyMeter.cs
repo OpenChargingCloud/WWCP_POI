@@ -105,6 +105,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<TransparencySoftwareAssignment>  TransparencySoftwareStatus  { get; }
 
+        /// <summary>
+        /// How it signs its measurements, e.g. OCMF; in the order of their names, each once.
+        /// </summary>
+        public ImmutableArray<SignatureMethod>                 SignatureMethods            { get; }
+
+        /// <summary>
+        /// The public keys it signs its measurements with, with their certificate chains; in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<EnergyMeterPublicKey>            PublicKeys                  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -123,6 +133,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            String?                                     HardwareVersion              = null,
                            String?                                     FirmwareVersion              = null,
                            IEnumerable<TransparencySoftwareAssignment>? TransparencySoftwareStatus  = null,
+                           IEnumerable<SignatureMethod>?               SignatureMethods             = null,
+                           IEnumerable<EnergyMeterPublicKey>?          PublicKeys                   = null,
 
                            Timestamped<EnergyMeterAdminStatusType>?    InitialAdminStatus           = null,
                            Timestamped<EnergyMeterStatusType>?         InitialStatus                = null,
@@ -163,6 +175,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.HardwareVersion  = HardwareVersion;
             this.FirmwareVersion  = FirmwareVersion;
             this.TransparencySoftwareStatus = TransparencySoftwareAssignment.Checked(TransparencySoftwareStatus, $"the energy meter '{Id}'");
+            this.SignatureMethods = POIJSON.OrderedIds(SignatureMethods, $"signature method of the energy meter '{Id}'");
+            this.PublicKeys       = EnergyMeterPublicKey.Ordered(PublicKeys, $"public key of the energy meter '{Id}'");
 
         }
 
@@ -265,6 +279,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (TransparencySoftwareStatus.Length > 0)
                 json.Add("transparencySoftwareStatus", new JArray(TransparencySoftwareStatus.Select(assignment => assignment.ToJSON())));
 
+            if (SignatureMethods.Length > 0)
+                json.Add("signatureMethods", POIJSON.IdsToJSON(SignatureMethods));
+
+            if (PublicKeys.Length > 0)
+                json.Add("publicKeys",       new JArray(PublicKeys.Select(publicKey => publicKey.ToJSON())));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -309,7 +329,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseText  (JSON, "modelURL",         "model URL",                 URL.TryParse, out URL? modelURL,        out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, "serialNumber",     "serial number",             out var serialNumber,     out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, "hardwareVersion",  "hardware version",          out var hardwareVersion,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "firmwareVersion",  "firmware version",          out var firmwareVersion,  out ErrorResponse))
+                    !POIJSON.TryParseString(JSON, "firmwareVersion",  "firmware version",          out var firmwareVersion,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds<SignatureMethod>(JSON, "signatureMethods", "signature method",          SignatureMethod.TryParse,      out var signatureMethods, out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<EnergyMeterPublicKey>(JSON, "publicKeys",      "public key",                EnergyMeterPublicKey.TryParse, out var publicKeys,       out ErrorResponse))
                 {
                     return false;
                 }
@@ -363,6 +385,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               hardwareVersion,
                                               firmwareVersion,
                                               transparencySoftwareStatus,
+                                              signatureMethods,
+                                              publicKeys,
                                               DataSource:  dataSource,
                                               Created:     created,
                                               LastChange:  lastChange,

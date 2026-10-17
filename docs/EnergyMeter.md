@@ -2,8 +2,9 @@
 
 An energy meter measures the energy of what embeds it: a whole charging pool, a grid connection point
 (e.g. the grid meter), a charging station, or a single EVSE (e.g. the calibration-law meter of a charge point).
-It is described by its role, its manufacturer and model, serial number and versions, and by the transparency
-software releases that can verify its signed measurements, with their legal status.
+It is described by its role, its manufacturer and model, serial number and versions, by how it signs its
+measurements and the public keys it signs them with, and by the transparency software releases that can verify its
+signed measurements, with their legal status.
 
 An energy meter is an entity with admin status and status, but it is **not addressed by change sets on its own**:
 it is embedded completely in what it measures and changes as a property of that ([below](#where-energy-meters-live)).
@@ -55,6 +56,8 @@ is replaced or removed as a whole ([below](#change-sets)).
 | `hardwareVersion` | `HardwareVersion` | string | via parent | |
 | `firmwareVersion` | `FirmwareVersion` | string | via parent | |
 | `transparencySoftwareStatus` | `TransparencySoftwareStatus` | [TransparencySoftwareAssignment](#transparencysoftwarestatus)[] | via parent | The transparency software releases for its measurements, with their legal status; ordered by `transparencySoftwareId` (ordinal), at most one per release. Omitted when empty. |
+| `signatureMethods` | `SignatureMethods` | [SignatureMethod](#signaturemethods)[] | via parent | How it signs its measurements, e.g. `OCMF`; ordered by name (ordinal), each once. Omitted when empty. |
+| `publicKeys` | `PublicKeys` | [EnergyMeterPublicKey](#publickeys)[] | via parent | The public keys it signs its measurements with, with their certificate chains; ordered by `@id` (ordinal), each once. Omitted when empty. |
 
 All are optional and omitted when absent.
 
@@ -123,6 +126,38 @@ the release and the certificate are embedded in the roaming network (`transparen
 The array is ordered by `transparencySoftwareId` (ordinal) whatever the given order.
 
 
+## signatureMethods
+
+`SignatureMethod` ([source](../WWCP_POI2/RoamingNetwork/EnergyMeterManufacturer/EnergyMeter/SignatureMethod.cs)):
+how the meter signs its measurements, the format of its signed meter values and how they are signed, as a
+transparency software verifies them. The algorithm and the curve are those of its [public keys](#publickeys). A
+meter may sign in several ways, e.g. OCMF and a format of its own.
+
+Predefined are the energy meter signature formats [Chargy](https://github.com/OpenChargingCloud/ChargyCore.NET)
+verifies: `OCMF`, `EDL40`, `AlfenCrypt01`, `AlfenCrypt03`, `ChargePointCrypt01`, `EMHCrypt01`, `MennekesCrypt01`
+and `PCDF`; read in any case and written so, any other nonempty text accepted, e.g. a format no transparency software
+knows yet. Two that differ in case only are the same.
+
+
+## publicKeys
+
+`EnergyMeterPublicKey` ([source](../WWCP_POI3/RoamingNetwork/EnergyMeterManufacturer/EnergyMeter/EnergyMeterPublicKey.cs)):
+a public key the meter signs with. Unlike the keys of the parties, it is not a COSE key: energy meters sign with
+curves COSE does not know, e.g. secp192r1 or secp224k1. It is the DER encoded SubjectPublicKeyInfo [RFC 5280],
+which names its algorithm and curve itself; an app or a transparency software shows it as the meter shows it, e.g.
+as hexadecimal coordinates.
+
+| JSON key | Type | Description |
+|---|---|---|
+| `@id` | string | Mandatory: the SHA-256 of the DER encoded SubjectPublicKeyInfo, 64 lowercase hexadecimal digits; a reader calculates it and refuses another one. |
+| `key` | string | Mandatory: the DER encoded SubjectPublicKeyInfo as canonical Base64. |
+| `certificateChain` | string[] | Optional: the certificate chain of the key, each certificate DER encoded as canonical Base64: first the one of the key, then each one followed by the one that issued it, e.g. by the manufacturer of the meter. Omitted when empty. |
+
+`Algorithm` (not serialized) names the curve for people, as meters and transparency software name it, e.g.
+`secp256r1`, `secp192r1`, `brainpoolP256r1`, else `Ed25519`, `Ed448`, `RSA` or the object identifier of the
+algorithm.
+
+
 ## Runtime status
 
 See [README.md](README.md#runtime-status). Runtime status entity type: `EnergyMeter`, addressed by its identification
@@ -146,6 +181,10 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `EnergyMe
 - `manufacturerId`, when given, names an energy meter manufacturer of the network.
 - `transparencySoftwareStatus`: a JSON array of objects, each with `transparencySoftwareId` and `legalStatus`;
   a release at most once; every release and certificate exists in the network; a given certificate covers its release.
+- `signatureMethods`: an array of nonempty texts, none twice, in any case.
+- `publicKeys`: an array of objects, none twice; a key a valid public key of a known algorithm, DER encoded, with
+  its SHA-256 as `@id`; the first certificate of a chain the one of the key, each one issued by the next one, all DER
+  encoded; Base64 canonical.
 - `modelURL` a valid URL; texts are texts.
 
 
@@ -165,6 +204,11 @@ An EVSE's meter, as `energyMeter`:
   "firmwareVersion": "4.7.1",
   "transparencySoftwareStatus": [
     { "transparencySoftwareId": "chargy-1.5.0", "legalStatus": "germanCalibrationLaw", "certificateId": "PTB-2026-001" }
+  ],
+  "signatureMethods": [ "OCMF" ],
+  "publicKeys": [
+    { "@id": "b19e015397ed17785f274eee8706d2be6474a2ebc50c91d322a6f89cc894a72b",
+      "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAENtBxZdTUSRc5xrOyDhLLD43S2ku36d+UsniiIMiba63u9X2602GxJ+tnOVYQJ8pmA83ya2qKu3oBa+hwYFTINA==" }
   ],
   "created": "2026-01-01T00:00:00.000Z",
   "lastChange": "2026-01-01T00:00:00.000Z"

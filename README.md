@@ -106,7 +106,10 @@ parking product ids compare case-sensitively.
   operator or parking operator; absent: the grid operator). Missing values are unknown; active power must not
   exceed apparent power.
 - **Energy meter:** `role` (e.g. `grid`, `pv`, `battery`), `manufacturerId`, `modelId`, `modelURL`,
-  `serialNumber`, `hardwareVersion`, `firmwareVersion`; with admin status and status.
+  `serialNumber`, `hardwareVersion`, `firmwareVersion`; with admin status and status. How it signs its
+  measurements, `signatureMethods` (predefined the formats Chargy verifies, e.g. `OCMF`, `EDL40`), and the
+  `publicKeys` it signs them with: `{@id, key, certificateChain?}`, the DER encoded SubjectPublicKeyInfo as Base64,
+  identified by its SHA-256, of any curve, e.g. secp192r1 as well, with the certificates of the key.
   Its manufacturer is an energy meter manufacturer of the network (`name`, `description`, `address`,
   `homepage`, `hotline`, timestamps, without status).
 - **Parking:** a parking operator owns its garages, spaces and sensors directly. A space may name a

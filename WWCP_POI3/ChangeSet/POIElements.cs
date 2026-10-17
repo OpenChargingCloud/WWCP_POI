@@ -59,7 +59,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             { "parkingProductIds",     text => ParkingProduct_Id.   TryParse(text, out var id) ? id : null },
             { "eMobilityProviderIds",  text => EMobilityProvider_Id.TryParse(text, out var id) ? id : null },
             { "chargingConnectors",    text => ChargingConnector_Id.TryParse(text, out var id) ? id : null },
-            { "energyMeters",          text => EnergyMeter_Id.      TryParse(text, out var id) ? id : null }
+            { "energyMeters",          text => EnergyMeter_Id.      TryParse(text, out var id) ? id : null },
+            { "signatureMethods",      text => SignatureMethod.     TryParse(text, out var id) ? id : null }
         };
 
         #endregion

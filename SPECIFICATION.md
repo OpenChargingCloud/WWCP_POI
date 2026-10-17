@@ -2,7 +2,8 @@
 
 This document specifies which bytes POI 3 hashes and signs, so that a client can check a version,
 a commit or a signature without this library. It describes POI 3 as implemented; the examples in
-section 6 are checked by `WWCP_POI3_Tests/SpecificationVectorsTests.cs`.
+section 6 are checked by `WWCP_POI3_Tests/SpecificationVectorsTests.cs`. Section 8 is a draft, not
+implemented yet: proofs of single entities, e.g. of one charging station, by a signed hash tree.
 
 The words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
 
@@ -115,7 +116,7 @@ and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `Update
 
 - the first segment names a property of the entity, every further one a property of the value the segment before
   names. A segment on an array MUST name an element by `elementId`: the `@id` text of an object, a text itself,
-  compared as the identification type of the property compares them, any other ordinally: `EVSEIds`, `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`, `parkingSpaceIds`, `parkingSensorIds`, `parkingProductIds` and `eMobilityProviderIds` hold identifications of their entity types, `brands`, `chargingConnectors` and `energyMeters` objects with identifications of theirs;
+  compared as the identification type of the property compares them, any other ordinally: `EVSEIds`, `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`, `parkingSpaceIds`, `parkingSensorIds`, `parkingProductIds` and `eMobilityProviderIds` hold identifications of their entity types, `brands`, `chargingConnectors` and `energyMeters` objects with identifications of theirs, `signatureMethods` signature methods (without case);
   every element of the array MUST have one and no two the same, else the change is refused.
   A segment on any other value MAY name its `@id`, which it then MUST have;
 - `AddElement` names an element that does not exist yet, or an absent property, and its `newValue` MUST have the
@@ -397,3 +398,222 @@ uGmXUXrvziqRwcQIDE5C7ew7Rv1HPJ2vzqHwL+181Z7SWohOuOUEHvDWmrb7HaRyJxsbuFOsruTYOrTL
 
 None: the HTTP `ETag` of an entity is the SHA-256 of its canonical representation as the roaming network
 embeds it, and change sets name it as a precondition (section 4).
+
+
+## 8. Draft: proofs of entities by a signed hash tree
+
+> **Status:** draft, not implemented, without test vectors; it may still change. Sections 1 to 7 do
+> not depend on it.
+
+**Purpose.** An e-mobility driver's app that has found a charging station gets one small document:
+everything the roaming network says about this station as it is at runtime - the station with its
+EVSEs, charging connectors and energy meters with their public keys, the properties its groups give
+it, its pool, its operator, the charging tariffs its EVSEs take, the manufacturers and transparency
+software of its energy meters - signed by the roaming network operator. The app checks it offline,
+before charging, without the rest of the network.
+
+**Priorities.** With millions of charging stations, a proof grows with the logarithm of the size of
+the network, and checking one costs some dozen hash calculations and one signature verification.
+Writing may cost more: every commit hashes again what it changed, also every member of a group it
+changed.
+
+The ETags of section 3 hash a version as one document; a proof of one entity against them needs the
+whole version. A commit signature (section 5.4) covers the whole change set, which may be megabytes.
+This section therefore adds a hash tree along the entities of a version (8.1 to 8.3), proofs as
+pruned versions (8.4), and small signed statements of a tree's root (8.5).
+
+### 8.1 The effective content
+
+The tree is calculated over the **effective content** of a version: its content (section 2) with
+every charging pool, charging station, EVSE and parking space replaced by its effective one, as
+section 2 and [docs/](docs/README.md#group-priority-and-effective-members) define them: the
+properties its groups give it taken in, an effective pool embedding its effective stations, an
+effective station its effective EVSEs, an effective EVSE the charging tariffs that apply to it
+(`chargingTariffIds`). Groups, tariffs and every other entity are as in the content.
+
+The `lastChange` of an effective member is the latest of its own, the ones of its groups giving it
+properties and the ones of what it embeds, without the floors POI_API keeps at runtime (8.7). So the
+effective content follows from the version alone, and every server calculates the same tree.
+
+### 8.2 The tree
+
+With the hash algorithm `H` (8.3), the Merkle tree hash `MTH` of a list of byte strings is the one of
+RFC 9162, section 2.1.1:
+
+- `MTH({}) = H("")`;
+- `MTH({d}) = H(0x00 || d)`;
+- `MTH(D[n]) = H(0x01 || MTH(D[0:k]) || MTH(D[k:n]))` for `n > 1`, `k` the largest power of two
+  smaller than `n`.
+
+**Child arrays** are the arrays of entities that change sets add and remove (`Add`, `Remove`):
+
+| Parent | Child arrays |
+|---|---|
+| roaming network | `chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`, `gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `transparencySoftware`, `transparencySoftwareCertificates` |
+| charging station operator | `chargingPools`, `chargingTariffs`, `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `parkingSpaces` |
+| charging pool | `chargingStations` |
+| charging station | `EVSEs` |
+| grid operator | `gridConnectionPoints` |
+| parking operator | `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups`, `parkingProducts` |
+
+Everything else is part of the entity that embeds it: its roaming network operator with its keys,
+brands, charging connectors, energy meters, images, keys of parties, opening times.
+
+The **skeleton** of an entity is its JSON as the effective content embeds it, with every child array
+replaced by
+
+```json
+{ "@merkleRoot": "<MTH of its children's skeletons, lowercase hex>", "@size": <number of children> }
+```
+
+the children in the order of the content (the ordinal order of their identifications), each child
+as the canonical JSON (section 1) of its own skeleton. An absent child array stays absent; an empty
+one is `{"@merkleRoot": "<hex of H(\"\")>", "@size": 0}`.
+
+The **digest** of an entity is `H(0x00 || <canonical JSON of its skeleton>)`, the `MTH` of its
+skeleton alone: the leaf hash it is in the tree of its parent. The digest of the roaming network is
+the root of the tree, its **`effectiveTree` ETag**: `["effectiveTree", "sha256", "hex", "<digest>"]`,
+in text `effectiveTree:sha256:hex:<digest>`.
+
+### 8.3 Hash algorithms
+
+- A roaming network names its tree hash algorithms in `treeHashAlgorithms`, an array of the
+  algorithms of section 3.1 (`sha256`, `sha384`, `sha512`, and others section 3.1 may add, e.g.
+  `sha3-256`); `["sha256"]` when absent. It is a property of the roaming network, owned by the RNO
+  (section 4.1), and part of the content.
+- A version has one `effectiveTree` ETag per algorithm it names, in their order, after its `json`
+  and `cbor` ETags. Naming two, e.g. `["sha256", "sha512"]`, lets clients move from one to the other.
+- A commit lists them in its `eTags` (section 5.1) and is identified with the profile
+  `wwcp-poi-commit-v3`; a commit without them stays `wwcp-poi-commit-v2`. A reader MUST refuse a
+  commit whose `effectiveTree` ETags are not those of its version, as it does with the others.
+
+### 8.4 Proofs
+
+A **proof** is the roaming network in its effective content, **pruned**: each child array, at any
+depth, is given in one of three forms.
+
+1. **Complete:** the array of its children, each again in any of these forms. The verifier
+   calculates the `MTH` of their skeletons.
+2. **Pruned:** `{"@merkleRoot": "<hex>", "@size": n}`, as in the skeleton. The verifier takes it as
+   it is.
+3. **Partial:** some children with their audit paths (RFC 9162, section 2.1.3):
+
+   ```json
+   { "@size": 200000,
+     "@leaves": [ { "@index": 4711, "@auditPath": [ "<hex>", … ], "@entity": <the child, in any form> } ] }
+   ```
+
+   The verifier calculates the root from the digest of each child, its `@index` and `@size` and its
+   audit path (RFC 9162, section 2.1.3.2). All of them MUST give the same root; the array then is
+   `{"@merkleRoot": <it>, "@size": n}`.
+
+The verifier calculates the digest of the roaming network from the proof, bottom-up, and MUST refuse
+the proof unless it is the `effectiveTree` ETag of the algorithm named that an attestation it trusts
+(8.5) names. Everything the proof gives completely is then attested, and nothing else.
+
+```json
+{ "@context": "https://open.charging.cloud/contexts/wwcp+json/poiProof",
+  "hashAlgorithm": "sha256",
+  "roamingNetwork": <the roaming network, pruned>,
+  "attestations": [ <the attestations of its root (8.5)> ] }
+```
+
+The CBOR representation has the keys and values of the JSON one.
+
+A **charging station proof** gives completely:
+
+- the roaming network's own properties, with its roaming network operator and its keys;
+- the skeletons of the station's operator and pool, and the station with its EVSEs, their energy meters with their
+  `signatureMethods` and `publicKeys`;
+- the charging tariffs its effective EVSEs name, in the `chargingTariffs` of its operator;
+- the energy meter manufacturers the energy meters of the station and of its EVSEs name, and the
+  transparency software releases and certificates their `transparencySoftwareStatus` names;
+- optionally the parking spaces it names, and the grid connection point of its pool.
+
+All other child arrays are pruned. POI_API serves it as
+`GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/proof` (also `~/RNs/{RN_Id}/CSs/{CS_Id}/proof`;
+`…/EVSEs/{EVSE_Id}/proof` gives the proof of its station), with `?hashAlgorithm=` one of the network's,
+the first one by default. It is made for the newest attestation of the server's head, and stays the
+same until the next one.
+
+**Size** (informative): with 5,000 operators, one of them with 200,000 pools of 3 stations with 2 EVSEs
+each and 50 tariffs, a station proof has about 13 + 18 + 2 + 2 × 6 audit path hashes, about 1.4 KB as
+32-byte digests, plus the skeletons of the network, the operator and the pool and the complete station,
+tariffs, manufacturer and software: some 15 to 25 KB of JSON, less in CBOR.
+
+### 8.5 Attestations
+
+An **attestation** states that a version is the one its signer has, at a point in time, with the
+`effectiveTree` ETag of one algorithm. Unlike a commit signature, it does not depend on the size of
+the change set.
+
+```json
+{ "roamingNetworkId": "rn1", "commitId": "<commit id>", "revision": 4711,
+  "eTag": [ "effectiveTree", "sha256", "hex", "<digest>" ],
+  "role": "roamingNetworkOperator", "signer": "DE*RNO",
+  "signedAt": "2026-10-17T18:00:00.000Z", "validUntil": "2026-10-17T18:15:00.000Z",
+  "algorithm": "ES256", "keyId": "<key @id>", "value": "<Base64>",
+  "profile": "wwcp-poi-attestation-v1", "encoding": "base64" }
+```
+
+The signature input is the canonical JSON of
+
+```json
+{ "profile": "wwcp-poi-attestation-v1", "algorithm": "…", "keyId": "…", "encoding": "base64",
+  "role": "…", "signer": "…", "signedAt": "…", "validUntil": "…",
+  "roamingNetworkId": "…", "commitId": "…", "revision": …, "eTag": [ … ], "subject": { … } }
+```
+
+`signer`, `validUntil` and `subject` are left out where absent. Algorithms, encoding and verification
+are as in section 4; timestamps are written as in section 5.4.
+
+- **Freshness:** a server SHOULD attest its head again before `validUntil`, also without new commits,
+  e.g. every 5 minutes with a `validUntil` 15 minutes later. A verifier SHOULD refuse an attestation
+  after its `validUntil`.
+- **Trust:** the verifier MUST trust the key of an attestation independently of the proof. A key the
+  attested network names proves nothing, as whoever forged the network would name their own (8.7).
+- **Audit:** whoever has the history checks that the commit `commitId` has the attested ETag. An RNO
+  attesting a version it does not have is caught by it.
+- **Subject:** an attestation MAY attest the digest of one entity instead of the root:
+  `"subject": {"entityType": "ChargingStationOperator", "entityId": "DE*GEF", "digest": "<hex>"}`, with
+  the `eTag` still naming the root. The effective members of a charging station operator depend only
+  on its own groups. So the operator can attest its own node with one of its signing keys (role
+  `chargingStationOperator`), and a proof checked against it needs only the paths below the operator.
+- POI_API serves the current attestations as `GET ~/RNs/{RN_Id}/attestations` and pushes new ones on
+  the WebSocket topic `attestations`; a proof embeds those it was made for.
+
+### 8.6 Cost (informative)
+
+- **Writing:** entities are immutable and shared by the versions that did not change them, so a
+  digest is calculated once per entity object and kept with it. A child array keeps the inner nodes
+  of its tree, and an entity added, changed or removed updates `O(log n)` of them. A commit changing
+  one EVSE hashes its station, the path to its pool, the pool, the path to its operator, the operator,
+  the path to the network and the network: some 50 hash calculations. A commit changing a group with
+  100,000 members hashes all of them again: some 200,000 hash calculations, below a second.
+- **Serving:** a proof is calculated per attested version and kept until the next attestation.
+- **Verifying:** some 50 to 100 hash calculations and one signature verification per attestation,
+  milliseconds on a phone.
+
+### 8.7 Open points
+
+1. **Public keys of energy meters:** done. An energy meter names its `signatureMethods` and its
+   `publicKeys` (`{@id, key, certificateChain?}`, the DER encoded SubjectPublicKeyInfo, identified by its
+   SHA-256), see [docs/EnergyMeter.md](docs/EnergyMeter.md#publickeys). Still open is whether a
+   station proof also needs the certificates of the manufacturers, beyond the chains of the keys.
+2. **Trust anchor:** how an app knows the signing keys of an RNO. Proposal: a key statement signed by
+   an identity key of the RNO, `{roamingNetworkId, signingKeys, signedAt, validUntil}`, so that an app
+   pins only the identity keys of the RNOs it trusts.
+3. **Effective `lastChange`:** the tree takes it without the floors POI_API keeps at runtime, which
+   live in memory only (POI3-ISSUES #46). Either the floors become part of the version, or the tree
+   and POI_API tell different values.
+4. **Runtime:** admin status, status, energy status and price status are not content. A station
+   proof tells neither whether a station is available nor its prices at runtime. Signed runtime
+   statements, e.g. a price status the operator signs for some minutes, would complete it.
+5. **Rules of effective members:** they are in docs/README.md; a specification needs them here,
+   exactly.
+6. **Proofs of absence:** e.g. that an EVSE was removed. Two neighbouring leaves in the ordinal order
+   of identifications prove it; their form is open.
+7. **Stored content:** a tree over the content as given (section 2) would prove stored entities, e.g.
+   for preconditions and owners, the same way. The station proof does not need it.
+8. **CBOR skeletons:** whether the tree also hashes deterministic CBOR skeletons, for clients that read
+   CBOR only.
