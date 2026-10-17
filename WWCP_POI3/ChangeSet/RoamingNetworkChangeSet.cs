@@ -766,7 +766,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             json.Add("beforeETags",  new JArray(BeforeETags.Select(eTag   => eTag.  ToJSON())));
             json.Add("afterETags",   new JArray(AfterETags. Select(eTag   => eTag.  ToJSON())));
 
-            return json;
+            // Whole numbers as integers, so that ToString() of it is read back with its signatures, and a commit of it
+            // with its identification; see POIJSON.
+            return POIJSON.WholeNumbersAsIntegers(json);
 
         }
 

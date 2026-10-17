@@ -589,7 +589,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add("certificationInfo",  CertificationInfo.Value.ToString());
 
             if (MaxPower.HasValue)
-                json.Add("maxPower",           MaxPower.Value.Value);
+                json.Add("maxPower",           POIJSON.Number(MaxPower.Value.Value));
 
             if (ParkingSpaceIds.Length > 0)
                 json.Add("parkingSpaceIds",    POIJSON.IdsToJSON(ParkingSpaceIds));

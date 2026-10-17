@@ -950,6 +950,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (IncludeETags && ETags.Length > 0)
                 JSON.Add("eTags",  new JArray(ETags.Select(eTag => eTag.ToJSON(ETagDigestEncoding ?? POI.ETagDigestEncoding.HEX))));
 
+            // Whole numbers are integers in it, as every writer of its entities writes them (POIJSON.Number): ToString()
+            // of it is read back with its ETags.
             return CustomRoamingNetworkSerializer is not null
                        ? CustomRoamingNetworkSerializer(this, JSON)
                        : JSON;

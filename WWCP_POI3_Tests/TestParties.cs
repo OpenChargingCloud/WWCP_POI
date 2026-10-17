@@ -230,6 +230,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         /// <summary>
         /// Create a change set of the given changes against the given network, signed by all its parties with their test keys.
+        /// The network's JSON is held to whole numbers as integers on the way, see WholeNumbersAreIntegers().
         /// </summary>
         public static RoamingNetworkChangeSet CreateSignedChangeSet(this RoamingNetwork                Network,
                                                                     IEnumerable<RoamingNetworkChange>  Changes,
@@ -237,9 +238,75 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                     JObject?                           Metadata      = null,
                                                                     ChangeSet_Id?                      Id            = null,
                                                                     DateTimeOffset?                    CreatedAt     = null)
+        {
 
-            => Network.CreateChangeSet(Changes, Description, Metadata, Id, CreatedAt).
-                       SignedByAll(Network);
+            WholeNumbersAreIntegers(Network.ToJSON(), $"The roaming network '{Network.Id}'");
+
+            return Network.CreateChangeSet(Changes, Description, Metadata, Id, CreatedAt).
+                           SignedByAll(Network);
+
+        }
+
+        #endregion
+
+        #region SameByValue(Expected, Actual)
+
+        /// <summary>
+        /// Whether the given JSON is the same, its numbers compared by what they are worth, whatever their JSON type and
+        /// decimal places: a round trip through OCPI or DATEX II may compute a price of 6.0 for the price 6, which is the
+        /// same price, though another content.
+        /// </summary>
+        public static Boolean SameByValue(JToken  Expected,
+                                          JToken  Actual)
+        {
+
+            static JToken ByValue(JToken JSON)
+            {
+
+                var values = JSON is JContainer container
+                                 ? container.DescendantsAndSelf().OfType<JValue>().ToArray()
+                                 : JSON is JValue single ? [ single ] : [];
+
+                foreach (var value in values)
+                    if (value.Type is JTokenType.Integer or JTokenType.Float)
+                        value.Value = Convert.ToDouble(value.Value, System.Globalization.CultureInfo.InvariantCulture);
+
+                return JSON;
+
+            }
+
+            return JToken.DeepEquals(ByValue(Expected.DeepClone()), ByValue(Actual.DeepClone()));
+
+        }
+
+        #endregion
+
+        #region WholeNumbersAreIntegers(JSON, What)
+
+        /// <summary>
+        /// Fail where the given JSON holds a decimal without decimal places: ToString() would write 22000 as 22000.0, a
+        /// decimal with one decimal place, which is read back as another content. Every writer of POI3 writes a whole
+        /// number as the integer it is. Asked of every network a test makes a change set of, so that a writer that
+        /// forgets it is found by whichever test gives its property a value.
+        /// </summary>
+        /// <param name="JSON">The JSON, e.g. of a roaming network.</param>
+        /// <param name="What">What it is the JSON of, for the failure.</param>
+        public static void WholeNumbersAreIntegers(JToken  JSON,
+                                                   String  What)
+        {
+
+            var values = JSON is JContainer container
+                             ? container.DescendantsAndSelf().OfType<JValue>()
+                             : JSON is JValue single ? [ single ] : [];
+
+            var decimals = values.Where (value => value.Value is Decimal number && number.Scale == 0).
+                                  Select(value => $"'{value.Path}' ({value.Value})").
+                                  ToArray();
+
+            if (decimals.Length > 0)
+                throw new NUnit.Framework.AssertionException($"{What} writes whole numbers as decimals, which ToString() writes with a decimal place: {String.Join(", ", decimals)}!");
+
+        }
 
         #endregion
 

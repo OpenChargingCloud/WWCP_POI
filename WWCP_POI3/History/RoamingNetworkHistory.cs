@@ -452,7 +452,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (IncludeRuntimeStatus)
                 json.Add("runtimeStatus", new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON())));
 
-            return json;
+            // The roaming network and the runtime status write whole numbers as integers themselves (POIJSON.Number);
+            // this holds for anything else in it, too, so that ToString() of it is read back with its ETags.
+            return POIJSON.WholeNumbersAsIntegers(json);
 
         }
 

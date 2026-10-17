@@ -568,7 +568,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (leftElement is null)
                     continue;
 
-                if (!JToken.DeepEquals(leftElement, baseElement))
+                if (!POIJSON.SameValue(leftElement, baseElement))
                     return false;
 
                 leftElement.Remove();
@@ -602,7 +602,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (baseElement is null)
                     return false;
 
-                if (JToken.DeepEquals(leftElement, baseElement))
+                if (POIJSON.SameValue(leftElement, baseElement))
                 {
                     leftElement.Replace(rightElement.DeepClone());
                     continue;
@@ -685,7 +685,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (oldElement is null)
                     changes.Add(RoamingNetworkChange.AddElement(EntityType, EntityId, PathOf(id), newElement));
 
-                else if (!JToken.DeepEquals(oldElement, newElement))
+                else if (!POIJSON.SameValue(oldElement, newElement))
                 {
 
                     if (oldElement is JObject oldObject && newElement is JObject newObject)
@@ -781,7 +781,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Value1 is null
                    ? Value2 is null
-                   : Value2 is not null && JToken.DeepEquals(Value1, Value2);
+                   : Value2 is not null && POIJSON.SameValue(Value1, Value2);
 
         #endregion
 

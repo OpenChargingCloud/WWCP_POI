@@ -136,7 +136,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!Other.TryGetValue(key, out var after))
                     yield return (precondition, "removed it");
 
-                else if (before is null || !JToken.DeepEquals(before.Full, after.Full))
+                else if (before is null || !POIJSON.SameValue(before.Full, after.Full))
                     yield return (precondition, "changed it");
 
             }

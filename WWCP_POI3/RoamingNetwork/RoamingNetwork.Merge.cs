@@ -560,7 +560,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     // Removed by the left one: fine, unless the right one changed it.
-                    if (r!.Parent != b.Parent || !JToken.DeepEquals(r.Own, b.Own))
+                    if (r!.Parent != b.Parent || !POIJSON.SameValue(r.Own, b.Own))
                         Conflict(RoamingNetworkMergeConflictKind.DeleteModify, r, null, b.Full, null, r.Full,
                                  $"The left version removed the {r.Type} '{r.Id}' the right version changed!");
 
@@ -584,7 +584,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         continue;
                     }
 
-                    if (l.Parent != b.Parent || !JToken.DeepEquals(l.Own, b.Own))
+                    if (l.Parent != b.Parent || !POIJSON.SameValue(l.Own, b.Own))
                     {
                         Conflict(RoamingNetworkMergeConflictKind.DeleteModify, l, null, b.Full, l.Full, null,
                                  $"The right version removed the {l.Type} '{l.Id}' the left version changed!");
@@ -624,7 +624,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     // Moved by the left one, and the right one did not touch it: kept.
-                    if (b is not null && r.Parent == b.Parent && JToken.DeepEquals(r.Own, b.Own))
+                    if (b is not null && r.Parent == b.Parent && POIJSON.SameValue(r.Own, b.Own))
                         continue;
 
                     Conflict(RoamingNetworkMergeConflictKind.Moved, l, null, b?.Full, l.Full, r.Full,
@@ -642,7 +642,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (IsConflicted(b))
                 {
 
-                    if (!JToken.DeepEquals(l.Own, r.Own))
+                    if (!POIJSON.SameValue(l.Own, r.Own))
                         Conflict(RoamingNetworkMergeConflictKind.DifferentValues, l, null, b!.Own, l.Own, r.Own,
                                  $"The common ancestors of both versions conflict at the {l.Type} '{l.Id}', and the versions have it differently!");
 
@@ -700,7 +700,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                if (conflicting || JToken.DeepEquals(target, l.Own))
+                if (conflicting || POIJSON.SameValue(target, l.Own))
                     continue;
 
                 var differing     = target.Properties().Select(property => property.Name).
@@ -718,7 +718,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 // E.g. removed and added again by the right one: replaced as the right one has it, unless the left one changed it.
-                if (b is not null && l.Type != nameof(RoamingNetwork) && JToken.DeepEquals(target, r.Own) && SameSubtree(l, b, Left, Base))
+                if (b is not null && l.Type != nameof(RoamingNetwork) && POIJSON.SameValue(target, r.Own) && SameSubtree(l, b, Left, Base))
                 {
                     replaced.Add(key);
                     replaces.Add(RoamingNetworkChange.Remove(l.Type, l.Id));
@@ -755,7 +755,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             static Boolean Unchanged(MergeEntity Entity, MergeEntity BaseEntity)
-                => Entity.Parent == BaseEntity.Parent && JToken.DeepEquals(Entity.Own, BaseEntity.Own);
+                => Entity.Parent == BaseEntity.Parent && POIJSON.SameValue(Entity.Own, BaseEntity.Own);
 
             static MergeEntity Conflicted(MergeEntity Entity, MergeEntity? BaseEntity, MergeEntity? LeftEntity, MergeEntity? RightEntity)
             {
@@ -807,7 +807,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (IsConflicted(b))
                 {
 
-                    entities[key] = JToken.DeepEquals(l.Own, r.Own)
+                    entities[key] = POIJSON.SameValue(l.Own, r.Own)
                                         ? l
                                         : Conflicted(l, b, l, r);
 
@@ -943,7 +943,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Value1 is null
                    ? Value2 is null
-                   : Value2 is not null && JToken.DeepEquals(Value1, Value2);
+                   : Value2 is not null && POIJSON.SameValue(Value1, Value2);
 
         #endregion
 
@@ -971,7 +971,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        return false;
                    });
 
-            if (!JToken.DeepEquals(Entity.Own, BaseEntity.Own))
+            if (!POIJSON.SameValue(Entity.Own, BaseEntity.Own))
                 return false;
 
             var subtree      = Subtree(Entity,     Version).    ToDictionary(entity => entity.Key);
@@ -980,7 +980,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return subtree.Count == baseSubtree.Count &&
                    subtree.All(entry => baseSubtree.TryGetValue(entry.Key, out var baseEntity) &&
                                         entry.Value.Parent == baseEntity.Parent &&
-                                        JToken.DeepEquals(entry.Value.Own, baseEntity.Own));
+                                        POIJSON.SameValue(entry.Value.Own, baseEntity.Own));
 
         }
 

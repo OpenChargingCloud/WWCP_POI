@@ -66,6 +66,182 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Number              (Value)
+
+        /// <summary>
+        /// A decimal as JSON: one without decimal places as the integer it is, as its canonical JSON and its CBOR write
+        /// it anyway; one with decimal places as the decimal it is, with them.
+        /// </summary>
+        /// <remarks>
+        /// Every writer of a POI3 entity writes its decimals so. Newtonsoft writes the decimal 22000 as 22000.0, a
+        /// decimal with one decimal place, which a reader takes for other content: a roaming network with other ETags, a
+        /// change set whose signatures no longer fit it, a commit of another identification. As an integer it writes
+        /// 22000. Neither the canonical JSON nor the CBOR changes, and so neither do ETags, signatures and
+        /// identifications. And as JSON read from a text has the integer 22000 as well, JToken.DeepEquals takes the
+        /// JSON of an entity and the same JSON read again for the same.
+        /// </remarks>
+        public static JValue Number(Decimal Value)
+
+            => IsWhole(Value)
+                   ? new JValue((Int64) Value)
+                   : new JValue(Value);
+
+        #endregion
+
+        #region (private static) IsWhole(Value)
+
+        /// <summary>
+        /// Whether the given decimal is one without decimal places that is written as an integer: within 64 bits, and
+        /// not the negative zero.
+        /// </summary>
+        private static Boolean IsWhole(Decimal Value)
+
+            => Value.Scale == 0                              &&
+               !(Value == 0 && Decimal.IsNegative(Value))   &&
+               Value >= Int64.MinValue && Value <= Int64.MaxValue;
+
+        #endregion
+
+        #region WholeNumbersAsIntegers(JSON)
+
+        /// <summary>
+        /// The given JSON with every decimal without decimal places as the integer it is, as Number() writes it: for
+        /// JSON with decimals not written by POI3 itself, e.g. the values and the metadata a change set is given.
+        /// Changed in place, for JSON made for the purpose, e.g. by ToJSON(); the JSON given is the one returned.
+        /// </summary>
+        public static T WholeNumbersAsIntegers<T>(T JSON)
+            where T : JToken
+        {
+
+            switch (JSON)
+            {
+
+                case JValue { Value: Decimal number } value when IsWhole(number):
+                    value.Value = (Int64) number;
+                    break;
+
+                case JContainer container:
+                    foreach (var child in container.Children())
+                        WholeNumbersAsIntegers(child);
+                    break;
+
+            }
+
+            return JSON;
+
+        }
+
+        #endregion
+
+        #region SameContent(Value1, Value2)
+
+        /// <summary>
+        /// Whether the given values are the same content - the same canonical JSON - absent meaning null: the integer
+        /// 22000 is the decimal 22000, as the model holds it, and the decimal 22000.0 is not. JToken.DeepEquals has it
+        /// the other way round, as it compares numbers of different types as different and decimals by their values.
+        /// </summary>
+        public static Boolean SameContent(JToken? Value1,
+                                          JToken? Value2)
+
+            => Value1 is null || Value2 is null
+                   ? Value1 is null && Value2 is null
+                   : CanonicalJSON.Serialize(Value1) == CanonicalJSON.Serialize(Value2);
+
+        #endregion
+
+        #region SameValue(Value1, Value2)
+
+        /// <summary>
+        /// Whether the given values are the same, their numbers compared by what they are worth, whatever their JSON
+        /// type and their decimal places: 6, 6.0 and 6.00 are; null means absent. The question whether something
+        /// changed - of a merge, of the differences an importer commits, of what groups give - as JToken.DeepEquals
+        /// answered it while every decimal was written as a decimal: an importer computing a price per hour of 6.0 from
+        /// one per minute of 0.1 does not change the price 6.
+        /// </summary>
+        /// <remarks>
+        /// Not the question whether a value is the content it was: an old value is compared as canonical JSON
+        /// (SameContent), and so is a merge commit with the merge of its parents.
+        /// </remarks>
+        public static Boolean SameValue(JToken? Value1,
+                                        JToken? Value2)
+        {
+
+            if (Value1 is null || Value2 is null)
+                return Value1 is null && Value2 is null;
+
+            switch (Value1)
+            {
+
+                case JValue value1 when Value2 is JValue value2:
+
+                    if (value1.Type is JTokenType.Integer or JTokenType.Float &&
+                        value2.Type is JTokenType.Integer or JTokenType.Float)
+                    {
+
+                        if (value1.Value is Double or Single || value2.Value is Double or Single)
+                            return Convert.ToDouble(value1.Value, CultureInfo.InvariantCulture) == Convert.ToDouble(value2.Value, CultureInfo.InvariantCulture);
+
+                        try
+                        {
+                            return Convert.ToDecimal(value1.Value, CultureInfo.InvariantCulture) == Convert.ToDecimal(value2.Value, CultureInfo.InvariantCulture);
+                        }
+                        catch (OverflowException)
+                        {
+                            return JToken.DeepEquals(value1, value2);
+                        }
+
+                    }
+
+                    return JToken.DeepEquals(value1, value2);
+
+                case JArray array1 when Value2 is JArray array2:
+
+                    if (array1.Count != array2.Count)
+                        return false;
+
+                    for (var index = 0; index < array1.Count; index++)
+                        if (!SameValue(array1[index], array2[index]))
+                            return false;
+
+                    return true;
+
+                case JObject object1 when Value2 is JObject object2:
+
+                    if (object1.Count != object2.Count)
+                        return false;
+
+                    foreach (var property in object1.Properties())
+                        if (!object2.TryGetValue(property.Name, out var other) || !SameValue(property.Value, other))
+                            return false;
+
+                    return true;
+
+                case JProperty property1 when Value2 is JProperty property2:
+
+                    return property1.Name == property2.Name && SameValue(property1.Value, property2.Value);
+
+                default:
+                    return JToken.DeepEquals(Value1, Value2);
+
+            }
+
+        }
+
+        #endregion
+
+        #region ContentText(Value)
+
+        /// <summary>
+        /// A value as its content is, its canonical JSON, to say it in an error response; "absent" for none.
+        /// </summary>
+        public static String ContentText(JToken? Value)
+
+            => Value is null
+                   ? "absent"
+                   : CanonicalJSON.Serialize(Value);
+
+        #endregion
+
         #region TryParseI18N        (JSON, PropertyName, PropertyDescription, out Value, out ErrorResponse)
 
         /// <summary>
@@ -413,11 +589,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Seconds             (Duration)
 
         /// <summary>
-        /// The given duration in seconds.
+        /// The given duration in seconds, as JSON: a whole number of them as an integer, see Number().
         /// </summary>
-        public static Decimal Seconds(TimeSpan Duration)
+        public static JValue Seconds(TimeSpan Duration)
 
-            => (Decimal) Duration.Ticks / TimeSpan.TicksPerSecond;
+            => Number((Decimal) Duration.Ticks / TimeSpan.TicksPerSecond);
 
         #endregion
 

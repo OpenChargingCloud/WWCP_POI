@@ -118,14 +118,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = new JObject(
                            new JProperty("type",   Type.ToString()),
-                           new JProperty("price",  Price)
+                           new JProperty("price",  POIJSON.Number(Price))
                        );
 
             if (VAT.HasValue)
-                json.Add("vat",       VAT.Value);
+                json.Add("vat",       POIJSON.Number(VAT.Value));
 
             if (StepSize.HasValue)
-                json.Add("stepSize",  StepSize.Value);
+                json.Add("stepSize",  POIJSON.Number(StepSize.Value));
 
             return json;
 

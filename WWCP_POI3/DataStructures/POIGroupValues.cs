@@ -270,7 +270,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (candidate is ValueType && Equals(candidate, value))
                     continue;
 
-                if (!JToken.DeepEquals(jsonOf(group)[PropertyName], jsonOf(decidingGroup)[PropertyName]))
+                if (!POIJSON.SameValue(jsonOf(group)[PropertyName], jsonOf(decidingGroup)[PropertyName]))
                     throw Conflict(decidingGroup, group, $"'{PropertyName}'");
 
             }
@@ -291,7 +291,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (Element1 is not JObject object1 || Element2 is not JObject object2)
-                return JToken.DeepEquals(Element1, Element2);
+                return POIJSON.SameValue(Element1, Element2);
 
             var without1 = (JObject) object1.DeepClone();
             var without2 = (JObject) object2.DeepClone();
@@ -299,7 +299,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             without1.Remove("@id");
             without2.Remove("@id");
 
-            return JToken.DeepEquals(without1, without2);
+            return POIJSON.SameValue(without1, without2);
 
         }
 

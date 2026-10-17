@@ -135,7 +135,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(tariff["currency"]!.ToString(),                               Is.EqualTo("NOK"));
                 Assert.That(tariff["tariffType"]!.ToString(),                             Is.EqualTo("REGULAR"));
                 Assert.That(tariff["minPrice"]!.ToString(Newtonsoft.Json.Formatting.None), Is.EqualTo("""{"excludingVAT":2.5,"includingVAT":2.98}"""));
-                Assert.That(tariff["maxPrice"]!.ToString(Newtonsoft.Json.Formatting.None), Is.EqualTo("""{"excludingVAT":50.0}"""));
+                Assert.That(tariff["maxPrice"]!.ToString(Newtonsoft.Json.Formatting.None), Is.EqualTo("""{"excludingVAT":50}"""));
                 Assert.That(json["chargingStationOperators"]![0]!["chargingTariffs"]![1]!["tariffType"], Is.Null);
                 Assert.That(tariff["paymentMeans"]!.Values<String>(),                     Is.EqualTo(new[] { "CREDIT_CARD", "QR_CODE" }));
                 Assert.That(tariff["paymentBrands"]!.Values<String>(),                    Is.EqualTo(new[] { "Google Pay", "VISA" }));

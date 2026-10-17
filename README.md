@@ -249,8 +249,10 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
   Every reference must exist; a referenced entity can not be removed. The overload by the entity's
   type names it: a change is data, `{entityType, entityId, propertyName, oldValue, newValue}`, applied
   to the entity with that id in the version it is applied to.
-- **Old values:** `CreateChangeSet` gives every change the value it finds; JSON `null` means
-  "expected absent". A change finding another value conflicts.
+- **Old values:** `CreateChangeSet` gives every change the value it finds, where it is given none; JSON `null` means
+  "expected absent". A change finding another value conflicts. Values are compared as their content, their
+  canonical JSON: the integer `22000` is the decimal `22000` the model holds, as a change set read from text says
+  it, and `22000.0` is another value.
 - **Preconditions:** a change set may name the ETags entities must still have, e.g. the HTTP `ETag` a client
   read a charging pool with: `CreateChangeSet(changes, Preconditions: [ version.Precondition("ChargingPool",
   poolId) ])`. It applies, is rebased and merged only while they hold: a change set made for an older version is
@@ -382,6 +384,13 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
 - **Numbers:** written as canonical JSON, as the API's responses and the WebSocket messages are, so every
   number is read back as it was: a decimal with exactly its decimal places (`150000`, not `150000.0`, which
   canonical JSON and CBOR, and so the ETags, would tell apart) and a coordinate as the double it was.
+  Every `ToJSON()` - of an entity, a roaming network, a change set (and so of a commit), a snapshot - writes a
+  decimal without decimal places as the integer it is, as canonical JSON does: `ToString()` of it reads back as
+  it was, too, with its ETags, signatures and identification, where Newtonsoft would write `150000.0` for the
+  decimal. And the JSON of an entity is the very JSON read again from its text, also for `JToken.DeepEquals`.
+  Whether something changed - of a merge, of the differences an importer commits, of what groups give - compares
+  numbers by what they are worth: an importer computing a price of 6.0 per hour from 0.1 per minute does not change
+  the price 6. Whether a value is still the old value of a change compares it as content (see Old values).
 - **Loading:** `TryLoad` checks every commit again (owners' signatures, merges calculated again, ETags) and
   merges the tips afterwards, e.g. when a crash came before a merge commit was written.
 - **Retention:** a history keeps the versions of its root, its tips, every `VersionCheckpointInterval`-th

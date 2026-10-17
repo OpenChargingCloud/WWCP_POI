@@ -198,7 +198,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var before = Previous.TryGetParkingSpaceGroup(parkingSpaceGroup.Id, out var previous) ? previous : null;
 
-                if (before is not null && JToken.DeepEquals(parkingSpaceGroup.ToJSON(), before.ToJSON()))
+                if (before is not null && POIJSON.SameValue(parkingSpaceGroup.ToJSON(), before.ToJSON()))
                     continue;
 
                 candidates.UnionWith(parkingSpaceGroup.ParkingSpaceIds);
@@ -224,7 +224,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var current  = EffectiveParkingSpace(parkingSpace);
                 var before   = Previous.EffectiveParkingSpace(previousParkingSpace);
 
-                if (!JToken.DeepEquals(WithoutLastChange(current.ToJSON()), WithoutLastChange(before.ToJSON())))
+                if (!POIJSON.SameValue(WithoutLastChange(current.ToJSON()), WithoutLastChange(before.ToJSON())))
                     floors.Add(parkingSpaceId, LastChangeDate);
 
                 else if (current.LastChangeDate < before.LastChangeDate)

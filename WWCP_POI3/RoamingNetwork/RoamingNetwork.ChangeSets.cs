@@ -581,7 +581,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         !OldValueMatches(expectedOperator, currentValue))
                     {
                         ErrorResponse = operatorProperty
-                                            ? $"Change {index}: the property '{applied.PropertyName}' of the charging station operator '{operatorId}' is no longer the expected old value, but '{currentValue?.ToString(Newtonsoft.Json.Formatting.None) ?? "absent"}'!"
+                                            ? $"Change {index}: the property '{applied.PropertyName}' of the charging station operator '{operatorId}' is no longer the expected old value, but '{POIJSON.ContentText(currentValue)}'!"
                                             : $"Change {index}: the charging station operator '{operatorId}' is no longer the expected old value{(currentValue is null ? ": it does not exist" : "")}!";
                         return false;
                     }
@@ -730,7 +730,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (applied.OldValue is JToken oldValue &&
                         !OldValueMatches(oldValue, currentValue))
                     {
-                        ErrorResponse = $"Change {index}: the property '{propertyName}' is no longer the expected old value, but '{currentValue?.ToString(Newtonsoft.Json.Formatting.None) ?? "absent"}'!";
+                        ErrorResponse = $"Change {index}: the property '{propertyName}' is no longer the expected old value, but '{POIJSON.ContentText(currentValue)}'!";
                         return false;
                     }
 
@@ -1043,15 +1043,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) OldValueMatches(OldValue, CurrentValue)
 
         /// <summary>
-        /// Whether the current value is the expected old value:
-        /// a JSON null expects the value to be absent.
+        /// Whether the current value is the expected old value, as content - the same canonical JSON: the integer
+        /// 22000 is the decimal 22000, as a change set read from the wire says it, and 22000.0 is another value.
+        /// A JSON null expects the value to be absent.
         /// </summary>
         private static Boolean OldValueMatches(JToken   OldValue,
                                                JToken?  CurrentValue)
 
             => OldValue.Type == JTokenType.Null
                    ? CurrentValue is null
-                   : JToken.DeepEquals(OldValue, CurrentValue);
+                   : POIJSON.SameContent(OldValue, CurrentValue);
 
         #endregion
 

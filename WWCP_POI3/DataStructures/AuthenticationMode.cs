@@ -283,7 +283,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean Equals(AuthenticationMode? AuthenticationMode)
 
             => AuthenticationMode is not null &&
-               JToken.DeepEquals(ToJSON(), AuthenticationMode.ToJSON());
+               POIJSON.SameValue(ToJSON(), AuthenticationMode.ToJSON());
 
         /// <inheritdoc/>
         public override Int32 GetHashCode()

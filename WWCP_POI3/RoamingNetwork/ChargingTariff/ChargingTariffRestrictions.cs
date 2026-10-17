@@ -220,28 +220,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add("endDate",      EndDate.  Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
 
             if (MinEnergy.HasValue)
-                json.Add("minEnergy",    MinEnergy.Value);
+                json.Add("minEnergy",    POIJSON.Number(MinEnergy.Value));
 
             if (MaxEnergy.HasValue)
-                json.Add("maxEnergy",    MaxEnergy.Value);
+                json.Add("maxEnergy",    POIJSON.Number(MaxEnergy.Value));
 
             if (MinCurrent.HasValue)
-                json.Add("minCurrent",   MinCurrent.Value);
+                json.Add("minCurrent",   POIJSON.Number(MinCurrent.Value));
 
             if (MaxCurrent.HasValue)
-                json.Add("maxCurrent",   MaxCurrent.Value);
+                json.Add("maxCurrent",   POIJSON.Number(MaxCurrent.Value));
 
             if (MinPower.HasValue)
-                json.Add("minPower",     MinPower.Value);
+                json.Add("minPower",     POIJSON.Number(MinPower.Value));
 
             if (MaxPower.HasValue)
-                json.Add("maxPower",     MaxPower.Value);
+                json.Add("maxPower",     POIJSON.Number(MaxPower.Value));
 
             if (MinDuration.HasValue)
-                json.Add("minDuration",  MinDuration.Value);
+                json.Add("minDuration",  POIJSON.Number(MinDuration.Value));
 
             if (MaxDuration.HasValue)
-                json.Add("maxDuration",  MaxDuration.Value);
+                json.Add("maxDuration",  POIJSON.Number(MaxDuration.Value));
 
             if (DaysOfWeek.Length > 0)
                 json.Add("daysOfWeek",   new JArray(DaysOfWeek.Select(day => day.ToString().ToUpperInvariant())));

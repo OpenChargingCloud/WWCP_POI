@@ -91,7 +91,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Change.OldValue is JToken expected &&
                 !OldValueMatches(expected, ElementValue))
             {
-                ErrorResponse = $"'{POIElements.PathText(Change.ElementPath, Change.PropertyName)}' of the {Description} '{Change.EntityId}' is no longer the expected old value, but '{ElementValue?.ToString(Newtonsoft.Json.Formatting.None) ?? "absent"}'!";
+                ErrorResponse = $"'{POIElements.PathText(Change.ElementPath, Change.PropertyName)}' of the {Description} '{Change.EntityId}' is no longer the expected old value, but '{POIJSON.ContentText(ElementValue)}'!";
                 return false;
             }
 

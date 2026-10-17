@@ -454,22 +454,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add("vehicleTypes",              POIJSON.IdsToJSON(VehicleTypes));
 
             if (MaxVehicleWeight.HasValue)
-                json.Add("maxVehicleWeight",          MaxVehicleWeight.Value.Value);
+                json.Add("maxVehicleWeight",          POIJSON.Number(MaxVehicleWeight.Value.Value));
 
             if (MaxVehicleHeight.HasValue)
-                json.Add("maxVehicleHeight",                 MaxVehicleHeight.Value.m);
+                json.Add("maxVehicleHeight",                 POIJSON.Number(MaxVehicleHeight.Value.m));
 
             if (MaxVehicleLength.HasValue)
-                json.Add("maxVehicleLength",                 MaxVehicleLength.Value.m);
+                json.Add("maxVehicleLength",                 POIJSON.Number(MaxVehicleLength.Value.m));
 
             if (MaxVehicleWidth.HasValue)
-                json.Add("maxVehicleWidth",                  MaxVehicleWidth.Value.m);
+                json.Add("maxVehicleWidth",                  POIJSON.Number(MaxVehicleWidth.Value.m));
 
             if (Length.HasValue)
-                json.Add("length",                           Length.Value.m);
+                json.Add("length",                           POIJSON.Number(Length.Value.m));
 
             if (Width.HasValue)
-                json.Add("width",                            Width.Value.m);
+                json.Add("width",                            POIJSON.Number(Width.Value.m));
 
             if (EVSEPosition.HasValue)
                 json.Add("evsePosition",                     EVSEPosition.Value.ToString());

@@ -400,7 +400,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (Embedded is not null)
                         json.Remove(Embedded);
                 }
-                return JToken.DeepEquals(Current, Before);
+                return POIJSON.SameValue(Current, Before);
             }
 
             // Other than before: at least the last change of the operator; the same: at least the one it had.
@@ -518,7 +518,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var before = Before.TryGet(IdOf(group), out var previous) ? previous : null;
 
-                if (before is not null && JToken.DeepEquals(group.ToJSON(), before.ToJSON()))
+                if (before is not null && POIJSON.SameValue(group.ToJSON(), before.ToJSON()))
                     continue;
 
                 if (Relevant is not null && !Relevant(group) && (before is null || !Relevant(before)))

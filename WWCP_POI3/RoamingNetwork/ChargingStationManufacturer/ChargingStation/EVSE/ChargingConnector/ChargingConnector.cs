@@ -188,10 +188,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add("format",                 Format.Value.ToString());
 
             if (CableLength.HasValue)
-                json.Add("cableLength",            CableLength.Value.m);
+                json.Add("cableLength",            POIJSON.Number(CableLength.Value.m));
 
             if (CableWeight.HasValue)
-                json.Add("cableWeight",            CableWeight.Value.Value);
+                json.Add("cableWeight",            POIJSON.Number(CableWeight.Value.Value));
 
             if (CableManagementSystem.HasValue)
                 json.Add("cableManagementSystem",  CableManagementSystem.Value);
@@ -312,7 +312,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean Equals(ChargingConnector? ChargingConnector)
 
             => ChargingConnector is not null &&
-               JToken.DeepEquals(ToJSON(), ChargingConnector.ToJSON());
+               POIJSON.SameValue(ToJSON(), ChargingConnector.ToJSON());
 
         /// <inheritdoc/>
         public override Int32 GetHashCode()

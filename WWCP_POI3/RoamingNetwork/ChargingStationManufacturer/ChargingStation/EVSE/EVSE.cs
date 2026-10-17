@@ -507,13 +507,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add("chargingModes",      POIJSON.FlagsToJSON(ChargingModes));
 
             if (MaxVoltage.HasValue)
-                json.Add("maxVoltage",         MaxVoltage.Value.Value);
+                json.Add("maxVoltage",         POIJSON.Number(MaxVoltage.Value.Value));
 
             if (MaxCurrent.HasValue)
-                json.Add("maxCurrent",         MaxCurrent.Value.Value);
+                json.Add("maxCurrent",         POIJSON.Number(MaxCurrent.Value.Value));
 
             if (MaxPower.HasValue)
-                json.Add("maxPower",           MaxPower.Value.Value);
+                json.Add("maxPower",           POIJSON.Number(MaxPower.Value.Value));
 
             if (ChargingConnectors.Length > 0)
                 json.Add("chargingConnectors", new JArray(ChargingConnectors.Select(chargingConnector => chargingConnector.ToJSON())));
@@ -537,7 +537,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add("maxReservationDuration",  POIJSON.Seconds(MaxReservationDuration.Value));
 
             if (ReachDistance.HasValue)
-                json.Add("reachDistance",             ReachDistance.Value.m);
+                json.Add("reachDistance",             POIJSON.Number(ReachDistance.Value.m));
 
             if (OperationTimeout.HasValue)
                 json.Add("operationTimeout",          POIJSON.Seconds(OperationTimeout.Value));

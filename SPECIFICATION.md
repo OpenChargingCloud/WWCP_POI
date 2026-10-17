@@ -128,6 +128,10 @@ and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `Update
 - its `oldValue` is the element, or the property of the element, it names (JSON `null`: absent); `AddElement` has
   none.
 
+**Old values:** a change whose `oldValue` is not the value it finds MUST be refused. Both are compared as their
+canonical JSON (section 1): the number `22000` read from a text is the decimal 22000 without decimal places a
+reader holds, and `22000.0` is another value.
+
 **Timestamps:** a change set sets `lastChange` to its `createdAt`: of the roaming network always; of an entity
 when it is added (and `created`, unless given) or when one of its own properties changes; not when only an entity
 it embeds changes. `lastChange` therefore does not tell when anything below an entity last changed: its

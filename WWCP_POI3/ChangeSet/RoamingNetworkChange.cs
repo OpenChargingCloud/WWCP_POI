@@ -1831,8 +1831,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                ElementPath.SequenceEqual(RoamingNetworkChange.ElementPath) &&
 
-               JToken.DeepEquals(oldValue, RoamingNetworkChange.oldValue) &&
-               JToken.DeepEquals(newValue, RoamingNetworkChange.newValue);
+               POIJSON.SameValue(oldValue, RoamingNetworkChange.oldValue) &&
+               POIJSON.SameValue(newValue, RoamingNetworkChange.newValue);
 
         #endregion
 

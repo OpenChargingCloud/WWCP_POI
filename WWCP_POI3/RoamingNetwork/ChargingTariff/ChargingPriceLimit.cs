@@ -67,11 +67,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("excludingVAT",  ExcludingVAT)
+                           new JProperty("excludingVAT",  POIJSON.Number(ExcludingVAT))
                        );
 
             if (IncludingVAT.HasValue)
-                json.Add("includingVAT",  IncludingVAT.Value);
+                json.Add("includingVAT",  POIJSON.Number(IncludingVAT.Value));
 
             return json;
 

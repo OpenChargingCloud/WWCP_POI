@@ -252,7 +252,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean Equals(POIPublicKey? PublicKey)
 
             => PublicKey is not null &&
-               JToken.DeepEquals(ToJSON(), PublicKey.ToJSON());
+               POIJSON.SameValue(ToJSON(), PublicKey.ToJSON());
 
         /// <inheritdoc/>
         public override Int32 GetHashCode()

@@ -264,22 +264,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add("connectionType",                 ConnectionType.Value.ToString());
 
             if (NominalVoltage.HasValue)
-                json.Add("nominalVoltage",                 NominalVoltage.Value.Value);
+                json.Add("nominalVoltage",                 POIJSON.Number(NominalVoltage.Value.Value));
 
             if (NominalFrequency.HasValue)
-                json.Add("nominalFrequency",               NominalFrequency.Value.Value);
+                json.Add("nominalFrequency",               POIJSON.Number(NominalFrequency.Value.Value));
 
             if (ContractedImportPower.HasValue)
-                json.Add("contractedImportPower",          ContractedImportPower.Value.Value);
+                json.Add("contractedImportPower",          POIJSON.Number(ContractedImportPower.Value.Value));
 
             if (ContractedExportPower.HasValue)
-                json.Add("contractedExportPower",          ContractedExportPower.Value.Value);
+                json.Add("contractedExportPower",          POIJSON.Number(ContractedExportPower.Value.Value));
 
             if (ContractedImportApparentPower.HasValue)
-                json.Add("contractedImportApparentPower",  ContractedImportApparentPower.Value.Value);
+                json.Add("contractedImportApparentPower",  POIJSON.Number(ContractedImportApparentPower.Value.Value));
 
             if (ContractedExportApparentPower.HasValue)
-                json.Add("contractedExportApparentPower",  ContractedExportApparentPower.Value.Value);
+                json.Add("contractedExportApparentPower",  POIJSON.Number(ContractedExportApparentPower.Value.Value));
 
             if (ConnectionAgreementId is not null)
                 json.Add("connectionAgreementId",          ConnectionAgreementId);

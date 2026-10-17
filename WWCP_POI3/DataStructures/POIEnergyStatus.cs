@@ -47,15 +47,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("used",       EnergyInfo.Used.     Value),
-                           new JProperty("available",  EnergyInfo.Available.Value)
+                           new JProperty("used",       POIJSON.Number(EnergyInfo.Used.Value)),
+                           new JProperty("available",  POIJSON.Number(EnergyInfo.Available.Value))
                        );
 
             if (EnergyInfo.StoredEnergy.HasValue)
-                json.Add("storedEnergy",           EnergyInfo.StoredEnergy.Value.Value);
+                json.Add("storedEnergy",           POIJSON.Number(EnergyInfo.StoredEnergy.Value.Value));
 
             if (EnergyInfo.CurrentVoltage.HasValue)
-                json.Add("currentVoltage",         EnergyInfo.CurrentVoltage.Value.Value);
+                json.Add("currentVoltage",         POIJSON.Number(EnergyInfo.CurrentVoltage.Value.Value));
 
             if (EnergyInfo.RemainingChargingTime.HasValue)
                 json.Add("remainingChargingTime",  POIJSON.Seconds(EnergyInfo.RemainingChargingTime.Value));
