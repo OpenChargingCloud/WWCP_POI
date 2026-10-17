@@ -469,9 +469,12 @@ parking operator without any of `parkingGarages`, `parkingSpaces`,
 `~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs}`, each of them below it, e.g. `…/PSs/{PS_Id}`. The parking spaces a
 charging station names, whoever defines them, are listed by `…/CSs/{CS_Id}/PSs`. A charging pool, a charging
 station, an EVSE and `CPs` are served with the properties their groups give them, the effective ones; a charging
-pool, and what it embeds, with `?view=stored` as its operator embeds it, with the ETag a precondition names. The brands of a charging station
+pool, and what it embeds, with `?view=stored` as its operator embeds it, with the ETag a precondition names (`CPs`,
+the search, refuses it). The brands of a charging station
 operator, pool, station or EVSE, its own, are listed by `…/Brands` below it, e.g.
-`~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands`, each of them below it, `…/Brands/{Brand_Id}`. Every list, `~/RNs`,
+`~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands`, each of them below it, `…/Brands/{Brand_Id}`. The groups a member
+is in, which give it properties, are listed below it, each with its page below its operator: `…/CPs/{CP_Id}/CPGs`,
+`…/CSs/{CS_Id}/CSGs`, `…/EVSEs/{EVSE_Id}/EVSEGs` and `~/RNs/{RN_Id}/POs/{PO_Id}/PSs/{PS_Id}/PSGs`. Every list, `~/RNs`,
 `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` and
 the lists of what an operator embeds as well, takes:
 

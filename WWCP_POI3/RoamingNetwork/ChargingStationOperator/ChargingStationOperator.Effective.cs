@@ -388,6 +388,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// with at least the last change of this operator: so a group that stops giving a member something, or a member
         /// that leaves a group, changes its last change as well, not only its content; and where they are the same, with at
         /// least the last change they had in it, e.g. after an earlier change of the same change set: it never goes back.
+        /// Floors found before are kept, the later one of two: a merge compares with both of its parents, one after the
+        /// other.
         /// </summary>
         private void StampChangedEffective(ChargingStationOperator Previous)
         {
@@ -433,32 +435,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            var evses             = new Dictionary<EVSE_Id,            DateTimeOffset>();
-            var chargingStations  = new Dictionary<ChargingStation_Id, DateTimeOffset>();
-            var chargingPools     = new Dictionary<ChargingPool_Id,    DateTimeOffset>();
+            // The floors found before, e.g. comparing a merge with its other parent, are kept.
+            var evses             = new Dictionary<EVSE_Id,            DateTimeOffset>(effectiveFloors.EVSEs);
+            var chargingStations  = new Dictionary<ChargingStation_Id, DateTimeOffset>(effectiveFloors.ChargingStations);
+            var chargingPools     = new Dictionary<ChargingPool_Id,    DateTimeOffset>(effectiveFloors.ChargingPools);
+            var found             = false;
 
             foreach (var evseId in evseCandidates)
                 if (TryGetEVSE(evseId, out var evse) && Previous.TryGetEVSE(evseId, out var previousEVSE) &&
                     FloorOf(new (EffectiveEVSE(evse)), new (Previous.EffectiveEVSE(previousEVSE)), null) is DateTimeOffset floor)
                 {
-                    evses.Add(evse.Id, floor);
+                    found = Raise(evses, evse.Id, floor) | found;
                 }
 
             foreach (var chargingStationId in chargingStationCandidates)
                 if (TryGetChargingStation(chargingStationId, out var chargingStation) && Previous.TryGetChargingStation(chargingStationId, out var previousChargingStation) &&
                     FloorOf(new (EffectiveChargingStation(chargingStation)), new (Previous.EffectiveChargingStation(previousChargingStation)), "EVSEs") is DateTimeOffset floor)
                 {
-                    chargingStations.Add(chargingStation.Id, floor);
+                    found = Raise(chargingStations, chargingStation.Id, floor) | found;
                 }
 
             foreach (var chargingPoolId in chargingPoolCandidates)
                 if (TryGetChargingPool(chargingPoolId, out var chargingPool) && Previous.TryGetChargingPool(chargingPoolId, out var previousChargingPool) &&
                     FloorOf(new (EffectiveChargingPool(chargingPool)), new (Previous.EffectiveChargingPool(previousChargingPool)), "chargingStations") is DateTimeOffset floor)
                 {
-                    chargingPools.Add(chargingPool.Id, floor);
+                    found = Raise(chargingPools, chargingPool.Id, floor) | found;
                 }
 
-            if (evses.Count == 0 && chargingStations.Count == 0 && chargingPools.Count == 0)
+            if (!found)
                 return;
 
             effectiveFloors = new (evses, chargingStations, chargingPools);
@@ -495,6 +499,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (internal static) Raise(Floors, Id, Floor)
+
+        /// <summary>
+        /// Raise the floor of the given member to the given one, unless it has a later one: whether it did.
+        /// </summary>
+        internal static Boolean Raise<TId>(Dictionary<TId, DateTimeOffset>  Floors,
+                                           TId                              Id,
+                                           DateTimeOffset                   Floor)
+
+            where TId : notnull
+
+        {
+
+            if (Floors.TryGetValue(Id, out var had) && had >= Floor)
+                return false;
+
+            Floors[Id] = Floor;
+            return true;
+
+        }
+
+        #endregion
 
         #region (private static) MembersOfChangedGroups(Current, Before, IdOf, MembersOf, Relevant = null)
 

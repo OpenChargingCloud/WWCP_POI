@@ -418,7 +418,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             AddEmbeddedListHandlers<ParkingSpace_Id, ParkingSpace>(
                 chargingStationPath + "/PSs",
                 RequestedParkingSpacesOfChargingStation,
-                parkingSpace => parkingSpace.ToJSON());
+                parkingSpace => parkingSpace.ToJSON(),
+                Viewed: true);
 
             AddEmbeddedEntityHandlers<ParkingSpace_Id, ParkingSpace>(
                 chargingStationPath + "/PSs/{parkingSpaceId}",
@@ -472,7 +473,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 request => TryGetRequestedChargingPool(request, out var chargingPool, out var errorResponse)
                                ? (chargingPool.Brands, null)
                                : (null, errorResponse),
-                brand => brand.ToJSON());
+                brand => brand.ToJSON(),
+                Viewed: true);
 
             AddEmbeddedEntityHandlers<Brand_Id, Brand>(
                 chargingPoolPath + "/Brands/{brandId}",
@@ -488,7 +490,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 request => TryGetRequestedChargingStation(request, out var chargingStation, out var errorResponse)
                                ? (chargingStation.Brands, null)
                                : (null, errorResponse),
-                brand => brand.ToJSON());
+                brand => brand.ToJSON(),
+                Viewed: true);
 
             AddEmbeddedEntityHandlers<Brand_Id, Brand>(
                 chargingStationPath + "/Brands/{brandId}",
@@ -504,7 +507,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 request => TryGetRequestedEVSE(request, out var evse, out var errorResponse)
                                ? (evse.Brands, null)
                                : (null, errorResponse),
-                brand => brand.ToJSON());
+                brand => brand.ToJSON(),
+                Viewed: true);
 
             AddEmbeddedEntityHandlers<Brand_Id, Brand>(
                 chargingStationPath + "/EVSEs/{evseId}" + "/Brands/{brandId}",
@@ -514,6 +518,72 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Brand_Id.TryParse,
                 "brand of the EVSE",
                 brand => brand.ToJSON());
+
+            #endregion
+
+            #region The groups of a charging pool, station, EVSE and parking space: ~/…/CPGs, CSGs, EVSEGs, PSGs below it
+
+            // The groups a member is in, which give it properties at runtime, as its operator embeds them, each with its
+            // page below the operator: so a client tells which of the values of the member come from which group.
+            AddEmbeddedListHandlers<ChargingPoolGroup_Id, ChargingPoolGroup>(
+                chargingPoolPath + "/CPGs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse) &&
+                           TryGetRequestedChargingPool           (request, out var chargingPool,            out errorResponse)
+                               ? (new POICollection<ChargingPoolGroup_Id, ChargingPoolGroup>(chargingStationOperator.ChargingPoolGroupsOf(chargingPool.Id),
+                                                                                             chargingPoolGroup => chargingPoolGroup.Id,
+                                                                                             "charging pool group",
+                                                                                             $"the charging pool '{chargingPool.Id}'"),
+                                  null)
+                               : (null, errorResponse),
+                chargingPoolGroup => chargingPoolGroup.ToJSON());
+
+            AddEmbeddedListHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
+                chargingStationPath + "/CSGs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse) &&
+                           TryGetRequestedChargingStation        (request, out var chargingStation,         out errorResponse)
+                               ? (new POICollection<ChargingStationGroup_Id, ChargingStationGroup>(chargingStationOperator.ChargingStationGroupsOf(chargingStation.Id),
+                                                                                                   chargingStationGroup => chargingStationGroup.Id,
+                                                                                                   "charging station group",
+                                                                                                   $"the charging station '{chargingStation.Id}'"),
+                                  null)
+                               : (null, errorResponse),
+                chargingStationGroup => chargingStationGroup.ToJSON());
+
+            AddEmbeddedListHandlers<EVSEGroup_Id, EVSEGroup>(
+                chargingStationPath + "/EVSEs/{evseId}" + "/EVSEGs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse) &&
+                           TryGetRequestedEVSE                   (request, out var evse,                    out errorResponse)
+                               ? (new POICollection<EVSEGroup_Id, EVSEGroup>(chargingStationOperator.EVSEGroupsOf(evse.Id),
+                                                                             evseGroup => evseGroup.Id,
+                                                                             "EVSE group",
+                                                                             $"the EVSE '{evse.Id}'"),
+                                  null)
+                               : (null, errorResponse),
+                evseGroup => evseGroup.ToJSON());
+
+            AddEmbeddedListHandlers<ParkingSpaceGroup_Id, ParkingSpaceGroup>(
+                parkingOperatorPath + "/PSs/{parkingSpaceId}" + "/PSGs",
+                request => {
+
+                    if (!TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse))
+                        return (null, errorResponse);
+
+                    var text = request.ParsedURLParameters[2];
+
+                    if (!ParkingSpace_Id.TryParse(text, out var parkingSpaceId))
+                        return (null, EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Invalid parking space identification '{text}'!"));
+
+                    if (!parkingOperator.TryGetParkingSpace(parkingSpaceId, out _))
+                        return (null, EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The parking space '{parkingSpaceId}' is unknown at the parking operator '{parkingOperator.Id}'!"));
+
+                    return (new POICollection<ParkingSpaceGroup_Id, ParkingSpaceGroup>(parkingOperator.ParkingSpaceGroupsOf(parkingSpaceId),
+                                                                                       parkingSpaceGroup => parkingSpaceGroup.Id,
+                                                                                       "parking space group",
+                                                                                       $"the parking space '{parkingSpaceId}'"),
+                            null);
+
+                },
+                parkingSpaceGroup => parkingSpaceGroup.ToJSON());
 
             #endregion
 
@@ -626,7 +696,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             AddEmbeddedListHandlers<ParkingSpace_Id, ParkingSpace>(
                 parkingOperatorPath + "/PSs",
                 RequestedParkingSpacesOfParkingOperator,
-                parkingSpace => parkingSpace.ToJSON());
+                parkingSpace => parkingSpace.ToJSON(),
+                Viewed: true);
 
             AddEmbeddedListHandlers<ParkingSpaceGroup_Id, ParkingSpaceGroup>(
                 parkingOperatorPath + "/PSGs",
@@ -781,7 +852,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private) AddEmbeddedListHandlers(Path, Collection, ToJSON)
+        #region (private) AddEmbeddedListHandlers(Path, Collection, ToJSON, Viewed = false)
 
         /// <summary>
         /// Answer GET of the given path with the children of an entity as it embeds them, searched and paged
@@ -791,9 +862,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Path">The path of the list, below the one of the entity.</param>
         /// <param name="Collection">The children of the entity the path names, or why there are none.</param>
         /// <param name="ToJSON">A child, as the entity embeds it.</param>
+        /// <param name="Viewed">Whether the list has the view ?view=stored: of charging pools, stations, EVSEs and parking
+        /// spaces and what they embed, which they are at runtime otherwise. Any other list is as it is given, and a view
+        /// asked for is no parameter of it.</param>
         private void AddEmbeddedListHandlers<TId, TEntity>(HTTPPath                                                                          Path,
                                                            Func<HTTPRequest, (POICollection<TId, TEntity>? Collection, HTTPResponse? ErrorResponse)>  Collection,
-                                                           Func<TEntity, JObject>                                                            ToJSON)
+                                                           Func<TEntity, JObject>                                                            ToJSON,
+                                                           Boolean                                                                           Viewed   = false)
 
             where TId     : notnull
             where TEntity : class
@@ -807,10 +882,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          return errorResponse!;
 
                                      // The view in the links to other pages as well.
-                                     if (!TryGetStoredView(request, out var stored, out errorResponse) ||
+                                     var stored = false;
+
+                                     if (Viewed && !TryGetStoredView(request, out stored, out errorResponse) ||
                                          !TryParseListQuery(request, stored ? [ ("view", StoredView) ] : [], out var query, out errorResponse))
                                      {
-                                         return errorResponse;
+                                         return errorResponse!;
                                      }
 
                                      // In the natural order of their identifications, not in the one their entity embeds them in.

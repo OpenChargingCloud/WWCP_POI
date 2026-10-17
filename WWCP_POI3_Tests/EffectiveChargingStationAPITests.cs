@@ -197,6 +197,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
             var (storedS,    _,              storedSpace)   = await Get("RNs/rn1/POs/DE*PAR/PSs/space-1?view=stored");
             var (_,          _,              spaces)        = await Get("RNs/rn1/POs/DE*PAR/PSs");
             var (pagedS,     _,              _)             = await Get("RNs/rn1/POs/DE*PAR/PSs?view=stored&limit=1&offset=1");
+            var (pools,      _,              _)             = await Get("RNs/rn1/CPs?view=stored");
+            var (whiteLabel, _,              _)             = await Get(CSO + "/Brands?view=nonsense");
+            var (_,          _,              stationGroups) = await Get(CS + "/CSGs");
+            var (_,          _,              evseGroups)    = await Get(CS + "/EVSEs/DE*GEF*E1*1/EVSEGs");
+            var (_,          _,              poolGroups)    = await Get(CP + "/CPGs");
+            var (_,          _,              spaceGroups)   = await Get("RNs/rn1/POs/DE*PAR/PSs/space-1/PSGs");
+            var (noSpace,    _,              _)             = await Get("RNs/rn1/POs/DE*PAR/PSs/space-9/PSGs");
 
             history!.Head.RoamingNetwork.TryGetEntityETag(nameof(ChargingStation), S1.ToString(), out var eTag);
 
@@ -242,6 +249,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
                 // Found by what its group gives it.
                 Assert.That(found!.Single()["@id"]!.Value<String>(),                           Is.EqualTo("DE*GEF*P1"));
+
+                // The charging pools of the roaming network only as they are at runtime; a list of what is not at
+                // runtime other than given has no view.
+                Assert.That(pools.StatusCode,                                                  Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(whiteLabel.StatusCode,                                             Is.EqualTo(HttpStatusCode.OK));
+
+                // The groups of a member, which give it properties: so a client tells where its values come from.
+                Assert.That(stationGroups!.Single()["@id"]!.Value<String>(),                   Is.EqualTo(SG1.ToString()));
+                Assert.That(stationGroups!.Single()["hotline"]!.Value<String>(),               Is.EqualTo("+49 800 424242"));
+                Assert.That(evseGroups!.Single()["@id"]!.Value<String>(),                      Is.EqualTo("DE*GEF*EG1"));
+                Assert.That(poolGroups,                                                        Is.Empty);
+                Assert.That(spaceGroups!.Single()["@id"]!.Value<String>(),                     Is.EqualTo("level-1"));
+                Assert.That(noSpace.StatusCode,                                                Is.EqualTo(HttpStatusCode.NotFound));
 
             }
 

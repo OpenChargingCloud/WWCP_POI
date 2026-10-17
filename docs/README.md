@@ -273,9 +273,15 @@ POI_API serves a charging pool, a charging station, an EVSE and a parking space 
 the charging pools so; `?view=stored` serves them as the operator embeds them, with the ETag a precondition names,
 also in the links to other pages of a list. Each of them, in either view, tells that ETag as `X-Stored-ETag` as well,
 exposed to scripts of other origins: a client reading an entity as it is at runtime makes a precondition with it
-without a second request. The operator and the
+without a second request. The groups of a member are listed below it (`…/CPs/{CP_Id}/CPGs`, `…/CSs/{CS_Id}/CSGs`,
+`…/EVSEs/{EVSE_Id}/EVSEGs`, `…/POs/{PO_Id}/PSs/{PS_Id}/PSGs`): with them and `?view=stored` a client tells which of its
+values come from which group. The operator and the
 roaming network embed the properties where they are given; so do their ETags, change sets and merges. The OCPI and
-DATEX II publishers publish the effective members; their importers keep in the groups what they give. See
+DATEX II publishers publish the effective members; their importers keep in the groups what they give
+(`POIGroupMembers.KeepWhatGroupsGive`, by the same rules: of an array it unites, a member takes as its own only the
+elements whose keys its groups do not give it; an array it takes whole, the charging tariffs, current types and charging
+modes of an EVSE, it takes whole). `~/RNs/{RN_Id}/CPs` searches the charging pools only as they are at runtime and
+refuses `?view=stored`; a list that is as it is given, e.g. of tariffs or groups, has no view and takes none. See
 [EVSEGroup](EVSEGroup.md#properties-of-its-members), [ChargingStationGroup](ChargingStationGroup.md#properties-of-its-members),
 [ChargingPoolGroup](ChargingPoolGroup.md#properties-of-its-members) and [ParkingSpaceGroup](ParkingSpaceGroup.md#properties-of-its-members).
 

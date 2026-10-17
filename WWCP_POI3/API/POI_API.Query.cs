@@ -175,6 +175,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
                                       return errorResponse;
 
+                                  // As they are at runtime, found by what their groups give them: as they are given, their
+                                  // operators embed them.
+                                  if (request.QueryString.GetStrings("view").Any())
+                                      return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"The charging pools of a roaming network are as they are at runtime! As they are given, their charging station operators embed them, ~/RNs/{roamingNetwork.Id}/CSOs/{{CSO_Id}}, and each has the view '{StoredView}'.");
+
                                   ChargingStationOperator_Id? operatorId = null;
 
                                   if (request.QueryString.GetString("operatorId") is String operatorIdText)

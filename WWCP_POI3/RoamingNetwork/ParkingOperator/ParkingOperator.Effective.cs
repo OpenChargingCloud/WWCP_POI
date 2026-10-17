@@ -179,6 +179,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// parking operator, with at least its last change: so a group that stops giving a parking space something, or a
         /// parking space that leaves a group, changes its last change as well, not only its content; and where they are the
         /// same, with at least the last change they had in it, e.g. after an earlier change of the same change set.
+        /// Floors found before are kept, the later one of two: a merge compares with both of its parents, one after the
+        /// other.
         /// </summary>
         private void StampChangedEffective(ParkingOperator Previous)
         {
@@ -213,7 +215,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     candidates.UnionWith(before.ParkingSpaceIds);
 
             // Other than before: at least the last change of the parking operator; the same: at least the one it had.
-            var floors = new Dictionary<ParkingSpace_Id, DateTimeOffset>();
+            // The floors found before, e.g. comparing a merge with its other parent, are kept.
+            var floors  = new Dictionary<ParkingSpace_Id, DateTimeOffset>(effectiveFloors);
+            var found   = false;
 
             foreach (var parkingSpaceId in candidates)
             {
@@ -225,14 +229,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var before   = Previous.EffectiveParkingSpace(previousParkingSpace);
 
                 if (!POIJSON.SameValue(WithoutLastChange(current.ToJSON()), WithoutLastChange(before.ToJSON())))
-                    floors.Add(parkingSpaceId, LastChangeDate);
+                    found = ChargingStationOperator.Raise(floors, parkingSpaceId, LastChangeDate) | found;
 
                 else if (current.LastChangeDate < before.LastChangeDate)
-                    floors.Add(parkingSpaceId, before.LastChangeDate);
+                    found = ChargingStationOperator.Raise(floors, parkingSpaceId, before.LastChangeDate) | found;
 
             }
 
-            if (floors.Count == 0)
+            if (!found)
                 return;
 
             effectiveFloors             = floors;

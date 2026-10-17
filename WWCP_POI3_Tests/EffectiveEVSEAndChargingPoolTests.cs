@@ -350,6 +350,49 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_merge_keeps_the_last_change_a_member_got_by_leaving_its_group()
+
+        /// <summary>
+        /// The left version takes the second EVSE out of its group, the right one changes the hotline of the group of
+        /// the charging pools: the merge, compared with the right version and then with the left one, keeps the last
+        /// change the EVSE got by leaving its group, though comparing it with the left one finds nothing new of it.
+        /// </summary>
+        [Test]
+        public void A_merge_keeps_the_last_change_a_member_got_by_leaving_its_group()
+        {
+
+            var t1     = T0.AddHours(1);
+            var t2     = T0.AddHours(2);
+            var rn1    = NewNetwork();
+
+            rn1.TryGetEVSEGroupById        (AC22,  out var ac22);
+            rn1.TryGetChargingPoolGroupById(Sites, out var sites);
+
+            var left   = rn1.ApplyChangeSet(rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(ac22!,  "EVSEIds", null, new JArray(E1.ToString(), E3.ToString())) ], CreatedAt: t1));
+            var right  = rn1.ApplyChangeSet(rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(sites!, "hotline", null, "+49 800 222222") ],                       CreatedAt: t2));
+
+            GEFOf(left).TryGetEffectiveEVSE(E2, out var leftE2);
+
+            var merged = RoamingNetwork.TryMerge(rn1, left, right, ChangeSet_Id.Parse("merge-1"), out var merge, out _, out var conflicts);
+
+            Assert.That(merged, Is.True, String.Join(" ", conflicts.Select(conflict => conflict.Description)));
+
+            GEFOf(merge!).TryGetEffectiveEVSE        (E2, out var effectiveE2);
+            GEFOf(merge!).TryGetEffectiveChargingPool(P1, out var effectiveP1);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(leftE2!.LastChangeDate,                                        Is.EqualTo(t1));
+                Assert.That(effectiveE2!.MaxPower,                                         Is.Null);
+                Assert.That(effectiveE2.LastChangeDate,                                    Is.GreaterThanOrEqualTo(t1));
+                Assert.That(effectiveP1!.HotlinePhoneNumber?.ToString(),                   Is.EqualTo("+49 800 222222"));
+                Assert.That(effectiveP1.LastChangeDate,                                    Is.GreaterThanOrEqualTo(t2));
+            }
+
+        }
+
+        #endregion
+
     }
 
 }
