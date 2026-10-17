@@ -393,5 +393,7 @@ if (!RoamingNetworkHistory.TryLoad(store, out var history, out var error))
 - Changing a property: `RoamingNetworkChange.UpdateProperty(evse, "maxPower", null, 22000)`, `CreateChangeSet`
   fills in the old value it finds; see [Change sets](../README.md#change-sets).
 - Changing the operator itself, e.g. its name or keys: `RoamingNetworkChange.UpdateProperty(qa.Operator!, "name", …)`,
-  see [RoamingNetworkOperator](../docs/RoamingNetworkOperator.md).
+  see [RoamingNetworkOperator](../docs/RoamingNetworkOperator.md). The hub does it in every roaming network it
+  operates: `roamingNetworkOperator rotate signingKey` (or `identityKey`) replaces a key by a new one, each change
+  signed by the key it replaces, and `roamingNetworkOperator name GraphDefined GmbH` renames it.
 - Another server following `QA`: [Peer](../README.md#peer).
