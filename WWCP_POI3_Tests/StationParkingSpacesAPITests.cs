@@ -224,6 +224,33 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
         #endregion
 
+        #region An_operator_leaves_out_its_parking_spaces_which_its_stations_list()
+
+        [Test]
+        public async Task An_operator_leaves_out_its_parking_spaces_which_its_stations_list()
+        {
+
+            var (_,     _, whole)     = await Get(CSO);
+            var (slim,  _, slimJSON)  = await Get(CSO + "?without=parkingSpaces");
+            var (_,     _, listJSON)  = await Get(Station + "/PSs");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(slim.StatusCode,                                                   Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(whole!   ["parkingSpaces"],                                        Is.Not.Null);
+                Assert.That(slimJSON!["parkingSpaces"],                                        Is.Null);
+                Assert.That(slimJSON!["chargingPools"],                                        Is.Not.Null);
+
+                // What it leaves out, its station lists.
+                Assert.That(JToken.DeepEquals(listJSON![0], whole!["parkingSpaces"]![0]),       Is.True);
+
+            }
+
+        }
+
+        #endregion
+
     }
 
 }

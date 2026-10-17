@@ -679,6 +679,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     Brands:                    Groups.Union ("brand",              EVSE.Brands,             group => group.Brands,             brand             => brand.Id,              brand             => brand.ToJSON()),
                                     Images:                    Groups.Union ("image",              EVSE.Images,             group => group.Images,             image             => image.URL.ToString(),  image             => image.ToJSON()),
                                     Standards:                 Groups.Union (EVSE.Standards, group => group.Standards),
+                                    FloorLevel:                Groups.Single("floorLevel",                EVSE.FloorLevel,                group => group.FloorLevel),
+                                    AcceptedEMobilityProviderIds:  Groups.Union (EVSE.AcceptedEMobilityProviderIds, group => group.AcceptedEMobilityProviderIds),
 
                                     // Its own tariffs, else the one of its groups; its energy meter is a device of its own.
                                     ChargingTariffIds:         Tariff.HasValue ? [ Tariff.Value.Id ] : EVSE.ChargingTariffIds,

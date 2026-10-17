@@ -39,7 +39,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
         private const String Full = """
             {
               "energySources":        [ [ "solar", "60 %" ], [ "wind", "40 %" ] ],
-              "environmentalImpacts": [ [ "CO2",   "0 %"  ] ],
+              "environmentalImpacts": [ [ "CO2",   "350 g/kWh" ] ],
               "supplierName":         { "en": "Supplier" },
               "productName":          { "en": "Green", "de": "Grün" },
               "additionalRemarks":    { "de": "Test" }
@@ -71,6 +71,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
             Assert.That(standalone["@context"]!.Value<String>(),             Is.EqualTo(EnergyMix.JSONLDContext));
             Assert.That(embedded  ["@context"],                              Is.Null);
             Assert.That(embedded  ["energySources"]![0]![1]!.Value<String>(),  Is.EqualTo("60 %"));
+
+            // Amounts per kWh, with their unit.
+            Assert.That(mix.EnvironmentalImpacts.Single().GramsPerKWh,      Is.EqualTo(350m));
+            Assert.That(embedded  ["environmentalImpacts"]![0]![1]!.Value<String>(),  Is.EqualTo("350 g/kWh"));
 
             Assert.That(EnergyMix.Parse(standalone),                         Is.EqualTo(mix));
             Assert.That(EnergyMix.Parse(embedded),                           Is.EqualTo(mix));
@@ -146,6 +150,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
         [TestCase("""{"energySources":[["solar","50 %","x"]],"environmentalImpacts":[],"supplierName":{},"productName":{}}""")]
         [TestCase("""{"energySources":[{"source":"solar","percentage":"50 %"}],"environmentalImpacts":[],"supplierName":{},"productName":{}}""")]
         [TestCase("""{"energySources":[["solar","50 %"],["solar","50 %"]],"environmentalImpacts":[],"supplierName":{},"productName":{}}""")]
+        [TestCase("""{"energySources":[],"environmentalImpacts":[["CO2","50 %"]],"supplierName":{},"productName":{}}""")]
+        [TestCase("""{"energySources":[],"environmentalImpacts":[["CO2","-1 g/kWh"]],"supplierName":{},"productName":{}}""")]
+        [TestCase("""{"energySources":[],"environmentalImpacts":[["CO2",350]],"supplierName":{},"productName":{}}""")]
+        [TestCase("""{"energySources":[],"environmentalImpacts":[["CO2","350,5 g/kWh"]],"supplierName":{},"productName":{}}""")]
+        [TestCase("""{"energySources":[],"environmentalImpacts":[["CO2","1 g/kWh"],["CO2","2 g/kWh"]],"supplierName":{},"productName":{}}""")]
         public void Invalid_documents_are_rejected(String JSON)
         {
             Assert.That(Rejects(JSON), Is.True);

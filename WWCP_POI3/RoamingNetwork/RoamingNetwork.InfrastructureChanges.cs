@@ -138,6 +138,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "operationTimeout",
             "extendedOperationTimeout",
             "standards",
+            "floorLevel",
+            "acceptedEMobilityProviderIds",
             "customData"
         ];
 
@@ -195,7 +197,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "reachDistance",
             "operationTimeout",
             "extendedOperationTimeout",
-            "standards"
+            "standards",
+            "floorLevel",
+            "acceptedEMobilityProviderIds"
         ];
 
         /// <summary>

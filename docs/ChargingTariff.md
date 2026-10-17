@@ -145,7 +145,7 @@ The whole object is replaced or removed by a change set.
 | JSON key | Type | Description |
 |---|---|---|
 | `energySources` | `[category, "percent %"]`[] | Mandatory, also when empty: `[]` means unknown. Each entry a pair of an `EnergySourceCategory` and a percentage text, e.g. `["Wind", "60 %"]`. |
-| `environmentalImpacts` | `[category, "percent %"]`[] | Mandatory, also when empty: `[]` means unknown. Pairs of an `EnvironmentalImpact` and a percentage. |
+| `environmentalImpacts` | `[category, "amount g/kWh"]`[] | Mandatory, also when empty: `[]` means unknown. Pairs of an `EnvironmentalImpact` and its amount per kWh, not negative, e.g. `["CarbonDioxide", "350 g/kWh"]` ([`EnvironmentalImpactAmount`](../WWCP_POI2/DataStructures/Complex/EnvironmentalImpactAmount.cs)). |
 | `supplierName` | I18N text | Mandatory, may be `{}`. The name or brand of the energy supplier. |
 | `productName` | I18N text | Mandatory, may be `{}`. The name or brand of the energy product. |
 | `additionalRemarks` | I18N text | Optional; omitted when empty. |

@@ -52,9 +52,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IEnumerable<PercentageOf<EnergySourceCategory>>  EnergySources           { get; }
 
         /// <summary>
-        /// The environmental impacts.
+        /// The environmental impacts per kWh, e.g. 350 g of carbon dioxide.
         /// </summary>
-        public IEnumerable<PercentageOf<EnvironmentalImpact>>   EnvironmentalImpacts    { get; }
+        public IEnumerable<EnvironmentalImpactAmount>           EnvironmentalImpacts    { get; }
 
         /// <summary>
         /// The name or brand of the energy supplier.
@@ -79,12 +79,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Create a new energy mix.
         /// </summary>
         /// <param name="EnergySources">The energy sources.</param>
-        /// <param name="EnvironmentalImpacts">The environmental impacts.</param>
+        /// <param name="EnvironmentalImpacts">The environmental impacts per kWh, e.g. 350 g of carbon dioxide.</param>
         /// <param name="SupplierName">The name or brand of the energy supplier.</param>
         /// <param name="ProductName">The name or brand of the energy product.</param>
         /// <param name="AdditionalRemarks">Optional additional remarks.</param>
         public EnergyMix(IEnumerable<PercentageOf<EnergySourceCategory>>  EnergySources,
-                         IEnumerable<PercentageOf<EnvironmentalImpact>>   EnvironmentalImpacts,
+                         IEnumerable<EnvironmentalImpactAmount>           EnvironmentalImpacts,
                          ImmutableI18NString                              SupplierName,
                          ImmutableI18NString                              ProductName,
                          ImmutableI18NString?                             AdditionalRemarks   = null)
@@ -93,11 +93,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var sources  = EnergySources.       ToImmutableArray();
             var impacts  = EnvironmentalImpacts.ToImmutableArray();
 
-            if (sources.Any(item => item.Value.IsNullOrEmpty || !float.IsFinite(item.Percent) || item.Percent < 0 || item.Percent > 100) ||
-                impacts.Any(item => item.Value.IsNullOrEmpty || !float.IsFinite(item.Percent) || item.Percent < 0 || item.Percent > 100))
+            if (sources.Any(item => item.Value.IsNullOrEmpty || !float.IsFinite(item.Percent) || item.Percent < 0 || item.Percent > 100))
                 throw new ArgumentException("Energy mix entries require a category and a percentage between zero and 100.");
 
-            if (sources.Select(item => item.Value).Distinct().Count() != sources.Length || impacts.Select(item => item.Value).Distinct().Count() != impacts.Length)
+            // E.g. a default one: amounts are not negative by construction.
+            if (impacts.Any(item => item.Category.IsNullOrEmpty))
+                throw new ArgumentException("Environmental impacts require a category.");
+
+            if (sources.Select(item => item.Value).Distinct().Count() != sources.Length || impacts.Select(item => item.Category).Distinct().Count() != impacts.Length)
                 throw new ArgumentException("Energy mix categories must be unique.");
 
             this.EnergySources         = sources;
@@ -190,12 +193,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse EnvironmentalImpacts    [mandatory]
 
-                if (!PercentageOfExtensions.TryParse<EnvironmentalImpact>(JSON,
-                                                                          "environmentalImpacts",
-                                                                          "environmental impact",
-                                                                          EnvironmentalImpact.TryParse,
-                                                                          out var environmentalImpacts,
-                                                                          out ErrorResponse))
+                if (!EnvironmentalImpactAmountExtensions.TryParse(JSON,
+                                                                  "environmentalImpacts",
+                                                                  out var environmentalImpacts,
+                                                                  out ErrorResponse))
                 {
                     return false;
                 }

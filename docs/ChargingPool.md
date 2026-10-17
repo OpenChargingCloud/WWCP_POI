@@ -172,12 +172,13 @@ C#: `AuthenticationMode.RFID(cardTypes, brands)`, `AuthenticationMode.SMS(number
 | JSON key | Type | Description |
 |---|---|---|
 | `energySources` | array | Always written: `[category, percentage]` pairs, e.g. `[["Sun", "60 %"], ["Wind", "40 %"]]`; predefined categories `unknown`, `Gas`, `Coal`, `StoneCoal`, `Oil`, `OtherFossil`, `NuclearFision`, `NuclearFusion`, `Sun`, `Wind`, `Geothermal`, `Waste`, `Biogas`, `OtherGreen`. `[]` means unknown. |
-| `environmentalImpacts` | array | Always written: `[category, percentage]` pairs as `energySources`; predefined categories `NuclearWaste`, `CarbonDioxide`. `[]` means unknown. |
+| `environmentalImpacts` | array | Always written: `[category, amount]` pairs, the amount per kWh with its unit, e.g. `[["CarbonDioxide", "350 g/kWh"]]`; predefined categories `NuclearWaste`, `CarbonDioxide`. `[]` means unknown. |
 | `supplierName` | I18N text | Mandatory. |
 | `productName` | I18N text | Mandatory. |
 | `additionalRemarks` | I18N text | Optional. |
 
-Each category at most once; percentages between 0 and 100.
+Each category at most once; percentages between 0 and 100, amounts not negative
+([`EnvironmentalImpactAmount`](../WWCP_POI2/DataStructures/Complex/EnvironmentalImpactAmount.cs)).
 
 
 ## Images

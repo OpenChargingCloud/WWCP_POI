@@ -43,7 +43,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
               "productName":  { "en": "Green" },
               "periods": [
                 { "start": "2026-10-11T13:00:00Z", "end": "2026-10-11T14:00:00Z",
-                  "energySources": [ [ "solar", "60 %" ], [ "wind", "40 %" ] ], "environmentalImpacts": [ [ "CO2", "0 %" ] ] },
+                  "energySources": [ [ "solar", "60 %" ], [ "wind", "40 %" ] ], "environmentalImpacts": [ [ "CO2", "0 g/kWh" ] ] },
                 { "start": "2026-10-11T16:00:00+02:00",
                   "energySources": [ [ "wind", "100 %" ] ], "environmentalImpacts": [] }
               ]

@@ -54,9 +54,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IEnumerable<PercentageOf<EnergySourceCategory>>  EnergySources           { get; }
 
         /// <summary>
-        /// The expected environmental impacts; empty for an unknown composition.
+        /// The expected environmental impacts per kWh; empty for an unknown composition.
         /// </summary>
-        public IEnumerable<PercentageOf<EnvironmentalImpact>>   EnvironmentalImpacts    { get; }
+        public IEnumerable<EnvironmentalImpactAmount>           EnvironmentalImpacts    { get; }
 
         #endregion
 
@@ -67,11 +67,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Start">The start of this period.</param>
         /// <param name="EnergySources">The expected energy sources; empty for an unknown composition.</param>
-        /// <param name="EnvironmentalImpacts">The expected environmental impacts; empty for an unknown composition.</param>
+        /// <param name="EnvironmentalImpacts">The expected environmental impacts per kWh; empty for an unknown composition.</param>
         /// <param name="End">The optional end of this period.</param>
         public EnergyMixPrognosisPeriod(DateTimeOffset                                   Start,
                                         IEnumerable<PercentageOf<EnergySourceCategory>>  EnergySources,
-                                        IEnumerable<PercentageOf<EnvironmentalImpact>>   EnvironmentalImpacts,
+                                        IEnumerable<EnvironmentalImpactAmount>           EnvironmentalImpacts,
                                         DateTimeOffset?                                  End   = null)
         {
 
@@ -81,12 +81,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (End.HasValue && End.Value <= Start)
                 throw new ArgumentException("The end of an energy mix prognosis period must be after its start!", nameof(End));
 
-            if (sources.Any(item => !Single.IsFinite(item.Percent) || item.Percent < 0 || item.Percent > 100) ||
-                impacts.Any(item => !Single.IsFinite(item.Percent) || item.Percent < 0 || item.Percent > 100))
+            if (sources.Any(item => !Single.IsFinite(item.Percent) || item.Percent < 0 || item.Percent > 100))
                 throw new ArgumentException("Each share of an energy mix prognosis period requires a percentage between 0 and 100!");
 
+            // E.g. a default one: amounts are not negative by construction.
+            if (impacts.Any(item => item.Category.IsNullOrEmpty))
+                throw new ArgumentException("Each environmental impact of an energy mix prognosis period requires a category!");
+
             if (sources.Select(item => item.Value).Distinct().Count() != sources.Length ||
-                impacts.Select(item => item.Value).Distinct().Count() != impacts.Length)
+                impacts.Select(item => item.Category).Distinct().Count() != impacts.Length)
                 throw new ArgumentException("A category must not be given twice within an energy mix prognosis period!");
 
             this.Start                 = Start;
@@ -194,12 +197,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse EnvironmentalImpacts    [mandatory]
 
-                if (!PercentageOfExtensions.TryParse<EnvironmentalImpact>(JSON,
-                                                                          "environmentalImpacts",
-                                                                          "environmental impact",
-                                                                          EnvironmentalImpact.TryParse,
-                                                                          out var environmentalImpacts,
-                                                                          out ErrorResponse))
+                if (!EnvironmentalImpactAmountExtensions.TryParse(JSON,
+                                                                  "environmentalImpacts",
+                                                                  out var environmentalImpacts,
+                                                                  out ErrorResponse))
                 {
                     return false;
                 }

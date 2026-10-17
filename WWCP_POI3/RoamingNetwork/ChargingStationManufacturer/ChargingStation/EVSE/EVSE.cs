@@ -184,6 +184,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<Standard>  Standards                  { get; }
 
+        /// <summary>
+        /// The floor level it is on, e.g. in a car park, in the numbering shown there, e.g. "-1" or "2B".
+        /// </summary>
+        public String?                   FloorLevel                 { get; }
+
+        /// <summary>
+        /// The e-mobility providers whose contracts it accepts, in the order of their identifications; none: unknown.
+        /// </summary>
+        public ImmutableArray<EMobilityProvider_Id>  AcceptedEMobilityProviderIds  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -211,6 +221,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     TimeSpan?                            OperationTimeout             = null,
                     Boolean?                             ExtendedOperationTimeout     = null,
                     IEnumerable<Standard>?               Standards                    = null,
+                    String?                              FloorLevel                   = null,
+                    IEnumerable<EMobilityProvider_Id>?   AcceptedEMobilityProviderIds = null,
 
                     Timestamped<EVSEAdminStatusType>?    InitialAdminStatus           = null,
                     Timestamped<EVSEStatusType>?         InitialStatus                = null,
@@ -284,6 +296,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.OperationTimeout          = OperationTimeout;
             this.ExtendedOperationTimeout  = ExtendedOperationTimeout;
             this.Standards                 = POIJSON.OrderedIds(Standards, $"standard of the EVSE '{Id}'");
+            this.FloorLevel                = FloorLevel;
+            this.AcceptedEMobilityProviderIds  = POIJSON.OrderedIds(AcceptedEMobilityProviderIds, $"accepted e-mobility provider of the EVSE '{Id}'");
             this.energyStatus        = new EnergyStatusRuntime(RaiseEnergyStatusChanged);
             this.priceStatus         = new PriceStatusRuntime (RaisePriceStatusChanged);
 
@@ -548,6 +562,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Standards.Length > 0)
                 json.Add("standards",                 POIJSON.IdsToJSON(Standards));
 
+            if (FloorLevel is not null)
+                json.Add("floorLevel",                FloorLevel);
+
+            if (AcceptedEMobilityProviderIds.Length > 0)
+                json.Add("acceptedEMobilityProviderIds",  POIJSON.IdsToJSON(AcceptedEMobilityProviderIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -632,7 +652,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                        "operation timeout",            out var operationTimeout,        out ErrorResponse) ||
                     !POIJSON.TryParseNonNegative(JSON, "reachDistance",
                                                        "reach distance",               out var reachDistance,           out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "standards", "standard", Standard.TryParse, out ImmutableArray<Standard> standards, out ErrorResponse))
+                    !POIJSON.TryParseIds        (JSON, "standards", "standard", Standard.TryParse, out ImmutableArray<Standard> standards, out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, "floorLevel",           "floor level",                  out var floorLevel,              out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, "acceptedEMobilityProviderIds", "accepted e-mobility provider identification",
+                                                 EMobilityProvider_Id.TryParse, out ImmutableArray<EMobilityProvider_Id> acceptedEMobilityProviderIds, out ErrorResponse))
                 {
                     return false;
                 }
@@ -669,6 +692,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 operationTimeout,
                                 extendedOperationTimeout,
                                 standards,
+                                floorLevel,
+                                acceptedEMobilityProviderIds,
                                 DataSource:  dataSource,
                                 Created:     created,
                                 LastChange:  lastChange,

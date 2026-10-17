@@ -46,7 +46,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}                                            a charging station operator;
     ///     ?without=chargingPools leaves out its charging pools, which ~/RNs/{RN_Id}/CPs?operatorId=… lists;
     ///     ?without=chargingTariffs,chargingTariffGroups,chargingPoolGroups,chargingStationGroups,EVSEGroups,
-    ///     or any of them, leaves them out, which ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs} list
+    ///     or any of them, leaves them out, which ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs} list;
+    ///     ?without=parkingSpaces leaves out its own parking spaces, which ~/…/CSs/{CS_Id}/PSs list as its stations name them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands                                     the brands of the charging station operator, its own
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands/{Brand_Id}                          a brand of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs                                        its charging tariffs, as it embeds them
@@ -249,7 +250,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            chargingStationOperator,
                                                                            chargingStationOperator.ToEmbeddedJSON,
-                                                                           [ "chargingPools", "chargingTariffs", "chargingTariffGroups", "chargingPoolGroups", "chargingStationGroups", "EVSEGroups" ],
+                                                                           [ "chargingPools", "chargingTariffs", "chargingTariffGroups", "chargingPoolGroups", "chargingStationGroups", "EVSEGroups", "parkingSpaces" ],
                                                                            "a charging station operator")
                                              : errorResponse);
 

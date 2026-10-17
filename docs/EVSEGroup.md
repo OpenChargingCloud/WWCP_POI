@@ -69,6 +69,8 @@ reads it, and each updated or removed by a change set:
 | `brands` | `Brands` | besides their own; of the same identification their own |
 | `images` | `Images` | besides their own; of the same URL their own |
 | `standards` | `Standards` | besides their own |
+| `floorLevel` | `FloorLevel` | unless they have their own |
+| `acceptedEMobilityProviderIds` | `AcceptedEMobilityProviderIds` | besides their own |
 
 Absent values are left out; an empty `EVSEIds` is not written, nor an empty array or unspecified flags of the
 properties above.
@@ -128,7 +130,7 @@ In a history it is set and read by `history.RuntimeStatus` with the entity type 
 - `@id` is mandatory and a valid EVSE group identification.
 - `EVSEIds` must not name an EVSE twice.
 - `priority` must be an integer; electrical limits, durations and the reach distance must not be negative; a
-  charging connector must be valid and not be given twice; `brands` and `standards` must not name a value twice, an
+  charging connector must be valid and not be given twice; `brands`, `standards` and `acceptedEMobilityProviderIds` must not name a value twice, an
   image URL must not be given twice.
 - In its operator: the group belongs to the operator its identification names; a group must not be given
   twice; every member must be an EVSE of the operator; `chargingTariffId` must be a tariff of the operator; every

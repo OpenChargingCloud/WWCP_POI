@@ -65,6 +65,8 @@ See [common properties](README.md#common-properties). An EVSE does not write `eT
 | `operationTimeout` | `OperationTimeout` | `TimeSpan?` | update/remove | The longest time allowed between the steps of a charging process before it expires or is cancelled, in s (a decimal), not negative. |
 | `extendedOperationTimeout` | `ExtendedOperationTimeout` | `Boolean?` | update/remove | Whether a driver can extend its timeouts, if known. |
 | `standards` | `Standards` | `ImmutableArray<Standard>` | update/remove | The standards it conforms to, e.g. `PAS 1899:2022`; a set of names, each once, in their ordinal order. |
+| `floorLevel` | `FloorLevel` | `String?` | update/remove | The floor level it is on, e.g. in a car park, in the numbering shown there, e.g. `"-1"` or `"2B"`. |
+| `acceptedEMobilityProviderIds` | `AcceptedEMobilityProviderIds` | `ImmutableArray<EMobilityProvider_Id>` | update/remove | The [e-mobility providers](EMobilityProvider.md) whose contracts it accepts, e.g. `DE-GDF`, each once, in their ordinal order; they need not be in the roaming network. None: unknown. |
 
 Absent values are left out; empty arrays and empty flags are not written.
 
@@ -229,7 +231,7 @@ See [runtime status](README.md#runtime-status) for the mechanism.
 - `@id` is mandatory and a valid EVSE identification.
 - `maxVoltage`, `maxCurrent`, `maxPower` and `maxReservationDuration` must not be negative.
 - A charging connector must not be given twice; each needs `@id` and `type`.
-- `chargingTariffIds` and `brands` must not name a value twice; an image URL must not be given twice. `brands` must
+- `chargingTariffIds`, `brands` and `acceptedEMobilityProviderIds` must not name a value twice; an image URL must not be given twice. `brands` must
   be given completely; `brandIds` is refused.
 - `currentTypes` and `chargingModes` accept only the flags above.
 - In its station and operator: the EVSE belongs to the operator of its station; it is unique within the operator
