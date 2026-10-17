@@ -64,8 +64,6 @@ e.g. in `examples/Example2/`:
 ```
 
 ```csharp
-using System.Text;
-
 using Newtonsoft.Json.Linq;
 
 using Org.BouncyCastle.Crypto.Generators;
@@ -74,6 +72,8 @@ using Org.BouncyCastle.Security;
 
 using org.GraphDefined.Vanaheimr.Aegir;
 using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 using cloud.charging.open.protocols.WWCP;
 using cloud.charging.open.protocols.WWCP.POI;
@@ -117,15 +117,16 @@ QA  revision 1, commit da9448f6…  Quality assurance
 Everything after Enter is the operator's own, in change sets it signs, made for the head of `QA` and submitted to the
 hub - by anybody, without signing in. Two helpers do that for every step: `Head()` reads the head as the hub serves it,
 checked against its ETags as it is read, and `Commit(…)` makes a change set of it, signs it with the signing key of
-`DE*GEF` and submits it.
+`DE*GEF` and submits it. Both talk to the hub with the `HTTPClient` of Hermod; a change set goes by the method
+`COMMIT`, which `POI_API.COMMIT` names.
 
 ```csharp
-using var http      = new HttpClient { BaseAddress = new Uri((args.FirstOrDefault() ?? "http://127.0.0.1:2356/") + "poi/") };
+await using var http  = new HTTPClient(URL.Parse(args.FirstOrDefault() ?? "http://127.0.0.1:2356"));
 
 // The head of QA as the hub serves it, checked against its ETags as it is read.
 async Task<RoamingNetwork> Head()
 
-    => RoamingNetwork.TryParse(JObject.Parse(await http.GetStringAsync("RNs/QA")), out var head, out var error)
+    => RoamingNetwork.TryParse(JObject.Parse((await http.GET(HTTPPath.Root + "poi/RNs/QA")).HTTPBodyAsUTF8String!), out var head, out var error)
            ? head
            : throw new InvalidOperationException(error);
 
@@ -136,17 +137,16 @@ async Task Commit(String Description, params RoamingNetworkChange[] Changes)
     var changeSet = (await Head()).CreateChangeSet(Changes, Description: new ImmutableI18NString(I18NString.Create(Languages.en, Description))).
                                    Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);
 
-    using var request   = new HttpRequestMessage(new HttpMethod("COMMIT"), "RNs/QA/history/changeSets") {
-                              Content = new StringContent(changeSet.ToJSON().ToString(), Encoding.UTF8, "application/json")
-                          };
+    var response  = await http.RunRequest(POI_API.COMMIT,
+                                          HTTPPath.Root + "poi/RNs/QA/history/changeSets",
+                                          Content:      changeSet.ToJSON().ToString().ToUTF8Bytes(),
+                                          ContentType:  HTTPContentType.Application.JSON_UTF8);
 
-    using var response  = await http.SendAsync(request);
+    var answer    = JObject.Parse(response.HTTPBodyAsUTF8String!);
 
-    var answer          = JObject.Parse(await response.Content.ReadAsStringAsync());
-
-    Console.WriteLine(response.IsSuccessStatusCode
-                          ? $"{(Int32) response.StatusCode} {answer["status"]}, revision {answer["revision"]}: {Description}"
-                          : $"{(Int32) response.StatusCode}: {answer}");
+    Console.WriteLine(response.HTTPStatusCode.IsSuccessful
+                          ? $"{response.HTTPStatusCode.Code} {answer["status"]}, revision {answer["revision"]}: {Description}"
+                          : $"{response.HTTPStatusCode}: {answer}");
 
 }
 ```

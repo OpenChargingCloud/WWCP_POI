@@ -164,8 +164,6 @@ WWCP_POI3, e.g. in `examples/Example1/`, the same program as in step 4:
 ```
 
 ```csharp
-using System.Text;
-
 using Newtonsoft.Json.Linq;
 
 using Org.BouncyCastle.Crypto.Generators;
@@ -174,6 +172,8 @@ using Org.BouncyCastle.Security;
 
 using org.GraphDefined.Vanaheimr.Aegir;
 using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 using cloud.charging.open.protocols.WWCP;
 using cloud.charging.open.protocols.WWCP.POI;
@@ -238,13 +238,14 @@ its own to add. E-mobility providers, grid operators and parking operators are a
 
 One `Add` of the pool, with its station and both EVSEs embedded, signed with the operator's signing key, made for
 the version the operator read from the hub and submitted to it - by anybody, without signing in: whether a change set
-may change what it changes, its signatures decide. The same program as in step 3, after Enter:
+may change what it changes, its signatures decide. The same program as in step 3, after Enter, with the `HTTPClient`
+of Hermod; a change set goes by the method `COMMIT`, which `POI_API.COMMIT` names:
 
 ```csharp
-using var http      = new HttpClient { BaseAddress = new Uri((args.FirstOrDefault() ?? "http://127.0.0.1:2356/") + "poi/") };
+await using var http  = new HTTPClient(URL.Parse(args.FirstOrDefault() ?? "http://127.0.0.1:2356"));
 
 // The head of QA, as the hub serves it: checked against its ETags as it is read.
-if (!RoamingNetwork.TryParse(JObject.Parse(await http.GetStringAsync("RNs/QA")), out var head, out var error))
+if (!RoamingNetwork.TryParse(JObject.Parse((await http.GET(HTTPPath.Root + "poi/RNs/QA")).HTTPBodyAsUTF8String!), out var head, out var error))
     throw new InvalidOperationException(error);
 
 var pool            = new ChargingPool(
@@ -266,11 +267,10 @@ var addPool         = head.CreateChangeSet([ RoamingNetworkChange.Add(pool) ],
                                            Description: new ImmutableI18NString(I18NString.Create(Languages.en, "The first charging pool"))).
                            Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);
 
-using var request   = new HttpRequestMessage(new HttpMethod("COMMIT"), "RNs/QA/history/changeSets") {
-                          Content = new StringContent(addPool.ToJSON().ToString(), Encoding.UTF8, "application/json")
-                      };
-
-using var response  = await http.SendAsync(request);   // 201 Created
+var response        = await http.RunRequest(POI_API.COMMIT,
+                                            HTTPPath.Root + "poi/RNs/QA/history/changeSets",
+                                            Content:      addPool.ToJSON().ToString().ToUTF8Bytes(),
+                                            ContentType:  HTTPContentType.Application.JSON_UTF8);   // 201 Created
 ```
 
 `CreateChangeSet` makes it for the version it is called on: its `beforeETags` are those of revision 1, its
