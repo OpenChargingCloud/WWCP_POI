@@ -269,7 +269,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    .. ChargingStationOperator.EVSEGroups.           Select(evseGroup            => Add(evseGroup)),
                    .. ChargingStationOperator.ChargingStationGroups.Select(chargingStationGroup => Add(chargingStationGroup)),
                    .. ChargingStationOperator.ChargingPoolGroups.   Select(chargingPoolGroup    => Add(chargingPoolGroup)),
-                   .. ChargingStationOperator.ChargingTariffGroups. Select(chargingTariffGroup  => Add(chargingTariffGroup))
+                   .. ChargingStationOperator.ChargingTariffGroups. Select(chargingTariffGroup  => Add(chargingTariffGroup)),
+                   .. ChargingStationOperator.EnergyMeterGroups.    Select(energyMeterGroup     => Add(energyMeterGroup, nameof(POI.ChargingStationOperator), ChargingStationOperator.Id.ToString()))
                ];
 
         #endregion
@@ -607,13 +608,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    GridOperator.ToJSON()));
 
         /// <summary>
-        /// Add the grid connection points of the given grid operator to the operator once added:
-        /// a change set their maintainers or the grid operator sign.
+        /// Add the grid connection points of the given grid operator, and then its energy meter groups, to the operator
+        /// once added: a change set their maintainers or the grid operator sign.
         /// </summary>
-        /// <param name="GridOperator">The grid operator with its grid connection points.</param>
+        /// <param name="GridOperator">The grid operator with its grid connection points and energy meter groups.</param>
         public static IReadOnlyList<RoamingNetworkChange> AddChildren(GridOperator GridOperator)
 
-            => [ .. GridOperator.GridConnectionPoints.Select(gridConnectionPoint => Add(gridConnectionPoint, GridOperator.Id)) ];
+            => [
+                   .. GridOperator.GridConnectionPoints.Select(gridConnectionPoint => Add(gridConnectionPoint, GridOperator.Id)),
+                   .. GridOperator.EnergyMeterGroups.   Select(energyMeterGroup    => Add(energyMeterGroup,    nameof(POI.GridOperator), GridOperator.Id.ToString()))
+               ];
 
         /// <summary>
         /// Remove the given grid operator, optionally checking its complete previous JSON representation.
@@ -885,6 +889,81 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           JToken?              OldValue   = null)
 
             => RemoveProperty(nameof(POI.GridConnectionPoint), GridConnectionPoint.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (EnergyMeterGroup, ChargingStationOperatorId)
+
+        /// <summary>
+        /// Add the given energy meter group to the given charging station operator, grouping energy meters of its
+        /// charging pools, charging stations and EVSEs.
+        /// </summary>
+        public static RoamingNetworkChange Add(EnergyMeterGroup            EnergyMeterGroup,
+                                               ChargingStationOperator_Id  ChargingStationOperatorId)
+
+            => Add(EnergyMeterGroup, nameof(POI.ChargingStationOperator), ChargingStationOperatorId.ToString());
+
+        #endregion
+
+        #region Add                   (EnergyMeterGroup, GridOperatorId)
+
+        /// <summary>
+        /// Add the given energy meter group to the given grid operator, grouping energy meters of its grid connection points.
+        /// </summary>
+        public static RoamingNetworkChange Add(EnergyMeterGroup  EnergyMeterGroup,
+                                               GridOperator_Id   GridOperatorId)
+
+            => Add(EnergyMeterGroup, nameof(POI.GridOperator), GridOperatorId.ToString());
+
+        #endregion
+
+        #region (private) Add         (EnergyMeterGroup, OwnerType, OwnerId)
+
+        private static RoamingNetworkChange Add(EnergyMeterGroup  EnergyMeterGroup,
+                                                String            OwnerType,
+                                                String            OwnerId)
+
+            => Add(nameof(POI.EnergyMeterGroup), EnergyMeterGroup.Id.ToString(), EnergyMeterGroup.ToJSON(), OwnerType, OwnerId);
+
+        #endregion
+
+        #region Remove                (EnergyMeterGroupId, OldValue = null)
+
+        /// <summary>
+        /// Remove the given energy meter group from its owner, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(EnergyMeterGroup_Id  EnergyMeterGroupId,
+                                                  JToken?              OldValue   = null)
+
+            => Remove(nameof(POI.EnergyMeterGroup), EnergyMeterGroupId.ToString(), OldValue);
+
+        #endregion
+
+        #region UpdateProperty        (EnergyMeterGroup, PropertyName, OldValue, NewValue)
+
+        /// <summary>
+        /// Update one property of the given energy meter group, optionally asserting its previous value,
+        /// e.g. energyMeterIds, or a property of an energy meter it gives its members.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(EnergyMeterGroup  EnergyMeterGroup,
+                                                          String            PropertyName,
+                                                          JToken?           OldValue,
+                                                          JToken            NewValue)
+
+            => UpdateProperty(nameof(POI.EnergyMeterGroup), EnergyMeterGroup.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        #endregion
+
+        #region RemoveProperty        (EnergyMeterGroup, PropertyName, OldValue = null)
+
+        /// <summary>
+        /// Remove one property of the given energy meter group, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(EnergyMeterGroup  EnergyMeterGroup,
+                                                          String            PropertyName,
+                                                          JToken?           OldValue   = null)
+
+            => RemoveProperty(nameof(POI.EnergyMeterGroup), EnergyMeterGroup.Id.ToString(), PropertyName, OldValue);
 
         #endregion
 

@@ -48,7 +48,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// different values where these decide what it takes; neither must they make it invalid, e.g. a charging station
     /// by a maximum power above the one of all its EVSEs together: the operator is refused, and so a change set making
     /// it so. An effective charging station has the effective EVSEs, an effective charging pool the effective charging
-    /// stations. Each is a version of its own, with the runtime status of its member, and its energy meters; its last
+    /// stations. The energy meters they embed take the properties of their energy meter groups the same way, as effective
+    /// energy meters. Each is a version of its own, with the runtime status of its member, and its energy meters; its last
     /// change is the latest of the member, its groups giving it properties and what it embeds, and, where it is other
     /// than in the version before, also when a group stopped giving it something, not before the last change of the
     /// operator.
@@ -239,6 +240,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => EVSEGroups.Where(evseGroup => evseGroup.EVSEIds.Contains(EVSEId));
 
+        /// <summary>
+        /// The groups the given energy meter is a member of, in the order of their identifications.
+        /// </summary>
+        public IEnumerable<EnergyMeterGroup> EnergyMeterGroupsOf(EnergyMeter_Id EnergyMeterId)
+
+            => EnergyMeterGroups.Where(energyMeterGroup => energyMeterGroup.EnergyMeterIds.Contains(EnergyMeterId));
+
         #endregion
 
 
@@ -274,6 +282,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return json;
             }
 
+            #region Energy meters, with the properties of their groups
+
+            var energyMeterGroupsOf = MembersOf(EnergyMeterGroups.Where(energyMeterGroup => energyMeterGroup.HasEnergyMeterProperties), energyMeterGroup => energyMeterGroup.EnergyMeterIds);
+
+            Boolean HasGroups(EnergyMeter? EnergyMeter)
+
+                => EnergyMeter is not null &&
+                   energyMeterGroupsOf.ContainsKey(EnergyMeter.Id);
+
+            EnergyMeter EffectiveMeter(EnergyMeter EnergyMeter)
+
+                => energyMeterGroupsOf.TryGetValue(EnergyMeter.Id, out var groups)
+                       ? EnergyMeterGroup.Effective(EnergyMeter, new POIGroupValues<EnergyMeterGroup>($"the energy meter '{EnergyMeter.Id}'", groups, JSONOf))
+                       : EnergyMeter;
+
+            #endregion
+
             #region EVSEs, with the charging tariff of their groups, unless they have their own
 
             var evseGroupsOf                   = MembersOf(EVSEGroups.           Where(evseGroup            => evseGroup.HasEVSEProperties),                    evseGroup            => evseGroup.EVSEIds);
@@ -301,10 +326,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         DateTimeOffset? atLeast = Changed?.EVSEs.TryGetValue(evse.Id, out var floor) == true ? floor : null;
 
-                        if (!hasGroups && tariff is null && !atLeast.HasValue)
+                        if (!hasGroups && tariff is null && !atLeast.HasValue && !HasGroups(evse.EnergyMeter))
                             continue;
 
-                        evses.Add(evse.Id, Effective(evse, new POIGroupValues<EVSEGroup>(member, groups ?? [], JSONOf), tariff, atLeast));
+                        evses.Add(evse.Id, Effective(evse,
+                                                     new POIGroupValues<EVSEGroup>(member, groups ?? [], JSONOf),
+                                                     tariff,
+                                                     evse.EnergyMeter is EnergyMeter energyMeter ? EffectiveMeter(energyMeter) : null,
+                                                     atLeast));
 
                     }
                 }
@@ -324,13 +353,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 DateTimeOffset? atLeast = Changed?.ChargingStations.TryGetValue(chargingStation.Id, out var floor) == true ? floor : null;
 
-                if (!hasGroups && !atLeast.HasValue && !chargingStation.EVSEs.Any(evse => evses.ContainsKey(evse.Id)))
+                if (!hasGroups && !atLeast.HasValue && !chargingStation.EVSEs.Any(evse => evses.ContainsKey(evse.Id)) && !chargingStation.EnergyMeters.Any(HasGroups))
                     continue;
 
                 chargingStations.Add(chargingStation.Id,
                                      Effective(chargingStation,
                                                new POIGroupValues<ChargingStationGroup>($"the charging station '{chargingStation.Id}'", groups ?? [], JSONOf),
                                                [.. chargingStation.EVSEs.Select(evse => evses.TryGetValue(evse.Id, out var effectiveEVSE) ? effectiveEVSE : evse)],
+                                               [.. chargingStation.EnergyMeters.Select(EffectiveMeter)],
                                                atLeast));
 
             }
@@ -349,13 +379,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 DateTimeOffset? atLeast = Changed?.ChargingPools.TryGetValue(chargingPool.Id, out var floor) == true ? floor : null;
 
-                if (!hasGroups && !atLeast.HasValue && !chargingPool.ChargingStations.Any(chargingStation => chargingStations.ContainsKey(chargingStation.Id)))
+                if (!hasGroups && !atLeast.HasValue && !chargingPool.ChargingStations.Any(chargingStation => chargingStations.ContainsKey(chargingStation.Id)) && !chargingPool.EnergyMeters.Any(HasGroups))
                     continue;
 
                 chargingPools.Add(chargingPool.Id,
                                   Effective(chargingPool,
                                             new POIGroupValues<ChargingPoolGroup>($"the charging pool '{chargingPool.Id}'", groups ?? [], JSONOf),
                                             [.. chargingPool.ChargingStations.Select(chargingStation => chargingStations.TryGetValue(chargingStation.Id, out var effectiveChargingStation) ? effectiveChargingStation : chargingStation)],
+                                            [.. chargingPool.EnergyMeters.Select(EffectiveMeter)],
                                             atLeast));
 
             }
@@ -441,6 +472,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (TryGetChargingStation(chargingStationId, out var chargingStation))
                     evseCandidates.UnionWith(chargingStation.EVSEs.Select(evse => evse.Id));
 
+            // The members of energy meter groups are embedded in what they measure.
+            var energyMeterCandidates = MembersOfChangedGroups(EnergyMeterGroups, Previous.EnergyMeterGroups, group => group.Id, group => group.EnergyMeterIds).ToHashSet();
+
+            if (energyMeterCandidates.Count > 0)
+            {
+                foreach (var chargingPool in ChargingPools)
+                {
+
+                    if (chargingPool.EnergyMeters.Any(energyMeter => energyMeterCandidates.Contains(energyMeter.Id)))
+                        chargingPoolCandidates.Add(chargingPool.Id);
+
+                    foreach (var chargingStation in chargingPool.ChargingStations)
+                    {
+
+                        if (chargingStation.EnergyMeters.Any(energyMeter => energyMeterCandidates.Contains(energyMeter.Id)))
+                            chargingStationCandidates.Add(chargingStation.Id);
+
+                        foreach (var evse in chargingStation.EVSEs)
+                            if (evse.EnergyMeter is not null && energyMeterCandidates.Contains(evse.EnergyMeter.Id))
+                                evseCandidates.Add(evse.Id);
+
+                    }
+
+                }
+            }
+
             #endregion
 
             // The floors found before, e.g. comparing a merge with its other parent, are kept.
@@ -485,8 +542,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) ShareRuntimeOfEffective()
 
         /// <summary>
-        /// Let the effective EVSEs, charging stations and charging pools take the runtime status of the EVSEs, charging
-        /// stations and charging pools again, after these took the one of their previous versions.
+        /// Let the effective EVSEs, charging stations and charging pools, and the effective energy meters they embed, take
+        /// the runtime status of the EVSEs, charging stations, charging pools and energy meters again, after these took the
+        /// one of their previous versions.
         /// </summary>
         private void ShareRuntimeOfEffective()
         {
@@ -502,6 +560,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var (chargingPoolId, effectiveChargingPool) in effectiveChargingPoolIndex)
                 if (TryGetChargingPool(chargingPoolId, out var chargingPool))
                     effectiveChargingPool.ShareRuntimeOf(chargingPool);
+
+            // An effective charging station embeds the effective EVSEs, an effective charging pool the effective charging
+            // stations: of each only its own energy meters.
+            foreach (var effectiveEnergyMeter in effectiveEVSEs.             Values.Select    (effectiveEVSE            => effectiveEVSE.           EnergyMeter).
+                                                 Concat(effectiveChargingStations. Values.SelectMany(effectiveChargingStation => effectiveChargingStation.EnergyMeters)).
+                                                 Concat(effectiveChargingPoolIndex.Values.SelectMany(effectiveChargingPool    => effectiveChargingPool.   EnergyMeters)).
+                                                 OfType<EnergyMeter>())
+            {
+                if (TryGetEnergyMeter(effectiveEnergyMeter.Id, out var energyMeter) && !ReferenceEquals(effectiveEnergyMeter, energyMeter))
+                    effectiveEnergyMeter.ShareRuntimeOf(energyMeter);
+            }
 
         }
 
@@ -620,6 +689,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private static) LastChangeOfEffective(Effective, Own) / LastChangesOfEffective(Effective, Own)
+
+        /// <summary>
+        /// The last change of the given effective energy meter, where its groups give it properties: what a member embeds
+        /// as it is at runtime is part of it. Null where it is the energy meter itself.
+        /// </summary>
+        private static DateTimeOffset? LastChangeOfEffective(EnergyMeter?  Effective,
+                                                             EnergyMeter?  Own)
+
+            => Effective is not null && !ReferenceEquals(Effective, Own)
+                   ? Effective.LastChangeDate
+                   : null;
+
+        /// <summary>
+        /// The last changes of the given effective energy meters, where their groups give them properties.
+        /// </summary>
+        private static IEnumerable<DateTimeOffset?> LastChangesOfEffective(IEnumerable<EnergyMeter>  Effective,
+                                                                           IEnumerable<EnergyMeter>  Own)
+
+            => Effective.Select(effective => LastChangeOfEffective(effective, Own.FirstOrDefault(own => own.Id == effective.Id)));
+
+        #endregion
+
         #region (private static) TariffOf(Member, Groups, TariffOf, JSONOf)
 
         /// <summary>
@@ -649,14 +741,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) Effective(EVSE,            Groups, Tariff)
+        #region (private static) Effective(EVSE,            Groups, Tariff, EnergyMeter)
 
         /// <summary>
-        /// The given EVSE with the properties of the given groups, and the given charging tariff of its groups, if any.
+        /// The given EVSE with the properties of the given groups, the given charging tariff of its groups, if any,
+        /// and its given effective energy meter.
         /// </summary>
         private static EVSE Effective(EVSE                                                 EVSE,
                                       POIGroupValues<EVSEGroup>                            Groups,
                                       (ChargingTariff_Id Id, DateTimeOffset LastChange)?   Tariff,
+                                      EnergyMeter?                                         EnergyMeter,
                                       DateTimeOffset?                                      AtLeast   = null)
         {
 
@@ -690,13 +784,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     FloorLevel:                Groups.Single("floorLevel",                EVSE.FloorLevel,                group => group.FloorLevel),
                                     AcceptedEMobilityProviderIds:  Groups.Union (EVSE.AcceptedEMobilityProviderIds, group => group.AcceptedEMobilityProviderIds),
 
-                                    // Its own tariffs, else the one of its groups; its energy meter is a device of its own.
+                                    // Its own tariffs, else the one of its groups; its energy meter is a device of its own,
+                                    // with the properties of its energy meter groups.
                                     ChargingTariffIds:         Tariff.HasValue ? [ Tariff.Value.Id ] : EVSE.ChargingTariffIds,
-                                    EnergyMeter:               EVSE.EnergyMeter,
+                                    EnergyMeter:               EnergyMeter,
 
                                     DataSource:                EVSE.DataSource,
                                     Created:                   EVSE.Created,
-                                    LastChange:                Latest(Groups.LastChange(EVSE.LastChangeDate), Tariff?.LastChange, AtLeast),
+                                    LastChange:                Latest(Groups.LastChange(EVSE.LastChangeDate), Tariff?.LastChange, AtLeast, LastChangeOfEffective(EnergyMeter, EVSE.EnergyMeter)),
                                     CustomData:                EVSE.CustomData
 
                                 );
@@ -715,14 +810,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) Effective(ChargingStation, Groups, EVSEs)
+        #region (private static) Effective(ChargingStation, Groups, EVSEs, EnergyMeters)
 
         /// <summary>
-        /// The given charging station with the properties of the given groups, and the given effective EVSEs.
+        /// The given charging station with the properties of the given groups, the given effective EVSEs, and its given
+        /// effective energy meters.
         /// </summary>
         private static ChargingStation Effective(ChargingStation                             ChargingStation,
                                                  POIGroupValues<ChargingStationGroup>        Groups,
                                                  EVSE[]                                      EVSEs,
+                                                 EnergyMeter[]                               EnergyMeters,
                                                  DateTimeOffset?                             AtLeast   = null)
         {
 
@@ -755,13 +852,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     Features:             Groups.Union (ChargingStation.Features,            group => group.Features),
                                     ParkingSpaceIds:      Groups.Union (ChargingStation.ParkingSpaceIds,     group => group.ParkingSpaceIds),
 
-                                    // Its effective EVSEs, and its very energy meters.
+                                    // Its effective EVSEs, and its very energy meters, with the properties of their groups.
                                     EVSEs:                EVSEs,
-                                    EnergyMeters:         ChargingStation.EnergyMeters,
+                                    EnergyMeters:         EnergyMeters,
 
                                     DataSource:           ChargingStation.DataSource,
                                     Created:              ChargingStation.Created,
-                                    LastChange:           Latest(EVSEs.Select(evse => evse.LastChangeDate).Append(Groups.LastChange(ChargingStation.LastChangeDate)).Max(), AtLeast),
+                                    LastChange:           Latest(EVSEs.Select(evse => evse.LastChangeDate).Append(Groups.LastChange(ChargingStation.LastChangeDate)).Max(),
+                                                                 [ AtLeast, .. LastChangesOfEffective(EnergyMeters, ChargingStation.EnergyMeters) ]),
                                     CustomData:           ChargingStation.CustomData
 
                                 );
@@ -780,14 +878,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) Effective(ChargingPool,    Groups, ChargingStations)
+        #region (private static) Effective(ChargingPool,    Groups, ChargingStations, EnergyMeters)
 
         /// <summary>
-        /// The given charging pool with the properties of the given groups, and the given effective charging stations.
+        /// The given charging pool with the properties of the given groups, the given effective charging stations, and
+        /// its given effective energy meters.
         /// </summary>
         private static ChargingPool Effective(ChargingPool                             ChargingPool,
                                               POIGroupValues<ChargingPoolGroup>        Groups,
                                               ChargingStation[]                        ChargingStations,
+                                              EnergyMeter[]                            EnergyMeters,
                                               DateTimeOffset?                          AtLeast   = null)
         {
 
@@ -837,13 +937,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     Standards:                 Groups.Union (ChargingPool.Standards,            group => group.Standards),
                                     NUTSCodes:                 Groups.Union (ChargingPool.NUTSCodes,            group => group.NUTSCodes),
 
-                                    // Its effective charging stations, and its very energy meters.
+                                    // Its effective charging stations, and its very energy meters, with the properties of their groups.
                                     ChargingStations:          ChargingStations,
-                                    EnergyMeters:              ChargingPool.EnergyMeters,
+                                    EnergyMeters:              EnergyMeters,
 
                                     DataSource:                ChargingPool.DataSource,
                                     Created:                   ChargingPool.Created,
-                                    LastChange:                Latest(ChargingStations.Select(chargingStation => chargingStation.LastChangeDate).Append(Groups.LastChange(ChargingPool.LastChangeDate)).Max(), AtLeast),
+                                    LastChange:                Latest(ChargingStations.Select(chargingStation => chargingStation.LastChangeDate).Append(Groups.LastChange(ChargingPool.LastChangeDate)).Max(),
+                                                                      [ AtLeast, .. LastChangesOfEffective(EnergyMeters, ChargingPool.EnergyMeters) ]),
                                     CustomData:                ChargingPool.CustomData
 
                                 );

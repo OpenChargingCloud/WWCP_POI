@@ -178,6 +178,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region OfEnergyMeters(Group, Members)
+
+        /// <summary>
+        /// The status of an energy meter group from the status of its energy meters: available when all of them are,
+        /// partialAvailable when one of them is, else offline when all of them are, error when all of them are offline
+        /// or have an error, inDeployment when all of them are, else unknown. Unknown and unspecified are left out.
+        /// </summary>
+        public static EnergyMeterGroupStatusType OfEnergyMeters(EnergyMeterGroup                                                     Group,
+                                                                IReadOnlyDictionary<EnergyMeter_Id, Timestamped<EnergyMeterStatusType>>  Members)
+        {
+
+            var members = Members.Values.
+                              Select(status => status.Value.ToString()!.ToLowerInvariant()).
+                              Where (status => status is not ("unknown" or "unspecified")).
+                              ToArray();
+
+            return EnergyMeterGroupStatusType.Parse(
+                       members.Length == 0                                   ? "unknown"
+                     : members.All     (m => m == "available")                ? "available"
+                     : members.Contains("available")                          ? "partialAvailable"
+                     : members.All     (m => m == "offline")                  ? "offline"
+                     : members.All     (m => m is "offline" or "error")       ? "error"
+                     : members.All     (m => m == "indeployment")             ? "inDeployment"
+                     : "unknown"
+                   );
+
+        }
+
+        #endregion
+
     }
 
 }

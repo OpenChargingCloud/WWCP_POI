@@ -294,6 +294,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseChildren<ChargingTariffGroup>(JSON, "chargingTariffGroups", "chargingTariffGroupIds", "ChargingTariffGroups", ChargingTariffGroup.TryParse, out var chargingTariffGroups, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseChildren<EnergyMeterGroup>(JSON, "energyMeterGroups", "energyMeterGroupIds", "energy meter groups", EnergyMeterGroup.TryParse, out var energyMeterGroups, out ErrorResponse))
+                    return false;
+
                 if (!POIJSON.TryParseChildren<ParkingSpace>(JSON, "parkingSpaces", "parkingSpaceIds", "parking spaces", ParkingSpace.TryParse, out var parkingSpaces, out ErrorResponse))
                     return false;
 
@@ -361,6 +364,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               Brands:               brands,
                                               SigningKeys:  signingKeys,
                                               IdentityKeys: identityKeys,
+                                              EnergyMeterGroups:    energyMeterGroups,
                                               DataSource:  dataSource,
                                               Created:     created,
                                               LastChange:  lastChange,

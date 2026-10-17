@@ -20,7 +20,7 @@ The pools, stations, EVSEs, tariffs and groups it embeds all begin with it: `DE*
 | Status | `ChargingStationOperatorStatusType`, initially `Available` |
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `chargingStationOperators` |
 | Owner | itself (a signing key; its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO); added and removed by the RNO |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs` (all, as `{@id, name, description}`), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` (`?without=chargingPools` without its charging pools, which `GET ~/RNs/{RN_Id}/CPs?operatorId={CSO_Id}` lists; `?without=` also any of `chargingTariffs`, `chargingTariffGroups`, `chargingPoolGroups`, `chargingStationGroups`, `EVSEGroups`, and `parkingSpaces`, its own parking spaces, which `…/CSs/{CS_Id}/PSs` list as its charging stations name them), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs\|CTGs\|CPGs\|CSGs\|EVSEGs}` (each of them, searched and paged), and one of them below it, e.g. `…/CTs/{CT_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands/{Brand_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs` (all, as `{@id, name, description}`), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` (`?without=chargingPools` without its charging pools, which `GET ~/RNs/{RN_Id}/CPs?operatorId={CSO_Id}` lists; `?without=` also any of `chargingTariffs`, `chargingTariffGroups`, `chargingPoolGroups`, `chargingStationGroups`, `EVSEGroups`, `energyMeterGroups`, and `parkingSpaces`, its own parking spaces, which `…/CSs/{CS_Id}/PSs` list as its charging stations name them), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs\|CTGs\|CPGs\|CSGs\|EVSEGs\|EMGs}` (each of them, searched and paged), and one of them below it, e.g. `…/CTs/{CT_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands/{Brand_Id}` |
 
 
 ## Common properties
@@ -62,6 +62,7 @@ The operator writes no `eTags`.
 | `chargingStationGroups` | `ChargingStationGroups` | `POICollection<ChargingStationGroup_Id, ChargingStationGroup>` | add/remove | See [Groups](#groups). |
 | `chargingPoolGroups` | `ChargingPoolGroups` | `POICollection<ChargingPoolGroup_Id, ChargingPoolGroup>` | add/remove | See [Groups](#groups). |
 | `chargingTariffGroups` | `ChargingTariffGroups` | `POICollection<ChargingTariffGroup_Id, ChargingTariffGroup>` | add/remove | See [Groups](#groups). |
+| `energyMeterGroups` | `EnergyMeterGroups` | `POICollection<EnergyMeterGroup_Id, EnergyMeterGroup>` | add/remove | Groups of the energy meters of its pools, stations and EVSEs, see [Groups](#groups). |
 | `parkingSpaces` | `ParkingSpaces` | `POICollection<ParkingSpace_Id, ParkingSpace>` | add/remove | The [parking spaces](ParkingSpace.md) it defines itself where no parking operator does: in no parking garage, without parking sensors or parking products; identifications unique within the network, parking operators' as well. |
 
 Children are written only when there are any; collections in the ordinal order of their identifications.
@@ -72,8 +73,9 @@ Children are written only when there are any; collections in the ordinal order o
 - `EVSEs`: the EVSEs of all its pools.
 - `EnergyMeters`: the energy meters of all its pools, their grid connection points, stations and EVSEs.
 - `TryGetChargingPool`, `TryGetChargingStation`, `TryGetEVSE`, `TryGetEnergyMeter`, `TryGetChargingTariff`,
-  `TryGetEVSEGroup`, `TryGetChargingStationGroup`, `TryGetChargingPoolGroup`, `TryGetChargingTariffGroup`:
-  lookups by identification, across all pools.
+  `TryGetEVSEGroup`, `TryGetChargingStationGroup`, `TryGetChargingPoolGroup`, `TryGetChargingTariffGroup`,
+  `TryGetEnergyMeterGroup`: lookups by identification, across all pools; `EnergyMeterGroupsOf(energyMeterId)` and
+  the like: the groups of a member.
 - No reference to its roaming network: versions share the operators they did not change, so it would be the
   wrong version for all but one of them. An operator is always reached through its roaming network.
 
@@ -120,10 +122,10 @@ See [ChargingTariff](ChargingTariff.md).
 
 ## Groups
 
-Four kinds of groups, each a list of members of this operator, embedded completely in the ordinal order of their
+Five kinds of groups, each a list of members of this operator, embedded completely in the ordinal order of their
 identifications. Groups may overlap; members must exist at the operator. Added with
-`RoamingNetworkChange.Add(group)`, removed with `Remove(groupId)`; a member can not be removed while a group
-names it.
+`RoamingNetworkChange.Add(group)`, an energy meter group with `Add(group, operatorId)`, removed with
+`Remove(groupId)`; a member can not be removed while a group names it.
 
 | JSON key | Type | Identification, e.g. | Members | Common tariff |
 |---|---|---|---|---|
@@ -131,6 +133,7 @@ names it.
 | `chargingStationGroups` | [ChargingStationGroup](ChargingStationGroup.md) | `DE*GEF*SG1` | `chargingStationIds` | `chargingTariffId` |
 | `chargingPoolGroups` | [ChargingPoolGroup](ChargingPoolGroup.md) | `DE*GEF*PG1` | `chargingPoolIds` | `chargingTariffId` |
 | `chargingTariffGroups` | [ChargingTariffGroup](ChargingTariffGroup.md) | `DE*GEF*TG1` | `chargingTariffIds` | — |
+| `energyMeterGroups` | [EnergyMeterGroup](EnergyMeterGroup.md) | `gef-evse-meters`, any text unique within the network | `energyMeterIds`, of its pools, stations and EVSEs | — |
 
 
 ## Logos
@@ -268,9 +271,9 @@ the runtime status and internal data of the operator and of everything it embeds
 - **Data licenses:** no null entry, none twice; `dataLicenseIds` only of well-known licenses.
 - **Logos:** an array of at most one object with `uri`.
 - **Children:** given completely: `chargingPoolIds`, `chargingTariffIds`, `EVSEGroupIds`, `chargingStationGroupIds`,
-  `chargingPoolGroupIds` and `chargingTariffGroupIds` are refused. No null entries.
+  `chargingPoolGroupIds`, `chargingTariffGroupIds` and `energyMeterGroupIds` are refused. No null entries.
 - **Brands:** complete, each `@id` once; `brandIds` is refused. See [Brand](Brand.md#validation).
-- **Belonging:** every pool, tariff and group names this operator in its identification.
+- **Belonging:** every pool, tariff and group but an energy meter group names this operator in its identification.
 - **Uniqueness within the operator:** pools, stations, EVSEs, energy meters, tariffs and each kind of group.
 - **References within the operator:** every `chargingTariffIds` of an EVSE, every member and `chargingTariffId` of a group exists at it.
 - **References within the network** (when the network is built or a change set applied): station manufacturers,

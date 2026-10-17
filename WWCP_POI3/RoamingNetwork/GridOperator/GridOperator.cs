@@ -100,6 +100,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IEnumerable<EnergyMeter>  EnergyMeters
             => GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.EnergyMeter).OfType<EnergyMeter>();
 
+        /// <summary>
+        /// The groups of the energy meters of its grid connection points, embedded completely, in the order of their
+        /// identifications.
+        /// </summary>
+        public POICollection<EnergyMeterGroup_Id, EnergyMeterGroup>        EnergyMeterGroups       { get; }
+
+        /// <summary>
+        /// The grid connection points as they are at runtime, with their energy meters taking the properties of their
+        /// groups, in the order of their identifications: a grid connection point whose energy meter they give nothing
+        /// is itself.
+        /// </summary>
+        public POICollection<GridConnectionPoint_Id, GridConnectionPoint>  EffectiveGridConnectionPoints
+            => effectiveGridConnectionPoints.Value;
+
+        #endregion
+
+        #region Data
+
+        /// <summary>
+        /// The effective grid connection points differing from the grid connection points, by their identifications.
+        /// </summary>
+        private readonly ImmutableDictionary<GridConnectionPoint_Id, GridConnectionPoint>        effectiveGridConnectionPointIndex;
+
+        /// <summary>
+        /// The effective grid connection points, calculated when asked for.
+        /// </summary>
+        private readonly Lazy<POICollection<GridConnectionPoint_Id, GridConnectionPoint>>       effectiveGridConnectionPoints;
+
         #endregion
 
         #region Constructor(s)
@@ -116,6 +144,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<GridConnectionPoint>?             GridConnectionPoints         = null,
                             IEnumerable<POIPublicKey>?                    SigningKeys                  = null,
                             IEnumerable<POIPublicKey>?                    IdentityKeys                 = null,
+                            IEnumerable<EnergyMeterGroup>?                EnergyMeterGroups            = null,
 
                             Timestamped<GridOperatorAdminStatusType>?     InitialAdminStatus           = null,
                             Timestamped<GridOperatorStatusType>?          InitialStatus                = null,
@@ -157,6 +186,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // Grid connection point identifications compare without case.
             this.GridConnectionPoints = new (GridConnectionPoints, gridConnectionPoint => gridConnectionPoint.Id, "grid connection point", $"the grid operator '{Id}'");
 
+            #region Energy meter groups, of the energy meters of its grid connection points
+
+            var energyMeterGroups = (EnergyMeterGroups ?? []).ToArray();
+
+            if (energyMeterGroups.Any(group => group is null))
+                throw new ArgumentException("Groups must not contain null entries!", nameof(EnergyMeterGroups));
+
+            this.EnergyMeterGroups = new (energyMeterGroups, group => group.Id, "energy meter group", $"the grid operator '{Id}'");
+
+            var energyMeterIds = this.EnergyMeters.Select(energyMeter => energyMeter.Id).ToHashSet();
+
+            foreach (var energyMeterGroup in this.EnergyMeterGroups)
+                foreach (var memberId in energyMeterGroup.EnergyMeterIds)
+                    if (!energyMeterIds.Contains(memberId))
+                        throw new ArgumentException($"The member '{memberId}' of the group '{energyMeterGroup.Id}' is unknown at the grid operator '{Id}'!", nameof(EnergyMeterGroups));
+
+            #endregion
+
+            #region Effective grid connection points, with their energy meters taking the properties of their groups
+
+            this.effectiveGridConnectionPointIndex  = CalculateEffective();
+            this.effectiveGridConnectionPoints      = new (() => effectiveGridConnectionPointIndex.IsEmpty
+                                                                    ? this.GridConnectionPoints
+                                                                    : new (this.GridConnectionPoints.Select(EffectiveGridConnectionPoint), gridConnectionPoint => gridConnectionPoint.Id, "grid connection point", $"the grid operator '{Id}'"));
+
+            #endregion
+
         }
 
         #endregion
@@ -174,11 +230,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region EffectiveGridConnectionPoint(GridConnectionPoint)
+
+        /// <summary>
+        /// The given grid connection point of this grid operator as it is at runtime, with its energy meter taking the
+        /// properties of its groups: the grid connection point itself, when they give it none.
+        /// </summary>
+        /// <param name="GridConnectionPoint">A grid connection point of this grid operator.</param>
+        public GridConnectionPoint EffectiveGridConnectionPoint(GridConnectionPoint GridConnectionPoint)
+
+            => effectiveGridConnectionPointIndex.TryGetValue(GridConnectionPoint.Id, out var effectiveGridConnectionPoint)
+                   ? effectiveGridConnectionPoint
+                   : GridConnectionPoint;
+
+        #endregion
+
+        #region TryGetEffectiveGridConnectionPoint(GridConnectionPointId, out GridConnectionPoint)
+
+        /// <summary>
+        /// Try to return the grid connection point with the given identification as it is at runtime.
+        /// </summary>
+        public Boolean TryGetEffectiveGridConnectionPoint(GridConnectionPoint_Id                        GridConnectionPointId,
+                                                          [NotNullWhen(true)] out GridConnectionPoint?  GridConnectionPoint)
+        {
+
+            if (!TryGetGridConnectionPoint(GridConnectionPointId, out GridConnectionPoint))
+                return false;
+
+            GridConnectionPoint = EffectiveGridConnectionPoint(GridConnectionPoint);
+            return true;
+
+        }
+
+        #endregion
+
+        #region TryGetEnergyMeterGroup(EnergyMeterGroupId, out EnergyMeterGroup)
+
+        /// <summary>
+        /// Try to return the energy meter group with the given identification.
+        /// </summary>
+        public Boolean TryGetEnergyMeterGroup(EnergyMeterGroup_Id                        EnergyMeterGroupId,
+                                              [NotNullWhen(true)] out EnergyMeterGroup?  EnergyMeterGroup)
+
+            => EnergyMeterGroups.TryGet(EnergyMeterGroupId, out EnergyMeterGroup);
+
+        #endregion
+
+        #region EnergyMeterGroupsOf(EnergyMeterId)
+
+        /// <summary>
+        /// The groups the given energy meter is a member of, in the order of their identifications.
+        /// </summary>
+        public IEnumerable<EnergyMeterGroup> EnergyMeterGroupsOf(EnergyMeter_Id EnergyMeterId)
+
+            => EnergyMeterGroups.Where(energyMeterGroup => energyMeterGroup.EnergyMeterIds.Contains(EnergyMeterId));
+
+        #endregion
+
         #region (internal) ShareRuntimeOfAll(Previous)
 
         /// <summary>
         /// Take the runtime status and internal data of the given previous version of this grid operator,
-        /// and of the energy meters of its grid connection points, by their identifications.
+        /// and of the energy meters of its grid connection points and its energy meter groups, by their identifications.
         /// </summary>
         internal void ShareRuntimeOfAll(GridOperator Previous)
         {
@@ -190,6 +303,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var energyMeter in EnergyMeters)
                 if (previousMeters.TryGetValue(energyMeter.Id, out var previousMeter))
                     energyMeter.ShareRuntimeOf(previousMeter);
+
+            foreach (var energyMeterGroup in EnergyMeterGroups)
+                if (Previous.TryGetEnergyMeterGroup(energyMeterGroup.Id, out var previousEnergyMeterGroup))
+                    energyMeterGroup.ShareRuntimeOf(previousEnergyMeterGroup);
+
+            // The effective energy meters take the runtime status of the energy meters again.
+            foreach (var (gridConnectionPointId, effectiveGridConnectionPoint) in effectiveGridConnectionPointIndex)
+                if (TryGetGridConnectionPoint(gridConnectionPointId, out var gridConnectionPoint) &&
+                    gridConnectionPoint.         EnergyMeter is EnergyMeter energyMeter &&
+                    effectiveGridConnectionPoint.EnergyMeter is EnergyMeter effectiveEnergyMeter)
+                {
+                    effectiveEnergyMeter.ShareRuntimeOf(energyMeter);
+                }
+
+        }
+
+        #endregion
+
+        #region (private) CalculateEffective()
+
+        /// <summary>
+        /// The effective grid connection points differing from the grid connection points, by their identifications:
+        /// those whose energy meter takes properties of its groups. Grid connection points have no timestamps; the energy
+        /// meter has the latest last change of it and its groups.
+        /// </summary>
+        private ImmutableDictionary<GridConnectionPoint_Id, GridConnectionPoint> CalculateEffective()
+        {
+
+            var energyMeterGroupsOf = EnergyMeterGroups.Where     (energyMeterGroup => energyMeterGroup.HasEnergyMeterProperties).
+                                                        SelectMany(energyMeterGroup => energyMeterGroup.EnergyMeterIds.Select(memberId => (MemberId: memberId, Group: energyMeterGroup))).
+                                                        GroupBy   (membership => membership.MemberId).
+                                                        ToDictionary(members => members.Key,
+                                                                     members => members.Select(membership => membership.Group).ToArray());
+
+            if (energyMeterGroupsOf.Count == 0)
+                return ImmutableDictionary<GridConnectionPoint_Id, GridConnectionPoint>.Empty;
+
+            // The JSON of a group, calculated once for all its members.
+            var groupsJSON  = new Dictionary<EnergyMeterGroup, JObject>(ReferenceEqualityComparer.Instance);
+
+            JObject JSONOf(EnergyMeterGroup Group)
+            {
+                if (!groupsJSON.TryGetValue(Group, out var json))
+                {
+                    json = Group.ToJSON();
+                    groupsJSON.Add(Group, json);
+                }
+                return json;
+            }
+
+            var effective = ImmutableDictionary.CreateBuilder<GridConnectionPoint_Id, GridConnectionPoint>();
+
+            foreach (var gridConnectionPoint in GridConnectionPoints)
+                if (gridConnectionPoint.EnergyMeter is EnergyMeter energyMeter &&
+                    energyMeterGroupsOf.TryGetValue(energyMeter.Id, out var groups))
+                {
+                    effective.Add(gridConnectionPoint.Id,
+                                  gridConnectionPoint.WithEnergyMeter(EnergyMeterGroup.Effective(energyMeter,
+                                                                                                 new POIGroupValues<EnergyMeterGroup>($"the energy meter '{energyMeter.Id}'", groups, JSONOf))));
+                }
+
+            return effective.ToImmutable();
 
         }
 
@@ -280,6 +455,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (GridConnectionPoints.Count > 0)
                 json.Add("gridConnectionPoints", new JArray(GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.ToJSON())));
 
+            if (EnergyMeterGroups.Count > 0)
+                json.Add("energyMeterGroups",    new JArray(EnergyMeterGroups.   Select(energyMeterGroup    => energyMeterGroup.   ToJSON())));
+
             POIPartyKeys.AddTo(json, this);
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
@@ -341,6 +519,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseChildren<GridConnectionPoint>(JSON, "gridConnectionPoints", "gridConnectionPointIds", "grid connection points", GridConnectionPoint.TryParse, out var gridConnectionPoints, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseChildren<EnergyMeterGroup>   (JSON, "energyMeterGroups",    "energyMeterGroupIds",    "energy meter groups",    EnergyMeterGroup.   TryParse, out var energyMeterGroups,    out ErrorResponse))
+                    return false;
+
                 if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
                     return false;
 
@@ -360,8 +541,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 homepage,
                                                 hotline,
                                                 gridConnectionPoints,
-                                                SigningKeys:   signingKeys,
-                                                IdentityKeys:  identityKeys,
+                                                SigningKeys:        signingKeys,
+                                                IdentityKeys:       identityKeys,
+                                                EnergyMeterGroups:  energyMeterGroups,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,

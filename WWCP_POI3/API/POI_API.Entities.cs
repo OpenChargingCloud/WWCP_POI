@@ -45,8 +45,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs                                                     its charging station operators, in short
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}                                            a charging station operator;
     ///     ?without=chargingPools leaves out its charging pools, which ~/RNs/{RN_Id}/CPs?operatorId=… lists;
-    ///     ?without=chargingTariffs,chargingTariffGroups,chargingPoolGroups,chargingStationGroups,EVSEGroups,
-    ///     or any of them, leaves them out, which ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs} list;
+    ///     ?without=chargingTariffs,chargingTariffGroups,chargingPoolGroups,chargingStationGroups,EVSEGroups,energyMeterGroups,
+    ///     or any of them, leaves them out, which ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs|EMGs} list;
     ///     ?without=parkingSpaces leaves out its own parking spaces, which ~/…/CSs/{CS_Id}/PSs list as its stations name them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands                                     the brands of the charging station operator, its own
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands/{Brand_Id}                          a brand of the charging station operator
@@ -60,6 +60,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CSGs/{CSG_Id}                              a charging station group of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EVSEGs                                     its EVSE groups, as it embeds them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EVSEGs/{EVSEG_Id}                          an EVSE group of the charging station operator
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EMGs                                       its energy meter groups, as it embeds them
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/EMGs/{EMG_Id}                              an energy meter group of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool, the effective one;
     ///     ?expand=gridConnectionPoint embeds its grid connection point instead of naming it,
     ///     ?view=stored serves it, and everything below, as its operator embeds it
@@ -78,9 +80,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///                                                                            a brand of the EVSE
     /// GET ~/RNs/{RN_Id}/GOs                                                      its grid operators, in short
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}                                              a grid operator;
-    ///     ?without=gridConnectionPoints leaves out its grid connection points, which ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs lists
-    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs                                         its grid connection points, as it embeds them
-    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}                                a grid connection point of the grid operator
+    ///     ?without=gridConnectionPoints,energyMeterGroups, or either of them, leaves them out, which
+    ///     ~/RNs/{RN_Id}/GOs/{GO_Id}/{GCPs|EMGs} list
+    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs                                         its grid connection points, the effective ones;
+    ///     ?view=stored as it embeds them
+    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}                                a grid connection point of the grid operator, the
+    ///                                                                             effective one; ?view=stored as it embeds it
+    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMGs                                         its energy meter groups, as it embeds them
+    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMGs/{EMG_Id}                                an energy meter group of the grid operator
     /// GET ~/RNs/{RN_Id}/EMPs                                                     its e-mobility providers, in short
     /// GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}                                            an e-mobility provider
     /// GET ~/RNs/{RN_Id}/CSMs                                                     its charging station manufacturers, in short
@@ -102,10 +109,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///
     /// A charging pool, a charging station, an EVSE and a parking space are served as they are at runtime, the effective
     /// ones of their operator: with the properties their groups give them, see ChargingStationOperator.EffectiveChargingPools
-    /// and ParkingOperator.EffectiveParkingSpaces; a charging pool also in ~/RNs/{RN_Id}/CPs, searched so. Their operators
-    /// and the roaming network embed them as they are given, with their groups. ?view=stored serves a charging pool, and
-    /// what it embeds, or a parking space as its operator embeds it, with the ETag a precondition of a change set names,
-    /// also in the links to other pages of a list; in either view, X-Stored-ETag tells that ETag as well.
+    /// and ParkingOperator.EffectiveParkingSpaces; a charging pool also in ~/RNs/{RN_Id}/CPs, searched so. The energy
+    /// meters they embed take the properties of their energy meter groups, and so does the one of a grid connection
+    /// point, see GridOperator.EffectiveGridConnectionPoints. Their operators and the roaming network embed them as they
+    /// are given, with their groups. ?view=stored serves a charging pool, and what it embeds, a parking space or a grid
+    /// connection point as its operator embeds it, with the ETag a precondition of a change set names, also in the links
+    /// to other pages of a list; in either view, X-Stored-ETag tells that ETag as well.
     ///
     /// Brands are embedded in what they are a brand of, and mean something of their own on every level: a charging
     /// station operator is a white-label solution for its brands, a charging pool, charging station or EVSE also
@@ -250,13 +259,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            chargingStationOperator,
                                                                            chargingStationOperator.ToEmbeddedJSON,
-                                                                           [ "chargingPools", "chargingTariffs", "chargingTariffGroups", "chargingPoolGroups", "chargingStationGroups", "EVSEGroups", "parkingSpaces" ],
+                                                                           [ "chargingPools", "chargingTariffs", "chargingTariffGroups", "chargingPoolGroups", "chargingStationGroups", "EVSEGroups", "energyMeterGroups", "parkingSpaces" ],
                                                                            "a charging station operator")
                                              : errorResponse);
 
             #endregion
 
-            #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs, CTGs, CPGs, CSGs, EVSEGs, and each of them below
+            #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs, CTGs, CPGs, CSGs, EVSEGs, EMGs, and each of them below
 
             // Its charging tariffs and its groups: a list each, and each of them on its own.
             AddEmbeddedListHandlers<ChargingTariff_Id, ChargingTariff>(
@@ -339,6 +348,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 "EVSE group",
                 eVSEGroup => eVSEGroup.ToJSON());
 
+            AddEmbeddedListHandlers<EnergyMeterGroup_Id, EnergyMeterGroup>(
+                chargingStationOperatorPath + "/EMGs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.EnergyMeterGroups, null)
+                               : (null, errorResponse),
+                energyMeterGroup => energyMeterGroup.ToJSON());
+
+            AddEmbeddedEntityHandlers<EnergyMeterGroup_Id, EnergyMeterGroup>(
+                chargingStationOperatorPath + "/EMGs/{energyMeterGroupId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.EnergyMeterGroups, null)
+                               : (null, errorResponse),
+                EnergyMeterGroup_Id.TryParse,
+                "energy meter group",
+                energyMeterGroup => energyMeterGroup.ToJSON());
+
             #endregion
 
             #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}
@@ -373,18 +398,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       if (expansion != "gridConnectionPoint")
                                           return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Unknown expansion '{expansion}'; a charging pool expands only 'gridConnectionPoint'!");
 
-                                  // Embedded with its grid operator, in the place of its identification.
+                                  // Embedded with its grid operator, in the place of its identification: as it is at runtime,
+                                  // as the charging pool is, unless the view is the stored one.
                                   if (chargingPool.GridConnectionPointId is GridConnectionPoint_Id gridConnectionPointId &&
                                       roamingNetwork.TryGetGridConnectionPoint(gridConnectionPointId, out var gridOperator, out var gridConnectionPoint) &&
                                       json.Property("gridConnectionPointId") is JProperty idProperty)
                                   {
+
+                                      if (!TryGetStoredView(request, out var stored, out errorResponse))
+                                          return errorResponse;
+
+                                      var shown    = stored
+                                                         ? gridConnectionPoint
+                                                         : gridOperator.EffectiveGridConnectionPoint(gridConnectionPoint);
 
                                       var embedded = new JObject(
                                                          new JProperty("@id",             gridConnectionPoint.Id.ToString()),
                                                          new JProperty("gridOperatorId",  gridOperator.Id.ToString())
                                                      );
 
-                                      foreach (var property in gridConnectionPoint.ToJSON().Properties().Where(property => property.Name != "@id"))
+                                      foreach (var property in shown.ToJSON().Properties().Where(property => property.Name != "@id"))
                                           embedded.Add(new JProperty(property.Name, property.Value.DeepClone()));
 
                                       idProperty.Replace(new JProperty("gridConnectionPoint", embedded));
@@ -595,20 +628,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            gridOperator,
                                                                            gridOperator.ToJSON,
-                                                                           [ "gridConnectionPoints" ],
+                                                                           [ "gridConnectionPoints", "energyMeterGroups" ],
                                                                            "a grid operator")
                                              : errorResponse);
 
             #endregion
 
-            #region ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs
+            #region ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs, EMGs
 
+            // As they are at runtime, with their energy meters taking the properties of their groups; with ?view=stored as they are given.
             AddEmbeddedListHandlers<GridConnectionPoint_Id, GridConnectionPoint>(
                 gridOperatorPath + "/GCPs",
+                RequestedGridConnectionPointsOfGridOperator,
+                gridConnectionPoint => gridConnectionPoint.ToJSON(),
+                Viewed: true);
+
+            AddEmbeddedListHandlers<EnergyMeterGroup_Id, EnergyMeterGroup>(
+                gridOperatorPath + "/EMGs",
                 request => TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse)
-                               ? (gridOperator.GridConnectionPoints, null)
+                               ? (gridOperator.EnergyMeterGroups, null)
                                : (null, errorResponse),
-                gridConnectionPoint => gridConnectionPoint.ToJSON());
+                energyMeterGroup => energyMeterGroup.ToJSON());
+
+            AddEmbeddedEntityHandlers<EnergyMeterGroup_Id, EnergyMeterGroup>(
+                gridOperatorPath + "/EMGs/{energyMeterGroupId}",
+                request => TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse)
+                               ? (gridOperator.EnergyMeterGroups, null)
+                               : (null, errorResponse),
+                EnergyMeterGroup_Id.TryParse,
+                "energy meter group",
+                energyMeterGroup => energyMeterGroup.ToJSON());
 
             #endregion
 
@@ -617,15 +666,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
             AddEntityHandlers(gridOperatorPath + "/GCPs/{gridConnectionPointId}",
                               request => {
 
-                                  if (!TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse))
+                                  if (!TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse) ||
+                                      !TryGetStoredView           (request, out var stored,           out errorResponse))
+                                  {
                                       return errorResponse;
+                                  }
 
                                   if (!GridConnectionPoint_Id.TryParse(request.ParsedURLParameters[2], out var gridConnectionPointId))
                                       return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid grid connection point identification!");
 
-                                  return gridOperator.TryGetGridConnectionPoint(gridConnectionPointId, out var gridConnectionPoint)
-                                             ? CachedEntityResponse(request, gridConnectionPoint, gridConnectionPoint.ToJSON)
-                                             : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The grid connection point '{gridConnectionPointId}' of the grid operator '{gridOperator.Id}' is unknown!");
+                                  if (!gridOperator.TryGetGridConnectionPoint(gridConnectionPointId, out var gridConnectionPoint))
+                                      return EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The grid connection point '{gridConnectionPointId}' of the grid operator '{gridOperator.Id}' is unknown!");
+
+                                  // As it is at runtime, unless the view is the stored one; the ETag of its stored representation in either view.
+                                  var shown = stored
+                                                  ? gridConnectionPoint
+                                                  : gridOperator.EffectiveGridConnectionPoint(gridConnectionPoint);
+
+                                  return CachedEntityResponse(request,
+                                                              shown,
+                                                              shown.ToJSON,
+                                                              StoredETag: StoredETagOf(request, gridConnectionPoint, gridConnectionPoint.ToJSON));
 
                               });
 
@@ -1082,8 +1143,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) TryGetStoredView               (Request, out Stored,                               out ErrorResponse)
 
         /// <summary>
-        /// Whether the request asks for ?view=stored: charging pools, charging stations, EVSEs and parking spaces as they
-        /// are given, not as they are at runtime with the properties their groups give them. Any other view is refused.
+        /// Whether the request asks for ?view=stored: charging pools, charging stations, EVSEs, parking spaces and grid
+        /// connection points as they are given, not as they are at runtime with the properties their groups give them, or
+        /// their energy meters. Any other view is refused.
         /// </summary>
         private static Boolean TryGetStoredView(HTTPRequest                             Request,
                                                 out Boolean                             Stored,
@@ -1100,7 +1162,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (view != StoredView)
                 {
                     Stored         = false;
-                    ErrorResponse  = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Unknown view '{view}'; a charging pool, charging station, EVSE or parking space has only the view '{StoredView}'!");
+                    ErrorResponse  = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Unknown view '{view}'; a charging pool, charging station, EVSE, parking space or grid connection point has only the view '{StoredView}'!");
                     return false;
                 }
 
@@ -1263,6 +1325,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             return (stored ? parkingOperator.ParkingSpaces : parkingOperator.EffectiveParkingSpaces, null);
+
+        }
+
+        #endregion
+
+        #region (private) RequestedGridConnectionPointsOfGridOperator(Request)
+
+        /// <summary>
+        /// The grid connection points of the requested grid operator as they are at runtime, with their energy meters
+        /// taking the properties of their groups; with ?view=stored as it embeds them; or why there are none.
+        /// </summary>
+        private (POICollection<GridConnectionPoint_Id, GridConnectionPoint>? Collection, HTTPResponse? ErrorResponse) RequestedGridConnectionPointsOfGridOperator(HTTPRequest Request)
+        {
+
+            if (!TryGetRequestedGridOperator(Request, out _, out var gridOperator, out var errorResponse) ||
+                !TryGetStoredView           (Request, out var stored,           out errorResponse))
+            {
+                return (null, errorResponse);
+            }
+
+            return (stored ? gridOperator.GridConnectionPoints : gridOperator.EffectiveGridConnectionPoints, null);
 
         }
 

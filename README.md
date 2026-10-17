@@ -35,7 +35,8 @@ flowchart TD
     ParkingOperator --> ParkingSpaceGroup
     ParkingOperator --> ParkingProduct
     ChargingStationOperator --> ChargingTariff
-    ChargingStationOperator --> Groups["EVSEGroup, ChargingStationGroup,<br/>ChargingPoolGroup, ChargingTariffGroup"]
+    ChargingStationOperator --> Groups["EVSEGroup, ChargingStationGroup,<br/>ChargingPoolGroup, ChargingTariffGroup,<br/>EnergyMeterGroup"]
+    GridOperator --> EnergyMeterGroup
     ChargingStationOperator --> ChargingPool
     ChargingStationOperator --> Brand
     ChargingPool --> Brand
@@ -68,12 +69,13 @@ flowchart TD
 
 Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`,
 `gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
-`EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `chargingPools`, `chargingStations`,
+`EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `energyMeterGroups`, `chargingPools`, `chargingStations`,
 `EVSEs`, `chargingConnectors`, `energyMeters`, `gridConnectionPoints`, `parkingGarages`, `parkingSpaces`, `parkingSensors`,
 `parkingSpaceGroups`, `parkingProducts`, `brands`), each 0..n
 in the order of their ids; a grid connection point and an EVSE each have 0..1 `energyMeter`.
 Dotted lines are references, which must exist in the network.
 A pool, station, EVSE, tariff or group belongs to the operator its id names; ids are unique within the operator.
+Energy meter groups, of a charging station operator or of a grid operator, have ids unique within the network.
 Energy meter, grid connection point, parking garage, space, sensor, space group and product ids are unique within the network;
 parking product ids compare case-sensitively.
 
@@ -145,13 +147,18 @@ parking product ids compare case-sensitively.
   `url`, `category` (e.g. `LOCATION`, `CHARGER`), `type`, `width`, `height`, `thumbnail`; a URL only once.
 - **Groups:** EVSE, charging station, charging pool and charging tariff groups name members of their
   operator (`EVSEIds`, `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`), the first three
-  optionally a `chargingTariffId`; parking space groups name `parkingSpaceIds`. Groups may overlap and
+  optionally a `chargingTariffId`; parking space groups name `parkingSpaceIds`; energy meter groups name
+  `energyMeterIds`, of a charging station operator those of its pools, stations and EVSEs, of a grid operator those of
+  its grid connection points. Groups may overlap and
   have admin status and status, and a `priority` (0 unless given): where groups of a member give it different
   values, the higher decides, and the same priority must not disagree.
 - **Effective members:** an EVSE, charging station, charging pool or parking space group may give its members any
   property of theirs but their identification, name, description, what they embed and their energy meters, e.g. the
   connectors of all EVSEs of a type, the model and the hotline of all stations of a model, the payment options of all
-  pools of a site partner, the dimensions and the roof of all parking spaces of a level, given once. The members take them at runtime: `chargingStationOperator.EffectiveChargingPools`, with
+  pools of a site partner, the dimensions and the roof of all parking spaces of a level, given once. An energy meter
+  group gives its meters the properties of an energy meter but their serial number and public keys, e.g. the
+  manufacturer, model and firmware of a series; the effective members embed the effective energy meters, and so do the
+  effective grid connection points of a grid operator. The members take them at runtime: `chargingStationOperator.EffectiveChargingPools`, with
   their effective stations and EVSEs, `TryGetEffectiveEVSE(id, out var evse)` and alike. A single value is the member's
   own, else the one of its group with the highest priority; arrays are united. POI_API serves and searches them, with
   the ETag a precondition names as `X-Stored-ETag`, the
@@ -203,6 +210,7 @@ a change set can manage:
 | [ChargingPoolGroup](docs/ChargingPoolGroup.md) | Charging pools of one operator, optionally with a common tariff and properties they take at runtime. |
 | [ChargingTariffGroup](docs/ChargingTariffGroup.md) | Charging tariffs of one operator. |
 | [EnergyMeter](docs/EnergyMeter.md) | A meter of a pool, grid connection point, station or EVSE, with its transparency software. |
+| [EnergyMeterGroup](docs/EnergyMeterGroup.md) | Energy meters of one charging station operator or grid operator, with properties they take at runtime. |
 | [ChargingStationManufacturer](docs/ChargingStationManufacturer.md) | A maker of charging stations, named by the stations it built. |
 | [EMobilityProvider](docs/EMobilityProvider.md) | An e-mobility service provider with its keys. |
 | [GridOperator](docs/GridOperator.md) | A distribution system operator with its grid connection points, each signed by its maintainer. |
@@ -466,10 +474,11 @@ without them, so that a large one is not read whole to show what it says of itse
 without any of `chargingStationOperators`, `gridOperators`, `eMobilityProviders`, `chargingStationManufacturers` and
 `parkingOperators`, each listed by `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}`, with its `eTags`, the ones of all of it;
 and
-`GET ~/RNs/{RN_Id}/GOs/{GO_Id}?without=gridConnectionPoints`, and `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs` lists them as
-the grid operator embeds them; a charging station operator without any of `chargingTariffs`, `chargingTariffGroups`,
-`chargingPoolGroups`, `chargingStationGroups` and `EVSEGroups` as well, listed by
-`~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs}`, each of them below it, e.g. `…/CTs/{CT_Id}`; and a
+`GET ~/RNs/{RN_Id}/GOs/{GO_Id}?without=gridConnectionPoints,energyMeterGroups`, and `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/{GCPs|EMGs}`
+lists them, the grid connection points as they are at runtime, `?view=stored` as the grid operator embeds them; a
+charging station operator without any of `chargingTariffs`, `chargingTariffGroups`, `chargingPoolGroups`,
+`chargingStationGroups`, `EVSEGroups` and `energyMeterGroups` as well, listed by
+`~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs|EMGs}`, each of them below it, e.g. `…/CTs/{CT_Id}`; and a
 parking operator without any of `parkingGarages`, `parkingSpaces`,
 `parkingSpaceGroups`, `parkingSensors` and `parkingProducts`, e.g. `?without=parkingSpaces,parkingSensors`, listed by
 `~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs}`, each of them below it, e.g. `…/PSs/{PS_Id}`. The parking spaces a

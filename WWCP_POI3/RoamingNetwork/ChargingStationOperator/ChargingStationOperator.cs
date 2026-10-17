@@ -504,6 +504,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => ChargingTariffGroups.TryGet(ChargingTariffGroupId, out ChargingTariffGroup);
 
         /// <summary>
+        /// The groups of the energy meters of its charging pools, charging stations and EVSEs, embedded completely,
+        /// in the order of their identifications.
+        /// </summary>
+        public POICollection<EnergyMeterGroup_Id, EnergyMeterGroup>  EnergyMeterGroups  { get; } = POICollection<EnergyMeterGroup_Id, EnergyMeterGroup>.Empty;
+
+        /// <summary>
+        /// Try to return the energy meter group with the given identification.
+        /// </summary>
+        public Boolean TryGetEnergyMeterGroup(EnergyMeterGroup_Id                                                    EnergyMeterGroupId,
+                                              [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EnergyMeterGroup?  EnergyMeterGroup)
+
+            => EnergyMeterGroups.TryGet(EnergyMeterGroupId, out EnergyMeterGroup);
+
+        /// <summary>
         /// The parking spaces it defines itself, where no parking operator does: embedded completely, in the order of
         /// their identifications. They are in no parking garage, and have no parking sensors or parking products.
         /// </summary>
@@ -630,6 +644,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Previous.TryGetChargingTariffGroup(chargingTariffGroup.Id, out var previousChargingTariffGroup))
                     chargingTariffGroup.ShareRuntimeOf(previousChargingTariffGroup);
 
+            foreach (var energyMeterGroup in EnergyMeterGroups)
+                if (Previous.TryGetEnergyMeterGroup(energyMeterGroup.Id, out var previousEnergyMeterGroup))
+                    energyMeterGroup.ShareRuntimeOf(previousEnergyMeterGroup);
+
             foreach (var parkingSpace in ParkingSpaces)
                 if (Previous.TryGetParkingSpace(parkingSpace.Id, out var previousParkingSpace))
                     parkingSpace.ShareRuntimeOf(previousParkingSpace);
@@ -692,6 +710,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        IEnumerable<Brand>?                                   Brands                                  = null,
                                        IEnumerable<POIPublicKey>?                            SigningKeys                             = null,
                                        IEnumerable<POIPublicKey>?                            IdentityKeys                            = null,
+                                       IEnumerable<EnergyMeterGroup>?                        EnergyMeterGroups                       = null,
 
                                        Timestamped<ChargingStationOperatorAdminStatusType>?  InitialAdminStatus                     = null,
                                        Timestamped<ChargingStationOperatorStatusType>?       InitialStatus                          = null,
@@ -902,6 +921,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             throw new ArgumentException($"The member '{memberId}' of the group '{chargingTariffGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffGroups));
 
                 }
+
+            }
+
+            {
+
+                var energyMeterGroups = (EnergyMeterGroups ?? []).ToArray();
+
+                if (energyMeterGroups.Any(group => group is null))
+                    throw new ArgumentException("Groups must not contain null entries!", nameof(EnergyMeterGroups));
+
+                this.EnergyMeterGroups = new (energyMeterGroups, group => group.Id, "energy meter group", $"the operator '{Id}'");
+
+                // The energy meters of its own charging pools, charging stations and EVSEs.
+                foreach (var energyMeterGroup in this.EnergyMeterGroups)
+                    foreach (var memberId in energyMeterGroup.EnergyMeterIds)
+                        if (!energyMeterIndex.ContainsKey(memberId))
+                            throw new ArgumentException($"The member '{memberId}' of the group '{energyMeterGroup.Id}' is unknown at the operator '{Id}'!", nameof(EnergyMeterGroups));
 
             }
 
@@ -1265,6 +1301,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (ChargingTariffGroups.Count > 0)
                     json.Add("chargingTariffGroups", new JArray(ChargingTariffGroups.Select(group => group.ToJSON())));
+
+                if (EnergyMeterGroups.Count > 0)
+                    json.Add("energyMeterGroups", new JArray(EnergyMeterGroups.Select(group => group.ToJSON())));
 
                 if (ParkingSpaces.Count > 0)
                     json.Add("parkingSpaces", new JArray(ParkingSpaces.Select(parkingSpace => parkingSpace.ToJSON())));

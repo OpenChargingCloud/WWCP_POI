@@ -936,6 +936,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Energy meter groups, of charging station operators and grid operators
+
+                else if (change.EntityType == nameof(EnergyMeterGroup))
+                {
+                    if (!TryApplyEnergyMeterGroupChange(change, index, ChangeSet.CreatedAt, operators, gridOps, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                #endregion
+
                 #region Transparency software releases and certificates
 
                 else if (change.EntityType == nameof(TransparencySoftware))
@@ -994,8 +1004,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Every manufacturer a charging station names, every grid connection point a charging pool names,
             // and every maintainer of a grid connection point must still be one of the network;
-            // grid connection points and energy meters must be unique within the network.
-            var allEnergyMeters = AllEnergyMeters(operators.Values, gridOps.Values).ToArray();
+            // grid connection points, energy meters and energy meter groups must be unique within the network.
+            var allEnergyMeters      = AllEnergyMeters     (operators.Values, gridOps.Values).ToArray();
+            var allEnergyMeterGroups = AllEnergyMeterGroups(operators.Values, gridOps.Values).ToArray();
 
             if ((UnknownManufacturer (operators.Values, manufacturers) ??
                  DuplicateGridConnectionPoint(gridOps.Values)          ??
@@ -1006,7 +1017,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  UnknownChargingStation(parkingOps.Values, operators)  ??
                  UnknownParkingSpace(operators.Values, parkingOps.Values) ??
                  UnknownTransparencyReference(allEnergyMeters, softwares, certificates, manufacturers) ??
-                 UnknownEnergyMeterManufacturer(allEnergyMeters, meterManufacturers)) is String referenceError)
+                 UnknownEnergyMeterManufacturer(allEnergyMeters, meterManufacturers) ??
+                 DuplicateEnergyMeterGroup(allEnergyMeterGroups)       ??
+                 UnknownEnergyMeterGroupReference(allEnergyMeterGroups, meterManufacturers, softwares, certificates)) is String referenceError)
             {
                 ErrorResponse = referenceError;
                 return false;

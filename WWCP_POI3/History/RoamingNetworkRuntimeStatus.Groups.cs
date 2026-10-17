@@ -289,9 +289,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          ? parkingSpace.CurrentStatus
                                          : null);
 
+        private readonly GroupKind<EnergyMeterGroup, EnergyMeterGroup_Id, EnergyMeter_Id, EnergyMeterStatusType, EnergyMeterGroupStatusType> energyMeterGroups
+
+            = Kind<EnergyMeterGroup, EnergyMeterGroup_Id, EnergyMeter_Id, EnergyMeterStatusType, EnergyMeterGroupStatusType>(
+                  nameof(EnergyMeterGroup),
+                  nameof(EnergyMeter),
+                  text            => EnergyMeterGroup_Id.TryParse(text, out var id) ? id : null,
+                  text            => EnergyMeter_Id.     TryParse(text, out var id) ? id : null,
+                  network         => network.EnergyMeterGroups,
+                  (network, id)   => network.TryGetEnergyMeterGroupById(id, out var group) ? group : null,
+                  group           => group.Id,
+                  group           => group.EnergyMeterIds,
+                  group           => group.CurrentStatus,
+                  (network, id)   => network.TryGetEnergyMeterById(id, out var energyMeter)
+                                         ? energyMeter.CurrentStatus
+                                         : null);
+
         private IGroupKind[] groupKinds
 
-            => [ evseGroups, chargingStationGroups, chargingPoolGroups, chargingTariffGroups, parkingSpaceGroups ];
+            => [ evseGroups, chargingStationGroups, chargingPoolGroups, chargingTariffGroups, parkingSpaceGroups, energyMeterGroups ];
 
         /// <summary>
         /// The groups whose status is to be calculated again, with since when at least.
@@ -394,6 +410,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public void CalculateStatus(ParkingSpaceGroup_Id GroupId, POIGroupStatusCalculator<ParkingSpaceGroup, ParkingSpace_Id, ParkingSpaceStatusType, ParkingSpaceGroupStatusType> Calculator)
             => Calculate(parkingSpaceGroups, GroupId, kind => kind.Calculate(GroupId, Calculator));
 
+        /// <summary>
+        /// Calculate the status of the given energy meter group with the given delegate, e.g. POIGroupStatus.OfEnergyMeters.
+        /// Its status set otherwise is refused from now on.
+        /// </summary>
+        public void CalculateStatus(EnergyMeterGroup_Id GroupId, POIGroupStatusCalculator<EnergyMeterGroup, EnergyMeter_Id, EnergyMeterStatusType, EnergyMeterGroupStatusType> Calculator)
+            => Calculate(energyMeterGroups, GroupId, kind => kind.Calculate(GroupId, Calculator));
+
         #endregion
 
         #region SetStatusManually(GroupId)
@@ -427,6 +450,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public void SetStatusManually(ParkingSpaceGroup_Id GroupId)
             => parkingSpaceGroups.SetManually(GroupId);
+
+        /// <summary>
+        /// Set the status of the given energy meter group manually again, also while a delegate calculates that of all others.
+        /// </summary>
+        public void SetStatusManually(EnergyMeterGroup_Id GroupId)
+            => energyMeterGroups.SetManually(GroupId);
 
         #endregion
 
@@ -466,6 +495,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public void CalculateStatusOfAllParkingSpaceGroups(POIGroupStatusCalculator<ParkingSpaceGroup, ParkingSpace_Id, ParkingSpaceStatusType, ParkingSpaceGroupStatusType>? Calculator)
             => Calculate(parkingSpaceGroups, null, kind => kind.CalculateAll(Calculator));
+
+        /// <summary>
+        /// Calculate the status of every energy meter group with the given delegate, unless the group has a delegate
+        /// of its own or is set manually; null sets them all manually again.
+        /// </summary>
+        public void CalculateStatusOfAllEnergyMeterGroups(POIGroupStatusCalculator<EnergyMeterGroup, EnergyMeter_Id, EnergyMeterStatusType, EnergyMeterGroupStatusType>? Calculator)
+            => Calculate(energyMeterGroups, null, kind => kind.CalculateAll(Calculator));
 
         #endregion
 

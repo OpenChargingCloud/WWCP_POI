@@ -233,6 +233,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (internal) WithEnergyMeter(EnergyMeter)
+
+        /// <summary>
+        /// This grid connection point with the given energy meter, e.g. its energy meter as it is at runtime.
+        /// </summary>
+        internal GridConnectionPoint WithEnergyMeter(EnergyMeter? EnergyMeter)
+
+            => new (Id,
+                    Name,
+                    Description,
+                    Address,
+                    GeoLocation,
+                    VoltageLevel,
+                    ConnectionType,
+                    NominalVoltage,
+                    NominalFrequency,
+                    ContractedImportPower,
+                    ContractedExportPower,
+                    ContractedImportApparentPower,
+                    ContractedExportApparentPower,
+                    ConnectionAgreementId,
+                    NetworkLocationId,
+                    MarketLocationIds,
+                    MeteringLocationIds,
+                    EnergyMeter,
+                    MaintainedBy,
+                    CustomData);
+
+        #endregion
+
+
         #region ToJSON()
 
         /// <summary>

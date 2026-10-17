@@ -154,9 +154,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The embedded children a party must not be added with, by its entity type.
         /// </summary>
         internal static readonly Dictionary<String, String[]> PartyChildren = new () {
-            { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups", "parkingSpaces" ] },
+            { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups", "energyMeterGroups", "parkingSpaces" ] },
             { nameof(EMobilityProvider),       [] },
-            { nameof(GridOperator),            [ "gridConnectionPoints" ] },
+            { nameof(GridOperator),            [ "gridConnectionPoints", "energyMeterGroups" ] },
             { nameof(ParkingOperator),         [ "parkingGarages", "parkingSpaces", "parkingSensors", "parkingSpaceGroups", "parkingProducts" ] }
         };
 
@@ -335,12 +335,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // Grid connection points added by an earlier change of this change set: their grid operator and maintainer.
             var addedGridConnectionPoints = new Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>();
 
+            // Energy meter groups added by an earlier change of this change set, by their owners.
+            var addedEnergyMeterGroups = new Dictionary<EnergyMeterGroup_Id, POIPartyId>();
+
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
             {
 
                 var change = ChangeSet.Changes[index];
 
-                if (!TryGetOwners(change, addedParking, addedGridConnectionPoints, out var owners, out ErrorResponse))
+                if (!TryGetOwners(change, addedParking, addedGridConnectionPoints, addedEnergyMeterGroups, out var owners, out ErrorResponse))
                 {
                     ErrorResponse = $"Change {index}: {ErrorResponse}";
                     return false;
@@ -398,7 +401,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryGetOwners(Change, AddedParking, AddedGridConnectionPoints, out Owners, out ErrorResponse)
+        #region (private) TryGetOwners(Change, AddedParking, AddedGridConnectionPoints, AddedEnergyMeterGroups, out Owners, out ErrorResponse)
 
         /// <summary>
         /// The parties and kinds of keys of which one must sign the given change.
@@ -406,6 +409,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private Boolean TryGetOwners(RoamingNetworkChange                                                                    Change,
                                      Dictionary<(String, Object), POIPartyId>                                                AddedParking,
                                      Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>  AddedGridConnectionPoints,
+                                     Dictionary<EnergyMeterGroup_Id, POIPartyId>                                             AddedEnergyMeterGroups,
                                      [NotNullWhen(true)]  out (POIPartyId, POIKeyKind)[]?                                    Owners,
                                      [NotNullWhen(false)] out String?                                                        ErrorResponse)
         {
@@ -642,6 +646,65 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 Owners = [ (owner.Value, POIKeyKind.Signing) ];
+                return true;
+
+            }
+
+            #endregion
+
+            #region The energy meter groups of a charging station operator or a grid operator
+
+            if (Change.EntityType == nameof(EnergyMeterGroup))
+            {
+
+                if (!EnergyMeterGroup_Id.TryParse(Change.EntityId, out var energyMeterGroupId))
+                {
+                    ErrorResponse = $"invalid {Change.EntityType} identification '{Change.EntityId}'!";
+                    return false;
+                }
+
+                POIPartyId? owner = null;
+
+                if (Change.Kind == RoamingNetworkChangeKind.Add)
+                {
+
+                    if (Change.ParentEntityType is not (nameof(ChargingStationOperator) or nameof(GridOperator)) || Change.ParentEntityId is null)
+                    {
+                        ErrorResponse = $"adding the {Change.EntityType} '{Change.EntityId}' needs its ChargingStationOperator or GridOperator as its parent!";
+                        return false;
+                    }
+
+                    // The owner as the keys of the parties name it.
+                    owner = PartyIdOf(new POIPartyId(Change.ParentEntityType, Change.ParentEntityId));
+
+                    AddedEnergyMeterGroups[energyMeterGroupId] = owner.Value;
+
+                }
+
+                else if (AddedEnergyMeterGroups.TryGetValue(energyMeterGroupId, out var addedOwner))
+                    owner = addedOwner;
+
+                else
+                {
+
+                    var (chargingStationOperator, gridOperator, _) = EnergyMeterGroupOwners(energyMeterGroupId, chargingStationOperators, gridOperators);
+
+                    if      (chargingStationOperator is not null)
+                        owner = new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString());
+
+                    else if (gridOperator is not null)
+                        owner = new POIPartyId(nameof(GridOperator),            gridOperator.           Id.ToString());
+
+                }
+
+                if (!owner.HasValue)
+                {
+                    ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' belongs to no charging station operator and no grid operator!";
+                    return false;
+                }
+
+                // For a grid operator not taking part, the roaming network operator.
+                Owners = [ SignerOf(owner.Value) ];
                 return true;
 
             }

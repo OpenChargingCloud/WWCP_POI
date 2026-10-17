@@ -299,6 +299,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators, gridOperators), transparencySoftware.Index, transparencySoftwareCertificates.Index, chargingStationManufacturers.Index) is String transparencyError)
                 throw new ArgumentException(transparencyError, nameof(TransparencySoftware));
 
+            // Energy meter groups are unique within the network, and name manufacturers, releases and certificates of it.
+            if ((DuplicateEnergyMeterGroup       (AllEnergyMeterGroups(chargingStationOperators, gridOperators)) ??
+                 UnknownEnergyMeterGroupReference(AllEnergyMeterGroups(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware.Index, transparencySoftwareCertificates.Index)) is String energyMeterGroupError)
+            {
+                throw new ArgumentException(energyMeterGroupError, nameof(ChargingStationOperators));
+            }
+
+            foreach (var energyMeterGroup in AllEnergyMeterGroups(chargingStationOperators, gridOperators))
+                energyMeterGroups.TryAdd(energyMeterGroup.Id, energyMeterGroup);
+
             foreach (var parkingOperator in parkingOperators)
             {
 
@@ -2170,6 +2180,99 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var energyMeter in EnergyMeters)
                 if (!seen.Add(energyMeter.Id))
                     return $"The energy meter '{energyMeter.Id}' must not be given twice in the roaming network!";
+
+            return null;
+
+        }
+
+        #endregion
+
+
+        #region Energy meter groups
+
+        private readonly ConcurrentDictionary<EnergyMeterGroup_Id, EnergyMeterGroup> energyMeterGroups = [];
+
+        /// <summary>
+        /// The energy meter groups of all charging station operators and grid operators.
+        /// </summary>
+        public IEnumerable<EnergyMeterGroup> EnergyMeterGroups
+            => energyMeterGroups.Values;
+
+        /// <summary>
+        /// Try to get the energy meter group having the given identification, of any charging station operator or grid operator.
+        /// </summary>
+        /// <param name="EnergyMeterGroupId">The identification of an energy meter group.</param>
+        /// <param name="EnergyMeterGroup">The energy meter group.</param>
+        public Boolean TryGetEnergyMeterGroupById(EnergyMeterGroup_Id                        EnergyMeterGroupId,
+                                                  [NotNullWhen(true)] out EnergyMeterGroup?  EnergyMeterGroup)
+
+            => energyMeterGroups.TryGetValue(EnergyMeterGroupId, out EnergyMeterGroup);
+
+        /// <summary>
+        /// The energy meter groups of the given charging station operators and grid operators.
+        /// </summary>
+        internal static IEnumerable<EnergyMeterGroup> AllEnergyMeterGroups(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
+                                                                           IEnumerable<GridOperator>             GridOperators)
+
+            => ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeterGroups).
+                   Concat(GridOperators.SelectMany(gridOperator => gridOperator.EnergyMeterGroups));
+
+        /// <summary>
+        /// The error, when two of the given energy meter groups have the same identification: they are unique within
+        /// the roaming network, not only within their owner.
+        /// </summary>
+        internal static String? DuplicateEnergyMeterGroup(IEnumerable<EnergyMeterGroup> EnergyMeterGroups)
+        {
+
+            var seen = new HashSet<EnergyMeterGroup_Id>();
+
+            foreach (var energyMeterGroup in EnergyMeterGroups)
+                if (!seen.Add(energyMeterGroup.Id))
+                    return $"The energy meter group '{energyMeterGroup.Id}' must not be given twice in the roaming network!";
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when an energy meter group gives its members an unknown manufacturer, an unknown transparency
+        /// software release or certificate, or a certificate not covering its release.
+        /// </summary>
+        internal static String? UnknownEnergyMeterGroupReference(IEnumerable<EnergyMeterGroup>                                                           EnergyMeterGroups,
+                                                                 IReadOnlyDictionary<EnergyMeterManufacturer_Id,         EnergyMeterManufacturer>          EnergyMeterManufacturers,
+                                                                 IReadOnlyDictionary<TransparencySoftware_Id,            TransparencySoftware>             TransparencySoftware,
+                                                                 IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  Certificates)
+        {
+
+            foreach (var energyMeterGroup in EnergyMeterGroups)
+            {
+
+                if (energyMeterGroup.ManufacturerId.HasValue &&
+                    !EnergyMeterManufacturers.ContainsKey(energyMeterGroup.ManufacturerId.Value))
+                {
+                    return $"The energy meter group '{energyMeterGroup.Id}' names the unknown energy meter manufacturer '{energyMeterGroup.ManufacturerId}'!";
+                }
+
+                foreach (var assignment in energyMeterGroup.TransparencySoftwareStatus)
+                {
+
+                    if (!TransparencySoftware.ContainsKey(assignment.TransparencySoftwareId))
+                        return $"The transparency software release '{assignment.TransparencySoftwareId}' of the energy meter group '{energyMeterGroup.Id}' is unknown in the roaming network!";
+
+                    if (assignment.CertificateId.HasValue)
+                    {
+
+                        if (!Certificates.TryGetValue(assignment.CertificateId.Value, out var certificate))
+                            return $"The certificate '{assignment.CertificateId}' of the energy meter group '{energyMeterGroup.Id}' is unknown in the roaming network!";
+
+                        if (!certificate.Covers(assignment.TransparencySoftwareId))
+                            return $"The certificate '{certificate.Id}' of the energy meter group '{energyMeterGroup.Id}' does not cover the transparency software release '{assignment.TransparencySoftwareId}'!";
+
+                    }
+
+                }
+
+            }
 
             return null;
 

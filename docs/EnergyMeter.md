@@ -82,6 +82,16 @@ stations' and EVSEs'), `ChargingStation.AllEnergyMeters`, `EVSE.AllEnergyMeters`
   as a whole.
 
 
+## Energy meter groups
+
+A charging station operator groups the energy meters of its pools, stations and EVSEs, a grid operator those of its
+grid connection points, in [EnergyMeterGroups](EnergyMeterGroup.md), `energyMeterGroups`. A group may give its members
+`role`, `manufacturerId`, `modelId`, `modelURL`, `hardwareVersion`, `firmwareVersion`, `transparencySoftwareStatus`
+and `signatureMethods`, but never `serialNumber` or `publicKeys`: a value of their own wins, arrays are united. The
+meters keep only their own; they take the others at runtime, as the effective energy meters the effective EVSEs,
+charging stations, charging pools and grid connection points embed. A meter still named by a group can not be removed.
+
+
 ## Change sets
 
 A change of a meter is a change of its embedder, owned and signed by that embedder's charging station operator:

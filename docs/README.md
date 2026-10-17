@@ -20,6 +20,9 @@ flowchart TD
     RoamingNetwork --> ParkingOperator
     GridOperator --> GridConnectionPoint
     GridConnectionPoint --> EnergyMeter
+    GridOperator --> EnergyMeterGroup
+    ChargingStationOperator --> EnergyMeterGroup
+    EnergyMeterGroup -. energyMeterIds .-> EnergyMeter
     ChargingPool -. gridConnectionPointId .-> GridConnectionPoint
     ChargingStationOperator --> ChargingPool
     ChargingStationOperator --> ChargingTariff
@@ -49,6 +52,7 @@ flowchart TD
 | [ChargingPoolGroup](ChargingPoolGroup.md) | operator, `chargingPoolGroups` | its operator | Charging pools of the operator, optionally with a common tariff and properties they take at runtime. |
 | [ChargingTariffGroup](ChargingTariffGroup.md) | operator, `chargingTariffGroups` | its operator | Charging tariffs of the operator. |
 | [EnergyMeter](EnergyMeter.md) | pool, grid connection point, station, EVSE | whoever owns or maintains what embeds it | A meter with its role, manufacturer, model, versions and transparency software. |
+| [EnergyMeterGroup](EnergyMeterGroup.md) | operator or grid operator, `energyMeterGroups` | its operator or grid operator | Energy meters of the operator's pools, stations and EVSEs, or of the grid operator's grid connection points, with properties they take at runtime. |
 | [ChargingStationManufacturer](ChargingStationManufacturer.md) | roaming network, `chargingStationManufacturers` | RNO | A maker of charging stations, named by stations' `manufacturerId`. |
 | [EMobilityProvider](EMobilityProvider.md) | roaming network, `eMobilityProviders` | the provider; added and removed by the RNO | An EMSP, with its keys. |
 | [GridOperator](GridOperator.md) | roaming network, `gridOperators` | the grid operator, or the RNO while it has no keys; added and removed by the RNO | A DSO with its grid connection points, each signed by its maintainer. |
@@ -186,7 +190,7 @@ update, e.g. `calculated` for the status of a group its delegate calculates.
 
 ### Calculated status of groups
 
-The status of an EVSE, charging station, charging pool, charging tariff or parking space group is set manually,
+The status of an EVSE, charging station, charging pool, charging tariff, parking space or energy meter group is set manually,
 or calculated by a delegate from the status of its members. The delegate is local configuration of a history,
 not content:
 
@@ -233,12 +237,13 @@ manually again, `IsCalculated(groupType, groupId)` tells.
 
 Charging tariff groups are `active` when one tariff is, else `planned` when one is, else `expired` when all are.
 Parking space groups are `available` when one space is, else `inUse`, else `reserved` when one is, else `blocked`,
-`planned` or `inDeployment` when all are.
+`planned` or `inDeployment` when all are. Energy meter groups are `available` when all meters are, `partialAvailable`
+when one is, else `offline` when all are, `error` when all are `offline` or `error`, `inDeployment` when all are.
 
 
 ### Group priority and effective members
 
-Every group, of EVSEs, charging stations, charging pools, charging tariffs or parking spaces, has an optional
+Every group, of EVSEs, charging stations, charging pools, charging tariffs, parking spaces or energy meters, has an optional
 `priority`, an integer, 0 unless given. Where groups of a member give it different values, the one with the higher
 priority decides; groups of the same member with the same priority must not give it different values that decide.
 
@@ -252,6 +257,12 @@ at runtime, as the effective members of their operator (`EffectiveChargingPools`
 `ChargingPoolGroupsOf`, `ChargingStationGroupsOf`, `EVSEGroupsOf`; of a parking operator `EffectiveParkingSpaces`,
 `TryGetEffectiveParkingSpace`, `ParkingSpaceGroupsOf`, of the roaming network `EffectiveParkingSpaces` and
 `TryGetEffectiveParkingSpaceById`).
+
+Energy meter groups give their members the properties of an energy meter but those of the single device, its serial
+number and its public keys. The effective EVSEs, charging stations and charging pools embed the effective energy
+meters, and so do the effective grid connection points of a grid operator (`EffectiveGridConnectionPoints`,
+`TryGetEffectiveGridConnectionPoint`, `EnergyMeterGroupsOf`); a member whose energy meter takes something of its groups
+is effective as well. See [EnergyMeterGroup](EnergyMeterGroup.md#properties-of-its-members).
 
 - A single value is the member's own, else the one of its group with the highest priority.
 - An array is its own united with those of all its groups; of brands, charging connectors and data licenses of the
@@ -277,7 +288,7 @@ charging pool, removed and added again, keeps its runtime status and those of it
 taking other tariffs of the groups there changed then. A merge compares with both of its parents, also when its version
 is calculated again.
 
-POI_API serves a charging pool, a charging station, an EVSE and a parking space as they are at runtime, and searches
+POI_API serves a charging pool, a charging station, an EVSE, a parking space and a grid connection point as they are at runtime, and searches
 the charging pools so; `?view=stored` serves them as the operator embeds them, with the ETag a precondition names,
 also in the links to other pages of a list. Each of them, in either view, tells that ETag as `X-Stored-ETag` as well,
 exposed to scripts of other origins: a client reading an entity as it is at runtime makes a precondition with it

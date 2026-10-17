@@ -675,6 +675,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     Authoritative, at, out normalized, out oldTimestamp, out oldValue);
                     break;
 
+                case nameof(EnergyMeterGroup):
+
+                    if (!EnergyMeterGroup_Id.TryParse(EntityId, out var energyMeterGroupId) ||
+                        !network.TryGetEnergyMeterGroupById(energyMeterGroupId, out var energyMeterGroup))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<EnergyMeterGroupAdminStatusType>(Value, EnergyMeterGroupAdminStatusType.TryParse,
+                                                    () => energyMeterGroup.CurrentAdminStatus,
+                                                    (status, timestamp) => energyMeterGroup.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => energyMeterGroup.SetAdminStatus([ new Timestamped<EnergyMeterGroupAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<EnergyMeterGroupStatusType>(Value, EnergyMeterGroupStatusType.TryParse,
+                                                    () => energyMeterGroup.CurrentStatus,
+                                                    (status, timestamp) => energyMeterGroup.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => energyMeterGroup.SetStatus([ new Timestamped<EnergyMeterGroupStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
                 case nameof(ChargingPool):
 
                     if (!ChargingPool_Id.TryParse(EntityId, out var chargingPoolId) ||
@@ -1008,6 +1031,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     Add(statuses, POIRuntimeStatusKind.Status,      nameof(ParkingSpaceGroup), parkingSpaceGroup.Id.ToString(), parkingSpaceGroup.CurrentStatus);
                 }
 
+                foreach (var energyMeterGroup in network.EnergyMeterGroups)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(EnergyMeterGroup), energyMeterGroup.Id.ToString(), energyMeterGroup.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(EnergyMeterGroup), energyMeterGroup.Id.ToString(), energyMeterGroup.CurrentStatus);
+                }
+
                 foreach (var manufacturer in network.ChargingStationManufacturers)
                 {
                     Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingStationManufacturer), manufacturer.Id.ToString(), manufacturer.CurrentAdminStatus);
@@ -1125,6 +1154,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 entities.UnionWith(RoamingNetwork.ChargingPoolGroups);
                 entities.UnionWith(RoamingNetwork.ChargingTariffGroups);
                 entities.UnionWith(RoamingNetwork.ParkingSpaceGroups);
+                entities.UnionWith(RoamingNetwork.EnergyMeterGroups);
                 entities.UnionWith(RoamingNetwork.ChargingTariffs);
                 entities.UnionWith(RoamingNetwork.ParkingOperators);
                 entities.UnionWith(RoamingNetwork.ParkingGarages);
@@ -1205,6 +1235,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var parkingSpaceGroup in RoamingNetwork.ParkingSpaceGroups)
                     if (!listeners.ContainsKey(parkingSpaceGroup))
                         listeners[parkingSpaceGroup] = ListenTo(parkingSpaceGroup);
+
+                foreach (var energyMeterGroup in RoamingNetwork.EnergyMeterGroups)
+                    if (!listeners.ContainsKey(energyMeterGroup))
+                        listeners[energyMeterGroup] = ListenTo(energyMeterGroup);
 
                 foreach (var manufacturer in RoamingNetwork.ChargingStationManufacturers)
                     if (!listeners.ContainsKey(manufacturer))
@@ -1646,6 +1680,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private) ListenTo(EnergyMeterGroup)
+
+        private Action ListenTo(EnergyMeterGroup Entity)
+        {
+
+            OnEnergyMeterGroupAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(EnergyMeterGroup), entity.Id.ToString(), newStatus, oldStatus, dataSource);
+                return Task.CompletedTask;
+            };
+
+            OnEnergyMeterGroupStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(EnergyMeterGroup), entity.Id.ToString(), newStatus, oldStatus, dataSource);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
         #region (private) ListenTo(ParkingSpaceGroup)
 
         private Action ListenTo(ParkingSpaceGroup Entity)
@@ -1949,6 +2010,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            Concat(network.ChargingPoolGroups.SelectMany(chargingPoolGroup => new[] { chargingPoolGroup.NextAdminStatus?.Timestamp, chargingPoolGroup.NextStatus?.Timestamp })).
                            Concat(network.ChargingTariffGroups.SelectMany(chargingTariffGroup => new[] { chargingTariffGroup.NextAdminStatus?.Timestamp, chargingTariffGroup.NextStatus?.Timestamp })).
                            Concat(network.ParkingSpaceGroups.SelectMany(parkingSpaceGroup => new[] { parkingSpaceGroup.NextAdminStatus?.Timestamp, parkingSpaceGroup.NextStatus?.Timestamp })).
+                           Concat(network.EnergyMeterGroups.SelectMany(energyMeterGroup => new[] { energyMeterGroup.NextAdminStatus?.Timestamp, energyMeterGroup.NextStatus?.Timestamp })).
                            Concat(network.ChargingStationManufacturers.SelectMany(manufacturer => new[] { manufacturer.NextAdminStatus?.Timestamp, manufacturer.NextStatus?.Timestamp })).
                            Where(timestamp => timestamp.HasValue).
                            Min();
@@ -2072,6 +2134,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
                     _ = parkingSpaceGroup.AdminStatus;
                     _ = parkingSpaceGroup.Status;
+                }
+
+                foreach (var energyMeterGroup in network.EnergyMeterGroups)
+                {
+                    _ = energyMeterGroup.AdminStatus;
+                    _ = energyMeterGroup.Status;
                 }
 
                 foreach (var manufacturer in network.ChargingStationManufacturers)
