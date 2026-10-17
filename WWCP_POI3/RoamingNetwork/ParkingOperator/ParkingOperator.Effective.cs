@@ -247,6 +247,53 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (internal) EffectiveFloors()
+
+        /// <summary>
+        /// The last changes its effective parking spaces have at least, beyond what they and their groups tell: what a
+        /// snapshot of a version keeps.
+        /// </summary>
+        internal IEnumerable<POIEffectiveLastChange> EffectiveFloors()
+
+            => effectiveFloors.Select(floor => new POIEffectiveLastChange(nameof(ParkingSpace), floor.Key.ToString(), floor.Value));
+
+        #endregion
+
+        #region (internal) TakeEffectiveFloors(Floors)
+
+        /// <summary>
+        /// Take the given floors of the last changes of effective parking spaces, e.g. of a snapshot, and calculate the
+        /// effective parking spaces again with them. Floors of parking spaces it does not have are passed over; of two the
+        /// later one is kept.
+        /// </summary>
+        /// <param name="Floors">Floors, also of other operators and of other kinds of members.</param>
+        internal void TakeEffectiveFloors(IEnumerable<POIEffectiveLastChange> Floors)
+        {
+
+            var floors  = new Dictionary<ParkingSpace_Id, DateTimeOffset>(effectiveFloors);
+            var found   = false;
+
+            foreach (var floor in Floors)
+                if (floor.EntityType == nameof(ParkingSpace) &&
+                    ParkingSpace_Id.TryParse(floor.EntityId, out var parkingSpaceId) &&
+                    TryGetParkingSpace(parkingSpaceId, out var parkingSpace))
+                {
+                    found = ChargingStationOperator.Raise(floors, parkingSpace.Id, floor.LastChange) | found;
+                }
+
+            if (!found)
+                return;
+
+            effectiveFloors             = floors;
+            effectiveParkingSpaceIndex  = CalculateEffective(floors);
+            effectiveParkingSpaces      = new (CalculateEffectiveParkingSpaces);
+
+            ShareRuntimeOfEffective();
+
+        }
+
+        #endregion
+
         #region (private) CalculateEffectiveParkingSpaces()
 
         /// <summary>

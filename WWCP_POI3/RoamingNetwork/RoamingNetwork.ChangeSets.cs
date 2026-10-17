@@ -1042,6 +1042,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // Its admin status, status and internal data are not content: they go along.
             RoamingNetwork.ShareRuntimeOf(this);
 
+            // What the change set moved did not exist between its removal and its addition: compared with this version.
+            RoamingNetwork.TakeMovedMembers(this, ChangeSet);
+
             ChangesWithOldValues  = changesWithOldValues.MoveToImmutable();
             ErrorResponse         = null;
             return true;

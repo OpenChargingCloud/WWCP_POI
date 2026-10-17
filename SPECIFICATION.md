@@ -603,9 +603,11 @@ are as in section 4; timestamps are written as in section 5.4.
 2. **Trust anchor:** how an app knows the signing keys of an RNO. Proposal: a key statement signed by
    an identity key of the RNO, `{roamingNetworkId, signingKeys, signedAt, validUntil}`, so that an app
    pins only the identity keys of the RNOs it trusts.
-3. **Effective `lastChange`:** the tree takes it without the floors POI_API keeps at runtime, which
-   live in memory only (POI3-ISSUES #46). Either the floors become part of the version, or the tree
-   and POI_API tell different values.
+3. **Effective `lastChange`:** the floors are part of a version since POI3-ISSUES #45 and #46:
+   snapshots keep them as `effectiveLastChanges`, a change set is compared with the version before it
+   as a whole, a merge with both parents. How they are found is not specified here yet; until it is,
+   the tree takes the effective `lastChange` without them, and the tree and POI_API may tell different
+   values.
 4. **Runtime:** admin status, status, energy status and price status are not content. A station
    proof tells neither whether a station is available nor its prices at runtime. Signed runtime
    statements, e.g. a price status the operator signs for some minutes, would complete it.

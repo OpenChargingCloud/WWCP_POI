@@ -391,7 +391,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Floors found before are kept, the later one of two: a merge compares with both of its parents, one after the
         /// other.
         /// </summary>
-        private void StampChangedEffective(ChargingStationOperator Previous)
+        /// <param name="Previous">The previous version of this operator.</param>
+        /// <param name="AlsoEVSEs">EVSEs to compare as well, e.g. those a change set moved to another charging station.</param>
+        /// <param name="AlsoChargingStations">Charging stations to compare as well, e.g. those a change set moved to another charging pool.</param>
+        private void StampChangedEffective(ChargingStationOperator           Previous,
+                                           IEnumerable<EVSE_Id>?             AlsoEVSEs              = null,
+                                           IEnumerable<ChargingStation_Id>?  AlsoChargingStations   = null)
         {
 
             static Boolean Same(JObject Current, JObject Before, String? Embedded)
@@ -419,6 +424,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var evseCandidates             = new HashSet<EVSE_Id>           (Previous.effectiveFloors.EVSEs.Keys);
             var chargingStationCandidates  = new HashSet<ChargingStation_Id>(Previous.effectiveFloors.ChargingStations.Keys);
             var chargingPoolCandidates     = new HashSet<ChargingPool_Id>   (Previous.effectiveFloors.ChargingPools.Keys);
+
+            evseCandidates.           UnionWith(AlsoEVSEs            ?? []);
+            chargingStationCandidates.UnionWith(AlsoChargingStations ?? []);
 
             evseCandidates.           UnionWith(MembersOfChangedGroups(EVSEGroups,            Previous.EVSEGroups,            group => group.Id, group => group.EVSEIds));
             chargingStationCandidates.UnionWith(MembersOfChangedGroups(ChargingStationGroups, Previous.ChargingStationGroups, group => group.Id, group => group.ChargingStationIds));

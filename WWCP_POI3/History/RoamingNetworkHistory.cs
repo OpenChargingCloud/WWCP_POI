@@ -322,6 +322,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                // The last changes of its effective members as its history left them: they never go back.
+                if (!roamingNetwork.TryTakeEffectiveFloors(Snapshot["effectiveLastChanges"], out var effectiveLastChangesError))
+                {
+                    ErrorResponse = effectiveLastChangesError;
+                    return false;
+                }
+
                 return TryFromSnapshot(roamingNetwork,
                                        commit,
                                        out History,
@@ -449,6 +456,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            new JProperty("roamingNetwork",  head.RoamingNetwork.ToJSON())
                        );
 
+            // Not content, but part of the version as its history calculated it.
+            if (head.RoamingNetwork.EffectiveFloorsJSON() is JArray effectiveLastChanges)
+                json.Add("effectiveLastChanges", effectiveLastChanges);
+
             if (IncludeRuntimeStatus)
                 json.Add("runtimeStatus", new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON())));
 
@@ -478,6 +489,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                new (CBORValue.FromText("commit"),          head.Commit.ToCBOR()),
                                new (CBORValue.FromText("roamingNetwork"),  head.RoamingNetwork.ToCBOR())
                            };
+
+            if (head.RoamingNetwork.EffectiveFloorsJSON() is JArray effectiveLastChanges)
+                entries.Add(new (CBORValue.FromText("effectiveLastChanges"), CBORJSON.ToCBOR(effectiveLastChanges)));
 
             if (IncludeRuntimeStatus)
                 entries.Add(new (CBORValue.FromText("runtimeStatus"),
@@ -527,6 +541,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!RoamingNetwork.TryParse(roamingNetworkCBOR, out var roamingNetwork, out var roamingNetworkError))
                 {
                     ErrorResponse = "Invalid roaming network of the snapshot: " + roamingNetworkError;
+                    return false;
+                }
+
+                // The last changes of its effective members as its history left them: they never go back.
+                if (!roamingNetwork.TryTakeEffectiveFloors(Snapshot.TryGetValue(CBORValue.FromText("effectiveLastChanges"), out var effectiveLastChangesCBOR)
+                                                               ? CBORJSON.ToJSON(effectiveLastChangesCBOR)
+                                                               : null,
+                                                           out var effectiveLastChangesError))
+                {
+                    ErrorResponse = effectiveLastChangesError;
                     return false;
                 }
 

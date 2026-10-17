@@ -269,6 +269,14 @@ it is calculated once per version of the operator. Its `lastChange` is the lates
 properties and what it embeds, so that a publisher sees a group's change in every member; where it is other than in
 the version before, e.g. when it left a group, at least the last change of the operator, and it never goes back.
 
+These floors are part of a version as its history calculated it, though not content: a snapshot keeps them as
+`effectiveLastChanges`, `[{entityType, entityId, lastChange}]` (the base of a store as well), so that a history loaded
+again after its log was compacted, or started from a snapshot, tells the same last changes as one that replayed all of
+it. A change set is compared with the version before it as a whole, too: a charging station it moves to another
+charging pool, removed and added again, keeps its runtime status and those of its EVSEs and energy meters, and an EVSE
+taking other tariffs of the groups there changed then. A merge compares with both of its parents, also when its version
+is calculated again.
+
 POI_API serves a charging pool, a charging station, an EVSE and a parking space as they are at runtime, and searches
 the charging pools so; `?view=stored` serves them as the operator embeds them, with the ETag a precondition names,
 also in the links to other pages of a list. Each of them, in either view, tells that ETag as `X-Stored-ETag` as well,

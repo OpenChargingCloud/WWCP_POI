@@ -356,9 +356,11 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   may require roles (`RequiredSignatureRoles`); `OnCommitSignatures` tells of new ones.
 - **Appending:** a commit's parents must be known; one with one parent must be signed by its owners and
   lead to its ETags, a merge commit must be the merge of its parents.
-- **Snapshot:** now and complete, for the first sync: `{timestamp, commit, roamingNetwork, runtimeStatus}`.
-  `TryFromSnapshot` checks the commit id, recomputes the ETags of the network and takes the runtime status
-  as the server's; changes follow as commits since. `runtimeStatus=false` leaves the status out.
+- **Snapshot:** now and complete, for the first sync: `{timestamp, commit, roamingNetwork, effectiveLastChanges?,
+  runtimeStatus}`. `TryFromSnapshot` checks the commit id, recomputes the ETags of the network and takes the runtime
+  status as the server's; changes follow as commits since. `runtimeStatus=false` leaves the status out.
+  `effectiveLastChanges` are the floors of the last changes of effective members, which are not content either, so
+  that their last changes never go back ([docs/](docs/README.md#group-priority-and-effective-members)).
 - **Announcements:** `OnCommitAnnouncement` tells of every commit a history takes, in order:
   timestamp, commit id, parent ids, revision, description.
 - **Runtime status:** `history.RuntimeStatus` sets and reads the status of the head's entities by name,
@@ -384,7 +386,8 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
                                                 Retention: new RoamingNetworkHistoryRetention { RetainCommits = 1000 });
 ```
 
-- **Content:** a base, the snapshot of the root with its runtime status, and a log since, one entry per line:
+- **Content:** a base, the snapshot of the root with its runtime status and the floors of the last changes of its
+  effective members, and a log since, one entry per line:
   every commit, signatures added later, and every change of the runtime status. Commits and signatures
   are written, and synced to the disk, before the history shows them: a store failing refuses the commit.
   Status updates are synced in batches (`StatusFlushInterval`, 1 s).

@@ -559,6 +559,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                // A merge compared its effective members with both of its parents, and took the runtime status of both.
+                if (commit.IsMerge)
+                {
+
+                    if (!TryGetVersion(commit.ParentIds[1], out var right, out ErrorResponse))
+                    {
+                        RoamingNetwork = null;
+                        return false;
+                    }
+
+                    nextVersion.ShareRuntimeOfMergedParents(RoamingNetwork, right);
+
+                }
+
                 RoamingNetwork = nextVersion;
 
             }
@@ -671,18 +685,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) SnapshotJSON(Commit, RoamingNetwork, StatusOf)
 
         /// <summary>
-        /// A snapshot of the given commit and its version, with the runtime status of the given version.
+        /// A snapshot of the given commit and its version, with the floors of the last changes of its effective members,
+        /// and with the runtime status of the given version.
         /// </summary>
         private static JObject SnapshotJSON(RoamingNetworkCommit  Commit,
                                             RoamingNetwork        RoamingNetwork,
                                             RoamingNetwork        StatusOf)
+        {
 
-            => new (
-                   new JProperty("timestamp",       Timestamp.Now.ToISO8601()),
-                   new JProperty("commit",          Commit.ToJSON()),
-                   new JProperty("roamingNetwork",  RoamingNetwork.ToJSON()),
-                   new JProperty("runtimeStatus",   new JArray(RoamingNetworkRuntimeStatus.Of(StatusOf).Select(status => status.ToJSON())))
-               );
+            var json = new JObject(
+                           new JProperty("timestamp",       Timestamp.Now.ToISO8601()),
+                           new JProperty("commit",          Commit.ToJSON()),
+                           new JProperty("roamingNetwork",  RoamingNetwork.ToJSON())
+                       );
+
+            if (RoamingNetwork.EffectiveFloorsJSON() is JArray effectiveLastChanges)
+                json.Add("effectiveLastChanges", effectiveLastChanges);
+
+            json.Add("runtimeStatus", new JArray(RoamingNetworkRuntimeStatus.Of(StatusOf).Select(status => status.ToJSON())));
+
+            return json;
+
+        }
 
         #endregion
 
