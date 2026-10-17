@@ -47,7 +47,7 @@ is replaced or removed as a whole ([below](#change-sets)).
 
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
-| `role` | `Role` | string | via parent | What it measures, free text, e.g. `grid`, `pv`, `battery`, `evse`. |
+| `role` | `Role` | `EnergyMeterRole` | via parent | What it measures; predefined `grid`, `gridConnectionPoint`, `pool`, `station`, `evse`, `pv`, `wind`, `battery`, read in any case and written so, any other nonempty text accepted. |
 | `manufacturerId` | `ManufacturerId` | `EnergyMeterManufacturer_Id` | via parent | Its manufacturer, which must be an energy meter manufacturer of the roaming network ([below](#manufacturerid)). |
 | `modelId` | `ModelId` | `EnergyMeterModel_Id` | via parent | Its model, as its manufacturer names it; nonempty text, not checked against anything. |
 | `modelURL` | `ModelURL` | URL | via parent | The homepage of its model, e.g. with its data sheet. |
@@ -85,7 +85,7 @@ A change of a meter is a change of its embedder, owned and signed by that embedd
 
 ```csharp
 var meter = new EnergyMeter(EnergyMeter_Id.Parse("evse-meter-2"),
-                            Role:            "evse",
+                            Role:            EnergyMeterRole.EVSE,
                             ManufacturerId:  EnergyMeterManufacturer_Id.Parse("ACME"),
                             SerialNumber:    "1ESY1161229886");
 

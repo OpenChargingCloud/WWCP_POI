@@ -66,9 +66,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
-        /// What it measures, e.g. "grid", "pv" or "battery".
+        /// What it measures, e.g. the grid, a PV system or a battery.
         /// </summary>
-        public String?  Role               { get; }
+        public EnergyMeterRole?             Role            { get; }
 
         /// <summary>
         /// Its manufacturer, one of its roaming network.
@@ -115,7 +115,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public EnergyMeter(EnergyMeter_Id                              Id,
                            I18NString?                                 Name                         = null,
                            I18NString?                                 Description                  = null,
-                           String?                                     Role                         = null,
+                           EnergyMeterRole?                            Role                         = null,
                            EnergyMeterManufacturer_Id?                 ManufacturerId               = null,
                            EnergyMeterModel_Id?                        ModelId                      = null,
                            URL?                                        ModelURL                     = null,
@@ -241,8 +241,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (DataSource is not null)
                 json.Add("dataSource",       DataSource);
 
-            if (Role is not null)
-                json.Add("role",             Role);
+            if (Role.HasValue)
+                json.Add("role",             Role.Value.ToString());
 
             if (ManufacturerId.HasValue)
                 json.Add("manufacturerId",   ManufacturerId.Value.ToString());
@@ -303,7 +303,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseI18N  (JSON, "name",             "energy meter name",         out var name,             out ErrorResponse) ||
                     !POIJSON.TryParseI18N  (JSON, "description",      "energy meter description",  out var description,      out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, "dataSource",       "data source",               out var dataSource,       out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "role",             "energy meter role",         out var role,             out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, "role",             "energy meter role",           EnergyMeterRole.           TryParse, out EnergyMeterRole?            role,           out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, "manufacturerId",   "manufacturer identification", EnergyMeterManufacturer_Id.TryParse, out EnergyMeterManufacturer_Id? manufacturerId, out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, "modelId",          "model identification",        EnergyMeterModel_Id.       TryParse, out EnergyMeterModel_Id?        modelId,        out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, "modelURL",         "model URL",                 URL.TryParse, out URL? modelURL,        out ErrorResponse) ||

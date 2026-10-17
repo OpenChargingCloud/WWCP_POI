@@ -81,7 +81,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                    ContractedExportPower:          Watt.FromW(100000),
                                                                                                                    ContractedImportApparentPower:  VoltAmpere.FromVA(300000),
                                                                                                                    MarketLocationIds:              [ "DE0001", "DE0002" ],
-                                                                                                                   EnergyMeter:                    new EnergyMeter(GridMeter, Role: "grid", Created: Created)) ],
+                                                                                                                   EnergyMeter:                    new EnergyMeter(GridMeter, Role: EnergyMeterRole.Grid, Created: Created)) ],
                                                                   Created:               Created) ],
                     ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                              I18NString.Create(Languages.en, "GraphDefined"),
@@ -89,7 +89,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                              ChargingPools:  [ new ChargingPool(P1,
                                                                                                                 Created:                Created,
                                                                                                                 GridConnectionPointId:  GCP,
-                                                                                                                EnergyMeters:         [ new EnergyMeter(PVMeter, Role: "pv", SerialNumber: "PV-1", Created: Created) ],
+                                                                                                                EnergyMeters:         [ new EnergyMeter(PVMeter, Role: EnergyMeterRole.PV, SerialNumber: "PV-1", Created: Created) ],
                                                                                                                 ChargingStations:     [ new ChargingStation(S1,
                                                                                                                                                             Created:  Created,
                                                                                                                                                             EVSEs:    [ new EVSE(E1,
@@ -252,7 +252,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var point    = net.GridConnectionPoints.Single();
 
-            var newMeter = new EnergyMeter(EnergyMeter_Id.Parse("evse-meter-2"), Role: "evse").ToJSON();
+            var newMeter = new EnergyMeter(EnergyMeter_Id.Parse("evse-meter-2"), Role: EnergyMeterRole.EVSE).ToJSON();
 
             history.Commit(rn1.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add           (new EMobilityProvider(EMobilityProvider_Id.Parse("DE*ZAP")).WithKeys()),
