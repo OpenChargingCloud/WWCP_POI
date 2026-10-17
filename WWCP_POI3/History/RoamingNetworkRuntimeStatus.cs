@@ -375,6 +375,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     Authoritative, at, out normalized, out oldTimestamp, out oldValue);
                     break;
 
+                case nameof(RoamingNetworkOperator):
+
+                    if (!RoamingNetworkOperator_Id.TryParse(EntityId, out var roamingNetworkOperatorId) ||
+                        network.Operator is not RoamingNetworkOperator roamingNetworkOperator ||
+                        roamingNetworkOperator.Id != roamingNetworkOperatorId)
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<RoamingNetworkOperatorAdminStatusType>(Value, RoamingNetworkOperatorAdminStatusType.TryParse,
+                                                    () => roamingNetworkOperator.CurrentAdminStatus,
+                                                    (status, timestamp) => roamingNetworkOperator.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => roamingNetworkOperator.SetAdminStatus([ new Timestamped<RoamingNetworkOperatorAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<RoamingNetworkOperatorStatusType>(Value, RoamingNetworkOperatorStatusType.TryParse,
+                                                    () => roamingNetworkOperator.CurrentStatus,
+                                                    (status, timestamp) => roamingNetworkOperator.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => roamingNetworkOperator.SetStatus([ new Timestamped<RoamingNetworkOperatorStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
                 case nameof(GridOperator):
 
                     if (!GridOperator_Id.TryParse(EntityId, out var gridOperatorId) ||
@@ -900,6 +924,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetwork), network.Id.ToString(), network.CurrentAdminStatus);
                 Add(statuses, POIRuntimeStatusKind.Status,      nameof(RoamingNetwork), network.Id.ToString(), network.CurrentStatus);
 
+                if (network.Operator is RoamingNetworkOperator roamingNetworkOperator)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetworkOperator), roamingNetworkOperator.Id.ToString(), roamingNetworkOperator.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(RoamingNetworkOperator), roamingNetworkOperator.Id.ToString(), roamingNetworkOperator.CurrentStatus);
+                }
+
                 foreach (var eMobilityProvider in network.EMobilityProviders)
                 {
                     Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(EMobilityProvider), eMobilityProvider.Id.ToString(), eMobilityProvider.CurrentAdminStatus);
@@ -1086,6 +1116,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var entities = new HashSet<Object>(ReferenceEqualityComparer.Instance) { RoamingNetwork };
 
+                if (RoamingNetwork.Operator is not null)
+                    entities.Add(RoamingNetwork.Operator);
+
                 entities.UnionWith(RoamingNetwork.ChargingStationManufacturers);
                 entities.UnionWith(RoamingNetwork.EVSEGroups);
                 entities.UnionWith(RoamingNetwork.ChargingStationGroups);
@@ -1117,6 +1150,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!listeners.ContainsKey(RoamingNetwork))
                     listeners[RoamingNetwork] = ListenTo(RoamingNetwork);
+
+                if (RoamingNetwork.Operator is RoamingNetworkOperator roamingNetworkOperator && !listeners.ContainsKey(roamingNetworkOperator))
+                    listeners[roamingNetworkOperator] = ListenTo(roamingNetworkOperator);
 
                 foreach (var eMobilityProvider in RoamingNetwork.EMobilityProviders)
                     if (!listeners.ContainsKey(eMobilityProvider))
@@ -1271,6 +1307,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             OnEMobilityProviderStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
                 Raise(POIRuntimeStatusKind.Status, nameof(EMobilityProvider), entity.Id.ToString(), newStatus, oldStatus, dataSource);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(RoamingNetworkOperator)
+
+        private Action ListenTo(RoamingNetworkOperator Entity)
+        {
+
+            OnRoamingNetworkOperatorAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(RoamingNetworkOperator), entity.Id.ToString(), newStatus, oldStatus, dataSource);
+                return Task.CompletedTask;
+            };
+
+            OnRoamingNetworkOperatorStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(RoamingNetworkOperator), entity.Id.ToString(), newStatus, oldStatus, dataSource);
                 return Task.CompletedTask;
             };
 

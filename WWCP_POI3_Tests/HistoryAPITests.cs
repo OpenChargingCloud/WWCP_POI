@@ -535,7 +535,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(JObject.Parse(withStatus.Text)["runtimeStatus"]!.Count(),  Is.EqualTo(2));
+                // Of the roaming network and of its operator.
+                Assert.That(JObject.Parse(withStatus.Text)["runtimeStatus"]!.Count(),  Is.EqualTo(4));
                 Assert.That(JObject.Parse(withoutStatus.Text)["runtimeStatus"],        Is.Null);
                 Assert.That(invalid.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
 

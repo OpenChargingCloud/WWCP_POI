@@ -696,7 +696,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
                 Assert.That(lastAdmin.GetPayloadJSON()!["oldValue"]!.Value<String>(),           Is.EqualTo("outOfService"));
                 Assert.That(client.Pushes.Reader.Count,                                         Is.Zero);
 
-                Assert.That(runtimeStatus.Payload!["runtimeStatus"]!.Count(),                   Is.EqualTo(2));
+                // Of the roaming network and of its operator.
+                Assert.That(runtimeStatus.Payload!["runtimeStatus"]!.Count(),                   Is.EqualTo(4));
 
             }
 
@@ -862,7 +863,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
                 Assert.That(push.Payload!["value"]!.Value<String>(),                 Is.EqualTo("offline"));
                 Assert.That(subscriber.Pushes.Reader.Count,                          Is.Zero);
 
-                Assert.That(leader!.RuntimeStatus.All.Count,                         Is.EqualTo(2));
+                // Of the roaming network and of its operator.
+                Assert.That(leader!.RuntimeStatus.All.Count,                         Is.EqualTo(4));
 
             }
 

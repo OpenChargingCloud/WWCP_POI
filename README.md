@@ -172,7 +172,8 @@ parking product ids compare case-sensitively.
   elements}, …]}`: new prices of charging tariffs of their operator at runtime, e.g. ad hoc prices following the
   electricity market, without a commit, kept the same way. For every tariff, the most specific one applies at an EVSE:
   its own before its station's before its pool's (`ChargingPrices.Effective`).
-- **Keys:** the roaming network (for its operator, the RNO), charging station operators, e-mobility providers,
+- **Keys:** the roaming network operator (RNO, the `roamingNetworkOperator` a roaming network embeds: the network
+  has no keys of its own), charging station operators, e-mobility providers,
   grid operators and parking operators each name 1..n `signingKeys` (a grid operator not taking part none at all), short keys signing their change sets
   (e.g. secp256r1), and 1..n `identityKeys`, long-term keys signing changes of their identity keys (e.g. secp521r1):
   `{@id, key, notBefore?, notAfter?}`, the public COSE key as Base64 of its deterministic CBOR, identified by its
@@ -187,7 +188,8 @@ a change set can manage:
 
 | Entity | Description |
 |---|---|
-| [RoamingNetwork](docs/RoamingNetwork.md) | The root: one version of a roaming network with everything it embeds, its keys and its ETags. |
+| [RoamingNetwork](docs/RoamingNetwork.md) | The root: one version of a roaming network with everything it embeds and its ETags. |
+| [RoamingNetworkOperator](docs/RoamingNetworkOperator.md) | Its operator, the RNO, with the keys of the network; one may operate many networks. |
 | [ChargingStationOperator](docs/ChargingStationOperator.md) | A charge point operator with its charging pools, tariffs and groups. |
 | [ChargingPool](docs/ChargingPool.md) | A charging location: address, opening times, facilities, grid connection point and charging stations. |
 | [ChargingStation](docs/ChargingStation.md) | A charger with its EVSEs, manufacturer and model, energy meters and energy status. |
@@ -219,11 +221,15 @@ var gef = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF")
                                       SigningKeys:   [ POIPublicKey.From(gefSigningKey)  ],   // e.g. secp256r1
                                       IdentityKeys:  [ POIPublicKey.From(gefIdentityKey) ]);  // e.g. secp521r1
 
+// The operator of the roaming network, who may operate other roaming networks as well.
+var rno = new RoamingNetworkOperator(RoamingNetworkOperator_Id.Parse("GraphDefined"),
+                                     SigningKeys:   [ POIPublicKey.From(rnoSigningKey)  ],
+                                     IdentityKeys:  [ POIPublicKey.From(rnoIdentityKey) ]);
+
 var rn1 = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                              DataSource:                "v1",
                              ChargingStationOperators:  [ gef ],
-                             SigningKeys:               [ POIPublicKey.From(rnoSigningKey)  ],
-                             IdentityKeys:              [ POIPublicKey.From(rnoIdentityKey) ]);
+                             Operator:                  rno);
 
 var newOperator = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*NEW"),
                                               SigningKeys:   [ POIPublicKey.From(newSigningKey)  ],
@@ -274,7 +280,7 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 - **Owners:** every change set must be signed by the owner of every change it makes, with a key the owner has
   in the version it is applied to, valid at its `createdAt` (`TryCheckOwnership`); every signature must be one of
   a key of a party. Nobody else's signature counts, there is no external trust configuration.
-  - The **RNO** owns the roaming network itself, manufacturers, energy meter manufacturers and
+  - The **RNO** owns itself, the roaming network itself, manufacturers, energy meter manufacturers and
     transparency software, and adds and removes parties: with their keys (a grid operator not taking part
     without, then the RNO signs in its place until it gives it keys), without their children:
     `RoamingNetworkChange.Add(party)` leaves them out, `AddChildren(party)` gives the changes the party then
@@ -294,7 +300,8 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
     A party keeps at least one key of each kind.
   - The RNO's identity keys are the root of trust: nobody can replace them once they are lost or expired.
     An RNO should therefore name at least two identity keys with different `notAfter`, one of them kept
-    offline, and replace an identity key well before it expires.
+    offline, and replace an identity key well before it expires. The RNO is neither added nor removed: it comes
+    with the network, and a network without one can not be changed where only the RNO may.
 - **Rebase:** `rn2.TryRebase(cs, …)` prepares a change set of an older version again, unless it conflicts;
   the rebased change set is unsigned, its owners sign it again.
 - **Signatures:** `Sign(…)` and `VerifySignature(…)` over canonical JSON (COSE algorithms of Styx);

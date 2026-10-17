@@ -127,7 +127,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(gef.SigningKeys.Single().Id,                                              Is.EqualTo(key.Id));
                 Assert.That(gef.SigningKeys.Single().Key.Curve,                                       Is.EqualTo(COSECurve.P256));
                 Assert.That(gef.IdentityKeys.Single().Key.Curve,                                      Is.EqualTo(COSECurve.P521));
-                Assert.That(fromCBOR.SigningKeys.Single().Id,                                         Is.EqualTo(TestParties.Key(TestParties.Party(rn1)).Public.Id));
+                Assert.That(fromCBOR.Operator!.SigningKeys.Single().Id,                               Is.EqualTo(TestParties.Key(TestParties.Party(rn1)).Public.Id));
                 Assert.That(key.Id,                                                                   Has.Length.EqualTo(64));
 
                 Assert.That(RoamingNetwork.TryParse(wrongId,   out _, out var error1),               Is.False);
@@ -423,8 +423,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 // The keys of the roaming network operator itself, without anybody to recover them:
                 // its signing keys by a signing or an identity key, its identity keys only by an identity key.
-                var rnoSigningKeys   = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1, "signingKeys",  null, newKeys));
-                var rnoIdentityKeys  = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1, "identityKeys", null, new JArray(rotatedIdentity.Public.ToJSON())));
+                var rnoSigningKeys   = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1.Operator!, "signingKeys",  null, newKeys));
+                var rnoIdentityKeys  = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1.Operator!, "identityKeys", null, new JArray(rotatedIdentity.Public.ToJSON())));
+
+                // The roaming network has no keys of its own.
+                Assert.That(() => Change(rn1, RoamingNetworkChange.UpdateProperty(rn1, "signingKeys", null, newKeys)),
+                            Throws.ArgumentException.With.Message.Contains("a roaming network has no keys of its own"));
 
                 Assert.That(Apply(rn1, rnoSigningKeys. SignedBy(TestParties.Party(rn1))).Applied,                       Is.True);
                 Assert.That(Apply(rn1, rnoSigningKeys. SignedBy(TestParties.Party(rn1), POIKeyKind.Identity)).Applied,  Is.True);

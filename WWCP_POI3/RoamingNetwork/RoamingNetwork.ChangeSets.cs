@@ -89,8 +89,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      transparencySoftware,
                                      transparencySoftwareCertificates,
                                      energyMeterManufacturers,
-                                     SigningKeys,
-                                     IdentityKeys
+                                     Operator
                                  ) {
                                      Revision = Revision
                                  };
@@ -515,8 +514,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var dataSource            = DataSource;
             var licenses              = DataLicenses.ToImmutableArray();
             var customData            = CustomData;
-            var signingKeys           = SigningKeys;
-            var identityKeys          = IdentityKeys;
+            var networkOperators      = new Dictionary<RoamingNetworkOperator_Id, RoamingNetworkOperator>();
             var operators             = new Dictionary<ChargingStationOperator_Id, ChargingStationOperator>(chargingStationOperators.Index);
             var manufacturers         = new Dictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>(chargingStationManufacturers.Index);
             var providers             = new Dictionary<EMobilityProvider_Id, EMobilityProvider>(eMobilityProviders.Index);
@@ -526,6 +524,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var certificates          = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(transparencySoftwareCertificates.Index);
             var meterManufacturers    = new Dictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>(energyMeterManufacturers.Index);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
+
+            if (Operator is not null)
+                networkOperators.Add(Operator.Id, Operator);
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
             {
@@ -713,7 +714,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         var networkJSON = new JObject();
 
-                        if (CurrentValue(change.EntityPropertyName!, name, description, dataSource, licenses, customData, signingKeys, identityKeys) is JToken networkPropertyValue)
+                        if (CurrentValue(change.EntityPropertyName!, name, description, dataSource, licenses, customData) is JToken networkPropertyValue)
                             networkJSON[change.EntityPropertyName!] = networkPropertyValue;
 
                         if (!TryResolveElementChange(ref applied, networkJSON, "roaming network", out networkElementValue, out var networkElementError))
@@ -725,7 +726,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     var propertyName  = applied.PropertyName ?? "";
-                    currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses, customData, signingKeys, identityKeys);
+                    currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses, customData);
 
                     if (applied.OldValue is JToken oldValue &&
                         !OldValueMatches(oldValue, currentValue))
@@ -793,16 +794,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                 case POIPartyKeys.SigningKeysProperty:
                                 case POIPartyKeys.IdentityKeysProperty:
-                                    if (!POIPartyKeys.TryParse(new JObject(new JProperty(propertyName, newValue)), out var newSigningKeys, out var newIdentityKeys, out var keysError))
-                                    {
-                                        ErrorResponse = $"Change {index}: {keysError}";
-                                        return false;
-                                    }
-                                    if (propertyName == POIPartyKeys.SigningKeysProperty)
-                                        signingKeys  = POIPublicKey.Ordered(newSigningKeys,  $"signing key of the roaming network '{Id}'");
-                                    else
-                                        identityKeys = POIPublicKey.Ordered(newIdentityKeys, $"identity key of the roaming network '{Id}'");
-                                    break;
+                                    ErrorResponse = $"Change {index}: a roaming network has no keys of its own: they are the keys of its {nameof(POI.RoamingNetworkOperator)}!";
+                                    return false;
 
                                 default:
                                     ErrorResponse = $"Change {index}: the property '{propertyName}' of a roaming network can not be changed!";
@@ -866,6 +859,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     // The old value of an element change is the value of what it addresses.
                     if (change.IsElementChange)
                         currentValue = networkElementValue;
+
+                }
+
+                #endregion
+
+                #region The roaming network operator: changed, but neither added nor removed
+
+                else if (change.EntityType == nameof(POI.RoamingNetworkOperator))
+                {
+
+                    if (change.Kind is RoamingNetworkChangeKind.Add or RoamingNetworkChangeKind.Remove)
+                    {
+                        ErrorResponse = $"Change {index}: the operator of a roaming network is changed, but neither added nor removed!";
+                        return false;
+                    }
+
+                    if (!TryApplyRegistryChange(RoamingNetworkOperatorRegistry, change, index, ChangeSet.CreatedAt, networkOperators, out currentValue, out ErrorResponse))
+                        return false;
 
                 }
 
@@ -1023,8 +1034,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  softwares.Values,
                                  certificates.Values,
                                  meterManufacturers.Values,
-                                 signingKeys,
-                                 identityKeys
+                                 networkOperators.Values.SingleOrDefault()
                              ) {
                                  Revision = Revision + 1
                              };
@@ -1093,9 +1103,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             ImmutableI18NString        Description,
                                             String?                    DataSource,
                                             ImmutableArray<DataLicense>  DataLicenses,
-                                            CustomDataNew              CustomData,
-                                            ImmutableArray<POIPublicKey>  SigningKeys,
-                                            ImmutableArray<POIPublicKey>  IdentityKeys)
+                                            CustomDataNew              CustomData)
 
             => PropertyName switch {
                    "name"          => Name.       IsNotNullOrEmpty()       ? Name.       ToJSON()      : null,
@@ -1103,8 +1111,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    "dataSource"    => DataSource.IsNeitherNullNorEmpty()   ? DataSource                : null,
                    "dataLicenses"  => DataLicenses.Length > 0              ? DataLicenses.ToPOIJSON()  : null,
                    "customData"    => CustomData.HasValues                 ? CustomData.ToJObject()    : null,
-                   POIPartyKeys.SigningKeysProperty   => SigningKeys. Length > 0  ? new JArray(SigningKeys. Select(key => key.ToJSON())) : null,
-                   POIPartyKeys.IdentityKeysProperty  => IdentityKeys.Length > 0  ? new JArray(IdentityKeys.Select(key => key.ToJSON())) : null,
                    _               => null
                };
 

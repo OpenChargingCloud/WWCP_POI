@@ -832,7 +832,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // The trust anchor: the snapshot must be one of the roaming network the keys of its operator name.
             if (options.TrustedRoamingNetworkOperatorKeyIds is { Count: > 0 } trustedKeyIds &&
-                !newHistory.Head.RoamingNetwork.IdentityKeys.Concat(newHistory.Head.RoamingNetwork.SigningKeys).Any(key => trustedKeyIds.Contains(key.Id)))
+                !(newHistory.Head.RoamingNetwork.Operator is RoamingNetworkOperator roamingNetworkOperator &&
+                  roamingNetworkOperator.IdentityKeys.Concat(roamingNetworkOperator.SigningKeys).Any(key => trustedKeyIds.Contains(key.Id))))
             {
                 throw new InvalidOperationException("The snapshot of the other server names none of the trusted keys of the roaming network operator!");
             }

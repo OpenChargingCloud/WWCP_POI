@@ -125,8 +125,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     public sealed partial class RoamingNetwork : AImmutableEMobilityEntity<RoamingNetwork_Id,
                                                                            RoamingNetworkAdminStatusType,
-                                                                           RoamingNetworkStatusType>,
-                                                 IPOIParty
+                                                                           RoamingNetworkStatusType>
     {
 
         #region Data
@@ -164,18 +163,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region SigningKeys, IdentityKeys
+        #region Operator
 
         /// <summary>
-        /// The keys of the roaming network operator signing its change sets and commits, in the order of their identifications.
+        /// The operator of the roaming network, with its keys: it owns the roaming network itself and decides who
+        /// is a member. A roaming network without one can not be changed, as nobody may sign a change of it.
         /// </summary>
-        public ImmutableArray<POIPublicKey>  SigningKeys     { get; }
-
-        /// <summary>
-        /// The identity keys of the roaming network operator, signing changes of its own keys
-        /// and, for recovery, of the keys of other parties, in the order of their identifications.
-        /// </summary>
-        public ImmutableArray<POIPublicKey>  IdentityKeys    { get; }
+        public RoamingNetworkOperator?  Operator    { get; }
 
         #endregion
 
@@ -217,8 +211,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               IEnumerable<TransparencySoftware>?         TransparencySoftware           = null,
                               IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates  = null,
                               IEnumerable<EnergyMeterManufacturer>?      EnergyMeterManufacturers       = null,
-                              IEnumerable<POIPublicKey>?                 SigningKeys                    = null,
-                              IEnumerable<POIPublicKey>?                 IdentityKeys                   = null)
+                              RoamingNetworkOperator?                    Operator                       = null)
 
             : base(Id,
                    Name,
@@ -236,7 +229,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
-            (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the roaming network '{Id}'");
+            this.Operator = Operator;
 
             #region Data licenses and charging station operators
 
@@ -570,10 +563,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Parse SigningKeys, IdentityKeys [optional]
+                #region Parse Operator       [optional]
 
-                if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
+                // The keys of a roaming network are the keys of its operator.
+                if (JSON.ContainsKey(POIPartyKeys.SigningKeysProperty) || JSON.ContainsKey(POIPartyKeys.IdentityKeysProperty))
+                {
+                    ErrorResponse = $"A roaming network has no keys of its own: they are the keys of its operator, '{RoamingNetworkOperator.JSONProperty}'!";
                     return false;
+                }
+
+                RoamingNetworkOperator? roamingNetworkOperator = null;
+
+                if (JSON[RoamingNetworkOperator.JSONProperty] is JToken operatorJSON)
+                {
+
+                    if (operatorJSON is not JObject operatorObject)
+                    {
+                        ErrorResponse = "The roaming network operator must be a JSON object!";
+                        return false;
+                    }
+
+                    if (!RoamingNetworkOperator.TryParse(operatorObject, out roamingNetworkOperator, out ErrorResponse))
+                        return false;
+
+                }
 
                 #endregion
 
@@ -709,8 +722,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      TransparencySoftware:      transparencySoftware,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
                                      EnergyMeterManufacturers:  energyMeterManufacturers,
-                                     SigningKeys:               signingKeys,
-                                     IdentityKeys:              identityKeys
+                                     Operator:                  roamingNetworkOperator
                                  );
 
                 #region Check ETags          [optional]
@@ -804,6 +816,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            "dataLicenses",
                                            DataLicenses.ToPOIJSON()
                                        ))
+                             : null,
+
+                         Operator is not null
+                             ? new JProperty(RoamingNetworkOperator.JSONProperty, Operator.ToJSON())
                              : null,
 
                          ChargingStationOperators.Any() && ExpandChargingStationOperatorIds != InfoStatus.Hidden
@@ -941,8 +957,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (!transparencySoftwareCertificates.IsEmpty)
                 JSON.Add("transparencySoftwareCertificates", new JArray(transparencySoftwareCertificates.Select(certificate => certificate.ToJSON())));
-
-            POIPartyKeys.AddTo(JSON, this);
 
             POIEntityMetadata.AddTo(JSON, Created, LastChangeDate, CustomData);
 
@@ -1114,16 +1128,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Parse SigningKeys, IdentityKeys [optional]
+                #region Parse Operator       [optional]
 
-                var keysJSON = new JObject();
-
+                // The keys of a roaming network are the keys of its operator.
                 foreach (var keysProperty in new[] { POIPartyKeys.SigningKeysProperty, POIPartyKeys.IdentityKeysProperty })
-                    if (CBOR.TryGetValue(CBORValue.FromText(keysProperty), out var keysCBOR))
-                        keysJSON.Add(keysProperty, CBORJSON.ToJSON(keysCBOR));
+                {
+                    if (CBOR.TryGetValue(CBORValue.FromText(keysProperty), out _))
+                    {
+                        ErrorResponse = $"A roaming network has no keys of its own: they are the keys of its operator, '{RoamingNetworkOperator.JSONProperty}'!";
+                        return false;
+                    }
+                }
 
-                if (!POIPartyKeys.TryParse(keysJSON, out var signingKeys, out var identityKeys, out ErrorResponse))
-                    return false;
+                RoamingNetworkOperator? roamingNetworkOperator = null;
+
+                if (CBOR.TryGetValue(CBORValue.FromText(RoamingNetworkOperator.JSONProperty), out var operatorCBOR))
+                {
+
+                    if (CBORJSON.ToJSON(operatorCBOR) is not JObject operatorJSON)
+                    {
+                        ErrorResponse = "The roaming network operator must be a map!";
+                        return false;
+                    }
+
+                    if (!RoamingNetworkOperator.TryParse(operatorJSON, out roamingNetworkOperator, out ErrorResponse))
+                        return false;
+
+                }
 
                 #endregion
 
@@ -1246,8 +1277,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      TransparencySoftware:      transparencySoftware,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
                                      EnergyMeterManufacturers:  energyMeterManufacturers,
-                                     SigningKeys:               signingKeys,
-                                     IdentityKeys:              identityKeys
+                                     Operator:                  roamingNetworkOperator
                                  );
 
                 #region Check ETags          [optional]
@@ -1316,6 +1346,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (DataLicenses.Any())
                 CBOR.Add(CBORValue.FromText("dataLicenses"),          CBORJSON.ToCBOR(DataLicenses.ToPOIJSON()));
 
+            if (Operator is not null)
+                CBOR.Add(CBORValue.FromText(RoamingNetworkOperator.JSONProperty), Operator.ToCBOR());
+
             if (ChargingStationOperators.Any())
                 CBOR.Add(CBORValue.FromText("chargingStationOperators"),
                          CBORValue.FromArray(chargingStationOperators.
@@ -1356,8 +1389,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          CBORValue.FromArray(transparencySoftwareCertificates.
                                                  Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON()))));
 
-            foreach (var keys in POIPartyKeys.AddTo([], this).Properties())
-                CBOR.Add(CBORValue.FromText(keys.Name), CBORJSON.ToCBOR(keys.Value));
 
             // Always part of the content, with the keys and values of the JSON representation.
             foreach (var metadata in POIEntityMetadata.AddTo([], Created, LastChangeDate, CustomData).Properties())

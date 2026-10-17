@@ -88,6 +88,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             POIPartyKeys.IdentityKeysProperty
         ]);
 
+        private static readonly Registry<RoamingNetworkOperator_Id, RoamingNetworkOperator> RoamingNetworkOperatorRegistry = new (
+            "roaming network operator",
+            "a",
+            ChangeablePartyProperties,
+            RoamingNetworkOperator_Id.TryParse,
+            POI.RoamingNetworkOperator.TryParse,
+            roamingNetworkOperator => roamingNetworkOperator.Id,
+            roamingNetworkOperator => roamingNetworkOperator.ToJSON(),
+            (changed, previous) => changed.ShareRuntimeOf(previous)
+        );
+
         private static readonly Registry<ChargingStationManufacturer_Id, ChargingStationManufacturer> ManufacturerRegistry = new (
             "charging station manufacturer",
             "a",

@@ -568,6 +568,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region UpdateProperty        (RoamingNetworkOperator, PropertyName, OldValue, NewValue)
+
+        /// <summary>
+        /// Update one property of the given roaming network operator, e.g. its keys, optionally asserting its previous value.
+        /// A roaming network operator is neither added nor removed: it comes with the roaming network it operates.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(RoamingNetworkOperator  RoamingNetworkOperator,
+                                                          String                  PropertyName,
+                                                          JToken?                 OldValue,
+                                                          JToken                  NewValue)
+
+            => UpdateProperty(nameof(POI.RoamingNetworkOperator), RoamingNetworkOperator.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given roaming network operator, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(RoamingNetworkOperator  RoamingNetworkOperator,
+                                                          String                  PropertyName,
+                                                          JToken?                 OldValue   = null)
+
+            => RemoveProperty(nameof(POI.RoamingNetworkOperator), RoamingNetworkOperator.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
         #region Add                   (GridOperator)
 
         /// <summary>

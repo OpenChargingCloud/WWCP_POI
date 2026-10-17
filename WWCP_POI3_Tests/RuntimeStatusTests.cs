@@ -93,7 +93,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                                 "ChargingStationOperator Status available",
                                 "ChargingStationOperator AdminStatus operational",
                                 "RoamingNetwork Status available",
-                                "RoamingNetwork AdminStatus operational"
+                                "RoamingNetwork AdminStatus operational",
+                                "RoamingNetworkOperator Status available",
+                                "RoamingNetworkOperator AdminStatus operational"
                             }));
                 Assert.That(all.Select(status => status.Timestamp),  Is.All.EqualTo(Created));
             }
@@ -367,7 +369,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(fromNoStatus,                                     Is.True, errorPlain);
 
                 Assert.That(snapshotJSON["timestamp"],                        Is.Not.Null);
-                Assert.That(snapshotJSON["runtimeStatus"]!.Count(),           Is.EqualTo(4));
+                Assert.That(snapshotJSON["runtimeStatus"]!.Count(),           Is.EqualTo(6));
                 Assert.That(withoutStatus["runtimeStatus"],                   Is.Null);
 
                 // The leader's status, with the leader's timestamps.

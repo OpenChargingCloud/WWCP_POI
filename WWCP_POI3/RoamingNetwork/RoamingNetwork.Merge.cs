@@ -243,9 +243,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The embedded children a change set addresses on their own: their JSON key and entity type, by the entity type embedding them.
+        /// A key holds an array of them, or, as the roaming network operator, one.
         /// </summary>
         private static readonly Dictionary<String, (String Key, String Type)[]> MergeChildren = new () {
-            { nameof(RoamingNetwork),           [ ("chargingStationOperators",          nameof(ChargingStationOperator)),
+            { nameof(RoamingNetwork),           [ (RoamingNetworkOperator.JSONProperty, nameof(RoamingNetworkOperator)),
+                                                  ("chargingStationOperators",          nameof(ChargingStationOperator)),
                                                   ("chargingStationManufacturers",      nameof(ChargingStationManufacturer)),
                                                   ("eMobilityProviders",                nameof(EMobilityProvider)),
                                                   ("gridOperators",                     nameof(GridOperator)),
@@ -278,9 +280,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "description",
             "dataSource",
             "dataLicenses",
-            "customData",
-            POIPartyKeys.SigningKeysProperty,
-            POIPartyKeys.IdentityKeysProperty
+            "customData"
         ];
 
         #endregion
@@ -466,8 +466,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 entities[entity.Key] = entity;
 
                 foreach (var (key, childType) in children)
-                    foreach (var child in (JSON[key] as JArray ?? []).OfType<JObject>())
+                {
+
+                    IEnumerable<JObject> childObjects = JSON[key] is JObject single
+                                                            ? [ single ]
+                                                            : (JSON[key] as JArray ?? []).OfType<JObject>();
+
+                    foreach (var child in childObjects)
                         Walk(childType, child["@id"]!.Value<String>()!, entity.Key, child);
+
+                }
 
             }
 
@@ -718,7 +726,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 // E.g. removed and added again by the right one: replaced as the right one has it, unless the left one changed it.
-                if (b is not null && l.Type != nameof(RoamingNetwork) && POIJSON.SameValue(target, r.Own) && SameSubtree(l, b, Left, Base))
+                if (b is not null && l.Type is not (nameof(RoamingNetwork) or nameof(RoamingNetworkOperator)) && POIJSON.SameValue(target, r.Own) && SameSubtree(l, b, Left, Base))
                 {
                     replaced.Add(key);
                     replaces.Add(RoamingNetworkChange.Remove(l.Type, l.Id));
@@ -1014,6 +1022,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Object? id = EntityType switch {
                 nameof(RoamingNetwork)                   => RoamingNetwork_Id.                 TryParse(EntityId, out var roamingNetworkId)  ? roamingNetworkId  : null,
+                nameof(RoamingNetworkOperator)           => RoamingNetworkOperator_Id.         TryParse(EntityId, out var networkOperatorId) ? networkOperatorId : null,
                 nameof(ChargingStationOperator)          => ChargingStationOperator_Id.        TryParse(EntityId, out var operatorId)        ? operatorId        : null,
                 nameof(ChargingStationManufacturer)      => ChargingStationManufacturer_Id.    TryParse(EntityId, out var manufacturerId)    ? manufacturerId    : null,
                 nameof(EMobilityProvider)                => EMobilityProvider_Id.              TryParse(EntityId, out var providerId)        ? providerId        : null,
@@ -1062,6 +1071,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => EntityType switch {
                    nameof(RoamingNetwork)                   => ChangeableNetworkProperties,
+                   nameof(RoamingNetworkOperator)           => RoamingNetworkOperatorRegistry.         ChangeableProperties,
                    nameof(ChargingStationOperator)          => ChangeableOperatorProperties,
                    nameof(ChargingPool)                     => ChangeableChargingPoolProperties,
                    nameof(ChargingStation)                  => ChangeableChargingStationProperties,

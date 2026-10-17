@@ -52,11 +52,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                   SigningKeys:   [ POIPublicKey.From(gefSigningKey)  ],   // e.g. secp256r1
                                                   IdentityKeys:  [ POIPublicKey.From(gefIdentityKey) ]);  // e.g. secp521r1
 
+            // The operator of the roaming network, who may operate other roaming networks as well.
+            var rno = new RoamingNetworkOperator(RoamingNetworkOperator_Id.Parse("GraphDefined"),
+                                                 SigningKeys:   [ POIPublicKey.From(rnoSigningKey)  ],
+                                                 IdentityKeys:  [ POIPublicKey.From(rnoIdentityKey) ]);
+
             var rn1 = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                                          DataSource:                "v1",
                                          ChargingStationOperators:  [ gef ],
-                                         SigningKeys:               [ POIPublicKey.From(rnoSigningKey)  ],
-                                         IdentityKeys:              [ POIPublicKey.From(rnoIdentityKey) ]);
+                                         Operator:                  rno);
 
             var newOperator = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*NEW"),
                                                           SigningKeys:   [ POIPublicKey.From(newSigningKey)  ],

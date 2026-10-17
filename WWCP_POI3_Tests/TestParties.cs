@@ -47,19 +47,32 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #endregion
 
 
+        #region OperatorId(NetworkId)
+
+        /// <summary>
+        /// The identification of the test operator of the given roaming network: every network has one of its own,
+        /// with keys of its own.
+        /// </summary>
+        public static RoamingNetworkOperator_Id OperatorId(RoamingNetwork_Id NetworkId)
+            => RoamingNetworkOperator_Id.Parse($"{NetworkId}-RNO");
+
+        #endregion
+
         #region Party(Network) / Party(EntityType, EntityId)
 
         /// <summary>
-        /// The roaming network operator of the given roaming network.
+        /// The roaming network operator of the given roaming network: the one it embeds, or its test operator.
         /// </summary>
         public static POIPartyId Party(RoamingNetwork Network)
-            => new (nameof(RoamingNetwork), Network.Id.ToString());
+            => Network.Operator is not null
+                   ? Network.OperatorParty
+                   : Party(Network.Id);
 
         /// <summary>
-        /// The roaming network operator of the given roaming network.
+        /// The test operator of the given roaming network.
         /// </summary>
         public static POIPartyId Party(RoamingNetwork_Id NetworkId)
-            => new (nameof(RoamingNetwork), NetworkId.ToString());
+            => new (nameof(RoamingNetworkOperator), OperatorId(NetworkId).ToString());
 
         /// <summary>
         /// A charging station operator.
@@ -120,13 +133,17 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region WithKeys(this Network)
 
         /// <summary>
-        /// The given roaming network with the test keys of its roaming network operator and of all its parties.
-        /// Its runtime status is not taken along.
+        /// The given roaming network with the test keys of its roaming network operator and of all its parties;
+        /// a network without an operator gets its test operator. Its runtime status is not taken along.
         /// </summary>
         public static RoamingNetwork WithKeys(this RoamingNetwork Network)
         {
 
-            var json = WithKeys(Network.ToJSON(), Party(Network));
+            var json = Network.ToJSON();
+
+            json[RoamingNetworkOperator.JSONProperty] = WithKeys(json[RoamingNetworkOperator.JSONProperty] as JObject ?? new JObject(new JProperty("@id",      OperatorId(Network.Id).ToString()),
+                                                                                                                                      new JProperty("created",  json["created"])),
+                                                                 Party(Network));
 
             foreach (var (array, type) in new[] { ("chargingStationOperators", nameof(ChargingStationOperator)),
                                                   ("eMobilityProviders",       nameof(EMobilityProvider)),

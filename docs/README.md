@@ -12,6 +12,7 @@ for the bytes that are hashed and signed, the [specification](../SPECIFICATION.m
 
 ```mermaid
 flowchart TD
+    RoamingNetwork --> RoamingNetworkOperator
     RoamingNetwork --> ChargingStationOperator
     RoamingNetwork --> ChargingStationManufacturer
     RoamingNetwork --> EMobilityProvider
@@ -37,6 +38,7 @@ flowchart TD
 | Entity | Embedded in, as | Owner | What it is |
 |---|---|---|---|
 | [RoamingNetwork](RoamingNetwork.md) | — (root) | roaming network operator (RNO) | One version of a roaming network with everything it embeds; carries the ETags. |
+| [RoamingNetworkOperator](RoamingNetworkOperator.md) | roaming network, `roamingNetworkOperator` | itself; neither added nor removed | The RNO, with the keys of the network: owns it, its registries, and who is a member. One may operate many networks. |
 | [ChargingStationOperator](ChargingStationOperator.md) | roaming network, `chargingStationOperators` | the operator; added and removed by the RNO | A CPO with its charging pools, tariffs and groups. |
 | [ChargingPool](ChargingPool.md) | operator, `chargingPools` | its operator | A charging location: address, opening times, facilities, grid connection, stations. |
 | [ChargingStation](ChargingStation.md) | charging pool, `chargingStations` | its operator | A charger with its EVSEs, manufacturer and model, energy status. |
@@ -63,7 +65,7 @@ status; brands, embedded on several levels, have a file of their own:
 |---|---|
 | Brands, of operators, pools, stations, EVSEs and RFID authentication modes | [Brand](Brand.md) |
 | Energy meter manufacturers, transparency software and certificates | [RoamingNetwork](RoamingNetwork.md) |
-| Signing and identity keys | [RoamingNetwork](RoamingNetwork.md), and each party: [ChargingStationOperator](ChargingStationOperator.md), [EMobilityProvider](EMobilityProvider.md), [GridOperator](GridOperator.md), [ParkingOperator](ParkingOperator.md) |
+| Signing and identity keys | [RoamingNetworkOperator](RoamingNetworkOperator.md#keys), and each party: [ChargingStationOperator](ChargingStationOperator.md), [EMobilityProvider](EMobilityProvider.md), [GridOperator](GridOperator.md), [ParkingOperator](ParkingOperator.md) |
 | Data licenses | [RoamingNetwork](RoamingNetwork.md), [ChargingStationOperator](ChargingStationOperator.md), [ChargingPool](ChargingPool.md) |
 | Logos, contact data | [ChargingStationOperator](ChargingStationOperator.md) |
 | Grid connection points and their maintainers | [GridOperator](GridOperator.md) |

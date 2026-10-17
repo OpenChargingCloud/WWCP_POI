@@ -50,7 +50,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A party of the roaming network, by the type and the identification of its entity.
     /// </summary>
-    /// <param name="EntityType">The entity type, e.g. ChargingStationOperator, or RoamingNetwork for the roaming network operator.</param>
+    /// <param name="EntityType">The entity type, e.g. ChargingStationOperator or RoamingNetworkOperator.</param>
     /// <param name="EntityId">The identification of the entity.</param>
     public readonly record struct POIPartyId(String  EntityType,
                                              String  EntityId)
@@ -99,8 +99,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <inheritdoc/>
         public override String ToString()
 
-            => EntityType == nameof(RoamingNetwork)
-                   ? $"the roaming network operator of '{EntityId}'"
+            => EntityType == nameof(RoamingNetworkOperator)
+                   ? EntityId.Length > 0
+                         ? $"the roaming network operator '{EntityId}'"
+                         : "the roaming network operator, of which this roaming network has none"
                    : $"the {EntityType} '{EntityId}'";
 
     }
@@ -114,7 +116,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// by a key the owner has in the version the change set is applied to, valid at its creation:
     /// a signing key for data and for the signing keys of a party, an identity key for its identity keys.
     /// <list type="bullet">
-    ///   <item>The roaming network operator (the keys of the roaming network) owns the roaming network itself,
+    ///   <item>The roaming network operator (the RoamingNetworkOperator it embeds) owns itself, the roaming network itself,
     ///         manufacturers, energy meter manufacturers and transparency software, and adds and removes parties:
     ///         it decides who is a member, so removing a party removes all its data with it, without its signature.</item>
     ///   <item>A charging station operator, e-mobility provider, grid operator or parking operator owns its own properties,
@@ -139,7 +141,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The entity types of parties, besides the roaming network itself.
+        /// The entity types of parties, besides the roaming network operator.
         /// </summary>
         private static readonly String[] PartyTypes = [
             nameof(ChargingStationOperator),
@@ -172,7 +174,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Party = PartyId.EntityType switch {
 
-                nameof(RoamingNetwork)           => IsThisRoamingNetwork(PartyId.EntityId) ? this : null,
+                nameof(RoamingNetworkOperator)   => Operator is not null &&
+                                                    RoamingNetworkOperator_Id.TryParse(PartyId.EntityId, out var roamingNetworkOperatorId) &&
+                                                    roamingNetworkOperatorId == Operator.Id
+                                                        ? Operator : null,
 
                 nameof(ChargingStationOperator)  => ChargingStationOperator_Id.TryParse(PartyId.EntityId, out var chargingStationOperatorId) &&
                                                     chargingStationOperators.TryGet(chargingStationOperatorId, out var chargingStationOperator)
@@ -213,6 +218,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region OperatorParty
+
+        /// <summary>
+        /// The roaming network operator as a party. For a roaming network without one,
+        /// a party nobody can sign for: everything only it may change can not be changed.
+        /// </summary>
+        public POIPartyId OperatorParty
+            => new (nameof(RoamingNetworkOperator), Operator?.Id.ToString() ?? "");
+
+        #endregion
+
         #region Parties
 
         /// <summary>
@@ -223,7 +239,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             get
             {
 
-                yield return (new POIPartyId(nameof(RoamingNetwork), Id.ToString()), this);
+                if (Operator is not null)
+                    yield return (OperatorParty, Operator);
 
                 foreach (var chargingStationOperator in chargingStationOperators)
                     yield return (new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString()), chargingStationOperator);
@@ -375,8 +392,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private (POIPartyId, POIKeyKind) SignerOf(POIPartyId PartyId)
 
-            => TryGetParty(PartyId, out var party) && party.SigningKeys.IsDefaultOrEmpty && PartyId.EntityType != nameof(RoamingNetwork)
-                   ? (new POIPartyId(nameof(RoamingNetwork), Id.ToString()), POIKeyKind.Signing)
+            => TryGetParty(PartyId, out var party) && party.SigningKeys.IsDefaultOrEmpty && PartyId.EntityType != nameof(RoamingNetworkOperator)
+                   ? (OperatorParty, POIKeyKind.Signing)
                    : (PartyIdOf(PartyId), POIKeyKind.Signing);
 
         #endregion
@@ -396,12 +413,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Owners         = null;
             ErrorResponse  = null;
 
-            var roamingNetworkOperator  = new POIPartyId(nameof(RoamingNetwork), Id.ToString());
+            var roamingNetworkOperator  = OperatorParty;
             var isProperty              = Change.Kind is not (RoamingNetworkChangeKind.Add or RoamingNetworkChangeKind.Remove);
 
             #region The roaming network itself
 
             if (Change.EntityType == nameof(RoamingNetwork))
+            {
+                Owners = [ (roamingNetworkOperator, POIKeyKind.Signing) ];
+                return true;
+            }
+
+            #endregion
+
+            #region The roaming network operator: its keys as those of every party
+
+            if (Change.EntityType == nameof(RoamingNetworkOperator))
             {
                 Owners = Change.EntityPropertyName == POIPartyKeys.SigningKeysProperty
                              ? [ (roamingNetworkOperator, POIKeyKind.Signing), (roamingNetworkOperator, POIKeyKind.Identity) ]
@@ -640,7 +667,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ErrorResponse = null;
 
-            var isParty = Change.EntityType == nameof(RoamingNetwork) || PartyTypes.Contains(Change.EntityType);
+            var isParty = Change.EntityType == nameof(RoamingNetworkOperator) || PartyTypes.Contains(Change.EntityType);
 
             if (!isParty)
                 return true;

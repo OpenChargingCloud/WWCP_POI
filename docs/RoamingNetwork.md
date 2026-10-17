@@ -6,12 +6,12 @@ they share, e.g. charging station and energy meter manufacturers and transparenc
 A version of a roaming network with everything it embeds is one immutable data set, named by its
 [ETags](README.md#etags); a change set leads to the next version.
 
-The roaming network is owned by its **roaming network operator (RNO)**, who has no entity of its own:
-the RNO is named by the network's `signingKeys` and `identityKeys`. The RNO signs changes of the network's own
-properties, adds and removes parties, and owns the registries (manufacturers, energy meter manufacturers,
-transparency software releases and certificates). Each party owns its own properties and data. There is no registry
-of brands: every charging station operator, pool, station, EVSE and RFID authentication mode embeds its own, see
-[Brand](Brand.md).
+The roaming network is owned by its **roaming network operator (RNO)**, the
+[RoamingNetworkOperator](RoamingNetworkOperator.md) it embeds as `roamingNetworkOperator`, with its keys: the
+network has none of its own. The RNO signs changes of the network's own properties, adds and removes parties, and
+owns the registries (manufacturers, energy meter manufacturers, transparency software releases and certificates).
+Each party owns its own properties and data. There is no registry of brands: every charging station operator, pool,
+station, EVSE and RFID authentication mode embeds its own, see [Brand](Brand.md).
 
 The identification is a `RoamingNetwork_Id`, any nonempty text without surrounding whitespace, compared
 case-insensitively, e.g. `rn1` or `Prod`. It names the network on a server (`~/RNs/{RN_Id}`) and in every
@@ -24,7 +24,7 @@ change set and commit (`roamingNetworkId`).
 | Admin status | `RoamingNetworkAdminStatusType`, initially `operational` |
 | Status | `RoamingNetworkStatusType`, initially `available` |
 | Embedded in | — (root) |
-| Owner | the roaming network operator (RNO), by the network's own `signingKeys` / `identityKeys` |
+| Owner | its roaming network operator (RNO), `roamingNetworkOperator`, by its `signingKeys` / `identityKeys` |
 | HTTP | `GET ~/RNs` (list of `{@id, name, description}`), `GET ~/RNs/{RN_Id}`; history under `~/RNs/{RN_Id}/history/…`, see [../README.md](../README.md#history-and-sync) |
 
 `GET ~/RNs/{RN_Id}` serves the complete network as canonical JSON, or as deterministic CBOR for
@@ -53,6 +53,7 @@ See [README.md](README.md#common-properties).
 |---|---|---|---|---|
 | `@context` | `JSONLDContext` (const) | string | — | `https://open.charging.cloud/contexts/wwcp+json/roamingNetwork`, see [below](#context). |
 | `dataLicenses` | `DataLicenses` | [DataLicense](#datalicenses)[] | update/remove | The licenses of the data, ordered by `@id` (ordinal); omitted when empty. |
+| `roamingNetworkOperator` | `Operator` | [RoamingNetworkOperator](RoamingNetworkOperator.md)? | its properties: update/remove | Its operator, with the keys of the network; omitted for a network without one, which nobody can change where only the RNO may. Neither added nor removed. |
 | `chargingStationOperators` | `ChargingStationOperators` | [ChargingStationOperator](ChargingStationOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `chargingStationManufacturers` | `ChargingStationManufacturers` | [ChargingStationManufacturer](ChargingStationManufacturer.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `eMobilityProviders` | `EMobilityProviders` | [EMobilityProvider](EMobilityProvider.md)[] | add/remove | Ordered by `@id` (ordinal). |
@@ -61,8 +62,6 @@ See [README.md](README.md#common-properties).
 | `energyMeterManufacturers` | `EnergyMeterManufacturers` | [EnergyMeterManufacturer](#energymetermanufacturers)[] | add/remove | Ordered by `@id` (ordinal). |
 | `transparencySoftware` | `TransparencySoftware` | [TransparencySoftware](#transparencysoftware)[] | add/remove | Releases, one per version of a software, ordered by `@id` (ordinal). |
 | `transparencySoftwareCertificates` | `TransparencySoftwareCertificates` | [TransparencySoftwareCertificate](#transparencysoftwarecertificates)[] | add/remove | Ordered by `@id` (ordinal). |
-| `signingKeys` | `SigningKeys` | [POIPublicKey](#signingkeys-and-identitykeys)[] | update | The RNO's keys signing its data changes, ordered by `@id`. Can not be removed. |
-| `identityKeys` | `IdentityKeys` | [POIPublicKey](#signingkeys-and-identitykeys)[] | update | The RNO's long-term keys signing changes of its identity keys, ordered by `@id`. Can not be removed. |
 
 Every collection is omitted when empty. Children are never written or read by their identifications alone:
 `TryParse` refuses `chargingStationOperatorIds`, `chargingStationManufacturerIds`, `eMobilityProviderIds`,
@@ -82,7 +81,7 @@ with the default view options ([SPECIFICATION.md](../SPECIFICATION.md#2-the-cont
 - `ChargingTariffs`, `EVSEGroups`, `ChargingStationGroups`, `ChargingPoolGroups`, `ChargingTariffGroups` — those of all
   charging station operators; `TryGet…ById` looks in the operator the identification names.
 - `ParkingGarages`, `ParkingSpaces`, `ParkingSensors`, `ParkingSpaceGroups`, `ParkingProducts` — those of all parking operators.
-- `Parties` — the RNO (`POIPartyId("RoamingNetwork", id)`) and every operator and provider, with their keys; `TryGetParty`.
+- `Parties` — the RNO (`OperatorParty`, `POIPartyId("RoamingNetworkOperator", id)`) and every operator and provider, with their keys; `TryGetParty`.
 - `Revision` — a local counter, one more per applied change set; not content.
 - Lookups: `TryGetChargingStationOperatorById`, `TryGetEMobilityProviderById`, `TryGetGridOperatorById`,
   `TryGetParkingOperatorById`, `TryGetChargingStationManufacturerById`, `TryGetEnergyMeterManufacturerById`,
@@ -116,30 +115,10 @@ Operators and pools have their own `dataLicenses`.
 
 ## signingKeys and identityKeys
 
-The public keys of the RNO (`POIPublicKey`, [source](../WWCP_POI3/DataStructures/POIPublicKey.cs); checked by
-`POIPartyKeys`). Every party has the same two arrays; see [../README.md](../README.md#change-sets) and
-[SPECIFICATION.md](../SPECIFICATION.md#41-keys-and-owners).
-
-| JSON key | Type | Description |
-|---|---|---|
-| `@id` | string | The SHA-256 COSE key thumbprint [RFC 9679] of `key`, 64 lowercase hex digits. Must match `key`. |
-| `key` | string | Canonical Base64 of the deterministic CBOR of the public COSE key; private parts are refused. |
-| `notBefore` | timestamp | Optional start of validity (UTC, to the millisecond). |
-| `notAfter` | timestamp | Optional end of validity; not before `notBefore`. |
-
-- **signingKeys** — short keys (e.g. secp256r1) signing change sets of RNO data: the network's other properties,
-  the registries, adding and removing parties, and the rotation of the `signingKeys` themselves.
-- **identityKeys** — long-term keys (e.g. secp521r1) signing changes of the RNO's `identityKeys`, of its
-  `signingKeys` when none of them can sign any more, and, for recovery, of the keys of any other party.
-- **Two identity keys at least.** Nobody can replace the RNO's identity keys once they are lost or expired: there is
-  nobody above the RNO, and no external trust configuration. An RNO should therefore name at least two identity keys
-  with different `notAfter`, one of them kept offline, and replace an identity key well before it expires. This is
-  advice, not checked.
-- Both arrays are ordered by `@id` (ordinal); a key must not be given twice, nor be both a signing and an identity key.
-- A key counts only when valid at the `createdAt` of the change set (`IsValidAt`), and only in the version the
-  change set is applied to.
-- The constructor accepts none, but a change set can only replace them with a nonempty array (`UpdateProperty`);
-  `RemoveProperty` is refused.
+A roaming network has no keys of its own: they are those of its operator, see
+[RoamingNetworkOperator](RoamingNetworkOperator.md#keys). `TryParse` refuses a network that names `signingKeys` or
+`identityKeys` itself, as a network written before there were operators did; a change set changing them on the
+network is refused as well.
 
 
 ## chargingStationOperators
@@ -261,8 +240,9 @@ A change set must be signed by the owner of each of its changes ([../README.md](
 | Change | Key of the RNO |
 |---|---|
 | `UpdateProperty`/`RemoveProperty` of the network's `name`, `description`, `dataSource`, `dataLicenses`, `customData` | signing key |
-| `UpdateProperty` of the network's `signingKeys` | signing key or identity key |
-| `UpdateProperty` of the network's `identityKeys` | identity key |
+| `UpdateProperty`/`RemoveProperty` of the RNO's own properties | signing key |
+| `UpdateProperty` of the RNO's `signingKeys` | signing key or identity key |
+| `UpdateProperty` of the RNO's `identityKeys` | identity key |
 | `Add`/`Remove` of a charging station operator, e-mobility provider, grid operator or parking operator | signing key |
 | `UpdateProperty` of the `signingKeys`/`identityKeys` of such a party (recovery; the party's own keys also count, see its file) | identity key |
 | every change of charging station manufacturers, energy meter manufacturers, transparency software releases and certificates | signing key |
@@ -285,7 +265,7 @@ var cs = rn1.CreateChangeSet([
                                                                              new ImmutableI18NString(I18NString.Create(Languages.en, "EMH metering")))),
              RoamingNetworkChange.Add           (newOperator)                       // with its keys, without children
          ]).
-         Sign(rnoSigningKey, POIPublicKey.From(rnoSigningKey).Id, COSEAlgorithm.ES256);
+         Sign(rnoSigningKey, POIPublicKey.From(rnoSigningKey).Id, COSEAlgorithm.ES256);  // a signing key of rn1.Operator
 ```
 
 

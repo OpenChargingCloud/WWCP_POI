@@ -29,12 +29,12 @@ A version of a roaming network is identified by its **content**: its JSON repres
 
 - **Included:** `@context`
   (`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork`), `@id`, `name`, `description`,
-  `dataSource`, `dataLicenses`, every embedded entity completely (operators with their pools,
+  `dataSource`, `dataLicenses`, its operator `roamingNetworkOperator`, every embedded entity completely (operators with their pools,
   stations, EVSEs, connectors, energy meters, tariffs and groups; manufacturers, e-mobility
   providers, grid operators with their grid connection points, parking operators, energy meter
   manufacturers, transparency software releases and certificates), the brands of operators, pools,
-  stations, EVSEs and RFID authentication modes, the `signingKeys` and `identityKeys` of the
-  roaming network and of its parties, `created`, `lastChange` and `customData`.
+  stations, EVSEs and RFID authentication modes, the `signingKeys` and `identityKeys` of its
+  operator and of its parties, `created`, `lastChange` and `customData`.
 - **Excluded:** `eTags`; the runtime status (admin status, status, energy status); the local
   revision counter; internal data.
 - **Order:** embedded entities in the ordinal order of their identifications; the order of
@@ -165,17 +165,19 @@ A **key** of a party is a public COSE key in its static data:
 ```
 
 A reader MUST calculate the thumbprint and refuse a key whose `@id` differs, and a key with
-private parts. The roaming network (for its operator, the RNO), charging station operators,
+private parts. The roaming network operator (RNO), charging station operators,
 e-mobility providers, grid operators and parking operators each name 1..n `signingKeys`, e.g.
 secp256r1, and 1..n `identityKeys`, e.g. secp521r1; a key is not both. A grid operator not taking
-part names neither. The `keyId` of a
+part names neither. The RNO is the `roamingNetworkOperator` the roaming network embeds, the party
+`{"entityType": "RoamingNetworkOperator", "entityId": its @id}`; the roaming network names no keys
+of its own, and a reader MUST refuse one that does. The `keyId` of a
 signature is the `@id` of the key.
 
 Every change has exactly one **owner**:
 
 | Change | Owner |
 |---|---|
-| the roaming network itself, charging station and energy meter manufacturers, transparency software releases and certificates | the RNO |
+| the RNO itself, the roaming network itself, charging station and energy meter manufacturers, transparency software releases and certificates | the RNO |
 | `Add` and `Remove` of a charging station operator, e-mobility provider, grid operator or parking operator | the RNO |
 | the other properties of such a party | the party; the RNO for a party without signing keys |
 | pools, stations, EVSEs, tariffs and groups | the charging station operator their identification names |
@@ -195,7 +197,9 @@ or one of its identity keys; for its `identityKeys` one of its identity keys. Fo
 identity key of the RNO also counts for both kinds of keys of every other party. Every signature
 MUST be by a key of a party. A party is added with at least one key of each kind, a grid operator
 also with none, and without embedded children, and keeps at least one of each once it has them. The RNO decides who is a member: removing a
-party removes everything it embeds, and needs no signature of the party.
+party removes everything it embeds, and needs no signature of the party. The RNO itself is
+neither added nor removed: a change set that does MUST be refused. A roaming network without an
+RNO can not be changed where only the RNO may.
 
 Nobody can replace the identity keys of the RNO once they are lost or expired. An RNO SHOULD name
 at least two identity keys with different `notAfter`, and SHOULD replace an identity key before it
