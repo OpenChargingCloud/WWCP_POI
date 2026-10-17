@@ -145,12 +145,13 @@ parking product ids compare case-sensitively.
   optionally a `chargingTariffId`; parking space groups name `parkingSpaceIds`. Groups may overlap and
   have admin status and status, and a `priority` (0 unless given): where groups of a member give it different
   values, the higher decides, and the same priority must not disagree.
-- **Effective members:** an EVSE, charging station or charging pool group may give its members any property of
-  theirs but their identification, name, description, what they embed and their energy meters, e.g. the connectors
-  of all EVSEs of a type, the model and the hotline of all stations of a model, the payment options of all pools of a
-  site partner, given once. The members take them at runtime: `chargingStationOperator.EffectiveChargingPools`, with
+- **Effective members:** an EVSE, charging station, charging pool or parking space group may give its members any
+  property of theirs but their identification, name, description, what they embed and their energy meters, e.g. the
+  connectors of all EVSEs of a type, the model and the hotline of all stations of a model, the payment options of all
+  pools of a site partner, the dimensions and the roof of all parking spaces of a level, given once. The members take them at runtime: `chargingStationOperator.EffectiveChargingPools`, with
   their effective stations and EVSEs, `TryGetEffectiveEVSE(id, out var evse)` and alike. A single value is the member's
-  own, else the one of its group with the highest priority; arrays are united. POI_API serves and searches them, the
+  own, else the one of its group with the highest priority; arrays are united. POI_API serves and searches them, with
+  the ETag a precondition names as `X-Stored-ETag`, the
   OCPI and DATEX II publishers publish them, their importers keep in the groups what they give; the network, its ETags
   and change sets keep the properties where they are given. See [docs/](docs/README.md#group-priority-and-effective-members).
 - **Transparency software:** releases (`TransparencySoftware`, one per version) and their certificates
@@ -204,7 +205,7 @@ a change set can manage:
 | [ParkingGarage](docs/ParkingGarage.md) | A car park with opening times, images and parking products. |
 | [ParkingSpace](docs/ParkingSpace.md) | One parking space, possibly in a garage, with its sensors and charging stations. |
 | [ParkingSensor](docs/ParkingSensor.md) | A sensor detecting whether parking spaces are occupied, named by the spaces it watches. |
-| [ParkingSpaceGroup](docs/ParkingSpaceGroup.md) | Parking spaces of one operator, e.g. a level or a zone. |
+| [ParkingSpaceGroup](docs/ParkingSpaceGroup.md) | Parking spaces of one operator, e.g. a level or a zone, with properties they take at runtime. |
 
 ## Change sets
 

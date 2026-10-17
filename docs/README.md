@@ -54,7 +54,7 @@ flowchart TD
 | [ParkingGarage](ParkingGarage.md) | parking operator, `parkingGarages` | its parking operator | A car park with opening times, images and products. |
 | [ParkingSpace](ParkingSpace.md) | parking operator, `parkingSpaces` | its parking operator | One parking space, possibly in a garage, with sensors and charging stations. |
 | [ParkingSensor](ParkingSensor.md) | parking operator, `parkingSensors` | its parking operator | A sensor detecting whether a space is occupied. |
-| [ParkingSpaceGroup](ParkingSpaceGroup.md) | parking operator, `parkingSpaceGroups` | its parking operator | Parking spaces of the operator, e.g. one level or zone. |
+| [ParkingSpaceGroup](ParkingSpaceGroup.md) | parking operator, `parkingSpaceGroups` | its parking operator | Parking spaces of the operator, e.g. one level or zone, with properties they take at runtime. |
 
 The documents for these entities also cover what they embed that is no entity of its own, i.e. that has no
 status; brands, embedded on several levels, have a file of their own:
@@ -240,14 +240,16 @@ Every group, of EVSEs, charging stations, charging pools, charging tariffs or pa
 `priority`, an integer, 0 unless given. Where groups of a member give it different values, the one with the higher
 priority decides; groups of the same member with the same priority must not give it different values that decide.
 
-EVSE, charging station and charging pool groups give their members properties: any property of an EVSE, charging
-station or charging pool but its identification, name, description, data source, custom data, what it embeds
-(stations, EVSEs) and its energy meters; an EVSE group not the `chargingTariffIds` of an EVSE either, it names a
-`chargingTariffId` of its own. The network keeps them in the group, so that e.g. the connectors and the power of a
+EVSE, charging station, charging pool and parking space groups give their members properties: any property of an
+EVSE, charging station, charging pool or parking space but its identification, name, description, data source, custom
+data, what it embeds (stations, EVSEs) and its energy meters; an EVSE group not the `chargingTariffIds` of an EVSE
+either, it names a `chargingTariffId` of its own; a parking space group not the APDS reference of a parking space. The network keeps them in the group, so that e.g. the connectors and the power of a
 thousand EVSEs of a type, or the model and the hotline of a thousand stations, are given once; the members take them
 at runtime, as the effective members of their operator (`EffectiveChargingPools`, `EffectiveChargingStations`,
 `EffectiveEVSEs`, `TryGetEffectiveChargingPool`, `TryGetEffectiveChargingStation`, `TryGetEffectiveEVSE`,
-`ChargingPoolGroupsOf`, `ChargingStationGroupsOf`, `EVSEGroupsOf`).
+`ChargingPoolGroupsOf`, `ChargingStationGroupsOf`, `EVSEGroupsOf`; of a parking operator `EffectiveParkingSpaces`,
+`TryGetEffectiveParkingSpace`, `ParkingSpaceGroupsOf`, of the roaming network `EffectiveParkingSpaces` and
+`TryGetEffectiveParkingSpaceById`).
 
 - A single value is the member's own, else the one of its group with the highest priority.
 - An array is its own united with those of all its groups; of brands, charging connectors and data licenses of the
@@ -262,14 +264,18 @@ at runtime, as the effective members of their operator (`EffectiveChargingPools`
 An operator whose groups disagree with the same priority, or make a member invalid, is refused, and so is a change
 set, already by `CreateChangeSet`. An effective member shares the runtime status of the member, and its energy meters;
 it is calculated once per version of the operator. Its `lastChange` is the latest of the member, its groups giving
-properties and what it embeds, so that a publisher sees a group's change in every member.
+properties and what it embeds, so that a publisher sees a group's change in every member; where it is other than in
+the version before, e.g. when it left a group, at least the last change of the operator, and it never goes back.
 
-POI_API serves a charging pool, a charging station and an EVSE as they are at runtime, and searches the charging pools
-so; `?view=stored` serves them as the operator embeds them, with the ETag a precondition names. The operator and the
+POI_API serves a charging pool, a charging station, an EVSE and a parking space as they are at runtime, and searches
+the charging pools so; `?view=stored` serves them as the operator embeds them, with the ETag a precondition names,
+also in the links to other pages of a list. Each of them, in either view, tells that ETag as `X-Stored-ETag` as well,
+exposed to scripts of other origins: a client reading an entity as it is at runtime makes a precondition with it
+without a second request. The operator and the
 roaming network embed the properties where they are given; so do their ETags, change sets and merges. The OCPI and
 DATEX II publishers publish the effective members; their importers keep in the groups what they give. See
-[EVSEGroup](EVSEGroup.md#properties-of-its-members), [ChargingStationGroup](ChargingStationGroup.md#properties-of-its-members)
-and [ChargingPoolGroup](ChargingPoolGroup.md#properties-of-its-members).
+[EVSEGroup](EVSEGroup.md#properties-of-its-members), [ChargingStationGroup](ChargingStationGroup.md#properties-of-its-members),
+[ChargingPoolGroup](ChargingPoolGroup.md#properties-of-its-members) and [ParkingSpaceGroup](ParkingSpaceGroup.md#properties-of-its-members).
 
 
 ### ETags

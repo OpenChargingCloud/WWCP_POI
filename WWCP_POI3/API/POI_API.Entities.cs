@@ -99,11 +99,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs                                          its parking products, as it embeds them
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs/{PP_Id}                                  a parking product of the parking operator
     ///
-    /// A charging pool, a charging station and an EVSE are served as they are at runtime, the effective ones of their
-    /// operator: with the properties their groups give them, see ChargingStationOperator.EffectiveChargingPools; a
-    /// charging pool also in ~/RNs/{RN_Id}/CPs, searched so. A charging station operator and the roaming network embed
-    /// them as they are given, with their groups. ?view=stored serves a charging pool, and what it embeds, as its
-    /// operator embeds it, with the ETag a precondition of a change set names.
+    /// A charging pool, a charging station, an EVSE and a parking space are served as they are at runtime, the effective
+    /// ones of their operator: with the properties their groups give them, see ChargingStationOperator.EffectiveChargingPools
+    /// and ParkingOperator.EffectiveParkingSpaces; a charging pool also in ~/RNs/{RN_Id}/CPs, searched so. Their operators
+    /// and the roaming network embed them as they are given, with their groups. ?view=stored serves a charging pool, and
+    /// what it embeds, or a parking space as its operator embeds it, with the ETag a precondition of a change set names,
+    /// also in the links to other pages of a list; in either view, X-Stored-ETag tells that ETag as well.
     ///
     /// Brands are embedded in what they are a brand of, and mean something of their own on every level: a charging
     /// station operator is a white-label solution for its brands, a charging pool, charging station or EVSE also
@@ -355,8 +356,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                        SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).
                                                        ToArray();
 
+                                  // The ETag a precondition names: the one of the charging pool as its operator embeds it.
+                                  var storedETag = roamingNetwork.TryGetChargingStationOperatorById(chargingPool.Id.OperatorId, out var chargingStationOperator) &&
+                                                   chargingStationOperator.TryGetChargingPool(chargingPool.Id, out var storedChargingPool)
+                                                       ? StoredETagOf(request, storedChargingPool, storedChargingPool.ToJSON)
+                                                       : null;
+
                                   if (expansions.Length == 0)
-                                      return CachedEntityResponse(request, chargingPool, chargingPool.ToJSON);
+                                      return CachedEntityResponse(request, chargingPool, chargingPool.ToJSON, StoredETag: storedETag);
 
                                   // An expanded view depends on the version of the pool and on the one of its grid connection point.
                                   var json = chargingPool.ToJSON();
@@ -383,7 +390,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                   }
 
-                                  return EntityResponse(request, json);
+                                  return EntityResponse(request, FormatOf(request), POIRepresentation.Of(json, FormatOf(request)), StoredETag: storedETag);
 
                               });
 
@@ -392,8 +399,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}
 
             AddEntityHandlers(chargingStationPath,
-                              request => TryGetRequestedChargingStation(request, out var chargingStation, out var errorResponse)
-                                             ? CachedEntityResponse(request, chargingStation, chargingStation.ToJSON)
+                              request => TryGetRequestedChargingStation         (request, out var chargingStation,         out var errorResponse) &&
+                                         TryGetRequestedChargingStationOperator (request, out var chargingStationOperator, out errorResponse)
+                                             ? CachedEntityResponse(request,
+                                                                    chargingStation,
+                                                                    chargingStation.ToJSON,
+                                                                    StoredETag: chargingStationOperator.TryGetChargingStation(chargingStation.Id, out var stored)
+                                                                                    ? StoredETagOf(request, stored, stored.ToJSON)
+                                                                                    : null)
                                              : errorResponse);
 
             #endregion
@@ -412,15 +425,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 RequestedParkingSpacesOfChargingStation,
                 ParkingSpace_Id.TryParse,
                 "parking space",
-                parkingSpace => parkingSpace.ToJSON());
+                parkingSpace => parkingSpace.ToJSON(),
+                (request, parkingSpace) => TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out _) &&
+                                           roamingNetwork.TryGetParkingSpaceById(parkingSpace.Id, out var stored)
+                                               ? stored
+                                               : null);
 
             #endregion
 
             #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}
 
             AddEntityHandlers(chargingStationPath + "/EVSEs/{evseId}",
-                              request => TryGetRequestedEVSE(request, out var evse, out var errorResponse)
-                                             ? CachedEntityResponse(request, evse, evse.ToJSON)
+                              request => TryGetRequestedEVSE                    (request, out var evse,                    out var errorResponse) &&
+                                         TryGetRequestedChargingStationOperator (request, out var chargingStationOperator, out errorResponse)
+                                             ? CachedEntityResponse(request,
+                                                                    evse,
+                                                                    evse.ToJSON,
+                                                                    StoredETag: chargingStationOperator.TryGetEVSE(evse.Id, out var stored)
+                                                                                    ? StoredETagOf(request, stored, stored.ToJSON)
+                                                                                    : null)
                                              : errorResponse);
 
             #endregion
@@ -599,11 +622,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 parkingGarage => parkingGarage.ToJSON());
 
+            // As they are at runtime, with the properties their groups give them; with ?view=stored as they are given.
             AddEmbeddedListHandlers<ParkingSpace_Id, ParkingSpace>(
                 parkingOperatorPath + "/PSs",
-                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
-                               ? (parkingOperator.ParkingSpaces, null)
-                               : (null, errorResponse),
+                RequestedParkingSpacesOfParkingOperator,
                 parkingSpace => parkingSpace.ToJSON());
 
             AddEmbeddedListHandlers<ParkingSpaceGroup_Id, ParkingSpaceGroup>(
@@ -642,12 +664,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddEmbeddedEntityHandlers<ParkingSpace_Id, ParkingSpace>(
                 parkingOperatorPath + "/PSs/{parkingSpaceId}",
-                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
-                               ? (parkingOperator.ParkingSpaces, null)
-                               : (null, errorResponse),
+                RequestedParkingSpacesOfParkingOperator,
                 ParkingSpace_Id.TryParse,
                 "parking space",
-                parkingSpace => parkingSpace.ToJSON());
+                parkingSpace => parkingSpace.ToJSON(),
+                (request, parkingSpace) => TryGetRequestedParkingOperator(request, out var parkingOperator, out _) &&
+                                           parkingOperator.TryGetParkingSpace(parkingSpace.Id, out var stored)
+                                               ? stored
+                                               : null);
 
             AddEmbeddedEntityHandlers<ParkingSpaceGroup_Id, ParkingSpaceGroup>(
                 parkingOperatorPath + "/PSGs/{parkingSpaceGroupId}",
@@ -782,8 +806,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      if (collection is null)
                                          return errorResponse!;
 
-                                     if (!TryParseListQuery(request, [], out var query, out errorResponse))
+                                     // The view in the links to other pages as well.
+                                     if (!TryGetStoredView(request, out var stored, out errorResponse) ||
+                                         !TryParseListQuery(request, stored ? [ ("view", StoredView) ] : [], out var query, out errorResponse))
+                                     {
                                          return errorResponse;
+                                     }
 
                                      // In the natural order of their identifications, not in the one their entity embeds them in.
                                      return QueryResponse<TEntity>(request,
@@ -819,7 +847,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                              Func<HTTPRequest, (POICollection<TId, TEntity>? Collection, HTTPResponse? ErrorResponse)>  Collection,
                                                              TryParseIdDelegate<TId>                                                           TryParseId,
                                                              String                                                                            Description,
-                                                             Func<TEntity, JObject>                                                            ToJSON)
+                                                             Func<TEntity, JObject>                                                            ToJSON,
+                                                             Func<HTTPRequest, TEntity, TEntity?>?                                             StoredOf   = null)
 
             where TId     : notnull
             where TEntity : class
@@ -837,9 +866,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      if (!TryParseId(text, out var id))
                                          return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Invalid {Description} identification '{text}'!");
 
-                                     return collection.TryGet(id, out var child)
-                                                ? CachedEntityResponse(request, child, () => ToJSON(child))
-                                                : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The {Description} '{id}' is unknown here!");
+                                     if (!collection.TryGet(id, out var child))
+                                         return EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The {Description} '{id}' is unknown here!");
+
+                                     // An entity served as it is at runtime tells the ETag of its stored representation as well.
+                                     return CachedEntityResponse(request,
+                                                                 child,
+                                                                 () => ToJSON(child),
+                                                                 StoredETag: StoredOf?.Invoke(request, child) is TEntity stored
+                                                                                 ? StoredETagOf(request, stored, () => ToJSON(stored))
+                                                                                 : null);
 
                                  });
 
@@ -965,6 +1001,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private static) TryGetStoredView               (Request, out Stored,                               out ErrorResponse)
+
+        /// <summary>
+        /// Whether the request asks for ?view=stored: charging pools, charging stations, EVSEs and parking spaces as they
+        /// are given, not as they are at runtime with the properties their groups give them. Any other view is refused.
+        /// </summary>
+        private static Boolean TryGetStoredView(HTTPRequest                             Request,
+                                                out Boolean                             Stored,
+                                                [NotNullWhen(false)] out HTTPResponse?  ErrorResponse)
+        {
+
+            // Every part of every parameter of its name: a list, separated by commas or given more than once.
+            var views = Request.QueryString.GetStrings("view").
+                                SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).
+                                Distinct().
+                                ToArray();
+
+            foreach (var view in views)
+                if (view != StoredView)
+                {
+                    Stored         = false;
+                    ErrorResponse  = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Unknown view '{view}'; a charging pool, charging station, EVSE or parking space has only the view '{StoredView}'!");
+                    return false;
+                }
+
+            Stored         = views.Length > 0;
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
         #region (private) TryGetRequestedChargingPool           (Request, out ChargingPool,                         out ErrorResponse)
 
         /// <summary>
@@ -988,20 +1057,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            // Every part of every parameter of its name: a list, separated by commas or given more than once.
-            var views = Request.QueryString.GetStrings("view").
-                                SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).
-                                Distinct().
-                                ToArray();
+            if (!TryGetStoredView(Request, out var stored, out ErrorResponse))
+                return false;
 
-            foreach (var view in views)
-                if (view != StoredView)
-                {
-                    ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Unknown view '{view}'; a charging pool, charging station or EVSE has only the view '{StoredView}'!");
-                    return false;
-                }
-
-            if (!(views.Length > 0
+            if (!(stored
                       ? chargingStationOperator.TryGetChargingPool         (chargingPoolId, out ChargingPool)
                       : chargingStationOperator.TryGetEffectiveChargingPool(chargingPoolId, out ChargingPool)))
             {
@@ -1084,21 +1143,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private (POICollection<ParkingSpace_Id, ParkingSpace>? Collection, HTTPResponse? ErrorResponse) RequestedParkingSpacesOfChargingStation(HTTPRequest Request)
         {
 
-            if (!TryGetRequestedRoamingNetwork(Request, out var roamingNetwork, out var errorResponse) ||
-                !TryGetRequestedChargingStation(Request, out var chargingStation, out errorResponse))
+            if (!TryGetRequestedRoamingNetwork (Request, out var roamingNetwork,  out var errorResponse) ||
+                !TryGetRequestedChargingStation(Request, out var chargingStation, out errorResponse)     ||
+                !TryGetStoredView              (Request, out var stored,          out errorResponse))
             {
                 return (null, errorResponse);
             }
 
+            // As they are at runtime, with the properties their groups give them; with ?view=stored as they are given.
             return (new POICollection<ParkingSpace_Id, ParkingSpace>(
                         chargingStation.ParkingSpaceIds.
-                                        Select(parkingSpaceId => roamingNetwork.TryGetParkingSpaceById(parkingSpaceId, out var parkingSpace) ? parkingSpace : null).
+                                        Select(parkingSpaceId => (stored
+                                                                      ? roamingNetwork.TryGetParkingSpaceById         (parkingSpaceId, out var parkingSpace)
+                                                                      : roamingNetwork.TryGetEffectiveParkingSpaceById(parkingSpaceId, out parkingSpace))
+                                                                      ? parkingSpace
+                                                                      : null).
                                         OfType<ParkingSpace>(),
                         parkingSpace => parkingSpace.Id,
                         "parking space",
                         $"the charging station '{chargingStation.Id}'"
                     ),
                     null);
+
+        }
+
+        #endregion
+
+        #region (private) RequestedParkingSpacesOfParkingOperator(Request)
+
+        /// <summary>
+        /// The parking spaces of the requested parking operator as they are at runtime, with the properties their groups
+        /// give them; with ?view=stored as it embeds them; or why there are none.
+        /// </summary>
+        private (POICollection<ParkingSpace_Id, ParkingSpace>? Collection, HTTPResponse? ErrorResponse) RequestedParkingSpacesOfParkingOperator(HTTPRequest Request)
+        {
+
+            if (!TryGetRequestedParkingOperator(Request, out var parkingOperator, out var errorResponse) ||
+                !TryGetStoredView              (Request, out var stored,          out errorResponse))
+            {
+                return (null, errorResponse);
+            }
+
+            return (stored ? parkingOperator.ParkingSpaces : parkingOperator.EffectiveParkingSpaces, null);
 
         }
 
@@ -1273,6 +1359,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private)        StoredETagOf          (Request, Stored, JSON)
+
+        /// <summary>
+        /// The HTTP ETag of the given entity as its parent embeds it, in the format the request prefers: the one a
+        /// precondition of a change set names, also of an entity served as it is at runtime. Calculated once per version.
+        /// </summary>
+        private String StoredETagOf(HTTPRequest   Request,
+                                    Object        Stored,
+                                    Func<JToken>  JSON)
+        {
+
+            var format = FormatOf(Request);
+
+            return $"\"{representationCache.GetValue(Stored, _ => new Representations()).
+                                             GetOrAdd("", format, () => POIRepresentation.Of(JSON(), format)).
+                                             ETag.ToString(ETagDigestEncoding.HEX)}\"";
+
+        }
+
+        #endregion
+
         #region (private static) FormatOf              (Request)
 
         /// <summary>
@@ -1293,10 +1400,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// calculated once per version, view and format.
         /// </summary>
         /// <param name="View">The view of the entity, e.g. without its charging pools; its whole representation by default.</param>
+        /// <param name="StoredETag">The ETag of the stored representation of the entity, e.g. of a charging pool served as it is at runtime: X-Stored-ETag.</param>
         private HTTPResponse CachedEntityResponse(HTTPRequest   Request,
                                                   Object        Version,
                                                   Func<JToken>  JSON,
-                                                  String        View   = "")
+                                                  String        View         = "",
+                                                  String?       StoredETag   = null)
         {
 
             var format = FormatOf(Request);
@@ -1304,7 +1413,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return EntityResponse(Request,
                                   format,
                                   representationCache.GetValue(Version, _ => new Representations()).
-                                                      GetOrAdd(View, format, () => POIRepresentation.Of(JSON(), format)));
+                                                      GetOrAdd(View, format, () => POIRepresentation.Of(JSON(), format)),
+                                  StoredETag: StoredETag);
 
         }
 
@@ -1411,7 +1521,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static HTTPResponse EntityResponse(HTTPRequest                    Request,
                                                    ETagFormat                     Format,
                                                    POIRepresentation              Representation,
-                                                   Action<HTTPResponse.Builder>?  Headers   = null)
+                                                   Action<HTTPResponse.Builder>?  Headers      = null,
+                                                   String?                        StoredETag   = null)
         {
 
             var eTag         = $"\"{Representation.ETag.ToString(ETagDigestEncoding.HEX)}\"";
@@ -1438,10 +1549,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Headers?.Invoke(response);
 
+            if (StoredETag is not null)
+                response.Set("X-Stored-ETag", StoredETag);
+
             // Not CORS-safelisted response headers: scripts of other origins see them only when exposed.
-            response.Set("Access-Control-Expose-Headers", Headers is null
-                                                              ? "ETag"
-                                                              : "ETag, X-Total-Count, X-Filtered-Count, Link");
+            response.Set("Access-Control-Expose-Headers", Headers is not null  ? "ETag, X-Total-Count, X-Filtered-Count, Link"
+                                                        : StoredETag is not null ? "ETag, X-Stored-ETag"
+                                                        : "ETag");
 
             return response.AsImmutable;
 

@@ -113,7 +113,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ];
 
         /// <summary>
-        /// The properties of a parking space group a change set can update or remove.
+        /// The properties of a parking space group a change set can update or remove: also those of a parking space it
+        /// gives its members, all but its identification, name, description, data source, custom data and APDS reference.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableParkingSpaceGroupProperties = [
             "name",
@@ -122,7 +123,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "parkingSpaceIds",
             "parkingProductIds",
             "priority",
-            "customData"
+            "customData",
+            "geoLocation",
+            "parkingGarageId",
+            "parkingSensorIds",
+            "chargingStationIds",
+            "parkingRestrictions",
+            "euVehicleCategories",
+            "physicalReference",
+            "vehicleTypes",
+            "maxVehicleWeight",
+            "maxVehicleHeight",
+            "maxVehicleLength",
+            "maxVehicleWidth",
+            "length",
+            "width",
+            "evsePosition",
+            "direction",
+            "surface",
+            "slope",
+            "timeLimit",
+            "restrictedToVehicleTypes",
+            "driveThrough",
+            "reservationRequired",
+            "roofed",
+            "illuminated",
+            "refrigerationOutlet",
+            "dangerousGoodsAllowed",
+            "protectedArea",
+            "standards",
+            "images"
         ];
 
         /// <summary>

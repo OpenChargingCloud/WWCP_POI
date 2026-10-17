@@ -125,7 +125,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                                     EVSEGroups:             [ new EVSEGroup(EVSEGroup_Id.Parse("DE*GEF*EG1"),
                                                                                             EVSEIds:   [ EVSE_Id.Parse("DE*GEF*E1*1") ],
                                                                                             MaxPower:  Watt.FromW(22000),
-                                                                                            Created:   Created) ]) ]).WithKeys();
+                                                                                            Created:   Created) ]) ],
+                   ParkingOperators:          [ new ParkingOperator(ParkingOperator_Id.Parse("DE*PAR"),
+                                                                    Created:             Created,
+                                                                    ParkingSpaces:       [ new ParkingSpace(ParkingSpace_Id.Parse("space-1"), Created: Created) ],
+                                                                    ParkingSpaceGroups:  [ new ParkingSpaceGroup(ParkingSpaceGroup_Id.Parse("level-1"),
+                                                                                                                 ParkingSpaceIds:  [ ParkingSpace_Id.Parse("space-1") ],
+                                                                                                                 Roofed:           true,
+                                                                                                                 Created:          Created) ]) ]).WithKeys();
 
         #endregion
 
@@ -147,6 +154,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                         : null);
 
         }
+
+        #endregion
+
+        #region (static) HeaderOf(Response, Name)
+
+        private static String? HeaderOf(HttpResponseMessage Response, String Name)
+
+            => Response.Headers.TryGetValues(Name, out var values)
+                   ? String.Join(", ", values)
+                   : null;
 
         #endregion
 
@@ -174,8 +191,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
             var (_,          _,              storedBrands)  = await Get(CS + "/Brands?view=stored");
             var (unknown,    _,              _)             = await Get(CP + "?view=effective");
             var (_,          _,              found)         = await Get("RNs/rn1/CPs?match=424242");
-            var (_,          _,              evseJSON)      = await Get(CS + "/EVSEs/DE*GEF*E1*1");
-            var (_,          _,              storedEVSE)    = await Get(CS + "/EVSEs/DE*GEF*E1*1?view=stored");
+            var (evse,       _,              evseJSON)      = await Get(CS + "/EVSEs/DE*GEF*E1*1");
+            var (storedE,    _,              storedEVSE)    = await Get(CS + "/EVSEs/DE*GEF*E1*1?view=stored");
+            var (space,      _,              spaceJSON)     = await Get("RNs/rn1/POs/DE*PAR/PSs/space-1");
+            var (storedS,    _,              storedSpace)   = await Get("RNs/rn1/POs/DE*PAR/PSs/space-1?view=stored");
+            var (_,          _,              spaces)        = await Get("RNs/rn1/POs/DE*PAR/PSs");
+            var (pagedS,     _,              _)             = await Get("RNs/rn1/POs/DE*PAR/PSs?view=stored&limit=1&offset=1");
 
             history!.Head.RoamingNetwork.TryGetEntityETag(nameof(ChargingStation), S1.ToString(), out var eTag);
 
@@ -204,6 +225,20 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(evseJSON!["maxPower"]!.Value<Int32>(),                             Is.EqualTo(22000));
                 Assert.That(stationJSON["EVSEs"]![0]!["maxPower"]!.Value<Int32>(),             Is.EqualTo(22000));
                 Assert.That(storedEVSE!["maxPower"],                                           Is.Null);
+
+                // The ETag a precondition names, also when served as it is at runtime.
+                Assert.That(station.Headers.ETag!.ToString(),                                  Is.Not.EqualTo(stored.Headers.ETag!.ToString()));
+                Assert.That(HeaderOf(station, "X-Stored-ETag"),                                Is.EqualTo(stored.Headers.ETag!.ToString()));
+                Assert.That(HeaderOf(stored,  "X-Stored-ETag"),                                Is.EqualTo(stored.Headers.ETag!.ToString()));
+                Assert.That(HeaderOf(station, "Access-Control-Expose-Headers"),                Is.EqualTo("ETag, X-Stored-ETag"));
+                Assert.That(HeaderOf(evse,    "X-Stored-ETag"),                                Is.EqualTo(storedE.Headers.ETag!.ToString()));
+
+                // Parking spaces as well, of their parking operator and their lists.
+                Assert.That(spaceJSON!["roofed"]!.Value<Boolean>(),                            Is.True);
+                Assert.That(storedSpace!["roofed"],                                            Is.Null);
+                Assert.That(spaces!.Single()["roofed"]!.Value<Boolean>(),                      Is.True);
+                Assert.That(HeaderOf(space,   "X-Stored-ETag"),                                Is.EqualTo(storedS.Headers.ETag!.ToString()));
+                Assert.That(HeaderOf(pagedS,  "Link"),                                         Is.EqualTo("</RNs/rn1/POs/DE*PAR/PSs?view=stored&limit=1>; rel=\"prev\""));
 
                 // Found by what its group gives it.
                 Assert.That(found!.Single()["@id"]!.Value<String>(),                           Is.EqualTo("DE*GEF*P1"));

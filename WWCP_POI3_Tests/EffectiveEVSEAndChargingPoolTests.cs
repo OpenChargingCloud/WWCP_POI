@@ -282,7 +282,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             // The second EVSE leaves the group of 22 kW EVSEs: it is as it is given, but changed now.
             Assert.That(history.Commit(rn1.CreateSignedChangeSet([
-                            RoamingNetworkChange.UpdateProperty(ac22!, "EVSEIds", null, new JArray(E1.ToString(), E3.ToString()))
+                            RoamingNetworkChange.UpdateProperty(ac22!, "EVSEIds",    null, new JArray(E1.ToString(), E3.ToString())),
+                            // A further change of the same change set: the operator is read again, the last change stays.
+                            RoamingNetworkChange.UpdateProperty(ac22!, "maxVoltage", null, 400)
                         ], CreatedAt: T0)).IsCommitted);
 
             var gef2 = GEFOf(history.Head.RoamingNetwork);

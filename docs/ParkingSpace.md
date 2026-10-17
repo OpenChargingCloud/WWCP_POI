@@ -27,6 +27,11 @@ with all it says; the charging stations naming it go on naming it.
 | Owner | the operator embedding it (signing key) |
 | HTTP | `GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs/{PS_Id}`; embedded in its parking operator, `GET ~/RNs/{RN_Id}/POs/{PO_Id}`, and listed by `GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs`; one of a charging station operator embedded in it, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}`. Either below the charging stations naming it, `GET …/CSs/{CS_Id}/PSs[/{PS_Id}]` |
 
+A [ParkingSpaceGroup](ParkingSpaceGroup.md) of its parking operator may give it most of the properties below, so that a
+space has only few of its own: at runtime it takes them, as the effective parking space of its parking operator. See
+[properties of its members](ParkingSpaceGroup.md#properties-of-its-members). POI_API serves the effective parking space;
+`?view=stored` the space as it is given. The parking spaces of charging station operators have no groups.
+
 
 ## Common properties
 

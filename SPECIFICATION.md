@@ -45,8 +45,8 @@ A version of a roaming network is identified by its **content**: its JSON repres
 - **Absent values** are left out. Some arrays are written also when empty, as empty means
   something there (e.g. `energySources: []`, unknown); an implementation MUST keep arrays as it
   read them.
-- **Properties given by groups** are part of the content where they are given: an EVSE, charging station
-  or charging pool group may give its members their properties, which they take at runtime only (the
+- **Properties given by groups** are part of the content where they are given: an EVSE, charging station,
+  charging pool or parking space group may give its members their properties, which they take at runtime only (the
   *effective* members; a single value is the member's own, else the one of its group with the highest
   `priority`, 0 unless given; arrays are united). The content, the ETags of the network and of its
   entities, change sets and merges know them only in the group. A version whose groups of one member give
@@ -101,7 +101,8 @@ entity MUST still have for the change set to apply, or to be rebased onto anothe
 entity is the one of its representation as the roaming network embeds it, with everything it embeds: over
 its canonical JSON (section 1), or the canonical CBOR of its keys and values, with the hash algorithm the
 ETag names; the HTTP `ETag` an entity is served with as it is given (POI_API: `?view=stored` for charging
-pools, stations and EVSEs, which it serves with the properties their groups give them by default). The entity
+pools, stations, EVSEs and parking spaces, which it serves with the properties their groups give them by
+default, telling this ETag as `X-Stored-ETag` as well). The entity
 is found by its type and identification, compared as the type compares it. A change set whose preconditions
 do not all hold in the version it is applied to MUST be refused; a rebased change set keeps them. They hold
 in a merge as well (section 5.3): a change set committed for a version older than a tip it will be merged

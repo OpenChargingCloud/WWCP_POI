@@ -253,8 +253,20 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                     Assert.That(response.Content.Headers.ContentType?.MediaType,                Is.EqualTo("application/json"), path);
                     Assert.That(HeaderOf(response, "ETag"),                                     Is.EqualTo(ETagOf("json", content)), path);
                     Assert.That(HeaderOf(response, "Access-Control-Allow-Origin"),              Is.EqualTo("*"), path);
-                    Assert.That(HeaderOf(response, "Access-Control-Expose-Headers"),            Is.EqualTo("ETag"), path);
                     Assert.That(ParseJSON((content))["@id"]!.Value<String>(),  Is.EqualTo(id), path);
+
+                    // A charging pool, station or EVSE, served as it is at runtime, tells the ETag of its stored representation
+                    // as well: without groups giving it something, the same.
+                    if (path is CP or CS or EV)
+                    {
+                        Assert.That(HeaderOf(response, "Access-Control-Expose-Headers"),        Is.EqualTo("ETag, X-Stored-ETag"), path);
+                        Assert.That(HeaderOf(response, "X-Stored-ETag"),                        Is.EqualTo(HeaderOf(response, "ETag")), path);
+                    }
+                    else
+                    {
+                        Assert.That(HeaderOf(response, "Access-Control-Expose-Headers"),        Is.EqualTo("ETag"), path);
+                        Assert.That(HeaderOf(response, "X-Stored-ETag"),                        Is.Null, path);
+                    }
                 }
 
             }

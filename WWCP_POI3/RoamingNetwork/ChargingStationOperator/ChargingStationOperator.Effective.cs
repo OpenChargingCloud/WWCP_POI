@@ -81,6 +81,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private Lazy<POICollection<ChargingPool_Id, ChargingPool>>        effectiveChargingPools;
 
+        /// <summary>
+        /// The last changes effective members have at least, as StampChangedEffective(…) found them: kept by the next version
+        /// while they are the same.
+        /// </summary>
+        private ChangedMembers                                              effectiveFloors   = new ([], [], []);
+
         #endregion
 
         #region Properties
@@ -239,12 +245,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) CalculateEffective(Changed = null)
 
         /// <summary>
-        /// The members that are other than in the version before, and the last change they have at least: the one of the operator.
+        /// The last change members have at least: the one of the operator, where they are other than in the version before;
+        /// the one they had in it, where they are the same.
         /// </summary>
-        private sealed record ChangedMembers(HashSet<EVSE_Id>             EVSEs,
-                                             HashSet<ChargingStation_Id>  ChargingStations,
-                                             HashSet<ChargingPool_Id>     ChargingPools,
-                                             DateTimeOffset               LastChange);
+        private sealed record ChangedMembers(Dictionary<EVSE_Id,            DateTimeOffset>  EVSEs,
+                                             Dictionary<ChargingStation_Id, DateTimeOffset>  ChargingStations,
+                                             Dictionary<ChargingPool_Id,    DateTimeOffset>  ChargingPools);
 
         /// <summary>
         /// The effective EVSEs, charging stations and charging pools differing from the given ones, by their identifications;
@@ -293,12 +299,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                TariffOf(member, chargingStationTariffGroupsOf.GetValueOrDefault(chargingStation.Id), chargingStationGroup => chargingStationGroup.ChargingTariffId, JSONOf) ??
                                                TariffOf(member, chargingPoolTariffGroupsOf.   GetValueOrDefault(chargingPool.Id),    chargingPoolGroup    => chargingPoolGroup.   ChargingTariffId, JSONOf);
 
-                        var changed    = Changed?.EVSEs.Contains(evse.Id) == true;
+                        DateTimeOffset? atLeast = Changed?.EVSEs.TryGetValue(evse.Id, out var floor) == true ? floor : null;
 
-                        if (!hasGroups && tariff is null && !changed)
+                        if (!hasGroups && tariff is null && !atLeast.HasValue)
                             continue;
 
-                        evses.Add(evse.Id, Effective(evse, new POIGroupValues<EVSEGroup>(member, groups ?? [], JSONOf), tariff, changed ? Changed!.LastChange : null));
+                        evses.Add(evse.Id, Effective(evse, new POIGroupValues<EVSEGroup>(member, groups ?? [], JSONOf), tariff, atLeast));
 
                     }
                 }
@@ -316,16 +322,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var hasGroups = chargingStationGroupsOf.TryGetValue(chargingStation.Id, out var groups);
 
-                var changed   = Changed?.ChargingStations.Contains(chargingStation.Id) == true;
+                DateTimeOffset? atLeast = Changed?.ChargingStations.TryGetValue(chargingStation.Id, out var floor) == true ? floor : null;
 
-                if (!hasGroups && !changed && !chargingStation.EVSEs.Any(evse => evses.ContainsKey(evse.Id)))
+                if (!hasGroups && !atLeast.HasValue && !chargingStation.EVSEs.Any(evse => evses.ContainsKey(evse.Id)))
                     continue;
 
                 chargingStations.Add(chargingStation.Id,
                                      Effective(chargingStation,
                                                new POIGroupValues<ChargingStationGroup>($"the charging station '{chargingStation.Id}'", groups ?? [], JSONOf),
                                                [.. chargingStation.EVSEs.Select(evse => evses.TryGetValue(evse.Id, out var effectiveEVSE) ? effectiveEVSE : evse)],
-                                               changed ? Changed!.LastChange : null));
+                                               atLeast));
 
             }
 
@@ -341,16 +347,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var hasGroups = chargingPoolGroupsOf.TryGetValue(chargingPool.Id, out var groups);
 
-                var changed   = Changed?.ChargingPools.Contains(chargingPool.Id) == true;
+                DateTimeOffset? atLeast = Changed?.ChargingPools.TryGetValue(chargingPool.Id, out var floor) == true ? floor : null;
 
-                if (!hasGroups && !changed && !chargingPool.ChargingStations.Any(chargingStation => chargingStations.ContainsKey(chargingStation.Id)))
+                if (!hasGroups && !atLeast.HasValue && !chargingPool.ChargingStations.Any(chargingStation => chargingStations.ContainsKey(chargingStation.Id)))
                     continue;
 
                 chargingPools.Add(chargingPool.Id,
                                   Effective(chargingPool,
                                             new POIGroupValues<ChargingPoolGroup>($"the charging pool '{chargingPool.Id}'", groups ?? [], JSONOf),
                                             [.. chargingPool.ChargingStations.Select(chargingStation => chargingStations.TryGetValue(chargingStation.Id, out var effectiveChargingStation) ? effectiveChargingStation : chargingStation)],
-                                            changed ? Changed!.LastChange : null));
+                                            atLeast));
 
             }
 
@@ -380,7 +386,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Calculate the effective members again where they are other than in the given previous version of this operator,
         /// with at least the last change of this operator: so a group that stops giving a member something, or a member
-        /// that leaves a group, changes its last change as well, not only its content.
+        /// that leaves a group, changes its last change as well, not only its content; and where they are the same, with at
+        /// least the last change they had in it, e.g. after an earlier change of the same change set: it never goes back.
         /// </summary>
         private void StampChangedEffective(ChargingStationOperator Previous)
         {
@@ -396,35 +403,67 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return JToken.DeepEquals(Current, Before);
             }
 
-            var evses             = new HashSet<EVSE_Id>();
-            var chargingStations  = new HashSet<ChargingStation_Id>();
-            var chargingPools     = new HashSet<ChargingPool_Id>();
+            // Other than before: at least the last change of the operator; the same: at least the one it had.
+            DateTimeOffset? FloorOf(AEntity Current, AEntity Before, String? Embedded)
 
-            foreach (var evseId in effectiveEVSEs.Keys.Concat(Previous.effectiveEVSEs.Keys).Distinct())
+                => !Same(Current.ToJSONOf(), Before.ToJSONOf(), Embedded)  ? LastChangeDate
+                   : Current.LastChangeDate < Before.LastChangeDate        ? Before.LastChangeDate
+                   : null;
+
+            #region Only where something may be other: the members of groups that changed, and those having a floor before
+
+            // A member whose own representation changed has the last change of the change set anyway: only its groups
+            // can change it without a change of its own, or the floor it had keep it.
+            var evseCandidates             = new HashSet<EVSE_Id>           (Previous.effectiveFloors.EVSEs.Keys);
+            var chargingStationCandidates  = new HashSet<ChargingStation_Id>(Previous.effectiveFloors.ChargingStations.Keys);
+            var chargingPoolCandidates     = new HashSet<ChargingPool_Id>   (Previous.effectiveFloors.ChargingPools.Keys);
+
+            evseCandidates.           UnionWith(MembersOfChangedGroups(EVSEGroups,            Previous.EVSEGroups,            group => group.Id, group => group.EVSEIds));
+            chargingStationCandidates.UnionWith(MembersOfChangedGroups(ChargingStationGroups, Previous.ChargingStationGroups, group => group.Id, group => group.ChargingStationIds));
+            chargingPoolCandidates.   UnionWith(MembersOfChangedGroups(ChargingPoolGroups,    Previous.ChargingPoolGroups,    group => group.Id, group => group.ChargingPoolIds));
+
+            // The tariff of a charging station or charging pool group is the one of their EVSEs.
+            foreach (var chargingPoolId in MembersOfChangedGroups(ChargingPoolGroups, Previous.ChargingPoolGroups, group => group.Id, group => group.ChargingPoolIds, group => group.ChargingTariffId.HasValue))
+                if (TryGetChargingPool(chargingPoolId, out var chargingPool))
+                    evseCandidates.UnionWith(chargingPool.EVSEs.Select(evse => evse.Id));
+
+            foreach (var chargingStationId in MembersOfChangedGroups(ChargingStationGroups, Previous.ChargingStationGroups, group => group.Id, group => group.ChargingStationIds, group => group.ChargingTariffId.HasValue))
+                if (TryGetChargingStation(chargingStationId, out var chargingStation))
+                    evseCandidates.UnionWith(chargingStation.EVSEs.Select(evse => evse.Id));
+
+            #endregion
+
+            var evses             = new Dictionary<EVSE_Id,            DateTimeOffset>();
+            var chargingStations  = new Dictionary<ChargingStation_Id, DateTimeOffset>();
+            var chargingPools     = new Dictionary<ChargingPool_Id,    DateTimeOffset>();
+
+            foreach (var evseId in evseCandidates)
                 if (TryGetEVSE(evseId, out var evse) && Previous.TryGetEVSE(evseId, out var previousEVSE) &&
-                    !Same(EffectiveEVSE(evse).ToJSON(), Previous.EffectiveEVSE(previousEVSE).ToJSON(), null))
+                    FloorOf(new (EffectiveEVSE(evse)), new (Previous.EffectiveEVSE(previousEVSE)), null) is DateTimeOffset floor)
                 {
-                    evses.Add(evse.Id);
+                    evses.Add(evse.Id, floor);
                 }
 
-            foreach (var chargingStationId in effectiveChargingStations.Keys.Concat(Previous.effectiveChargingStations.Keys).Distinct())
+            foreach (var chargingStationId in chargingStationCandidates)
                 if (TryGetChargingStation(chargingStationId, out var chargingStation) && Previous.TryGetChargingStation(chargingStationId, out var previousChargingStation) &&
-                    !Same(EffectiveChargingStation(chargingStation).ToJSON(), Previous.EffectiveChargingStation(previousChargingStation).ToJSON(), "EVSEs"))
+                    FloorOf(new (EffectiveChargingStation(chargingStation)), new (Previous.EffectiveChargingStation(previousChargingStation)), "EVSEs") is DateTimeOffset floor)
                 {
-                    chargingStations.Add(chargingStation.Id);
+                    chargingStations.Add(chargingStation.Id, floor);
                 }
 
-            foreach (var chargingPoolId in effectiveChargingPoolIndex.Keys.Concat(Previous.effectiveChargingPoolIndex.Keys).Distinct())
+            foreach (var chargingPoolId in chargingPoolCandidates)
                 if (TryGetChargingPool(chargingPoolId, out var chargingPool) && Previous.TryGetChargingPool(chargingPoolId, out var previousChargingPool) &&
-                    !Same(EffectiveChargingPool(chargingPool).ToJSON(), Previous.EffectiveChargingPool(previousChargingPool).ToJSON(), "chargingStations"))
+                    FloorOf(new (EffectiveChargingPool(chargingPool)), new (Previous.EffectiveChargingPool(previousChargingPool)), "chargingStations") is DateTimeOffset floor)
                 {
-                    chargingPools.Add(chargingPool.Id);
+                    chargingPools.Add(chargingPool.Id, floor);
                 }
 
             if (evses.Count == 0 && chargingStations.Count == 0 && chargingPools.Count == 0)
                 return;
 
-            (effectiveEVSEs, effectiveChargingStations, effectiveChargingPoolIndex) = CalculateEffective(new (evses, chargingStations, chargingPools, LastChangeDate));
+            effectiveFloors = new (evses, chargingStations, chargingPools);
+
+            (effectiveEVSEs, effectiveChargingStations, effectiveChargingPoolIndex) = CalculateEffective(effectiveFloors);
             effectiveChargingPools = new (CalculateEffectiveChargingPools);
 
         }
@@ -457,6 +496,52 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (private static) MembersOfChangedGroups(Current, Before, IdOf, MembersOf, Relevant = null)
+
+        /// <summary>
+        /// The members, in either version, of the groups that are other than before, added or removed: only these can give
+        /// their members something else. Of the relevant ones only, if given, e.g. those naming a charging tariff.
+        /// </summary>
+        private static IEnumerable<TMemberId> MembersOfChangedGroups<TGroupId, TGroup, TMemberId>(POICollection<TGroupId, TGroup>  Current,
+                                                                                                  POICollection<TGroupId, TGroup>  Before,
+                                                                                                  Func<TGroup, TGroupId>           IdOf,
+                                                                                                  Func<TGroup, IEnumerable<TMemberId>>  MembersOf,
+                                                                                                  Func<TGroup, Boolean>?           Relevant   = null)
+
+            where TGroupId : notnull
+            where TGroup   : class, IPOIPrioritizedGroup
+
+        {
+
+            foreach (var group in Current)
+            {
+
+                var before = Before.TryGet(IdOf(group), out var previous) ? previous : null;
+
+                if (before is not null && JToken.DeepEquals(group.ToJSON(), before.ToJSON()))
+                    continue;
+
+                if (Relevant is not null && !Relevant(group) && (before is null || !Relevant(before)))
+                    continue;
+
+                foreach (var memberId in MembersOf(group))
+                    yield return memberId;
+
+                if (before is not null)
+                    foreach (var memberId in MembersOf(before))
+                        yield return memberId;
+
+            }
+
+            foreach (var before in Before)
+                if (!Current.TryGet(IdOf(before), out _) && (Relevant is null || Relevant(before)))
+                    foreach (var memberId in MembersOf(before))
+                        yield return memberId;
+
+        }
+
+        #endregion
+
         #region (private static) MembersOf(Groups, MemberIdsOf)
 
         /// <summary>
@@ -471,6 +556,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                       GroupBy   (membership => membership.MemberId).
                       ToDictionary(members => members.Key,
                                    members => members.Select(membership => membership.Group).ToArray());
+
+        #endregion
+
+        #region (private) AEntity
+
+        /// <summary>
+        /// An effective member, with its JSON representation and its last change.
+        /// </summary>
+        private readonly record struct AEntity(Func<JObject> ToJSONOf, DateTimeOffset LastChangeDate)
+        {
+            public AEntity(EVSE            EVSE)            : this(EVSE.           ToJSON, EVSE.           LastChangeDate) { }
+            public AEntity(ChargingStation ChargingStation) : this(ChargingStation.ToJSON, ChargingStation.LastChangeDate) { }
+            public AEntity(ChargingPool    ChargingPool)    : this(ChargingPool.   ToJSON, ChargingPool.   LastChangeDate) { }
+        }
 
         #endregion
 

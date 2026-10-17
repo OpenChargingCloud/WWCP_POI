@@ -1627,6 +1627,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => parkingSpaces.Values;
 
         /// <summary>
+        /// The parking spaces of all parking operators as they are at runtime, with the properties their parking space groups
+        /// give them, and those charging station operators define where no parking operator does.
+        /// </summary>
+        public IEnumerable<ParkingSpace>    EffectiveParkingSpaces
+            => parkingSpaces.Values.Select(EffectiveParkingSpace);
+
+        /// <summary>
         /// The parking sensors of all parking operators.
         /// </summary>
         public IEnumerable<ParkingSensor>   ParkingSensors
@@ -1677,6 +1684,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               [NotNullWhen(true)] out ParkingSpace?  ParkingSpace)
 
             => parkingSpaces.TryGetValue(ParkingSpaceId, out ParkingSpace);
+
+        /// <summary>
+        /// Try to get the parking space having the given identification as it is at runtime, with the properties its
+        /// parking space groups give it.
+        /// </summary>
+        public Boolean TryGetEffectiveParkingSpaceById(ParkingSpace_Id                        ParkingSpaceId,
+                                                       [NotNullWhen(true)] out ParkingSpace?  ParkingSpace)
+        {
+
+            if (!parkingSpaces.TryGetValue(ParkingSpaceId, out ParkingSpace))
+                return false;
+
+            ParkingSpace = EffectiveParkingSpace(ParkingSpace);
+            return true;
+
+        }
+
+        /// <summary>
+        /// The given parking space as it is at runtime: with the properties the parking space groups of its parking operator
+        /// give it; one of a charging station operator as it is.
+        /// </summary>
+        private ParkingSpace EffectiveParkingSpace(ParkingSpace ParkingSpace)
+        {
+
+            foreach (var parkingOperator in parkingOperators)
+                if (parkingOperator.TryGetParkingSpace(ParkingSpace.Id, out var own) && ReferenceEquals(own, ParkingSpace))
+                    return parkingOperator.EffectiveParkingSpace(ParkingSpace);
+
+            return ParkingSpace;
+
+        }
 
         /// <summary>
         /// Try to get the parking sensor having the given identification, of any parking operator.
@@ -1735,7 +1773,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The error, when a parking garage, space or sensor names a charging station the given operators do not have,
+        /// The error, when a parking garage, space, space group or sensor names a charging station the given operators do not have,
         /// or a parking space of a charging station operator does.
         /// </summary>
         internal static String? UnknownChargingStation(IEnumerable<ParkingOperator>                                              ParkingOperators,
@@ -1752,6 +1790,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var named = parkingOperator.ParkingGarages.SelectMany(parkingGarage => parkingGarage.ChargingStationIds.Select(id => (Kind: "parking garage", Id: parkingGarage.Id.ToString(), ChargingStationId: id))).
                             Concat(parkingOperator.ParkingSpaces. SelectMany(parkingSpace  => parkingSpace. ChargingStationIds.Select(id => (Kind: "parking space",  Id: parkingSpace. Id.ToString(), ChargingStationId: id)))).
+                            Concat(parkingOperator.ParkingSpaceGroups.SelectMany(parkingSpaceGroup => parkingSpaceGroup.ChargingStationIds.Select(id => (Kind: "parking space group", Id: parkingSpaceGroup.Id.ToString(), ChargingStationId: id)))).
                             Concat(parkingOperator.ParkingSensors.SelectMany(parkingSensor => parkingSensor.ChargingStationIds.Select(id => (Kind: "parking sensor", Id: parkingSensor.Id.ToString(), ChargingStationId: id))));
 
                 foreach (var (kind, id, chargingStationId) in named)

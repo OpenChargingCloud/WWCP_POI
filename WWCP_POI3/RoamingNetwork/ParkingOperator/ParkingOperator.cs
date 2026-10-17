@@ -57,7 +57,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// embedded completely in its roaming network. It owns all of them directly; a parking space may name a parking garage
     /// and parking sensors of the same operator.
     /// </summary>
-    public sealed class ParkingOperator : AImmutableEMobilityEntity<ParkingOperator_Id,
+    public sealed partial class ParkingOperator : AImmutableEMobilityEntity<ParkingOperator_Id,
                                                                     ParkingOperatorAdminStatusType,
                                                                     ParkingOperatorStatusType>,
                                           IEquatable<ParkingOperator>,
@@ -213,6 +213,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            // So does a parking space group, for its members.
+            foreach (var parkingSpaceGroup in this.ParkingSpaceGroups)
+            {
+
+                if (parkingSpaceGroup.ParkingGarageId.HasValue &&
+                    !this.ParkingGarages.Contains(parkingSpaceGroup.ParkingGarageId.Value))
+                {
+                    throw new ArgumentException($"The parking garage '{parkingSpaceGroup.ParkingGarageId}' of the parking space group '{parkingSpaceGroup.Id}' is unknown at the parking operator '{Id}'!", nameof(ParkingSpaceGroups));
+                }
+
+                foreach (var parkingSensorId in parkingSpaceGroup.ParkingSensorIds)
+                    if (!this.ParkingSensors.Contains(parkingSensorId))
+                        throw new ArgumentException($"The parking sensor '{parkingSensorId}' of the parking space group '{parkingSpaceGroup.Id}' is unknown at the parking operator '{Id}'!", nameof(ParkingSpaceGroups));
+
+            }
+
+            // The effective parking spaces, with the properties their groups give them.
+            this.effectiveParkingSpaceIndex  = CalculateEffective();
+            this.effectiveParkingSpaces      = new (CalculateEffectiveParkingSpaces);
+
         }
 
         #endregion
@@ -304,6 +324,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var parkingSpaceGroup in ParkingSpaceGroups)
                 if (Previous.TryGetParkingSpaceGroup(parkingSpaceGroup.Id, out var previousParkingSpaceGroup))
                     parkingSpaceGroup.ShareRuntimeOf(previousParkingSpaceGroup);
+
+            StampChangedEffective(Previous);
+            ShareRuntimeOfEffective();
 
         }
 
