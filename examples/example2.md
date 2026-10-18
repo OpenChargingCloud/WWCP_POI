@@ -1,9 +1,10 @@
-# Example 2: two pools of a DC and an AC station, their templates and a group
+# Example 2: two pools of a DC and an AC station, their templates and their groups
 
 From a fresh installation of the [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) to the roaming
 network `QA` with the charging station operator `DE*GEF`, GraphDefined GmbH: the templates of a DC and an AC station and
 of their EVSEs, two charging pools, each with a DC station and an AC station of two EVSEs each naming their templates,
-and a charging station group of the DC stations. Six commits, each signed by the one whose data it changes:
+then a charging station group and an EVSE group for each current. Seven commits, each signed by the one whose data it
+changes:
 
 | Revision | Signed by | Commit |
 |---|---|---|
@@ -12,17 +13,19 @@ and a charging station group of the DC stations. Six commits, each signed by the
 | 2 | `DE*GEF` | `Add` of the charging station templates `DE*GEF*ST_DC` and `DE*GEF*ST_AC`, and of the EVSE templates `DE*GEF*ET_DC` and `DE*GEF*ET_AC` |
 | 3 | `DE*GEF` | `Add` of the pool `DE*GEF*P1`, Jena Paradies: the DC station `DE*GEF*S1` with `DE*GEF*E1*1` and `DE*GEF*E1*2`, the AC station `DE*GEF*S2` with `DE*GEF*E2*1` and `DE*GEF*E2*2`, each naming its template |
 | 4 | `DE*GEF` | `Add` of the pool `DE*GEF*P2`, Jena Nord: the DC station `DE*GEF*S3`, the AC station `DE*GEF*S4`, and their EVSEs |
-| 5 | `DE*GEF` | `Add` of the charging station group `DE*GEF*SG_DC`: the DC stations `S1` and `S3` |
+| 5 | `DE*GEF` | `Add` of the charging station groups `DE*GEF*SG_DC`, the DC stations `S1` and `S3`, and `DE*GEF*SG_AC`, the AC stations `S2` and `S4` |
+| 6 | `DE*GEF` | `Add` of the EVSE groups `DE*GEF*EG_DC`, the EVSEs of `S1` and `S3`, and `DE*GEF*EG_AC`, those of `S2` and `S4` |
 
 An EVSE says itself what it is: its current type and its power, 150 kW DC or 22 kW AC. What a series of stations or
 EVSEs has in common comes from a template it names in its `templateIds`: here each charging station template the power
 of its stations together, 300 kW and 44 kW, and each EVSE template the connector of its EVSEs, a CCS cable or a type 2
 socket. The network keeps them in the templates; the stations and EVSEs take them at runtime, see
-[step 7](#7-as-they-are-at-runtime). A template may also give a charging tariff, see
+[step 8](#8-as-they-are-at-runtime). A template may also give a charging tariff, see
 [ChargingStationTemplate](../docs/ChargingStationTemplate.md) and [EVSETemplate](../docs/EVSETemplate.md). A group
-gives nothing: it collects members, e.g. for an offer, see [ChargingStationGroup](../docs/ChargingStationGroup.md).
+gives nothing: it collects members, here the stations and the EVSEs of one current, e.g. for an offer, see
+[ChargingStationGroup](../docs/ChargingStationGroup.md) and [EVSEGroup](../docs/EVSEGroup.md).
 
-The code blocks of steps 2 to 6 are one `Program.cs`, the program of `DE*GEF`, in this order; the output is what a run
+The code blocks of steps 2 to 7 are one `Program.cs`, the program of `DE*GEF`, in this order; the output is what a run
 prints, `…` for elided keys, signatures, digests and timestamps.
 
 
@@ -267,42 +270,93 @@ await Commit("Jena Nord, a DC and an AC station", RoamingNetworkChange.Add(Pool(
 ```
 
 
-## 6. A group of the DC stations
+## 6. The groups of the stations: DC and AC
 
 A [charging station group](../docs/ChargingStationGroup.md) names its stations by their identifications, of its
 operator, in any of its pools: `{operatorId}*SG{suffix}`, embedded in its operator as `chargingStationGroups`. It gives
-them nothing; it is a set that does not follow from their properties, e.g. the stations of an offer, and has a status of
-its own.
+them nothing: here it collects the stations of one current across both pools, e.g. to name them in an offer, and has a
+status of its own.
 
 ```csharp
-await Commit("The DC charging stations",
+await Commit("The DC and the AC charging stations",
              RoamingNetworkChange.Add(new ChargingStationGroup(ChargingStationGroup_Id.Parse("DE*GEF*SG_DC"),
                                                                Name:                I18NString.Create(Languages.en, "DC charging stations"),
-                                                               ChargingStationIds:  [ ChargingStation_Id.Parse("DE*GEF*S1"), ChargingStation_Id.Parse("DE*GEF*S3") ])));
+                                                               ChargingStationIds:  [ ChargingStation_Id.Parse("DE*GEF*S1"), ChargingStation_Id.Parse("DE*GEF*S3") ])),
+             RoamingNetworkChange.Add(new ChargingStationGroup(ChargingStationGroup_Id.Parse("DE*GEF*SG_AC"),
+                                                               Name:                I18NString.Create(Languages.en, "AC charging stations"),
+                                                               ChargingStationIds:  [ ChargingStation_Id.Parse("DE*GEF*S2"), ChargingStation_Id.Parse("DE*GEF*S4") ])));
 ```
 
 ```
-201 Committed, revision 5: The DC charging stations
+201 Committed, revision 5: The DC and the AC charging stations
 ```
 
-`GET /poi/RNs/QA/CSOs/DE*GEF/CSGs/DE*GEF*SG_DC`:
+`GET /poi/RNs/QA/CSOs/DE*GEF/CSGs` lists both, as the operator embeds them:
+
+```json
+[
+  {
+    "@id":                "DE*GEF*SG_AC",
+    "chargingStationIds": [ "DE*GEF*S2", "DE*GEF*S4" ],
+    "created":            "…",
+    "lastChange":         "…",
+    "name":               { "en": "AC charging stations" }
+  },
+  {
+    "@id":                "DE*GEF*SG_DC",
+    "chargingStationIds": [ "DE*GEF*S1", "DE*GEF*S3" ],
+    "created":            "…",
+    "lastChange":         "…",
+    "name":               { "en": "DC charging stations" }
+  }
+]
+```
+
+
+## 7. The groups of the EVSEs: DC and AC
+
+The same for the EVSEs: an [EVSE group](../docs/EVSEGroup.md) names its EVSEs, `{operatorId}*EG{suffix}`, embedded in
+its operator as `EVSEGroups`. The DC group has the four EVSEs of `S1` and `S3`, the AC group those of `S2` and `S4`.
+
+```csharp
+// The EVSEs of the given stations: DE*GEF*E{s}*1 and DE*GEF*E{s}*2 of each station s.
+static IEnumerable<EVSE_Id> EVSEsOf(params Int32[] Stations)
+
+    => Stations.SelectMany(s => new[] { EVSE_Id.Parse($"DE*GEF*E{s}*1"), EVSE_Id.Parse($"DE*GEF*E{s}*2") });
+
+await Commit("The DC and the AC EVSEs",
+             RoamingNetworkChange.Add(new EVSEGroup(EVSEGroup_Id.Parse("DE*GEF*EG_DC"),
+                                                    Name:     I18NString.Create(Languages.en, "DC EVSEs"),
+                                                    EVSEIds:  EVSEsOf(1, 3))),
+             RoamingNetworkChange.Add(new EVSEGroup(EVSEGroup_Id.Parse("DE*GEF*EG_AC"),
+                                                    Name:     I18NString.Create(Languages.en, "AC EVSEs"),
+                                                    EVSEIds:  EVSEsOf(2, 4))));
+```
+
+```
+201 Committed, revision 6: The DC and the AC EVSEs
+```
+
+`GET /poi/RNs/QA/CSOs/DE*GEF/EVSEGs/DE*GEF*EG_DC`:
 
 ```json
 {
-  "@id":                "DE*GEF*SG_DC",
-  "chargingStationIds": [ "DE*GEF*S1", "DE*GEF*S3" ],
-  "created":            "…",
-  "lastChange":         "…",
-  "name":               { "en": "DC charging stations" }
+  "@id":        "DE*GEF*EG_DC",
+  "EVSEIds":    [ "DE*GEF*E1*1", "DE*GEF*E1*2", "DE*GEF*E3*1", "DE*GEF*E3*2" ],
+  "created":    "…",
+  "lastChange": "…",
+  "name":       { "en": "DC EVSEs" }
 }
 ```
 
-The templates of one station, in its order, `GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/CSTs`: the DC
-template alone; its groups, `…/CSGs`: the DC group. A station may name several templates: of two giving a value, the one
-it names first gives it, see [templates](../docs/README.md#templates-and-effective-members).
+Each member also lists its templates and its groups below itself. The templates of one station, in its order,
+`GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/CSTs`: the DC template alone; its groups, `…/CSGs`: the DC
+station group; the groups of one of its EVSEs, `…/CSs/DE*GEF*S1/EVSEs/DE*GEF*E1*1/EVSEGs`: the DC EVSE group. A station
+may name several templates: of two giving a value, the one it names first gives it, see
+[templates](../docs/README.md#templates-and-effective-members).
 
 
-## 7. As they are at runtime
+## 8. As they are at runtime
 
 The POI API serves a pool, its stations and its EVSEs as they are at runtime, with what their templates give them:
 `GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1`, shortened to the first EVSE of each station:
@@ -387,7 +441,7 @@ of a version gives them: `TryGetEffectiveEVSE(evseId, out var evse)`, `Effective
 
 ```
 RoamingHub> roamingNetworks
-QA  revision 5  Quality assurance  (operated by 'RNO-47EAB7CF', this hub, 1 charging station operator(s), 2 charging pool(s))
+QA  revision 6  Quality assurance  (operated by 'RNO-47EAB7CF', this hub, 1 charging station operator(s), 2 charging pool(s))
 ```
 
 
@@ -398,7 +452,8 @@ QA  revision 5  Quality assurance  (operated by 'RNO-47EAB7CF', this hub, 1 char
   of the templates of its station, else of the templates of its pool.
 - A station added later takes its template by naming it, `templateIds`; an [element change](../docs/README.md#element-changes)
   adds a template at the end of its list.
-- An offer at the stations of the group, e.g. 20 % less at night: a [charging tariff offer](../docs/ChargingTariffOffer.md)
-  naming `DE*GEF*SG_DC`.
+- An offer at the members of a group, e.g. 20 % less at night at the DC stations: a
+  [charging tariff offer](../docs/ChargingTariffOffer.md) naming `DE*GEF*SG_DC` in its `chargingStationGroupIds`, or
+  at the AC EVSEs `DE*GEF*EG_AC` in its `EVSEGroupIds`.
 - The status of a group, calculated from the status of its members: [Calculated status of
   groups](../docs/README.md#calculated-status-of-groups).

@@ -396,7 +396,7 @@ if (!RoamingNetworkHistory.TryLoad(store, out var history, out var error))
 ## Next
 
 - [Example 2](example2.md): two pools of a DC and an AC station each, the stations and EVSEs taking their power and
-  their connectors from templates of their current, and a group of the DC stations.
+  their connectors from templates of their current, and grouped by their current.
 - More of the pool, the station and the EVSEs: address, opening times, connectors, tariffs, in
   [ChargingPool](../docs/ChargingPool.md), [ChargingStation](../docs/ChargingStation.md), [EVSE](../docs/EVSE.md).
 - Changing a property: `RoamingNetworkChange.UpdateProperty(evse, "maxPower", null, 22000)`, `CreateChangeSet`
