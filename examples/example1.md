@@ -93,7 +93,7 @@ Next: 'roamingNetworks QA add chargingStationOperator <id> signingKey <key> iden
 http://127.0.0.1:2356/poi/RNs/QA
 ```
 
-or `POST /api/v1/poi/roamingNetworks` with `{"@id": "QA", "name": {"en": "Quality assurance"}}`, or the form
+or `POST /api/v1/poi/RNs` with `{"@id": "QA", "name": {"en": "Quality assurance"}}`, or the form
 **New roaming network** below the list on the **Points of interest** page. The hub stores it in `poi/QA` (`CURRENT`,
 `gen-000001/base.json`, `gen-000001/log.jsonl`) and serves it below `/poi`, readable by everyone. The network embeds
 its operator with its keys; it has none of its own:
@@ -215,8 +215,8 @@ QA  revision 1, commit adcb769c…  Quality assurance
 http://127.0.0.1:2356/poi/RNs/QA
 ```
 
-or `POST /api/v1/poi/roamingNetworks/QA/chargingStationOperators` with the operator as POI writes it, each key the
-Base64 of its COSE key or `{"key": …}`:
+or `POST /api/v1/poi/RNs/QA/CSOs` - below `/api/v1` the path `GET /poi/RNs/QA/CSOs` lists it at - with the operator
+as POI writes it, each key the Base64 of its COSE key or `{"key": …}`:
 
 ```json
 {
@@ -230,8 +230,8 @@ Base64 of its COSE key or `{"key": …}`:
 or the form **New party of a roaming network** below the list on the **Points of interest** page. A private key is
 refused - it is no longer private once it was sent - and so is the operator with its charging pools in it: they are
 its own to add. E-mobility providers, grid operators and parking operators are added the same way:
-`eMobilityProvider`, `gridOperator`, `parkingOperator` at the prompt, `…/eMobilityProviders`, `…/gridOperators`,
-`…/parkingOperators` over HTTP; a grid operator not taking part without keys.
+`eMobilityProvider`, `gridOperator`, `parkingOperator` at the prompt, `…/EMPs`, `…/GOs`, `…/POs` over HTTP; a grid
+operator not taking part without keys.
 
 
 ## 4. `DE*GEF` commits its first charging pool
