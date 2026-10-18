@@ -1,37 +1,29 @@
-# Example 1: a roaming network, an operator and its first charging pool
+# Example 1: the first start and the roaming network `QA`
 
-From a fresh installation of the [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) to a roaming
-network `QA` with one charging station operator and its first charging pool, in three commits, each signed by the
-one whose data it changes:
+From a fresh installation of the [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) to its first
+roaming network, `QA`: what the first start makes, who may make a roaming network, and four ways to make it - at the
+prompt or over SSH, in the web interface, over HTTP with curl or C#, and in C# with POI 3 alone, without a hub. Each
+makes the same: revision 0 of `QA`, its genesis commit, signed by the hub as the roaming network operator (RNO).
 
-| Revision | Signed by | Commit |
-|---|---|---|
-| 0 | the hub, as the roaming network operator (RNO) | Genesis: the roaming network `QA`, operated by the hub |
-| 1 | the hub, as the RNO | `Add` of the charging station operator `DE*GEF`, with the public halves of its keys |
-| 2 | `DE*GEF` | `Add` of the charging pool `DE*GEF*P1` with the charging station `DE*GEF*S1` and the EVSEs `DE*GEF*E1*1` and `DE*GEF*E1*2` |
-
-The hub is the [RoamingNetworkOperator](../docs/RoamingNetworkOperator.md) of every roaming network it makes: it
-makes its keys at its first start, and its signing key signs the change sets that are the RNO's - the network itself,
-its parties - and every commit it makes. The charging station operator keeps its own keys and signs its own data.
-
-The properties are kept to a minimum: names, a location and the power of the EVSEs. All the others are in
-[docs/](../docs/README.md). The output is what one run printed, `…` for elided keys, paths, signatures and digests.
-[Without the hub](#without-the-hub-poi-3-alone) shows the same with POI 3 alone, in C#.
+[Example 2](example2.md) adds the charging station operator `DE*GEF` to `QA`, [example 3](example3.md) its charging
+pools; [README](README.md) says what each is about. The output is what one run printed, `…` for elided keys, paths,
+signatures and digests.
 
 
-## 1. The first start: what is there
+## 1. The first start
 
 ```bash
-dotnet run --project RoamingHubCLI
+dotnet run --project RoamingHubCLI -- --authorize-ssh-key root=C:\Users\you\.ssh\id_ed25519.pub
 ```
 
 A first start, beside an empty `configuration.json` or none, makes up what the hub needs and says so once:
 
-- **the account `root`**, with a password shown once in the box at the end of the banner;
+- **the account `root`**, an administrator, with a password shown once in the box at the end of the banner, and the
+  SSH key given by `--authorize-ssh-key` (without it, a key pair made up, its private key shown once below the
+  password);
 - **the roaming network operator this hub is**: a signing key (P-256) and an identity key (P-521), in
   `roamingNetworkOperator/` beside the configuration file - `operator.json`, the operator as its roaming networks
-  will embed it, with the public halves of the keys, and `signing-key.pem` and `identity-key.pem`, the private keys,
-  readable only by the account the hub runs as;
+  will embed it, with the public halves of the keys, and `signing-key.pem` and `identity-key.pem`, the private keys;
 - **no roaming network**: `poi/` stays empty until one is made.
 
 ```
@@ -55,6 +47,9 @@ Keep a copy of `roamingNetworkOperator/` somewhere nobody else can read it (it i
 private keys the hub can not sign as the operator any more, and does not start - a new key would be none its roaming
 networks know - and without the identity key, nobody can ever replace the keys of its roaming networks.
 
+
+## 2. Who the hub is
+
 At the prompt, or over SSH, the hub says who it is, with the public halves of its keys, and what it serves:
 
 ```
@@ -68,8 +63,8 @@ RoamingHub> roamingNetworks
 This hub serves no roaming network yet: 'roamingNetworks add <id> [<name>]' makes one, operated by this hub, 'RNO-67BDC1FC'.
 ```
 
-`GET /api/v1/poi/roamingNetworkOperator` answers with `operator.json`, public as it is in every roaming network the
-hub operates:
+`GET /api/v1/poi/roamingNetworkOperator`, for everybody, answers with `operator.json`, public as it is in every
+roaming network the hub operates:
 
 ```json
 {
@@ -82,9 +77,37 @@ hub operates:
 ```
 
 
-## 2. The first roaming network: `QA`
+## 3. Who may make a roaming network
 
-By an administrator (`poi:edit`), with nothing but its identification and its name - its operator is the hub:
+Making one is `poi:edit`, an administrator's, and `root` is one. Wherever the hub is asked, it signs with its own keys,
+so it asks who it is:
+
+| Where | Signed in as `root` by |
+|---|---|
+| the prompt of the console the hub runs in | being at it: the console may do everything |
+| the same prompt over SSH, port 22356 | its SSH key: `ssh -p 22356 root@127.0.0.1` |
+| the web interface, http://127.0.0.1:2356/ | its password, from the first-start box |
+| a program over HTTP, below `/api/v1` | an API key of it in the header `API-Key`, or its password by HTTP Basic |
+
+A program gets an API key of its own, one that may change things (`readWrite`; a `readOnly` one may only read). At the
+console the account is named, over SSH it is the one signed in:
+
+```
+RoamingHub> apiKeys root add readWrite Example programs
+'root' has a new API key, ReadWrite:
+PWfD544NqMPPINzb65YAEeMzxNZRkwzX7M59wZQ8
+```
+
+It is shown whole by `apiKeys root` again, and taken out by `apiKeys root remove PWfD544N`. The programs below read it
+from the environment variable `ROAMINGHUB_API_KEY`.
+
+
+## 4. Making `QA`
+
+With nothing but its identification and its name: its operator is the hub, with the keys of its first start. The
+identification is the name of its directory below `poi/` as well: letters, digits, `-` and `_`, at most 64 of them.
+
+### At the prompt or over SSH
 
 ```
 RoamingHub> roamingNetworks add QA Quality assurance
@@ -93,10 +116,98 @@ Next: 'roamingNetworks QA add chargingStationOperator <id> signingKey <key> iden
 http://127.0.0.1:2356/poi/RNs/QA
 ```
 
-or `POST /api/v1/poi/RNs` with `{"@id": "QA", "name": {"en": "Quality assurance"}}`, or the form
-**New roaming network** below the list on the **Points of interest** page. The hub stores it in `poi/QA` (`CURRENT`,
-`gen-000001/base.json`, `gen-000001/log.jsonl`) and serves it below `/poi`, readable by everyone. The network embeds
-its operator with its keys; it has none of its own:
+### In the web interface
+
+**Points of interest**, below the list of the roaming networks, the card **New roaming network**: *Identification*
+`QA`, *Name* `Quality assurance`, then **Make the roaming network**. It is there only for whoever may make one; made,
+the page goes to `QA`.
+
+### Over HTTP: curl
+
+```bash
+curl -X POST http://127.0.0.1:2356/api/v1/poi/RNs \
+     -H "API-Key: $ROAMINGHUB_API_KEY" -H "Content-Type: application/json" \
+     -d '{"@id": "QA", "name": {"en": "Quality assurance"}}'
+```
+
+`201 Created`, with the network as the POI API lists it and its genesis commit:
+
+```json
+{
+  "message":        "The roaming network 'QA' was made, at revision 0, commit 1d728939…, operated by this hub, 'RNO-67BDC1FC'. Its parties are added now, with change sets this hub signs.",
+  "roamingNetwork": { "@id": "QA", "name": { "en": "Quality assurance" }, "roamingNetworkOperator": { "@id": "RNO-67BDC1FC" } },
+  "revision":       0,
+  "commitId":       "1d728939…"
+}
+```
+
+`400` where it is no roaming network the hub makes - one with keys, an operator or a party in it among them -, `409`
+where there is one of that identification already, also in another case, `401` without a key or a password, `403`
+for an account that may not.
+
+### Over HTTP: C#
+
+A console project of the administrator, e.g. in `examples/Admin/`, with WWCP_POI3, which brings Hermod along:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\WWCP_POI3\WWCP_POI3.csproj" />
+  </ItemGroup>
+
+</Project>
+```
+
+```csharp
+using Newtonsoft.Json.Linq;
+
+using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+
+await using var http  = new HTTPClient(URL.Parse(args.FirstOrDefault() ?? "http://127.0.0.1:2356"));
+var apiKey            = APIKey_Id.Parse(Environment.GetEnvironmentVariable("ROAMINGHUB_API_KEY")!);
+
+// The given JSON posted below /api/v1 with the API key of the administrator, and what the hub answered.
+async Task<JObject> Post(String Path, JObject JSON)
+{
+
+    var response  = await http.POST(HTTPPath.Parse(Path),
+                                    Content:         JSON.ToString().ToUTF8Bytes(),
+                                    ContentType:     HTTPContentType.Application.JSON_UTF8,
+                                    RequestBuilder:  request => request.API_Key = apiKey);
+
+    var answer    = JObject.Parse(response.HTTPBodyAsUTF8String!);
+
+    Console.WriteLine($"{response.HTTPStatusCode.Code}: {answer["message"] ?? answer}");
+    return answer;
+
+}
+
+await Post("/api/v1/poi/RNs", new JObject(
+                                  new JProperty("@id",   "QA"),
+                                  new JProperty("name",  new JObject(new JProperty("en", "Quality assurance")))
+                              ));
+```
+
+```
+201: The roaming network 'QA' was made, at revision 0, commit 1d728939…, operated by this hub, 'RNO-67BDC1FC'. Its parties are added now, with change sets this hub signs.
+```
+
+[Example 2](example2.md#over-http-c) adds `DE*GEF` with the same `Post`.
+
+### What `QA` is
+
+The hub stores it in `poi/QA` (`CURRENT`, `gen-000001/base.json`, `gen-000001/log.jsonl`) and serves it below `/poi`,
+readable by everyone, `GET /poi/RNs/QA`. The network embeds its operator with its keys; it has none of its own:
 
 ```json
 {
@@ -140,34 +251,25 @@ roaming network operator - as every commit the hub makes of a roaming network it
 }
 ```
 
-
-## 3. The first charging station operator: `DE*GEF`
-
-`DE*GEF` makes its own keys and keeps them; the hub gets only their public halves. A console project with
-WWCP_POI3, e.g. in `examples/Example1/`, the same program as in step 4:
-
-```xml
-<Project Sdk="Microsoft.NET.Sdk">
-
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\WWCP_POI3\WWCP_POI3.csproj" />
-  </ItemGroup>
-
-</Project>
+```
+RoamingHub> roamingNetworks
+QA  revision 0  Quality assurance  (operated by 'RNO-67BDC1FC', this hub, 0 charging station operator(s), 0 charging pool(s))
 ```
 
+
+## 5. Without the hub: POI 3 alone
+
+The same in C#, without a hub: the program is the roaming network operator itself, keeps its keys and the history of
+`QA` in its directory, and may serve it over HTTP. The same project as above; [example 2](example2.md#5-without-the-hub-poi-3-alone)
+and [example 3](example3.md#9-without-the-hub-poi-3-alone) go on with it, in the same directory. First the usings and
+three helpers they share:
+
 ```csharp
-using Newtonsoft.Json.Linq;
+using System.Security.Cryptography;
 
 using Org.BouncyCastle.Crypto.Generators;
 using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Pkcs;
 using Org.BouncyCastle.Security;
 
 using org.GraphDefined.Vanaheimr.Aegir;
@@ -186,151 +288,31 @@ static ECPrivateKeyParameters NewKey(COSECurve Curve)
     return (ECPrivateKeyParameters) generator.GenerateKeyPair().Private;
 }
 
-// The keys of DE*GEF: kept here, and only their public halves, the Base64 of their COSE keys, given to the hub.
-var gefSigningKey   = NewKey(COSECurve.P256);
-var gefIdentityKey  = NewKey(COSECurve.P521);
+// A private key in a PEM file, PKCS #8, as the hub keeps its own; and read back.
+static void SaveKey(ECPrivateKeyParameters Key, String File)
+    => System.IO.File.WriteAllText(File, new String(PemEncoding.Write("PRIVATE KEY", PrivateKeyInfoFactory.CreatePrivateKeyInfo(Key).GetEncoded())) + "\n");
 
-Console.WriteLine($"signingKey  {POIPublicKey.From(gefSigningKey). ToJSON()["key"]}");
-Console.WriteLine($"identityKey {POIPublicKey.From(gefIdentityKey).ToJSON()["key"]}");
-Console.WriteLine("Add DE*GEF with these keys at the hub, then press Enter.");
-Console.ReadLine();
-```
-
-```
-signingKey  pAECIAEhWCB5Vy8gs2bOr0hjZtbdc/XbBab5nzh3mkRz7A9iGuDKISJY…
-identityKey pAECIAMhWEIB4zA7f9XhNrIzPv42Zza3sqVlH+RfPf3ukr4R7y5nrh0H…
-Add DE*GEF with these keys at the hub, then press Enter.
-```
-
-An administrator adds it, and the hub signs it as the RNO: adding a party is the RNO's.
-
-```
-RoamingHub> roamingNetworks QA add chargingStationOperator DE*GEF signingKey pAECIAEhWCB5Vy8g… identityKey pAECIAMhWEIB4zA7… GraphDefined
-The ChargingStationOperator 'DE*GEF' was added to the roaming network 'QA', at revision 1, commit adcb769c…. It adds its data now, with change sets it signs.
-RoamingHub> roamingNetworks QA
-QA  revision 1, commit adcb769c…  Quality assurance
-  operated by 'RNO-67BDC1FC', this hub
-  RoamingNetworkOperator RNO-67BDC1FC  signing key(s) 882bbf1af577e9dd…, identity key(s) 67bdc1fcdf7c9816…
-  ChargingStationOperator DE*GEF  signing key(s) a3fec322ff2c43e0…, identity key(s) 62756187531ce24f…
-http://127.0.0.1:2356/poi/RNs/QA
-```
-
-or `POST /api/v1/poi/RNs/QA/CSOs` - below `/api/v1` the path `GET /poi/RNs/QA/CSOs` lists it at - with the operator
-as POI writes it, each key the Base64 of its COSE key or `{"key": …}`:
-
-```json
+static ECPrivateKeyParameters LoadKey(String File)
 {
-  "@id":          "DE*GEF",
-  "name":         { "en": "GraphDefined" },
-  "signingKeys":  [ "pAECIAEhWCB5Vy8g…" ],
-  "identityKeys": [ "pAECIAMhWEIB4zA7…" ]
+    var text = System.IO.File.ReadAllText(File);
+    return (ECPrivateKeyParameters) PrivateKeyFactory.CreateKey(Convert.FromBase64String(text[PemEncoding.Find(text).Base64Data]));
 }
+
+// What signs every commit of QA: the signing key of its operator, in the role of the roaming network operator.
+static RoamingNetworkCommitSigner OperatorSigner(ECPrivateKeyParameters SigningKey)
+    => new (SigningKey, POIPublicKey.From(SigningKey).Id, COSEAlgorithm.ES256, RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator, "GraphDefined");
 ```
 
-or the form **New party of a roaming network** below the list on the **Points of interest** page. A private key is
-refused - it is no longer private once it was sent - and so is the operator with its charging pools in it: they are
-its own to add. E-mobility providers, grid operators and parking operators are added the same way:
-`eMobilityProvider`, `gridOperator`, `parkingOperator` at the prompt, `…/EMPs`, `…/GOs`, `…/POs` over HTTP; a grid
-operator not taking part without keys.
-
-
-## 4. `DE*GEF` commits its first charging pool
-
-One `Add` of the pool, with its station and both EVSEs embedded, signed with the operator's signing key, made for
-the version the operator read from the hub and submitted to it - by anybody, without signing in: whether a change set
-may change what it changes, its signatures decide. The same program as in step 3, after Enter, with the `HTTPClient`
-of Hermod; a change set goes by the method `COMMIT`, `http.COMMIT(…)`:
+The roaming network operator makes its keys once, keeps them in `RNO/`, and starts the history of `QA`:
 
 ```csharp
-await using var http  = new HTTPClient(URL.Parse(args.FirstOrDefault() ?? "http://127.0.0.1:2356"));
-
-// The head of QA, as the hub serves it: checked against its ETags as it is read.
-if (!RoamingNetwork.TryParse(JObject.Parse((await http.GET(HTTPPath.Root + "poi/RNs/QA")).HTTPBodyAsUTF8String!), out var head, out var error))
-    throw new InvalidOperationException(error);
-
-var pool            = new ChargingPool(
-                          ChargingPool_Id.Parse("DE*GEF*P1"),
-                          Name:              I18NString.Create(Languages.en, "Jena Paradies"),
-                          GeoLocation:       GeoCoordinate.Parse(50.9271, 11.5892),
-                          ChargingStations:  [
-                              new ChargingStation(
-                                  ChargingStation_Id.Parse("DE*GEF*S1"),
-                                  EVSEs: [
-                                      new EVSE(EVSE_Id.Parse("DE*GEF*E1*1"), MaxPower: Watt.FromW(11000)),
-                                      new EVSE(EVSE_Id.Parse("DE*GEF*E1*2"), MaxPower: Watt.FromW(11000))
-                                  ]
-                              )
-                          ]
-                      );
-
-var addPool         = head.CreateChangeSet([ RoamingNetworkChange.Add(pool) ],
-                                           Description: new ImmutableI18NString(I18NString.Create(Languages.en, "The first charging pool"))).
-                           Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);
-
-var response        = await http.COMMIT(HTTPPath.Root + "poi/RNs/QA/history/changeSets",
-                                        Content:      addPool.ToJSON().ToString().ToUTF8Bytes(),
-                                        ContentType:  HTTPContentType.Application.JSON_UTF8);   // 201 Created
-```
-
-`CreateChangeSet` makes it for the version it is called on: its `beforeETags` are those of revision 1, its
-`afterETags` those of the result. `201 Created` answers with the commit and the head, shortened:
-
-```json
-{
-  "status":          "Committed",
-  "@id":             "2d2a60b9…",
-  "revision":        2,
-  "parentIds":       [ "adcb769c…" ],
-  "changeSetId":     "MSQ5AtSUtAG8542fS12Yh6rCW7x8xv2G",
-  "createdAt":       "2026-10-17T18:16:17.709Z",
-  "description":     { "en": "The first charging pool" },
-  "numberOfChanges": 1,
-  "signatureKeyIds": [ "a3fec322…" ],
-  "eTags":           [ [ "json", "sha256", "hex", "faf55b2e…" ], [ "cbor", "sha256", "hex", "23340139…" ] ],
-  "head":            { "@id": "2d2a60b9…", "revision": 2, … }
-}
-```
-
-```
-RoamingHub> roamingNetworks
-QA  revision 2  Quality assurance  (operated by 'RNO-67BDC1FC', this hub, 1 charging station operator(s), 1 charging pool(s))
-```
-
-The pool is the operator's alone: the same change set signed by the hub, or by any key of no party, is `422` with
-the reason, e.g. `Change 0: Add of the ChargingPool 'DE*GEF*P1' needs a signature by a signing key of the
-ChargingStationOperator 'DE*GEF'!`, and nothing changes. With curl, the change set written to a file:
-
-```bash
-curl -X COMMIT -H "Content-Type: application/json" --data-binary @addPool.json http://127.0.0.1:2356/poi/RNs/QA/history/changeSets
-```
-
-| Request | Returns |
-|---|---|
-| `GET /poi/RNs` | `[{"@id":"QA","name":{"en":"Quality assurance"}}]` |
-| `GET /poi/RNs/QA/CSOs` | `[{"@id":"DE*GEF","name":{"en":"GraphDefined"}}]` |
-| `GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1` | the pool, its keys in canonical order, its `lastChange` the `createdAt` of its change set |
-| `GET /poi/RNs/QA/EVSEs/DE*GEF*E1*2` | `307` to `/poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/EVSEs/DE*GEF*E1*2` |
-| `GET /poi/RNs/QA/history/head` | the head commit: `revision` 2, its `parentIds`, `eTags` and `signatureKeyIds` |
-
-Stations and EVSEs can also be added one by one, `RoamingNetworkChange.Add(station, poolId)` and
-`Add(evse, stationId)`, e.g. a third EVSE later.
-
-
-## 5. The next start
-
-The hub reads its operator back from `roamingNetworkOperator/` and `QA` from `poi/QA`, checking every commit again -
-signatures, ETags, merges - and signs the commits it makes of `QA` again. Without one of its private keys it does
-not start: a new key would be none `QA` knows.
-
-
-## Without the hub: POI 3 alone
-
-The same in one C# program, with the usings and `NewKey` of step 3. The RNO is an entity of its own, which the
-roaming network embeds:
-
-```csharp
+// The keys of the roaming network operator, made once and kept in RNO/.
 var rnoSigningKey   = NewKey(COSECurve.P256);
 var rnoIdentityKey  = NewKey(COSECurve.P521);
+
+Directory.CreateDirectory("RNO");
+SaveKey(rnoSigningKey,  "RNO/signing-key.pem");
+SaveKey(rnoIdentityKey, "RNO/identity-key.pem");
 
 // The operator of QA, who may operate other roaming networks as well.
 var rno      = new RoamingNetworkOperator(
@@ -345,33 +327,34 @@ var qa       = new RoamingNetwork(
                    Operator:  rno
                );
 
-// One directory per roaming network. Start only once, on an empty one:
-// on a used one it replaces what is stored. Afterwards: TryLoad, below.
-var store    = new RoamingNetworkHistoryFileStore("poi/QA");
-var history  = RoamingNetworkHistory.Start(qa, Store: store);
+// One directory per roaming network. Start only once, on an empty one: on a used one it replaces what is stored.
+using var store    = new RoamingNetworkHistoryFileStore("poi/QA");
+var history        = RoamingNetworkHistory.Start(qa,
+                                                 Signers:  [ OperatorSigner(rnoSigningKey) ],
+                                                 Store:    store);
 
-// The RNO adds DE*GEF with the public halves of its keys: adding a party is the RNO's.
-var gef      = new ChargingStationOperator(
-                   ChargingStationOperator_Id.Parse("DE*GEF"),
-                   Name:          I18NString.Create(Languages.en, "GraphDefined"),
-                   SigningKeys:   [ POIPublicKey.From(gefSigningKey)  ],
-                   IdentityKeys:  [ POIPublicKey.From(gefIdentityKey) ]
-               );
-
-history.Commit(history.Head.RoamingNetwork.
-                   CreateChangeSet([ RoamingNetworkChange.Add(gef) ]).
-                   Sign(rnoSigningKey, POIPublicKey.From(rnoSigningKey).Id, COSEAlgorithm.ES256));   // revision 1
-
-// DE*GEF adds its pool: the pool of step 4.
-history.Commit(history.Head.RoamingNetwork.
-                   CreateChangeSet([ RoamingNetworkChange.Add(pool) ]).
-                   Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256));   // revision 2
+Console.WriteLine($"QA at revision {history.Head.Commit.Revision}, commit {history.Head.Commit.Id}");
 ```
 
-`Start(qa, Signers: [ new RoamingNetworkCommitSigner(rnoSigningKey, …, RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator) ], …)`
-signs every commit as the hub does. `POI_API` serves the history over HTTP, readable by everyone; change sets are
-refused unless `AuthorizeChangeSetSubmission` says who may submit them - for `QA` everybody, as their signatures
-decide:
+```
+QA at revision 0, commit 5a1f39d2…
+```
+
+The signer signs every commit as the hub does, here the genesis commit. From then on the history is loaded from its
+directory, not started again, with the usings and helpers above; `TryLoad` checks every commit again, and the file
+`LOCK` keeps a second store out of the directory - one program at a time:
+
+```csharp
+var rnoSigningKey  = LoadKey("RNO/signing-key.pem");
+
+using var store    = new RoamingNetworkHistoryFileStore("poi/QA");
+
+if (!RoamingNetworkHistory.TryLoad(store, out var history, out var error, Signers: [ OperatorSigner(rnoSigningKey) ]))
+    throw new InvalidOperationException(error);
+```
+
+`POI_API` serves it over HTTP, readable by everyone, as the hub does below `/poi`; change sets are refused unless
+`AuthorizeChangeSetSubmission` says who may submit them - for `QA` everybody, as their signatures decide:
 
 ```csharp
 var httpServer  = new HTTPServer(IPAddress: IPv4Address.Localhost, TCPPort: IPPort.Parse(8080), AutoStart: true);
@@ -382,27 +365,19 @@ var poiAPI      = new POI_API(httpServer) {
 poiAPI.AddRoamingNetworkHistory(history);
 ```
 
-From then on the history is loaded from its directory, not started again; `TryLoad` checks every commit again, and
-the file `LOCK` keeps a second store out of the directory - one program at a time:
 
-```csharp
-using var store = new RoamingNetworkHistoryFileStore("poi/QA");
+## 6. The next start
 
-if (!RoamingNetworkHistory.TryLoad(store, out var history, out var error))
-    throw new InvalidOperationException(error);
-```
+The hub reads its operator back from `roamingNetworkOperator/` and `QA` from `poi/QA`, checking every commit again -
+signatures, ETags, merges - and signs the commits it makes of `QA` again. Without one of its private keys it does not
+start: a new key would be none `QA` knows.
 
 
 ## Next
 
-- [Example 2](example2.md): two pools of a DC and an AC station each, the stations and EVSEs taking their power and
-  their connectors from templates of their current, and grouped by their current.
-- More of the pool, the station and the EVSEs: address, opening times, connectors, tariffs, in
-  [ChargingPool](../docs/ChargingPool.md), [ChargingStation](../docs/ChargingStation.md), [EVSE](../docs/EVSE.md).
-- Changing a property: `RoamingNetworkChange.UpdateProperty(evse, "maxPower", null, 22000)`, `CreateChangeSet`
-  fills in the old value it finds; see [Change sets](../README.md#change-sets).
-- Changing the operator itself, e.g. its name or keys: `RoamingNetworkChange.UpdateProperty(qa.Operator!, "name", …)`,
-  see [RoamingNetworkOperator](../docs/RoamingNetworkOperator.md). The hub does it in every roaming network it
-  operates: `roamingNetworkOperator rotate signingKey` (or `identityKey`) replaces a key by a new one, each change
-  signed by the key it replaces, and `roamingNetworkOperator name GraphDefined GmbH` renames it.
+- [Example 2](example2.md): the charging station operator `DE*GEF` makes its keys and is added to `QA`.
+- Changing the operator itself, e.g. its name or keys: `roamingNetworkOperator rotate signingKey` (or `identityKey`)
+  replaces a key of the hub by a new one in every roaming network it operates, each change signed by the key it
+  replaces, and `roamingNetworkOperator name GraphDefined GmbH` renames it; in C#,
+  `RoamingNetworkChange.UpdateProperty(qa.Operator!, "name", …)`, see [RoamingNetworkOperator](../docs/RoamingNetworkOperator.md).
 - Another server following `QA`: [Peer](../README.md#peer).
