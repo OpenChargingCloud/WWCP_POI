@@ -128,7 +128,7 @@ public sealed class ArchiveInputStreamTests
             CBORValue.FromMap(tree.AsMap().Append(tree.AsMap()[^1])).ToByteArray();
         using var input = new Input(invalid, asynchronous); var calls = 0;
         var expected = Assert.Catch(() => { using var history = RoamingNetworkHistory.ParseCBOR(invalid, VerifyBatch, VerifyCommit, authorizeSnapshotBoundary: _ => true); });
-        var actual = Assert.CatchAsync(async () => { using var history = await Read(input, asynchronous, work,
+        var actual = await Assert.CatchAsync(async () => { using var history = await Read(input, asynchronous, work,
             commitTrust: (commit, peer) => { calls++; return VerifyCommit(commit, peer); }); });
         Assert.That(actual!.GetType(), Is.EqualTo(expected!.GetType())); Assert.That(actual.Message, Is.EqualTo(expected.Message));
         Assert.That(calls, Is.Zero); Assert.That(input.DisposeCalls, Is.Zero); work.Clean();
@@ -138,11 +138,11 @@ public sealed class ArchiveInputStreamTests
 
     [TestCase(1, false)] [TestCase(1, true)] [TestCase(2, false)] [TestCase(2, true)]
     [TestCase(3, false)] [TestCase(3, true)] [TestCase(4, false)] [TestCase(4, true)]
-    public void Byte_limit_reports_only_the_first_excess_byte_without_draining_input(Int32 profile, Boolean asynchronous)
+    public async Task Byte_limit_reports_only_the_first_excess_byte_without_draining_input(Int32 profile, Boolean asynchronous)
     {
         using var work = new Workspace(); var bytes = Bytes(profile); using var input = new Input(bytes.Concat(new Byte[100]).ToArray(), asynchronous);
         var calls = 0; var maximum = bytes.Length - 1;
-        var error = Assert.ThrowsAsync<RoamingNetworkHistoryLimitException>(async () => { using var history = await Read(input, asynchronous, work,
+        var error = await Assert.ThrowsAsync<RoamingNetworkHistoryLimitException>(async () => { using var history = await Read(input, asynchronous, work,
             limits: new(maxArchiveBytes: maximum), commitTrust: (commit, peer) => { calls++; return VerifyCommit(commit, peer); }); });
         Assert.That(error!.Violation, Is.EqualTo(new RoamingNetworkHistoryLimitViolation(RoamingNetworkHistoryLimitKind.ArchiveBytes, maximum, maximum + 1L)));
         Assert.That(input.Consumed, Is.EqualTo(maximum + 1)); Assert.That(calls, Is.Zero);
@@ -151,30 +151,30 @@ public sealed class ArchiveInputStreamTests
 
     [TestCase(1, false)] [TestCase(1, true)] [TestCase(2, false)] [TestCase(2, true)]
     [TestCase(3, false)] [TestCase(3, true)] [TestCase(4, false)] [TestCase(4, true)]
-    public void Inventory_limits_reject_before_trust_after_capture(Int32 profile, Boolean asynchronous)
+    public async Task Inventory_limits_reject_before_trust_after_capture(Int32 profile, Boolean asynchronous)
     {
         using var work = new Workspace(); using var input = new Input(Bytes(profile), asynchronous); var calls = 0;
-        var error = Assert.ThrowsAsync<RoamingNetworkHistoryLimitException>(async () => { using var history = await Read(input, asynchronous, work,
+        var error = await Assert.ThrowsAsync<RoamingNetworkHistoryLimitException>(async () => { using var history = await Read(input, asynchronous, work,
             limits: new(maxCommits: 1), commitTrust: (commit, peer) => { calls++; return VerifyCommit(commit, peer); }); });
         Assert.That(error!.Violation.Kind, Is.EqualTo(RoamingNetworkHistoryLimitKind.RetainedCommits));
         Assert.That(calls, Is.Zero); Assert.That(input.DisposeCalls, Is.Zero); work.Clean();
     }
 
     [TestCase(false)] [TestCase(true)]
-    public void Already_cancelled_input_does_not_read_or_create_a_file(Boolean asynchronous)
+    public async Task Already_cancelled_input_does_not_read_or_create_a_file(Boolean asynchronous)
     {
         using var work = new Workspace(); using var input = new Input(Bytes(), asynchronous); using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel(); var error = Assert.ThrowsAsync<OperationCanceledException>(async () => { using var history = await Read(input, asynchronous, work, token: cancellation.Token); });
+        cancellation.Cancel(); var error = await Assert.ThrowsAsync<OperationCanceledException>(async () => { using var history = await Read(input, asynchronous, work, token: cancellation.Token); });
         Assert.That(error!.CancellationToken, Is.EqualTo(cancellation.Token)); Assert.That(input.Reads, Is.Zero);
         Assert.That(input.DisposeCalls, Is.Zero); work.Clean();
     }
 
     [TestCase(false)] [TestCase(true)]
-    public void Cancellation_during_capture_deletes_only_owned_files(Boolean asynchronous)
+    public async Task Cancellation_during_capture_deletes_only_owned_files(Boolean asynchronous)
     {
         using var work = new Workspace(); using var cancellation = new CancellationTokenSource(); using var input = new Input(Bytes(), asynchronous) { Yield = asynchronous };
         input.OnRead = count => { if (count == 3) { Assert.That(work.Spools, Has.Length.EqualTo(1)); cancellation.Cancel(); } };
-        var error = Assert.ThrowsAsync<OperationCanceledException>(async () => { using var history = await Read(input, asynchronous, work, token: cancellation.Token); });
+        var error = await Assert.ThrowsAsync<OperationCanceledException>(async () => { using var history = await Read(input, asynchronous, work, token: cancellation.Token); });
         Assert.That(error!.CancellationToken, Is.EqualTo(cancellation.Token)); Assert.That(input.Reads, Is.EqualTo(3));
         Assert.That(input.DisposeCalls, Is.Zero); work.Clean();
     }
@@ -185,7 +185,7 @@ public sealed class ArchiveInputStreamTests
     {
         using var work = new Workspace(); using var cancellation = new CancellationTokenSource(); var bytes = Bytes(profile);
         using var input = new Input(bytes, asynchronous); var calls = 0;
-        var error = Assert.ThrowsAsync<OperationCanceledException>(async () => { using var history = await Read(input, asynchronous, work, token: cancellation.Token,
+        var error = await Assert.ThrowsAsync<OperationCanceledException>(async () => { using var history = await Read(input, asynchronous, work, token: cancellation.Token,
             commitTrust: (commit, peer) => { calls++; cancellation.Cancel(); return VerifyCommit(commit, peer); }); });
         Assert.That(error!.CancellationToken, Is.EqualTo(cancellation.Token)); Assert.That(calls, Is.EqualTo(1)); work.Clean();
         using var retry = new Input(bytes, asynchronous); using var history = await Read(retry, asynchronous, work);
@@ -204,11 +204,11 @@ public sealed class ArchiveInputStreamTests
     }
 
     [TestCase(false)] [TestCase(true)]
-    public void Source_IO_failure_after_spilling_releases_the_file_and_leaves_input_open(Boolean asynchronous)
+    public async Task Source_IO_failure_after_spilling_releases_the_file_and_leaves_input_open(Boolean asynchronous)
     {
         using var work = new Workspace(); using var input = new Input(Bytes(), asynchronous);
         input.OnRead = count => { if (count == 3) { Assert.That(work.Spools, Has.Length.EqualTo(1)); throw new IOException("Injected source failure."); } };
-        Assert.ThrowsAsync<IOException>(async () => { using var history = await Read(input, asynchronous, work); });
+        await Assert.ThrowsAsync<IOException>(async () => { using var history = await Read(input, asynchronous, work); });
         Assert.That(input.DisposeCalls, Is.Zero); work.Clean();
     }
 
@@ -217,7 +217,7 @@ public sealed class ArchiveInputStreamTests
     {
         using var work = new Workspace(); using var input = new Input(Bytes(), asynchronous);
         var missing = System.IO.Path.Combine(work.Path, "missing"); var options = new RoamingNetworkArchiveReadOptions(0, missing);
-        Assert.ThrowsAsync<DirectoryNotFoundException>(async () => {
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(async () => {
             using var history = asynchronous ? await RoamingNetworkHistory.ParseCBORAsync(input, readOptions: options) : RoamingNetworkHistory.ParseCBOR(input, readOptions: options);
         });
         Assert.That(Directory.Exists(missing), Is.False); Assert.That(input.DisposeCalls, Is.Zero); work.Clean();
@@ -227,10 +227,10 @@ public sealed class ArchiveInputStreamTests
     }
 
     [TestCase(false)] [TestCase(true)]
-    public void Unreadable_source_is_rejected_before_reading(Boolean asynchronous)
+    public async Task Unreadable_source_is_rejected_before_reading(Boolean asynchronous)
     {
         using var work = new Workspace(); using var input = new Input(Bytes(), asynchronous, readable: false);
-        Assert.ThrowsAsync<ArgumentException>(async () => { using var history = await Read(input, asynchronous, work); });
+        await Assert.ThrowsAsync<ArgumentException>(async () => { using var history = await Read(input, asynchronous, work); });
         Assert.That(input.Reads, Is.Zero); Assert.That(input.DisposeCalls, Is.Zero); work.Clean();
     }
 
@@ -249,10 +249,10 @@ public sealed class ArchiveInputStreamTests
     [TestCase(0, false)] [TestCase(0, true)]
     [TestCase(1, false)] [TestCase(1, true)]
     [TestCase(2, false)] [TestCase(2, true)]
-    public void Owned_capture_file_is_released_at_every_fault_seam(Int32 stage, Boolean asynchronous)
+    public async Task Owned_capture_file_is_released_at_every_fault_seam(Int32 stage, Boolean asynchronous)
     {
         using var work = new Workspace();
-        Assert.ThrowsAsync<IOException>(async () => {
+        await Assert.ThrowsAsync<IOException>(async () => {
             await using var spool = new POIArchiveInputSpool(new(0, work.Path), new(), asynchronous,
                 (current, path) => { if ((Int32) current == stage) throw new IOException("Injected spool failure."); });
             if (asynchronous) await spool.AppendAsync(Bytes(), default); else spool.Append(Bytes());
@@ -274,10 +274,10 @@ public sealed class ArchiveInputStreamTests
 
     [TestCase(1, false)] [TestCase(1, true)] [TestCase(2, false)] [TestCase(2, true)]
     [TestCase(3, false)] [TestCase(3, true)] [TestCase(4, false)] [TestCase(4, true)]
-    public void Missing_signature_verifiers_are_not_replaced_by_cancellation_wrappers(Int32 profile, Boolean asynchronous)
+    public async Task Missing_signature_verifiers_are_not_replaced_by_cancellation_wrappers(Int32 profile, Boolean asynchronous)
     {
         using var work = new Workspace(); using var input = new Input(Bytes(profile), asynchronous);
-        Assert.CatchAsync<ArgumentException>(async () => {
+        await Assert.CatchAsync<ArgumentException>(async () => {
             using var history = asynchronous
                 ? await RoamingNetworkHistory.ParseCBORAsync(input, authorizeSnapshotBoundary: _ => true, readOptions: new(0, work.Path))
                 : RoamingNetworkHistory.ParseCBOR(input, authorizeSnapshotBoundary: _ => true, readOptions: new(0, work.Path));
@@ -286,11 +286,11 @@ public sealed class ArchiveInputStreamTests
     }
 
     [TestCase(3, false)] [TestCase(3, true)] [TestCase(4, false)] [TestCase(4, true)]
-    public void Boundary_authority_remains_required(Int32 profile, Boolean asynchronous)
+    public async Task Boundary_authority_remains_required(Int32 profile, Boolean asynchronous)
     {
         using var work = new Workspace(); using var input = new Input(Bytes(profile), asynchronous); var calls = 0;
         Boolean Verify(RoamingNetworkCommit commit, RoamingNetworkChangeSetSignature peer) { calls++; return VerifyCommit(commit, peer); }
-        Assert.CatchAsync<ArgumentException>(async () => {
+        await Assert.CatchAsync<ArgumentException>(async () => {
             using var history = asynchronous
                 ? await RoamingNetworkHistory.ParseCBORAsync(input, VerifyBatch, Verify, readOptions: new(0, work.Path))
                 : RoamingNetworkHistory.ParseCBOR(input, VerifyBatch, Verify, readOptions: new(0, work.Path));
@@ -309,15 +309,15 @@ public sealed class ArchiveInputStreamTests
         var pending = Read(input, true, work, token: cancellation.Token);
         await input.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.That(work.Spools, Has.Length.EqualTo(1)); cancellation.Cancel();
-        var error = Assert.CatchAsync<OperationCanceledException>(async () => { using var history = await pending; });
+        var error = await Assert.CatchAsync<OperationCanceledException>(async () => { using var history = await pending; });
         Assert.That(error!.CancellationToken, Is.EqualTo(cancellation.Token)); Assert.That(input.DisposeCalls, Is.Zero); work.Clean();
     }
 
     [TestCase(false)] [TestCase(true)]
-    public void Private_spool_also_enforces_its_byte_budget(Boolean asynchronous)
+    public async Task Private_spool_also_enforces_its_byte_budget(Boolean asynchronous)
     {
         using var work = new Workspace();
-        Assert.ThrowsAsync<RoamingNetworkHistoryLimitException>(async () => {
+        await Assert.ThrowsAsync<RoamingNetworkHistoryLimitException>(async () => {
             await using var spool = new POIArchiveInputSpool(new(0, work.Path), new(maxArchiveBytes: 2), asynchronous);
             if (asynchronous) { await spool.AppendAsync(new Byte[2], default); await spool.AppendAsync(new Byte[1], default); }
             else { spool.Append(new Byte[2]); spool.Append(new Byte[1]); }

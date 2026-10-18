@@ -111,7 +111,7 @@ namespace WWCP_POI_Tests.Json
                   [ "solar", "100 %" ]
                 ],
                 "environmentalImpacts": [
-                  [ "CO2", "0 %" ]
+                  [ "CO2", "0 g/kWh" ]
                 ]
               }
             }

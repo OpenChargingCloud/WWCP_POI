@@ -274,9 +274,12 @@ public static class POIRepresentation
     /// <summary>
     /// The shares of an energy mix are [category, percentage] pairs, e.g. ["solar", "42.5 %"]:
     /// an array of them has its elements bound to the pair kind, whose second element is a reading.
+    /// The environmental impacts are [category, amount] pairs, e.g. ["CarbonDioxide", "350 g/kWh"]
+    /// (see WWCP_POI2's EnvironmentalImpactAmount): an amount per kWh, which Styx has no unit for,
+    /// so they stay text.
     /// </summary>
     internal static String? PairKind(String kind)
-        => kind is "EnergySource" or "EnvironmentalImpact"
+        => kind is "EnergySource"
                ? kind + "Pair"
                : null;
 
@@ -284,7 +287,7 @@ public static class POIRepresentation
     /// Whether the element at the given index of a pair is a reading.
     /// </summary>
     internal static Boolean IsPairReading(String kind, Int32 index)
-        => kind is "EnergySourcePair" or "EnvironmentalImpactPair" && index == 1;
+        => kind is "EnergySourcePair" && index == 1;
 
     /// <summary>
     /// Visit the [category, percentage] pairs below the given document.
