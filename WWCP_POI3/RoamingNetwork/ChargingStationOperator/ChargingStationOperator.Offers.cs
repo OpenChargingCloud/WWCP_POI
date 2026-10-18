@@ -15,6 +15,14 @@
  * limitations under the License.
  */
 
+#region Usings
+
+using System.Collections.Immutable;
+
+using org.GraphDefined.Vanaheimr.Illias;
+
+#endregion
+
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
@@ -24,6 +32,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     public sealed partial class ChargingStationOperator
     {
+
+        #region TimeZoneOf(EVSEId)
+
+        /// <summary>
+        /// The time zone the regular openings of charging tariff offers are local times of at the given EVSE of this
+        /// operator: the one of its charging pool as it is at runtime, UTC when it has none, or one unknown here.
+        /// </summary>
+        /// <param name="EVSEId">An EVSE of this operator.</param>
+        public TimeZoneInfo TimeZoneOf(EVSE_Id EVSEId)
+
+            => evseTimeZones.Value.TryGetValue(EVSEId, out var timeZone)
+                   ? timeZone
+                   : TimeZoneInfo.Utc;
+
+        /// <summary>
+        /// The time zones of the EVSEs whose charging pool, as it is at runtime, has a known one.
+        /// </summary>
+        private ImmutableDictionary<EVSE_Id, TimeZoneInfo> CalculateEVSETimeZones()
+        {
+
+            var timeZones = ImmutableDictionary.CreateBuilder<EVSE_Id, TimeZoneInfo>();
+
+            foreach (var chargingPool in ChargingPools)
+                if (EffectiveChargingPool(chargingPool).TimeZone is Time_Zone timeZone &&
+                    TimeZoneInfo.TryFindSystemTimeZoneById(timeZone.ToString(), out var timeZoneInfo))
+                {
+                    foreach (var evse in chargingPool.ChargingStations.SelectMany(chargingStation => chargingStation.EVSEs))
+                        timeZones[evse.Id] = timeZoneInfo;
+                }
+
+            return timeZones.ToImmutable();
+
+        }
+
+        #endregion
 
         #region CoveredEVSEs(Offer)
 
@@ -67,7 +110,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The error, when two charging tariff offers of this operator overlap: they cover the same EVSE, for some of the
-        /// same sessions, at some of the same times (see ChargingTariffOffer.Overlap).
+        /// same sessions, at some of the same times in the time zone of the EVSE (see ChargingTariffOffer.Overlap).
         /// </summary>
         private String? OverlappingOffers()
         {
@@ -84,14 +127,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             for (var i = 0; i < offers.Length; i++)
                 for (var j = i + 1; j < offers.Length; j++)
-                    if (ChargingTariffOffer.Overlap(offers[i], offers[j]) &&
-                        CoveredBy(offers[i]).Intersect(CoveredBy(offers[j])).
-                                             OrderBy(evseId => evseId.ToString(), StringComparer.Ordinal).
-                                             Cast<EVSE_Id?>().
-                                             FirstOrDefault() is EVSE_Id evseId)
+                    if (ChargingTariffOffer.SessionsOverlap(offers[i], offers[j]) &&
+                        FirstOverlap(offers[i], offers[j], CoveredBy(offers[i]).Intersect(CoveredBy(offers[j])), TimeZoneOf) is EVSE_Id evseId)
                     {
                         return $"The charging tariff offers '{offers[i].Id}' and '{offers[j].Id}' of the operator '{Id}' overlap at the EVSE '{evseId}': they must not cover the same EVSE for the same sessions at the same times!";
                     }
+
+            return null;
+
+        }
+
+        #endregion
+
+        #region (internal static) FirstOverlap(Offer1, Offer2, EVSEIds, TimeZoneOf)
+
+        /// <summary>
+        /// The first of the given EVSEs, both offers cover, in the ordinal order, in whose time zone the offers apply at
+        /// some of the same times; null, when there is none. The times are compared once per time zone.
+        /// </summary>
+        internal static EVSE_Id? FirstOverlap(ChargingTariffOffer           Offer1,
+                                              ChargingTariffOffer           Offer2,
+                                              IEnumerable<EVSE_Id>          EVSEIds,
+                                              Func<EVSE_Id, TimeZoneInfo>   TimeZoneOf)
+        {
+
+            var overlapIn = new Dictionary<TimeZoneInfo, Boolean>();
+
+            foreach (var evseId in EVSEIds.OrderBy(evseId => evseId.ToString(), StringComparer.Ordinal))
+            {
+
+                var timeZone = TimeZoneOf(evseId);
+
+                if (!overlapIn.TryGetValue(timeZone, out var overlap))
+                    overlapIn[timeZone] = overlap = ChargingTariffOffer.TimesOverlap(Offer1, Offer2, timeZone);
+
+                if (overlap)
+                    return evseId;
+
+            }
 
             return null;
 
@@ -107,6 +180,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IEnumerable<ChargingTariffOffer> OffersCovering(EVSE_Id EVSEId)
 
             => ChargingTariffOffers.Where(offer => CoveredEVSEs(offer).Contains(EVSEId));
+
+        #endregion
+
+        #region ApplicableOffers(EVSEId, Timestamp)
+
+        /// <summary>
+        /// The charging tariff offers of this operator that apply at the given EVSE of it at the given time: covering it,
+        /// active then and open by their opening times in its time zone. They are for different sessions, as they do not
+        /// overlap.
+        /// </summary>
+        public IEnumerable<ChargingTariffOffer> ApplicableOffers(EVSE_Id         EVSEId,
+                                                                 DateTimeOffset  Timestamp)
+
+            => OffersCovering(EVSEId).Where(offer => offer.AppliesAt(Timestamp, TimeZoneOf(EVSEId)));
 
         #endregion
 

@@ -86,6 +86,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private Lazy<POICollection<ChargingPool_Id, ChargingPool>>        effectiveChargingPools;
 
         /// <summary>
+        /// The time zones of its EVSEs, of their charging pools as they are at runtime, calculated when asked for.
+        /// </summary>
+        private readonly Lazy<ImmutableDictionary<EVSE_Id, TimeZoneInfo>>  evseTimeZones;
+
+        /// <summary>
         /// The last changes effective members have at least, as StampChangedEffective(…) found them: kept by the next version
         /// while they are the same.
         /// </summary>

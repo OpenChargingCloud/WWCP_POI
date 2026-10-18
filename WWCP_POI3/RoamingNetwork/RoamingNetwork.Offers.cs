@@ -84,6 +84,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region ApplicableOffers(EVSEId, Timestamp)
+
+        /// <summary>
+        /// The charging tariff offers that apply at the given EVSE at the given time: covering it, active then and open by
+        /// their opening times in the time zone of its charging pool. Of its operator all of them, as they do not overlap;
+        /// of an e-mobility provider, whose offers may come to overlap by the changes of others, the one that applies in
+        /// place of the others (ChargingTariffOffer.Precedes). In the order of OffersCovering(…).
+        /// </summary>
+        /// <param name="EVSEId">An EVSE.</param>
+        /// <param name="Timestamp">A time.</param>
+        public IEnumerable<ChargingTariffOffer> ApplicableOffers(EVSE_Id         EVSEId,
+                                                                 DateTimeOffset  Timestamp)
+        {
+
+            if (!chargingStationOperators.TryGet(EVSEId.OperatorId, out var chargingStationOperator) ||
+                !chargingStationOperator.TryGetEVSE(EVSEId, out _))
+            {
+                return [];
+            }
+
+            var timeZone        = chargingStationOperator.TimeZoneOf(EVSEId);
+
+            var providerOffers  = eMobilityProviders.
+                                      Select(eMobilityProvider => eMobilityProvider.ChargingTariffOffers.
+                                                                      Where    (offer => offer.AppliesAt(Timestamp, timeZone) &&
+                                                                                         CoveredEVSEs(offer, chargingStationOperators.Index, eMobilityProviders).Contains(EVSEId)).
+                                                                      Aggregate((ChargingTariffOffer?) null,
+                                                                                (applying, offer) => applying is null || ChargingTariffOffer.Precedes(offer, applying) ? offer : applying)).
+                                      OfType<ChargingTariffOffer>();
+
+            return chargingStationOperator.ApplicableOffers(EVSEId, Timestamp).
+                       Concat(providerOffers).
+                       ToArray();
+
+        }
+
+        #endregion
+
 
         #region (internal static) DuplicateChargingTariffOffer(ChargingStationOperators, EMobilityProviders)
 
@@ -186,7 +224,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The pairs of charging tariff offers of the given e-mobility provider that overlap: they cover the same EVSE, for
-        /// some of the same sessions, at some of the same times; with the first such EVSE, in the ordinal order.
+        /// some of the same sessions, at some of the same times in the time zone of the EVSE; with the first such EVSE, in
+        /// the ordinal order.
         /// </summary>
         internal static Dictionary<(ChargingTariffOffer_Id, ChargingTariffOffer_Id), EVSE_Id> OverlappingOffers(EMobilityProvider                                                         EMobilityProvider,
                                                                                                                 IReadOnlyDictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators,
@@ -205,13 +244,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return evseIds;
             }
 
+            TimeZoneInfo TimeZoneOf(EVSE_Id EVSEId)
+                => ChargingStationOperators.TryGetValue(EVSEId.OperatorId, out var chargingStationOperator)
+                       ? chargingStationOperator.TimeZoneOf(EVSEId)
+                       : TimeZoneInfo.Utc;
+
             for (var i = 0; i < offers.Length; i++)
                 for (var j = i + 1; j < offers.Length; j++)
-                    if (ChargingTariffOffer.Overlap(offers[i], offers[j]) &&
-                        CoveredBy(offers[i]).Intersect(CoveredBy(offers[j])).
-                                             OrderBy(evseId => evseId.ToString(), StringComparer.Ordinal).
-                                             Cast<EVSE_Id?>().
-                                             FirstOrDefault() is EVSE_Id evseId)
+                    if (ChargingTariffOffer.SessionsOverlap(offers[i], offers[j]) &&
+                        ChargingStationOperator.FirstOverlap(offers[i], offers[j], CoveredBy(offers[i]).Intersect(CoveredBy(offers[j])), TimeZoneOf) is EVSE_Id evseId)
                     {
                         overlaps[(offers[i].Id, offers[j].Id)] = evseId;
                     }

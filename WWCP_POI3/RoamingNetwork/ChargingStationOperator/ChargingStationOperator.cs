@@ -1180,18 +1180,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region The members of its groups, the groups of its offers, and its offers not overlapping
-
-            if (CheckGroupsAndOffers && InvalidGroupOrOffer() is String groupOrOfferError)
-                throw new ArgumentException(groupOrOfferError, nameof(ChargingTariffOffers));
-
-            #endregion
-
             #region Effective charging tariffs, charging pools, charging stations and EVSEs, with the properties their templates give them
 
             this.effectiveChargingTariffs = CalculateEffectiveChargingTariffs();
             (this.effectiveEVSEs, this.effectiveChargingStations, this.effectiveChargingPoolIndex) = CalculateEffective();
             this.effectiveChargingPools = new (CalculateEffectiveChargingPools);
+            this.evseTimeZones          = new (CalculateEVSETimeZones);
+
+            #endregion
+
+            #region The members of its groups, the groups of its offers, and its offers not overlapping in the time zones of its EVSEs
+
+            if (CheckGroupsAndOffers && InvalidGroupOrOffer() is String groupOrOfferError)
+                throw new ArgumentException(groupOrOfferError, nameof(ChargingTariffOffers));
 
             #endregion
 

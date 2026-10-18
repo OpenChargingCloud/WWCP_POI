@@ -755,7 +755,10 @@ Its content is `@id`, `name`, `description`, `dataSource`, `created`, `lastChang
   groups, or where its operator is named.
 - **When:** `notBefore` and `notAfter`, both inclusive, as of keys (section 4.1); absent, always since
   and for good. `openingTimes`, as a charging pool writes them, e.g. every day from 18:00 to 06:00;
-  absent, at any time. An offer applies to the part of a session within these times, as the
+  absent, at any time. Their regular openings are local times of the time zone of the EVSE's charging
+  pool as it is at runtime (`timeZone`), UTC where it has none; their exceptional openings and closings
+  are periods of absolute time: an exceptional closing closes, else an exceptional opening opens, else
+  the regular openings apply. An offer applies to the part of a session within these times, as the
   restrictions of a tariff element do: a session from 17:30 to 19:00 takes an offer opening at 18:00
   from 18:00 on.
 - **For which sessions:** `maxSessionsPerContract`, how often one contract, or ad hoc one means of
@@ -777,11 +780,17 @@ them.
 
 **No overlap.** Two offers of one owner overlap where they cover the same EVSE, for sessions both apply
 to (ad hoc, or with a contract of a provider both name, or one of them names none), at times both apply
-in, by their `notBefore`, `notAfter` and `openingTimes`. A version where two offers of an operator
+in, by their `notBefore`, `notAfter` and `openingTimes` in the time zone of that EVSE, exceptional
+openings and closings included. A version where two offers of an operator
 overlap is invalid: they and what they cover are its own data, checked per EVSE. A change set of a
 provider MUST NOT make two of its offers overlap; where they come to overlap by the changes of others,
 e.g. an operator adding an EVSE to a group both name, the one with the later `notBefore` applies, of the
 same `notBefore` the one with the ordinal lower identification.
+
+**Which offers apply.** At an EVSE at a time, the offers apply that cover it, are `active` then and whose
+opening times are open then: of its operator all of them, which are for different sessions; of a
+provider the one that applies in place of its others by the rule above. POI_API lists them below an
+EVSE, charging station or charging pool with `?applicable=true`, at another time than now with `&at=`.
 
 **References across owners are weak.** A provider's groups and offers name members, groups and
 operators of others without asking them. A member, group or operator that does not exist (any more) is
@@ -792,7 +801,9 @@ can remove a charging station and add it to another pool of its operator, its gr
 EVSEs throughout.
 
 - **Runtime status** (not content): `planned` before its `notBefore`, `active`, `expired` after its
-  `notAfter`, unless its owner sets `exhausted` before, e.g. when its budget is used up.
+  `notAfter`, unless its owner sets `exhausted` before, e.g. when its budget is used up. It becomes
+  `active` and `expired` without being set: a server tells of these changes at their times as of every
+  other status, so that subscribers and peers learn of them; an offer new in a version is told by it.
 - **Effective content:** offers are content, child arrays of their owners (8.2), but they change no
   effective member, and a station proof (8.4) gives none (9.5).
 - **Publishers** (informative): OCPI knows no offers. An operator's active offer without

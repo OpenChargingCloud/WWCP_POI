@@ -71,6 +71,14 @@ applies to the part of a charging session within these times, as the restriction
 session from 17:30 to 19:00 takes an offer opening at 18:00 from 18:00 on. It applies only while it is `active`
 ([runtime status](#runtime-status)).
 
+- **Time zone:** the regular openings are local times of the time zone of the charging pool of the EVSE, as it is at
+  runtime (its `timeZone`, also one a [template](ChargingPoolTemplate.md) gives it); UTC where it has none, or one
+  unknown. At EVSEs in two time zones an offer opening at 18:00 opens at two times.
+- **Exceptional periods:** exceptional openings and closings are periods of absolute time. During an exceptional
+  closing the offer does not apply, else during an exceptional opening it does, else by its regular openings.
+  Opening times without any regular opening are open at any time, but for their exceptional closings.
+- `ChargingTariffOffer.IsOpenAt(timestamp, timeZone)` and `AppliesAt(timestamp, timeZone)` tell it for one time.
+
 
 ## What it changes
 
@@ -91,14 +99,33 @@ session from 17:30 to 19:00 takes an offer opening at 18:00 from 18:00 on. It ap
 
 Two offers of one owner **overlap** where they cover the same EVSE, for sessions both apply to (ad hoc, or with a
 contract of a provider both name, or one of them names none), at times both apply in, by their `notBefore`,
-`notAfter` and `openingTimes`.
+`notAfter` and `openingTimes` in the time zone of that EVSE.
+
+- **Exactly:** within the times both their `notBefore` and `notAfter` leave, the boundaries of their exceptional
+  periods split the time into stretches; in each, an offer is closed, open, or open by its regular openings. A
+  stretch of more than a week, also one without an end, is compared week by week, a shorter one day by day in the
+  time zone (`ChargingTariffOffer.TimesOverlap(offer1, offer2, timeZone)`). So an offer for two weekdays does not
+  overlap one for Saturdays, and offers without an end stay cheap to compare.
+- **Per time zone:** the times of two offers are compared once for every time zone of the EVSEs both cover; the
+  error names the first EVSE, in the ordinal order, where they overlap. A change set giving a charging pool another
+  time zone can make offers overlap there.
 
 - **Operators:** a version where two offers of an operator overlap is invalid, and so is a change set making them
   overlap. The offers, their groups and the EVSEs are all the operator's data; it is checked per EVSE.
 - **Providers:** a change set of a provider must not make two of its offers overlap. They may still come to overlap
   by the changes of others, e.g. when an operator adds an EVSE to a group both name; then the one with the later
-  `notBefore` applies, of the same `notBefore` the one with the ordinal lower identification. A version is never
-  invalid for the data of two owners together.
+  `notBefore` applies, of the same `notBefore` the one with the ordinal lower identification
+  (`ChargingTariffOffer.Precedes`). A version is never invalid for the data of two owners together.
+
+
+## Which offers apply
+
+At an EVSE at a time, the offers apply that cover it, are `active` then and whose opening times are open then
+(`RoamingNetwork.ApplicableOffers(evseId, timestamp)`):
+
+- of its operator all of them: they do not overlap, so they are for different sessions, e.g. one for ad hoc
+  sessions and one for contracts;
+- of each provider at most one: of its offers that came to overlap there, the one that applies in place of the others.
 
 
 ## References across owners
@@ -117,6 +144,10 @@ See [runtime status](README.md#runtime-status) for the mechanism.
 - **Status** `ChargingTariffOfferStatusType`: `planned` before its `notBefore`, `active` from then on, `expired`
   after its `notAfter`, calculated; unless its owner sets `exhausted` before, e.g. when its budget is used up or it
   ends early. Only an `active` offer applies.
+- **Told when it changes:** the runtime status wakes up at the `notBefore` of an offer and right after its
+  `notAfter`, and tells of the new status by a status update (`OnStatusUpdate`, with the old one), though no status
+  was set: so subscribers and peers learn of it. An offer new in a version is not told of, the version tells it;
+  its owner setting it `exhausted`, or no longer, is told as every set status is.
 - **Admin status** `ChargingTariffOfferAdminStatusType`, set manually, as of every entity.
 
 The status is not content: a budget used up changes no version, and is sent to peers as every status is.
@@ -128,6 +159,9 @@ The status is not content: a budget used up changes no version, and is sent to p
 - `…/EVSEs/{EVSE_Id}/CTOs` lists the offers covering an EVSE, of its operator and of providers; `…/CSs/{CS_Id}/CTOs`
   and `…/CPs/{CP_Id}/CTOs` those covering one of its EVSEs. `?status=active` leaves out all others,
   `?eMobilityProviderId=` all but those of the operator and of that provider.
+- `?applicable=true` leaves out all but the offers that [apply](#which-offers-apply) at one of its EVSEs now;
+  `&at=2026-10-12T20:00:00Z` at another time. `at` without `applicable=true`, another value of `applicable`, or a
+  time that is none, is refused (`400`).
 - An EVSE, charging station or charging pool itself does not change: the offers are not part of what it is at runtime.
 
 

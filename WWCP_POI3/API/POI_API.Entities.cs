@@ -19,6 +19,7 @@
 
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -64,7 +65,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTOs/{CTO_Id}                              a charging tariff offer of the charging station operator
     /// GET ~/…/CPs/{CP_Id}/CTOs, ~/…/CSs/{CS_Id}/CTOs, ~/…/EVSEs/{EVSE_Id}/CTOs     the charging tariff offers covering one of its EVSEs,
     ///                                                                             of its operator and of e-mobility providers;
-    ///                                                                             ?status=active, ?eMobilityProviderId=… filter them
+    ///                                                                             ?status=active, ?eMobilityProviderId=… filter them;
+    ///                                                                             ?applicable=true, also &at=…, those that apply
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs                                       its charging tariff groups, as it embeds them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs/{CTG_Id}                              a charging tariff group of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPGs                                       its charging pool groups, as it embeds them
@@ -1290,7 +1292,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Answer GET of the given path with the charging tariff offers covering one of the given EVSEs: of their operator,
         /// then of e-mobility providers, each in the order of their identifications, searched and paged by the query of the
         /// request. ?status= leaves out the offers of another status now, e.g. ?status=active; ?eMobilityProviderId= the
-        /// offers of every other provider. HEAD by Hermod from it, and OPTIONS.
+        /// offers of every other provider; ?applicable=true those that do not apply at one of the EVSEs now, or at the time
+        /// &at= gives (RoamingNetwork.ApplicableOffers). HEAD by Hermod from it, and OPTIONS.
         /// </summary>
         /// <param name="Path">The path of the list, below the one of the member.</param>
         /// <param name="EVSEs">The roaming network and the EVSEs of the member the path names, or why there are none.</param>
@@ -1336,20 +1339,54 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                      }
 
+                                     var now        = Timestamp.Now;
+
+                                     // The offers that apply at the given time, now by default.
+                                     DateTimeOffset? applicableAt = null;
+
+                                     if (request.QueryString.GetString("applicable") is String applicableText)
+                                     {
+
+                                         if (applicableText != "true")
+                                             return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Invalid applicable '{applicableText}': only true!");
+
+                                         applicableAt = now;
+                                         further.Add(("applicable", applicableText));
+
+                                     }
+
+                                     if (request.QueryString.GetString("at") is String atText)
+                                     {
+
+                                         if (!applicableAt.HasValue)
+                                             return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "A time 'at' is only given together with applicable=true!");
+
+                                         if (!DateTimeOffset.TryParse(atText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var at))
+                                             return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Invalid time '{atText}'!");
+
+                                         applicableAt = at;
+                                         further.Add(("at", atText));
+
+                                     }
+
                                      if (!TryParseListQuery(request, further, out var query, out errorResponse))
                                          return errorResponse!;
 
-                                     var now        = Timestamp.Now;
                                      var operators  = roamingNetwork.ChargingStationOperators.ToDictionary(chargingStationOperator => chargingStationOperator.Id);
                                      var providers  = roamingNetwork.EMobilityProviders.ToArray();
 
+                                     var applicable = applicableAt.HasValue
+                                                          ? evseIds.SelectMany(evseId => roamingNetwork.ApplicableOffers(evseId, applicableAt.Value)).Select(offer => offer.Id).ToHashSet()
+                                                          : null;
+
                                      var operatorOffers  = evseIds.SelectMany(evseId => operators.TryGetValue(evseId.OperatorId, out var chargingStationOperator)
                                                                                             ? chargingStationOperator.OffersCovering(evseId)
-                                                                                            : []);
+                                                                                            : []).
+                                                                   Where     (offer             => applicable?.Contains(offer.Id) != false);
 
                                      var providerOffers  = providers.Where     (eMobilityProvider => !providerId.HasValue || eMobilityProvider.Id == providerId.Value).
                                                                      SelectMany(eMobilityProvider => eMobilityProvider.ChargingTariffOffers).
-                                                                     Where     (offer             => RoamingNetwork.CoveredEVSEs(offer, operators, providers).Overlaps(evseIds));
+                                                                     Where     (offer             => applicable?.Contains(offer.Id) ?? RoamingNetwork.CoveredEVSEs(offer, operators, providers).Overlaps(evseIds));
 
                                      var offers          = operatorOffers.DistinctBy(offer => offer.Id).OrderBy(offer => offer.Id.ToString(), StringComparer.Ordinal).
                                                                Concat(providerOffers.DistinctBy(offer => offer.Id).OrderBy(offer => offer.Id.ToString(), StringComparer.Ordinal)).

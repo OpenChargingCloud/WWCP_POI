@@ -124,6 +124,36 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     NotBefore:                   DateTimeOffset.Parse("2026-10-01T00:00:00Z"),
                     Created:                     Created);
 
+        /// <summary>
+        /// 10 % less at all EVSEs of DE*GEF, for every session, within the given times.
+        /// </summary>
+        internal static ChargingTariffOffer GEFOffer(String                  Id,
+                                                     DateTimeOffset?         NotBefore      = null,
+                                                     DateTimeOffset?         NotAfter       = null,
+                                                     ImmutableOpeningTimes?  OpeningTimes   = null)
+
+            => new (ChargingTariffOffer_Id.Parse(Id),
+                    Discount:                    new ChargingTariffDiscount(10),
+                    ChargingStationOperatorIds:  [ GEF ],
+                    NotBefore:                   NotBefore,
+                    NotAfter:                    NotAfter,
+                    OpeningTimes:                OpeningTimes,
+                    Created:                     Created);
+
+        /// <summary>
+        /// The opening times of the given day from the given hour to the other one, and what else is given.
+        /// </summary>
+        internal static ImmutableOpeningTimes Weekly(DayOfWeek Day, Byte From, Byte To, Action<OpeningTimes>? More = null)
+        {
+
+            var openingTimes = new OpeningTimes().AddRegularOpening(Day, new HourMin(From, 0), new HourMin(To, 0));
+
+            More?.Invoke(openingTimes);
+
+            return new ImmutableOpeningTimes(openingTimes);
+
+        }
+
         #endregion
 
         #region NewNetwork(OperatorOffers = null, ProviderOffers = null)
@@ -407,6 +437,208 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Offers_overlap_only_at_the_same_times()
+
+        /// <summary>
+        /// Two offers overlap only at times both apply in: within their common notBefore and notAfter, by their regular
+        /// openings in the time zone of the EVSE, and by their exceptional openings and closings, periods of absolute time.
+        /// </summary>
+        [Test]
+        public void Offers_overlap_only_at_the_same_times()
+        {
+
+            var monday          = DateTimeOffset.Parse("2026-10-19T00:00:00Z");
+            var berlin          = TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin");
+
+            var mondayTuesday   = GEFOffer("mon-tue",     NotBefore: monday, NotAfter: monday.AddDays(2).AddTicks(-1));
+            var mondayToSunday  = GEFOffer("mon-sun",     NotBefore: monday, NotAfter: monday.AddDays(7).AddTicks(-1));
+            var saturdays       = GEFOffer("saturdays",   OpeningTimes: Weekly(DayOfWeek.Saturday, 8, 20));
+            var closed          = GEFOffer("closed",      OpeningTimes: new ImmutableOpeningTimes(new OpeningTimes().AddExceptionalClosing(monday.AddDays(-1), monday.AddDays(3))));
+            var closedHalf      = GEFOffer("closed-half", OpeningTimes: new ImmutableOpeningTimes(new OpeningTimes().AddExceptionalClosing(monday.AddDays(-1), monday.AddDays(1).AddHours(12))));
+            var mondays         = GEFOffer("mondays",     OpeningTimes: Weekly(DayOfWeek.Monday,  8, 10));
+            var tuesdays        = GEFOffer("tuesdays",    OpeningTimes: Weekly(DayOfWeek.Tuesday, 8, 10));
+            var andTuesday      = GEFOffer("and-tuesday", OpeningTimes: Weekly(DayOfWeek.Monday,  8, 10, openingTimes => openingTimes.AddExceptionalOpening(monday.AddDays(1).AddHours(9), monday.AddDays(1).AddHours(9.5))));
+
+            // On Wednesday from 8 to 9 local time, this week; and on that Wednesday from 6 to 7 UTC, 8 to 9 in Berlin.
+            var wednesday       = GEFOffer("wednesday",     NotBefore: monday, NotAfter: monday.AddDays(7).AddTicks(-1), OpeningTimes: Weekly(DayOfWeek.Wednesday, 8, 9));
+            var exceptionally   = GEFOffer("exceptionally", OpeningTimes: Weekly(DayOfWeek.Monday, 8, 9, openingTimes => openingTimes.AddExceptionalOpening(monday.AddDays(2).AddHours(6), monday.AddDays(2).AddHours(7))));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // Two days have no Saturday, a week has.
+                Assert.That(ChargingTariffOffer.TimesOverlap(mondayTuesday,  saturdays),          Is.False);
+                Assert.That(ChargingTariffOffer.TimesOverlap(mondayToSunday, saturdays),          Is.True);
+
+                // Closed during all of the other's times, or only during a part of them.
+                Assert.That(ChargingTariffOffer.TimesOverlap(mondayTuesday,  closed),             Is.False);
+                Assert.That(ChargingTariffOffer.TimesOverlap(mondayTuesday,  closedHalf),         Is.True);
+
+                // Mondays and Tuesdays do not overlap, an exceptional opening on a Tuesday does.
+                Assert.That(ChargingTariffOffer.TimesOverlap(mondays,        tuesdays),           Is.False);
+                Assert.That(ChargingTariffOffer.TimesOverlap(andTuesday,     tuesdays),           Is.True);
+                Assert.That(ChargingTariffOffer.TimesOverlap(tuesdays,       andTuesday),         Is.True);
+
+                // Regular openings are local times, exceptional periods absolute ones.
+                Assert.That(ChargingTariffOffer.TimesOverlap(wednesday,      exceptionally),          Is.False);
+                Assert.That(ChargingTariffOffer.TimesOverlap(wednesday,      exceptionally, berlin),  Is.True);
+
+                Assert.That(wednesday.IsOpenAt(monday.AddDays(2).AddHours(6.5)),          Is.False);
+                Assert.That(wednesday.IsOpenAt(monday.AddDays(2).AddHours(6.5), berlin),  Is.True);
+                Assert.That(closed.   IsOpenAt(monday.AddDays(2)),                        Is.False);
+                Assert.That(closed.   IsOpenAt(monday.AddDays(3)),                        Is.True);
+
+            }
+
+        }
+
+        #endregion
+
+        #region Offers_of_an_operator_overlap_in_the_time_zone_of_the_EVSE()
+
+        /// <summary>
+        /// Two offers of an operator at the same EVSEs, at times that are the same only in Berlin: the time zone of the
+        /// charging pool of an EVSE tells whether they overlap there, UTC without one. A change set giving the pool the
+        /// time zone of Berlin is refused, one giving it that of New York is not.
+        /// </summary>
+        [Test]
+        public void Offers_of_an_operator_overlap_in_the_time_zone_of_the_EVSE()
+        {
+
+            var monday         = DateTimeOffset.Parse("2026-10-19T00:00:00Z");
+            var wednesday      = GEFOffer("wednesday",     NotBefore: monday, NotAfter: monday.AddDays(7).AddTicks(-1), OpeningTimes: Weekly(DayOfWeek.Wednesday, 8, 9));
+            var exceptionally  = GEFOffer("exceptionally", OpeningTimes: Weekly(DayOfWeek.Monday, 8, 9, openingTimes => openingTimes.AddExceptionalOpening(monday.AddDays(2).AddHours(6), monday.AddDays(2).AddHours(7))));
+
+            var rn1            = NewNetwork(OperatorOffers: [ wednesday, exceptionally ]);
+            var gef1           = rn1.GetChargingStationOperatorById(GEF)!;
+
+            gef1.TryGetChargingPool(P1, out var p1);
+
+            var rn2            = Apply(rn1, RoamingNetworkChange.UpdateProperty(p1!, "timeZone", null, "America/New_York"));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(gef1.TimeZoneOf(E1),                                                        Is.EqualTo(TimeZoneInfo.Utc));
+                Assert.That(rn2.GetChargingStationOperatorById(GEF)!.TimeZoneOf(E1).Id,                 Does.Contain("New_York").Or.Contain("Eastern"));
+
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.UpdateProperty(p1!, "timeZone", null, "Europe/Berlin")),
+                            Throws.ArgumentException.With.Message.Contains("The charging tariff offers 'exceptionally' and 'wednesday' of the operator 'DE*GEF' overlap at the EVSE 'DE*GEF*E1*1'"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region The_applicable_offers_of_an_EVSE()
+
+        /// <summary>
+        /// At an EVSE the offers apply that cover it and are active and open then: of its operator all of them, of a
+        /// provider whose offers came to overlap by the changes of others the one with the later notBefore.
+        /// </summary>
+        [Test]
+        public void The_applicable_offers_of_an_EVSE()
+        {
+
+            var evening  = DateTimeOffset.Parse("2026-10-12T20:00:00Z");
+            var noon     = DateTimeOffset.Parse("2026-10-12T12:00:00Z");
+            var single   = EVSEGroup_Id.Parse("DE-GDF*EGSINGLE");
+
+            // A second offer of the provider, from September, at the EVSE of the second pool of DE*GEF...
+            var rn1      = NewNetwork();
+            var rn2      = Apply(rn1,
+                                 RoamingNetworkChange.Add(new EVSEGroup(single, EVSEIds: [ E3 ]), GDF),
+                                 RoamingNetworkChange.Add(new ChargingTariffOffer(ChargingTariffOffer_Id.Parse("gdf-single"),
+                                                                                  ChargingTariff:  new ChargingTariffOfferPrice(Currency.EUR, [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.35m, StepSize: 1) ]) ]),
+                                                                                  EVSEGroupIds:    [ single ],
+                                                                                  NotBefore:       DateTimeOffset.Parse("2026-09-01T00:00:00Z"),
+                                                                                  Created:         Created), GDF));
+
+            // ...which the operator moves to the partner site of the provider: both offers of the provider cover it.
+            var rn3      = Apply(rn2, RoamingNetworkChange.Remove(nameof(ChargingStation), S2.ToString()),
+                                      RoamingNetworkChange.Add   (nameof(ChargingStation), S2.ToString(), new ChargingStation(S2, Created: Created, EVSEs: [ new EVSE(E3, Created: Created) ]).ToJSON(), nameof(ChargingPool), P1.ToString()));
+
+            static IEnumerable<String> IdsOf(IEnumerable<ChargingTariffOffer> Offers)
+                => Offers.Select(offer => offer.Id.ToString());
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // The night offer of the operator in the evening, the HPC offer of the provider all day; the summer is over.
+                Assert.That(IdsOf(rn1.ApplicableOffers(E1, evening)),                                       Is.EqualTo(new[] { "gef-night", "gdf-hpc-39" }));
+                Assert.That(IdsOf(rn1.ApplicableOffers(E1, noon)),                                          Is.EqualTo(new[] { "gdf-hpc-39" }));
+                Assert.That(IdsOf(rn1.ApplicableOffers(E3, evening)),                                       Is.Empty);
+
+                // Of the two offers of the provider the one with the later notBefore, before it the other one.
+                Assert.That(IdsOf(rn3.OffersCovering  (E3)),                                                Is.EqualTo(new[] { "gef-summer-2026", "gdf-hpc-39", "gdf-single" }));
+                Assert.That(IdsOf(rn3.ApplicableOffers(E3, evening)),                                       Is.EqualTo(new[] { "gdf-hpc-39" }));
+                Assert.That(IdsOf(rn3.ApplicableOffers(E3, DateTimeOffset.Parse("2026-09-15T12:00:00Z"))),  Is.EqualTo(new[] { "gdf-single" }));
+
+            }
+
+        }
+
+        #endregion
+
+        #region The_status_of_an_offer_is_told_when_it_begins_and_when_it_ends()
+
+        /// <summary>
+        /// Its status follows its times: the runtime status tells of it when it becomes active at its notBefore and when it
+        /// expires after its notAfter, though no status was set.
+        /// </summary>
+        [Test]
+        public async Task The_status_of_an_offer_is_told_when_it_begins_and_when_it_ends()
+        {
+
+            var history  = RoamingNetworkHistory.Start(NewNetwork());
+            var told     = new List<POIStatusUpdate>();
+            var expired  = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            history.RuntimeStatus.OnStatusUpdate += statusUpdate => {
+
+                if (statusUpdate.EntityType == nameof(ChargingTariffOffer) && statusUpdate.EntityId == "gef-flash")
+                {
+
+                    lock (told)
+                        told.Add(statusUpdate);
+
+                    if (statusUpdate.Value == "expired")
+                        expired.TrySetResult();
+
+                }
+
+            };
+
+            var now      = Timestamp.Now;
+            var begin    = DateTimeOffset.FromUnixTimeMilliseconds(now.ToUnixTimeMilliseconds() + 1000);
+            var end      = begin.AddMilliseconds(500);
+
+            Assert.That(history.Commit(history.Head.RoamingNetwork.CreateSignedChangeSet([
+                            RoamingNetworkChange.Add(new ChargingTariffOffer(ChargingTariffOffer_Id.Parse("gef-flash"),
+                                                                             Discount:                    new ChargingTariffDiscount(10),
+                                                                             ChargingStationOperatorIds:  [ GEF ],
+                                                                             NotBefore:                   begin,
+                                                                             NotAfter:                    end,
+                                                                             Sessions:                    ChargingTariffOfferSessions.contract,
+                                                                             Created:                     Created), GEF)
+                        ], CreatedAt: now)).IsCommitted);
+
+            await expired.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(told.Select(statusUpdate => statusUpdate.Value),     Is.EqualTo(new[] { "active", "expired" }));
+                Assert.That(told[0].Timestamp,                                   Is.EqualTo(begin));
+                Assert.That(told[0].OldValue,                                    Is.EqualTo("planned"));
+                Assert.That(told[1].Timestamp,                                   Is.EqualTo(end));
+                Assert.That(Timestamp.Now,                                       Is.GreaterThan(end));
+            }
+
+        }
+
+        #endregion
+
         #region The_status_of_an_offer_follows_its_times_unless_exhausted()
 
         [Test]
@@ -645,6 +877,33 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(IdsOf(ofPool),                                            Is.EqualTo(new[] { "gef-night", "gef-summer-2026", "gdf-hpc-39" }));
                 Assert.That(invalid.StatusCode,                                       Is.EqualTo(HttpStatusCode.BadRequest));
 
+            }
+
+        }
+
+        #endregion
+
+        #region The_applicable_offers_are_served_below_the_EVSEs_they_cover()
+
+        [Test]
+        public async Task The_applicable_offers_are_served_below_the_EVSEs_they_cover()
+        {
+
+            var (_,        evening)  = await Get(EVSE + "/CTOs?applicable=true&at=2026-10-12T20:00:00Z");
+            var (_,        noon)     = await Get(EVSE + "/CTOs?applicable=true&at=2026-10-12T12:00:00Z");
+            var (_,        ofGDF)    = await Get(EVSE + "/CTOs?applicable=true&at=2026-10-12T12:00:00Z&eMobilityProviderId=DE-XYZ");
+            var (atAlone,  _)        = await Get(EVSE + "/CTOs?at=2026-10-12T20:00:00Z");
+            var (notTrue,  _)        = await Get(EVSE + "/CTOs?applicable=false");
+            var (noTime,   _)        = await Get(EVSE + "/CTOs?applicable=true&at=yesterday");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(IdsOf(evening),           Is.EqualTo(new[] { "gef-night", "gdf-hpc-39" }));
+                Assert.That(IdsOf(noon),              Is.EqualTo(new[] { "gdf-hpc-39" }));
+                Assert.That(IdsOf(ofGDF),             Is.Empty);
+                Assert.That(atAlone.StatusCode,       Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(notTrue.StatusCode,       Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(noTime.StatusCode,        Is.EqualTo(HttpStatusCode.BadRequest));
             }
 
         }

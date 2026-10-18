@@ -115,6 +115,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly Lock                               timerLock             = new ();
         private readonly Timer                              plannedStatusTimer;
 
+        /// <summary>
+        /// The status of every charging tariff offer of the head version as its times tell it, as told last: an offer
+        /// becoming active at its notBefore, or expiring after its notAfter, is told of by a status update.
+        /// </summary>
+        private readonly Dictionary<ChargingTariffOffer_Id, Timestamped<ChargingTariffOfferStatusType>>  offerStatuses      = [];
+        private readonly Lock                                                                            offerStatusesLock  = new ();
+
         #endregion
 
         #region Events
@@ -1304,6 +1311,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             SchedulePlannedStatus();
 
+            // Its offers may have other times now.
+            TakeOfferStatus(RoamingNetwork);
+
             // Its groups may have other members now.
             HeadChanged(RoamingNetwork);
 
@@ -2048,6 +2058,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var network  = history.Head.RoamingNetwork;
+            var now      = Timestamp.Now;
 
             var next     = new[] {
                                network.NextAdminStatus?.Timestamp,
@@ -2072,7 +2083,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            Concat(network.ChargingStationGroups.SelectMany(chargingStationGroup => new[] { chargingStationGroup.NextAdminStatus?.Timestamp, chargingStationGroup.NextStatus?.Timestamp })).
                            Concat(network.ChargingPoolGroups.SelectMany(chargingPoolGroup => new[] { chargingPoolGroup.NextAdminStatus?.Timestamp, chargingPoolGroup.NextStatus?.Timestamp })).
                            Concat(network.ChargingTariffGroups.SelectMany(chargingTariffGroup => new[] { chargingTariffGroup.NextAdminStatus?.Timestamp, chargingTariffGroup.NextStatus?.Timestamp })).
-                           Concat(network.ChargingTariffOffers.SelectMany(chargingTariffOffer => new[] { chargingTariffOffer.NextAdminStatus?.Timestamp, chargingTariffOffer.NextStatus?.Timestamp })).
+                           Concat(network.ChargingTariffOffers.SelectMany(chargingTariffOffer => new[] { chargingTariffOffer.NextAdminStatus?.Timestamp, chargingTariffOffer.NextStatus?.Timestamp, chargingTariffOffer.NextStatusChange(now) })).
                            Concat(network.ParkingSpaceGroups.SelectMany(parkingSpaceGroup => new[] { parkingSpaceGroup.NextAdminStatus?.Timestamp, parkingSpaceGroup.NextStatus?.Timestamp })).
                            Concat(network.EnergyMeterGroups.SelectMany(energyMeterGroup => new[] { energyMeterGroup.NextAdminStatus?.Timestamp, energyMeterGroup.NextStatus?.Timestamp })).
                            Concat(network.ChargingStationManufacturers.SelectMany(manufacturer => new[] { manufacturer.NextAdminStatus?.Timestamp, manufacturer.NextStatus?.Timestamp })).
@@ -2100,6 +2111,54 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 plannedStatusTimer.Change(due, Timeout.InfiniteTimeSpan);
 
             }
+
+        }
+
+        #endregion
+
+        #region (private) TakeOfferStatus(RoamingNetwork)
+
+        /// <summary>
+        /// Tell of every charging tariff offer of the given head version whose status, as its times tell it, is another
+        /// one than told last: it becomes active at its notBefore and expires after its notAfter, and no planned status of
+        /// its schedule tells so. An offer new in the version is not told of, the version tells it; its owner setting it
+        /// exhausted, or no longer, its schedule tells.
+        /// </summary>
+        private void TakeOfferStatus(RoamingNetwork RoamingNetwork)
+        {
+
+            var now      = Timestamp.Now;
+            var changed  = new List<(ChargingTariffOffer_Id Id, Timestamped<ChargingTariffOfferStatusType> New, Timestamped<ChargingTariffOfferStatusType> Old)>();
+
+            lock (offerStatusesLock)
+            {
+
+                var offers = RoamingNetwork.ChargingTariffOffers.ToDictionary(chargingTariffOffer => chargingTariffOffer.Id);
+
+                foreach (var gone in offerStatuses.Keys.Where(offerId => !offers.ContainsKey(offerId)).ToArray())
+                    offerStatuses.Remove(gone);
+
+                foreach (var offer in offers.Values)
+                {
+
+                    var status = offer.StatusSince(now);
+
+                    if (offerStatuses.TryGetValue(offer.Id, out var told) &&
+                        told.Value   != status.Value &&
+                        told.Value   != ChargingTariffOfferStatusType.Exhausted &&
+                        status.Value != ChargingTariffOfferStatusType.Exhausted)
+                    {
+                        changed.Add((offer.Id, status, told));
+                    }
+
+                    offerStatuses[offer.Id] = status;
+
+                }
+
+            }
+
+            foreach (var (offerId, newStatus, oldStatus) in changed)
+                Raise(POIRuntimeStatusKind.Status, nameof(ChargingTariffOffer), offerId.ToString(), newStatus, oldStatus, null);
 
         }
 
@@ -2199,6 +2258,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     _ = chargingTariffOffer.AdminStatus;
                     _ = chargingTariffOffer.Status;
                 }
+
+                TakeOfferStatus(network);
 
                 foreach (var parkingSpaceGroup in network.ParkingSpaceGroups)
                 {

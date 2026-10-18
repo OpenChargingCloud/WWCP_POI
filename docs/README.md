@@ -347,7 +347,8 @@ at runtime makes a precondition with it without a second request. The templates 
 its order (`…/CPs/{CP_Id}/CPTs`, `…/CSs/{CS_Id}/CSTs`, `…/EVSEs/{EVSE_Id}/EVSETs`, `…/CTs/{CT_Id}/CTTs`,
 `…/POs/{PO_Id}/PSs/{PS_Id}/PSTs`): with them and `?view=stored` a client tells which of its values come from which
 template, and calculates the effective member itself. Its groups are listed below it as well (`…/CPGs`, `…/CSGs`,
-`…/EVSEGs`, `…/PSGs`), and the [charging tariff offers](ChargingTariffOffer.md) covering it (`…/CTOs`). The owner and
+`…/EVSEGs`, `…/PSGs`), and the [charging tariff offers](ChargingTariffOffer.md) covering it (`…/CTOs`;
+`?applicable=true` those that apply). The owner and
 the roaming network embed the properties where they are given; so do their ETags, change sets and merges. The OCPI and
 DATEX II publishers publish the effective members; their importers keep in the templates what they give
 (`KeepWhatTemplatesGive`, by the same rules: of an array it unites, a member takes as its own only the elements whose

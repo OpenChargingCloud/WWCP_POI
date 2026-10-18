@@ -370,6 +370,62 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region NextStatusChange(Timestamp)
+
+        /// <summary>
+        /// When its status, as its times tell it, changes next after the given time: at its notBefore while it is
+        /// planned, right after its notAfter while it is active; null when it does not any more.
+        /// </summary>
+        public DateTimeOffset? NextStatusChange(DateTimeOffset Timestamp)
+
+            => NotBefore.HasValue && Timestamp <  NotBefore.Value ? NotBefore.Value
+             : NotAfter. HasValue && Timestamp <= NotAfter. Value ? After(NotAfter)
+             : null;
+
+        #endregion
+
+        #region IsOpenAt(Timestamp, TimeZone = null)
+
+        /// <summary>
+        /// Whether its opening times are open at the given time, at an EVSE in the given time zone, UTC when none is given:
+        /// not during an exceptional closing, but during an exceptional opening, else by its regular openings in local
+        /// time. Without opening times at any time.
+        /// </summary>
+        /// <param name="Timestamp">A time.</param>
+        /// <param name="TimeZone">The time zone of the charging pool of the EVSE, see SPECIFICATION 9.4.</param>
+        public Boolean IsOpenAt(DateTimeOffset  Timestamp,
+                                TimeZoneInfo?   TimeZone   = null)
+        {
+
+            var openness = OpenIn(OpeningTimes, Timestamp);
+
+            if (openness != Openness.Regularly)
+                return openness == Openness.Open;
+
+            var local = TimeZoneInfo.ConvertTime(Timestamp, TimeZone ?? TimeZoneInfo.Utc);
+
+            return RegularWeekOf(OpeningTimes!)[((Int32) local.DayOfWeek + 6) % 7 * 1440 + local.Hour * 60 + local.Minute];
+
+        }
+
+        #endregion
+
+        #region AppliesAt(Timestamp, TimeZone = null)
+
+        /// <summary>
+        /// Whether it applies at the given time at an EVSE it covers, in the given time zone: it is active then, and its
+        /// opening times are open.
+        /// </summary>
+        /// <param name="Timestamp">A time.</param>
+        /// <param name="TimeZone">The time zone of the charging pool of the EVSE, UTC when none is given.</param>
+        public Boolean AppliesAt(DateTimeOffset  Timestamp,
+                                 TimeZoneInfo?   TimeZone   = null)
+
+            => StatusAt(Timestamp) == ChargingTariffOfferStatusType.Active &&
+               IsOpenAt(Timestamp, TimeZone);
+
+        #endregion
+
         #region Covers(EVSE, ChargingStation, ChargingPool)
 
         /// <summary>
@@ -418,49 +474,190 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) TimesOverlap(Offer1, Offer2)
+        #region (static) TimesOverlap(Offer1, Offer2, TimeZone = null)
 
         /// <summary>
-        /// Whether the given offers apply at some of the same times: their notBefore and notAfter leave a common time,
-        /// and their opening times, compared week by week by their regular openings, too. Opening times with exceptional
-        /// openings count as open at any time, exceptional closings as open as well: the comparison errs on the side of
-        /// an overlap.
+        /// Whether the given offers apply at some of the same times at an EVSE in the given time zone, UTC when none is
+        /// given: some time within both their notBefore and notAfter, both inclusive, at which both their opening times
+        /// are open. Regular openings are local times of the time zone, exceptional openings and closings periods of
+        /// absolute time: an exceptional closing closes, else an exceptional opening opens, else the regular openings
+        /// apply. The boundaries of the exceptional periods split the common times into stretches; a stretch of more than
+        /// a week, also one without an end, is compared week by week, a shorter one day by day.
         /// </summary>
+        /// <param name="Offer1">A charging tariff offer.</param>
+        /// <param name="Offer2">Another charging tariff offer.</param>
+        /// <param name="TimeZone">The time zone of the charging pool of the EVSE, see SPECIFICATION 9.4.</param>
         public static Boolean TimesOverlap(ChargingTariffOffer  Offer1,
-                                           ChargingTariffOffer  Offer2)
+                                           ChargingTariffOffer  Offer2,
+                                           TimeZoneInfo?        TimeZone   = null)
         {
 
-            var begin  = Max(Offer1.NotBefore, Offer2.NotBefore);
-            var end    = Min(Offer1.NotAfter,  Offer2.NotAfter);
+            var timeZone  = TimeZone ?? TimeZoneInfo.Utc;
+            var begin     = Max(Offer1.NotBefore, Offer2.NotBefore);
+            var end       = After(Min(Offer1.NotAfter, Offer2.NotAfter));
 
-            if (begin.HasValue && end.HasValue && end.Value < begin.Value)
+            if (begin.HasValue && end.HasValue && end.Value <= begin.Value)
                 return false;
 
-            var week1  = WeekOf(Offer1.OpeningTimes);
-            var week2  = WeekOf(Offer2.OpeningTimes);
+            var points    = new List<DateTimeOffset?> { begin };
 
-            if (week1 is null || week2 is null)
-                return true;
+            points.AddRange(ExceptionalPeriodsOf(Offer1).Concat(ExceptionalPeriodsOf(Offer2)).
+                                SelectMany(period => new[] { period.Begin, period.End }).
+                                Where     (timestamp => (!begin.HasValue || timestamp > begin.Value) && (!end.HasValue || timestamp < end.Value)).
+                                Distinct  ().
+                                Order     ().
+                                Select    (timestamp => (DateTimeOffset?) timestamp));
 
-            return new BitArray(week1).And(week2).Cast<Boolean>().Any(open => open);
+            points.Add(end);
+
+            for (var i = 0; i < points.Count - 1; i++)
+                if (StretchOverlaps(Offer1, Offer2, points[i], points[i + 1], timeZone))
+                    return true;
+
+            return false;
 
         }
 
-        private static DateTimeOffset? Max(DateTimeOffset? A, DateTimeOffset? B)
-            => !A.HasValue ? B : !B.HasValue ? A : A.Value > B.Value ? A : B;
+        #endregion
 
-        private static DateTimeOffset? Min(DateTimeOffset? A, DateTimeOffset? B)
-            => !A.HasValue ? B : !B.HasValue ? A : A.Value < B.Value ? A : B;
+        #region (static) Overlap(Offer1, Offer2, TimeZone = null)
 
         /// <summary>
-        /// The minutes of a week, from Monday 00:00, the given opening times are regularly open at; null for at any time.
-        /// A period ending before it begins ends the next day.
+        /// Whether the given offers, both covering an EVSE in the given time zone, overlap there: for some of the same
+        /// sessions, at some of the same times.
         /// </summary>
-        private static BitArray? WeekOf(ImmutableOpeningTimes? OpeningTimes)
+        /// <param name="Offer1">A charging tariff offer.</param>
+        /// <param name="Offer2">Another charging tariff offer.</param>
+        /// <param name="TimeZone">The time zone of the charging pool of the EVSE, UTC when none is given.</param>
+        public static Boolean Overlap(ChargingTariffOffer  Offer1,
+                                      ChargingTariffOffer  Offer2,
+                                      TimeZoneInfo?        TimeZone   = null)
+
+            => SessionsOverlap(Offer1, Offer2) &&
+               TimesOverlap   (Offer1, Offer2, TimeZone);
+
+        #endregion
+
+        #region (static) Precedes(Offer1, Offer2)
+
+        /// <summary>
+        /// Whether the first offer applies in place of the second one, where two offers of an e-mobility provider came to
+        /// overlap by the changes of others: the one with the later notBefore, of the same notBefore the one with the
+        /// ordinal lower identification. An offer without a notBefore has the earliest one.
+        /// </summary>
+        public static Boolean Precedes(ChargingTariffOffer  Offer1,
+                                       ChargingTariffOffer  Offer2)
         {
 
-            if (OpeningTimes is null || OpeningTimes.IsOpen24Hours || !OpeningTimes.ExceptionalOpenings.IsDefaultOrEmpty)
-                return null;
+            var notBefore1 = Offer1.NotBefore ?? DateTimeOffset.MinValue;
+            var notBefore2 = Offer2.NotBefore ?? DateTimeOffset.MinValue;
+
+            return notBefore1 != notBefore2
+                       ? notBefore1 > notBefore2
+                       : String.CompareOrdinal(Offer1.Id.ToString(), Offer2.Id.ToString()) < 0;
+
+        }
+
+        #endregion
+
+
+        #region (private static) StretchOverlaps(Offer1, Offer2, From, To, TimeZone)
+
+        /// <summary>
+        /// Whether the given offers are both open at some time from the given one, or ever before, to the other one, or for
+        /// good: no boundary of an exceptional period of theirs lies in between, so each is closed, open, or open by its
+        /// regular openings in all of it.
+        /// </summary>
+        private static Boolean StretchOverlaps(ChargingTariffOffer  Offer1,
+                                               ChargingTariffOffer  Offer2,
+                                               DateTimeOffset?      From,
+                                               DateTimeOffset?      To,
+                                               TimeZoneInfo         TimeZone)
+        {
+
+            // A time within it tells what is in effect in all of it; without a beginning and an end, nothing exceptional.
+            var probe   = From ?? To?.AddTicks(-1);
+
+            var open1   = OpenIn(Offer1.OpeningTimes, probe);
+            var open2   = OpenIn(Offer2.OpeningTimes, probe);
+
+            if (open1 == Openness.Closed || open2 == Openness.Closed)
+                return false;
+
+            if (open1 == Openness.Open && open2 == Openness.Open)
+                return true;
+
+            // One or both of them by their regular openings: a stretch of more than a week has every time of the week.
+            var week1   = open1 == Openness.Regularly ? RegularWeekOf(Offer1.OpeningTimes!) : null;
+            var week2   = open2 == Openness.Regularly ? RegularWeekOf(Offer2.OpeningTimes!) : null;
+
+            if (!From.HasValue || !To.HasValue || To.Value - From.Value > TimeSpan.FromDays(8))
+                return week1 is null ? Any(week2!)
+                     : week2 is null ? Any(week1)
+                     : Any(new BitArray(week1).And(week2));
+
+            var periods1 = week1 is null ? [ (From.Value, To.Value) ] : RegularPeriodsOf(week1, From.Value, To.Value, TimeZone);
+            var periods2 = week2 is null ? [ (From.Value, To.Value) ] : RegularPeriodsOf(week2, From.Value, To.Value, TimeZone);
+
+            return periods1.Any(period1 => periods2.Any(period2 => period1.Begin < period2.End && period2.Begin < period1.End));
+
+        }
+
+        #endregion
+
+        #region (private) Openness / (private static) OpenIn(OpeningTimes, Timestamp)
+
+        private enum Openness
+        {
+            Closed,
+            Open,
+            Regularly
+        }
+
+        /// <summary>
+        /// Whether the given opening times are closed at the given time by an exceptional closing, open by an exceptional
+        /// opening or at any time, else open by their regular openings. Without a time, by their regular openings.
+        /// </summary>
+        private static Openness OpenIn(ImmutableOpeningTimes?  OpeningTimes,
+                                       DateTimeOffset?         Timestamp)
+        {
+
+            if (OpeningTimes is null)
+                return Openness.Open;
+
+            if (Timestamp.HasValue && OpeningTimes.ExceptionalClosings.Any(period => period.Begin <= Timestamp.Value && Timestamp.Value < period.End))
+                return Openness.Closed;
+
+            if (OpeningTimes.IsOpen24Hours)
+                return Openness.Open;
+
+            if (Timestamp.HasValue && OpeningTimes.ExceptionalOpenings.Any(period => period.Begin <= Timestamp.Value && Timestamp.Value < period.End))
+                return Openness.Open;
+
+            return Openness.Regularly;
+
+        }
+
+        #endregion
+
+        #region (private static) ExceptionalPeriodsOf(Offer)
+
+        private static IEnumerable<ExceptionalPeriod> ExceptionalPeriodsOf(ChargingTariffOffer Offer)
+
+            => Offer.OpeningTimes is ImmutableOpeningTimes openingTimes
+                   ? openingTimes.ExceptionalOpenings.Concat(openingTimes.ExceptionalClosings)
+                   : [];
+
+        #endregion
+
+        #region (private static) RegularWeekOf(OpeningTimes)
+
+        /// <summary>
+        /// The minutes of a week, from Monday 00:00 in local time, the given opening times are regularly open at. A period
+        /// ending at midnight ends at the end of its day.
+        /// </summary>
+        private static BitArray RegularWeekOf(ImmutableOpeningTimes OpeningTimes)
+        {
 
             var week = new BitArray(MinutesPerWeek);
 
@@ -491,17 +688,83 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Overlap(Offer1, Offer2)
+        #region (private static) RegularPeriodsOf(Week, From, To, TimeZone)
 
         /// <summary>
-        /// Whether the given offers, both covering an EVSE, overlap there: for some of the same sessions, at some of the
-        /// same times.
+        /// The periods of absolute time from the given time to the other one the given week of local minutes is open in:
+        /// a local time a change to daylight saving time skips is the first one after it.
         /// </summary>
-        public static Boolean Overlap(ChargingTariffOffer  Offer1,
-                                      ChargingTariffOffer  Offer2)
+        private static List<(DateTimeOffset Begin, DateTimeOffset End)> RegularPeriodsOf(BitArray        Week,
+                                                                                          DateTimeOffset  From,
+                                                                                          DateTimeOffset  To,
+                                                                                          TimeZoneInfo    TimeZone)
+        {
 
-            => SessionsOverlap(Offer1, Offer2) &&
-               TimesOverlap   (Offer1, Offer2);
+            var periods  = new List<(DateTimeOffset Begin, DateTimeOffset End)>();
+            var day      = TimeZoneInfo.ConvertTime(From, TimeZone).Date.AddDays(-1);
+            var lastDay  = TimeZoneInfo.ConvertTime(To,   TimeZone).Date.AddDays(1);
+
+            for (; day <= lastDay; day = day.AddDays(1))
+            {
+
+                var offset = ((Int32) day.DayOfWeek + 6) % 7 * 1440;
+
+                for (var minute = 0; minute < 1440; minute++)
+                {
+
+                    if (!Week[offset + minute])
+                        continue;
+
+                    var first = minute;
+
+                    while (minute < 1440 && Week[offset + minute])
+                        minute++;
+
+                    var begin  = AtLocal(day.AddMinutes(first),  TimeZone);
+                    var end    = AtLocal(day.AddMinutes(minute), TimeZone);
+
+                    if (begin < To && From < end)
+                        periods.Add((begin < From ? From : begin, end > To ? To : end));
+
+                }
+
+            }
+
+            return periods;
+
+        }
+
+        private static DateTimeOffset AtLocal(DateTime      Local,
+                                              TimeZoneInfo  TimeZone)
+        {
+
+            Local = DateTime.SpecifyKind(Local, DateTimeKind.Unspecified);
+
+            while (TimeZone.IsInvalidTime(Local))
+                Local = Local.AddMinutes(1);
+
+            return new DateTimeOffset(Local, TimeZone.GetUtcOffset(Local));
+
+        }
+
+        #endregion
+
+        #region (private static) Max(A, B) / Min(A, B) / After(Timestamp) / Any(Bits)
+
+        private static DateTimeOffset? Max(DateTimeOffset? A, DateTimeOffset? B)
+            => !A.HasValue ? B : !B.HasValue ? A : A.Value > B.Value ? A : B;
+
+        private static DateTimeOffset? Min(DateTimeOffset? A, DateTimeOffset? B)
+            => !A.HasValue ? B : !B.HasValue ? A : A.Value < B.Value ? A : B;
+
+        /// <summary>
+        /// The time right after the given inclusive end, the exclusive end.
+        /// </summary>
+        private static DateTimeOffset? After(DateTimeOffset? Timestamp)
+            => Timestamp.HasValue && Timestamp.Value < DateTimeOffset.MaxValue ? Timestamp.Value.AddTicks(1) : null;
+
+        private static Boolean Any(BitArray Bits)
+            => Bits.Cast<Boolean>().Any(bit => bit);
 
         #endregion
 

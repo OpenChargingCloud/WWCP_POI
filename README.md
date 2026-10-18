@@ -522,7 +522,7 @@ operator, pool, station or EVSE, its own, are listed by `…/Brands` below it, e
 names, in its order, are listed below it, each with its page below its owner: `…/CPs/{CP_Id}/CPTs`,
 `…/CSs/{CS_Id}/CSTs`, `…/EVSEs/{EVSE_Id}/EVSETs`, `…/CTs/{CT_Id}/CTTs` and `~/RNs/{RN_Id}/POs/{PO_Id}/PSs/{PS_Id}/PSTs`;
 so are the groups it is in, `…/CPGs`, `…/CSGs`, `…/EVSEGs` and `…/PSGs`, and the charging tariff offers covering it,
-`…/CTOs`. Every list, `~/RNs`,
+`…/CTOs` (`?applicable=true`, also `&at=`, those that apply now or then). Every list, `~/RNs`,
 `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` and
 the lists of what an operator embeds as well, takes:
 
