@@ -276,7 +276,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    .. ChargingStationOperator.ChargingStationGroups.Select(chargingStationGroup => Add(chargingStationGroup)),
                    .. ChargingStationOperator.ChargingPoolGroups.   Select(chargingPoolGroup    => Add(chargingPoolGroup)),
                    .. ChargingStationOperator.ChargingTariffGroups. Select(chargingTariffGroup  => Add(chargingTariffGroup)),
-                   .. ChargingStationOperator.EnergyMeterGroups.    Select(energyMeterGroup     => Add(energyMeterGroup, nameof(POI.ChargingStationOperator), ChargingStationOperator.Id.ToString()))
+                   .. ChargingStationOperator.EnergyMeterGroups.    Select(energyMeterGroup     => Add(energyMeterGroup, nameof(POI.ChargingStationOperator), ChargingStationOperator.Id.ToString())),
+                   .. ChargingStationOperator.ChargingTariffOffers. Select(chargingTariffOffer  => Add(chargingTariffOffer, ChargingStationOperator.Id))
                ];
 
         #endregion
@@ -546,8 +547,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    EMobilityProvider.ToJSON()));
 
         /// <summary>
-        /// Add the EVSE groups, charging station groups and charging pool groups of the given e-mobility provider, in this
-        /// order, to the provider once added: a change set the provider signs.
+        /// Add the EVSE groups, charging station groups, charging pool groups and charging tariff offers of the given
+        /// e-mobility provider, in this order, to the provider once added: a change set the provider signs.
         /// </summary>
         /// <param name="EMobilityProvider">The e-mobility provider with its groups.</param>
         public static IReadOnlyList<RoamingNetworkChange> AddChildren(EMobilityProvider EMobilityProvider)
@@ -555,7 +556,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => [
                    .. EMobilityProvider.EVSEGroups.           Select(evseGroup            => Add(evseGroup,            EMobilityProvider.Id)),
                    .. EMobilityProvider.ChargingStationGroups.Select(chargingStationGroup => Add(chargingStationGroup, EMobilityProvider.Id)),
-                   .. EMobilityProvider.ChargingPoolGroups.   Select(chargingPoolGroup    => Add(chargingPoolGroup,    EMobilityProvider.Id))
+                   .. EMobilityProvider.ChargingPoolGroups.   Select(chargingPoolGroup    => Add(chargingPoolGroup,    EMobilityProvider.Id)),
+                   .. EMobilityProvider.ChargingTariffOffers. Select(chargingTariffOffer  => Add(chargingTariffOffer,  EMobilityProvider.Id))
                ];
 
         /// <summary>
@@ -1345,6 +1347,53 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           JToken?                    OldValue   = null)
 
             => RemoveProperty(nameof(POI.ChargingTariffTemplate), ChargingTariffTemplate.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ChargingTariffOffer, ChargingStationOperatorId / EMobilityProviderId)
+
+        /// <summary>
+        /// Add the given charging tariff offer to the given charging station operator, at its own EVSEs.
+        /// </summary>
+        public static RoamingNetworkChange Add(ChargingTariffOffer         ChargingTariffOffer,
+                                               ChargingStationOperator_Id  ChargingStationOperatorId)
+
+            => Add(nameof(POI.ChargingTariffOffer), ChargingTariffOffer.Id.ToString(), ChargingTariffOffer.ToJSON(), nameof(POI.ChargingStationOperator), ChargingStationOperatorId.ToString());
+
+        /// <summary>
+        /// Add the given charging tariff offer to the given e-mobility provider, for its customers at the EVSEs of any operator.
+        /// </summary>
+        public static RoamingNetworkChange Add(ChargingTariffOffer   ChargingTariffOffer,
+                                               EMobilityProvider_Id  EMobilityProviderId)
+
+            => Add(nameof(POI.ChargingTariffOffer), ChargingTariffOffer.Id.ToString(), ChargingTariffOffer.ToJSON(), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
+
+        /// <summary>
+        /// Remove the given charging tariff offer from its owner, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingTariffOffer_Id  ChargingTariffOfferId,
+                                                  JToken?                 OldValue   = null)
+
+            => Remove(nameof(POI.ChargingTariffOffer), ChargingTariffOfferId.ToString(), OldValue);
+
+        /// <summary>
+        /// Update one property of the given charging tariff offer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingTariffOffer  ChargingTariffOffer,
+                                                          String               PropertyName,
+                                                          JToken?              OldValue,
+                                                          JToken               NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingTariffOffer), ChargingTariffOffer.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given charging tariff offer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingTariffOffer  ChargingTariffOffer,
+                                                          String               PropertyName,
+                                                          JToken?              OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingTariffOffer), ChargingTariffOffer.Id.ToString(), PropertyName, OldValue);
 
         #endregion
 

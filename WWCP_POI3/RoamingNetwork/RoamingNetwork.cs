@@ -291,9 +291,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (UnknownMaintainer(gridOperators, chargingStationOperators.Index, parkingOperators.Index) is String maintainerError)
                 throw new ArgumentException(maintainerError, nameof(GridOperators));
 
-            // Groups of e-mobility providers and charging station operators are unique within the network.
-            if (DuplicateProviderGroup(chargingStationOperators, eMobilityProviders) is String providerGroupError)
+            // Groups of e-mobility providers and charging station operators are unique within the network, and so are their
+            // charging tariff offers.
+            if ((DuplicateProviderGroup      (chargingStationOperators, eMobilityProviders) ??
+                 DuplicateChargingTariffOffer(chargingStationOperators, eMobilityProviders)) is String providerGroupError)
+            {
                 throw new ArgumentException(providerGroupError, nameof(EMobilityProviders));
+            }
 
             this.transparencySoftware = new (TransparencySoftware, entity => entity.Id, "transparency software release");
 

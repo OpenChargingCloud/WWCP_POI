@@ -478,6 +478,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public POICollection<EnergyMeterTemplate_Id, EnergyMeterTemplate>          EnergyMeterTemplates      { get; } = POICollection<EnergyMeterTemplate_Id, EnergyMeterTemplate>.Empty;
 
         /// <summary>
+        /// Its charging tariff offers at its own EVSEs, embedded completely, in the order of their identifications.
+        /// </summary>
+        public POICollection<ChargingTariffOffer_Id, ChargingTariffOffer>          ChargingTariffOffers      { get; } = POICollection<ChargingTariffOffer_Id, ChargingTariffOffer>.Empty;
+
+        /// <summary>
+        /// Try to return the charging tariff offer with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingTariffOffer(ChargingTariffOffer_Id                                                    ChargingTariffOfferId,
+                                                 [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ChargingTariffOffer?  ChargingTariffOffer)
+
+            => ChargingTariffOffers.TryGet(ChargingTariffOfferId, out ChargingTariffOffer);
+
+        /// <summary>
         /// Try to return the EVSE template with the given identification.
         /// </summary>
         public Boolean TryGetEVSETemplate(EVSETemplate_Id                                                    EVSETemplateId,
@@ -714,6 +727,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Previous.TryGetEnergyMeterGroup(energyMeterGroup.Id, out var previousEnergyMeterGroup))
                     energyMeterGroup.ShareRuntimeOf(previousEnergyMeterGroup);
 
+            foreach (var chargingTariffOffer in ChargingTariffOffers)
+                if (Previous.TryGetChargingTariffOffer(chargingTariffOffer.Id, out var previousChargingTariffOffer))
+                    chargingTariffOffer.ShareRuntimeOf(previousChargingTariffOffer);
+
             foreach (var parkingSpace in ParkingSpaces)
                 if (Previous.TryGetParkingSpace(parkingSpace.Id, out var previousParkingSpace))
                     parkingSpace.ShareRuntimeOf(previousParkingSpace);
@@ -782,6 +799,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        IEnumerable<ChargingPoolTemplate>?                    ChargingPoolTemplates                   = null,
                                        IEnumerable<ChargingTariffTemplate>?                  ChargingTariffTemplates                 = null,
                                        IEnumerable<EnergyMeterTemplate>?                     EnergyMeterTemplates                    = null,
+                                       IEnumerable<ChargingTariffOffer>?                     ChargingTariffOffers                    = null,
 
                                        Timestamped<ChargingStationOperatorAdminStatusType>?  InitialAdminStatus                     = null,
                                        Timestamped<ChargingStationOperatorStatusType>?       InitialStatus                          = null,
@@ -1093,6 +1111,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var templateId in energyMeter.TemplateIds)
                     if (!this.EnergyMeterTemplates.Contains(templateId))
                         throw new ArgumentException($"The template '{templateId}' of the energy meter '{energyMeter.Id}' is unknown at the operator '{Id}'!", nameof(EnergyMeterTemplates));
+
+            #endregion
+
+            #region Charging tariff offers: naming groups of its own and no operator but itself, not overlapping at an EVSE
+
+            this.ChargingTariffOffers = new (ChargingTariffOffers, offer => offer.Id, "charging tariff offer", $"the operator '{Id}'");
+
+            foreach (var offer in this.ChargingTariffOffers)
+            {
+
+                foreach (var operatorId in offer.ChargingStationOperatorIds)
+                    if (operatorId != Id)
+                        throw new ArgumentException($"The charging tariff offer '{offer.Id}' of the operator '{Id}' must not name the operator '{operatorId}'!", nameof(ChargingTariffOffers));
+
+                foreach (var groupId in offer.EVSEGroupIds)
+                    if (!this.EVSEGroups.Contains(groupId))
+                        throw new ArgumentException($"The EVSE group '{groupId}' of the charging tariff offer '{offer.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffOffers));
+
+                foreach (var groupId in offer.ChargingStationGroupIds)
+                    if (!this.ChargingStationGroups.Contains(groupId))
+                        throw new ArgumentException($"The charging station group '{groupId}' of the charging tariff offer '{offer.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffOffers));
+
+                foreach (var groupId in offer.ChargingPoolGroupIds)
+                    if (!this.ChargingPoolGroups.Contains(groupId))
+                        throw new ArgumentException($"The charging pool group '{groupId}' of the charging tariff offer '{offer.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffOffers));
+
+            }
+
+            if (OverlappingOffers() is String overlapError)
+                throw new ArgumentException(overlapError, nameof(ChargingTariffOffers));
 
             #endregion
 
@@ -1455,6 +1503,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (EnergyMeterGroups.Count > 0)
                     json.Add("energyMeterGroups", new JArray(EnergyMeterGroups.Select(group => group.ToJSON())));
+
+                if (ChargingTariffOffers.Count > 0)
+                    json.Add("chargingTariffOffers", new JArray(ChargingTariffOffers.Select(offer => offer.ToJSON())));
 
                 if (ParkingSpaces.Count > 0)
                     json.Add("parkingSpaces", new JArray(ParkingSpaces.Select(parkingSpace => parkingSpace.ToJSON())));

@@ -652,6 +652,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     Authoritative, at, out normalized, out oldTimestamp, out oldValue);
                     break;
 
+                case nameof(ChargingTariffOffer):
+
+                    if (!ChargingTariffOffer_Id.TryParse(EntityId, out var chargingTariffOfferId) ||
+                        !network.TryGetChargingTariffOfferById(chargingTariffOfferId, out var chargingTariffOffer))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    // Its owner sets it exhausted; planned, active and expired follow from its times (StatusAt).
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ChargingTariffOfferAdminStatusType>(Value, ChargingTariffOfferAdminStatusType.TryParse,
+                                                    () => chargingTariffOffer.CurrentAdminStatus,
+                                                    (status, timestamp) => chargingTariffOffer.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => chargingTariffOffer.SetAdminStatus([ new Timestamped<ChargingTariffOfferAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ChargingTariffOfferStatusType>(Value, ChargingTariffOfferStatusType.TryParse,
+                                                    () => chargingTariffOffer.CurrentStatus,
+                                                    (status, timestamp) => chargingTariffOffer.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => chargingTariffOffer.SetStatus([ new Timestamped<ChargingTariffOfferStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
                 case nameof(ParkingSpaceGroup):
 
                     if (!ParkingSpaceGroup_Id.TryParse(EntityId, out var parkingSpaceGroupId) ||
@@ -1025,6 +1049,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     Add(statuses, POIRuntimeStatusKind.Status,      nameof(ChargingTariffGroup), chargingTariffGroup.Id.ToString(), chargingTariffGroup.CurrentStatus);
                 }
 
+                // The status of an offer is calculated from its times, unless its owner set it exhausted.
+                foreach (var chargingTariffOffer in network.ChargingTariffOffers)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ChargingTariffOffer), chargingTariffOffer.Id.ToString(), chargingTariffOffer.CurrentAdminStatus);
+                    Add<ChargingTariffOfferStatusType>(statuses, POIRuntimeStatusKind.Status, nameof(ChargingTariffOffer), chargingTariffOffer.Id.ToString(), chargingTariffOffer.StatusSince(Timestamp.Now));
+                }
+
                 foreach (var parkingSpaceGroup in network.ParkingSpaceGroups)
                 {
                     Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ParkingSpaceGroup), parkingSpaceGroup.Id.ToString(), parkingSpaceGroup.CurrentAdminStatus);
@@ -1153,6 +1184,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 entities.UnionWith(RoamingNetwork.ChargingStationGroups);
                 entities.UnionWith(RoamingNetwork.ChargingPoolGroups);
                 entities.UnionWith(RoamingNetwork.ChargingTariffGroups);
+                entities.UnionWith(RoamingNetwork.ChargingTariffOffers);
                 entities.UnionWith(RoamingNetwork.ParkingSpaceGroups);
                 entities.UnionWith(RoamingNetwork.EnergyMeterGroups);
                 entities.UnionWith(RoamingNetwork.ChargingTariffs);
@@ -1231,6 +1263,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var chargingTariffGroup in RoamingNetwork.ChargingTariffGroups)
                     if (!listeners.ContainsKey(chargingTariffGroup))
                         listeners[chargingTariffGroup] = ListenTo(chargingTariffGroup);
+
+                foreach (var chargingTariffOffer in RoamingNetwork.ChargingTariffOffers)
+                    if (!listeners.ContainsKey(chargingTariffOffer))
+                        listeners[chargingTariffOffer] = ListenTo(chargingTariffOffer);
 
                 foreach (var parkingSpaceGroup in RoamingNetwork.ParkingSpaceGroups)
                     if (!listeners.ContainsKey(parkingSpaceGroup))
@@ -1680,6 +1716,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private) ListenTo(ChargingTariffOffer)
+
+        private Action ListenTo(ChargingTariffOffer Entity)
+        {
+
+            OnChargingTariffOfferAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ChargingTariffOffer), entity.Id.ToString(), newStatus, oldStatus, dataSource);
+                return Task.CompletedTask;
+            };
+
+            OnChargingTariffOfferStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ChargingTariffOffer), entity.Id.ToString(), newStatus, oldStatus, dataSource);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
         #region (private) ListenTo(EnergyMeterGroup)
 
         private Action ListenTo(EnergyMeterGroup Entity)
@@ -2009,6 +2072,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            Concat(network.ChargingStationGroups.SelectMany(chargingStationGroup => new[] { chargingStationGroup.NextAdminStatus?.Timestamp, chargingStationGroup.NextStatus?.Timestamp })).
                            Concat(network.ChargingPoolGroups.SelectMany(chargingPoolGroup => new[] { chargingPoolGroup.NextAdminStatus?.Timestamp, chargingPoolGroup.NextStatus?.Timestamp })).
                            Concat(network.ChargingTariffGroups.SelectMany(chargingTariffGroup => new[] { chargingTariffGroup.NextAdminStatus?.Timestamp, chargingTariffGroup.NextStatus?.Timestamp })).
+                           Concat(network.ChargingTariffOffers.SelectMany(chargingTariffOffer => new[] { chargingTariffOffer.NextAdminStatus?.Timestamp, chargingTariffOffer.NextStatus?.Timestamp })).
                            Concat(network.ParkingSpaceGroups.SelectMany(parkingSpaceGroup => new[] { parkingSpaceGroup.NextAdminStatus?.Timestamp, parkingSpaceGroup.NextStatus?.Timestamp })).
                            Concat(network.EnergyMeterGroups.SelectMany(energyMeterGroup => new[] { energyMeterGroup.NextAdminStatus?.Timestamp, energyMeterGroup.NextStatus?.Timestamp })).
                            Concat(network.ChargingStationManufacturers.SelectMany(manufacturer => new[] { manufacturer.NextAdminStatus?.Timestamp, manufacturer.NextStatus?.Timestamp })).
@@ -2128,6 +2192,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
                     _ = chargingTariffGroup.AdminStatus;
                     _ = chargingTariffGroup.Status;
+                }
+
+                foreach (var chargingTariffOffer in network.ChargingTariffOffers)
+                {
+                    _ = chargingTariffOffer.AdminStatus;
+                    _ = chargingTariffOffer.Status;
                 }
 
                 foreach (var parkingSpaceGroup in network.ParkingSpaceGroups)

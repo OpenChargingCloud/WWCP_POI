@@ -267,12 +267,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   ("chargingPoolGroups",                nameof(ChargingPoolGroup)),
                                                   ("chargingTariffGroups",              nameof(ChargingTariffGroup)),
                                                   ("energyMeterGroups",                 nameof(EnergyMeterGroup)),
+                                                  ("chargingTariffOffers",              nameof(ChargingTariffOffer)),
                                                   ("parkingSpaces",                     nameof(ParkingSpace)) ] },
             { nameof(ChargingPool),             [ ("chargingStations",                  nameof(ChargingStation)) ] },
             { nameof(ChargingStation),          [ ("EVSEs",                             nameof(EVSE)) ] },
             { nameof(EMobilityProvider),        [ ("EVSEGroups",                        nameof(EVSEGroup)),
                                                   ("chargingStationGroups",             nameof(ChargingStationGroup)),
-                                                  ("chargingPoolGroups",                nameof(ChargingPoolGroup)) ] },
+                                                  ("chargingPoolGroups",                nameof(ChargingPoolGroup)),
+                                                  ("chargingTariffOffers",              nameof(ChargingTariffOffer)) ] },
             { nameof(GridOperator),             [ ("energyMeterTemplates",              nameof(EnergyMeterTemplate)),
                                                   ("gridConnectionPoints",              nameof(GridConnectionPoint)),
                                                   ("energyMeterGroups",                 nameof(EnergyMeterGroup)) ] },
@@ -1060,6 +1062,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 nameof(ChargingTariffGroup)              => ChargingTariffGroup_Id.            TryParse(EntityId, out var tariffGroupId)     ? tariffGroupId     : null,
                 nameof(GridConnectionPoint)              => GridConnectionPoint_Id.            TryParse(EntityId, out var pointId)           ? pointId           : null,
                 nameof(EnergyMeterGroup)                 => EnergyMeterGroup_Id.               TryParse(EntityId, out var meterGroupId)      ? meterGroupId      : null,
+                nameof(ChargingTariffOffer)              => ChargingTariffOffer_Id.            TryParse(EntityId, out var offerId)           ? offerId           : null,
                 _                                        => ParkingId(EntityType, EntityId)
             };
 
@@ -1113,6 +1116,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    nameof(GridConnectionPoint)              => ChangeableGridConnectionPointProperties,
                    nameof(EnergyMeterTemplate)              => ChangeableEnergyMeterTemplateProperties,
                    nameof(EnergyMeterGroup)                 => ChangeableEnergyMeterGroupProperties,
+                   nameof(ChargingTariffOffer)              => ChangeableChargingTariffOfferProperties,
                    _ when ChangeableGroupProperties.TryGetValue(EntityType, out var groupProperties)
                                                             => groupProperties,
                    _ when ChangeableTemplateProperties.TryGetValue(EntityType, out var templateProperties)

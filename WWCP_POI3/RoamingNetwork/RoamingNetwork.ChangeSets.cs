@@ -896,6 +896,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                 }
 
+                // Charging tariff offers of charging station operators and e-mobility providers.
+                else if (change.EntityType == nameof(ChargingTariffOffer))
+                {
+                    if (!TryApplyChargingTariffOfferChange(change, index, ChangeSet.CreatedAt, operators, providers, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
                 // Groups of e-mobility providers; those of charging station operators are part of their infrastructure.
                 else if (IsProviderGroupChange(change, providers.Values))
                 {
@@ -1034,6 +1041,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  UnknownEnergyMeterManufacturer(allEnergyMeters, meterManufacturers) ??
                  DuplicateEnergyMeterGroup(allEnergyMeterGroups)       ??
                  DuplicateProviderGroup(operators.Values, providers.Values) ??
+                 DuplicateChargingTariffOffer(operators.Values, providers.Values) ??
+                 NewProviderOfferOverlap(operators, providers) ??
                  DuplicateEnergyMeterTemplate(allEnergyMeterTemplates) ??
                  UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, meterManufacturers, softwares, certificates)) is String referenceError)
             {

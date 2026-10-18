@@ -104,6 +104,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public POICollection<ChargingPoolGroup_Id,    ChargingPoolGroup>     ChargingPoolGroups       { get; } = POICollection<ChargingPoolGroup_Id,    ChargingPoolGroup>.   Empty;
 
+        /// <summary>
+        /// Its charging tariff offers for its customers, at the EVSEs of any operator.
+        /// </summary>
+        public POICollection<ChargingTariffOffer_Id,  ChargingTariffOffer>   ChargingTariffOffers     { get; } = POICollection<ChargingTariffOffer_Id,  ChargingTariffOffer>. Empty;
+
         #endregion
 
         #region Constructor(s)
@@ -122,6 +127,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  IEnumerable<EVSEGroup>?                           EVSEGroups                   = null,
                                  IEnumerable<ChargingStationGroup>?                ChargingStationGroups        = null,
                                  IEnumerable<ChargingPoolGroup>?                   ChargingPoolGroups           = null,
+                                 IEnumerable<ChargingTariffOffer>?                 ChargingTariffOffers         = null,
 
                                  Timestamped<EMobilityProviderAdminStatusType>?    InitialAdminStatus           = null,
                                  Timestamped<EMobilityProviderStatusType>?         InitialStatus                = null,
@@ -176,6 +182,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region Its charging tariff offers: for sessions with its own contracts
+
+            this.ChargingTariffOffers = new (ChargingTariffOffers, offer => offer.Id, "charging tariff offer", $"the e-mobility provider '{Id}'");
+
+            foreach (var offer in this.ChargingTariffOffers)
+                if (offer.Sessions.HasValue || !offer.EMobilityProviderIds.IsEmpty)
+                    throw new ArgumentException($"The charging tariff offer '{offer.Id}' of the e-mobility provider '{Id}' is for sessions with its own contracts: it must name neither sessions nor e-mobility providers!", nameof(ChargingTariffOffers));
+
+            #endregion
+
         }
 
         #endregion
@@ -221,6 +237,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => ChargingPoolGroups.TryGet(ChargingPoolGroupId, out ChargingPoolGroup);
 
+        /// <summary>
+        /// Try to get its charging tariff offer with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingTariffOffer(ChargingTariffOffer_Id                        ChargingTariffOfferId,
+                                                 [NotNullWhen(true)] out ChargingTariffOffer?  ChargingTariffOffer)
+
+            => ChargingTariffOffers.TryGet(ChargingTariffOfferId, out ChargingTariffOffer);
+
         #endregion
 
         #region (internal) ShareRuntimeOfAll(Previous)
@@ -245,6 +269,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var chargingPoolGroup in ChargingPoolGroups)
                 if (Previous.TryGetChargingPoolGroup(chargingPoolGroup.Id, out var previousChargingPoolGroup))
                     chargingPoolGroup.ShareRuntimeOf(previousChargingPoolGroup);
+
+            foreach (var chargingTariffOffer in ChargingTariffOffers)
+                if (Previous.TryGetChargingTariffOffer(chargingTariffOffer.Id, out var previousChargingTariffOffer))
+                    chargingTariffOffer.ShareRuntimeOf(previousChargingTariffOffer);
 
         }
 
@@ -341,6 +369,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingPoolGroups.Count > 0)
                 json.Add("chargingPoolGroups",     new JArray(ChargingPoolGroups.   Select(group => group.ToJSON())));
 
+            if (ChargingTariffOffers.Count > 0)
+                json.Add("chargingTariffOffers",   new JArray(ChargingTariffOffers. Select(offer => offer.ToJSON())));
+
             POIPartyKeys.AddTo(json, this);
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
@@ -404,7 +435,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!POIJSON.TryParseChildren<EVSEGroup>           (JSON, "EVSEGroups",            "EVSEGroupIds",            "EVSEGroups",            EVSEGroup.           TryParse, out var evseGroups,            out ErrorResponse) ||
                     !POIJSON.TryParseChildren<ChargingStationGroup>(JSON, "chargingStationGroups", "chargingStationGroupIds", "ChargingStationGroups", ChargingStationGroup.TryParse, out var chargingStationGroups, out ErrorResponse) ||
-                    !POIJSON.TryParseChildren<ChargingPoolGroup>   (JSON, "chargingPoolGroups",    "chargingPoolGroupIds",    "ChargingPoolGroups",    ChargingPoolGroup.   TryParse, out var chargingPoolGroups,    out ErrorResponse))
+                    !POIJSON.TryParseChildren<ChargingPoolGroup>   (JSON, "chargingPoolGroups",    "chargingPoolGroupIds",    "ChargingPoolGroups",    ChargingPoolGroup.   TryParse, out var chargingPoolGroups,    out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingTariffOffer> (JSON, "chargingTariffOffers",  "chargingTariffOfferIds",  "charging tariff offers", ChargingTariffOffer. TryParse, out var chargingTariffOffers,  out ErrorResponse))
                 {
                     return false;
                 }
@@ -429,6 +461,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           EVSEGroups:             evseGroups,
                                                           ChargingStationGroups:  chargingStationGroups,
                                                           ChargingPoolGroups:     chargingPoolGroups,
+                                                          ChargingTariffOffers:   chargingTariffOffers,
                                                           DataSource:  dataSource,
                                                           Created:     created,
                                                           LastChange:  lastChange,

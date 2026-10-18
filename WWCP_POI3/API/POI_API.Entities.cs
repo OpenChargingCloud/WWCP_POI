@@ -47,7 +47,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///     ?without=chargingPools leaves out its charging pools, which ~/RNs/{RN_Id}/CPs?operatorId=… lists;
     ///     ?without=chargingTariffs,EVSETemplates,chargingStationTemplates,chargingPoolTemplates,chargingTariffTemplates,
     ///     energyMeterTemplates,chargingTariffGroups,chargingPoolGroups,chargingStationGroups,EVSEGroups,energyMeterGroups,
-    ///     or any of them, leaves them out, which ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|EVSETs|CSTs|CPTs|CTTs|EMTs|CTGs|CPGs|CSGs|EVSEGs|EMGs} list;
+    ///     chargingTariffOffers, or any of them, leaves them out, which
+    ///     ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|EVSETs|CSTs|CPTs|CTTs|EMTs|CTGs|CPGs|CSGs|EVSEGs|EMGs|CTOs} list;
     ///     ?without=parkingSpaces leaves out its own parking spaces, which ~/…/CSs/{CS_Id}/PSs list as its stations name them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands                                     the brands of the charging station operator, its own
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands/{Brand_Id}                          a brand of the charging station operator
@@ -59,6 +60,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{EVSETs|CSTs|CPTs|CTTs|EMTs}               its EVSE, charging station, charging pool, charging
     ///                                                                             tariff and energy meter templates, as it embeds them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{EVSETs|CSTs|CPTs|CTTs|EMTs}/{Id}          a template of the charging station operator
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTOs                                       its charging tariff offers, as it embeds them
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTOs/{CTO_Id}                              a charging tariff offer of the charging station operator
+    /// GET ~/…/CPs/{CP_Id}/CTOs, ~/…/CSs/{CS_Id}/CTOs, ~/…/EVSEs/{EVSE_Id}/CTOs     the charging tariff offers covering one of its EVSEs,
+    ///                                                                             of its operator and of e-mobility providers;
+    ///                                                                             ?status=active, ?eMobilityProviderId=… filter them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs                                       its charging tariff groups, as it embeds them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs/{CTG_Id}                              a charging tariff group of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPGs                                       its charging pool groups, as it embeds them
@@ -103,8 +109,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMGs/{EMG_Id}                                an energy meter group of the grid operator
     /// GET ~/RNs/{RN_Id}/EMPs                                                     its e-mobility providers, in short
     /// GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}                                            an e-mobility provider;
-    ///     ?without=EVSEGroups,chargingStationGroups,chargingPoolGroups, or any of them, leaves them out, which
-    ///     ~/RNs/{RN_Id}/EMPs/{EMP_Id}/{EVSEGs|CSGs|CPGs} list, each of them below it, e.g. …/EVSEGs/{EVSEG_Id}
+    ///     ?without=EVSEGroups,chargingStationGroups,chargingPoolGroups,chargingTariffOffers, or any of them, leaves them
+    ///     out, which ~/RNs/{RN_Id}/EMPs/{EMP_Id}/{EVSEGs|CSGs|CPGs|CTOs} list, each of them below it, e.g. …/CTOs/{CTO_Id}
     /// GET ~/RNs/{RN_Id}/CSMs                                                     its charging station manufacturers, in short
     /// GET ~/RNs/{RN_Id}/CSMs/{CSM_Id}                                            a charging station manufacturer
     /// GET ~/RNs/{RN_Id}/POs                                                      its parking operators, in short
@@ -280,7 +286,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                            chargingStationOperator,
                                                                            chargingStationOperator.ToEmbeddedJSON,
                                                                            [ "chargingPools", "chargingTariffs", "EVSETemplates", "chargingStationTemplates", "chargingPoolTemplates", "chargingTariffTemplates", "energyMeterTemplates",
-                                                                             "chargingTariffGroups", "chargingPoolGroups", "chargingStationGroups", "EVSEGroups", "energyMeterGroups", "parkingSpaces" ],
+                                                                             "chargingTariffGroups", "chargingPoolGroups", "chargingStationGroups", "EVSEGroups", "energyMeterGroups", "chargingTariffOffers", "parkingSpaces" ],
                                                                            "a charging station operator")
                                              : errorResponse);
 
@@ -387,6 +393,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 "energy meter template",
                 energyMeterTemplate => energyMeterTemplate.ToJSON());
 
+
+            AddEmbeddedListHandlers<ChargingTariffOffer_Id, ChargingTariffOffer>(
+                chargingStationOperatorPath + "/CTOs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingTariffOffers, null)
+                               : (null, errorResponse),
+                chargingTariffOffer => chargingTariffOffer.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingTariffOffer_Id, ChargingTariffOffer>(
+                chargingStationOperatorPath + "/CTOs/{chargingTariffOfferId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingTariffOffers, null)
+                               : (null, errorResponse),
+                ChargingTariffOffer_Id.TryParse,
+                "charging tariff offer",
+                chargingTariffOffer => chargingTariffOffer.ToJSON());
 
             AddEmbeddedListHandlers<ChargingTariffGroup_Id, ChargingTariffGroup>(
                 chargingStationOperatorPath + "/CTGs",
@@ -729,6 +751,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region The charging tariff offers covering an EVSE, or one of the EVSEs of a charging station or pool: ~/…/CTOs below it
+
+            // Of its operator and of e-mobility providers; ?status=active leaves out all others, ?eMobilityProviderId= all
+            // but those of the operator and of that provider. The member itself does not change.
+            AddCoveringOffersHandlers(
+                chargingStationPath + "/EVSEs/{evseId}" + "/CTOs",
+                request => TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse) &&
+                           TryGetRequestedEVSE          (request, out var evse,           out errorResponse)
+                               ? (roamingNetwork, [ evse.Id ], null)
+                               : (null, null, errorResponse));
+
+            AddCoveringOffersHandlers(
+                chargingStationPath + "/CTOs",
+                request => TryGetRequestedRoamingNetwork (request, out var roamingNetwork,  out var errorResponse) &&
+                           TryGetRequestedChargingStation(request, out var chargingStation, out errorResponse)
+                               ? (roamingNetwork, [ .. chargingStation.EVSEs.Select(evse => evse.Id) ], null)
+                               : (null, null, errorResponse));
+
+            AddCoveringOffersHandlers(
+                chargingPoolPath + "/CTOs",
+                request => TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse) &&
+                           TryGetRequestedChargingPool  (request, out var chargingPool,   out errorResponse)
+                               ? (roamingNetwork, [ .. chargingPool.ChargingStations.SelectMany(chargingStation => chargingStation.EVSEs).Select(evse => evse.Id) ], null)
+                               : (null, null, errorResponse));
+
+            #endregion
+
             #region The groups of a charging pool, station, EVSE and parking space: ~/…/CPGs, CSGs, EVSEGs, PSGs below it
 
             // The groups a member is in, which give it nothing, of its operator and of e-mobility providers, as their owners
@@ -889,15 +938,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            eMobilityProvider,
                                                                            eMobilityProvider.ToJSON,
-                                                                           [ "EVSEGroups", "chargingStationGroups", "chargingPoolGroups" ],
+                                                                           [ "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffOffers" ],
                                                                            "an e-mobility provider")
                                              : errorResponse);
 
             #endregion
 
-            #region ~/RNs/{RN_Id}/EMPs/{EMP_Id}/EVSEGs, CSGs, CPGs, and each of them below
+            #region ~/RNs/{RN_Id}/EMPs/{EMP_Id}/EVSEGs, CSGs, CPGs, CTOs, and each of them below
 
-            // Its groups, of members of any operator: a list each, and each of them on its own.
+            // Its groups, of members of any operator, and its charging tariff offers: a list each, and each of them on its own.
+            AddEmbeddedListHandlers<ChargingTariffOffer_Id, ChargingTariffOffer>(
+                eMobilityProviderPath + "/CTOs",
+                request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
+                               ? (eMobilityProvider.ChargingTariffOffers, null)
+                               : (null, errorResponse),
+                chargingTariffOffer => chargingTariffOffer.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingTariffOffer_Id, ChargingTariffOffer>(
+                eMobilityProviderPath + "/CTOs/{chargingTariffOfferId}",
+                request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
+                               ? (eMobilityProvider.ChargingTariffOffers, null)
+                               : (null, errorResponse),
+                ChargingTariffOffer_Id.TryParse,
+                "charging tariff offer",
+                chargingTariffOffer => chargingTariffOffer.ToJSON());
+
             AddEmbeddedListHandlers<EVSEGroup_Id, EVSEGroup>(
                 eMobilityProviderPath + "/EVSEGs",
                 request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
@@ -1218,6 +1283,90 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (private) AddCoveringOffersHandlers(Path, EVSEs)
+
+        /// <summary>
+        /// Answer GET of the given path with the charging tariff offers covering one of the given EVSEs: of their operator,
+        /// then of e-mobility providers, each in the order of their identifications, searched and paged by the query of the
+        /// request. ?status= leaves out the offers of another status now, e.g. ?status=active; ?eMobilityProviderId= the
+        /// offers of every other provider. HEAD by Hermod from it, and OPTIONS.
+        /// </summary>
+        /// <param name="Path">The path of the list, below the one of the member.</param>
+        /// <param name="EVSEs">The roaming network and the EVSEs of the member the path names, or why there are none.</param>
+        private void AddCoveringOffersHandlers(HTTPPath                                                                                            Path,
+                                               Func<HTTPRequest, (RoamingNetwork? Network, IReadOnlyList<EVSE_Id>? EVSEIds, HTTPResponse? ErrorResponse)>  EVSEs)
+
+            => AddEntityHandlers(Path,
+                                 request => {
+
+                                     var (roamingNetwork, evseIds, errorResponse) = EVSEs(request);
+
+                                     if (roamingNetwork is null || evseIds is null)
+                                         return errorResponse!;
+
+                                     var further = new List<(String Name, String Value)>();
+
+                                     ChargingTariffOfferStatusType? status = null;
+
+                                     if (request.QueryString.GetString("status") is String statusText)
+                                     {
+
+                                         if (!ChargingTariffOfferStatusType.TryParse(statusText, out var parsedStatus) ||
+                                             !new[] { ChargingTariffOfferStatusType.Planned, ChargingTariffOfferStatusType.Active, ChargingTariffOfferStatusType.Exhausted, ChargingTariffOfferStatusType.Expired }.Contains(parsedStatus))
+                                         {
+                                             return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Invalid status of a charging tariff offer '{statusText}': planned, active, exhausted or expired!");
+                                         }
+
+                                         status = parsedStatus;
+                                         further.Add(("status", statusText));
+
+                                     }
+
+                                     EMobilityProvider_Id? providerId = null;
+
+                                     if (request.QueryString.GetString("eMobilityProviderId") is String providerText)
+                                     {
+
+                                         if (!EMobilityProvider_Id.TryParse(providerText, out var parsedProviderId))
+                                             return EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Invalid e-mobility provider identification '{providerText}'!");
+
+                                         providerId = parsedProviderId;
+                                         further.Add(("eMobilityProviderId", providerText));
+
+                                     }
+
+                                     if (!TryParseListQuery(request, further, out var query, out errorResponse))
+                                         return errorResponse!;
+
+                                     var now        = Timestamp.Now;
+                                     var operators  = roamingNetwork.ChargingStationOperators.ToDictionary(chargingStationOperator => chargingStationOperator.Id);
+                                     var providers  = roamingNetwork.EMobilityProviders.ToArray();
+
+                                     var operatorOffers  = evseIds.SelectMany(evseId => operators.TryGetValue(evseId.OperatorId, out var chargingStationOperator)
+                                                                                            ? chargingStationOperator.OffersCovering(evseId)
+                                                                                            : []);
+
+                                     var providerOffers  = providers.Where     (eMobilityProvider => !providerId.HasValue || eMobilityProvider.Id == providerId.Value).
+                                                                     SelectMany(eMobilityProvider => eMobilityProvider.ChargingTariffOffers).
+                                                                     Where     (offer             => RoamingNetwork.CoveredEVSEs(offer, operators, providers).Overlaps(evseIds));
+
+                                     var offers          = operatorOffers.DistinctBy(offer => offer.Id).OrderBy(offer => offer.Id.ToString(), StringComparer.Ordinal).
+                                                               Concat(providerOffers.DistinctBy(offer => offer.Id).OrderBy(offer => offer.Id.ToString(), StringComparer.Ordinal)).
+                                                               Where (offer => !status.HasValue || offer.StatusAt(now) == status.Value).
+                                                               ToArray();
+
+                                     return QueryResponse<ChargingTariffOffer>(request,
+                                                                               query,
+                                                                               () => offers,
+                                                                               offer   => SearchTextOf(offer, offer.ToJSON),
+                                                                               entries => new JArray(entries.Select(offer => offer.ToJSON())),
+                                                                               format  => POIRepresentation.Of(new JArray(offers.Select(offer => offer.ToJSON())), format),
+                                                                               offers.Length);
+
+                                 });
+
+        #endregion
 
         #region (private) AddOrderedListHandlers(Path, List, ToJSON)
 

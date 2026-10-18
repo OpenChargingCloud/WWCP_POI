@@ -155,8 +155,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         internal static readonly Dictionary<String, String[]> PartyChildren = new () {
             { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSETemplates", "chargingStationTemplates", "chargingPoolTemplates", "chargingTariffTemplates", "energyMeterTemplates",
-                                                 "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups", "energyMeterGroups", "parkingSpaces" ] },
-            { nameof(EMobilityProvider),       [ "EVSEGroups", "chargingStationGroups", "chargingPoolGroups" ] },
+                                                 "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups", "energyMeterGroups", "chargingTariffOffers", "parkingSpaces" ] },
+            { nameof(EMobilityProvider),       [ "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffOffers" ] },
             { nameof(GridOperator),            [ "gridConnectionPoints", "energyMeterTemplates", "energyMeterGroups" ] },
             { nameof(ParkingOperator),         [ "parkingGarages", "parkingSpaces", "parkingSensors", "parkingSpaceTemplates", "parkingSpaceGroups", "parkingProducts" ] }
         };
@@ -340,7 +340,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // keyed by their typed identifications, so that a later change may name them in another spelling.
             var addedEnergyMeterChildren = new Dictionary<(String, Object), POIPartyId>();
 
-            // Groups of e-mobility providers added by an earlier change of this change set, by their providers.
+            // Groups of e-mobility providers and charging tariff offers added by an earlier change of this change set, by
+            // their owners.
             var addedProviderGroups      = new Dictionary<(String, Object), POIPartyId>();
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
@@ -483,6 +484,64 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 Owners = [ (roamingNetworkOperator, POIKeyKind.Signing) ];
                 return true;
+            }
+
+            #endregion
+
+            #region The charging tariff offers of a charging station operator or an e-mobility provider
+
+            if (Change.EntityType == nameof(ChargingTariffOffer))
+            {
+
+                if (!ChargingTariffOffer_Id.TryParse(Change.EntityId, out var offerId))
+                {
+                    ErrorResponse = $"invalid {Change.EntityType} identification '{Change.EntityId}'!";
+                    return false;
+                }
+
+                POIPartyId? owner = null;
+
+                if (Change.Kind == RoamingNetworkChangeKind.Add)
+                {
+
+                    if (Change.ParentEntityType is not (nameof(ChargingStationOperator) or nameof(EMobilityProvider)) || Change.ParentEntityId is null)
+                    {
+                        ErrorResponse = $"adding the {Change.EntityType} '{Change.EntityId}' needs its ChargingStationOperator or EMobilityProvider as its parent!";
+                        return false;
+                    }
+
+                    // The owner as the keys of the parties name it.
+                    owner = PartyIdOf(new POIPartyId(Change.ParentEntityType, Change.ParentEntityId));
+
+                    AddedProviderGroups[(Change.EntityType, offerId)] = owner.Value;
+
+                }
+
+                else if (AddedProviderGroups.TryGetValue((Change.EntityType, offerId), out var addedOwner))
+                    owner = addedOwner;
+
+                else
+                {
+
+                    var (chargingStationOperator, eMobilityProvider, _) = ChargingTariffOfferOwners(Change.EntityId, chargingStationOperators, eMobilityProviders);
+
+                    if      (chargingStationOperator is not null)
+                        owner = new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString());
+
+                    else if (eMobilityProvider is not null)
+                        owner = new POIPartyId(nameof(EMobilityProvider),       eMobilityProvider.      Id.ToString());
+
+                }
+
+                if (!owner.HasValue)
+                {
+                    ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' belongs to no charging station operator and no e-mobility provider!";
+                    return false;
+                }
+
+                Owners = [ SignerOf(owner.Value) ];
+                return true;
+
             }
 
             #endregion
