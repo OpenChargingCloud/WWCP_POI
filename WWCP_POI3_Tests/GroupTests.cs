@@ -235,6 +235,54 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_station_its_groups_name_is_moved_to_another_pool()
+
+        /// <summary>
+        /// A charging station a charging station group names, whose EVSEs an EVSE group names, is moved to another
+        /// charging pool in one change set: removed and added again. In between its operator does not have it, though its
+        /// groups name it and its EVSEs: a change set checks the members of groups after its last change (POI3-ISSUES #47).
+        /// A change set leaving a group naming a member that is gone is still refused.
+        /// </summary>
+        [Test]
+        public void A_station_its_groups_name_is_moved_to_another_pool()
+        {
+
+            var p2      = ChargingPool_Id.Parse("DE*GEF*P2");
+            var rn1     = Apply(NewNetwork(), RoamingNetworkChange.Add(nameof(ChargingPool), p2.ToString(), new ChargingPool(p2, Created: Created).ToJSON()));
+
+            var s1JSON  = (JObject) rn1.ToJSON().SelectToken("$.chargingStationOperators[0].chargingPools[0].chargingStations[0]")!.DeepClone();
+
+            var rn2     = Apply(rn1, RoamingNetworkChange.Remove(nameof(ChargingStation), S1.ToString()),
+                                     RoamingNetworkChange.Add   (nameof(ChargingStation), S1.ToString(), s1JSON, nameof(ChargingPool), p2.ToString()));
+
+            // Added again without its second EVSE.
+            var withoutE2 = (JObject) s1JSON.DeepClone();
+            withoutE2.Descendants().OfType<JObject>().Single(evse => evse["@id"]?.Value<String>() == E2.ToString()).Remove();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn2.GetChargingStationOperatorById(GEF)!.TryGetChargingPool(p2, out var movedTo),  Is.True);
+                Assert.That(movedTo!.ChargingStations.Select(chargingStation => chargingStation.Id),            Is.EqualTo(new[] { S1 }));
+                Assert.That(rn2.TryGetEVSEGroupById(EG1, out var eg1),                                          Is.True);
+                Assert.That(eg1!.EVSEIds,                                                                       Is.EqualTo(new[] { E1, E2 }));
+                Assert.That(rn2.TryGetChargingStationGroupById(SG1, out var sg1),                               Is.True);
+                Assert.That(sg1!.ChargingStationIds,                                                            Is.EqualTo(new[] { S1 }));
+
+                // Removed and not added again, or added again without an EVSE its group names: refused.
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Remove(nameof(ChargingStation), S1.ToString())),
+                            Throws.ArgumentException.With.Message.Contains("The member 'DE*GEF*E1*1' of the group 'DE*GEF*EG1' is unknown at the operator 'DE*GEF'"));
+
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Remove(nameof(ChargingStation), S1.ToString()),
+                                             RoamingNetworkChange.Add   (nameof(ChargingStation), S1.ToString(), withoutE2, nameof(ChargingPool), p2.ToString())),
+                            Throws.ArgumentException.With.Message.Contains("The member 'DE*GEF*E1*2' of the group 'DE*GEF*EG1' is unknown at the operator 'DE*GEF'"));
+
+            }
+
+        }
+
+        #endregion
+
         #region The_runtime_status_reaches_groups()
 
         [Test]

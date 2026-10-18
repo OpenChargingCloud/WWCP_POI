@@ -551,7 +551,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region The changed operator must still be a valid one
 
-            if (!ChargingStationOperator.TryParse(operatorJSON, out var changedOperator, out var changedOperatorError))
+            if (!ChargingStationOperator.TryParseWithinChangeSet(operatorJSON, out var changedOperator, out var changedOperatorError))
             {
                 ErrorResponse = $"Change {Index}: {changedOperatorError}";
                 return false;

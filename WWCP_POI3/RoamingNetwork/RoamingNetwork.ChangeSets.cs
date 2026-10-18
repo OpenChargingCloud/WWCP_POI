@@ -628,7 +628,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             currentOperatorJSON!["lastChange"] = ChangeSet.CreatedAt.ToISO8601();
 
                             // The changed operator must still be a valid one.
-                            if (!ChargingStationOperator.TryParse(currentOperatorJSON, out var changedOperator, out var changedOperatorError))
+                            if (!ChargingStationOperator.TryParseWithinChangeSet(currentOperatorJSON, out var changedOperator, out var changedOperatorError))
                             {
                                 ErrorResponse = $"Change {index}: {changedOperatorError}";
                                 return false;
@@ -658,7 +658,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             newOperatorJSON["created"]    ??= ChangeSet.CreatedAt.ToISO8601();
                             newOperatorJSON["lastChange"]   = ChangeSet.CreatedAt.ToISO8601();
 
-                            if (!ChargingStationOperator.TryParse(newOperatorJSON, out var newOperator, out var newOperatorError))
+                            if (!ChargingStationOperator.TryParseWithinChangeSet(newOperatorJSON, out var newOperator, out var newOperatorError))
                             {
                                 ErrorResponse = $"Change {index}: {newOperatorError}";
                                 return false;
@@ -1021,6 +1021,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #endregion
 
             }
+
+            // The groups and charging tariff offers of every operator the change set changed or added, after its last change:
+            // a charging station it moved to another charging pool was no member of its operator in between.
+            foreach (var changedOperator in operators.Values.OrderBy(chargingStationOperator => chargingStationOperator.Id.ToString(), StringComparer.Ordinal))
+                if (!(chargingStationOperators.TryGet(changedOperator.Id, out var previousOperator) && ReferenceEquals(previousOperator, changedOperator)) &&
+                    changedOperator.InvalidGroupOrOffer() is String groupOrOfferError)
+                {
+                    ErrorResponse = groupOrOfferError;
+                    return false;
+                }
 
             // Every manufacturer a charging station names, every grid connection point a charging pool names,
             // and every maintainer of a grid connection point must still be one of the network;

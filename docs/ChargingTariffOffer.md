@@ -106,8 +106,8 @@ contract of a provider both name, or one of them names none), at times both appl
 A provider's groups and offers name members, groups and operators of others without asking them. These references
 are weak: a member, group or operator that does not exist (any more) is left out, and its owner removes it without
 the provider, e.g. an operator an EVSE a provider's group still names. References within one owner are strong: a
-member or group an operator's group or offer names can not be removed, update the group or offer first, in the same
-change set.
+member or group an operator's group or offer names can not be removed: update the group or offer in the same change
+set. They are checked after its last change, as is the rule that the offers of an operator do not overlap.
 
 
 ## Runtime status

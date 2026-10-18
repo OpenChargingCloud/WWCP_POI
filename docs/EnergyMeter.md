@@ -93,7 +93,8 @@ arrays are united. The meter keeps only its own; it takes the others at runtime,
 effective EVSEs, charging stations, charging pools and grid connection points embed.
 
 [Energy meter groups](EnergyMeterGroup.md) of the same owners collect energy meters and give them nothing. A meter
-still named by a group can not be removed.
+still named by a group after the last change of a change set can not be removed: one of a charging station moved to
+another pool stays in its groups.
 
 
 ## Change sets

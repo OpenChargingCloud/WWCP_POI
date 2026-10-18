@@ -50,7 +50,7 @@ See [README.md](README.md#common-properties). No `eTags`.
 
 References, not embedded tariffs: every identification must name a [ChargingTariff](ChargingTariff.md) the
 operator embeds in `chargingTariffs`. A member still named by a group can not be removed; remove it from the
-group first, in an earlier change of the same change set or an earlier one.
+group in the same change set or an earlier one: the members are checked after its last change.
 
 `UpdateProperty(group, "chargingTariffIds", oldValue, new JArray("DE*GEF*T1", "DE*GEF*T2"))` replaces the
 members as a whole, or [element by element](README.md#element-changes); `RemoveProperty(group, "chargingTariffIds")` leaves none.

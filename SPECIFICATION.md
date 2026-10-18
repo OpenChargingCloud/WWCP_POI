@@ -786,7 +786,10 @@ same `notBefore` the one with the ordinal lower identification.
 **References across owners are weak.** A provider's groups and offers name members, groups and
 operators of others without asking them. A member, group or operator that does not exist (any more) is
 left out, and its owner removes it without the provider. References within one owner are strong: a
-member or group an operator's group or offer names can not be removed.
+member or group an operator's group or offer names can not be removed. A change set is checked for them
+after its last change, not after each change, and so for the offers of an operator not overlapping: it
+can remove a charging station and add it to another pool of its operator, its groups naming it and its
+EVSEs throughout.
 
 - **Runtime status** (not content): `planned` before its `notBefore`, `active`, `expired` after its
   `notAfter`, unless its owner sets `exhausted` before, e.g. when its budget is used up.

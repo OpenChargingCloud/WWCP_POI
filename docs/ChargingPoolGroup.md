@@ -57,7 +57,7 @@ changes the membership by updating `chargingPoolIds` as a whole, e.g.
 [element by element](README.md#element-changes).
 
 - **A group of an operator** names pools of that operator. A pool can not be removed while a group of its operator
-  names it: remove it from the group first, in the same or an earlier change set.
+  names it: remove it from the group in the same or an earlier change set.
 - **A group of an e-mobility provider** names pools of any operator, by weak references: a pool that does not exist
   (any more) is left out, and its operator removes it without the provider.
 
@@ -87,7 +87,8 @@ Events: `OnAdminStatusChanged` (`OnChargingPoolGroupAdminStatusChangedDelegate`)
   of the roaming network has it.
 - **Members:** no pool twice; of a group of an operator, every member a charging pool of the operator.
 - **Change sets:** `UpdateProperty`/`RemoveProperty` only of `name`, `description`, `dataSource`, `chargingPoolIds`
-  and `customData`. After every change the whole party is read again, so the rules above hold for the result.
+  and `customData`. After every change the whole party is read again, so the rules above hold for the result; the
+  members of a group of an operator are checked after the last change of the change set.
 
 
 ## Example

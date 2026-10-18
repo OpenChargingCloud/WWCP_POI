@@ -74,7 +74,7 @@ RoamingNetworkChange.Remove(chargingStationGroupId)
 ```
 
 A group a [charging tariff offer](ChargingTariffOffer.md) of the same party names can not be removed: update the offer
-first, in the same change set. An offer of an e-mobility provider naming a group of an operator does not keep it.
+in the same change set. An offer of an e-mobility provider naming a group of an operator does not keep it.
 
 
 ## Runtime status
@@ -101,7 +101,8 @@ no energy status.
   the roaming network.
 - `chargingStationIds` must not name a station twice; a group of an operator names only stations of the operator.
 - A change set applies each change to the embedded JSON of the party and reads it again, so these rules hold after
-  every single change.
+  every single change; that a group of an operator names only charging stations of the operator is checked after the last
+  change, so a charging station moved by a `Remove` and an `Add` stays in its groups.
 - `Add(chargingStationGroup, partyId)` refuses a parent other than a charging station operator or an e-mobility
   provider whose identification the group's names; the group must not exist yet. It gets the change set's
   `createdAt` as `lastChange`, and as `created` unless given.

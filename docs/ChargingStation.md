@@ -95,8 +95,9 @@ RoamingNetworkChange.Add   (evse, chargingStationId)   // the EVSE with everythi
 RoamingNetworkChange.Remove(evseId)
 ```
 
-Moving an EVSE to another station is a `Remove` and an `Add`. An EVSE named by an
-[EVSEGroup](EVSEGroup.md) can not be removed while the group names it.
+Moving an EVSE to another station is a `Remove` and an `Add` in one change set. An EVSE named by an
+[EVSEGroup](EVSEGroup.md) can not be removed while the group names it; the groups are checked after the last change,
+so a group naming a moved EVSE keeps naming it.
 
 
 ## energyMeters
@@ -263,8 +264,10 @@ The station's status is set on its own; it is not calculated from the status of 
   [templates and effective members](README.md#templates-and-effective-members). Its `templateIds` must name charging
   station templates of the operator.
 - A change set applies each change to the embedded JSON of the operator and reads the operator again, so the
-  operator must be valid after every single change (e.g. remove a station from its groups before removing it);
-  the references into the network are checked after the last change.
+  operator must be valid after every single change (e.g. add a template before naming it); the members of its
+  groups, the groups of its offers, its offers not overlapping and the references into the network are checked
+  after the last change. So a station moved to another pool (`Remove` and `Add`) stays in its groups, and its EVSEs
+  in theirs.
 - `Add(station, poolId)` needs the pool, of the same operator, as its parent; the station must not exist yet. It
   gets the change set's `createdAt` as `lastChange`, and as `created` unless given.
 

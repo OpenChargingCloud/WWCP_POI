@@ -82,6 +82,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        [NotNullWhen(true)]  out ChargingStationOperator?      ChargingStationOperator,
                                        [NotNullWhen(false)] out String?                       ErrorResponse,
                                        CustomJObjectParserDelegate<ChargingStationOperator>?  CustomChargingStationOperatorParser   = null)
+
+            => TryParse(JSON,
+                        true,
+                        out ChargingStationOperator,
+                        out ErrorResponse,
+                        CustomChargingStationOperatorParser);
+
+        #endregion
+
+        #region (internal) TryParseWithinChangeSet(JSON, out ChargingStationOperator, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given JSON representation of a charging station operator a change of a change set made,
+        /// without checking the members of its groups, the groups of its charging tariff offers and its offers not
+        /// overlapping: the change set checks them after its last change (see InvalidGroupOrOffer()).
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="ChargingStationOperator">The parsed charging station operator.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        internal static Boolean TryParseWithinChangeSet(JObject                                            JSON,
+                                                        [NotNullWhen(true)]  out ChargingStationOperator?  ChargingStationOperator,
+                                                        [NotNullWhen(false)] out String?                   ErrorResponse)
+
+            => TryParse(JSON,
+                        false,
+                        out ChargingStationOperator,
+                        out ErrorResponse,
+                        null);
+
+        #endregion
+
+        #region (private) TryParse (JSON, CheckGroupsAndOffers, out ChargingStationOperator, out ErrorResponse, ...)
+
+        /// <summary>
+        /// Try to parse the given JSON representation of a charging station operator, checking the members of its groups,
+        /// the groups of its charging tariff offers and its offers not overlapping only when told so.
+        /// </summary>
+        private static Boolean TryParse(JObject                                                JSON,
+                                        Boolean                                                CheckGroupsAndOffers,
+                                        [NotNullWhen(true)]  out ChargingStationOperator?      ChargingStationOperator,
+                                        [NotNullWhen(false)] out String?                       ErrorResponse,
+                                        CustomJObjectParserDelegate<ChargingStationOperator>?  CustomChargingStationOperatorParser)
         {
 
             ChargingStationOperator = null;
@@ -354,6 +396,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
                 ChargingStationOperator = new ChargingStationOperator(
+                                              CheckGroupsAndOffers,
                                               id,
                                               name,
                                               description,

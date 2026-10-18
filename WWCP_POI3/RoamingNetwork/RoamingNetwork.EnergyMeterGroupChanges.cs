@@ -421,7 +421,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (chargingStationOperator is not null)
             {
 
-                if (!ChargingStationOperator.TryParse(ownerJSON, out var changedOperator, out var changedOperatorError))
+                if (!ChargingStationOperator.TryParseWithinChangeSet(ownerJSON, out var changedOperator, out var changedOperatorError))
                 {
                     ErrorResponse = $"Change {Index}: {changedOperatorError}";
                     return false;

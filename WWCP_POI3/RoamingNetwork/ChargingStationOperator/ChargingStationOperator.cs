@@ -813,6 +813,100 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        CustomDataNew?                                        CustomData                             = null,
                                        UserDefinedDictionary?                                InternalData                           = null)
 
+            : this(true,
+                   Id,
+                   Name,
+                   Description,
+                   Logo,
+                   Address,
+                   GeoLocation,
+                   Telephone,
+                   EMailAddress,
+                   Homepage,
+                   HotlinePhoneNumber,
+                   TermsAndConditionsURL,
+                   DataLicenses,
+                   ChargingPools,
+                   ChargingTariffs,
+                   EVSEGroups,
+                   ChargingStationGroups,
+                   ChargingPoolGroups,
+                   ChargingTariffGroups,
+                   ParkingSpaces,
+                   Brands,
+                   SigningKeys,
+                   IdentityKeys,
+                   EnergyMeterGroups,
+                   EVSETemplates,
+                   ChargingStationTemplates,
+                   ChargingPoolTemplates,
+                   ChargingTariffTemplates,
+                   EnergyMeterTemplates,
+                   ChargingTariffOffers,
+                   InitialAdminStatus,
+                   InitialStatus,
+                   MaxAdminStatusScheduleSize,
+                   MaxStatusScheduleSize,
+                   DataSource,
+                   Created,
+                   LastChange,
+                   CustomData,
+                   InternalData)
+
+        { }
+
+        /// <summary>
+        /// Create a new charging station operator, checking the members of its groups, the groups its charging tariff
+        /// offers name and its offers not overlapping only when told so: within a change set they are checked after its
+        /// last change (see InvalidGroupOrOffer()), as a charging station moved to another charging pool is no member of
+        /// its operator between its removal and its addition.
+        /// </summary>
+        /// <param name="CheckGroupsAndOffers">Whether to check the members of its groups and its charging tariff offers.</param>
+        private ChargingStationOperator(Boolean                                               CheckGroupsAndOffers,
+                                        ChargingStationOperator_Id                            Id,
+                                        //RoamingNetwork                                        RoamingNetwork,
+                                        I18NString?                                           Name                                   = null,
+                                        I18NString?                                           Description                            = null,
+
+                                        URL?                                                  Logo                                   = null,
+                                        Address?                                              Address                                = null,
+                                        GeoCoordinate?                                        GeoLocation                            = null,
+                                        PhoneNumber?                                          Telephone                              = null,
+                                        SimpleEMailAddress?                                   EMailAddress                           = null,
+                                        URL?                                                  Homepage                               = null,
+                                        PhoneNumber?                                          HotlinePhoneNumber                     = null,
+                                        URL?                                                  TermsAndConditionsURL                  = null,
+                                        IEnumerable<DataLicense>?                             DataLicenses                           = null,
+                                        IEnumerable<ChargingPool>?                            ChargingPools                          = null,
+                                        IEnumerable<ChargingTariff>?                          ChargingTariffs                        = null,
+                                        IEnumerable<EVSEGroup>?                               EVSEGroups                              = null,
+                                        IEnumerable<ChargingStationGroup>?                    ChargingStationGroups                   = null,
+                                        IEnumerable<ChargingPoolGroup>?                       ChargingPoolGroups                      = null,
+                                        IEnumerable<ChargingTariffGroup>?                     ChargingTariffGroups                    = null,
+                                        IEnumerable<ParkingSpace>?                            ParkingSpaces                           = null,
+                                        IEnumerable<Brand>?                                   Brands                                  = null,
+                                        IEnumerable<POIPublicKey>?                            SigningKeys                             = null,
+                                        IEnumerable<POIPublicKey>?                            IdentityKeys                            = null,
+                                        IEnumerable<EnergyMeterGroup>?                        EnergyMeterGroups                       = null,
+                                        IEnumerable<EVSETemplate>?                            EVSETemplates                           = null,
+                                        IEnumerable<ChargingStationTemplate>?                 ChargingStationTemplates                = null,
+                                        IEnumerable<ChargingPoolTemplate>?                    ChargingPoolTemplates                   = null,
+                                        IEnumerable<ChargingTariffTemplate>?                  ChargingTariffTemplates                 = null,
+                                        IEnumerable<EnergyMeterTemplate>?                     EnergyMeterTemplates                    = null,
+                                        IEnumerable<ChargingTariffOffer>?                     ChargingTariffOffers                    = null,
+
+                                        Timestamped<ChargingStationOperatorAdminStatusType>?  InitialAdminStatus                     = null,
+                                        Timestamped<ChargingStationOperatorStatusType>?       InitialStatus                          = null,
+                                        UInt16?                                               MaxAdminStatusScheduleSize             = DefaultMaxAdminStatusScheduleSize,
+                                        UInt16?                                               MaxStatusScheduleSize                  = DefaultMaxStatusScheduleSize,
+
+                                        String?                                               DataSource                             = null,
+                                        DateTimeOffset?                                       Created                                = null,
+                                        DateTimeOffset?                                       LastChange                             = null,
+
+                                        CustomDataNew?                                        CustomData                             = null,
+                                        UserDefinedDictionary?                                InternalData                           = null)
+
             : base(Id,
                    Name ?? I18NString.Create("Charging Station Operator " + Id.ToString()),
                    Description,
@@ -909,8 +1003,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region Groups, of this operator, of its members
-
+            #region Groups, of this operator (their members: see InvalidGroupOrOffer())
 
             {
 
@@ -922,16 +1015,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 this.EVSEGroups = new (evseGroups, group => group.Id, "EVSE group", $"the operator '{Id}'");
 
                 foreach (var evseGroup in this.EVSEGroups)
-                {
-
                     if (evseGroup.Id.OperatorId != Id)
                         throw new ArgumentException($"The group '{evseGroup.Id}' does not belong to the operator '{Id}'!", nameof(EVSEGroups));
-
-                    foreach (var memberId in evseGroup.EVSEIds)
-                        if (!evseIndex.ContainsKey(memberId))
-                            throw new ArgumentException($"The member '{memberId}' of the group '{evseGroup.Id}' is unknown at the operator '{Id}'!", nameof(EVSEGroups));
-
-                }
 
             }
 
@@ -945,16 +1030,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 this.ChargingStationGroups = new (chargingStationGroups, group => group.Id, "charging station group", $"the operator '{Id}'");
 
                 foreach (var chargingStationGroup in this.ChargingStationGroups)
-                {
-
                     if (chargingStationGroup.Id.OperatorId != Id)
                         throw new ArgumentException($"The group '{chargingStationGroup.Id}' does not belong to the operator '{Id}'!", nameof(ChargingStationGroups));
-
-                    foreach (var memberId in chargingStationGroup.ChargingStationIds)
-                        if (!chargingStationIndex.ContainsKey(memberId))
-                            throw new ArgumentException($"The member '{memberId}' of the group '{chargingStationGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingStationGroups));
-
-                }
 
             }
 
@@ -968,16 +1045,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 this.ChargingPoolGroups = new (chargingPoolGroups, group => group.Id, "charging pool group", $"the operator '{Id}'");
 
                 foreach (var chargingPoolGroup in this.ChargingPoolGroups)
-                {
-
                     if (chargingPoolGroup.Id.OperatorId != Id)
                         throw new ArgumentException($"The group '{chargingPoolGroup.Id}' does not belong to the operator '{Id}'!", nameof(ChargingPoolGroups));
-
-                    foreach (var memberId in chargingPoolGroup.ChargingPoolIds)
-                        if (!this.ChargingPools.Contains(memberId))
-                            throw new ArgumentException($"The member '{memberId}' of the group '{chargingPoolGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingPoolGroups));
-
-                }
 
             }
 
@@ -991,16 +1060,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 this.ChargingTariffGroups = new (chargingTariffGroups, group => group.Id, "charging tariff group", $"the operator '{Id}'");
 
                 foreach (var chargingTariffGroup in this.ChargingTariffGroups)
-                {
-
                     if (chargingTariffGroup.Id.OperatorId != Id)
                         throw new ArgumentException($"The group '{chargingTariffGroup.Id}' does not belong to the operator '{Id}'!", nameof(ChargingTariffGroups));
-
-                    foreach (var memberId in chargingTariffGroup.ChargingTariffIds)
-                        if (!this.ChargingTariffs.Contains(memberId))
-                            throw new ArgumentException($"The member '{memberId}' of the group '{chargingTariffGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffGroups));
-
-                }
 
             }
 
@@ -1012,12 +1073,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     throw new ArgumentException("Groups must not contain null entries!", nameof(EnergyMeterGroups));
 
                 this.EnergyMeterGroups = new (energyMeterGroups, group => group.Id, "energy meter group", $"the operator '{Id}'");
-
-                // The energy meters of its own charging pools, charging stations and EVSEs.
-                foreach (var energyMeterGroup in this.EnergyMeterGroups)
-                    foreach (var memberId in energyMeterGroup.EnergyMeterIds)
-                        if (!energyMeterIndex.ContainsKey(memberId))
-                            throw new ArgumentException($"The member '{memberId}' of the group '{energyMeterGroup.Id}' is unknown at the operator '{Id}'!", nameof(EnergyMeterGroups));
 
             }
 
@@ -1114,33 +1169,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region Charging tariff offers: naming groups of its own and no operator but itself, not overlapping at an EVSE
+            #region Charging tariff offers: naming no operator but itself (their groups: see InvalidGroupOrOffer())
 
             this.ChargingTariffOffers = new (ChargingTariffOffers, offer => offer.Id, "charging tariff offer", $"the operator '{Id}'");
 
             foreach (var offer in this.ChargingTariffOffers)
-            {
-
                 foreach (var operatorId in offer.ChargingStationOperatorIds)
                     if (operatorId != Id)
                         throw new ArgumentException($"The charging tariff offer '{offer.Id}' of the operator '{Id}' must not name the operator '{operatorId}'!", nameof(ChargingTariffOffers));
 
-                foreach (var groupId in offer.EVSEGroupIds)
-                    if (!this.EVSEGroups.Contains(groupId))
-                        throw new ArgumentException($"The EVSE group '{groupId}' of the charging tariff offer '{offer.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffOffers));
+            #endregion
 
-                foreach (var groupId in offer.ChargingStationGroupIds)
-                    if (!this.ChargingStationGroups.Contains(groupId))
-                        throw new ArgumentException($"The charging station group '{groupId}' of the charging tariff offer '{offer.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffOffers));
+            #region The members of its groups, the groups of its offers, and its offers not overlapping
 
-                foreach (var groupId in offer.ChargingPoolGroupIds)
-                    if (!this.ChargingPoolGroups.Contains(groupId))
-                        throw new ArgumentException($"The charging pool group '{groupId}' of the charging tariff offer '{offer.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffOffers));
-
-            }
-
-            if (OverlappingOffers() is String overlapError)
-                throw new ArgumentException(overlapError, nameof(ChargingTariffOffers));
+            if (CheckGroupsAndOffers && InvalidGroupOrOffer() is String groupOrOfferError)
+                throw new ArgumentException(groupOrOfferError, nameof(ChargingTariffOffers));
 
             #endregion
 
@@ -1151,6 +1194,66 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.effectiveChargingPools = new (CalculateEffectiveChargingPools);
 
             #endregion
+
+        }
+
+        #endregion
+
+        #region (internal) InvalidGroupOrOffer()
+
+        /// <summary>
+        /// The error, when a group of this operator names a member it does not have, a charging tariff offer of it names a
+        /// group it does not have, or two of its offers overlap; null when there is none. A change set checks it after its
+        /// last change, not after every change: a charging station moved to another charging pool is removed and added
+        /// again, and is no member of this operator in between, though its groups still name it and its EVSEs.
+        /// </summary>
+        internal String? InvalidGroupOrOffer()
+        {
+
+            foreach (var evseGroup in EVSEGroups)
+                foreach (var memberId in evseGroup.EVSEIds)
+                    if (!evseIndex.ContainsKey(memberId))
+                        return $"The member '{memberId}' of the group '{evseGroup.Id}' is unknown at the operator '{Id}'!";
+
+            foreach (var chargingStationGroup in ChargingStationGroups)
+                foreach (var memberId in chargingStationGroup.ChargingStationIds)
+                    if (!chargingStationIndex.ContainsKey(memberId))
+                        return $"The member '{memberId}' of the group '{chargingStationGroup.Id}' is unknown at the operator '{Id}'!";
+
+            foreach (var chargingPoolGroup in ChargingPoolGroups)
+                foreach (var memberId in chargingPoolGroup.ChargingPoolIds)
+                    if (!ChargingPools.Contains(memberId))
+                        return $"The member '{memberId}' of the group '{chargingPoolGroup.Id}' is unknown at the operator '{Id}'!";
+
+            foreach (var chargingTariffGroup in ChargingTariffGroups)
+                foreach (var memberId in chargingTariffGroup.ChargingTariffIds)
+                    if (!ChargingTariffs.Contains(memberId))
+                        return $"The member '{memberId}' of the group '{chargingTariffGroup.Id}' is unknown at the operator '{Id}'!";
+
+            // The energy meters of its own charging pools, charging stations and EVSEs.
+            foreach (var energyMeterGroup in EnergyMeterGroups)
+                foreach (var memberId in energyMeterGroup.EnergyMeterIds)
+                    if (!energyMeterIndex.ContainsKey(memberId))
+                        return $"The member '{memberId}' of the group '{energyMeterGroup.Id}' is unknown at the operator '{Id}'!";
+
+            foreach (var offer in ChargingTariffOffers)
+            {
+
+                foreach (var groupId in offer.EVSEGroupIds)
+                    if (!EVSEGroups.Contains(groupId))
+                        return $"The EVSE group '{groupId}' of the charging tariff offer '{offer.Id}' is unknown at the operator '{Id}'!";
+
+                foreach (var groupId in offer.ChargingStationGroupIds)
+                    if (!ChargingStationGroups.Contains(groupId))
+                        return $"The charging station group '{groupId}' of the charging tariff offer '{offer.Id}' is unknown at the operator '{Id}'!";
+
+                foreach (var groupId in offer.ChargingPoolGroupIds)
+                    if (!ChargingPoolGroups.Contains(groupId))
+                        return $"The charging pool group '{groupId}' of the charging tariff offer '{offer.Id}' is unknown at the operator '{Id}'!";
+
+            }
+
+            return OverlappingOffers();
 
         }
 

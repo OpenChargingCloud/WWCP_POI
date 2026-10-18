@@ -288,7 +288,9 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
   (`Add(station, poolId)`), EVSEs (`Add(evse, stationId)`), parking garages, spaces, sensors, space templates and space groups
   (`Add(space, parkingOperatorId)`) and grid connection points (`Add(point, gridOperatorId)`). Energy meters
   are properties of what embeds them (`energyMeters`, `energyMeter`).
-  Every reference must exist; a referenced entity can not be removed. The overload by the entity's
+  Every reference must exist; a referenced entity can not be removed. The members of an operator's groups, the
+  groups of its offers and the references into the network are checked after the last change of a change set, so a
+  charging station moved to another pool (`Remove` and `Add`) stays in its groups. The overload by the entity's
   type names it: a change is data, `{entityType, entityId, propertyName, oldValue, newValue}`, applied
   to the entity with that id in the version it is applied to.
 - **Old values:** `CreateChangeSet` gives every change the value it finds, where it is given none; JSON `null` means

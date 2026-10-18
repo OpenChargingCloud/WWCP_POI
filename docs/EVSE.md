@@ -239,8 +239,9 @@ See [runtime status](README.md#runtime-status) for the mechanism.
   roaming network.
 - In its roaming network: the energy meter's manufacturer must be an energy meter manufacturer.
 - A change set applies each change to the embedded JSON of the operator and reads the operator again, so the
-  operator must be valid after every single change (e.g. remove an EVSE from its [EVSEGroups](EVSEGroup.md)
-  before removing it; add a tariff before naming it); the references into the network are checked after the last change.
+  operator must be valid after every single change (e.g. add a tariff before naming it); the members of its groups
+  and the references into the network are checked after the last change, so an EVSE moved to another station stays
+  in its [EVSEGroups](EVSEGroup.md).
 - `Add(evse, stationId)` needs the station, of the same operator, as its parent; the EVSE must not exist yet. It
   gets the change set's `createdAt` as `lastChange`, and as `created` unless given. `Remove(evseId)` removes it
   with its connectors and energy meter.

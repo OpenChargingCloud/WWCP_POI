@@ -108,7 +108,8 @@ not only within the pool.
 - **Add:** `RoamingNetworkChange.Add(chargingStation, chargingPoolId)`; the parent pool must exist.
 - **Remove:** `RoamingNetworkChange.Remove(chargingStationId)`; removing the last one removes `chargingStations`.
   A station a charging station group of its operator names can not be removed.
-- **Move** to another pool of the operator: `Remove` and `Add`.
+- **Move** to another pool of the operator: `Remove` and `Add` in one change set. Its groups and those of its EVSEs
+  keep naming them: the members of groups are checked after the last change.
 
 See [ChargingStation](ChargingStation.md).
 
@@ -288,8 +289,8 @@ Events: `OnAdminStatusChanged` (`OnChargingPoolAdminStatusChangedDelegate`) and 
 - **Removal:** a pool a charging pool group of its operator names, or whose stations or EVSEs a group of its operator
   names, can not be removed; groups of e-mobility providers name it by weak references.
 - **Change sets:** `UpdateProperty`/`RemoveProperty` only of the properties marked above; a given parent must be the
-  actual one. After every change, the whole operator is read again (`ChargingStationOperator.TryParse`), so all rules
-  above hold for the result.
+  actual one. After every change, the whole operator is read again, so all rules above hold for the result; the
+  members of its operator's groups are checked after the last change of the change set.
 
 
 ## Example
