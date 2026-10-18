@@ -883,6 +883,33 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Offers_are_found_by_their_identification_in_the_roaming_network()
+
+        /// <summary>
+        /// Below an EVSE the offers of its operator and of providers: their identifications name no owner, the roaming
+        /// network redirects to where each is.
+        /// </summary>
+        [Test]
+        public async Task Offers_are_found_by_their_identification_in_the_roaming_network()
+        {
+
+            var (ofOperator,  night)  = await Get("RNs/rn1/CTOs/gef-night");
+            var (ofProvider,  hpc)    = await Get("RNs/rn1/CTOs/GDF-HPC-39");
+            var (unknown,     _)      = await Get("RNs/rn1/CTOs/nothing-like-it");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Uri.UnescapeDataString(ofOperator.RequestMessage!.RequestUri!.AbsolutePath),  Is.EqualTo("/RNs/rn1/CSOs/DE*GEF/CTOs/gef-night"));
+                Assert.That(night!["@id"]!.Value<String>(),                                                Is.EqualTo("gef-night"));
+                Assert.That(Uri.UnescapeDataString(ofProvider.RequestMessage!.RequestUri!.AbsolutePath),  Is.EqualTo("/RNs/rn1/EMPs/DE-GDF/CTOs/gdf-hpc-39"));
+                Assert.That(hpc!["@id"]!.Value<String>(),                                                  Is.EqualTo("gdf-hpc-39"));
+                Assert.That(unknown.StatusCode,                                                            Is.EqualTo(HttpStatusCode.NotFound));
+            }
+
+        }
+
+        #endregion
+
         #region The_applicable_offers_are_served_below_the_EVSEs_they_cover()
 
         [Test]

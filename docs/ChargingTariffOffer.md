@@ -21,7 +21,7 @@ Two parties have offers:
 | Status | `ChargingTariffOfferStatusType`: `planned`, `active`, `exhausted`, `expired`; see [runtime status](#runtime-status) |
 | Embedded in | [ChargingStationOperator](ChargingStationOperator.md) or [EMobilityProvider](EMobilityProvider.md), as `chargingTariffOffers` |
 | Owner | the party embedding it (signing key), the parent of an `Add` |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTOs/{CTO_Id}` and `GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}/CTOs/{CTO_Id}`; embedded in its owner, and listed by `…/CTOs` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTOs/{CTO_Id}` and `GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}/CTOs/{CTO_Id}`; embedded in its owner, and listed by `…/CTOs`; `GET ~/RNs/{RN_Id}/CTOs/{CTO_Id}` redirects to it below its owner |
 
 
 ## Properties

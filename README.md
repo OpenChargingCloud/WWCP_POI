@@ -482,11 +482,14 @@ JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json
 | `GET ~/RNs/{RN_Id}/GOs/{GO_Id}[/GCPs/{GCP_Id}]` | a grid operator, or one of its grid connection points |
 | `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer or parking operator |
 | `GET ~/RNs/{RN_Id}/{CPs\|CSs\|EVSEs}/{Id}` | `307 Temporary Redirect` to where a charging pool, station or EVSE is, below its operator, the query kept |
+| `GET ~/RNs/{RN_Id}/CTOs/{CTO_Id}` | `307 Temporary Redirect` to a charging tariff offer below its owner, a charging station operator or an e-mobility provider |
 
 What names a charging station or an EVSE names it by its identification only: a group or an offer, a parking
 garage, space or sensor of a parking operator. `~/RNs/{RN_Id}/CSs/{CS_Id}` finds it in the roaming network, e.g. for
 a link, and redirects to `~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}`, a browser as well; temporarily, as a
-station may move to another pool of its operator. One not there is `404`.
+station may move to another pool of its operator. One not there is `404`. A charging tariff offer is found by
+`~/RNs/{RN_Id}/CTOs/{CTO_Id}` as well: the offers covering an EVSE are of its operator and of e-mobility providers,
+and their identifications, unique in the roaming network, name no owner.
 
 Versions are immutable and their runtime status is no part of these representations, so each one is calculated
 once per version and format and kept as long as the version is referenced; an entity a commit does not change is

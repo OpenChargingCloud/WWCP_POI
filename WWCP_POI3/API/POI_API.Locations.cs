@@ -27,12 +27,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// Where a charging pool, a charging station or an EVSE of a roaming network is, by its identification alone.
+    /// Where a charging pool, a charging station, an EVSE or a charging tariff offer of a roaming network is, by its
+    /// identification alone.
     /// </summary>
     /// <remarks>
     /// GET ~/RNs/{RN_Id}/CPs/{CP_Id}        to ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}
     /// GET ~/RNs/{RN_Id}/CSs/{CS_Id}        to ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}
     /// GET ~/RNs/{RN_Id}/EVSEs/{EVSE_Id}    to ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}
+    /// GET ~/RNs/{RN_Id}/CTOs/{CTO_Id}      to ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTOs/{CTO_Id} or ~/RNs/{RN_Id}/EMPs/{EMP_Id}/CTOs/{CTO_Id}
+    ///
+    /// The charging tariff offers covering an EVSE, ~/…/EVSEs/{EVSE_Id}/CTOs, are of its operator and of e-mobility
+    /// providers, and their identifications, unique in the roaming network, name no owner: they are found by it.
     ///
     /// What names a charging station or an EVSE names it by its identification only: a group of its operator, a
     /// parking garage, space or sensor of a parking operator. These find it in the roaming network and answer with
@@ -99,6 +104,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                          : null,
                 "EVSE");
 
+            AddLocationHandlers("CTOs", OfferLocationResponse);
+
         }
 
         #endregion
@@ -119,6 +126,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               Func<TId, ChargingStationOperator_Id>              OperatorIdOf,
                                               Func<ChargingStationOperator, TId, String?>        PathBelowOperator,
                                               String                                             Description)
+
+            => AddLocationHandlers(Segment,
+                                   request => LocationResponse(request, TryParseId, OperatorIdOf, PathBelowOperator, Description));
+
+        #endregion
+
+        #region (private) AddLocationHandlers(Segment, LocationResponse)
+
+        /// <summary>
+        /// Answer GET of ~/RNs/{RN_Id}/{Segment}/{Id} with the given redirect to where the entity is, or why there is
+        /// none, for a browser as well; HEAD by Hermod from it, and OPTIONS.
+        /// </summary>
+        /// <param name="Segment">The segment of the kind of entity, e.g. "CTOs".</param>
+        /// <param name="LocationResponse">The redirect to where the requested entity is, or why there is none.</param>
+        private void AddLocationHandlers(String                           Segment,
+                                         Func<HTTPRequest, HTTPResponse>  LocationResponse)
         {
 
             var path = HTTPPath.Root + $"RNs/{{roamingNetworkId}}/{Segment}/{{id}}";
@@ -127,7 +150,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        HTTPMethod:    HTTPMethod.GET,
                        HTTPDelegate:  request => {
 
-                           var response = LocationResponse(request, TryParseId, OperatorIdOf, PathBelowOperator, Description);
+                           var response = LocationResponse(request);
 
                            // A browser gets the HTML view of what is not there, as of any URL of this API.
                            return response.HTTPStatusCode != HTTPStatusCode.TemporaryRedirect && HTMLView is not null && WantsHTML(request)
@@ -182,25 +205,66 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     : roamingNetwork.ChargingStationOperators;
 
             foreach (var chargingStationOperator in chargingStationOperators)
-            {
-
-                if (PathBelowOperator(chargingStationOperator, id) is not String below)
-                    continue;
-
-                var requestTarget  = Request.RequestTarget ?? "";
-                var queryAt        = requestTarget.IndexOf('?');
-
-                return new HTTPResponse.Builder(Request) {
-                           HTTPStatusCode            = HTTPStatusCode.TemporaryRedirect,
-                           Location                  = Location.Parse((URLPathPrefix + $"RNs/{roamingNetwork.Id}/CSOs/{chargingStationOperator.Id}/{below}").ToString() +
-                                                                      (queryAt >= 0 ? requestTarget[queryAt..] : "")),
-                           CacheControl              = "no-store",
-                           AccessControlAllowOrigin  = "*"
-                       }.AsImmutable;
-
-            }
+                if (PathBelowOperator(chargingStationOperator, id) is String below)
+                    return RedirectTo(Request, roamingNetwork, $"CSOs/{chargingStationOperator.Id}/{below}");
 
             return EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The {Description} '{id}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+
+        }
+
+        #endregion
+
+        #region (private) OfferLocationResponse(Request)
+
+        /// <summary>
+        /// The redirect to the requested charging tariff offer below its owner, a charging station operator or an
+        /// e-mobility provider, or why there is none: its identification is unique in the roaming network.
+        /// </summary>
+        private HTTPResponse OfferLocationResponse(HTTPRequest Request)
+        {
+
+            if (!TryGetRequestedRoamingNetwork(Request, out var roamingNetwork, out var errorResponse))
+                return errorResponse;
+
+            var text = Request.ParsedURLParameters[^1];
+
+            if (!ChargingTariffOffer_Id.TryParse(text, out var offerId))
+                return EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Invalid charging tariff offer identification '{text}'!");
+
+            foreach (var chargingStationOperator in roamingNetwork.ChargingStationOperators)
+                if (chargingStationOperator.TryGetChargingTariffOffer(offerId, out var offer))
+                    return RedirectTo(Request, roamingNetwork, $"CSOs/{chargingStationOperator.Id}/CTOs/{Uri.EscapeDataString(offer.Id.ToString())}");
+
+            foreach (var eMobilityProvider in roamingNetwork.EMobilityProviders)
+                if (eMobilityProvider.TryGetChargingTariffOffer(offerId, out var offer))
+                    return RedirectTo(Request, roamingNetwork, $"EMPs/{eMobilityProvider.Id}/CTOs/{Uri.EscapeDataString(offer.Id.ToString())}");
+
+            return EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The charging tariff offer '{offerId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+
+        }
+
+        #endregion
+
+        #region (private) RedirectTo(Request, RoamingNetwork, PathBelowNetwork)
+
+        /// <summary>
+        /// 307 Temporary Redirect to the given path below the given roaming network, the query of the request kept.
+        /// </summary>
+        private HTTPResponse RedirectTo(HTTPRequest     Request,
+                                        RoamingNetwork  RoamingNetwork,
+                                        String          PathBelowNetwork)
+        {
+
+            var requestTarget  = Request.RequestTarget ?? "";
+            var queryAt        = requestTarget.IndexOf('?');
+
+            return new HTTPResponse.Builder(Request) {
+                       HTTPStatusCode            = HTTPStatusCode.TemporaryRedirect,
+                       Location                  = Location.Parse((URLPathPrefix + $"RNs/{RoamingNetwork.Id}/{PathBelowNetwork}").ToString() +
+                                                                  (queryAt >= 0 ? requestTarget[queryAt..] : "")),
+                       CacheControl              = "no-store",
+                       AccessControlAllowOrigin  = "*"
+                   }.AsImmutable;
 
         }
 
