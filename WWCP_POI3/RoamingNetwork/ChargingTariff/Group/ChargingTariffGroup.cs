@@ -50,7 +50,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                     Timestamped<ChargingTariffGroupStatusType>   NewStatus,
                                                                     Context?                                     DataSource);
 
-
     /// <summary>
     /// A group of charging tariffs of one charging station operator, embedded completely in it; groups may overlap.
     /// </summary>
@@ -68,12 +67,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ChargingTariff_Id>  ChargingTariffIds  { get; }
 
-        /// <summary>
-        /// Its priority over the other groups of a member, where they give it different values: the higher wins;
-        /// 0, unless given. Groups of the same member with the same priority must not give it different values.
-        /// </summary>
-        public Int32?  Priority  { get; }
-
         #endregion
 
         #region Constructor(s)
@@ -85,7 +78,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    I18NString?                                        Name                         = null,
                                    I18NString?                                        Description                  = null,
                                    IEnumerable<ChargingTariff_Id>?                    ChargingTariffIds            = null,
-                                   Int32?                                             Priority                     = null,
 
                                    Timestamped<ChargingTariffGroupAdminStatusType>?   InitialAdminStatus           = null,
                                    Timestamped<ChargingTariffGroupStatusType>?        InitialStatus                = null,
@@ -119,12 +111,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.ChargingTariffIds  = POIJSON.OrderedIds(ChargingTariffIds, $"member of the charging tariff group '{Id}'");
-            this.Priority           = Priority;
 
         }
 
         #endregion
-
 
         #region Status events
 
@@ -176,7 +166,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-
         #region ToJSON()
 
         /// <summary>
@@ -200,9 +189,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (ChargingTariffIds.Length > 0)
                 json.Add("chargingTariffIds",  POIJSON.IdsToJSON(ChargingTariffIds));
-
-            if (Priority.HasValue)
-                json.Add("priority",  Priority.Value);
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
@@ -247,9 +233,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseInteger(JSON, "priority", "priority of the charging tariff group", out var priority, out ErrorResponse))
-                    return false;
-
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -263,7 +246,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                               name,
                                                               description,
                                                               members,
-                                                              Priority:    priority,
                                                               DataSource:  dataSource,
                                                               Created:     created,
                                                               LastChange:  lastChange,
@@ -283,7 +265,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         #endregion
-
 
         #region Operator overloading, IEquatable, IComparable
 

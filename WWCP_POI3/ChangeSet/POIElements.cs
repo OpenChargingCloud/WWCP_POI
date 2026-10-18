@@ -29,7 +29,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///         of the element the segment before addresses. A segment on an array names the element by its identification;
     ///         a segment on any other value may name its <c>@id</c>, which it must then have.</item>
     ///   <item>An added element goes where the ordinal order of the identifications puts it, when the array is in that order,
-    ///         otherwise at its end. An array left without elements is removed, as entities write no empty arrays.</item>
+    ///         otherwise at its end; to <c>templateIds</c>, whose order is content, always at its end. An array left without
+    ///         elements is removed, as entities write no empty arrays.</item>
     /// </list>
     /// </remarks>
     public static class POIElements
@@ -38,9 +39,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The identification types of the elements of a property, by the name of the property:
-        /// its elements are the same as their type compares them, e.g. without case.
+        /// The property of a member naming its templates, in an order that is content: the first template giving a value wins.
         /// </summary>
+        public const String TemplateIdsProperty = "templateIds";
+
         /// <summary>
         /// The properties holding one identified object, not an array of them, e.g. the energy meter of an EVSE.
         /// </summary>
@@ -48,11 +50,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "energyMeter"
         ];
 
+        /// <summary>
+        /// The identification types of the elements of a property, by the name of the property:
+        /// its elements are the same as their type compares them, e.g. without case.
+        /// </summary>
         private static readonly Dictionary<String, Func<String, Object?>> ElementIdTypes = new () {
             { "EVSEIds",               text => EVSE_Id.             TryParse(text, out var id) ? id : null },
             { "chargingStationIds",    text => ChargingStation_Id.  TryParse(text, out var id) ? id : null },
             { "chargingPoolIds",       text => ChargingPool_Id.     TryParse(text, out var id) ? id : null },
             { "chargingTariffIds",     text => ChargingTariff_Id.   TryParse(text, out var id) ? id : null },
+            { "energyMeterIds",        text => EnergyMeter_Id.      TryParse(text, out var id) ? id : null },
+            { "chargingStationOperatorIds", text => ChargingStationOperator_Id.TryParse(text, out var id) ? id : null },
+            { "EVSEGroupIds",          text => EVSEGroup_Id.           TryParse(text, out var id) ? id : null },
+            { "chargingStationGroupIds", text => ChargingStationGroup_Id.TryParse(text, out var id) ? id : null },
+            { "chargingPoolGroupIds",  text => ChargingPoolGroup_Id.   TryParse(text, out var id) ? id : null },
+            { TemplateIdsProperty,     TemplateIdOf },
             { "brands",                text => Brand_Id.            TryParse(text, out var id) ? id : null },
             { "parkingSpaceIds",       text => ParkingSpace_Id.     TryParse(text, out var id) ? id : null },
             { "parkingSensorIds",      text => ParkingSensor_Id.    TryParse(text, out var id) ? id : null },
@@ -65,6 +77,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (private static) TemplateIdOf(Text)
+
+        /// <summary>
+        /// The template identification the given text names: of an EVSE, charging station, charging pool or charging
+        /// tariff template by its infix, otherwise of a parking space or energy meter template, both without case.
+        /// </summary>
+        private static Object? TemplateIdOf(String Text)
+
+            => EVSETemplate_Id.           TryParse(Text, out var evseTemplateId)     ? evseTemplateId
+             : ChargingStationTemplate_Id.TryParse(Text, out var stationTemplateId)  ? stationTemplateId
+             : ChargingPoolTemplate_Id.   TryParse(Text, out var poolTemplateId)     ? poolTemplateId
+             : ChargingTariffTemplate_Id. TryParse(Text, out var tariffTemplateId)   ? tariffTemplateId
+             : ParkingSpaceTemplate_Id.   TryParse(Text, out var otherTemplateId)    ? otherTemplateId
+             : null;
+
+        #endregion
 
         #region IdOf(Element)
 
@@ -344,7 +373,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                             : new JArray(newElement);
 
                         else
-                            Insert(targetArray, newElement);
+                            Insert(last.PropertyName, targetArray, newElement);
 
                     }
                     else
@@ -594,7 +623,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (baseElement is not null)
                         return false;
 
-                    Insert(merged, rightElement.DeepClone());
+                    Insert(PropertyName, merged, rightElement.DeepClone());
                     continue;
 
                 }
@@ -749,19 +778,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) Insert(Array, Element)
+        #region (private static) Insert(PropertyName, Array, Element)
 
         /// <summary>
         /// Insert the given element where the ordinal order of the identifications puts it, when the array is in that order,
-        /// otherwise at its end.
+        /// otherwise at its end; into <c>templateIds</c>, whose order is content, always at its end.
         /// </summary>
-        private static void Insert(JArray  Array,
+        private static void Insert(String  PropertyName,
+                                   JArray  Array,
                                    JToken  Element)
         {
 
             var id       = IdOf(Element)!;
             var ids      = Array.Select(element => IdOf(element)!).ToArray();
-            var ordered  = ids.Zip(ids.Skip(1)).All(pair => String.CompareOrdinal(pair.First, pair.Second) < 0);
+            var ordered  = PropertyName != TemplateIdsProperty &&
+                           ids.Zip(ids.Skip(1)).All(pair => String.CompareOrdinal(pair.First, pair.Second) < 0);
 
             if (ordered)
                 Array.Insert(ids.TakeWhile(other => String.CompareOrdinal(other, id) < 0).Count(), Element);

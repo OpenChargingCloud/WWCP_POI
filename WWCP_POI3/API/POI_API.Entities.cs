@@ -45,13 +45,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs                                                     its charging station operators, in short
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}                                            a charging station operator;
     ///     ?without=chargingPools leaves out its charging pools, which ~/RNs/{RN_Id}/CPs?operatorId=… lists;
-    ///     ?without=chargingTariffs,chargingTariffGroups,chargingPoolGroups,chargingStationGroups,EVSEGroups,energyMeterGroups,
-    ///     or any of them, leaves them out, which ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs|EMGs} list;
+    ///     ?without=chargingTariffs,EVSETemplates,chargingStationTemplates,chargingPoolTemplates,chargingTariffTemplates,
+    ///     energyMeterTemplates,chargingTariffGroups,chargingPoolGroups,chargingStationGroups,EVSEGroups,energyMeterGroups,
+    ///     or any of them, leaves them out, which ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|EVSETs|CSTs|CPTs|CTTs|EMTs|CTGs|CPGs|CSGs|EVSEGs|EMGs} list;
     ///     ?without=parkingSpaces leaves out its own parking spaces, which ~/…/CSs/{CS_Id}/PSs list as its stations name them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands                                     the brands of the charging station operator, its own
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands/{Brand_Id}                          a brand of the charging station operator
-    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs                                        its charging tariffs, as it embeds them
-    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs/{CT_Id}                                a charging tariff of the charging station operator
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs                                        its charging tariffs, the effective ones;
+    ///                                                                             ?view=stored as it embeds them
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs/{CT_Id}                                a charging tariff of the charging station operator,
+    ///                                                                             the effective one; ?view=stored as it embeds it
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs/{CT_Id}/CTTs                           the templates the charging tariff names, in its order
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{EVSETs|CSTs|CPTs|CTTs|EMTs}               its EVSE, charging station, charging pool, charging
+    ///                                                                             tariff and energy meter templates, as it embeds them
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{EVSETs|CSTs|CPTs|CTTs|EMTs}/{Id}          a template of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs                                       its charging tariff groups, as it embeds them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTGs/{CTG_Id}                              a charging tariff group of the charging station operator
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPGs                                       its charging pool groups, as it embeds them
@@ -65,27 +72,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}                                a charging pool, the effective one;
     ///     ?expand=gridConnectionPoint embeds its grid connection point instead of naming it,
     ///     ?view=stored serves it, and everything below, as its operator embeds it
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CPTs                           the templates the charging pool names, in its order
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands                         the brands of the charging pool, its own
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands/{Brand_Id}              a brand of the charging pool
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}                    a charging station
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs                the parking spaces it names, of parking
     ///                                                                             operators or of its operator, as they embed them
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs/{PS_Id}        a parking space the charging station names
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/CSTs               the templates the charging station names, in its order
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/Brands             the brands of the charging station, its own
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/Brands/{Brand_Id}  a brand of the charging station
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}    an EVSE
+    /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/EVSETs
+    ///                                                                            the templates the EVSE names, in its order
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/Brands
     ///                                                                            the brands of the EVSE, its own
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/Brands/{Brand_Id}
     ///                                                                            a brand of the EVSE
     /// GET ~/RNs/{RN_Id}/GOs                                                      its grid operators, in short
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}                                              a grid operator;
-    ///     ?without=gridConnectionPoints,energyMeterGroups, or either of them, leaves them out, which
-    ///     ~/RNs/{RN_Id}/GOs/{GO_Id}/{GCPs|EMGs} list
+    ///     ?without=gridConnectionPoints,energyMeterTemplates,energyMeterGroups, or any of them, leaves them out, which
+    ///     ~/RNs/{RN_Id}/GOs/{GO_Id}/{GCPs|EMTs|EMGs} list
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs                                         its grid connection points, the effective ones;
     ///     ?view=stored as it embeds them
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}                                a grid connection point of the grid operator, the
     ///                                                                             effective one; ?view=stored as it embeds it
+    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMTs                                         its energy meter templates, as it embeds them
+    /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMTs/{EMT_Id}                                an energy meter template of the grid operator
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMGs                                         its energy meter groups, as it embeds them
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMGs/{EMG_Id}                                an energy meter group of the grid operator
     /// GET ~/RNs/{RN_Id}/EMPs                                                     its e-mobility providers, in short
@@ -94,12 +107,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSMs/{CSM_Id}                                            a charging station manufacturer
     /// GET ~/RNs/{RN_Id}/POs                                                      its parking operators, in short
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}                                              a parking operator;
-    ///     ?without=parkingGarages,parkingSpaces,parkingSpaceGroups,parkingSensors,parkingProducts, or any of them,
-    ///     leaves them out, which ~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs} list
+    ///     ?without=parkingGarages,parkingSpaces,parkingSpaceTemplates,parkingSpaceGroups,parkingSensors,parkingProducts,
+    ///     or any of them, leaves them out, which ~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSTs|PSGs|PSNs|PPs} list
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PGs                                          its parking garages, as it embeds them
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PGs/{PG_Id}                                  a parking garage of the parking operator
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs                                          its parking spaces, as it embeds them
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs/{PS_Id}                                  a parking space of the parking operator
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs/{PS_Id}/PSTs                             the templates the parking space names, in its order
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSTs                                         its parking space templates, as it embeds them
+    /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSTs/{PST_Id}                                a parking space template of the parking operator
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSGs                                         its parking space groups, as it embeds them
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSGs/{PSG_Id}                                a parking space group of the parking operator
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSNs                                         its parking sensors, as it embeds them
@@ -107,13 +123,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs                                          its parking products, as it embeds them
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}/PPs/{PP_Id}                                  a parking product of the parking operator
     ///
-    /// A charging pool, a charging station, an EVSE and a parking space are served as they are at runtime, the effective
-    /// ones of their operator: with the properties their groups give them, see ChargingStationOperator.EffectiveChargingPools
-    /// and ParkingOperator.EffectiveParkingSpaces; a charging pool also in ~/RNs/{RN_Id}/CPs, searched so. The energy
-    /// meters they embed take the properties of their energy meter groups, and so does the one of a grid connection
-    /// point, see GridOperator.EffectiveGridConnectionPoints. Their operators and the roaming network embed them as they
-    /// are given, with their groups. ?view=stored serves a charging pool, and what it embeds, a parking space or a grid
-    /// connection point as its operator embeds it, with the ETag a precondition of a change set names, also in the links
+    /// A charging pool, a charging station, an EVSE, a charging tariff and a parking space are served as they are at
+    /// runtime, the effective ones of their operator: with the properties their templates give them, see
+    /// ChargingStationOperator.EffectiveChargingPools, EffectiveChargingTariffs and ParkingOperator.EffectiveParkingSpaces;
+    /// a charging pool also in ~/RNs/{RN_Id}/CPs, searched so. The energy meters they embed take the properties of their
+    /// energy meter templates, and so does the one of a grid connection point, see GridOperator.EffectiveGridConnectionPoints.
+    /// Their operators and the roaming network embed them as they are given, naming their templates. ?view=stored serves a
+    /// charging pool, and what it embeds, a charging tariff, a parking space or a grid connection point as its operator
+    /// embeds it, with the ETag a precondition of a change set names, also in the links
     /// to other pages of a list; in either view, X-Stored-ETag tells that ETag as well.
     ///
     /// Brands are embedded in what they are a brand of, and mean something of their own on every level: a charging
@@ -259,30 +276,114 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            chargingStationOperator,
                                                                            chargingStationOperator.ToEmbeddedJSON,
-                                                                           [ "chargingPools", "chargingTariffs", "chargingTariffGroups", "chargingPoolGroups", "chargingStationGroups", "EVSEGroups", "energyMeterGroups", "parkingSpaces" ],
+                                                                           [ "chargingPools", "chargingTariffs", "EVSETemplates", "chargingStationTemplates", "chargingPoolTemplates", "chargingTariffTemplates", "energyMeterTemplates",
+                                                                             "chargingTariffGroups", "chargingPoolGroups", "chargingStationGroups", "EVSEGroups", "energyMeterGroups", "parkingSpaces" ],
                                                                            "a charging station operator")
                                              : errorResponse);
 
             #endregion
 
-            #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs, CTGs, CPGs, CSGs, EVSEGs, EMGs, and each of them below
+            #region ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CTs, EVSETs, CSTs, CPTs, CTTs, EMTs, CTGs, CPGs, CSGs, EVSEGs, EMGs, and each of them below
 
-            // Its charging tariffs and its groups: a list each, and each of them on its own.
+            // Its charging tariffs, its templates and its groups: a list each, and each of them on its own. The charging
+            // tariffs as they are at runtime, with the properties their templates give them; with ?view=stored as it embeds them.
             AddEmbeddedListHandlers<ChargingTariff_Id, ChargingTariff>(
                 chargingStationOperatorPath + "/CTs",
-                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
-                               ? (chargingStationOperator.ChargingTariffs, null)
-                               : (null, errorResponse),
-                chargingTariff => chargingTariff.ToJSON());
+                RequestedChargingTariffsOfOperator,
+                chargingTariff => chargingTariff.ToJSON(),
+                Viewed: true);
 
             AddEmbeddedEntityHandlers<ChargingTariff_Id, ChargingTariff>(
                 chargingStationOperatorPath + "/CTs/{chargingTariffId}",
-                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
-                               ? (chargingStationOperator.ChargingTariffs, null)
-                               : (null, errorResponse),
+                RequestedChargingTariffsOfOperator,
                 ChargingTariff_Id.TryParse,
                 "charging tariff",
-                chargingTariff => chargingTariff.ToJSON());
+                chargingTariff => chargingTariff.ToJSON(),
+                (request, chargingTariff) => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out _) &&
+                                             chargingStationOperator.TryGetChargingTariff(chargingTariff.Id, out var stored)
+                                                 ? stored
+                                                 : null);
+
+            AddEmbeddedListHandlers<EVSETemplate_Id, EVSETemplate>(
+                chargingStationOperatorPath + "/EVSETs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.EVSETemplates, null)
+                               : (null, errorResponse),
+                evseTemplate => evseTemplate.ToJSON());
+
+            AddEmbeddedEntityHandlers<EVSETemplate_Id, EVSETemplate>(
+                chargingStationOperatorPath + "/EVSETs/{EVSETemplateId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.EVSETemplates, null)
+                               : (null, errorResponse),
+                EVSETemplate_Id.TryParse,
+                "EVSE template",
+                evseTemplate => evseTemplate.ToJSON());
+
+            AddEmbeddedListHandlers<ChargingStationTemplate_Id, ChargingStationTemplate>(
+                chargingStationOperatorPath + "/CSTs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingStationTemplates, null)
+                               : (null, errorResponse),
+                chargingStationTemplate => chargingStationTemplate.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingStationTemplate_Id, ChargingStationTemplate>(
+                chargingStationOperatorPath + "/CSTs/{chargingStationTemplateId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingStationTemplates, null)
+                               : (null, errorResponse),
+                ChargingStationTemplate_Id.TryParse,
+                "charging station template",
+                chargingStationTemplate => chargingStationTemplate.ToJSON());
+
+            AddEmbeddedListHandlers<ChargingPoolTemplate_Id, ChargingPoolTemplate>(
+                chargingStationOperatorPath + "/CPTs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingPoolTemplates, null)
+                               : (null, errorResponse),
+                chargingPoolTemplate => chargingPoolTemplate.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingPoolTemplate_Id, ChargingPoolTemplate>(
+                chargingStationOperatorPath + "/CPTs/{chargingPoolTemplateId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingPoolTemplates, null)
+                               : (null, errorResponse),
+                ChargingPoolTemplate_Id.TryParse,
+                "charging pool template",
+                chargingPoolTemplate => chargingPoolTemplate.ToJSON());
+
+            AddEmbeddedListHandlers<ChargingTariffTemplate_Id, ChargingTariffTemplate>(
+                chargingStationOperatorPath + "/CTTs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingTariffTemplates, null)
+                               : (null, errorResponse),
+                chargingTariffTemplate => chargingTariffTemplate.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingTariffTemplate_Id, ChargingTariffTemplate>(
+                chargingStationOperatorPath + "/CTTs/{chargingTariffTemplateId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.ChargingTariffTemplates, null)
+                               : (null, errorResponse),
+                ChargingTariffTemplate_Id.TryParse,
+                "charging tariff template",
+                chargingTariffTemplate => chargingTariffTemplate.ToJSON());
+
+            AddEmbeddedListHandlers<EnergyMeterTemplate_Id, EnergyMeterTemplate>(
+                chargingStationOperatorPath + "/EMTs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.EnergyMeterTemplates, null)
+                               : (null, errorResponse),
+                energyMeterTemplate => energyMeterTemplate.ToJSON());
+
+            AddEmbeddedEntityHandlers<EnergyMeterTemplate_Id, EnergyMeterTemplate>(
+                chargingStationOperatorPath + "/EMTs/{energyMeterTemplateId}",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
+                               ? (chargingStationOperator.EnergyMeterTemplates, null)
+                               : (null, errorResponse),
+                EnergyMeterTemplate_Id.TryParse,
+                "energy meter template",
+                energyMeterTemplate => energyMeterTemplate.ToJSON());
+
 
             AddEmbeddedListHandlers<ChargingTariffGroup_Id, ChargingTariffGroup>(
                 chargingStationOperatorPath + "/CTGs",
@@ -555,6 +656,76 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region The templates of a charging pool, station, EVSE, charging tariff and parking space: ~/…/CPTs, CSTs, EVSETs, CTTs, PSTs below it
+
+            // The templates a member names, in its order, which give it properties at runtime, as its owner embeds them,
+            // each with its page below the owner: so a client tells which of the values of the member come from which template.
+            AddOrderedListHandlers<ChargingPoolTemplate>(
+                chargingPoolPath + "/CPTs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse) &&
+                           TryGetRequestedChargingPool           (request, out var chargingPool,            out errorResponse)
+                               ? ([ .. chargingStationOperator.TemplatesOf(chargingPool) ], null)
+                               : (null, errorResponse),
+                chargingPoolTemplate => chargingPoolTemplate.ToJSON());
+
+            AddOrderedListHandlers<ChargingStationTemplate>(
+                chargingStationPath + "/CSTs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse) &&
+                           TryGetRequestedChargingStation        (request, out var chargingStation,         out errorResponse)
+                               ? ([ .. chargingStationOperator.TemplatesOf(chargingStation) ], null)
+                               : (null, errorResponse),
+                chargingStationTemplate => chargingStationTemplate.ToJSON());
+
+            AddOrderedListHandlers<EVSETemplate>(
+                chargingStationPath + "/EVSEs/{evseId}" + "/EVSETs",
+                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse) &&
+                           TryGetRequestedEVSE                   (request, out var evse,                    out errorResponse)
+                               ? ([ .. chargingStationOperator.TemplatesOf(evse) ], null)
+                               : (null, errorResponse),
+                evseTemplate => evseTemplate.ToJSON());
+
+            AddOrderedListHandlers<ChargingTariffTemplate>(
+                chargingStationOperatorPath + "/CTs/{chargingTariffId}" + "/CTTs",
+                request => {
+
+                    if (!TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse))
+                        return (null, errorResponse);
+
+                    var text = request.ParsedURLParameters[2];
+
+                    if (!ChargingTariff_Id.TryParse(text, out var chargingTariffId))
+                        return (null, EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Invalid charging tariff identification '{text}'!"));
+
+                    if (!chargingStationOperator.TryGetChargingTariff(chargingTariffId, out var chargingTariff))
+                        return (null, EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The charging tariff '{chargingTariffId}' is unknown at the operator '{chargingStationOperator.Id}'!"));
+
+                    return ([ .. chargingStationOperator.TemplatesOf(chargingTariff) ], null);
+
+                },
+                chargingTariffTemplate => chargingTariffTemplate.ToJSON());
+
+            AddOrderedListHandlers<ParkingSpaceTemplate>(
+                parkingOperatorPath + "/PSs/{parkingSpaceId}" + "/PSTs",
+                request => {
+
+                    if (!TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse))
+                        return (null, errorResponse);
+
+                    var text = request.ParsedURLParameters[2];
+
+                    if (!ParkingSpace_Id.TryParse(text, out var parkingSpaceId))
+                        return (null, EntityErrorResponse(request, HTTPStatusCode.BadRequest, $"Invalid parking space identification '{text}'!"));
+
+                    if (!parkingOperator.TryGetParkingSpace(parkingSpaceId, out var parkingSpace))
+                        return (null, EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The parking space '{parkingSpaceId}' is unknown at the parking operator '{parkingOperator.Id}'!"));
+
+                    return ([ .. parkingOperator.TemplatesOf(parkingSpace) ], null);
+
+                },
+                parkingSpaceTemplate => parkingSpaceTemplate.ToJSON());
+
+            #endregion
+
             #region The groups of a charging pool, station, EVSE and parking space: ~/…/CPGs, CSGs, EVSEGs, PSGs below it
 
             // The groups a member is in, which give it properties at runtime, as its operator embeds them, each with its
@@ -628,13 +799,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            gridOperator,
                                                                            gridOperator.ToJSON,
-                                                                           [ "gridConnectionPoints", "energyMeterGroups" ],
+                                                                           [ "gridConnectionPoints", "energyMeterTemplates", "energyMeterGroups" ],
                                                                            "a grid operator")
                                              : errorResponse);
 
             #endregion
 
-            #region ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs, EMGs
+            #region ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs, EMTs, EMGs
 
             // As they are at runtime, with their energy meters taking the properties of their groups; with ?view=stored as they are given.
             AddEmbeddedListHandlers<GridConnectionPoint_Id, GridConnectionPoint>(
@@ -642,6 +813,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 RequestedGridConnectionPointsOfGridOperator,
                 gridConnectionPoint => gridConnectionPoint.ToJSON(),
                 Viewed: true);
+
+            AddEmbeddedListHandlers<EnergyMeterTemplate_Id, EnergyMeterTemplate>(
+                gridOperatorPath + "/EMTs",
+                request => TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse)
+                               ? (gridOperator.EnergyMeterTemplates, null)
+                               : (null, errorResponse),
+                energyMeterTemplate => energyMeterTemplate.ToJSON());
+
+            AddEmbeddedEntityHandlers<EnergyMeterTemplate_Id, EnergyMeterTemplate>(
+                gridOperatorPath + "/EMTs/{energyMeterTemplateId}",
+                request => TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse)
+                               ? (gridOperator.EnergyMeterTemplates, null)
+                               : (null, errorResponse),
+                EnergyMeterTemplate_Id.TryParse,
+                "energy meter template",
+                energyMeterTemplate => energyMeterTemplate.ToJSON());
 
             AddEmbeddedListHandlers<EnergyMeterGroup_Id, EnergyMeterGroup>(
                 gridOperatorPath + "/EMGs",
@@ -739,13 +926,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            parkingOperator,
                                                                            parkingOperator.ToJSON,
-                                                                           [ "parkingGarages", "parkingSpaces", "parkingSpaceGroups", "parkingSensors", "parkingProducts" ],
+                                                                           [ "parkingGarages", "parkingSpaces", "parkingSpaceTemplates", "parkingSpaceGroups", "parkingSensors", "parkingProducts" ],
                                                                            "a parking operator")
                                              : errorResponse);
 
             #endregion
 
-            #region ~/RNs/{RN_Id}/POs/{PO_Id}/PGs, PSs, PSGs, PSNs, PPs
+            #region ~/RNs/{RN_Id}/POs/{PO_Id}/PGs, PSs, PSTs, PSGs, PSNs, PPs
 
             AddEmbeddedListHandlers<ParkingGarage_Id, ParkingGarage>(
                 parkingOperatorPath + "/PGs",
@@ -760,6 +947,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 RequestedParkingSpacesOfParkingOperator,
                 parkingSpace => parkingSpace.ToJSON(),
                 Viewed: true);
+
+            AddEmbeddedListHandlers<ParkingSpaceTemplate_Id, ParkingSpaceTemplate>(
+                parkingOperatorPath + "/PSTs",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingSpaceTemplates, null)
+                               : (null, errorResponse),
+                parkingSpaceTemplate => parkingSpaceTemplate.ToJSON());
+
+            AddEmbeddedEntityHandlers<ParkingSpaceTemplate_Id, ParkingSpaceTemplate>(
+                parkingOperatorPath + "/PSTs/{parkingSpaceTemplateId}",
+                request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
+                               ? (parkingOperator.ParkingSpaceTemplates, null)
+                               : (null, errorResponse),
+                ParkingSpaceTemplate_Id.TryParse,
+                "parking space template",
+                parkingSpaceTemplate => parkingSpaceTemplate.ToJSON());
 
             AddEmbeddedListHandlers<ParkingSpaceGroup_Id, ParkingSpaceGroup>(
                 parkingOperatorPath + "/PSGs",
@@ -960,6 +1163,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                    entries => new JArray(entries.Select(ToJSON)),
                                                                    format => collection.Representation(EmbeddedView, format, () => new JArray(collection.InNaturalOrder.Select(ToJSON))),
                                                                    collection.Count);
+
+                                 });
+
+        #endregion
+
+
+        #region (private) AddOrderedListHandlers(Path, List, ToJSON)
+
+        /// <summary>
+        /// Answer GET of the given path with the templates a member names, in its order, as their owner embeds them:
+        /// the order is content, the first template giving a value wins. Searched and paged by the query of the request
+        /// like any list. HEAD by Hermod from it, and OPTIONS.
+        /// </summary>
+        /// <param name="Path">The path of the list, below the one of the member.</param>
+        /// <param name="List">The templates of the member the path names, in its order, or why there are none.</param>
+        /// <param name="ToJSON">A template, as its owner embeds it.</param>
+        private void AddOrderedListHandlers<TEntity>(HTTPPath                                                                  Path,
+                                                     Func<HTTPRequest, (IReadOnlyList<TEntity>? List, HTTPResponse? ErrorResponse)>  List,
+                                                     Func<TEntity, JObject>                                                    ToJSON)
+
+            where TEntity : class
+
+            => AddEntityHandlers(Path,
+                                 request => {
+
+                                     var (list, errorResponse) = List(request);
+
+                                     if (list is null)
+                                         return errorResponse!;
+
+                                     if (!TryParseListQuery(request, [], out var query, out errorResponse))
+                                         return errorResponse!;
+
+                                     return QueryResponse<TEntity>(request,
+                                                                   query,
+                                                                   () => list,
+                                                                   child => SearchTextOf(child, () => ToJSON(child)),
+                                                                   entries => new JArray(entries.Select(ToJSON)),
+                                                                   format => POIRepresentation.Of(new JArray(list.Select(ToJSON)), format),
+                                                                   list.Count);
 
                                  });
 
@@ -1304,6 +1547,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         $"the charging station '{chargingStation.Id}'"
                     ),
                     null);
+
+        }
+
+        #endregion
+
+        #region (private) RequestedChargingTariffsOfOperator(Request)
+
+        /// <summary>
+        /// The charging tariffs of the charging station operator the request names, as they are at runtime, with the
+        /// properties their templates give them; with ?view=stored as it embeds them; or why there are none.
+        /// </summary>
+        private (POICollection<ChargingTariff_Id, ChargingTariff>? Collection, HTTPResponse? ErrorResponse) RequestedChargingTariffsOfOperator(HTTPRequest Request)
+        {
+
+            if (!TryGetRequestedChargingStationOperator(Request, out var chargingStationOperator, out var errorResponse) ||
+                !TryGetStoredView                      (Request, out var stored,                  out errorResponse))
+            {
+                return (null, errorResponse);
+            }
+
+            return (stored ? chargingStationOperator.ChargingTariffs : chargingStationOperator.EffectiveChargingTariffs, null);
 
         }
 

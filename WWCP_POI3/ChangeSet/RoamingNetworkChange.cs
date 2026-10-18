@@ -257,14 +257,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region AddChildren           (ChargingStationOperator)
 
         /// <summary>
-        /// Add the charging tariffs, charging pools and groups of the given charging station operator,
-        /// in this order, to the operator once added: a change set the operator signs.
+        /// Add the charging tariff templates, charging tariffs, the EVSE, charging station, charging pool and energy meter
+        /// templates, charging pools and groups of the given charging station operator, in this order, to the operator
+        /// once added: a change set the operator signs.
         /// </summary>
         /// <param name="ChargingStationOperator">The charging station operator with its children.</param>
         public static IReadOnlyList<RoamingNetworkChange> AddChildren(ChargingStationOperator ChargingStationOperator)
 
             => [
-                   .. ChargingStationOperator.ChargingTariffs.      Select(chargingTariff       => Add(chargingTariff)),
+                   .. ChargingStationOperator.ChargingTariffTemplates. Select(chargingTariffTemplate  => Add(chargingTariffTemplate)),
+                   .. ChargingStationOperator.ChargingTariffs.         Select(chargingTariff          => Add(chargingTariff)),
+                   .. ChargingStationOperator.EVSETemplates.           Select(evseTemplate            => Add(evseTemplate)),
+                   .. ChargingStationOperator.ChargingStationTemplates.Select(chargingStationTemplate => Add(chargingStationTemplate)),
+                   .. ChargingStationOperator.ChargingPoolTemplates.   Select(chargingPoolTemplate    => Add(chargingPoolTemplate)),
+                   .. ChargingStationOperator.EnergyMeterTemplates.    Select(energyMeterTemplate     => Add(energyMeterTemplate, nameof(POI.ChargingStationOperator), ChargingStationOperator.Id.ToString())),
                    .. ChargingStationOperator.ChargingPools.        Select(chargingPool         => Add(chargingPool)),
                    .. ChargingStationOperator.EVSEGroups.           Select(evseGroup            => Add(evseGroup)),
                    .. ChargingStationOperator.ChargingStationGroups.Select(chargingStationGroup => Add(chargingStationGroup)),
@@ -608,13 +614,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    GridOperator.ToJSON()));
 
         /// <summary>
-        /// Add the grid connection points of the given grid operator, and then its energy meter groups, to the operator
-        /// once added: a change set their maintainers or the grid operator sign.
+        /// Add the energy meter templates of the given grid operator, its grid connection points and then its energy meter
+        /// groups, to the operator once added: a change set their maintainers or the grid operator sign.
         /// </summary>
-        /// <param name="GridOperator">The grid operator with its grid connection points and energy meter groups.</param>
+        /// <param name="GridOperator">The grid operator with its energy meter templates, grid connection points and energy meter groups.</param>
         public static IReadOnlyList<RoamingNetworkChange> AddChildren(GridOperator GridOperator)
 
             => [
+                   .. GridOperator.EnergyMeterTemplates.Select(energyMeterTemplate => Add(energyMeterTemplate, nameof(POI.GridOperator), GridOperator.Id.ToString())),
                    .. GridOperator.GridConnectionPoints.Select(gridConnectionPoint => Add(gridConnectionPoint, GridOperator.Id)),
                    .. GridOperator.EnergyMeterGroups.   Select(energyMeterGroup    => Add(energyMeterGroup,    nameof(POI.GridOperator), GridOperator.Id.ToString()))
                ];
@@ -665,7 +672,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    ParkingOperator.ToJSON()));
 
         /// <summary>
-        /// Add the parking garages, spaces, sensors, space groups and products of the given parking operator,
+        /// Add the parking garages, space templates, spaces, sensors, space groups and products of the given parking operator,
         /// in this order, to the operator once added: a change set the operator signs.
         /// </summary>
         /// <param name="ParkingOperator">The parking operator with its parking data.</param>
@@ -673,6 +680,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => [
                    .. ParkingOperator.ParkingGarages.    Select(parkingGarage     => Add(parkingGarage,     ParkingOperator.Id)),
+                   .. ParkingOperator.ParkingSpaceTemplates.Select(parkingSpaceTemplate => Add(parkingSpaceTemplate, ParkingOperator.Id)),
                    .. ParkingOperator.ParkingSpaces.     Select(parkingSpace      => Add(parkingSpace,      ParkingOperator.Id)),
                    .. ParkingOperator.ParkingSensors.    Select(parkingSensor     => Add(parkingSensor,     ParkingOperator.Id)),
                    .. ParkingOperator.ParkingSpaceGroups.Select(parkingSpaceGroup => Add(parkingSpaceGroup, ParkingOperator.Id)),
@@ -892,6 +900,72 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Add                   (EnergyMeterTemplate, ChargingStationOperatorId)
+
+        /// <summary>
+        /// Add the given energy meter template to the given charging station operator, for energy meters of its
+        /// charging pools, charging stations and EVSEs.
+        /// </summary>
+        public static RoamingNetworkChange Add(EnergyMeterTemplate         EnergyMeterTemplate,
+                                               ChargingStationOperator_Id  ChargingStationOperatorId)
+
+            => Add(EnergyMeterTemplate, nameof(POI.ChargingStationOperator), ChargingStationOperatorId.ToString());
+
+        #endregion
+
+        #region Add                   (EnergyMeterTemplate, GridOperatorId)
+
+        /// <summary>
+        /// Add the given energy meter template to the given grid operator, for energy meters of its grid connection points.
+        /// </summary>
+        public static RoamingNetworkChange Add(EnergyMeterTemplate  EnergyMeterTemplate,
+                                               GridOperator_Id      GridOperatorId)
+
+            => Add(EnergyMeterTemplate, nameof(POI.GridOperator), GridOperatorId.ToString());
+
+        #endregion
+
+        #region (private) Add         (EnergyMeterTemplate, OwnerType, OwnerId)
+
+        private static RoamingNetworkChange Add(EnergyMeterTemplate  EnergyMeterTemplate,
+                                                String               OwnerType,
+                                                String               OwnerId)
+
+            => Add(nameof(POI.EnergyMeterTemplate), EnergyMeterTemplate.Id.ToString(), EnergyMeterTemplate.ToJSON(), OwnerType, OwnerId);
+
+        #endregion
+
+        #region Remove, UpdateProperty, RemoveProperty (EnergyMeterTemplate)
+
+        /// <summary>
+        /// Remove the given energy meter template, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(EnergyMeterTemplate_Id  EnergyMeterTemplateId,
+                                                  JToken?                 OldValue   = null)
+
+            => Remove(nameof(POI.EnergyMeterTemplate), EnergyMeterTemplateId.ToString(), OldValue);
+
+        /// <summary>
+        /// Update one property of the given energy meter template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(EnergyMeterTemplate     EnergyMeterTemplate,
+                                                          String                  PropertyName,
+                                                          JToken?                 OldValue,
+                                                          JToken                  NewValue)
+
+            => UpdateProperty(nameof(POI.EnergyMeterTemplate), EnergyMeterTemplate.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given energy meter template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(EnergyMeterTemplate     EnergyMeterTemplate,
+                                                          String                  PropertyName,
+                                                          JToken?                 OldValue   = null)
+
+            => RemoveProperty(nameof(POI.EnergyMeterTemplate), EnergyMeterTemplate.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
         #region Add                   (EnergyMeterGroup, ChargingStationOperatorId)
 
         /// <summary>
@@ -1096,6 +1170,170 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Add                   (EVSETemplate)
+
+        /// <summary>
+        /// Add the given EVSE template to its operator.
+        /// </summary>
+        /// <param name="EVSETemplate">The new EVSE template.</param>
+        public static RoamingNetworkChange Add(EVSETemplate EVSETemplate)
+
+            => Add(nameof(POI.EVSETemplate),
+                   EVSETemplate.Id.ToString(),
+                   EVSETemplate.ToJSON());
+
+        /// <summary>
+        /// Remove the given EVSE template, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(EVSETemplate_Id  EVSETemplateId,
+                                                  JToken?          OldValue   = null)
+
+            => Remove(nameof(POI.EVSETemplate), EVSETemplateId.ToString(), OldValue);
+
+        /// <summary>
+        /// Update one property of the given EVSE template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(EVSETemplate     EVSETemplate,
+                                                          String           PropertyName,
+                                                          JToken?          OldValue,
+                                                          JToken           NewValue)
+
+            => UpdateProperty(nameof(POI.EVSETemplate), EVSETemplate.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given EVSE template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(EVSETemplate     EVSETemplate,
+                                                          String           PropertyName,
+                                                          JToken?          OldValue   = null)
+
+            => RemoveProperty(nameof(POI.EVSETemplate), EVSETemplate.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ChargingStationTemplate)
+
+        /// <summary>
+        /// Add the given charging station template to its operator.
+        /// </summary>
+        /// <param name="ChargingStationTemplate">The new charging station template.</param>
+        public static RoamingNetworkChange Add(ChargingStationTemplate ChargingStationTemplate)
+
+            => Add(nameof(POI.ChargingStationTemplate),
+                   ChargingStationTemplate.Id.ToString(),
+                   ChargingStationTemplate.ToJSON());
+
+        /// <summary>
+        /// Remove the given charging station template, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingStationTemplate_Id  ChargingStationTemplateId,
+                                                  JToken?                     OldValue   = null)
+
+            => Remove(nameof(POI.ChargingStationTemplate), ChargingStationTemplateId.ToString(), OldValue);
+
+        /// <summary>
+        /// Update one property of the given charging station template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingStationTemplate     ChargingStationTemplate,
+                                                          String                      PropertyName,
+                                                          JToken?                     OldValue,
+                                                          JToken                      NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingStationTemplate), ChargingStationTemplate.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given charging station template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingStationTemplate     ChargingStationTemplate,
+                                                          String                      PropertyName,
+                                                          JToken?                     OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingStationTemplate), ChargingStationTemplate.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ChargingPoolTemplate)
+
+        /// <summary>
+        /// Add the given charging pool template to its operator.
+        /// </summary>
+        /// <param name="ChargingPoolTemplate">The new charging pool template.</param>
+        public static RoamingNetworkChange Add(ChargingPoolTemplate ChargingPoolTemplate)
+
+            => Add(nameof(POI.ChargingPoolTemplate),
+                   ChargingPoolTemplate.Id.ToString(),
+                   ChargingPoolTemplate.ToJSON());
+
+        /// <summary>
+        /// Remove the given charging pool template, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingPoolTemplate_Id  ChargingPoolTemplateId,
+                                                  JToken?                  OldValue   = null)
+
+            => Remove(nameof(POI.ChargingPoolTemplate), ChargingPoolTemplateId.ToString(), OldValue);
+
+        /// <summary>
+        /// Update one property of the given charging pool template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingPoolTemplate     ChargingPoolTemplate,
+                                                          String                   PropertyName,
+                                                          JToken?                  OldValue,
+                                                          JToken                   NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingPoolTemplate), ChargingPoolTemplate.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given charging pool template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingPoolTemplate     ChargingPoolTemplate,
+                                                          String                   PropertyName,
+                                                          JToken?                  OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingPoolTemplate), ChargingPoolTemplate.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ChargingTariffTemplate)
+
+        /// <summary>
+        /// Add the given charging tariff template to its operator.
+        /// </summary>
+        /// <param name="ChargingTariffTemplate">The new charging tariff template.</param>
+        public static RoamingNetworkChange Add(ChargingTariffTemplate ChargingTariffTemplate)
+
+            => Add(nameof(POI.ChargingTariffTemplate),
+                   ChargingTariffTemplate.Id.ToString(),
+                   ChargingTariffTemplate.ToJSON());
+
+        /// <summary>
+        /// Remove the given charging tariff template, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingTariffTemplate_Id  ChargingTariffTemplateId,
+                                                  JToken?                    OldValue   = null)
+
+            => Remove(nameof(POI.ChargingTariffTemplate), ChargingTariffTemplateId.ToString(), OldValue);
+
+        /// <summary>
+        /// Update one property of the given charging tariff template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingTariffTemplate     ChargingTariffTemplate,
+                                                          String                     PropertyName,
+                                                          JToken?                    OldValue,
+                                                          JToken                     NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingTariffTemplate), ChargingTariffTemplate.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given charging tariff template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingTariffTemplate     ChargingTariffTemplate,
+                                                          String                     PropertyName,
+                                                          JToken?                    OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingTariffTemplate), ChargingTariffTemplate.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
         #region Add                   (EVSEGroup)
 
         /// <summary>
@@ -1265,6 +1503,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           JToken?              OldValue   = null)
 
             => RemoveProperty(nameof(POI.ChargingTariffGroup), ChargingTariffGroup.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ParkingSpaceTemplate, ParkingOperatorId)
+
+        /// <summary>
+        /// Add the given parking space template to the given parking operator.
+        /// </summary>
+        public static RoamingNetworkChange Add(ParkingSpaceTemplate  ParkingSpaceTemplate,
+                                               ParkingOperator_Id    ParkingOperatorId)
+
+            => Add(nameof(POI.ParkingSpaceTemplate), ParkingSpaceTemplate.Id.ToString(), ParkingSpaceTemplate.ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+
+        /// <summary>
+        /// Remove the given parking space template, optionally checking its complete previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ParkingSpaceTemplate_Id  ParkingSpaceTemplateId,
+                                                  JToken?                  OldValue   = null)
+
+            => Remove(nameof(POI.ParkingSpaceTemplate), ParkingSpaceTemplateId.ToString(), OldValue);
+
+        /// <summary>
+        /// Update one property of the given parking space template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ParkingSpaceTemplate     ParkingSpaceTemplate,
+                                                          String                   PropertyName,
+                                                          JToken?                  OldValue,
+                                                          JToken                   NewValue)
+
+            => UpdateProperty(nameof(POI.ParkingSpaceTemplate), ParkingSpaceTemplate.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given parking space template, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ParkingSpaceTemplate     ParkingSpaceTemplate,
+                                                          String                   PropertyName,
+                                                          JToken?                  OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ParkingSpaceTemplate), ParkingSpaceTemplate.Id.ToString(), PropertyName, OldValue);
 
         #endregion
 

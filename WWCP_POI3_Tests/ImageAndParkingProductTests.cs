@@ -90,11 +90,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                      ParkingSpaces:       [ new ParkingSpace(SP1,
                                                                                                              ParkingGarageId:    ParkingGarage_Id.Parse("garage-1"),
                                                                                                              ParkingProductIds:  [ Hourly, Daily ],
+                                                                                                             TemplateIds:        [ ParkingSpaceTemplate_Id.Parse("level-1") ],
                                                                                                              Created:            Created) ],
-                                                                     ParkingSpaceGroups:  [ new ParkingSpaceGroup(ParkingSpaceGroup_Id.Parse("level-1"),
-                                                                                                                  ParkingSpaceIds:    [ SP1 ],
-                                                                                                                  ParkingProductIds:  [ Hourly ],
-                                                                                                                  Created:            Created) ]) ]).WithKeys();
+                                                                     ParkingSpaceTemplates:  [ new ParkingSpaceTemplate(ParkingSpaceTemplate_Id.Parse("level-1"),
+                                                                                                                        ParkingProductIds:  [ Hourly ],
+                                                                                                                        Created:            Created) ]) ]).WithKeys();
 
         #endregion
 

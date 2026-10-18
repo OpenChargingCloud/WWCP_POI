@@ -35,11 +35,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// Energy meter groups over HTTP, and the energy meters of charging pools, charging stations, EVSEs and grid
-    /// connection points served with the properties of their groups, as they are given with ?view=stored.
+    /// Energy meter templates and groups over HTTP, and the energy meters of charging pools, charging stations, EVSEs and
+    /// grid connection points served with the properties of their templates, as they are given with ?view=stored.
     /// </summary>
     [TestFixture]
-    public class EnergyMeterGroupAPITests
+    public class EnergyMeterTemplateAPITests
     {
 
         #region Data
@@ -63,7 +63,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void SetUp()
         {
 
-            history     = RoamingNetworkHistory.Start(EnergyMeterGroupTests.NewNetwork());
+            history     = RoamingNetworkHistory.Start(EnergyMeterTemplateTests.NewNetwork());
 
             httpServer  = new HTTPServer(
                               IPAddress:  IPv4Address.Localhost,
@@ -138,38 +138,47 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #endregion
 
 
-        #region Energy_meter_groups_are_served_by_their_owners()
+        #region Energy_meter_templates_and_groups_are_served_by_their_owners()
 
         [Test]
-        public async Task Energy_meter_groups_are_served_by_their_owners()
+        public async Task Energy_meter_templates_and_groups_are_served_by_their_owners()
         {
 
+            var (_,         _,              operatorTempl)   = await Get(CSO + "/EMTs");
+            var (template,  templContent,   templJSON)       = await Get(CSO + "/EMTs/gef-evse-meters");
+            var (unknown,   _,              _)               = await Get(CSO + "/EMTs/net-grid-meters");
+            var (_,         _,              gridTempl)       = await Get(GO  + "/EMTs");
+            var (_,         _,              gridTemplate)    = await Get(GO  + "/EMTs/NET-GRID-METERS");
             var (_,         _,              operatorGroups)  = await Get(CSO + "/EMGs");
-            var (group,     groupContent,   groupJSON)       = await Get(CSO + "/EMGs/gef-evse-meters");
-            var (unknown,   _,              _)               = await Get(CSO + "/EMGs/net-grid-meters");
-            var (_,         _,              gridGroups)      = await Get(GO  + "/EMGs");
-            var (_,         _,              gridGroup)       = await Get(GO  + "/EMGs/NET-GRID-METERS");
-            var (_,         _,              operatorWithout) = await Get(CSO + "?without=energyMeterGroups");
+            var (_,         _,              gridGroup)       = await Get(GO  + "/EMGs/net-all-grid-meters");
+            var (_,         _,              operatorWithout) = await Get(CSO + "?without=energyMeterTemplates,energyMeterGroups");
             var (_,         _,              operatorJSON)    = await Get(CSO);
-            var (_,         _,              gridWithout)     = await Get(GO  + "?without=energyMeterGroups");
+            var (_,         _,              gridWithout)     = await Get(GO  + "?without=energyMeterTemplates,energyMeterGroups");
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(operatorGroups!.Select(entry => entry["@id"]!.Value<String>()),       Is.EqualTo(new[] { "gef-evse-meters" }));
-                Assert.That(group.StatusCode,                                                     Is.EqualTo(HttpStatusCode.OK));
-                Assert.That(HeaderOf(group, "ETag"),                                              Is.EqualTo(ETagOf(groupContent)));
-                Assert.That(groupJSON!["modelId"]!.Value<String>(),                               Is.EqualTo("ACME-3000"));
+                Assert.That(operatorTempl!.Select(entry => entry["@id"]!.Value<String>()),        Is.EqualTo(new[] { "gef-evse-meters" }));
+                Assert.That(template.StatusCode,                                                  Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(HeaderOf(template, "ETag"),                                           Is.EqualTo(ETagOf(templContent)));
+                Assert.That(templJSON!["modelId"]!.Value<String>(),                               Is.EqualTo("ACME-3000"));
 
-                // A group of another owner is not one of this operator.
+                // A template of another owner is not one of this operator.
                 Assert.That(unknown.StatusCode,                                                   Is.EqualTo(HttpStatusCode.NotFound));
 
-                Assert.That(gridGroups!.Select(entry => entry["@id"]!.Value<String>()),           Is.EqualTo(new[] { "net-grid-meters" }));
-                Assert.That(gridGroup!["manufacturerId"]!.Value<String>(),                        Is.EqualTo("ZAP"));
+                Assert.That(gridTempl!.Select(entry => entry["@id"]!.Value<String>()),            Is.EqualTo(new[] { "net-grid-meters" }));
+                Assert.That(gridTemplate!["manufacturerId"]!.Value<String>(),                     Is.EqualTo("ZAP"));
 
-                Assert.That(operatorJSON!["energyMeterGroups"],                                   Is.Not.Null);
-                Assert.That(operatorWithout!["energyMeterGroups"],                                Is.Null);
-                Assert.That(gridWithout!["energyMeterGroups"],                                    Is.Null);
+                // Groups: collections of meters.
+                Assert.That(operatorGroups!.Select(entry => entry["@id"]!.Value<String>()),       Is.EqualTo(new[] { "gef-all-evse-meters" }));
+                Assert.That(gridGroup!["energyMeterIds"]!.Values<String>(),                       Is.EqualTo(new[] { "grid-meter" }));
+
+                Assert.That(operatorJSON!["energyMeterTemplates"],                                Is.Not.Null);
+                Assert.That(operatorJSON["energyMeterGroups"],                                    Is.Not.Null);
+                Assert.That(operatorWithout!["energyMeterTemplates"],                             Is.Null);
+                Assert.That(operatorWithout["energyMeterGroups"],                                 Is.Null);
+                Assert.That(gridWithout!["energyMeterTemplates"],                                 Is.Null);
+                Assert.That(gridWithout["energyMeterGroups"],                                     Is.Null);
 
             }
 
@@ -177,10 +186,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region Energy_meters_are_served_with_the_properties_of_their_groups()
+        #region Energy_meters_are_served_with_the_properties_of_their_templates()
 
         [Test]
-        public async Task Energy_meters_are_served_with_the_properties_of_their_groups()
+        public async Task Energy_meters_are_served_with_the_properties_of_their_templates()
         {
 
             var (evse,     _,               evseJSON)        = await Get(EVSE);
@@ -197,7 +206,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
 
-                // The meter of the EVSE: the model of its group, but its own serial number.
+                // The meter of the EVSE: the model of its template, but its own serial number.
                 Assert.That(evse.StatusCode,                                                             Is.EqualTo(HttpStatusCode.OK));
                 Assert.That(evseJSON!["energyMeter"]!["modelId"]!.Value<String>(),                       Is.EqualTo("ACME-3000"));
                 Assert.That(evseJSON["energyMeter"]!["serialNumber"]!.Value<String>(),                   Is.EqualTo("M-2"));
@@ -219,9 +228,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(expanded!["gridConnectionPoint"]!["energyMeter"]!["manufacturerId"]!.Value<String>(),  Is.EqualTo("ZAP"));
                 Assert.That(storedExpanded!["gridConnectionPoint"]!["energyMeter"]!["manufacturerId"],             Is.Null);
 
-                // Its grid operator embeds it as it is given, with its groups.
+                // Its grid operator embeds it as it is given, naming its templates.
                 Assert.That(storedOperator!["gridConnectionPoints"]![0]!["energyMeter"]!["manufacturerId"],        Is.Null);
-                Assert.That(storedOperator["energyMeterGroups"]![0]!["@id"]!.Value<String>(),                      Is.EqualTo("net-grid-meters"));
+                Assert.That(storedOperator["gridConnectionPoints"]![0]!["energyMeter"]!["templateIds"]!.Values<String>(),  Is.EqualTo(new[] { "net-grid-meters" }));
+                Assert.That(storedOperator["energyMeterTemplates"]![0]!["@id"]!.Value<String>(),                   Is.EqualTo("net-grid-meters"));
 
                 Assert.That(other.StatusCode,                                                            Is.EqualTo(HttpStatusCode.BadRequest));
 

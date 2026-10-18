@@ -30,7 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
     /// <summary>
     /// The last change of an effective member never goes back: not when a change set moves its charging station to
-    /// another charging pool, whose group gives it another tariff, and not after a restart or in a history started from
+    /// another charging pool, whose template gives it another tariff, and not after a restart or in a history started from
     /// a snapshot, which keep the floors of the last changes.
     /// </summary>
     [TestFixture]
@@ -51,15 +51,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly EVSE_Id                     E2       = EVSE_Id.                   Parse("DE*GEF*E2*1");
         private static readonly ChargingTariff_Id           T1       = ChargingTariff_Id.         Parse("DE*GEF*T1");
         private static readonly ChargingTariff_Id           T2       = ChargingTariff_Id.         Parse("DE*GEF*T2");
-        private static readonly EVSEGroup_Id                EG1      = EVSEGroup_Id.              Parse("DE*GEF*EG1");
+        private static readonly EVSETemplate_Id             ET1      = EVSETemplate_Id.           Parse("DE*GEF*ET1");
 
         #endregion
 
         #region NewNetwork()
 
         /// <summary>
-        /// Two charging pools, each in a group giving its EVSEs a tariff of its own, T1 and T2; a station with one EVSE in
-        /// each; the given EVSEs in a group giving them 22 kW. Everything of the creation, the groups as well.
+        /// Two charging pools, each taking a template giving its EVSEs a tariff of its own, T1 and T2; a station with one
+        /// EVSE in each; the given EVSEs taking a template giving them 22 kW. Everything of the creation, the templates as well.
         /// </summary>
         private static RoamingNetwork NewNetwork(params EVSE_Id[] Of22kW)
 
@@ -73,14 +73,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                      [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.39m, StepSize: 1) ]) ],
                                                                                                                                      Created: Created)) ],
                                                     ChargingPools:       [ new ChargingPool(P1,
+                                                                                            TemplateIds:       [ ChargingPoolTemplate_Id.Parse("DE*GEF*PT1") ],
                                                                                             Created:           Created,
-                                                                                            ChargingStations:  [ new ChargingStation(S1, Created: Created, EVSEs: [ new EVSE(E1, Created: Created) ]) ]),
+                                                                                            ChargingStations:  [ new ChargingStation(S1, Created: Created, EVSEs: [ new EVSE(E1, TemplateIds: Of22kW.Contains(E1) ? [ ET1 ] : null, Created: Created) ]) ]),
                                                                            new ChargingPool(P2,
+                                                                                            TemplateIds:       [ ChargingPoolTemplate_Id.Parse("DE*GEF*PT2") ],
                                                                                             Created:           Created,
-                                                                                            ChargingStations:  [ new ChargingStation(S2, Created: Created, EVSEs: [ new EVSE(E2, Created: Created) ]) ]) ],
-                                                    EVSEGroups:          [ new EVSEGroup(EG1, EVSEIds: Of22kW, MaxPower: Watt.FromW(22000), Created: Created) ],
-                                                    ChargingPoolGroups:  [ new ChargingPoolGroup(ChargingPoolGroup_Id.Parse("DE*GEF*PG1"), ChargingPoolIds: [ P1 ], ChargingTariffId: T1, Created: Created),
-                                                                           new ChargingPoolGroup(ChargingPoolGroup_Id.Parse("DE*GEF*PG2"), ChargingPoolIds: [ P2 ], ChargingTariffId: T2, Created: Created) ]) ]).WithKeys();
+                                                                                            ChargingStations:  [ new ChargingStation(S2, Created: Created, EVSEs: [ new EVSE(E2, TemplateIds: Of22kW.Contains(E2) ? [ ET1 ] : null, Created: Created) ]) ]) ],
+                                                    EVSETemplates:          [ new EVSETemplate(ET1, MaxPower: Watt.FromW(22000), Created: Created) ],
+                                                    ChargingPoolTemplates:  [ new ChargingPoolTemplate(ChargingPoolTemplate_Id.Parse("DE*GEF*PT1"), ChargingTariffId: T1, Created: Created),
+                                                                              new ChargingPoolTemplate(ChargingPoolTemplate_Id.Parse("DE*GEF*PT2"), ChargingTariffId: T2, Created: Created) ]) ]).WithKeys();
 
         private static ChargingStationOperator GEFOf(RoamingNetwork Network)
 
@@ -94,22 +96,27 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region (static) LeaveTheGroup(History)
+        #region (static) TakeTheOtherPoolTemplate(History)
 
         /// <summary>
-        /// The first EVSE leaves the group of 22 kW EVSEs: it is as it is given, but changed now, though it did not.
+        /// The first pool takes the template of the second one: its EVSE takes the tariff T2, so it changed now, though
+        /// neither it nor a template of it did.
         /// </summary>
-        private static void LeaveTheGroup(RoamingNetworkHistory History)
+        private static void TakeTheOtherPoolTemplate(RoamingNetworkHistory History)
         {
 
             var rn1 = History.Head.RoamingNetwork;
 
-            rn1.TryGetEVSEGroupById(EG1, out var eg1);
+            GEFOf(rn1).TryGetChargingPool(P1, out var p1);
 
-            Assert.That(History.Commit(rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(eg1!, "EVSEIds", null, new JArray(E2.ToString())) ],
+            Assert.That(History.Commit(rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(p1!, "templateIds", null, new JArray("DE*GEF*PT2")) ],
                                                                  CreatedAt: T0)).IsCommitted);
 
-            Assert.That(EffectiveE1Of(History).LastChangeDate, Is.EqualTo(T0));
+            GEFOf(History.Head.RoamingNetwork).TryGetEVSE(E1, out var e1);
+
+            Assert.That(EffectiveE1Of(History).ChargingTariffIds,  Is.EqualTo(new[] { T2 }));
+            Assert.That(EffectiveE1Of(History).LastChangeDate,     Is.EqualTo(T0));
+            Assert.That(e1!.LastChangeDate,                        Is.EqualTo(Created));
 
         }
 
@@ -120,14 +127,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         /// <summary>
         /// Removed from the first pool and added to the second one in one change set: its EVSE takes the tariff of the
-        /// group of the second pool, though neither it nor a group changed, so it changed now. It and its station keep
+        /// template of the second pool, though neither it nor a template changed, so it changed now. It and its station keep
         /// their status: between the removal and the addition they did not exist.
         /// </summary>
         [Test]
         public void A_station_moved_to_another_pool_changes_the_last_change_of_its_EVSEs_and_keeps_their_status()
         {
 
-            // Its EVSE in no group: a group naming it would name what does not exist between the removal and the addition.
+            // Its EVSE taking no template of its own: it takes the one of its pool.
             var history  = RoamingNetworkHistory.Start(NewNetwork(E2));
             var rn1      = history.Head.RoamingNetwork;
 
@@ -173,7 +180,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region A_snapshot_keeps_the_last_changes_of_effective_members()
 
         /// <summary>
-        /// A history started from a snapshot, as JSON, JSON text or CBOR, tells the last change the member left its group:
+        /// A history started from a snapshot, as JSON, JSON text or CBOR, tells the last change the member took another tariff:
         /// the snapshot keeps it as an effective last change, as it is neither content nor runtime status.
         /// </summary>
         [Test]
@@ -182,7 +189,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var history   = RoamingNetworkHistory.Start(NewNetwork(E1, E2));
 
-            LeaveTheGroup(history);
+            TakeTheOtherPoolTemplate(history);
 
             var snapshot  = history.ToSnapshotJSON();
 
@@ -213,7 +220,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region A_compacted_store_keeps_the_last_changes_of_effective_members()
 
         /// <summary>
-        /// The commit in which the member left its group is compacted into the base of the store: loaded again, the
+        /// The commit in which the member took another tariff is compacted into the base of the store: loaded again, the
         /// history still tells its last change, instead of the one of the member itself.
         /// </summary>
         [Test]
@@ -225,7 +232,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             history.Retention = new RoamingNetworkHistoryRetention { RetainCommits = 0, RecentVersions = 1, VersionCheckpointInterval = 1 };
 
-            LeaveTheGroup(history);
+            TakeTheOtherPoolTemplate(history);
 
             Assert.That(history.Compact(out var compactError), Is.True, compactError);
 

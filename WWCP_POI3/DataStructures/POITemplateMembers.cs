@@ -26,18 +26,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// The members of groups giving them properties, in the JSON an importer changes them in: what a source tells of a
-    /// member as its groups give it stays in its groups, so that a later change of a group still reaches the member.
-    /// The same rules as at runtime (see POIGroupValues): a single value is its own, else the one of its groups; an array
-    /// is its own united with those of its groups, of the same key its own winning.
+    /// The members of templates giving them properties, in the JSON an importer changes them in: what a source tells of a
+    /// member as its templates give it stays in its templates, so that a later change of a template still reaches the
+    /// member. The same rules as at runtime (see POITemplateValues): a single value is its own, else the one of the first
+    /// of its templates giving one; an array is its own united with those of its templates, of the same key its own winning.
     /// </summary>
-    public static class POIGroupMembers
+    public static class POITemplateMembers
     {
 
         #region Data
 
         /// <summary>
-        /// The arrays a member takes whole, its own, else the one of its groups: written as arrays, they are single
+        /// The arrays a member takes whole, its own, else the one of its templates: written as arrays, they are single
         /// values, e.g. the flags of the current types of an EVSE, or its charging tariffs.
         /// </summary>
         public static readonly IReadOnlySet<String> TakenWhole = new HashSet<String> {
@@ -45,7 +45,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         };
 
         /// <summary>
-        /// The keys of the elements of the arrays a member unites with those of its groups, by which its own element wins:
+        /// The keys of the elements of the arrays a member unites with those of its templates, by which its own element wins:
         /// e.g. an authentication mode by its type. The elements of the other arrays are keyed by what they are.
         /// </summary>
         public static readonly IReadOnlyDictionary<String, String> ElementKeys = new Dictionary<String, String> {
@@ -62,7 +62,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region KeyOf(Property, Element)
 
         /// <summary>
-        /// The key of an element of the given array: its own one wins over one of its groups of the same key.
+        /// The key of an element of the given array: its own one wins over one of its templates of the same key.
         /// </summary>
         /// <param name="Property">The JSON key of the array.</param>
         /// <param name="Element">An element of it.</param>
@@ -75,25 +75,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region KeepWhatGroupsGive(Desired, Stored, Effective, Properties)
+        #region KeepWhatTemplatesGive(Desired, Stored, Effective, Properties)
 
         /// <summary>
-        /// Keep in the groups of a member what they give it, of the given properties of the member as it is to be:
+        /// Keep in the templates of a member what they give it, of the given properties of the member as it is to be:
         /// - what it is to have as it has it with them, as it is effective, it keeps as it has it of its own, also nothing,
         /// - an array it takes whole it takes as its own when it is to have another one,
         /// - of an array it unites with theirs, it takes as its own only the elements whose keys they do not give it: a
-        ///   source may tell less of an element than its group gives, e.g. an RFID authentication mode without its card
+        ///   source may tell less of an element than its template gives, e.g. an RFID authentication mode without its card
         ///   types, which so stay,
         /// - what else it is to have otherwise becomes its own, as its own wins.
         /// </summary>
         /// <param name="Desired">The member as it is to be, changed in place.</param>
         /// <param name="Stored">The member as it is stored, if it is.</param>
-        /// <param name="Effective">The member with the properties its groups give it, as it is at runtime.</param>
+        /// <param name="Effective">The member with the properties its templates give it, as it is at runtime.</param>
         /// <param name="Properties">The properties to look at: those the source tells.</param>
-        public static void KeepWhatGroupsGive(JObject              Desired,
-                                              JObject?             Stored,
-                                              JObject              Effective,
-                                              IEnumerable<String>  Properties)
+        public static void KeepWhatTemplatesGive(JObject              Desired,
+                                                 JObject?             Stored,
+                                                 JObject              Effective,
+                                                 IEnumerable<String>  Properties)
         {
 
             foreach (var property in Properties)

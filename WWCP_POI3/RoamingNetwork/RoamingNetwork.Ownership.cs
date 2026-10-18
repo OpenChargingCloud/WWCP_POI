@@ -154,10 +154,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The embedded children a party must not be added with, by its entity type.
         /// </summary>
         internal static readonly Dictionary<String, String[]> PartyChildren = new () {
-            { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups", "energyMeterGroups", "parkingSpaces" ] },
+            { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSETemplates", "chargingStationTemplates", "chargingPoolTemplates", "chargingTariffTemplates", "energyMeterTemplates",
+                                                 "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups", "energyMeterGroups", "parkingSpaces" ] },
             { nameof(EMobilityProvider),       [] },
-            { nameof(GridOperator),            [ "gridConnectionPoints", "energyMeterGroups" ] },
-            { nameof(ParkingOperator),         [ "parkingGarages", "parkingSpaces", "parkingSensors", "parkingSpaceGroups", "parkingProducts" ] }
+            { nameof(GridOperator),            [ "gridConnectionPoints", "energyMeterTemplates", "energyMeterGroups" ] },
+            { nameof(ParkingOperator),         [ "parkingGarages", "parkingSpaces", "parkingSensors", "parkingSpaceTemplates", "parkingSpaceGroups", "parkingProducts" ] }
         };
 
         #endregion
@@ -335,15 +336,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // Grid connection points added by an earlier change of this change set: their grid operator and maintainer.
             var addedGridConnectionPoints = new Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>();
 
-            // Energy meter groups added by an earlier change of this change set, by their owners.
-            var addedEnergyMeterGroups = new Dictionary<EnergyMeterGroup_Id, POIPartyId>();
+            // Energy meter templates and groups added by an earlier change of this change set, by their owners;
+            // keyed by their typed identifications, so that a later change may name them in another spelling.
+            var addedEnergyMeterChildren = new Dictionary<(String, Object), POIPartyId>();
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
             {
 
                 var change = ChangeSet.Changes[index];
 
-                if (!TryGetOwners(change, addedParking, addedGridConnectionPoints, addedEnergyMeterGroups, out var owners, out ErrorResponse))
+                if (!TryGetOwners(change, addedParking, addedGridConnectionPoints, addedEnergyMeterChildren, out var owners, out ErrorResponse))
                 {
                     ErrorResponse = $"Change {index}: {ErrorResponse}";
                     return false;
@@ -401,7 +403,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryGetOwners(Change, AddedParking, AddedGridConnectionPoints, AddedEnergyMeterGroups, out Owners, out ErrorResponse)
+        #region (private) TryGetOwners(Change, AddedParking, AddedGridConnectionPoints, AddedEnergyMeterChildren, out Owners, out ErrorResponse)
 
         /// <summary>
         /// The parties and kinds of keys of which one must sign the given change.
@@ -409,7 +411,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private Boolean TryGetOwners(RoamingNetworkChange                                                                    Change,
                                      Dictionary<(String, Object), POIPartyId>                                                AddedParking,
                                      Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>  AddedGridConnectionPoints,
-                                     Dictionary<EnergyMeterGroup_Id, POIPartyId>                                             AddedEnergyMeterGroups,
+                                     Dictionary<(String, Object), POIPartyId>                                                AddedEnergyMeterChildren,
                                      [NotNullWhen(true)]  out (POIPartyId, POIKeyKind)[]?                                    Owners,
                                      [NotNullWhen(false)] out String?                                                        ErrorResponse)
         {
@@ -490,11 +492,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     nameof(ChargingPool)          => ChargingPool_Id.        TryParse(Change.EntityId, out var id1) ? id1.OperatorId : null,
                     nameof(ChargingStation)       => ChargingStation_Id.     TryParse(Change.EntityId, out var id2) ? id2.OperatorId : null,
                     nameof(ChargingTariff)        => ChargingTariff_Id.      TryParse(Change.EntityId, out var id3) ? id3.OperatorId : null,
-                    nameof(EVSEGroup)             => EVSEGroup_Id.           TryParse(Change.EntityId, out var id4) ? id4.OperatorId : null,
-                    nameof(ChargingStationGroup)  => ChargingStationGroup_Id.TryParse(Change.EntityId, out var id5) ? id5.OperatorId : null,
-                    nameof(ChargingPoolGroup)     => ChargingPoolGroup_Id.   TryParse(Change.EntityId, out var id6) ? id6.OperatorId : null,
-                    nameof(ChargingTariffGroup)   => ChargingTariffGroup_Id. TryParse(Change.EntityId, out var id7) ? id7.OperatorId : null,
-                    _                             => EVSE_Id.                TryParse(Change.EntityId, out var id8) ? id8.OperatorId : null
+                    nameof(EVSETemplate)             => EVSETemplate_Id.           TryParse(Change.EntityId, out var id4)  ? id4. OperatorId : null,
+                    nameof(ChargingStationTemplate)  => ChargingStationTemplate_Id.TryParse(Change.EntityId, out var id5)  ? id5. OperatorId : null,
+                    nameof(ChargingPoolTemplate)     => ChargingPoolTemplate_Id.   TryParse(Change.EntityId, out var id6)  ? id6. OperatorId : null,
+                    nameof(ChargingTariffTemplate)   => ChargingTariffTemplate_Id. TryParse(Change.EntityId, out var id7)  ? id7. OperatorId : null,
+                    nameof(EVSEGroup)                => EVSEGroup_Id.              TryParse(Change.EntityId, out var id8)  ? id8. OperatorId : null,
+                    nameof(ChargingStationGroup)     => ChargingStationGroup_Id.   TryParse(Change.EntityId, out var id9)  ? id9. OperatorId : null,
+                    nameof(ChargingPoolGroup)        => ChargingPoolGroup_Id.      TryParse(Change.EntityId, out var id10) ? id10.OperatorId : null,
+                    nameof(ChargingTariffGroup)      => ChargingTariffGroup_Id.    TryParse(Change.EntityId, out var id11) ? id11.OperatorId : null,
+                    _                                => EVSE_Id.                   TryParse(Change.EntityId, out var id12) ? id12.OperatorId : null
                 };
 
                 if (!operatorId.HasValue)
@@ -652,12 +658,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region The energy meter groups of a charging station operator or a grid operator
+            #region The energy meter templates and groups of a charging station operator or a grid operator
 
-            if (Change.EntityType == nameof(EnergyMeterGroup))
+            if (Change.EntityType is nameof(EnergyMeterTemplate) or nameof(EnergyMeterGroup))
             {
 
-                if (!EnergyMeterGroup_Id.TryParse(Change.EntityId, out var energyMeterGroupId))
+                Object? energyMeterChildId = Change.EntityType == nameof(EnergyMeterTemplate)
+                                                 ? EnergyMeterTemplate_Id.TryParse(Change.EntityId, out var templateId) ? templateId : null
+                                                 : EnergyMeterGroup_Id.   TryParse(Change.EntityId, out var groupId)    ? groupId    : null;
+
+                if (energyMeterChildId is null)
                 {
                     ErrorResponse = $"invalid {Change.EntityType} identification '{Change.EntityId}'!";
                     return false;
@@ -677,17 +687,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     // The owner as the keys of the parties name it.
                     owner = PartyIdOf(new POIPartyId(Change.ParentEntityType, Change.ParentEntityId));
 
-                    AddedEnergyMeterGroups[energyMeterGroupId] = owner.Value;
+                    AddedEnergyMeterChildren[(Change.EntityType, energyMeterChildId)] = owner.Value;
 
                 }
 
-                else if (AddedEnergyMeterGroups.TryGetValue(energyMeterGroupId, out var addedOwner))
+                else if (AddedEnergyMeterChildren.TryGetValue((Change.EntityType, energyMeterChildId), out var addedOwner))
                     owner = addedOwner;
 
                 else
                 {
 
-                    var (chargingStationOperator, gridOperator, _) = EnergyMeterGroupOwners(energyMeterGroupId, chargingStationOperators, gridOperators);
+                    var (chargingStationOperator, gridOperator, _) = EnergyMeterChildOwners(Change.EntityType == nameof(EnergyMeterTemplate)
+                                                                                                ? EnergyMeterTemplateKind
+                                                                                                : EnergyMeterGroupKind,
+                                                                                            Change.EntityId,
+                                                                                            chargingStationOperators,
+                                                                                            gridOperators);
 
                     if      (chargingStationOperator is not null)
                         owner = new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString());

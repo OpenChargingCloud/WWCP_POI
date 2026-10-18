@@ -299,15 +299,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators, gridOperators), transparencySoftware.Index, transparencySoftwareCertificates.Index, chargingStationManufacturers.Index) is String transparencyError)
                 throw new ArgumentException(transparencyError, nameof(TransparencySoftware));
 
-            // Energy meter groups are unique within the network, and name manufacturers, releases and certificates of it.
-            if ((DuplicateEnergyMeterGroup       (AllEnergyMeterGroups(chargingStationOperators, gridOperators)) ??
-                 UnknownEnergyMeterGroupReference(AllEnergyMeterGroups(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware.Index, transparencySoftwareCertificates.Index)) is String energyMeterGroupError)
+            // Energy meter templates and groups are unique within the network; templates name manufacturers, releases and
+            // certificates of it.
+            if ((DuplicateEnergyMeterGroup          (AllEnergyMeterGroups   (chargingStationOperators, gridOperators)) ??
+                 DuplicateEnergyMeterTemplate       (AllEnergyMeterTemplates(chargingStationOperators, gridOperators)) ??
+                 UnknownEnergyMeterTemplateReference(AllEnergyMeterTemplates(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware.Index, transparencySoftwareCertificates.Index)) is String energyMeterGroupError)
             {
                 throw new ArgumentException(energyMeterGroupError, nameof(ChargingStationOperators));
             }
 
             foreach (var energyMeterGroup in AllEnergyMeterGroups(chargingStationOperators, gridOperators))
                 energyMeterGroups.TryAdd(energyMeterGroup.Id, energyMeterGroup);
+
+            foreach (var energyMeterTemplate in AllEnergyMeterTemplates(chargingStationOperators, gridOperators))
+                energyMeterTemplates.TryAdd(energyMeterTemplate.Id, energyMeterTemplate);
 
             foreach (var parkingOperator in parkingOperators)
             {
@@ -323,6 +328,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 foreach (var parkingSpaceGroup in parkingOperator.ParkingSpaceGroups)
                     parkingSpaceGroups.TryAdd(parkingSpaceGroup.Id, parkingSpaceGroup);
+
+                foreach (var parkingSpaceTemplate in parkingOperator.ParkingSpaceTemplates)
+                    parkingSpaceTemplates.TryAdd(parkingSpaceTemplate.Id, parkingSpaceTemplate);
 
             }
 
@@ -1589,7 +1597,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The error, when a charging pool or a charging pool group names a grid connection point the given grid operators do not have.
+        /// The error, when a charging pool or a charging pool template names a grid connection point the given grid operators do not have.
         /// </summary>
         internal static String? UnknownGridConnectionPoint(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
                                                            IEnumerable<GridOperator>             GridOperators)
@@ -1604,11 +1612,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return $"The grid connection point '{chargingPool.GridConnectionPointId}' of the charging pool '{chargingPool.Id}' is unknown in the roaming network!";
                 }
 
-            foreach (var chargingPoolGroup in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPoolGroups))
-                if (chargingPoolGroup.GridConnectionPointId.HasValue &&
-                    !known.Contains(chargingPoolGroup.GridConnectionPointId.Value))
+            foreach (var chargingPoolTemplate in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPoolTemplates))
+                if (chargingPoolTemplate.GridConnectionPointId.HasValue &&
+                    !known.Contains(chargingPoolTemplate.GridConnectionPointId.Value))
                 {
-                    return $"The grid connection point '{chargingPoolGroup.GridConnectionPointId}' of the charging pool group '{chargingPoolGroup.Id}' is unknown in the roaming network!";
+                    return $"The grid connection point '{chargingPoolTemplate.GridConnectionPointId}' of the charging pool template '{chargingPoolTemplate.Id}' is unknown in the roaming network!";
                 }
 
             return null;
@@ -1780,6 +1788,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var spaces  = new HashSet<ParkingSpace_Id>();
             var sensors = new HashSet<ParkingSensor_Id>();
             var groups  = new HashSet<ParkingSpaceGroup_Id>();
+            var templates = new HashSet<ParkingSpaceTemplate_Id>();
             var products = new HashSet<ParkingProduct_Id>();
 
             foreach (var parkingOperator in ParkingOperators)
@@ -1800,6 +1809,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var parkingSpaceGroup in parkingOperator.ParkingSpaceGroups)
                     if (!groups.Add(parkingSpaceGroup.Id))
                         return $"The parking space group '{parkingSpaceGroup.Id}' must not be given twice in the roaming network!";
+
+                foreach (var parkingSpaceTemplate in parkingOperator.ParkingSpaceTemplates)
+                    if (!templates.Add(parkingSpaceTemplate.Id))
+                        return $"The parking space template '{parkingSpaceTemplate.Id}' must not be given twice in the roaming network!";
 
                 foreach (var parkingProduct in parkingOperator.ParkingProducts)
                     if (!products.Add(parkingProduct.Id))
@@ -1833,7 +1846,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var named = parkingOperator.ParkingGarages.SelectMany(parkingGarage => parkingGarage.ChargingStationIds.Select(id => (Kind: "parking garage", Id: parkingGarage.Id.ToString(), ChargingStationId: id))).
                             Concat(parkingOperator.ParkingSpaces. SelectMany(parkingSpace  => parkingSpace. ChargingStationIds.Select(id => (Kind: "parking space",  Id: parkingSpace. Id.ToString(), ChargingStationId: id)))).
-                            Concat(parkingOperator.ParkingSpaceGroups.SelectMany(parkingSpaceGroup => parkingSpaceGroup.ChargingStationIds.Select(id => (Kind: "parking space group", Id: parkingSpaceGroup.Id.ToString(), ChargingStationId: id)))).
+                            Concat(parkingOperator.ParkingSpaceTemplates.SelectMany(parkingSpaceTemplate => parkingSpaceTemplate.ChargingStationIds.Select(id => (Kind: "parking space template", Id: parkingSpaceTemplate.Id.ToString(), ChargingStationId: id)))).
                             Concat(parkingOperator.ParkingSensors.SelectMany(parkingSensor => parkingSensor.ChargingStationIds.Select(id => (Kind: "parking sensor", Id: parkingSensor.Id.ToString(), ChargingStationId: id))));
 
                 foreach (var (kind, id, chargingStationId) in named)
@@ -1852,7 +1865,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The error, when a charging station, also by its groups, or a charging station group names a parking space
+        /// The error, when a charging station, also by its templates, or a charging station template names a parking space
         /// neither the given parking operators nor the given charging station operators have.
         /// </summary>
         internal static String? UnknownParkingSpace(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
@@ -1864,10 +1877,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    Select    (parkingSpace    => parkingSpace.Id).
                                                    ToHashSet();
 
-            foreach (var chargingStationGroup in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationGroups))
-                foreach (var parkingSpaceId in chargingStationGroup.ParkingSpaceIds)
+            foreach (var chargingStationTemplate in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationTemplates))
+                foreach (var parkingSpaceId in chargingStationTemplate.ParkingSpaceIds)
                     if (!parkingSpaceIds.Contains(parkingSpaceId))
-                        return $"The parking space '{parkingSpaceId}' of the charging station group '{chargingStationGroup.Id}' is unknown in the roaming network!";
+                        return $"The parking space '{parkingSpaceId}' of the charging station template '{chargingStationTemplate.Id}' is unknown in the roaming network!";
 
             foreach (var chargingStation in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStations))
                 foreach (var parkingSpaceId in chargingStation.ParkingSpaceIds)
@@ -2068,6 +2081,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => parkingSpaceGroups.TryGetValue(ParkingSpaceGroupId, out ParkingSpaceGroup);
 
+        private readonly ConcurrentDictionary<ParkingSpaceTemplate_Id, ParkingSpaceTemplate> parkingSpaceTemplates = [];
+
+        /// <summary>
+        /// The parking space templates of all parking operators.
+        /// </summary>
+        public IEnumerable<ParkingSpaceTemplate> ParkingSpaceTemplates
+            => parkingSpaceTemplates.Values;
+
+        /// <summary>
+        /// Try to get the parking space template having the given identification, of any parking operator.
+        /// </summary>
+        public Boolean TryGetParkingSpaceTemplateById(ParkingSpaceTemplate_Id                        ParkingSpaceTemplateId,
+                                                      [NotNullWhen(true)] out ParkingSpaceTemplate?  ParkingSpaceTemplate)
+
+            => parkingSpaceTemplates.TryGetValue(ParkingSpaceTemplateId, out ParkingSpaceTemplate);
+
         #endregion
 
 
@@ -2208,6 +2237,50 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => energyMeterGroups.TryGetValue(EnergyMeterGroupId, out EnergyMeterGroup);
 
+        private readonly ConcurrentDictionary<EnergyMeterTemplate_Id, EnergyMeterTemplate> energyMeterTemplates = [];
+
+        /// <summary>
+        /// The energy meter templates of all charging station operators and grid operators.
+        /// </summary>
+        public IEnumerable<EnergyMeterTemplate> EnergyMeterTemplates
+            => energyMeterTemplates.Values;
+
+        /// <summary>
+        /// Try to get the energy meter template having the given identification, of any charging station operator or grid operator.
+        /// </summary>
+        /// <param name="EnergyMeterTemplateId">The identification of an energy meter template.</param>
+        /// <param name="EnergyMeterTemplate">The energy meter template.</param>
+        public Boolean TryGetEnergyMeterTemplateById(EnergyMeterTemplate_Id                        EnergyMeterTemplateId,
+                                                     [NotNullWhen(true)] out EnergyMeterTemplate?  EnergyMeterTemplate)
+
+            => energyMeterTemplates.TryGetValue(EnergyMeterTemplateId, out EnergyMeterTemplate);
+
+        /// <summary>
+        /// The energy meter templates of the given charging station operators and grid operators.
+        /// </summary>
+        internal static IEnumerable<EnergyMeterTemplate> AllEnergyMeterTemplates(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
+                                                                                 IEnumerable<GridOperator>             GridOperators)
+
+            => ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeterTemplates).
+                   Concat(GridOperators.SelectMany(gridOperator => gridOperator.EnergyMeterTemplates));
+
+        /// <summary>
+        /// The error, when two of the given energy meter templates have the same identification: they are unique within
+        /// the roaming network, not only within their owner.
+        /// </summary>
+        internal static String? DuplicateEnergyMeterTemplate(IEnumerable<EnergyMeterTemplate> EnergyMeterTemplates)
+        {
+
+            var seen = new HashSet<EnergyMeterTemplate_Id>();
+
+            foreach (var energyMeterTemplate in EnergyMeterTemplates)
+                if (!seen.Add(energyMeterTemplate.Id))
+                    return $"The energy meter template '{energyMeterTemplate.Id}' must not be given twice in the roaming network!";
+
+            return null;
+
+        }
+
         /// <summary>
         /// The energy meter groups of the given charging station operators and grid operators.
         /// </summary>
@@ -2235,38 +2308,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The error, when an energy meter group gives its members an unknown manufacturer, an unknown transparency
+        /// The error, when an energy meter template gives its members an unknown manufacturer, an unknown transparency
         /// software release or certificate, or a certificate not covering its release.
         /// </summary>
-        internal static String? UnknownEnergyMeterGroupReference(IEnumerable<EnergyMeterGroup>                                                           EnergyMeterGroups,
+        internal static String? UnknownEnergyMeterTemplateReference(IEnumerable<EnergyMeterTemplate>                                                     EnergyMeterTemplates,
                                                                  IReadOnlyDictionary<EnergyMeterManufacturer_Id,         EnergyMeterManufacturer>          EnergyMeterManufacturers,
                                                                  IReadOnlyDictionary<TransparencySoftware_Id,            TransparencySoftware>             TransparencySoftware,
                                                                  IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  Certificates)
         {
 
-            foreach (var energyMeterGroup in EnergyMeterGroups)
+            foreach (var energyMeterTemplate in EnergyMeterTemplates)
             {
 
-                if (energyMeterGroup.ManufacturerId.HasValue &&
-                    !EnergyMeterManufacturers.ContainsKey(energyMeterGroup.ManufacturerId.Value))
+                if (energyMeterTemplate.ManufacturerId.HasValue &&
+                    !EnergyMeterManufacturers.ContainsKey(energyMeterTemplate.ManufacturerId.Value))
                 {
-                    return $"The energy meter group '{energyMeterGroup.Id}' names the unknown energy meter manufacturer '{energyMeterGroup.ManufacturerId}'!";
+                    return $"The energy meter template '{energyMeterTemplate.Id}' names the unknown energy meter manufacturer '{energyMeterTemplate.ManufacturerId}'!";
                 }
 
-                foreach (var assignment in energyMeterGroup.TransparencySoftwareStatus)
+                foreach (var assignment in energyMeterTemplate.TransparencySoftwareStatus)
                 {
 
                     if (!TransparencySoftware.ContainsKey(assignment.TransparencySoftwareId))
-                        return $"The transparency software release '{assignment.TransparencySoftwareId}' of the energy meter group '{energyMeterGroup.Id}' is unknown in the roaming network!";
+                        return $"The transparency software release '{assignment.TransparencySoftwareId}' of the energy meter template '{energyMeterTemplate.Id}' is unknown in the roaming network!";
 
                     if (assignment.CertificateId.HasValue)
                     {
 
                         if (!Certificates.TryGetValue(assignment.CertificateId.Value, out var certificate))
-                            return $"The certificate '{assignment.CertificateId}' of the energy meter group '{energyMeterGroup.Id}' is unknown in the roaming network!";
+                            return $"The certificate '{assignment.CertificateId}' of the energy meter template '{energyMeterTemplate.Id}' is unknown in the roaming network!";
 
                         if (!certificate.Covers(assignment.TransparencySoftwareId))
-                            return $"The certificate '{certificate.Id}' of the energy meter group '{energyMeterGroup.Id}' does not cover the transparency software release '{assignment.TransparencySoftwareId}'!";
+                            return $"The certificate '{certificate.Id}' of the energy meter template '{energyMeterTemplate.Id}' does not cover the transparency software release '{assignment.TransparencySoftwareId}'!";
 
                     }
 
@@ -2302,7 +2375,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => chargingStationManufacturers.TryGet(ChargingStationManufacturerId, out ChargingStationManufacturer);
 
         /// <summary>
-        /// The error, when a charging station or a charging station group names a manufacturer the given ones do not have.
+        /// The error, when a charging station or a charging station template names a manufacturer the given ones do not have.
         /// </summary>
         internal static String? UnknownManufacturer(IEnumerable<ChargingStationOperator>                                              ChargingStationOperators,
                                                     IReadOnlyDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>  ChargingStationManufacturers)
@@ -2315,11 +2388,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return $"The manufacturer '{chargingStation.ManufacturerId}' of the charging station '{chargingStation.Id}' is unknown in the roaming network!";
                 }
 
-            foreach (var chargingStationGroup in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationGroups))
-                if (chargingStationGroup.ManufacturerId.HasValue &&
-                    !ChargingStationManufacturers.ContainsKey(chargingStationGroup.ManufacturerId.Value))
+            foreach (var chargingStationTemplate in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationTemplates))
+                if (chargingStationTemplate.ManufacturerId.HasValue &&
+                    !ChargingStationManufacturers.ContainsKey(chargingStationTemplate.ManufacturerId.Value))
                 {
-                    return $"The manufacturer '{chargingStationGroup.ManufacturerId}' of the charging station group '{chargingStationGroup.Id}' is unknown in the roaming network!";
+                    return $"The manufacturer '{chargingStationTemplate.ManufacturerId}' of the charging station template '{chargingStationTemplate.Id}' is unknown in the roaming network!";
                 }
 
             return null;

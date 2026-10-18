@@ -29,15 +29,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// The effective parking spaces of a parking operator: its parking spaces as they are at runtime, with the properties
-    /// their parking space groups give them.
+    /// the parking space templates they name give them.
     /// </summary>
     /// <remarks>
     /// As the effective members of a charging station operator (see ChargingStationOperator.EffectiveChargingPools):
-    /// a single value is the parking space's own, else the one of its group with the highest priority; an array is its own
-    /// united with those of all its groups, of images of the same URL its own, else the one of the higher priority. Groups
-    /// of the same priority must not give different values that decide, nor make it invalid. An effective parking space has
-    /// the runtime status of the parking space; its last change is the latest of it and its groups, and, where it is other
-    /// than in the version before, not before the last change of the parking operator.
+    /// a single value is the parking space's own, else the one of the first of its templates giving one; an array is its
+    /// own united with those of all its templates, of images of the same URL its own, else the one of the first template
+    /// giving it. Its templates must not make it invalid. An effective parking space has the runtime status of the parking
+    /// space; its last change is the latest of it and its templates, and, where it is other than in the version before,
+    /// not before the last change of the parking operator.
     /// </remarks>
     public sealed partial class ParkingOperator
     {
@@ -66,8 +66,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
-        /// The parking spaces as they are at runtime, with the properties their groups give them, in the order of their
-        /// identifications: a parking space they give nothing is itself.
+        /// The parking spaces as they are at runtime, with the properties their templates give them, in the order of their
+        /// identifications: a parking space naming no templates is itself.
         /// </summary>
         public POICollection<ParkingSpace_Id, ParkingSpace> EffectiveParkingSpaces
             => effectiveParkingSpaces.Value;
@@ -78,8 +78,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region EffectiveParkingSpace       (ParkingSpace)
 
         /// <summary>
-        /// The given parking space of this parking operator as it is at runtime, with the properties its groups give it:
-        /// the parking space itself, when they give it none.
+        /// The given parking space of this parking operator as it is at runtime, with the properties its templates give it:
+        /// the parking space itself, when it names none.
         /// </summary>
         /// <param name="ParkingSpace">A parking space of this parking operator.</param>
         public ParkingSpace EffectiveParkingSpace(ParkingSpace ParkingSpace)
@@ -109,6 +109,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TemplatesOf                 (ParkingSpace)
+
+        /// <summary>
+        /// The templates the given parking space names, in its order.
+        /// </summary>
+        public IEnumerable<ParkingSpaceTemplate> TemplatesOf(ParkingSpace ParkingSpace)
+
+            => ChargingStationOperator.TemplatesOf(ParkingSpace.TemplateIds, ParkingSpaceTemplates);
+
+        #endregion
+
         #region ParkingSpaceGroupsOf        (ParkingSpaceId)
 
         /// <summary>
@@ -130,38 +141,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private ImmutableDictionary<ParkingSpace_Id, ParkingSpace> CalculateEffective(Dictionary<ParkingSpace_Id, DateTimeOffset>? AtLeast = null)
         {
 
-            var groupsJSON  = new Dictionary<IPOIPrioritizedGroup, JObject>(ReferenceEqualityComparer.Instance);
-
-            JObject JSONOf(IPOIPrioritizedGroup Group)
-            {
-                if (!groupsJSON.TryGetValue(Group, out var json))
-                {
-                    json = Group.ToJSON();
-                    groupsJSON.Add(Group, json);
-                }
-                return json;
-            }
-
-            var groupsOf    = ParkingSpaceGroups.Where(parkingSpaceGroup => parkingSpaceGroup.HasParkingSpaceProperties).
-                                                 SelectMany(parkingSpaceGroup => parkingSpaceGroup.ParkingSpaceIds.Select(memberId => (MemberId: memberId, Group: parkingSpaceGroup))).
-                                                 GroupBy   (membership => membership.MemberId).
-                                                 ToDictionary(members => members.Key,
-                                                              members => members.Select(membership => membership.Group).ToArray());
-
-            var effective   = ImmutableDictionary.CreateBuilder<ParkingSpace_Id, ParkingSpace>();
+            var effective = ImmutableDictionary.CreateBuilder<ParkingSpace_Id, ParkingSpace>();
 
             foreach (var parkingSpace in ParkingSpaces)
             {
 
-                var hasGroups  = groupsOf.TryGetValue(parkingSpace.Id, out var groups);
                 DateTimeOffset? atLeast = AtLeast?.TryGetValue(parkingSpace.Id, out var floor) == true ? floor : null;
 
-                if (!hasGroups && !atLeast.HasValue)
+                if (parkingSpace.TemplateIds.Length == 0 && !atLeast.HasValue)
                     continue;
 
                 effective.Add(parkingSpace.Id,
                               Effective(parkingSpace,
-                                        new POIGroupValues<ParkingSpaceGroup>($"the parking space '{parkingSpace.Id}'", groups ?? [], JSONOf),
+                                        ChargingStationOperator.Values(parkingSpace.TemplateIds, ParkingSpaceTemplates),
                                         atLeast));
 
             }
@@ -176,8 +168,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Calculate the effective parking spaces again where they are other than in the given previous version of this
-        /// parking operator, with at least its last change: so a group that stops giving a parking space something, or a
-        /// parking space that leaves a group, changes its last change as well, not only its content; and where they are the
+        /// parking operator, with at least its last change: so a template that stops giving a parking space something
+        /// changes its last change as well, not only its content; and where they are the
         /// same, with at least the last change they had in it, e.g. after an earlier change of the same change set.
         /// Floors found before are kept, the later one of two: a merge compares with both of its parents, one after the
         /// other.
@@ -191,28 +183,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return JSON;
             }
 
-            // Only where something may be other: the members of groups that changed, added or removed, and those having a
-            // floor before. A parking space whose own representation changed has the last change of the change set anyway.
-            var candidates = new HashSet<ParkingSpace_Id>(Previous.effectiveFloors.Keys);
+            // Only where something may be other: the parking spaces naming templates that changed, added or removed, and those
+            // having a floor before. A parking space whose own representation changed has the last change of the change set
+            // anyway.
+            var candidates        = new HashSet<ParkingSpace_Id>(Previous.effectiveFloors.Keys);
+            var changedTemplates  = ChargingStationOperator.ChangedTemplates(ParkingSpaceTemplates, Previous.ParkingSpaceTemplates, template => template.Id);
 
-            foreach (var parkingSpaceGroup in ParkingSpaceGroups)
-            {
-
-                var before = Previous.TryGetParkingSpaceGroup(parkingSpaceGroup.Id, out var previous) ? previous : null;
-
-                if (before is not null && POIJSON.SameValue(parkingSpaceGroup.ToJSON(), before.ToJSON()))
-                    continue;
-
-                candidates.UnionWith(parkingSpaceGroup.ParkingSpaceIds);
-
-                if (before is not null)
-                    candidates.UnionWith(before.ParkingSpaceIds);
-
-            }
-
-            foreach (var before in Previous.ParkingSpaceGroups)
-                if (!TryGetParkingSpaceGroup(before.Id, out _))
-                    candidates.UnionWith(before.ParkingSpaceIds);
+            foreach (var parkingSpace in ParkingSpaces)
+                if (parkingSpace.TemplateIds.Any(changedTemplates.Contains))
+                    candidates.Add(parkingSpace.Id);
 
             // Other than before: at least the last change of the parking operator; the same: at least the one it had.
             // The floors found before, e.g. comparing a merge with its other parent, are kept.
@@ -250,7 +229,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (internal) EffectiveFloors()
 
         /// <summary>
-        /// The last changes its effective parking spaces have at least, beyond what they and their groups tell: what a
+        /// The last changes its effective parking spaces have at least, beyond what they and their templates tell: what a
         /// snapshot of a version keeps.
         /// </summary>
         internal IEnumerable<POIEffectiveLastChange> EffectiveFloors()
@@ -323,20 +302,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) Effective(ParkingSpace, Groups, AtLeast)
+        #region (private static) Effective(ParkingSpace, Templates, AtLeast)
 
         /// <summary>
-        /// The given parking space with the properties of the given groups.
+        /// The given parking space with the properties of the given templates, in the order of its templateIds.
         /// </summary>
         private static ParkingSpace Effective(ParkingSpace                         ParkingSpace,
-                                              POIGroupValues<ParkingSpaceGroup>    Groups,
+                                              POITemplateValues<ParkingSpaceTemplate>  Templates,
                                               DateTimeOffset?                      AtLeast)
         {
 
             try
             {
 
-                var lastChange = Groups.LastChange(ParkingSpace.LastChangeDate);
+                var lastChange = Templates.LastChange(ParkingSpace.LastChangeDate);
 
                 var effective  = new ParkingSpace(
 
@@ -344,40 +323,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ParkingSpace.Name,
                                      ParkingSpace.Description,
 
-                                     GeoLocation:               Groups.Single("geoLocation",               ParkingSpace.GeoLocation,               group => group.GeoLocation),
-                                     ParkingGarageId:           Groups.Single("parkingGarageId",           ParkingSpace.ParkingGarageId,           group => group.ParkingGarageId),
-                                     PhysicalReference:         Groups.Single("physicalReference",         ParkingSpace.PhysicalReference,         group => group.PhysicalReference),
-                                     MaxVehicleWeight:          Groups.Single("maxVehicleWeight",          ParkingSpace.MaxVehicleWeight,          group => group.MaxVehicleWeight),
-                                     MaxVehicleHeight:          Groups.Single("maxVehicleHeight",          ParkingSpace.MaxVehicleHeight,          group => group.MaxVehicleHeight),
-                                     MaxVehicleLength:          Groups.Single("maxVehicleLength",          ParkingSpace.MaxVehicleLength,          group => group.MaxVehicleLength),
-                                     MaxVehicleWidth:           Groups.Single("maxVehicleWidth",           ParkingSpace.MaxVehicleWidth,           group => group.MaxVehicleWidth),
-                                     Length:                    Groups.Single("length",                    ParkingSpace.Length,                    group => group.Length),
-                                     Width:                     Groups.Single("width",                     ParkingSpace.Width,                     group => group.Width),
-                                     EVSEPosition:              Groups.Single("evsePosition",              ParkingSpace.EVSEPosition,              group => group.EVSEPosition),
-                                     Direction:                 Groups.Single("direction",                 ParkingSpace.Direction,                 group => group.Direction),
-                                     Surface:                   Groups.Single("surface",                   ParkingSpace.Surface,                   group => group.Surface),
-                                     Slope:                     Groups.Single("slope",                     ParkingSpace.Slope,                     group => group.Slope),
-                                     TimeLimit:                 Groups.Single("timeLimit",                 ParkingSpace.TimeLimit,                 group => group.TimeLimit),
-                                     RestrictedToVehicleTypes:  Groups.Single("restrictedToVehicleTypes",  ParkingSpace.RestrictedToVehicleTypes,  group => group.RestrictedToVehicleTypes),
-                                     DriveThrough:              Groups.Single("driveThrough",              ParkingSpace.DriveThrough,              group => group.DriveThrough),
-                                     ReservationRequired:       Groups.Single("reservationRequired",       ParkingSpace.ReservationRequired,       group => group.ReservationRequired),
-                                     Roofed:                    Groups.Single("roofed",                    ParkingSpace.Roofed,                    group => group.Roofed),
-                                     Illuminated:               Groups.Single("illuminated",               ParkingSpace.Illuminated,               group => group.Illuminated),
-                                     RefrigerationOutlet:       Groups.Single("refrigerationOutlet",       ParkingSpace.RefrigerationOutlet,       group => group.RefrigerationOutlet),
-                                     DangerousGoodsAllowed:     Groups.Single("dangerousGoodsAllowed",     ParkingSpace.DangerousGoodsAllowed,     group => group.DangerousGoodsAllowed),
-                                     ProtectedArea:             Groups.Single("protectedArea",             ParkingSpace.ProtectedArea,             group => group.ProtectedArea),
+                                     GeoLocation:               Templates.Single(ParkingSpace.GeoLocation,               template => template.GeoLocation),
+                                     ParkingGarageId:           Templates.Single(ParkingSpace.ParkingGarageId,           template => template.ParkingGarageId),
+                                     PhysicalReference:         Templates.Single(ParkingSpace.PhysicalReference,         template => template.PhysicalReference),
+                                     MaxVehicleWeight:          Templates.Single(ParkingSpace.MaxVehicleWeight,          template => template.MaxVehicleWeight),
+                                     MaxVehicleHeight:          Templates.Single(ParkingSpace.MaxVehicleHeight,          template => template.MaxVehicleHeight),
+                                     MaxVehicleLength:          Templates.Single(ParkingSpace.MaxVehicleLength,          template => template.MaxVehicleLength),
+                                     MaxVehicleWidth:           Templates.Single(ParkingSpace.MaxVehicleWidth,           template => template.MaxVehicleWidth),
+                                     Length:                    Templates.Single(ParkingSpace.Length,                    template => template.Length),
+                                     Width:                     Templates.Single(ParkingSpace.Width,                     template => template.Width),
+                                     EVSEPosition:              Templates.Single(ParkingSpace.EVSEPosition,              template => template.EVSEPosition),
+                                     Direction:                 Templates.Single(ParkingSpace.Direction,                 template => template.Direction),
+                                     Surface:                   Templates.Single(ParkingSpace.Surface,                   template => template.Surface),
+                                     Slope:                     Templates.Single(ParkingSpace.Slope,                     template => template.Slope),
+                                     TimeLimit:                 Templates.Single(ParkingSpace.TimeLimit,                 template => template.TimeLimit),
+                                     RestrictedToVehicleTypes:  Templates.Single(ParkingSpace.RestrictedToVehicleTypes,  template => template.RestrictedToVehicleTypes),
+                                     DriveThrough:              Templates.Single(ParkingSpace.DriveThrough,              template => template.DriveThrough),
+                                     ReservationRequired:       Templates.Single(ParkingSpace.ReservationRequired,       template => template.ReservationRequired),
+                                     Roofed:                    Templates.Single(ParkingSpace.Roofed,                    template => template.Roofed),
+                                     Illuminated:               Templates.Single(ParkingSpace.Illuminated,               template => template.Illuminated),
+                                     RefrigerationOutlet:       Templates.Single(ParkingSpace.RefrigerationOutlet,       template => template.RefrigerationOutlet),
+                                     DangerousGoodsAllowed:     Templates.Single(ParkingSpace.DangerousGoodsAllowed,     template => template.DangerousGoodsAllowed),
+                                     ProtectedArea:             Templates.Single(ParkingSpace.ProtectedArea,             template => template.ProtectedArea),
 
-                                     ParkingSensorIds:          Groups.Union (ParkingSpace.ParkingSensorIds,     group => group.ParkingSensorIds),
-                                     ChargingStationIds:        Groups.Union (ParkingSpace.ChargingStationIds,   group => group.ChargingStationIds),
-                                     ParkingProductIds:         Groups.Union (ParkingSpace.ParkingProductIds,    group => group.ParkingProductIds),
-                                     ParkingRestrictions:       Groups.Union (ParkingSpace.ParkingRestrictions,  group => group.ParkingRestrictions),
-                                     EUVehicleCategories:       Groups.Union (ParkingSpace.EUVehicleCategories,  group => group.EUVehicleCategories),
-                                     VehicleTypes:              Groups.Union (ParkingSpace.VehicleTypes,         group => group.VehicleTypes),
-                                     Standards:                 Groups.Union (ParkingSpace.Standards,            group => group.Standards),
-                                     Images:                    Groups.Union ("image", ParkingSpace.Images, group => group.Images, image => image.URL.ToString(), image => image.ToJSON()),
+                                     ParkingSensorIds:          Templates.Union (ParkingSpace.ParkingSensorIds,     template => template.ParkingSensorIds),
+                                     ChargingStationIds:        Templates.Union (ParkingSpace.ChargingStationIds,   template => template.ChargingStationIds),
+                                     ParkingProductIds:         Templates.Union (ParkingSpace.ParkingProductIds,    template => template.ParkingProductIds),
+                                     ParkingRestrictions:       Templates.Union (ParkingSpace.ParkingRestrictions,  template => template.ParkingRestrictions),
+                                     EUVehicleCategories:       Templates.Union (ParkingSpace.EUVehicleCategories,  template => template.EUVehicleCategories),
+                                     VehicleTypes:              Templates.Union (ParkingSpace.VehicleTypes,         template => template.VehicleTypes),
+                                     Standards:                 Templates.Union (ParkingSpace.Standards,            template => template.Standards),
+                                     Images:                    Templates.Union (ParkingSpace.Images, template => template.Images, image => image.URL.ToString()),
 
-                                     // Its own identification in another system.
+                                     // Its own identification in another system, and the templates it names.
                                      APDSReference:             ParkingSpace.APDSReference,
+                                     TemplateIds:               ParkingSpace.TemplateIds,
 
                                      DataSource:                ParkingSpace.DataSource,
                                      Created:                   ParkingSpace.Created,
@@ -393,7 +373,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
             catch (ArgumentException e)
             {
-                throw new ArgumentException($"The parking space '{ParkingSpace.Id}' {Groups.With} is invalid: {e.Message}", e);
+                throw new ArgumentException($"The parking space '{ParkingSpace.Id}' {Templates.With} is invalid: {e.Message}", e);
             }
 
         }

@@ -283,7 +283,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region Floor_level_and_accepted_providers_of_EVSEs_and_their_groups()
 
         [Test]
-        public void Floor_level_and_accepted_providers_of_EVSEs_and_their_groups()
+        public void Floor_level_and_accepted_providers_of_EVSEs_and_their_templates()
         {
 
             var GDF   = EMobilityProvider_Id.Parse("DE-GDF");
@@ -293,16 +293,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var evse  = new EVSE(E1, FloorLevel: "-1", AcceptedEMobilityProviderIds: [ GDF, ABC ], Created: Created);
             var json  = evse.ToJSON();
 
-            // An EVSE without floor level and providers, which its group gives.
+            // An EVSE without floor level and providers, which its template gives.
             var rn1   = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                                            Created:                   Created,
                                            ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                                                     Created:        Created,
                                                                                                     ChargingPools:  [ new ChargingPool(P1,
                                                                                                                                        Created:           Created,
-                                                                                                                                       ChargingStations:  [ new ChargingStation(S1, Created: Created, EVSEs: [ new EVSE(E1, AcceptedEMobilityProviderIds: [ ABC ], Created: Created) ]) ]) ],
-                                                                                                    EVSEGroups:     [ new EVSEGroup(EVSEGroup_Id.Parse(GEF, "1"),
-                                                                                                                                    EVSEIds:                       [ E1 ],
+                                                                                                                                       ChargingStations:  [ new ChargingStation(S1, Created: Created, EVSEs: [ new EVSE(E1, AcceptedEMobilityProviderIds: [ ABC ], TemplateIds: [ EVSETemplate_Id.Parse(GEF, "1") ], Created: Created) ]) ]) ],
+                                                                                                    EVSETemplates:  [ new EVSETemplate(EVSETemplate_Id.Parse(GEF, "1"),
                                                                                                                                     FloorLevel:                    "-2",
                                                                                                                                     AcceptedEMobilityProviderIds:  [ XYZ ],
                                                                                                                                     Created:                       Created) ]) ]).WithKeys();
@@ -325,14 +324,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 twice["acceptedEMobilityProviderIds"] = new JArray("DE-GDF", "DE-GDF");
                 Assert.That(global::cloud.charging.open.protocols.WWCP.POI.EVSE.TryParse(twice, out _, out _),                                 Is.False);
 
-                // The group gives its floor level, and its providers besides the EVSE's own.
+                // The template gives its floor level, and its providers besides the EVSE's own.
                 Assert.That(cso.EffectiveEVSE(cso.EVSEs.Single()).FloorLevel,                   Is.EqualTo("-2"));
                 Assert.That(cso.EffectiveEVSE(cso.EVSEs.Single()).AcceptedEMobilityProviderIds,  Is.EquivalentTo(new[] { ABC, XYZ }));
                 var networkJSON = rn1.ToJSON(IncludeETags: false);
                 Assert.That(RoamingNetwork.TryParse(networkJSON, out var fromJSON, out var errorJSON),  Is.True, errorJSON);
                 Assert.That(fromJSON!.ToJSON(IncludeETags: false).ToString(),                  Is.EqualTo(networkJSON.ToString()));
 
-                // Changed by change sets; its own floor level before its group's.
+                // Changed by change sets; its own floor level before its template's.
                 var cso2 = rn2.GetChargingStationOperatorById(GEF)!;
                 Assert.That(cso2.EVSEs.Single().FloorLevel,                                     Is.EqualTo("2B"));
                 Assert.That(cso2.EffectiveEVSE(cso2.EVSEs.Single()).FloorLevel,                 Is.EqualTo("2B"));

@@ -115,6 +115,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<EnergyMeterPublicKey>            PublicKeys                  { get; }
 
+        /// <summary>
+        /// The energy meter templates it takes, each once, in its order: of every property they give, the first one giving it
+        /// decides, unless it has its own. It names them; they do not name their members.
+        /// </summary>
+        public ImmutableArray<EnergyMeterTemplate_Id>  TemplateIds  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -135,6 +141,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            IEnumerable<TransparencySoftwareAssignment>? TransparencySoftwareStatus  = null,
                            IEnumerable<SignatureMethod>?               SignatureMethods             = null,
                            IEnumerable<EnergyMeterPublicKey>?          PublicKeys                   = null,
+
+                           IEnumerable<EnergyMeterTemplate_Id>?        TemplateIds                  = null,
 
                            Timestamped<EnergyMeterAdminStatusType>?    InitialAdminStatus           = null,
                            Timestamped<EnergyMeterStatusType>?         InitialStatus                = null,
@@ -166,6 +174,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    InternalData)
 
         {
+
+            this.TemplateIds  = POIJSON.UniqueIds(TemplateIds, $"template of the energy meter '{Id}'");
 
             this.Role             = Role;
             this.ManufacturerId   = ManufacturerId;
@@ -285,6 +295,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (PublicKeys.Length > 0)
                 json.Add("publicKeys",       new JArray(PublicKeys.Select(publicKey => publicKey.ToJSON())));
 
+            if (TemplateIds.Length > 0)
+                json.Add("templateIds", POIJSON.IdsToJSON(TemplateIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -365,6 +378,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
+                if (!POIJSON.TryParseIds(JSON, "templateIds", "template identification", EnergyMeterTemplate_Id.TryParse, out ImmutableArray<EnergyMeterTemplate_Id> templateIds, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -387,6 +403,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               transparencySoftwareStatus,
                                               signatureMethods,
                                               publicKeys,
+                                              TemplateIds:  templateIds,
                                               DataSource:  dataSource,
                                               Created:     created,
                                               LastChange:  lastChange,

@@ -258,6 +258,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<NUTSCode>                  NUTSCodes                  { get; }
 
+        /// <summary>
+        /// The charging pool templates it takes, each once, in its order: of every property they give, the first one giving it
+        /// decides, unless it has its own. It names them; they do not name their members.
+        /// </summary>
+        public ImmutableArray<ChargingPoolTemplate_Id>  TemplateIds  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -301,6 +307,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<Standard>?                       Standards                    = null,
                             IEnumerable<NUTSCode>?                       NUTSCodes                    = null,
 
+                            IEnumerable<ChargingPoolTemplate_Id>?        TemplateIds                  = null,
+
                             Timestamped<ChargingPoolAdminStatusType>?    InitialAdminStatus           = null,
                             Timestamped<ChargingPoolStatusType>?         InitialStatus                = null,
                             UInt16?                                      MaxAdminStatusScheduleSize   = null,
@@ -331,6 +339,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    InternalData)
 
         {
+
+            this.TemplateIds  = POIJSON.UniqueIds(TemplateIds, $"template of the charging pool '{Id}'");
 
             var dataLicenses      = (DataLicenses     ?? []).ToArray();
             var chargingStations  = (ChargingStations ?? []).ToArray();
@@ -639,6 +649,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (NUTSCodes.Length > 0)
                 json.Add("nutsCodes",                 POIJSON.IdsToJSON(NUTSCodes));
 
+            if (TemplateIds.Length > 0)
+                json.Add("templateIds", POIJSON.IdsToJSON(TemplateIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -762,6 +775,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (JSON.ParseOptional("chargingWhenClosed", "charging when closed", out Boolean? chargingWhenClosed, out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
+                if (!POIJSON.TryParseIds(JSON, "templateIds", "template identification", ChargingPoolTemplate_Id.TryParse, out ImmutableArray<ChargingPoolTemplate_Id> templateIds, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -806,6 +822,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 assistanceServiceDetails,
                                                 standards,
                                                 nutsCodes,
+                                                TemplateIds:  templateIds,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,

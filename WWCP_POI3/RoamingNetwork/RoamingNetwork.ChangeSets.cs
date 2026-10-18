@@ -936,11 +936,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Energy meter groups, of charging station operators and grid operators
+                #region Energy meter templates and groups, of charging station operators and grid operators
 
                 else if (change.EntityType == nameof(EnergyMeterGroup))
                 {
                     if (!TryApplyEnergyMeterGroupChange(change, index, ChangeSet.CreatedAt, operators, gridOps, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                else if (change.EntityType == nameof(EnergyMeterTemplate))
+                {
+                    if (!TryApplyEnergyMeterTemplateChange(change, index, ChangeSet.CreatedAt, operators, gridOps, out currentValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1004,9 +1010,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Every manufacturer a charging station names, every grid connection point a charging pool names,
             // and every maintainer of a grid connection point must still be one of the network;
-            // grid connection points, energy meters and energy meter groups must be unique within the network.
-            var allEnergyMeters      = AllEnergyMeters     (operators.Values, gridOps.Values).ToArray();
-            var allEnergyMeterGroups = AllEnergyMeterGroups(operators.Values, gridOps.Values).ToArray();
+            // grid connection points, energy meters, and energy meter templates and groups must be unique within the network.
+            var allEnergyMeters         = AllEnergyMeters        (operators.Values, gridOps.Values).ToArray();
+            var allEnergyMeterGroups    = AllEnergyMeterGroups   (operators.Values, gridOps.Values).ToArray();
+            var allEnergyMeterTemplates = AllEnergyMeterTemplates(operators.Values, gridOps.Values).ToArray();
 
             if ((UnknownManufacturer (operators.Values, manufacturers) ??
                  DuplicateGridConnectionPoint(gridOps.Values)          ??
@@ -1019,7 +1026,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  UnknownTransparencyReference(allEnergyMeters, softwares, certificates, manufacturers) ??
                  UnknownEnergyMeterManufacturer(allEnergyMeters, meterManufacturers) ??
                  DuplicateEnergyMeterGroup(allEnergyMeterGroups)       ??
-                 UnknownEnergyMeterGroupReference(allEnergyMeterGroups, meterManufacturers, softwares, certificates)) is String referenceError)
+                 DuplicateEnergyMeterTemplate(allEnergyMeterTemplates) ??
+                 UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, meterManufacturers, softwares, certificates)) is String referenceError)
             {
                 ErrorResponse = referenceError;
                 return false;

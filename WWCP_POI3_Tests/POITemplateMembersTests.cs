@@ -27,24 +27,24 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// What an importer is to change of a member of groups: what a source tells as its groups give it stays in its
-    /// groups, by the rules by which they give it at runtime.
+    /// What an importer is to change of a member of templates: what a source tells as its templates give it stays in its
+    /// templates, by the rules by which they give it at runtime.
     /// </summary>
     [TestFixture]
-    public class POIGroupMembersTests
+    public class POITemplateMembersTests
     {
 
         #region (private static) Kept(Desired, Stored, Effective, Property)
 
         /// <summary>
-        /// The given property of the member as it is to be, after what its groups give is kept in them.
+        /// The given property of the member as it is to be, after what its templates give is kept in them.
         /// </summary>
         private static JToken? Kept(String Desired, String Stored, String Effective, String Property)
         {
 
             var desired = JObject.Parse(Desired);
 
-            POIGroupMembers.KeepWhatGroupsGive(desired, JObject.Parse(Stored), JObject.Parse(Effective), [ Property ]);
+            POITemplateMembers.KeepWhatTemplatesGive(desired, JObject.Parse(Stored), JObject.Parse(Effective), [ Property ]);
 
             return desired[Property];
 
@@ -53,15 +53,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #endregion
 
 
-        #region What_the_groups_give_as_it_is_stays_in_them()
+        #region What_the_templates_give_as_it_is_stays_in_them()
 
         [Test]
-        public void What_the_groups_give_as_it_is_stays_in_them()
+        public void What_the_templates_give_as_it_is_stays_in_them()
         {
             using (Assert.EnterMultipleScope())
             {
 
-                // As it has it with its groups: of its own, nothing, or what it has.
+                // As it has it with its templates: of its own, nothing, or what it has.
                 Assert.That(Kept("""{ "maxPower": 22000 }""",          "{}",                                """{ "maxPower": 22000 }""",                  "maxPower"),     Is.Null);
                 Assert.That(Kept("""{ "facilities": [ "CAFE" ] }""",    """{ "facilities": [ "SUPERMARKET" ] }""",  """{ "facilities": [ "CAFE" ] }""",  "facilities")!.ToString(Newtonsoft.Json.Formatting.None),
                             Is.EqualTo("""["SUPERMARKET"]"""));
@@ -74,10 +74,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region Of_a_united_array_only_what_the_groups_do_not_give_is_its_own()
+        #region Of_a_united_array_only_what_the_templates_do_not_give_is_its_own()
 
         [Test]
-        public void Of_a_united_array_only_what_the_groups_do_not_give_is_its_own()
+        public void Of_a_united_array_only_what_the_templates_do_not_give_is_its_own()
         {
             using (Assert.EnterMultipleScope())
             {
@@ -85,8 +85,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(Kept("""{ "facilities": [ "CAFE", "SUPERMARKET" ] }""",  "{}",  """{ "facilities": [ "CAFE" ] }""",  "facilities")!.ToString(Newtonsoft.Json.Formatting.None),
                             Is.EqualTo("""["SUPERMARKET"]"""));
 
-                // An authentication mode by its type: a source telling an RFID mode without the card types its group gives
-                // does not make it one of its own, and the card types of the group stay.
+                // An authentication mode by its type: a source telling an RFID mode without the card types its template gives
+                // does not make it one of its own, and the card types of the template stay.
                 Assert.That(Kept("""{ "authenticationModes": [ { "type": "RFID" }, { "type": "APP" } ] }""",
                                  "{}",
                                  """{ "authenticationModes": [ { "type": "RFID", "cardTypes": [ "MIFARE_CLASSIC" ] } ] }""",
@@ -108,8 +108,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region An_array_taken_whole_is_its_own_whole()
 
         /// <summary>
-        /// The charging tariffs, current types and charging modes of an EVSE are its own, else those of its groups:
-        /// told otherwise, they become its own whole, also with what its groups give.
+        /// The charging tariffs, current types and charging modes of an EVSE are its own, else those of its templates:
+        /// told otherwise, they become its own whole, also with what its templates give.
         /// </summary>
         [Test]
         public void An_array_taken_whole_is_its_own_whole()

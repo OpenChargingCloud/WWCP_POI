@@ -35,7 +35,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 {
 
     /// <summary>
-    /// Charging stations served with the properties their groups give them, as they are given with ?view=stored.
+    /// Charging stations, EVSEs, charging tariffs and parking spaces served with the properties their templates give them,
+    /// as they are given with ?view=stored, and the templates and groups of a member below it.
     /// </summary>
     [TestFixture]
     public class EffectiveChargingStationAPITests
@@ -45,8 +46,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
         private static readonly DateTimeOffset           Created  = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
 
-        private static readonly ChargingStation_Id       S1       = ChargingStation_Id.     Parse("DE*GEF*S1");
-        private static readonly ChargingStationGroup_Id  SG1      = ChargingStationGroup_Id.Parse("DE*GEF*SG1");
+        private static readonly ChargingStation_Id          S1       = ChargingStation_Id.        Parse("DE*GEF*S1");
+        private static readonly ChargingStationTemplate_Id  ST1      = ChargingStationTemplate_Id.Parse("DE*GEF*ST1");
+        private static readonly ChargingStationGroup_Id     SG1      = ChargingStationGroup_Id.   Parse("DE*GEF*SG1");
 
         private const String CSO = "RNs/rn1/CSOs/DE*GEF";
         private const String CP  = CSO + "/CPs/DE*GEF*P1";
@@ -103,7 +105,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
         #region NewNetwork()
 
         /// <summary>
-        /// A charging station with a hotline and a brand of its group only.
+        /// A charging station with a hotline and a brand of its template only, in a group that gives it nothing; its EVSE
+        /// with the maximum power of its template; a charging tariff with the prices of its template only; a parking space
+        /// roofed by its template.
         /// </summary>
         private static RoamingNetwork NewNetwork()
 
@@ -111,28 +115,32 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                    Created:                   Created,
                    ChargingStationOperators:  [ new ChargingStationOperator(
                                                     ChargingStationOperator_Id.Parse("DE*GEF"),
-                                                    Created:                Created,
-                                                    ChargingPools:          [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
-                                                                                               Created:           Created,
-                                                                                               ChargingStations:  [ new ChargingStation(S1,
-                                                                                                                                        Created:  Created,
-                                                                                                                                        EVSEs:    [ new EVSE(EVSE_Id.Parse("DE*GEF*E1*1"), Created: Created) ]) ]) ],
-                                                    ChargingStationGroups:  [ new ChargingStationGroup(SG1,
-                                                                                                       ChargingStationIds:  [ S1 ],
-                                                                                                       HotlinePhoneNumber:  PhoneNumber.Parse("+49 800 424242"),
-                                                                                                       Brands:              [ new Brand(Brand_Id.Parse("blue-charge"), new ImmutableI18NString(I18NString.Create(Languages.en, "Blue Charge"))) ],
-                                                                                                       Created:             Created) ],
-                                                    EVSEGroups:             [ new EVSEGroup(EVSEGroup_Id.Parse("DE*GEF*EG1"),
-                                                                                            EVSEIds:   [ EVSE_Id.Parse("DE*GEF*E1*1") ],
-                                                                                            MaxPower:  Watt.FromW(22000),
-                                                                                            Created:   Created) ]) ],
+                                                    Created:                   Created,
+                                                    ChargingTariffTemplates:   [ new ChargingTariffTemplate(ChargingTariffTemplate_Id.Parse("DE*GEF*TT1"),
+                                                                                                            Currency:  Currency.EUR,
+                                                                                                            Elements:  [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.39m, StepSize: 1) ]) ],
+                                                                                                            Created:   Created) ],
+                                                    ChargingTariffs:           [ new ChargingTariff(ChargingTariff_Id.Parse("DE*GEF*T1"), null, null, TemplateIds: [ ChargingTariffTemplate_Id.Parse("DE*GEF*TT1") ], Created: Created) ],
+                                                    ChargingPools:             [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
+                                                                                                  Created:           Created,
+                                                                                                  ChargingStations:  [ new ChargingStation(S1,
+                                                                                                                                           TemplateIds:  [ ST1 ],
+                                                                                                                                           Created:      Created,
+                                                                                                                                           EVSEs:        [ new EVSE(EVSE_Id.Parse("DE*GEF*E1*1"), TemplateIds: [ EVSETemplate_Id.Parse("DE*GEF*ET1") ], Created: Created) ]) ]) ],
+                                                    ChargingStationTemplates:  [ new ChargingStationTemplate(ST1,
+                                                                                                             HotlinePhoneNumber:  PhoneNumber.Parse("+49 800 424242"),
+                                                                                                             Brands:              [ new Brand(Brand_Id.Parse("blue-charge"), new ImmutableI18NString(I18NString.Create(Languages.en, "Blue Charge"))) ],
+                                                                                                             Created:             Created) ],
+                                                    EVSETemplates:             [ new EVSETemplate(EVSETemplate_Id.Parse("DE*GEF*ET1"),
+                                                                                                  MaxPower:  Watt.FromW(22000),
+                                                                                                  Created:   Created) ],
+                                                    ChargingStationGroups:     [ new ChargingStationGroup(SG1, ChargingStationIds: [ S1 ], Created: Created) ]) ],
                    ParkingOperators:          [ new ParkingOperator(ParkingOperator_Id.Parse("DE*PAR"),
-                                                                    Created:             Created,
-                                                                    ParkingSpaces:       [ new ParkingSpace(ParkingSpace_Id.Parse("space-1"), Created: Created) ],
-                                                                    ParkingSpaceGroups:  [ new ParkingSpaceGroup(ParkingSpaceGroup_Id.Parse("level-1"),
-                                                                                                                 ParkingSpaceIds:  [ ParkingSpace_Id.Parse("space-1") ],
-                                                                                                                 Roofed:           true,
-                                                                                                                 Created:          Created) ]) ]).WithKeys();
+                                                                    Created:                Created,
+                                                                    ParkingSpaces:          [ new ParkingSpace(ParkingSpace_Id.Parse("space-1"), TemplateIds: [ ParkingSpaceTemplate_Id.Parse("level-1") ], Created: Created) ],
+                                                                    ParkingSpaceTemplates:  [ new ParkingSpaceTemplate(ParkingSpaceTemplate_Id.Parse("level-1"),
+                                                                                                                       Roofed:   true,
+                                                                                                                       Created:  Created) ]) ]).WithKeys();
 
         #endregion
 
@@ -176,10 +184,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
         #endregion
 
 
-        #region Charging_stations_are_served_with_the_properties_of_their_groups()
+        #region Charging_stations_are_served_with_the_properties_of_their_templates()
 
         [Test]
-        public async Task Charging_stations_are_served_with_the_properties_of_their_groups()
+        public async Task Charging_stations_are_served_with_the_properties_of_their_templates()
         {
 
             var (_,          _,              operatorJSON)  = await Get(CSO);
@@ -199,11 +207,20 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
             var (pagedS,     _,              _)             = await Get("RNs/rn1/POs/DE*PAR/PSs?view=stored&limit=1&offset=1");
             var (pools,      _,              _)             = await Get("RNs/rn1/CPs?view=stored");
             var (whiteLabel, _,              _)             = await Get(CSO + "/Brands?view=nonsense");
+            var (_,          _,              stationTempl)  = await Get(CS + "/CSTs");
+            var (_,          _,              evseTempl)     = await Get(CS + "/EVSEs/DE*GEF*E1*1/EVSETs");
+            var (_,          _,              poolTempl)     = await Get(CP + "/CPTs");
+            var (_,          _,              spaceTempl)    = await Get("RNs/rn1/POs/DE*PAR/PSs/space-1/PSTs");
+            var (noSpace,    _,              _)             = await Get("RNs/rn1/POs/DE*PAR/PSs/space-9/PSTs");
             var (_,          _,              stationGroups) = await Get(CS + "/CSGs");
             var (_,          _,              evseGroups)    = await Get(CS + "/EVSEs/DE*GEF*E1*1/EVSEGs");
-            var (_,          _,              poolGroups)    = await Get(CP + "/CPGs");
-            var (_,          _,              spaceGroups)   = await Get("RNs/rn1/POs/DE*PAR/PSs/space-1/PSGs");
-            var (noSpace,    _,              _)             = await Get("RNs/rn1/POs/DE*PAR/PSs/space-9/PSGs");
+            var (tariff,     _,              tariffJSON)    = await Get(CSO + "/CTs/DE*GEF*T1");
+            var (storedT,    _,              storedTariff)  = await Get(CSO + "/CTs/DE*GEF*T1?view=stored");
+            var (_,          _,              tariffs)       = await Get(CSO + "/CTs");
+            var (_,          _,              tariffTempl)   = await Get(CSO + "/CTs/DE*GEF*T1/CTTs");
+            var (_,          _,              templates)     = await Get(CSO + "/EVSETs");
+            var (_,          _,              template)      = await Get(CSO + "/EVSETs/DE*GEF*ET1");
+            var (_,          _,              spaceTemplates) = await Get("RNs/rn1/POs/DE*PAR/PSTs");
 
             history!.Head.RoamingNetwork.TryGetEntityETag(nameof(ChargingStation), S1.ToString(), out var eTag);
 
@@ -247,7 +264,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(HeaderOf(space,   "X-Stored-ETag"),                                Is.EqualTo(storedS.Headers.ETag!.ToString()));
                 Assert.That(HeaderOf(pagedS,  "Link"),                                         Is.EqualTo("</RNs/rn1/POs/DE*PAR/PSs?view=stored&limit=1>; rel=\"prev\""));
 
-                // Found by what its group gives it.
+                // Found by what its template gives it.
                 Assert.That(found!.Single()["@id"]!.Value<String>(),                           Is.EqualTo("DE*GEF*P1"));
 
                 // The charging pools of the roaming network only as they are at runtime; a list of what is not at
@@ -255,13 +272,30 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(pools.StatusCode,                                                  Is.EqualTo(HttpStatusCode.BadRequest));
                 Assert.That(whiteLabel.StatusCode,                                             Is.EqualTo(HttpStatusCode.OK));
 
-                // The groups of a member, which give it properties: so a client tells where its values come from.
-                Assert.That(stationGroups!.Single()["@id"]!.Value<String>(),                   Is.EqualTo(SG1.ToString()));
-                Assert.That(stationGroups!.Single()["hotline"]!.Value<String>(),               Is.EqualTo("+49 800 424242"));
-                Assert.That(evseGroups!.Single()["@id"]!.Value<String>(),                      Is.EqualTo("DE*GEF*EG1"));
-                Assert.That(poolGroups,                                                        Is.Empty);
-                Assert.That(spaceGroups!.Single()["@id"]!.Value<String>(),                     Is.EqualTo("level-1"));
+                // The templates of a member, which give it properties: so a client tells where its values come from.
+                Assert.That(stationTempl!.Single()["@id"]!.Value<String>(),                    Is.EqualTo(ST1.ToString()));
+                Assert.That(stationTempl!.Single()["hotline"]!.Value<String>(),                Is.EqualTo("+49 800 424242"));
+                Assert.That(evseTempl!.Single()["@id"]!.Value<String>(),                       Is.EqualTo("DE*GEF*ET1"));
+                Assert.That(poolTempl,                                                         Is.Empty);
+                Assert.That(spaceTempl!.Single()["@id"]!.Value<String>(),                      Is.EqualTo("level-1"));
                 Assert.That(noSpace.StatusCode,                                                Is.EqualTo(HttpStatusCode.NotFound));
+
+                // The groups it is in, which give it nothing.
+                Assert.That(stationGroups!.Single()["@id"]!.Value<String>(),                   Is.EqualTo(SG1.ToString()));
+                Assert.That(stationGroups!.Single()["hotline"],                                Is.Null);
+                Assert.That(evseGroups,                                                        Is.Empty);
+
+                // A charging tariff with the prices of its template, as it is given with ?view=stored.
+                Assert.That(tariffJSON!["currency"]!.Value<String>(),                          Is.EqualTo("EUR"));
+                Assert.That(storedTariff!["currency"],                                         Is.Null);
+                Assert.That(tariffs!.Single()["currency"]!.Value<String>(),                    Is.EqualTo("EUR"));
+                Assert.That(HeaderOf(tariff, "X-Stored-ETag"),                                 Is.EqualTo(storedT.Headers.ETag!.ToString()));
+                Assert.That(tariffTempl!.Single()["@id"]!.Value<String>(),                     Is.EqualTo("DE*GEF*TT1"));
+
+                // The templates of their owners, as they embed them.
+                Assert.That(templates!.Single()["maxPower"]!.Value<Int32>(),                   Is.EqualTo(22000));
+                Assert.That(template!["@id"]!.Value<String>(),                                 Is.EqualTo("DE*GEF*ET1"));
+                Assert.That(spaceTemplates!.Single()["roofed"]!.Value<Boolean>(),              Is.True);
 
             }
 

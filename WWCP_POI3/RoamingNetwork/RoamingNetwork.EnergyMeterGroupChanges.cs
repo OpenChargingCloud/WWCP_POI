@@ -30,7 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// Changes of the energy meter groups of a roaming network.
+    /// Changes of the energy meter templates and groups of a roaming network.
     /// </summary>
     /// <remarks>
     /// They are embedded completely in their owner, a charging station operator or a grid operator: a change edits the
@@ -45,11 +45,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The properties of an energy meter an energy meter group can give its members: all but its identification,
-        /// name, description, data source, custom data, and what belongs to the single device, its serial number and
-        /// its public keys.
+        /// The properties of an energy meter an energy meter template can give its members: all but its identification,
+        /// name, description, data source, custom data, templates, and what belongs to the single device, its serial number
+        /// and its public keys.
         /// </summary>
-        internal static readonly ImmutableArray<String> EnergyMeterGroupMeterProperties = [
+        internal static readonly ImmutableArray<String> EnergyMeterTemplateMeterProperties = [
             "role",
             "manufacturerId",
             "modelId",
@@ -61,23 +61,66 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ];
 
         /// <summary>
-        /// The properties of an energy meter group a change set can update or remove: also those of an energy meter it
-        /// gives its members.
+        /// The properties of an energy meter group a change set can update or remove: its members, as it gives them nothing.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableEnergyMeterGroupProperties = [
             "name",
             "description",
             "dataSource",
             "energyMeterIds",
-            "priority",
+            "customData"
+        ];
+
+        /// <summary>
+        /// The properties of an energy meter template a change set can update or remove: those of an energy meter it gives
+        /// its members.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> ChangeableEnergyMeterTemplateProperties = [
+            "name",
+            "description",
+            "dataSource",
             "customData",
-            .. EnergyMeterGroupMeterProperties
+            .. EnergyMeterTemplateMeterProperties
         ];
 
         /// <summary>
         /// The JSON key of the energy meter groups of their owners.
         /// </summary>
-        private const String EnergyMeterGroupsProperty = "energyMeterGroups";
+        private const String EnergyMeterGroupsProperty     = "energyMeterGroups";
+
+        /// <summary>
+        /// The JSON key of the energy meter templates of their owners.
+        /// </summary>
+        private const String EnergyMeterTemplatesProperty  = "energyMeterTemplates";
+
+        /// <summary>
+        /// What a change of an energy meter template or group needs to know of its kind.
+        /// </summary>
+        private sealed record EnergyMeterChildKind(String                                     Description,
+                                                   String                                     Article,
+                                                   String                                     Property,
+                                                   ImmutableHashSet<String>                   Changeable,
+                                                   Func<String, Boolean>                      IsValidId,
+                                                   Func<ChargingStationOperator, String, String?>  StoredInOperator,
+                                                   Func<GridOperator,            String, String?>  StoredInGridOperator);
+
+        private static readonly EnergyMeterChildKind EnergyMeterGroupKind = new (
+            "energy meter group",
+            "an",
+            EnergyMeterGroupsProperty,
+            ChangeableEnergyMeterGroupProperties,
+            id => EnergyMeterGroup_Id.TryParse(id, out _),
+            (chargingStationOperator, id) => EnergyMeterGroup_Id.TryParse(id, out var groupId) && chargingStationOperator.TryGetEnergyMeterGroup(groupId, out var group) ? group.Id.ToString() : null,
+            (gridOperator,            id) => EnergyMeterGroup_Id.TryParse(id, out var groupId) && gridOperator.           TryGetEnergyMeterGroup(groupId, out var group) ? group.Id.ToString() : null);
+
+        private static readonly EnergyMeterChildKind EnergyMeterTemplateKind = new (
+            "energy meter template",
+            "an",
+            EnergyMeterTemplatesProperty,
+            ChangeableEnergyMeterTemplateProperties,
+            id => EnergyMeterTemplate_Id.TryParse(id, out _),
+            (chargingStationOperator, id) => EnergyMeterTemplate_Id.TryParse(id, out var templateId) && chargingStationOperator.TryGetEnergyMeterTemplate(templateId, out var template) ? template.Id.ToString() : null,
+            (gridOperator,            id) => EnergyMeterTemplate_Id.TryParse(id, out var templateId) && gridOperator.           TryGetEnergyMeterTemplate(templateId, out var template) ? template.Id.ToString() : null);
 
         #endregion
 
@@ -91,15 +134,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static (ChargingStationOperator? ChargingStationOperator, GridOperator? GridOperator, String? StoredId) EnergyMeterGroupOwners(EnergyMeterGroup_Id                   EnergyMeterGroupId,
                                                                                                                                              IEnumerable<ChargingStationOperator>  ChargingStationOperators,
                                                                                                                                              IEnumerable<GridOperator>             GridOperators)
+
+            => EnergyMeterChildOwners(EnergyMeterGroupKind, EnergyMeterGroupId.ToString(), ChargingStationOperators, GridOperators);
+
+        /// <summary>
+        /// The charging station operator or the grid operator having the energy meter template with the given
+        /// identification, with the identification it keeps it with; nulls for one nobody has.
+        /// </summary>
+        private static (ChargingStationOperator? ChargingStationOperator, GridOperator? GridOperator, String? StoredId) EnergyMeterTemplateOwners(EnergyMeterTemplate_Id                EnergyMeterTemplateId,
+                                                                                                                                                IEnumerable<ChargingStationOperator>  ChargingStationOperators,
+                                                                                                                                                IEnumerable<GridOperator>             GridOperators)
+
+            => EnergyMeterChildOwners(EnergyMeterTemplateKind, EnergyMeterTemplateId.ToString(), ChargingStationOperators, GridOperators);
+
+        private static (ChargingStationOperator? ChargingStationOperator, GridOperator? GridOperator, String? StoredId) EnergyMeterChildOwners(EnergyMeterChildKind                  Kind,
+                                                                                                                                             String                                EntityId,
+                                                                                                                                             IEnumerable<ChargingStationOperator>  ChargingStationOperators,
+                                                                                                                                             IEnumerable<GridOperator>             GridOperators)
         {
 
             foreach (var chargingStationOperator in ChargingStationOperators)
-                if (chargingStationOperator.TryGetEnergyMeterGroup(EnergyMeterGroupId, out var energyMeterGroup))
-                    return (chargingStationOperator, null, energyMeterGroup.Id.ToString());
+                if (Kind.StoredInOperator(chargingStationOperator, EntityId) is String storedId)
+                    return (chargingStationOperator, null, storedId);
 
             foreach (var gridOperator in GridOperators)
-                if (gridOperator.TryGetEnergyMeterGroup(EnergyMeterGroupId, out var energyMeterGroup))
-                    return (null, gridOperator, energyMeterGroup.Id.ToString());
+                if (Kind.StoredInGridOperator(gridOperator, EntityId) is String storedId)
+                    return (null, gridOperator, storedId);
 
             return (null, null, null);
 
@@ -107,7 +167,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) TryApplyEnergyMeterGroupChange(Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse)
+        #region (private static) TryApplyEnergyMeterGroupChange   (Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of an energy meter group to the given charging station operators or grid operators.
@@ -119,23 +179,57 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                               Dictionary<GridOperator_Id, GridOperator>                        GridOperators,
                                                               out JToken?                                                      CurrentValue,
                                                               [NotNullWhen(false)] out String?                                 ErrorResponse)
+
+            => TryApplyEnergyMeterChildChange(EnergyMeterGroupKind, Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse);
+
+        #endregion
+
+        #region (private static) TryApplyEnergyMeterTemplateChange(Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse)
+
+        /// <summary>
+        /// Apply a change of an energy meter template to the given charging station operators or grid operators.
+        /// </summary>
+        private static Boolean TryApplyEnergyMeterTemplateChange(RoamingNetworkChange                                             Change,
+                                                                 Int32                                                            Index,
+                                                                 DateTimeOffset                                                   CreatedAt,
+                                                                 Dictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators,
+                                                                 Dictionary<GridOperator_Id, GridOperator>                        GridOperators,
+                                                                 out JToken?                                                      CurrentValue,
+                                                                 [NotNullWhen(false)] out String?                                 ErrorResponse)
+
+            => TryApplyEnergyMeterChildChange(EnergyMeterTemplateKind, Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse);
+
+        #endregion
+
+        #region (private static) TryApplyEnergyMeterChildChange   (Kind, Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse)
+
+        /// <summary>
+        /// Apply a change of an energy meter template or group to the given charging station operators or grid operators.
+        /// </summary>
+        private static Boolean TryApplyEnergyMeterChildChange(EnergyMeterChildKind                                             Kind,
+                                                              RoamingNetworkChange                                             Change,
+                                                              Int32                                                            Index,
+                                                              DateTimeOffset                                                   CreatedAt,
+                                                              Dictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators,
+                                                              Dictionary<GridOperator_Id, GridOperator>                        GridOperators,
+                                                              out JToken?                                                      CurrentValue,
+                                                              [NotNullWhen(false)] out String?                                 ErrorResponse)
         {
 
             CurrentValue = null;
 
-            const String description = "energy meter group";
-
-            var entityId = Change.EntityId;
+            var description = Kind.Description;
+            var entityId    = Change.EntityId;
 
             #region Its owner: the one having it, or the parent of a new one
 
-            if (!EnergyMeterGroup_Id.TryParse(entityId, out var energyMeterGroupId))
+            if (!Kind.IsValidId(entityId))
             {
                 ErrorResponse = $"Change {Index}: invalid {description} identification '{entityId}'!";
                 return false;
             }
 
-            var (chargingStationOperator, gridOperator, storedId) = EnergyMeterGroupOwners(energyMeterGroupId, ChargingStationOperators.Values, GridOperators.Values);
+            var (chargingStationOperator, gridOperator, storedId) = EnergyMeterChildOwners(Kind, entityId, ChargingStationOperators.Values, GridOperators.Values);
 
             if (Change.Kind == RoamingNetworkChangeKind.Add)
             {
@@ -201,7 +295,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var ownerJSON   = chargingStationOperator is not null
                                   ? chargingStationOperator.ToEmbeddedJSON()
                                   : gridOperator!.          ToJSON();
-            var children    = ownerJSON[EnergyMeterGroupsProperty] as JArray;
+            var children    = ownerJSON[Kind.Property] as JArray;
             // Found under the identification it is kept with: the change may name it in another spelling.
             var entityJSON  = Change.Kind == RoamingNetworkChangeKind.Add
                                   ? null
@@ -220,7 +314,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var isProperty = Change.Kind is RoamingNetworkChangeKind.UpdateProperty or RoamingNetworkChangeKind.RemoveProperty;
 
-            // A property change compares the property, every other change the complete energy meter group.
+            // A property change compares the property, every other change the complete energy meter template or group.
             CurrentValue = isProperty
                                ? entityJSON![Change.PropertyName!]?.DeepClone()
                                : entityJSON?.DeepClone();
@@ -244,9 +338,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     var propertyName = Change.PropertyName!;
 
-                    if (!ChangeableEnergyMeterGroupProperties.Contains(propertyName))
+                    if (!Kind.Changeable.Contains(propertyName))
                     {
-                        ErrorResponse = $"Change {Index}: the property '{propertyName}' of an {description} can not be changed!";
+                        ErrorResponse = $"Change {Index}: the property '{propertyName}' of {Kind.Article} {description} can not be changed!";
                         return false;
                     }
 
@@ -286,7 +380,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (children is null)
                     {
                         children = [];
-                        ownerJSON[EnergyMeterGroupsProperty] = children;
+                        ownerJSON[Kind.Property] = children;
                     }
 
                     // The change set's timestamp is the last change and, unless given, the creation,
@@ -307,14 +401,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     children!.Remove(entityJSON!);
 
                     if (children.Count == 0)
-                        ownerJSON.Remove(EnergyMeterGroupsProperty);
+                        ownerJSON.Remove(Kind.Property);
 
                     break;
 
                 #endregion
 
                 default:
-                    ErrorResponse = $"Change {Index}: {Change.Kind} of an {description} is not supported yet!";
+                    ErrorResponse = $"Change {Index}: {Change.Kind} of {Kind.Article} {description} is not supported yet!";
                     return false;
 
             }

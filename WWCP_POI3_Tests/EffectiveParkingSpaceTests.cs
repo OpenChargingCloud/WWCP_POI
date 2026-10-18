@@ -30,7 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// Parking spaces taking the properties their parking space groups give them at runtime.
+    /// Parking spaces taking the properties their parking space templates give them at runtime.
     /// </summary>
     [TestFixture]
     public class EffectiveParkingSpaceTests
@@ -47,18 +47,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly ParkingSensor_Id      Sensor   = ParkingSensor_Id.    Parse("sensor-1");
         private static readonly ParkingSpace_Id       Space1   = ParkingSpace_Id.     Parse("space-1");
         private static readonly ParkingSpace_Id       Space2   = ParkingSpace_Id.     Parse("space-2");
-        private static readonly ParkingSpaceGroup_Id  Level1   = ParkingSpaceGroup_Id.Parse("level-1");
-        private static readonly ParkingSpaceGroup_Id  Wide     = ParkingSpaceGroup_Id.Parse("wide");
+        private static readonly ParkingSpaceTemplate_Id  Level1   = ParkingSpaceTemplate_Id.Parse("level-1");
+        private static readonly ParkingSpaceTemplate_Id  Wide     = ParkingSpaceTemplate_Id.Parse("wide");
 
         #endregion
 
-        #region NewNetwork(WidePriority = 1)
+        #region NewNetwork()
 
         /// <summary>
         /// Two parking spaces on level 1 of a garage, roofed, 5 m long and 2.5 m wide, for passenger cars; the first one is
-        /// wide, 3.5 m, by a group of a higher priority, and has a length of its own.
+        /// wide, 3.5 m, by a template it names first, and has a length of its own.
         /// </summary>
-        private static RoamingNetwork NewNetwork(Int32? WidePriority = 1)
+        private static RoamingNetwork NewNetwork()
 
             => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                    Created:           Created,
@@ -66,10 +66,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                             Created:             Created,
                                                             ParkingGarages:      [ new ParkingGarage(Garage, Created: Created) ],
                                                             ParkingSensors:      [ new ParkingSensor(Sensor, Created: Created) ],
-                                                            ParkingSpaces:       [ new ParkingSpace(Space1, Length: Meter.From_m(6), Created: Created),
-                                                                                   new ParkingSpace(Space2, Created: Created) ],
-                                                            ParkingSpaceGroups:  [ new ParkingSpaceGroup(Level1,
-                                                                                                         ParkingSpaceIds:   [ Space1, Space2 ],
+                                                            ParkingSpaces:       [ new ParkingSpace(Space1, Length: Meter.From_m(6), TemplateIds: [ Wide, Level1 ], Created: Created),
+                                                                                   new ParkingSpace(Space2,                          TemplateIds: [ Level1 ],       Created: Created) ],
+                                                            ParkingSpaceTemplates:  [ new ParkingSpaceTemplate(Level1,
                                                                                                          ParkingGarageId:   Garage,
                                                                                                          ParkingSensorIds:  [ Sensor ],
                                                                                                          VehicleTypes:      [ VehicleType.PERSONAL_VEHICLE ],
@@ -77,9 +76,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                          Width:             Meter.From_m(2.5m),
                                                                                                          Roofed:            true,
                                                                                                          Created:           Created),
-                                                                                   new ParkingSpaceGroup(Wide,
-                                                                                                         ParkingSpaceIds:   [ Space1 ],
-                                                                                                         Priority:          WidePriority,
+                                                                                   new ParkingSpaceTemplate(Wide,
                                                                                                          Width:             Meter.From_m(3.5m),
                                                                                                          VehicleTypes:      [ VehicleType.VAN ],
                                                                                                          Created:           Created,
@@ -98,10 +95,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #endregion
 
 
-        #region Parking_space_groups_have_the_properties_of_parking_spaces()
+        #region Parking_space_templates_have_the_properties_of_parking_spaces()
 
         [Test]
-        public void Parking_space_groups_have_the_properties_of_parking_spaces()
+        public void Parking_space_templates_have_the_properties_of_parking_spaces()
         {
 
             var rn1   = NewNetwork();
@@ -110,7 +107,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             Assert.That(RoamingNetwork.TryParse(json,         out var fromJSON, out var errorJSON),  Is.True, errorJSON);
             Assert.That(RoamingNetwork.TryParse(rn1.ToCBOR(), out var fromCBOR, out var errorCBOR),  Is.True, errorCBOR);
 
-            var level1 = json["parkingOperators"]![0]!["parkingSpaceGroups"]![0]!;
+            var level1 = json["parkingOperators"]![0]!["parkingSpaceTemplates"]![0]!;
 
             using (Assert.EnterMultipleScope())
             {
@@ -126,10 +123,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region Parking_spaces_take_the_properties_of_their_groups()
+        #region Parking_spaces_take_the_properties_of_their_templates()
 
         [Test]
-        public void Parking_spaces_take_the_properties_of_their_groups()
+        public void Parking_spaces_take_the_properties_of_their_templates()
         {
 
             var rn1  = NewNetwork();
@@ -141,7 +138,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
 
-                // Own values win, then the higher priority; arrays are united.
+                // Own values win, then the first template; arrays are united.
                 Assert.That(space1!.Length,                                      Is.EqualTo(Meter.From_m(6)));
                 Assert.That(space1.Width,                                        Is.EqualTo(Meter.From_m(3.5m)));
                 Assert.That(space2!.Width,                                       Is.EqualTo(Meter.From_m(2.5m)));
@@ -156,7 +153,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 // As given, and in the roaming network.
                 Assert.That(par.ParkingSpaces.First().Roofed,                    Is.Null);
                 Assert.That(par.EffectiveParkingSpaces.First(),                  Is.SameAs(space1));
-                Assert.That(par.ParkingSpaceGroupsOf(Space1).Count(),            Is.EqualTo(2));
+                Assert.That(par.TemplatesOf(par.ParkingSpaces.First()).Select(template => template.Id),  Is.EqualTo(new[] { Wide, Level1 }));
                 Assert.That(rn1.TryGetEffectiveParkingSpaceById(Space2, out var fromNetwork),  Is.True);
                 Assert.That(fromNetwork,                                         Is.SameAs(space2));
                 Assert.That(rn1.EffectiveParkingSpaces.Count(space => space.Roofed == true),  Is.EqualTo(2));
@@ -167,26 +164,25 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region Invalid_parking_space_groups_are_refused()
+        #region Invalid_parking_space_templates_are_refused()
 
         [Test]
-        public void Invalid_parking_space_groups_are_refused()
+        public void Invalid_parking_space_templates_are_refused()
         {
 
             var json = NewNetwork().ToJSON(IncludeETags: false);
 
-            JObject With(Int32 Group, String PropertyName, JToken Value)
+            JObject With(Int32 Template, String PropertyName, JToken Value)
             {
                 var changed = (JObject) json.DeepClone();
-                changed["parkingOperators"]![0]!["parkingSpaceGroups"]![Group]![PropertyName] = Value;
+                changed["parkingOperators"]![0]!["parkingSpaceTemplates"]![Template]![PropertyName] = Value;
                 return changed;
             }
 
             var cases = new (String Name, JObject JSON, String Error)[] {
-                ("same priority",       With(1, "priority",            0),                         "give the parking space 'space-1' different values of 'width' with the same priority 0"),
-                ("unknown garage",      With(0, "parkingGarageId",     "garage-9"),                "parking garage 'garage-9' of the parking space group 'level-1'"),
-                ("unknown sensor",      With(0, "parkingSensorIds",    new JArray("sensor-9")),    "parking sensor 'sensor-9' of the parking space group 'level-1'"),
-                ("unknown station",     With(0, "chargingStationIds",  new JArray("DE*GEF*S9")),   "charging station 'DE*GEF*S9' of the parking space group 'level-1'"),
+                ("unknown garage",      With(0, "parkingGarageId",     "garage-9"),                "parking garage 'garage-9' of the parking space template 'level-1'"),
+                ("unknown sensor",      With(0, "parkingSensorIds",    new JArray("sensor-9")),    "parking sensor 'sensor-9' of the parking space template 'level-1'"),
+                ("unknown station",     With(0, "chargingStationIds",  new JArray("DE*GEF*S9")),   "charging station 'DE*GEF*S9' of the parking space template 'level-1'"),
                 ("no width",            With(0, "width",               0),                         "must be positive")
             };
 
@@ -215,11 +211,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             PAROf(rn1).TryGetParkingSpace(Space2, out var space2);
             space2!.SetStatus(ParkingSpaceStatusType.InUse);
 
-            rn1.TryGetParkingSpaceGroupById(Level1, out var level1);
+            PAROf(rn1).TryGetParkingSpaceTemplate(Level1, out var level1);
 
             // Space 2 leaves level 1: as it is given, changed now.
             Assert.That(history.Commit(rn1.CreateSignedChangeSet([
-                            RoamingNetworkChange.UpdateProperty(level1!, "parkingSpaceIds", null, new JArray(Space1.ToString())),
+                            RoamingNetworkChange.RemoveProperty (space2,  "templateIds"),
                             RoamingNetworkChange.UpdateProperty(level1!, "roofed",          null, false)
                         ], CreatedAt: T0)).IsCommitted);
 

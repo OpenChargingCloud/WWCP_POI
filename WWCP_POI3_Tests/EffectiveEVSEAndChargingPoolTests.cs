@@ -30,7 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// EVSEs and charging pools taking the properties their groups give them at runtime, and charging stations taking
+    /// EVSEs and charging pools taking the properties their templates give them at runtime, and charging stations taking
     /// their effective EVSEs, charging pools their effective charging stations.
     /// </summary>
     [TestFixture]
@@ -51,8 +51,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly EVSE_Id                     E1       = EVSE_Id.                   Parse("DE*GEF*E1*1");
         private static readonly EVSE_Id                     E2       = EVSE_Id.                   Parse("DE*GEF*E1*2");
         private static readonly EVSE_Id                     E3       = EVSE_Id.                   Parse("DE*GEF*E2*1");
-        private static readonly EVSEGroup_Id                AC22     = EVSEGroup_Id.              Parse("DE*GEF*EG1");
-        private static readonly ChargingPoolGroup_Id        Sites    = ChargingPoolGroup_Id.      Parse("DE*GEF*PG1");
+        private static readonly EVSETemplate_Id             AC22     = EVSETemplate_Id.           Parse("DE*GEF*ET1");
+        private static readonly ChargingPoolTemplate_Id     Sites    = ChargingPoolTemplate_Id.   Parse("DE*GEF*PT1");
 
         private static readonly ChargingConnector_Id        C1       = ChargingConnector_Id.      Parse("1");
         private static readonly PhoneNumber                 Hotline  = PhoneNumber.Parse("+49 800 111111");
@@ -62,8 +62,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region NewNetwork()
 
         /// <summary>
-        /// Two charging pools in a group, which gives them a hotline, a parking type and a facility; three EVSEs in a group
-        /// of 22 kW EVSEs with a cable, the first one with 11 kW of its own. The first pool has a facility of its own.
+        /// Two charging pools taking a template, which gives them a hotline, a parking type and a facility; three EVSEs
+        /// taking a template of 22 kW EVSEs with a cable, the first one with 11 kW of its own. The first pool has a facility
+        /// of its own.
         /// </summary>
         private static RoamingNetwork NewNetwork(Int32? StationMaxPower = null)
 
@@ -74,27 +75,27 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                     Created:             Created,
                                                     ChargingPools:       [ new ChargingPool(P1,
                                                                                             Facilities:        [ Facility.CAFE ],
+                                                                                            TemplateIds:       [ Sites ],
                                                                                             Created:           Created,
                                                                                             ChargingStations:  [ new ChargingStation(S1,
                                                                                                                                      MaxPower:  StationMaxPower.HasValue ? Watt.FromW(StationMaxPower.Value) : null,
                                                                                                                                      Created:   Created,
-                                                                                                                                     EVSEs:     [ new EVSE(E1, MaxPower: Watt.FromW(11000), Created: Created),
-                                                                                                                                                  new EVSE(E2, Created: Created) ]) ]),
+                                                                                                                                     EVSEs:     [ new EVSE(E1, MaxPower: Watt.FromW(11000), TemplateIds: [ AC22 ], Created: Created),
+                                                                                                                                                  new EVSE(E2,                               TemplateIds: [ AC22 ], Created: Created) ]) ]),
                                                                            new ChargingPool(P2,
+                                                                                            TemplateIds:       [ Sites ],
                                                                                             Created:           Created,
                                                                                             ChargingStations:  [ new ChargingStation(S2,
                                                                                                                                      Created:   Created,
-                                                                                                                                     EVSEs:     [ new EVSE(E3, Created: Created) ]) ]) ],
-                                                    EVSEGroups:          [ new EVSEGroup(AC22,
-                                                                                         EVSEIds:             [ E1, E2, E3 ],
+                                                                                                                                     EVSEs:     [ new EVSE(E3, TemplateIds: [ AC22 ], Created: Created) ]) ]) ],
+                                                    EVSETemplates:       [ new EVSETemplate(AC22,
                                                                                          CurrentTypes:        CurrentTypes.AC_ThreePhases,
                                                                                          MaxPower:            Watt.FromW(22000),
                                                                                          ChargingConnectors:  [ new ChargingConnector(C1, ChargingConnectorType.IEC_62196_T2, Format: ChargingConnectorFormat.CABLE) ],
                                                                                          Standards:           [ Standard.PAS1899_2022 ],
                                                                                          Created:             Created,
                                                                                          LastChange:          Changed) ],
-                                                    ChargingPoolGroups:  [ new ChargingPoolGroup(Sites,
-                                                                                                 ChargingPoolIds:     [ P1, P2 ],
+                                                    ChargingPoolTemplates:  [ new ChargingPoolTemplate(Sites,
                                                                                                  HotlinePhoneNumber:  Hotline,
                                                                                                  ParkingType:         ParkingType.PARKING_LOT,
                                                                                                  Facilities:          [ Facility.SUPERMARKET ],
@@ -112,10 +113,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #endregion
 
 
-        #region EVSE_and_charging_pool_groups_have_the_properties_of_their_members()
+        #region EVSE_and_charging_pool_templates_have_the_properties_of_their_members()
 
         [Test]
-        public void EVSE_and_charging_pool_groups_have_the_properties_of_their_members()
+        public void EVSE_and_charging_pool_templates_have_the_properties_of_their_members()
         {
 
             var rn1   = NewNetwork();
@@ -125,8 +126,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             Assert.That(RoamingNetwork.TryParse(rn1.ToCBOR(), out var fromCBOR, out var errorCBOR),  Is.True, errorCBOR);
 
             var gef        = json["chargingStationOperators"]![0]!;
-            var evseGroup  = gef["EVSEGroups"]![0]!;
-            var poolGroup  = gef["chargingPoolGroups"]![0]!;
+            var evseGroup  = gef["EVSETemplates"]![0]!;
+            var poolGroup  = gef["chargingPoolTemplates"]![0]!;
 
             using (Assert.EnterMultipleScope())
             {
@@ -152,10 +153,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region EVSEs_and_charging_pools_take_the_properties_of_their_groups()
+        #region EVSEs_and_charging_pools_take_the_properties_of_their_templates()
 
         [Test]
-        public void EVSEs_and_charging_pools_take_the_properties_of_their_groups()
+        public void EVSEs_and_charging_pools_take_the_properties_of_their_templates()
         {
 
             var gef = GEFOf(NewNetwork());
@@ -171,7 +172,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
 
-                // EVSEs: their own maximum power wins, the others of the group they take.
+                // EVSEs: their own maximum power wins, the others of the template they take.
                 Assert.That(effectiveE1!.MaxPower,                                         Is.EqualTo(Watt.FromW(11000)));
                 Assert.That(effectiveE2!.MaxPower,                                         Is.EqualTo(Watt.FromW(22000)));
                 Assert.That(effectiveE2.CurrentTypes,                                      Is.EqualTo(CurrentTypes.AC_ThreePhases));
@@ -182,7 +183,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(e1.ChargingConnectors,                                         Is.Empty);
                 Assert.That(gef.EffectiveEVSE(e1),                                         Is.SameAs(effectiveE1));
 
-                // Charging pools: a single value of their group, arrays united.
+                // Charging pools: a single value of their template, arrays united.
                 Assert.That(effectiveP1.HotlinePhoneNumber,                                Is.EqualTo(Hotline));
                 Assert.That(effectiveP2!.ParkingType,                                      Is.EqualTo(ParkingType.PARKING_LOT));
                 Assert.That(effectiveP1.Facilities,                                        Is.EquivalentTo(new[] { Facility.CAFE, Facility.SUPERMARKET }));
@@ -196,8 +197,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(effectiveP1.LastChangeDate,                                    Is.EqualTo(Changed));
                 Assert.That(gef.EffectiveChargingPools.First(),                            Is.SameAs(effectiveP1));
                 Assert.That(gef.EffectiveEVSEs.Count(),                                    Is.EqualTo(3));
-                Assert.That(gef.EVSEGroupsOf(E3).Single().Id,                              Is.EqualTo(AC22));
-                Assert.That(gef.ChargingPoolGroupsOf(P2).Single().Id,                      Is.EqualTo(Sites));
+                Assert.That(gef.TemplatesOf(e1).Single().Id,                               Is.EqualTo(AC22));
+                Assert.That(gef.TemplatesOf(effectiveP2).Single().Id,                      Is.EqualTo(Sites));
 
                 // The charging pools themselves are as they are given.
                 Assert.That(gef.ChargingPools.First().HotlinePhoneNumber,                  Is.Null);
@@ -214,7 +215,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void A_charging_station_is_checked_with_its_effective_EVSEs()
         {
 
-            // 11 kW of its own and 22 kW of its group: 33 kW together.
+            // 11 kW of its own and 22 kW of its template: 33 kW together.
             Assert.That(() => NewNetwork(StationMaxPower: 33000), Throws.Nothing);
             Assert.That(() => NewNetwork(StationMaxPower: 40000), Throws.ArgumentException.With.Message.Contains("must not exceed the 33000 W of all its EVSEs together"));
 
@@ -222,10 +223,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region Invalid_EVSE_and_charging_pool_groups_are_refused()
+        #region Invalid_EVSE_and_charging_pool_templates_are_refused()
 
         [Test]
-        public void Invalid_EVSE_and_charging_pool_groups_are_refused()
+        public void Invalid_EVSE_and_charging_pool_templates_are_refused()
         {
 
             var json = NewNetwork().ToJSON();
@@ -239,21 +240,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 return changed;
             }
 
-            // A second group of the same priority, giving another value.
-            void SecondEVSEGroup(JObject GEF)
-                => ((JArray) GEF["EVSEGroups"]!).Add(new JObject(new JProperty("@id",       "DE*GEF*EG2"),
-                                                                 new JProperty("EVSEIds",   new JArray("DE*GEF*E1*2")),
-                                                                 new JProperty("maxPower",  11000),
-                                                                 new JProperty("created",   "2026-01-01T00:00:00.000Z")));
-
             var cases = new (String Name, JObject JSON, String Error)[] {
-                ("negative voltage",       With("EVSEGroups",          "maxVoltage",             -1),                         "must not be negative"),
-                ("twice a connector",      With("EVSEGroups",          "chargingConnectors",     new JArray(json["chargingStationOperators"]![0]!["EVSEGroups"]![0]!["chargingConnectors"]![0]!,
-                                                                                                            json["chargingStationOperators"]![0]!["EVSEGroups"]![0]!["chargingConnectors"]![0]!)),  "must not be given twice"),
-                ("same priority",          With("EVSEGroups",          "priority",               0, SecondEVSEGroup),         "give the EVSE 'DE*GEF*E1*2' different values of 'maxPower' with the same priority 0"),
-                ("unknown grid point",     With("chargingPoolGroups",  "gridConnectionPointId",  "GCP-9"),                    "grid connection point 'GCP-9' of the charging pool group 'DE*GEF*PG1'"),
-                ("twice a facility",       With("chargingPoolGroups",  "facilities",             new JArray("CAFE", "CAFE")), "must not be given twice"),
-                ("a text as priority",     With("chargingPoolGroups",  "priority",               "1"),                        "priority of the charging pool group must be an integer")
+                ("negative voltage",       With("EVSETemplates",          "maxVoltage",             -1),                         "must not be negative"),
+                ("twice a connector",      With("EVSETemplates",          "chargingConnectors",     new JArray(json["chargingStationOperators"]![0]!["EVSETemplates"]![0]!["chargingConnectors"]![0]!,
+                                                                                                               json["chargingStationOperators"]![0]!["EVSETemplates"]![0]!["chargingConnectors"]![0]!)),  "must not be given twice"),
+                ("unknown grid point",     With("chargingPoolTemplates",  "gridConnectionPointId",  "GCP-9"),                    "grid connection point 'GCP-9' of the charging pool template 'DE*GEF*PT1'"),
+                ("twice a facility",       With("chargingPoolTemplates",  "facilities",             new JArray("CAFE", "CAFE")), "must not be given twice")
             };
 
             using (Assert.EnterMultipleScope())
@@ -269,20 +261,21 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region A_member_leaving_its_group_changes_its_last_change()
+        #region A_member_leaving_its_template_changes_its_last_change()
 
         [Test]
-        public void A_member_leaving_its_group_changes_its_last_change()
+        public void A_member_leaving_its_template_changes_its_last_change()
         {
 
             var history = RoamingNetworkHistory.Start(NewNetwork());
             var rn1     = history.Head.RoamingNetwork;
 
-            rn1.TryGetEVSEGroupById(AC22, out var ac22);
+            GEFOf(rn1).TryGetEVSETemplate(AC22, out var ac22);
+            GEFOf(rn1).TryGetEVSE        (E2,   out var leaving);
 
-            // The second EVSE leaves the group of 22 kW EVSEs: it is as it is given, but changed now.
+            // The second EVSE leaves the template of 22 kW EVSEs, a change of its own: it is as it is given, changed now.
             Assert.That(history.Commit(rn1.CreateSignedChangeSet([
-                            RoamingNetworkChange.UpdateProperty(ac22!, "EVSEIds",    null, new JArray(E1.ToString(), E3.ToString())),
+                            RoamingNetworkChange.RemoveProperty(leaving!, "templateIds"),
                             // A further change of the same change set: the operator is read again, the last change stays.
                             RoamingNetworkChange.UpdateProperty(ac22!, "maxVoltage", null, 400)
                         ], CreatedAt: T0)).IsCommitted);
@@ -298,11 +291,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             {
                 Assert.That(effectiveE2!.MaxPower,                                         Is.Null);
                 Assert.That(effectiveE2.LastChangeDate,                                    Is.EqualTo(T0));
-                Assert.That(e2!.LastChangeDate,                                            Is.EqualTo(Created));
+                Assert.That(e2!.LastChangeDate,                                            Is.EqualTo(T0));
                 Assert.That(effectiveP1!.ChargingStations.Single().LastChangeDate,         Is.EqualTo(T0));
                 Assert.That(effectiveP1.LastChangeDate,                                    Is.EqualTo(T0));
 
-                // The members staying have the last change of their changed group.
+                // The members staying have the last change of their changed template.
                 Assert.That(effectiveE3!.LastChangeDate,                                   Is.EqualTo(T0));
             }
 
@@ -322,8 +315,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             GEFOf(rn1).TryGetEVSE(E2, out var e2);
             e2!.SetStatus(EVSEStatusType.Charging);
 
-            rn1.TryGetEVSEGroupById        (AC22,  out var ac22);
-            rn1.TryGetChargingPoolGroupById(Sites, out var sites);
+            GEFOf(rn1).TryGetEVSETemplate        (AC22,  out var ac22);
+            GEFOf(rn1).TryGetChargingPoolTemplate(Sites, out var sites);
 
             Assert.That(history.Commit(rn1.CreateSignedChangeSet([
                             RoamingNetworkChange.UpdateProperty(ac22!,  "maxPower",    null, 11000),
@@ -350,25 +343,25 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region A_merge_keeps_the_last_change_a_member_got_by_leaving_its_group()
+        #region A_merge_keeps_the_last_change_a_member_got_by_leaving_its_template()
 
         /// <summary>
-        /// The left version takes the second EVSE out of its group, the right one changes the hotline of the group of
+        /// The left version takes the second EVSE off its template, the right one changes the hotline of the template of
         /// the charging pools: the merge, compared with the right version and then with the left one, keeps the last
-        /// change the EVSE got by leaving its group, though comparing it with the left one finds nothing new of it.
+        /// change the EVSE got by leaving its template, though comparing it with the left one finds nothing new of it.
         /// </summary>
         [Test]
-        public void A_merge_keeps_the_last_change_a_member_got_by_leaving_its_group()
+        public void A_merge_keeps_the_last_change_a_member_got_by_leaving_its_template()
         {
 
             var t1     = T0.AddHours(1);
             var t2     = T0.AddHours(2);
             var rn1    = NewNetwork();
 
-            rn1.TryGetEVSEGroupById        (AC22,  out var ac22);
-            rn1.TryGetChargingPoolGroupById(Sites, out var sites);
+            GEFOf(rn1).TryGetEVSE                (E2,    out var e2);
+            GEFOf(rn1).TryGetChargingPoolTemplate(Sites, out var sites);
 
-            var left   = rn1.ApplyChangeSet(rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(ac22!,  "EVSEIds", null, new JArray(E1.ToString(), E3.ToString())) ], CreatedAt: t1));
+            var left   = rn1.ApplyChangeSet(rn1.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(e2!,     "templateIds") ],                                                 CreatedAt: t1));
             var right  = rn1.ApplyChangeSet(rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(sites!, "hotline", null, "+49 800 222222") ],                       CreatedAt: t2));
 
             GEFOf(left).TryGetEffectiveEVSE(E2, out var leftE2);

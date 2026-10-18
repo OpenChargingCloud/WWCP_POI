@@ -30,29 +30,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// The effective charging pools, charging stations and EVSEs of a charging station operator: as they are at
-    /// runtime, with the properties their groups give them.
+    /// The effective charging tariffs, charging pools, charging stations and EVSEs of a charging station operator: as they
+    /// are at runtime, with the properties their templates give them.
     /// </summary>
     /// <remarks>
-    /// The network keeps the properties where they are given, so a charging pool, charging station or EVSE may have
-    /// only few of its own and take the others from its groups: charging pool groups, charging station groups and
-    /// EVSE groups. Of every property they give:
-    /// - a single value, e.g. the address, is its own, else the one of its group with the highest priority giving it,
-    /// - an array, e.g. the features, is its own united with those of all its groups; of objects with the same
-    ///   identification, e.g. brands or charging connectors, or the same URL, e.g. images, its own wins, else the one
-    ///   of the group with the higher priority.
-    /// The charging tariffs of an EVSE are its own; without any, the one of its EVSE groups, else of the charging station
-    /// groups of its charging station, else of the charging pool groups of its charging pool, each the group's with the
-    /// highest priority giving one: the most specific groups decide.
-    /// The priority of a group is 0, unless given. Groups of a member with the same priority must not give it
-    /// different values where these decide what it takes; neither must they make it invalid, e.g. a charging station
-    /// by a maximum power above the one of all its EVSEs together: the operator is refused, and so a change set making
-    /// it so. An effective charging station has the effective EVSEs, an effective charging pool the effective charging
-    /// stations. The energy meters they embed take the properties of their energy meter groups the same way, as effective
-    /// energy meters. Each is a version of its own, with the runtime status of its member, and its energy meters; its last
-    /// change is the latest of the member, its groups giving it properties and what it embeds, and, where it is other
-    /// than in the version before, also when a group stopped giving it something, not before the last change of the
-    /// operator.
+    /// The network keeps the properties where they are given, so a charging pool, charging station, EVSE or charging tariff
+    /// may have only few of its own and take the others from the templates it names in its templateIds, in its order. Of
+    /// every property they give:
+    /// - a single value, e.g. the address, is its own, else the one of the first of its templates giving one,
+    /// - an array, e.g. the features, is its own united with those of all its templates; of objects with the same
+    ///   identification, e.g. brands or charging connectors, or the same URL, e.g. images, its own wins, else the one of
+    ///   the first template giving it.
+    /// The charging tariffs of an EVSE are its own; without any, the one of the first of its EVSE templates naming one,
+    /// else of the first template of its charging station naming one, else of the first template of its charging pool
+    /// naming one: the most specific templates decide. Templates never disagree, but they must not make a member invalid,
+    /// e.g. a charging station by a maximum power above the one of all its EVSEs together: the operator is refused, and so
+    /// a change set making it so. An effective charging station has the effective EVSEs, an effective charging pool the
+    /// effective charging stations; the energy meters they embed take the properties of their energy meter templates the
+    /// same way, as effective energy meters. Each is a version of its own, with the runtime status of its member, and its
+    /// energy meters; its last change is the latest of the member, its templates and what it embeds, and, where it is other
+    /// than in the version before, not before the last change of the operator.
     /// </remarks>
     public sealed partial class ChargingStationOperator
     {
@@ -78,6 +75,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             = ImmutableDictionary<ChargingPool_Id, ChargingPool>.Empty;
 
         /// <summary>
+        /// The effective charging tariffs differing from the charging tariffs, by their identifications.
+        /// </summary>
+        private ImmutableDictionary<ChargingTariff_Id,  ChargingTariff>   effectiveChargingTariffs
+            = ImmutableDictionary<ChargingTariff_Id, ChargingTariff>.Empty;
+
+        /// <summary>
         /// The effective charging pools, calculated when asked for.
         /// </summary>
         private Lazy<POICollection<ChargingPool_Id, ChargingPool>>        effectiveChargingPools;
@@ -93,24 +96,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
-        /// The charging pools as they are at runtime, with the properties their groups give them, and with their
+        /// The charging pools as they are at runtime, with the properties their templates give them, and with their
         /// effective charging stations, in the order of their identifications: a charging pool without any is itself.
         /// </summary>
         public POICollection<ChargingPool_Id, ChargingPool> EffectiveChargingPools
             => effectiveChargingPools.Value;
 
         /// <summary>
-        /// The charging stations of all its charging pools as they are at runtime, with the properties their groups give
+        /// The charging stations of all its charging pools as they are at runtime, with the properties their templates give
         /// them, and with their effective EVSEs.
         /// </summary>
         public IEnumerable<ChargingStation> EffectiveChargingStations
             => ChargingStations.Select(EffectiveChargingStation);
 
         /// <summary>
-        /// The EVSEs of all its charging pools as they are at runtime, with the properties their groups give them.
+        /// The EVSEs of all its charging pools as they are at runtime, with the properties their templates give them.
         /// </summary>
         public IEnumerable<EVSE> EffectiveEVSEs
             => EVSEs.Select(EffectiveEVSE);
+
+        /// <summary>
+        /// The charging tariffs as they are at runtime, with the properties their templates give them, in the order of
+        /// their identifications.
+        /// </summary>
+        public POICollection<ChargingTariff_Id, ChargingTariff> EffectiveChargingTariffs
+            => effectiveChargingTariffs.IsEmpty
+                   ? ChargingTariffs
+                   : new (ChargingTariffs.Select(EffectiveChargingTariff), chargingTariff => chargingTariff.Id, "charging tariff", $"the operator '{Id}'");
 
         #endregion
 
@@ -118,8 +130,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region EffectiveChargingPool          (ChargingPool)
 
         /// <summary>
-        /// The given charging pool of this operator as it is at runtime, with the properties its groups give it, and with
-        /// its effective charging stations: the charging pool itself, when there is nothing to give.
+        /// The given charging pool of this operator as it is at runtime, with the properties its templates give it, and
+        /// with its effective charging stations: the charging pool itself, when there is nothing to give.
         /// </summary>
         /// <param name="ChargingPool">A charging pool of this operator.</param>
         public ChargingPool EffectiveChargingPool(ChargingPool ChargingPool)
@@ -133,7 +145,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region EffectiveChargingStation       (ChargingStation)
 
         /// <summary>
-        /// The given charging station of this operator as it is at runtime, with the properties its groups give it, and
+        /// The given charging station of this operator as it is at runtime, with the properties its templates give it, and
         /// with its effective EVSEs: the charging station itself, when there is nothing to give.
         /// </summary>
         /// <param name="ChargingStation">A charging station of this operator.</param>
@@ -148,7 +160,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region EffectiveEVSE                  (EVSE)
 
         /// <summary>
-        /// The given EVSE of this operator as it is at runtime, with the properties its groups give it: the EVSE itself,
+        /// The given EVSE of this operator as it is at runtime, with the properties its templates give it: the EVSE itself,
         /// when they give it none.
         /// </summary>
         /// <param name="EVSE">An EVSE of this operator.</param>
@@ -157,6 +169,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => effectiveEVSEs.TryGetValue(EVSE.Id, out var effectiveEVSE)
                    ? effectiveEVSE
                    : EVSE;
+
+        #endregion
+
+        #region EffectiveChargingTariff        (ChargingTariff)
+
+        /// <summary>
+        /// The given charging tariff of this operator as it is at runtime, with the properties its templates give it: the
+        /// charging tariff itself, when it names none.
+        /// </summary>
+        /// <param name="ChargingTariff">A charging tariff of this operator.</param>
+        public ChargingTariff EffectiveChargingTariff(ChargingTariff ChargingTariff)
+
+            => effectiveChargingTariffs.TryGetValue(ChargingTariff.Id, out var effectiveChargingTariff)
+                   ? effectiveChargingTariff
+                   : ChargingTariff;
 
         #endregion
 
@@ -217,31 +244,50 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ChargingPoolGroupsOf / ChargingStationGroupsOf / EVSEGroupsOf
+        #region TryGetEffectiveChargingTariff  (ChargingTariffId,  out ChargingTariff)
 
         /// <summary>
-        /// The groups the given charging pool is a member of, in the order of their identifications.
+        /// Try to return the charging tariff with the given identification as it is at runtime.
+        /// </summary>
+        public Boolean TryGetEffectiveChargingTariff(ChargingTariff_Id                        ChargingTariffId,
+                                                     [NotNullWhen(true)] out ChargingTariff?  ChargingTariff)
+        {
+
+            if (!TryGetChargingTariff(ChargingTariffId, out ChargingTariff))
+                return false;
+
+            ChargingTariff = EffectiveChargingTariff(ChargingTariff);
+            return true;
+
+        }
+
+        #endregion
+
+        #region ChargingPoolGroupsOf / ChargingStationGroupsOf / EVSEGroupsOf / EnergyMeterGroupsOf
+
+        /// <summary>
+        /// The groups of this operator the given charging pool is a member of, in the order of their identifications.
         /// </summary>
         public IEnumerable<ChargingPoolGroup> ChargingPoolGroupsOf(ChargingPool_Id ChargingPoolId)
 
             => ChargingPoolGroups.Where(chargingPoolGroup => chargingPoolGroup.ChargingPoolIds.Contains(ChargingPoolId));
 
         /// <summary>
-        /// The groups the given charging station is a member of, in the order of their identifications.
+        /// The groups of this operator the given charging station is a member of, in the order of their identifications.
         /// </summary>
         public IEnumerable<ChargingStationGroup> ChargingStationGroupsOf(ChargingStation_Id ChargingStationId)
 
             => ChargingStationGroups.Where(chargingStationGroup => chargingStationGroup.ChargingStationIds.Contains(ChargingStationId));
 
         /// <summary>
-        /// The groups the given EVSE is a member of, in the order of their identifications.
+        /// The groups of this operator the given EVSE is a member of, in the order of their identifications.
         /// </summary>
         public IEnumerable<EVSEGroup> EVSEGroupsOf(EVSE_Id EVSEId)
 
             => EVSEGroups.Where(evseGroup => evseGroup.EVSEIds.Contains(EVSEId));
 
         /// <summary>
-        /// The groups the given energy meter is a member of, in the order of their identifications.
+        /// The groups of this operator the given energy meter is a member of, in the order of their identifications.
         /// </summary>
         public IEnumerable<EnergyMeterGroup> EnergyMeterGroupsOf(EnergyMeter_Id EnergyMeterId)
 
@@ -249,6 +295,82 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TemplatesOf(ChargingPool / ChargingStation / EVSE / ChargingTariff / EnergyMeter)
+
+        /// <summary>
+        /// The templates the given charging pool names, in its order.
+        /// </summary>
+        public IEnumerable<ChargingPoolTemplate> TemplatesOf(ChargingPool ChargingPool)
+
+            => TemplatesOf(ChargingPool.TemplateIds, ChargingPoolTemplates);
+
+        /// <summary>
+        /// The templates the given charging station names, in its order.
+        /// </summary>
+        public IEnumerable<ChargingStationTemplate> TemplatesOf(ChargingStation ChargingStation)
+
+            => TemplatesOf(ChargingStation.TemplateIds, ChargingStationTemplates);
+
+        /// <summary>
+        /// The templates the given EVSE names, in its order.
+        /// </summary>
+        public IEnumerable<EVSETemplate> TemplatesOf(EVSE EVSE)
+
+            => TemplatesOf(EVSE.TemplateIds, EVSETemplates);
+
+        /// <summary>
+        /// The templates the given charging tariff names, in its order.
+        /// </summary>
+        public IEnumerable<ChargingTariffTemplate> TemplatesOf(ChargingTariff ChargingTariff)
+
+            => TemplatesOf(ChargingTariff.TemplateIds, ChargingTariffTemplates);
+
+        /// <summary>
+        /// The templates the given energy meter of one of its charging pools, charging stations or EVSEs names, in its order.
+        /// </summary>
+        public IEnumerable<EnergyMeterTemplate> TemplatesOf(EnergyMeter EnergyMeter)
+
+            => TemplatesOf(EnergyMeter.TemplateIds, EnergyMeterTemplates);
+
+        #endregion
+
+
+        #region (private) CalculateEffectiveChargingTariffs()
+
+        /// <summary>
+        /// The effective charging tariffs differing from the given ones, by their identifications: those naming templates.
+        /// A tariff naming none must have a currency and elements of its own.
+        /// </summary>
+        private ImmutableDictionary<ChargingTariff_Id, ChargingTariff> CalculateEffectiveChargingTariffs()
+        {
+
+            var chargingTariffs = ImmutableDictionary.CreateBuilder<ChargingTariff_Id, ChargingTariff>();
+
+            foreach (var chargingTariff in ChargingTariffs)
+            {
+
+                if (chargingTariff.TemplateIds.Length == 0)
+                {
+
+                    if (!chargingTariff.IsComplete)
+                        throw new ArgumentException(chargingTariff.Currency is null
+                                                        ? $"The charging tariff '{chargingTariff.Id}' has no currency, neither of its own nor of its templates!"
+                                                        : $"The charging tariff '{chargingTariff.Id}' has no elements, neither of its own nor of its templates!");
+
+                    continue;
+
+                }
+
+                chargingTariffs.Add(chargingTariff.Id,
+                                    ChargingTariffTemplate.Effective(chargingTariff, Values(chargingTariff.TemplateIds, ChargingTariffTemplates)));
+
+            }
+
+            return chargingTariffs.ToImmutable();
+
+        }
+
+        #endregion
 
         #region (private) CalculateEffective(Changed = null)
 
@@ -269,43 +391,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  ImmutableDictionary<ChargingPool_Id,    ChargingPool>     ChargingPools)  CalculateEffective(ChangedMembers? Changed = null)
         {
 
-            // The JSON of a group, calculated once for all its members.
-            var groupsJSON  = new Dictionary<IPOIPrioritizedGroup, JObject>(ReferenceEqualityComparer.Instance);
+            #region Energy meters, with the properties of their templates
 
-            JObject JSONOf(IPOIPrioritizedGroup Group)
-            {
-                if (!groupsJSON.TryGetValue(Group, out var json))
-                {
-                    json = Group.ToJSON();
-                    groupsJSON.Add(Group, json);
-                }
-                return json;
-            }
-
-            #region Energy meters, with the properties of their groups
-
-            var energyMeterGroupsOf = MembersOf(EnergyMeterGroups.Where(energyMeterGroup => energyMeterGroup.HasEnergyMeterProperties), energyMeterGroup => energyMeterGroup.EnergyMeterIds);
-
-            Boolean HasGroups(EnergyMeter? EnergyMeter)
+            static Boolean HasTemplates(EnergyMeter? EnergyMeter)
 
                 => EnergyMeter is not null &&
-                   energyMeterGroupsOf.ContainsKey(EnergyMeter.Id);
+                   EnergyMeter.TemplateIds.Length > 0;
 
             EnergyMeter EffectiveMeter(EnergyMeter EnergyMeter)
 
-                => energyMeterGroupsOf.TryGetValue(EnergyMeter.Id, out var groups)
-                       ? EnergyMeterGroup.Effective(EnergyMeter, new POIGroupValues<EnergyMeterGroup>($"the energy meter '{EnergyMeter.Id}'", groups, JSONOf))
+                => HasTemplates(EnergyMeter)
+                       ? EnergyMeterTemplate.Effective(EnergyMeter, Values(EnergyMeter.TemplateIds, EnergyMeterTemplates))
                        : EnergyMeter;
 
             #endregion
 
-            #region EVSEs, with the charging tariff of their groups, unless they have their own
+            #region EVSEs, with the charging tariff of their templates, unless they have their own
 
-            var evseGroupsOf                   = MembersOf(EVSEGroups.           Where(evseGroup            => evseGroup.HasEVSEProperties),                    evseGroup            => evseGroup.EVSEIds);
-            var evseTariffGroupsOf             = MembersOf(EVSEGroups.           Where(evseGroup            => evseGroup.ChargingTariffId.HasValue),            evseGroup            => evseGroup.EVSEIds);
-            var chargingStationTariffGroupsOf  = MembersOf(ChargingStationGroups.Where(chargingStationGroup => chargingStationGroup.ChargingTariffId.HasValue), chargingStationGroup => chargingStationGroup.ChargingStationIds);
-            var chargingPoolTariffGroupsOf     = MembersOf(ChargingPoolGroups.   Where(chargingPoolGroup    => chargingPoolGroup.ChargingTariffId.HasValue),    chargingPoolGroup    => chargingPoolGroup.ChargingPoolIds);
-            var evses                          = ImmutableDictionary.CreateBuilder<EVSE_Id, EVSE>();
+            var evses = ImmutableDictionary.CreateBuilder<EVSE_Id, EVSE>();
 
             foreach (var chargingPool in ChargingPools)
             {
@@ -314,23 +417,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     foreach (var evse in chargingStation.EVSEs)
                     {
 
-                        var member     = $"the EVSE '{evse.Id}'";
-                        var hasGroups  = evseGroupsOf.TryGetValue(evse.Id, out var groups);
-
-                        // Its own tariffs, else the one of its most specific groups giving one.
-                        var tariff     = evse.ChargingTariffIds.Length > 0
-                                             ? null
-                                             : TariffOf(member, evseTariffGroupsOf.           GetValueOrDefault(evse.Id),            evseGroup            => evseGroup.           ChargingTariffId, JSONOf) ??
-                                               TariffOf(member, chargingStationTariffGroupsOf.GetValueOrDefault(chargingStation.Id), chargingStationGroup => chargingStationGroup.ChargingTariffId, JSONOf) ??
-                                               TariffOf(member, chargingPoolTariffGroupsOf.   GetValueOrDefault(chargingPool.Id),    chargingPoolGroup    => chargingPoolGroup.   ChargingTariffId, JSONOf);
+                        // Its own tariffs, else the one of its most specific templates naming one.
+                        var tariff  = evse.ChargingTariffIds.Length > 0
+                                          ? null
+                                          : TariffOf(Values(evse.           TemplateIds, EVSETemplates),            template => template.ChargingTariffId) ??
+                                            TariffOf(Values(chargingStation.TemplateIds, ChargingStationTemplates), template => template.ChargingTariffId) ??
+                                            TariffOf(Values(chargingPool.   TemplateIds, ChargingPoolTemplates),    template => template.ChargingTariffId);
 
                         DateTimeOffset? atLeast = Changed?.EVSEs.TryGetValue(evse.Id, out var floor) == true ? floor : null;
 
-                        if (!hasGroups && tariff is null && !atLeast.HasValue && !HasGroups(evse.EnergyMeter))
+                        if (evse.TemplateIds.Length == 0 && tariff is null && !atLeast.HasValue && !HasTemplates(evse.EnergyMeter))
                             continue;
 
                         evses.Add(evse.Id, Effective(evse,
-                                                     new POIGroupValues<EVSEGroup>(member, groups ?? [], JSONOf),
+                                                     Values(evse.TemplateIds, EVSETemplates),
                                                      tariff,
                                                      evse.EnergyMeter is EnergyMeter energyMeter ? EffectiveMeter(energyMeter) : null,
                                                      atLeast));
@@ -343,22 +443,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Charging stations, with their effective EVSEs
 
-            var chargingStationGroupsOf  = MembersOf(ChargingStationGroups.Where(chargingStationGroup => chargingStationGroup.HasChargingStationProperties), chargingStationGroup => chargingStationGroup.ChargingStationIds);
-            var chargingStations         = ImmutableDictionary.CreateBuilder<ChargingStation_Id, ChargingStation>();
+            var chargingStations = ImmutableDictionary.CreateBuilder<ChargingStation_Id, ChargingStation>();
 
             foreach (var chargingStation in ChargingStations)
             {
 
-                var hasGroups = chargingStationGroupsOf.TryGetValue(chargingStation.Id, out var groups);
-
                 DateTimeOffset? atLeast = Changed?.ChargingStations.TryGetValue(chargingStation.Id, out var floor) == true ? floor : null;
 
-                if (!hasGroups && !atLeast.HasValue && !chargingStation.EVSEs.Any(evse => evses.ContainsKey(evse.Id)) && !chargingStation.EnergyMeters.Any(HasGroups))
+                if (chargingStation.TemplateIds.Length == 0 && !atLeast.HasValue && !chargingStation.EVSEs.Any(evse => evses.ContainsKey(evse.Id)) && !chargingStation.EnergyMeters.Any(HasTemplates))
                     continue;
 
                 chargingStations.Add(chargingStation.Id,
                                      Effective(chargingStation,
-                                               new POIGroupValues<ChargingStationGroup>($"the charging station '{chargingStation.Id}'", groups ?? [], JSONOf),
+                                               Values(chargingStation.TemplateIds, ChargingStationTemplates),
                                                [.. chargingStation.EVSEs.Select(evse => evses.TryGetValue(evse.Id, out var effectiveEVSE) ? effectiveEVSE : evse)],
                                                [.. chargingStation.EnergyMeters.Select(EffectiveMeter)],
                                                atLeast));
@@ -369,22 +466,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Charging pools, with their effective charging stations
 
-            var chargingPoolGroupsOf  = MembersOf(ChargingPoolGroups.Where(chargingPoolGroup => chargingPoolGroup.HasChargingPoolProperties), chargingPoolGroup => chargingPoolGroup.ChargingPoolIds);
-            var chargingPools         = ImmutableDictionary.CreateBuilder<ChargingPool_Id, ChargingPool>();
+            var chargingPools = ImmutableDictionary.CreateBuilder<ChargingPool_Id, ChargingPool>();
 
             foreach (var chargingPool in ChargingPools)
             {
 
-                var hasGroups = chargingPoolGroupsOf.TryGetValue(chargingPool.Id, out var groups);
-
                 DateTimeOffset? atLeast = Changed?.ChargingPools.TryGetValue(chargingPool.Id, out var floor) == true ? floor : null;
 
-                if (!hasGroups && !atLeast.HasValue && !chargingPool.ChargingStations.Any(chargingStation => chargingStations.ContainsKey(chargingStation.Id)) && !chargingPool.EnergyMeters.Any(HasGroups))
+                if (chargingPool.TemplateIds.Length == 0 && !atLeast.HasValue && !chargingPool.ChargingStations.Any(chargingStation => chargingStations.ContainsKey(chargingStation.Id)) && !chargingPool.EnergyMeters.Any(HasTemplates))
                     continue;
 
                 chargingPools.Add(chargingPool.Id,
                                   Effective(chargingPool,
-                                            new POIGroupValues<ChargingPoolGroup>($"the charging pool '{chargingPool.Id}'", groups ?? [], JSONOf),
+                                            Values(chargingPool.TemplateIds, ChargingPoolTemplates),
                                             [.. chargingPool.ChargingStations.Select(chargingStation => chargingStations.TryGetValue(chargingStation.Id, out var effectiveChargingStation) ? effectiveChargingStation : chargingStation)],
                                             [.. chargingPool.EnergyMeters.Select(EffectiveMeter)],
                                             atLeast));
@@ -416,10 +510,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Calculate the effective members again where they are other than in the given previous version of this operator,
-        /// with at least the last change of this operator: so a group that stops giving a member something, or a member
-        /// that leaves a group, changes its last change as well, not only its content; and where they are the same, with at
-        /// least the last change they had in it, e.g. after an earlier change of the same change set: it never goes back.
-        /// Floors found before are kept, the later one of two: a merge compares with both of its parents, one after the
+        /// with at least the last change of this operator: so a template that stops giving a member something, or a member
+        /// that stops naming a template, changes its last change as well, not only its content; and where they are the same,
+        /// with at least the last change they had in it, e.g. after an earlier change of the same change set: it never goes
+        /// back. Floors found before are kept, the later one of two: a merge compares with both of its parents, one after the
         /// other.
         /// </summary>
         /// <param name="Previous">The previous version of this operator.</param>
@@ -448,10 +542,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    : Current.LastChangeDate < Before.LastChangeDate        ? Before.LastChangeDate
                    : null;
 
-            #region Only where something may be other: the members of groups that changed, and those having a floor before
+            #region Only where something may be other: the members naming templates that changed, and those having a floor before
 
-            // A member whose own representation changed has the last change of the change set anyway: only its groups
-            // can change it without a change of its own, or the floor it had keep it.
+            // A member whose own representation changed has the last change of the change set anyway: only its templates
+            // can change it without a change of its own, or the floor it had keep it. The EVSEs of a charging station or a
+            // charging pool naming other templates than before may take another tariff of them.
             var evseCandidates             = new HashSet<EVSE_Id>           (Previous.effectiveFloors.EVSEs.Keys);
             var chargingStationCandidates  = new HashSet<ChargingStation_Id>(Previous.effectiveFloors.ChargingStations.Keys);
             var chargingPoolCandidates     = new HashSet<ChargingPool_Id>   (Previous.effectiveFloors.ChargingPools.Keys);
@@ -459,43 +554,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
             evseCandidates.           UnionWith(AlsoEVSEs            ?? []);
             chargingStationCandidates.UnionWith(AlsoChargingStations ?? []);
 
-            evseCandidates.           UnionWith(MembersOfChangedGroups(EVSEGroups,            Previous.EVSEGroups,            group => group.Id, group => group.EVSEIds));
-            chargingStationCandidates.UnionWith(MembersOfChangedGroups(ChargingStationGroups, Previous.ChargingStationGroups, group => group.Id, group => group.ChargingStationIds));
-            chargingPoolCandidates.   UnionWith(MembersOfChangedGroups(ChargingPoolGroups,    Previous.ChargingPoolGroups,    group => group.Id, group => group.ChargingPoolIds));
+            var changedEVSETemplates             = ChangedTemplates(EVSETemplates,            Previous.EVSETemplates,            template => template.Id);
+            var changedChargingStationTemplates  = ChangedTemplates(ChargingStationTemplates, Previous.ChargingStationTemplates, template => template.Id);
+            var changedChargingPoolTemplates     = ChangedTemplates(ChargingPoolTemplates,    Previous.ChargingPoolTemplates,    template => template.Id);
+            var changedEnergyMeterTemplates      = ChangedTemplates(EnergyMeterTemplates,     Previous.EnergyMeterTemplates,     template => template.Id);
 
-            // The tariff of a charging station or charging pool group is the one of their EVSEs.
-            foreach (var chargingPoolId in MembersOfChangedGroups(ChargingPoolGroups, Previous.ChargingPoolGroups, group => group.Id, group => group.ChargingPoolIds, group => group.ChargingTariffId.HasValue))
-                if (TryGetChargingPool(chargingPoolId, out var chargingPool))
-                    evseCandidates.UnionWith(chargingPool.EVSEs.Select(evse => evse.Id));
-
-            foreach (var chargingStationId in MembersOfChangedGroups(ChargingStationGroups, Previous.ChargingStationGroups, group => group.Id, group => group.ChargingStationIds, group => group.ChargingTariffId.HasValue))
-                if (TryGetChargingStation(chargingStationId, out var chargingStation))
-                    evseCandidates.UnionWith(chargingStation.EVSEs.Select(evse => evse.Id));
-
-            // The members of energy meter groups are embedded in what they measure.
-            var energyMeterCandidates = MembersOfChangedGroups(EnergyMeterGroups, Previous.EnergyMeterGroups, group => group.Id, group => group.EnergyMeterIds).ToHashSet();
-
-            if (energyMeterCandidates.Count > 0)
+            foreach (var chargingPool in ChargingPools)
             {
-                foreach (var chargingPool in ChargingPools)
+
+                var poolChanged         = chargingPool.TemplateIds.Any(changedChargingPoolTemplates.Contains);
+                var poolTemplatesOther  = Previous.TryGetChargingPool(chargingPool.Id, out var previousPool) &&
+                                          !previousPool.TemplateIds.SequenceEqual(chargingPool.TemplateIds);
+
+                if (poolChanged || chargingPool.EnergyMeters.Any(energyMeter => energyMeter.TemplateIds.Any(changedEnergyMeterTemplates.Contains)))
+                    chargingPoolCandidates.Add(chargingPool.Id);
+
+                foreach (var chargingStation in chargingPool.ChargingStations)
                 {
 
-                    if (chargingPool.EnergyMeters.Any(energyMeter => energyMeterCandidates.Contains(energyMeter.Id)))
-                        chargingPoolCandidates.Add(chargingPool.Id);
+                    var stationChanged         = chargingStation.TemplateIds.Any(changedChargingStationTemplates.Contains);
+                    var stationTemplatesOther  = Previous.TryGetChargingStation(chargingStation.Id, out var previousStation) &&
+                                                 !previousStation.TemplateIds.SequenceEqual(chargingStation.TemplateIds);
 
-                    foreach (var chargingStation in chargingPool.ChargingStations)
-                    {
+                    if (stationChanged || chargingStation.EnergyMeters.Any(energyMeter => energyMeter.TemplateIds.Any(changedEnergyMeterTemplates.Contains)))
+                        chargingStationCandidates.Add(chargingStation.Id);
 
-                        if (chargingStation.EnergyMeters.Any(energyMeter => energyMeterCandidates.Contains(energyMeter.Id)))
-                            chargingStationCandidates.Add(chargingStation.Id);
-
-                        foreach (var evse in chargingStation.EVSEs)
-                            if (evse.EnergyMeter is not null && energyMeterCandidates.Contains(evse.EnergyMeter.Id))
-                                evseCandidates.Add(evse.Id);
-
-                    }
+                    // The tariff of a charging station template or charging pool template is the one of their EVSEs.
+                    foreach (var evse in chargingStation.EVSEs)
+                        if (poolChanged || stationChanged || poolTemplatesOther || stationTemplatesOther ||
+                            evse.TemplateIds.Any(changedEVSETemplates.Contains) ||
+                            (evse.EnergyMeter is not null && evse.EnergyMeter.TemplateIds.Any(changedEnergyMeterTemplates.Contains)))
+                        {
+                            evseCandidates.Add(evse.Id);
+                        }
 
                 }
+
             }
 
             #endregion
@@ -542,9 +636,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) ShareRuntimeOfEffective()
 
         /// <summary>
-        /// Let the effective EVSEs, charging stations and charging pools, and the effective energy meters they embed, take
-        /// the runtime status of the EVSEs, charging stations, charging pools and energy meters again, after these took the
-        /// one of their previous versions.
+        /// Let the effective EVSEs, charging stations, charging pools and charging tariffs, and the effective energy meters
+        /// they embed, take the runtime status of the EVSEs, charging stations, charging pools, charging tariffs and energy
+        /// meters again, after these took the one of their previous versions.
         /// </summary>
         private void ShareRuntimeOfEffective()
         {
@@ -560,6 +654,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var (chargingPoolId, effectiveChargingPool) in effectiveChargingPoolIndex)
                 if (TryGetChargingPool(chargingPoolId, out var chargingPool))
                     effectiveChargingPool.ShareRuntimeOf(chargingPool);
+
+            foreach (var (chargingTariffId, effectiveChargingTariff) in effectiveChargingTariffs)
+                if (TryGetChargingTariff(chargingTariffId, out var chargingTariff))
+                    effectiveChargingTariff.ShareRuntimeOf(chargingTariff);
 
             // An effective charging station embeds the effective EVSEs, an effective charging pool the effective charging
             // stations: of each only its own energy meters.
@@ -600,66 +698,70 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) MembersOfChangedGroups(Current, Before, IdOf, MembersOf, Relevant = null)
+        #region (internal static) ChangedTemplates(Current, Before, IdOf)
 
         /// <summary>
-        /// The members, in either version, of the groups that are other than before, added or removed: only these can give
-        /// their members something else. Of the relevant ones only, if given, e.g. those naming a charging tariff.
+        /// The identifications of the templates that are other than before, added or removed: only these can give the members
+        /// naming them something else.
         /// </summary>
-        private static IEnumerable<TMemberId> MembersOfChangedGroups<TGroupId, TGroup, TMemberId>(POICollection<TGroupId, TGroup>  Current,
-                                                                                                  POICollection<TGroupId, TGroup>  Before,
-                                                                                                  Func<TGroup, TGroupId>           IdOf,
-                                                                                                  Func<TGroup, IEnumerable<TMemberId>>  MembersOf,
-                                                                                                  Func<TGroup, Boolean>?           Relevant   = null)
+        internal static HashSet<TTemplateId> ChangedTemplates<TTemplateId, TTemplate>(POICollection<TTemplateId, TTemplate>  Current,
+                                                                                    POICollection<TTemplateId, TTemplate>  Before,
+                                                                                    Func<TTemplate, TTemplateId>           IdOf)
 
-            where TGroupId : notnull
-            where TGroup   : class, IPOIPrioritizedGroup
+            where TTemplateId : notnull
+            where TTemplate   : class, IPOITemplate
 
         {
 
-            foreach (var group in Current)
-            {
+            var changed = new HashSet<TTemplateId>();
 
-                var before = Before.TryGet(IdOf(group), out var previous) ? previous : null;
-
-                if (before is not null && POIJSON.SameValue(group.ToJSON(), before.ToJSON()))
-                    continue;
-
-                if (Relevant is not null && !Relevant(group) && (before is null || !Relevant(before)))
-                    continue;
-
-                foreach (var memberId in MembersOf(group))
-                    yield return memberId;
-
-                if (before is not null)
-                    foreach (var memberId in MembersOf(before))
-                        yield return memberId;
-
-            }
+            foreach (var template in Current)
+                if (!Before.TryGet(IdOf(template), out var before) || !POIJSON.SameValue(template.ToJSON(), before.ToJSON()))
+                    changed.Add(IdOf(template));
 
             foreach (var before in Before)
-                if (!Current.TryGet(IdOf(before), out _) && (Relevant is null || Relevant(before)))
-                    foreach (var memberId in MembersOf(before))
-                        yield return memberId;
+                if (!Current.TryGet(IdOf(before), out _))
+                    changed.Add(IdOf(before));
+
+            return changed;
 
         }
 
         #endregion
 
-        #region (private static) MembersOf(Groups, MemberIdsOf)
+        #region (internal static) Values(TemplateIds, Templates)
 
         /// <summary>
-        /// The given groups of each member.
+        /// The values the templates a member names give it, in its order; the templates exist, as the owner checked.
         /// </summary>
-        private static Dictionary<TMemberId, TGroup[]> MembersOf<TGroup, TMemberId>(IEnumerable<TGroup>                       Groups,
-                                                                                    Func<TGroup, IEnumerable<TMemberId>>      MemberIdsOf)
+        internal static POITemplateValues<TTemplate> Values<TTemplateId, TTemplate>(ImmutableArray<TTemplateId>            TemplateIds,
+                                                                                    POICollection<TTemplateId, TTemplate>  Templates)
 
-            where TMemberId : notnull
+            where TTemplateId : notnull
+            where TTemplate   : class, IPOITemplate
 
-            => Groups.SelectMany(group => MemberIdsOf(group).Select(memberId => (MemberId: memberId, Group: group))).
-                      GroupBy   (membership => membership.MemberId).
-                      ToDictionary(members => members.Key,
-                                   members => members.Select(membership => membership.Group).ToArray());
+            => new (TemplatesOf(TemplateIds, Templates));
+
+        #endregion
+
+        #region (internal static) TemplatesOf(TemplateIds, Templates)
+
+        /// <summary>
+        /// The templates a member names, in its order; an unknown one is left out.
+        /// </summary>
+        internal static IEnumerable<TTemplate> TemplatesOf<TTemplateId, TTemplate>(ImmutableArray<TTemplateId>            TemplateIds,
+                                                                                   POICollection<TTemplateId, TTemplate>  Templates)
+
+            where TTemplateId : notnull
+            where TTemplate   : class
+
+        {
+
+            foreach (var templateId in TemplateIds)
+                if (Templates.TryGet(templateId, out var template))
+                    yield return template;
+
+        }
 
         #endregion
 
@@ -692,7 +794,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) LastChangeOfEffective(Effective, Own) / LastChangesOfEffective(Effective, Own)
 
         /// <summary>
-        /// The last change of the given effective energy meter, where its groups give it properties: what a member embeds
+        /// The last change of the given effective energy meter, where its templates give it properties: what a member embeds
         /// as it is at runtime is part of it. Null where it is the energy meter itself.
         /// </summary>
         private static DateTimeOffset? LastChangeOfEffective(EnergyMeter?  Effective,
@@ -703,7 +805,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    : null;
 
         /// <summary>
-        /// The last changes of the given effective energy meters, where their groups give them properties.
+        /// The last changes of the given effective energy meters, where their templates give them properties.
         /// </summary>
         private static IEnumerable<DateTimeOffset?> LastChangesOfEffective(IEnumerable<EnergyMeter>  Effective,
                                                                            IEnumerable<EnergyMeter>  Own)
@@ -712,43 +814,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) TariffOf(Member, Groups, TariffOf, JSONOf)
+        #region (private static) TariffOf(Templates, TariffOf)
 
         /// <summary>
-        /// The charging tariff of the given groups of a member with the highest priority giving one, with its last change;
-        /// none without groups.
+        /// The charging tariff of the first of the given templates of a member naming one, with the last change of that
+        /// template; none without one.
         /// </summary>
-        private static (ChargingTariff_Id Id, DateTimeOffset LastChange)? TariffOf<TGroup>(String                                Member,
-                                                                                           TGroup[]?                             Groups,
-                                                                                           Func<TGroup, ChargingTariff_Id?>      TariffOf,
-                                                                                           Func<IPOIPrioritizedGroup, JObject>   JSONOf)
+        private static (ChargingTariff_Id Id, DateTimeOffset LastChange)? TariffOf<TTemplate>(POITemplateValues<TTemplate>         Templates,
+                                                                                              Func<TTemplate, ChargingTariff_Id?>  TariffOf)
 
-            where TGroup : class, IPOIPrioritizedGroup
+            where TTemplate : class, IPOITemplate
 
         {
 
-            if (Groups is null || Groups.Length == 0)
-                return null;
+            foreach (var template in Templates.Templates)
+                if (TariffOf(template) is ChargingTariff_Id tariffId)
+                    return (tariffId, template.LastChangeDate);
 
-            var values  = new POIGroupValues<TGroup>(Member, Groups, JSONOf);
-            var tariff  = values.Single("chargingTariffId", null, TariffOf);
-
-            return tariff.HasValue
-                       ? (tariff.Value, values.Groups.First(group => TariffOf(group) == tariff).LastChangeDate)
-                       : null;
+            return null;
 
         }
 
         #endregion
 
-        #region (private static) Effective(EVSE,            Groups, Tariff, EnergyMeter)
+        #region (private static) Effective(EVSE,            Templates, Tariff, EnergyMeter)
 
         /// <summary>
-        /// The given EVSE with the properties of the given groups, the given charging tariff of its groups, if any,
+        /// The given EVSE with the properties of the given templates, the given charging tariff of its templates, if any,
         /// and its given effective energy meter.
         /// </summary>
         private static EVSE Effective(EVSE                                                 EVSE,
-                                      POIGroupValues<EVSEGroup>                            Groups,
+                                      POITemplateValues<EVSETemplate>                      Templates,
                                       (ChargingTariff_Id Id, DateTimeOffset LastChange)?   Tariff,
                                       EnergyMeter?                                         EnergyMeter,
                                       DateTimeOffset?                                      AtLeast   = null)
@@ -763,35 +859,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     EVSE.Name,
                                     EVSE.Description,
 
-                                    PhysicalReference:         Groups.Single("physicalReference",         EVSE.PhysicalReference,         group => group.PhysicalReference),
-                                    CurrentTypes:              Groups.Single("currentTypes",              EVSE.CurrentTypes  != POI.CurrentTypes. Unspecified ? EVSE.CurrentTypes  : null,
-                                                                                                          group => group.CurrentTypes  != POI.CurrentTypes. Unspecified ? group.CurrentTypes  : (CurrentTypes?)  null),
-                                    ChargingModes:             Groups.Single("chargingModes",             EVSE.ChargingModes != POI.ChargingModes.Unspecified ? EVSE.ChargingModes : null,
-                                                                                                          group => group.ChargingModes != POI.ChargingModes.Unspecified ? group.ChargingModes : (ChargingModes?) null),
-                                    MaxVoltage:                Groups.Single("maxVoltage",                EVSE.MaxVoltage,                group => group.MaxVoltage),
-                                    MaxCurrent:                Groups.Single("maxCurrent",                EVSE.MaxCurrent,                group => group.MaxCurrent),
-                                    MaxPower:                  Groups.Single("maxPower",                  EVSE.MaxPower,                  group => group.MaxPower),
-                                    GeoLocation:               Groups.Single("geoLocation",               EVSE.GeoLocation,               group => group.GeoLocation),
-                                    MaxReservationDuration:    Groups.Single("maxReservationDuration",    EVSE.MaxReservationDuration,    group => group.MaxReservationDuration),
-                                    ReachDistance:             Groups.Single("reachDistance",             EVSE.ReachDistance,             group => group.ReachDistance),
-                                    OperationTimeout:          Groups.Single("operationTimeout",          EVSE.OperationTimeout,          group => group.OperationTimeout),
-                                    ExtendedOperationTimeout:  Groups.Single("extendedOperationTimeout",  EVSE.ExtendedOperationTimeout,  group => group.ExtendedOperationTimeout),
+                                    PhysicalReference:         Templates.Single(EVSE.PhysicalReference,         template => template.PhysicalReference),
+                                    CurrentTypes:              Templates.Single(EVSE.CurrentTypes  != POI.CurrentTypes. Unspecified ? EVSE.CurrentTypes  : null,
+                                                                                template => template.CurrentTypes  != POI.CurrentTypes. Unspecified ? template.CurrentTypes  : (CurrentTypes?)  null),
+                                    ChargingModes:             Templates.Single(EVSE.ChargingModes != POI.ChargingModes.Unspecified ? EVSE.ChargingModes : null,
+                                                                                template => template.ChargingModes != POI.ChargingModes.Unspecified ? template.ChargingModes : (ChargingModes?) null),
+                                    MaxVoltage:                Templates.Single(EVSE.MaxVoltage,                template => template.MaxVoltage),
+                                    MaxCurrent:                Templates.Single(EVSE.MaxCurrent,                template => template.MaxCurrent),
+                                    MaxPower:                  Templates.Single(EVSE.MaxPower,                  template => template.MaxPower),
+                                    GeoLocation:               Templates.Single(EVSE.GeoLocation,               template => template.GeoLocation),
+                                    MaxReservationDuration:    Templates.Single(EVSE.MaxReservationDuration,    template => template.MaxReservationDuration),
+                                    ReachDistance:             Templates.Single(EVSE.ReachDistance,             template => template.ReachDistance),
+                                    OperationTimeout:          Templates.Single(EVSE.OperationTimeout,          template => template.OperationTimeout),
+                                    ExtendedOperationTimeout:  Templates.Single(EVSE.ExtendedOperationTimeout,  template => template.ExtendedOperationTimeout),
 
-                                    ChargingConnectors:        Groups.Union ("charging connector", EVSE.ChargingConnectors, group => group.ChargingConnectors, chargingConnector => chargingConnector.Id,  chargingConnector => chargingConnector.ToJSON()),
-                                    Brands:                    Groups.Union ("brand",              EVSE.Brands,             group => group.Brands,             brand             => brand.Id,              brand             => brand.ToJSON()),
-                                    Images:                    Groups.Union ("image",              EVSE.Images,             group => group.Images,             image             => image.URL.ToString(),  image             => image.ToJSON()),
-                                    Standards:                 Groups.Union (EVSE.Standards, group => group.Standards),
-                                    FloorLevel:                Groups.Single("floorLevel",                EVSE.FloorLevel,                group => group.FloorLevel),
-                                    AcceptedEMobilityProviderIds:  Groups.Union (EVSE.AcceptedEMobilityProviderIds, group => group.AcceptedEMobilityProviderIds),
+                                    ChargingConnectors:        Templates.Union (EVSE.ChargingConnectors, template => template.ChargingConnectors, chargingConnector => chargingConnector.Id),
+                                    Brands:                    Templates.Union (EVSE.Brands,             template => template.Brands,             brand             => brand.Id),
+                                    Images:                    Templates.Union (EVSE.Images,             template => template.Images,             image             => image.URL.ToString()),
+                                    Standards:                 Templates.Union (EVSE.Standards,          template => template.Standards),
+                                    FloorLevel:                Templates.Single(EVSE.FloorLevel,                template => template.FloorLevel),
+                                    AcceptedEMobilityProviderIds:  Templates.Union (EVSE.AcceptedEMobilityProviderIds, template => template.AcceptedEMobilityProviderIds),
 
-                                    // Its own tariffs, else the one of its groups; its energy meter is a device of its own,
-                                    // with the properties of its energy meter groups.
+                                    // Its own tariffs, else the one of its templates; its energy meter is a device of its own,
+                                    // with the properties of its energy meter templates.
                                     ChargingTariffIds:         Tariff.HasValue ? [ Tariff.Value.Id ] : EVSE.ChargingTariffIds,
                                     EnergyMeter:               EnergyMeter,
+                                    TemplateIds:               EVSE.TemplateIds,
 
                                     DataSource:                EVSE.DataSource,
                                     Created:                   EVSE.Created,
-                                    LastChange:                Latest(Groups.LastChange(EVSE.LastChangeDate), Tariff?.LastChange, AtLeast, LastChangeOfEffective(EnergyMeter, EVSE.EnergyMeter)),
+                                    LastChange:                Latest(Templates.LastChange(EVSE.LastChangeDate), Tariff?.LastChange, AtLeast, LastChangeOfEffective(EnergyMeter, EVSE.EnergyMeter)),
                                     CustomData:                EVSE.CustomData
 
                                 );
@@ -803,21 +900,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
             catch (ArgumentException e)
             {
-                throw new ArgumentException($"The EVSE '{EVSE.Id}' {Groups.With} is invalid: {e.Message}", e);
+                throw new ArgumentException($"The EVSE '{EVSE.Id}' {Templates.With} is invalid: {e.Message}", e);
             }
 
         }
 
         #endregion
 
-        #region (private static) Effective(ChargingStation, Groups, EVSEs, EnergyMeters)
+        #region (private static) Effective(ChargingStation, Templates, EVSEs, EnergyMeters)
 
         /// <summary>
-        /// The given charging station with the properties of the given groups, the given effective EVSEs, and its given
+        /// The given charging station with the properties of the given templates, the given effective EVSEs, and its given
         /// effective energy meters.
         /// </summary>
         private static ChargingStation Effective(ChargingStation                             ChargingStation,
-                                                 POIGroupValues<ChargingStationGroup>        Groups,
+                                                 POITemplateValues<ChargingStationTemplate>  Templates,
                                                  EVSE[]                                      EVSEs,
                                                  EnergyMeter[]                               EnergyMeters,
                                                  DateTimeOffset?                             AtLeast   = null)
@@ -832,33 +929,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     ChargingStation.Name,
                                     ChargingStation.Description,
 
-                                    PhysicalReference:    Groups.Single("physicalReference",  ChargingStation.PhysicalReference,   group => group.PhysicalReference),
-                                    Address:              Groups.Single("address",            ChargingStation.Address,             group => group.Address),
-                                    GeoLocation:          Groups.Single("geoLocation",        ChargingStation.GeoLocation,         group => group.GeoLocation),
-                                    HotlinePhoneNumber:   Groups.Single("hotline",            ChargingStation.HotlinePhoneNumber,  group => group.HotlinePhoneNumber),
-                                    ManufacturerId:       Groups.Single("manufacturerId",     ChargingStation.ManufacturerId,      group => group.ManufacturerId),
-                                    ModelId:              Groups.Single("modelId",            ChargingStation.ModelId,             group => group.ModelId),
-                                    OpeningTimes:         Groups.Single("openingTimes",       ChargingStation.OpeningTimes,        group => group.OpeningTimes),
-                                    Accessibility:        Groups.Single("accessibility",      ChargingStation.Accessibility,       group => group.Accessibility),
-                                    CalibrationInfo:      Groups.Single("calibrationInfo",    ChargingStation.CalibrationInfo,     group => group.CalibrationInfo),
-                                    CertificationInfo:    Groups.Single("certificationInfo",  ChargingStation.CertificationInfo,   group => group.CertificationInfo),
-                                    MaxPower:             Groups.Single("maxPower",           ChargingStation.MaxPower,            group => group.MaxPower),
+                                    PhysicalReference:    Templates.Single(ChargingStation.PhysicalReference,   template => template.PhysicalReference),
+                                    Address:              Templates.Single(ChargingStation.Address,             template => template.Address),
+                                    GeoLocation:          Templates.Single(ChargingStation.GeoLocation,         template => template.GeoLocation),
+                                    HotlinePhoneNumber:   Templates.Single(ChargingStation.HotlinePhoneNumber,  template => template.HotlinePhoneNumber),
+                                    ManufacturerId:       Templates.Single(ChargingStation.ManufacturerId,      template => template.ManufacturerId),
+                                    ModelId:              Templates.Single(ChargingStation.ModelId,             template => template.ModelId),
+                                    OpeningTimes:         Templates.Single(ChargingStation.OpeningTimes,        template => template.OpeningTimes),
+                                    Accessibility:        Templates.Single(ChargingStation.Accessibility,       template => template.Accessibility),
+                                    CalibrationInfo:      Templates.Single(ChargingStation.CalibrationInfo,     template => template.CalibrationInfo),
+                                    CertificationInfo:    Templates.Single(ChargingStation.CertificationInfo,   template => template.CertificationInfo),
+                                    MaxPower:             Templates.Single(ChargingStation.MaxPower,            template => template.MaxPower),
 
-                                    Brands:               Groups.Union ("brand",  ChargingStation.Brands, group => group.Brands, brand => brand.Id,             brand => brand.ToJSON()),
-                                    Images:               Groups.Union ("image",  ChargingStation.Images, group => group.Images, image => image.URL.ToString(), image => image.ToJSON()),
+                                    Brands:               Templates.Union (ChargingStation.Brands, template => template.Brands, brand => brand.Id),
+                                    Images:               Templates.Union (ChargingStation.Images, template => template.Images, image => image.URL.ToString()),
 
-                                    VehicleTypes:         Groups.Union (ChargingStation.VehicleTypes,        group => group.VehicleTypes),
-                                    EUVehicleCategories:  Groups.Union (ChargingStation.EUVehicleCategories, group => group.EUVehicleCategories),
-                                    Features:             Groups.Union (ChargingStation.Features,            group => group.Features),
-                                    ParkingSpaceIds:      Groups.Union (ChargingStation.ParkingSpaceIds,     group => group.ParkingSpaceIds),
+                                    VehicleTypes:         Templates.Union (ChargingStation.VehicleTypes,        template => template.VehicleTypes),
+                                    EUVehicleCategories:  Templates.Union (ChargingStation.EUVehicleCategories, template => template.EUVehicleCategories),
+                                    Features:             Templates.Union (ChargingStation.Features,            template => template.Features),
+                                    ParkingSpaceIds:      Templates.Union (ChargingStation.ParkingSpaceIds,     template => template.ParkingSpaceIds),
 
-                                    // Its effective EVSEs, and its very energy meters, with the properties of their groups.
+                                    // Its effective EVSEs, and its very energy meters, with the properties of their templates.
                                     EVSEs:                EVSEs,
                                     EnergyMeters:         EnergyMeters,
+                                    TemplateIds:          ChargingStation.TemplateIds,
 
                                     DataSource:           ChargingStation.DataSource,
                                     Created:              ChargingStation.Created,
-                                    LastChange:           Latest(EVSEs.Select(evse => evse.LastChangeDate).Append(Groups.LastChange(ChargingStation.LastChangeDate)).Max(),
+                                    LastChange:           Latest(EVSEs.Select(evse => evse.LastChangeDate).Append(Templates.LastChange(ChargingStation.LastChangeDate)).Max(),
                                                                  [ AtLeast, .. LastChangesOfEffective(EnergyMeters, ChargingStation.EnergyMeters) ]),
                                     CustomData:           ChargingStation.CustomData
 
@@ -871,21 +969,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
             catch (ArgumentException e)
             {
-                throw new ArgumentException($"The charging station '{ChargingStation.Id}' {Groups.With} is invalid: {e.Message}", e);
+                throw new ArgumentException($"The charging station '{ChargingStation.Id}' {Templates.With} is invalid: {e.Message}", e);
             }
 
         }
 
         #endregion
 
-        #region (private static) Effective(ChargingPool,    Groups, ChargingStations, EnergyMeters)
+        #region (private static) Effective(ChargingPool,    Templates, ChargingStations, EnergyMeters)
 
         /// <summary>
-        /// The given charging pool with the properties of the given groups, the given effective charging stations, and
+        /// The given charging pool with the properties of the given templates, the given effective charging stations, and
         /// its given effective energy meters.
         /// </summary>
         private static ChargingPool Effective(ChargingPool                             ChargingPool,
-                                              POIGroupValues<ChargingPoolGroup>        Groups,
+                                              POITemplateValues<ChargingPoolTemplate>  Templates,
                                               ChargingStation[]                        ChargingStations,
                                               EnergyMeter[]                            EnergyMeters,
                                               DateTimeOffset?                          AtLeast   = null)
@@ -903,47 +1001,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     ChargingPool.Name,
                                     ChargingPool.Description,
 
-                                    Address:                   Groups.Single("address",                   ChargingPool.Address,                          group => group.Address),
-                                    GeoLocation:               Groups.Single("geoLocation",               ChargingPool.GeoLocation,                      group => group.GeoLocation),
-                                    ParkingType:               Groups.Single("parkingType",               ChargingPool.ParkingType,                      group => group.ParkingType),
-                                    Accessibility:             Groups.Single("accessibility",             ChargingPool.Accessibility,                    group => group.Accessibility),
-                                    HotlinePhoneNumber:        Groups.Single("hotline",                   ChargingPool.HotlinePhoneNumber,               group => group.HotlinePhoneNumber),
-                                    GridConnectionPointId:     Groups.Single("gridConnectionPointId",     ChargingPool.GridConnectionPointId,            group => group.GridConnectionPointId),
-                                    OpeningTimes:              Groups.Single("openingTimes",              ChargingPool.OpeningTimes,                     group => group.OpeningTimes),
-                                    EnergyMix:                 Groups.Single("energyMix",                 ChargingPool.EnergyMix,                        group => group.EnergyMix),
-                                    TimeZone:                  Groups.Single("timeZone",                  ChargingPool.TimeZone,                         group => group.TimeZone),
-                                    EntranceAddress:           Groups.Single("entranceAddress",           ChargingPool.EntranceAddress,                  group => group.EntranceAddress),
-                                    EntranceLocation:          Groups.Single("entranceLocation",          ChargingPool.EntranceLocation,                 group => group.EntranceLocation),
-                                    ExitAddress:               Groups.Single("exitAddress",               ChargingPool.ExitAddress,                      group => group.ExitAddress),
-                                    ExitLocation:              Groups.Single("exitLocation",              ChargingPool.ExitLocation,                     group => group.ExitLocation),
-                                    ArrivalInstructions:       Groups.Single("arrivalInstructions",       Given(ChargingPool.ArrivalInstructions),       group => Given(group.ArrivalInstructions)),
-                                    ChargingWhenClosed:        Groups.Single("chargingWhenClosed",        ChargingPool.ChargingWhenClosed,               group => group.ChargingWhenClosed),
-                                    AssistanceServiceDetails:  Groups.Single("assistanceServiceDetails",  Given(ChargingPool.AssistanceServiceDetails),  group => Given(group.AssistanceServiceDetails)),
+                                    Address:                   Templates.Single(ChargingPool.Address,                          template => template.Address),
+                                    GeoLocation:               Templates.Single(ChargingPool.GeoLocation,                      template => template.GeoLocation),
+                                    ParkingType:               Templates.Single(ChargingPool.ParkingType,                      template => template.ParkingType),
+                                    Accessibility:             Templates.Single(ChargingPool.Accessibility,                    template => template.Accessibility),
+                                    HotlinePhoneNumber:        Templates.Single(ChargingPool.HotlinePhoneNumber,               template => template.HotlinePhoneNumber),
+                                    GridConnectionPointId:     Templates.Single(ChargingPool.GridConnectionPointId,            template => template.GridConnectionPointId),
+                                    OpeningTimes:              Templates.Single(ChargingPool.OpeningTimes,                     template => template.OpeningTimes),
+                                    EnergyMix:                 Templates.Single(ChargingPool.EnergyMix,                        template => template.EnergyMix),
+                                    TimeZone:                  Templates.Single(ChargingPool.TimeZone,                         template => template.TimeZone),
+                                    EntranceAddress:           Templates.Single(ChargingPool.EntranceAddress,                  template => template.EntranceAddress),
+                                    EntranceLocation:          Templates.Single(ChargingPool.EntranceLocation,                 template => template.EntranceLocation),
+                                    ExitAddress:               Templates.Single(ChargingPool.ExitAddress,                      template => template.ExitAddress),
+                                    ExitLocation:              Templates.Single(ChargingPool.ExitLocation,                     template => template.ExitLocation),
+                                    ArrivalInstructions:       Templates.Single(Given(ChargingPool.ArrivalInstructions),       template => Given(template.ArrivalInstructions)),
+                                    ChargingWhenClosed:        Templates.Single(ChargingPool.ChargingWhenClosed,               template => template.ChargingWhenClosed),
+                                    AssistanceServiceDetails:  Templates.Single(Given(ChargingPool.AssistanceServiceDetails),  template => Given(template.AssistanceServiceDetails)),
 
-                                    DataLicenses:              Groups.Union ("data license",         ChargingPool.DataLicenses,         group => group.DataLicenses,         dataLicense         => dataLicense.Id,                 dataLicense         => dataLicense.ToPOIJSON()),
-                                    Brands:                    Groups.Union ("brand",                ChargingPool.Brands,               group => group.Brands,               brand               => brand.Id,                       brand               => brand.ToJSON()),
-                                    Images:                    Groups.Union ("image",                ChargingPool.Images,               group => group.Images,               image               => image.URL.ToString(),           image               => image.ToJSON()),
-                                    AuthenticationModes:       Groups.Union ("authentication mode",  ChargingPool.AuthenticationModes,  group => group.AuthenticationModes,  authenticationMode  => authenticationMode.Type,        authenticationMode  => authenticationMode.ToJSON()),
-                                    RelatedLocations:          Groups.Union ("related location",     ChargingPool.RelatedLocations,     group => group.RelatedLocations,     relatedLocation     => relatedLocation.ToJSON().ToString(Newtonsoft.Json.Formatting.None),
-                                                                                                                                                                             relatedLocation     => relatedLocation.ToJSON()),
+                                    DataLicenses:              Templates.Union (ChargingPool.DataLicenses,         template => template.DataLicenses,         dataLicense         => dataLicense.Id),
+                                    Brands:                    Templates.Union (ChargingPool.Brands,               template => template.Brands,               brand               => brand.Id),
+                                    Images:                    Templates.Union (ChargingPool.Images,               template => template.Images,               image               => image.URL.ToString()),
+                                    AuthenticationModes:       Templates.Union (ChargingPool.AuthenticationModes,  template => template.AuthenticationModes,  authenticationMode  => authenticationMode.Type),
+                                    RelatedLocations:          Templates.Union (ChargingPool.RelatedLocations,     template => template.RelatedLocations,     relatedLocation     => relatedLocation.ToJSON().ToString(Newtonsoft.Json.Formatting.None)),
 
-                                    Facilities:                Groups.Union (ChargingPool.Facilities,           group => group.Facilities),
-                                    PaymentOptions:            Groups.Union (ChargingPool.PaymentOptions,       group => group.PaymentOptions),
-                                    UIFeatures:                Groups.Union (ChargingPool.UIFeatures,           group => group.UIFeatures),
-                                    Features:                  Groups.Union (ChargingPool.Features,             group => group.Features),
-                                    LocationLanguages:         Groups.Union (ChargingPool.LocationLanguages,    group => group.LocationLanguages),
-                                    ParkingRestrictions:       Groups.Union (ChargingPool.ParkingRestrictions,  group => group.ParkingRestrictions),
-                                    Services:                  Groups.Union (ChargingPool.Services,             group => group.Services),
-                                    Standards:                 Groups.Union (ChargingPool.Standards,            group => group.Standards),
-                                    NUTSCodes:                 Groups.Union (ChargingPool.NUTSCodes,            group => group.NUTSCodes),
+                                    Facilities:                Templates.Union (ChargingPool.Facilities,           template => template.Facilities),
+                                    PaymentOptions:            Templates.Union (ChargingPool.PaymentOptions,       template => template.PaymentOptions),
+                                    UIFeatures:                Templates.Union (ChargingPool.UIFeatures,           template => template.UIFeatures),
+                                    Features:                  Templates.Union (ChargingPool.Features,             template => template.Features),
+                                    LocationLanguages:         Templates.Union (ChargingPool.LocationLanguages,    template => template.LocationLanguages),
+                                    ParkingRestrictions:       Templates.Union (ChargingPool.ParkingRestrictions,  template => template.ParkingRestrictions),
+                                    Services:                  Templates.Union (ChargingPool.Services,             template => template.Services),
+                                    Standards:                 Templates.Union (ChargingPool.Standards,            template => template.Standards),
+                                    NUTSCodes:                 Templates.Union (ChargingPool.NUTSCodes,            template => template.NUTSCodes),
 
-                                    // Its effective charging stations, and its very energy meters, with the properties of their groups.
+                                    // Its effective charging stations, and its very energy meters, with the properties of their templates.
                                     ChargingStations:          ChargingStations,
                                     EnergyMeters:              EnergyMeters,
+                                    TemplateIds:               ChargingPool.TemplateIds,
 
                                     DataSource:                ChargingPool.DataSource,
                                     Created:                   ChargingPool.Created,
-                                    LastChange:                Latest(ChargingStations.Select(chargingStation => chargingStation.LastChangeDate).Append(Groups.LastChange(ChargingPool.LastChangeDate)).Max(),
+                                    LastChange:                Latest(ChargingStations.Select(chargingStation => chargingStation.LastChangeDate).Append(Templates.LastChange(ChargingPool.LastChangeDate)).Max(),
                                                                       [ AtLeast, .. LastChangesOfEffective(EnergyMeters, ChargingPool.EnergyMeters) ]),
                                     CustomData:                ChargingPool.CustomData
 
@@ -956,7 +1054,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
             catch (ArgumentException e)
             {
-                throw new ArgumentException($"The charging pool '{ChargingPool.Id}' {Groups.With} is invalid: {e.Message}", e);
+                throw new ArgumentException($"The charging pool '{ChargingPool.Id}' {Templates.With} is invalid: {e.Message}", e);
             }
 
         }

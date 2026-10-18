@@ -83,6 +83,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "assistanceServiceDetails",
             "standards",
             "nutsCodes",
+            "templateIds",
             "customData"
         ];
 
@@ -111,6 +112,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "certificationInfo",
             "maxPower",
             "parkingSpaceIds",
+            "templateIds",
             "customData"
         ];
 
@@ -140,6 +142,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "standards",
             "floorLevel",
             "acceptedEMobilityProviderIds",
+            "templateIds",
             "customData"
         ];
 
@@ -147,7 +150,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The direct children of an operator besides its charging pools, by their JSON keys.
         /// </summary>
         private static readonly ImmutableDictionary<String, String> OperatorChildArrays = new Dictionary<String, String> {
-            { nameof(ChargingTariff),       "chargingTariffs"       },
+            { nameof(ChargingTariff),           "chargingTariffs"           },
+            { nameof(EVSETemplate),             "EVSETemplates"             },
+            { nameof(ChargingStationTemplate),  "chargingStationTemplates"  },
+            { nameof(ChargingPoolTemplate),     "chargingPoolTemplates"     },
+            { nameof(ChargingTariffTemplate),   "chargingTariffTemplates"   },
             { nameof(EVSEGroup),            "EVSEGroups"            },
             { nameof(ChargingStationGroup), "chargingStationGroups" },
             { nameof(ChargingPoolGroup),    "chargingPoolGroups"    },
@@ -155,10 +162,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }.ToImmutableDictionary();
 
         /// <summary>
-        /// The properties of a charging station a charging station group can give its members:
-        /// all but its identification, name, description, data source, custom data, EVSEs and energy meters.
+        /// The properties of a charging station a charging station template can give its members:
+        /// all but its identification, name, description, data source, custom data, templates, EVSEs and energy meters.
         /// </summary>
-        internal static readonly ImmutableArray<String> ChargingStationGroupStationProperties = [
+        internal static readonly ImmutableArray<String> ChargingStationTemplateStationProperties = [
             "physicalReference",
             "address",
             "geoLocation",
@@ -179,10 +186,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ];
 
         /// <summary>
-        /// The properties of an EVSE an EVSE group can give its members:
-        /// all but its identification, name, description, data source, custom data, energy meter and charging tariffs.
+        /// The properties of an EVSE an EVSE template can give its members:
+        /// all but its identification, name, description, data source, custom data, templates, energy meter and charging tariffs.
         /// </summary>
-        internal static readonly ImmutableArray<String> EVSEGroupEVSEProperties = [
+        internal static readonly ImmutableArray<String> EVSETemplateEVSEProperties = [
             "physicalReference",
             "currentTypes",
             "chargingModes",
@@ -203,10 +210,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ];
 
         /// <summary>
-        /// The properties of a charging pool a charging pool group can give its members:
-        /// all but its identification, name, description, data source, custom data, charging stations and energy meters.
+        /// The properties of a charging pool a charging pool template can give its members:
+        /// all but its identification, name, description, data source, custom data, templates, charging stations and energy meters.
         /// </summary>
-        internal static readonly ImmutableArray<String> ChargingPoolGroupPoolProperties = [
+        internal static readonly ImmutableArray<String> ChargingPoolTemplatePoolProperties = [
             "dataLicenses",
             "address",
             "geoLocation",
@@ -240,17 +247,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ];
 
         /// <summary>
-        /// The properties of a group a change set can update or remove, by the group type: an EVSE, charging station or
-        /// charging pool group also those of its members it gives them.
+        /// The properties of a charging tariff a charging tariff template can give its members:
+        /// all but its identification, name, description, data source, custom data and templates.
+        /// </summary>
+        internal static readonly ImmutableArray<String> ChargingTariffTemplateTariffProperties = [
+            "currency",
+            "tariffType",
+            "tariffURL",
+            "elements",
+            "minPrice",
+            "maxPrice",
+            "paymentMeans",
+            "paymentBrands",
+            "validFrom",
+            "validUntil",
+            "energyMix"
+        ];
+
+        /// <summary>
+        /// The properties of a group a change set can update or remove, by the group type: its members, as it gives them
+        /// nothing.
         /// </summary>
         private static readonly ImmutableDictionary<String, ImmutableHashSet<String>> ChangeableGroupProperties = new Dictionary<String, ImmutableHashSet<String>> {
-            { nameof(EVSEGroup),            [ "name", "description", "dataSource", "EVSEIds",            "chargingTariffId", "priority", "customData",
-                                              .. EVSEGroupEVSEProperties ] },
-            { nameof(ChargingStationGroup), [ "name", "description", "dataSource", "chargingStationIds", "chargingTariffId", "priority", "customData",
-                                              .. ChargingStationGroupStationProperties ] },
-            { nameof(ChargingPoolGroup),    [ "name", "description", "dataSource", "chargingPoolIds",    "chargingTariffId", "priority", "customData",
-                                              .. ChargingPoolGroupPoolProperties ] },
-            { nameof(ChargingTariffGroup),  [ "name", "description", "dataSource", "chargingTariffIds",                      "priority", "customData" ] }
+            { nameof(EVSEGroup),            [ "name", "description", "dataSource", "EVSEIds",            "customData" ] },
+            { nameof(ChargingStationGroup), [ "name", "description", "dataSource", "chargingStationIds", "customData" ] },
+            { nameof(ChargingPoolGroup),    [ "name", "description", "dataSource", "chargingPoolIds",    "customData" ] },
+            { nameof(ChargingTariffGroup),  [ "name", "description", "dataSource", "chargingTariffIds",  "customData" ] }
+        }.ToImmutableDictionary();
+
+        /// <summary>
+        /// The properties of a template a change set can update or remove, by the template type: those of its members it
+        /// gives them, and of an EVSE, charging station or charging pool template the charging tariff of their EVSEs.
+        /// </summary>
+        private static readonly ImmutableDictionary<String, ImmutableHashSet<String>> ChangeableTemplateProperties = new Dictionary<String, ImmutableHashSet<String>> {
+            { nameof(EVSETemplate),             [ "name", "description", "dataSource", "chargingTariffId", "customData",
+                                                  .. EVSETemplateEVSEProperties ] },
+            { nameof(ChargingStationTemplate),  [ "name", "description", "dataSource", "chargingTariffId", "customData",
+                                                  .. ChargingStationTemplateStationProperties ] },
+            { nameof(ChargingPoolTemplate),     [ "name", "description", "dataSource", "chargingTariffId", "customData",
+                                                  .. ChargingPoolTemplatePoolProperties ] },
+            { nameof(ChargingTariffTemplate),   [ "name", "description", "dataSource", "customData",
+                                                  .. ChargingTariffTemplateTariffProperties ] }
         }.ToImmutableDictionary();
 
         /// <summary>
@@ -271,15 +308,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "validFrom",
             "validUntil",
             "energyMix",
+            "templateIds",
             "customData"
-        ];
-
-        /// <summary>
-        /// The properties of a charging tariff a change set can update, but not remove: a tariff needs them.
-        /// </summary>
-        private static readonly ImmutableHashSet<String> RequiredChargingTariffProperties = [
-            "currency",
-            "elements"
         ];
 
         #endregion
@@ -296,6 +326,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                           or nameof(ChargingStation)
                           or nameof(EVSE)
                           or nameof(ChargingTariff)
+                          or nameof(EVSETemplate)
+                          or nameof(ChargingStationTemplate)
+                          or nameof(ChargingPoolTemplate)
+                          or nameof(ChargingTariffTemplate)
                           or nameof(EVSEGroup)
                           or nameof(ChargingStationGroup)
                           or nameof(ChargingPoolGroup)
@@ -332,6 +366,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 nameof(ChargingStationGroup) => ChargingStationGroup_Id.TryParse(entityId, out var chargingStationGroupId) ? chargingStationGroupId.OperatorId : null,
                 nameof(ChargingPoolGroup)    => ChargingPoolGroup_Id.   TryParse(entityId, out var chargingPoolGroupId)    ? chargingPoolGroupId.   OperatorId : null,
                 nameof(ChargingTariffGroup)  => ChargingTariffGroup_Id. TryParse(entityId, out var chargingTariffGroupId)  ? chargingTariffGroupId. OperatorId : null,
+                nameof(EVSETemplate)            => EVSETemplate_Id.           TryParse(entityId, out var evseTemplateId)            ? evseTemplateId.           OperatorId : null,
+                nameof(ChargingStationTemplate) => ChargingStationTemplate_Id.TryParse(entityId, out var chargingStationTemplateId) ? chargingStationTemplateId.OperatorId : null,
+                nameof(ChargingPoolTemplate)    => ChargingPoolTemplate_Id.   TryParse(entityId, out var chargingPoolTemplateId)    ? chargingPoolTemplateId.   OperatorId : null,
+                nameof(ChargingTariffTemplate)  => ChargingTariffTemplate_Id. TryParse(entityId, out var chargingTariffTemplateId)  ? chargingTariffTemplateId. OperatorId : null,
                 _                        => EVSE_Id.           TryParse(entityId, out var evseId)            ? evseId.           OperatorId : null
 
             };
@@ -418,6 +456,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            nameof(ChargingTariff)   => ChangeableChargingTariffProperties,
                                            _ when ChangeableGroupProperties.TryGetValue(Change.EntityType, out var groupProperties)
                                                                     => groupProperties,
+                                           _ when ChangeableTemplateProperties.TryGetValue(Change.EntityType, out var templateProperties)
+                                                                    => templateProperties,
                                            _                        => ChangeableEVSEProperties
                                        };
 
@@ -429,12 +469,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (Change.Kind == RoamingNetworkChangeKind.RemoveProperty)
                     {
-
-                        if (Change.EntityType == nameof(ChargingTariff) && RequiredChargingTariffProperties.Contains(propertyName))
-                        {
-                            ErrorResponse = $"Change {Index}: the property '{propertyName}' of a {description} can not be removed, only changed!";
-                            return false;
-                        }
 
                         if (CurrentValue is null)
                         {
@@ -588,7 +622,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var operatorId = OperatorJSON["@id"]?.Value<String>();
 
-            // Charging tariffs and groups are children of the operator itself.
+            // Charging tariffs, templates and groups are children of the operator itself.
             if (OperatorChildArrays.TryGetValue(EntityType, out var childArray))
             {
 
@@ -676,6 +710,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 case nameof(ChargingStationGroup):
                 case nameof(ChargingPoolGroup):
                 case nameof(ChargingTariffGroup):
+                case nameof(EVSETemplate):
+                case nameof(ChargingStationTemplate):
+                case nameof(ChargingPoolTemplate):
+                case nameof(ChargingTariffTemplate):
 
                     if (Change.ParentEntityType is not null &&
                        (Change.ParentEntityType != nameof(ChargingStationOperator) || StoredId(Operator, Change.ParentEntityType, Change.ParentEntityId) is null))
@@ -764,6 +802,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          nameof(ChargingStationGroup)    => ChargingStationGroup_Id.   TryParse(EntityId, out var chargingStationGroupId) && Operator.TryGetChargingStationGroup(chargingStationGroupId, out var chargingStationGroup) ? chargingStationGroup.Id.ToString() : null,
                          nameof(ChargingPoolGroup)       => ChargingPoolGroup_Id.      TryParse(EntityId, out var chargingPoolGroupId)    && Operator.TryGetChargingPoolGroup   (chargingPoolGroupId,    out var chargingPoolGroup)    ? chargingPoolGroup.   Id.ToString() : null,
                          nameof(ChargingTariffGroup)     => ChargingTariffGroup_Id.    TryParse(EntityId, out var chargingTariffGroupId)  && Operator.TryGetChargingTariffGroup (chargingTariffGroupId,  out var chargingTariffGroup)  ? chargingTariffGroup. Id.ToString() : null,
+                         nameof(EVSETemplate)            => EVSETemplate_Id.           TryParse(EntityId, out var evseTemplateId)            && Operator.TryGetEVSETemplate           (evseTemplateId,            out var evseTemplate)            ? evseTemplate.           Id.ToString() : null,
+                         nameof(ChargingStationTemplate) => ChargingStationTemplate_Id.TryParse(EntityId, out var chargingStationTemplateId) && Operator.TryGetChargingStationTemplate(chargingStationTemplateId, out var chargingStationTemplate) ? chargingStationTemplate.Id.ToString() : null,
+                         nameof(ChargingPoolTemplate)    => ChargingPoolTemplate_Id.   TryParse(EntityId, out var chargingPoolTemplateId)    && Operator.TryGetChargingPoolTemplate   (chargingPoolTemplateId,    out var chargingPoolTemplate)    ? chargingPoolTemplate.   Id.ToString() : null,
+                         nameof(ChargingTariffTemplate)  => ChargingTariffTemplate_Id. TryParse(EntityId, out var chargingTariffTemplateId)  && Operator.TryGetChargingTariffTemplate (chargingTariffTemplateId,  out var chargingTariffTemplate)  ? chargingTariffTemplate. Id.ToString() : null,
                          _                               => null
                      };
 
@@ -781,6 +823,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    nameof(ChargingStationGroup) => "charging station group",
                    nameof(ChargingPoolGroup)    => "charging pool group",
                    nameof(ChargingTariffGroup)  => "charging tariff group",
+                   nameof(EVSETemplate)             => "EVSE template",
+                   nameof(ChargingStationTemplate)  => "charging station template",
+                   nameof(ChargingPoolTemplate)     => "charging pool template",
+                   nameof(ChargingTariffTemplate)   => "charging tariff template",
                    _                        => "EVSE"
                };
 

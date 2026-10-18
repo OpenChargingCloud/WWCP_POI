@@ -186,7 +186,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var cases = new (String Name, JObject JSON, String Error)[] {
                 ("unknown currency",     Changed(network => Tariff(network)["currency"] = "XXX"),                                                  "ISO 4217"),
-                ("no elements",          Changed(network => Tariff(network)["elements"] = new JArray()),                                           "at least one element"),
+                ("no elements",          Changed(network => Tariff(network)["elements"] = new JArray()),                                           "has no elements, neither of its own nor of its templates"),
                 ("flat with step",       Changed(network => Tariff(network)["elements"]![1]!["priceComponents"]![1]!["stepSize"] = 1),             "FLAT price component has no step size"),
                 ("energy without step",  Changed(network => ((JObject) Tariff(network)["elements"]![0]!["priceComponents"]![0]!).Remove("stepSize")), "needs a positive step size"),
                 ("min above max",        Changed(network => Restrictions(network)["minPower"] = 50000),                                           "must not exceed its maximum"),
@@ -291,12 +291,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.Add(NewTariff(t3))),
                             Throws.ArgumentException.With.Message.Contains("already exists"));
 
-                // What a tariff needs can be changed, but not removed.
+                // What a tariff needs it must have, of its own or of its templates.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.RemoveProperty(changedT1, "currency")),
-                            Throws.ArgumentException.With.Message.Contains("the property 'currency' of a charging tariff can not be removed, only changed"));
+                            Throws.ArgumentException.With.Message.Contains("The charging tariff 'DE*GEF*T1' has no currency, neither of its own nor of its templates"));
 
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.RemoveProperty(changedT1, "elements")),
-                            Throws.ArgumentException.With.Message.Contains("the property 'elements' of a charging tariff can not be removed, only changed"));
+                            Throws.ArgumentException.With.Message.Contains("The charging tariff 'DE*GEF*T1' has no elements, neither of its own nor of its templates"));
 
             }
 

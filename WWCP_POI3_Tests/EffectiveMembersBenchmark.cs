@@ -33,7 +33,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
     /// <summary>
     /// What effective members cost: an operator of 500 charging pools, 2,000 charging stations and 10,000 EVSEs, with and
-    /// without groups giving all of them properties, parsed and changed by commits. Run on purpose only, in Release:
+    /// without templates giving all of them properties, parsed and changed by commits. Run on purpose only, in Release:
     /// dotnet test -c Release --filter "FullyQualifiedName~EffectiveMembersBenchmark" --logger "console;verbosity=detailed"
     /// </summary>
     [TestFixture, Explicit]
@@ -43,7 +43,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly DateTimeOffset              Created  = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
         private static readonly ChargingStationOperator_Id  GEF      = ChargingStationOperator_Id.Parse("DE*GEF");
 
-        private static RoamingNetwork Network(Boolean WithGroups, Int32 Pools = 500, Int32 Stations = 4, Int32 EVSEs = 5)
+        private static RoamingNetwork Network(Boolean WithTemplates, Int32 Pools = 500, Int32 Stations = 4, Int32 EVSEs = 5)
         {
 
             var pools = new List<ChargingPool>();
@@ -57,26 +57,25 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     var evses = new List<EVSE>();
                     for (var e = 1; e <= EVSEs; e++)
                         evses.Add(new EVSE(EVSE_Id.Parse($"DE*GEF*E{stationNo}*{e}"), Created: Created,
-                                           MaxPower: WithGroups ? null : Watt.FromW(22000)));
+                                           MaxPower:     WithTemplates ? null : Watt.FromW(22000),
+                                           TemplateIds:  WithTemplates ? [ EVSETemplate_Id.Parse("DE*GEF*ET1") ] : null));
                     stations.Add(new ChargingStation(ChargingStation_Id.Parse($"DE*GEF*S{stationNo}"), Created: Created, EVSEs: evses,
-                                                     HotlinePhoneNumber: WithGroups ? null : PhoneNumber.Parse("+49 800 111111")));
+                                                     HotlinePhoneNumber:  WithTemplates ? null : PhoneNumber.Parse("+49 800 111111"),
+                                                     TemplateIds:         WithTemplates ? [ ChargingStationTemplate_Id.Parse("DE*GEF*ST1") ] : null));
                 }
                 pools.Add(new ChargingPool(ChargingPool_Id.Parse($"DE*GEF*P{p}"), Created: Created, ChargingStations: stations,
-                                           Facilities: WithGroups ? null : [ Facility.CAFE ]));
+                                           Facilities:   WithTemplates ? null : [ Facility.CAFE ],
+                                           TemplateIds:  WithTemplates ? [ ChargingPoolTemplate_Id.Parse("DE*GEF*PT1") ] : null));
             }
-
-            var allEVSEs    = pools.SelectMany(pool => pool.ChargingStations).SelectMany(station => station.EVSEs).Select(evse => evse.Id).ToArray();
-            var allStations = pools.SelectMany(pool => pool.ChargingStations).Select(station => station.Id).ToArray();
-            var allPools    = pools.Select(pool => pool.Id).ToArray();
 
             return new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                        Created:                   Created,
                        ChargingStationOperators:  [ new ChargingStationOperator(GEF,
-                                                        Created:                Created,
-                                                        ChargingPools:          pools,
-                                                        EVSEGroups:             WithGroups ? [ new EVSEGroup(EVSEGroup_Id.Parse("DE*GEF*EG1"), EVSEIds: allEVSEs, MaxPower: Watt.FromW(22000), Created: Created) ] : null,
-                                                        ChargingStationGroups:  WithGroups ? [ new ChargingStationGroup(ChargingStationGroup_Id.Parse("DE*GEF*SG1"), ChargingStationIds: allStations, HotlinePhoneNumber: PhoneNumber.Parse("+49 800 111111"), Created: Created) ] : null,
-                                                        ChargingPoolGroups:     WithGroups ? [ new ChargingPoolGroup(ChargingPoolGroup_Id.Parse("DE*GEF*PG1"), ChargingPoolIds: allPools, Facilities: [ Facility.CAFE ], Created: Created) ] : null) ]).WithKeys();
+                                                        Created:                   Created,
+                                                        ChargingPools:             pools,
+                                                        EVSETemplates:             WithTemplates ? [ new EVSETemplate(EVSETemplate_Id.Parse("DE*GEF*ET1"), MaxPower: Watt.FromW(22000), Created: Created) ] : null,
+                                                        ChargingStationTemplates:  WithTemplates ? [ new ChargingStationTemplate(ChargingStationTemplate_Id.Parse("DE*GEF*ST1"), HotlinePhoneNumber: PhoneNumber.Parse("+49 800 111111"), Created: Created) ] : null,
+                                                        ChargingPoolTemplates:     WithTemplates ? [ new ChargingPoolTemplate(ChargingPoolTemplate_Id.Parse("DE*GEF*PT1"), Facilities: [ Facility.CAFE ], Created: Created) ] : null) ]).WithKeys();
 
         }
 
@@ -93,10 +92,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void Effective_members_of_a_large_operator()
         {
 
-            foreach (var withGroups in new[] { false, true })
+            foreach (var withTemplates in new[] { false, true })
             {
 
-                var network   = Network(withGroups);
+                var network   = Network(withTemplates);
                 var gef       = network.GetChargingStationOperatorById(GEF)!;
                 var json      = gef.ToEmbeddedJSON();
 
@@ -116,19 +115,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 var effective = Time(() => _ = history.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!.EffectiveChargingPools.Count);
 
-                TestContext.Out.WriteLine($"{(withGroups ? "with groups   " : "without groups")}: parse operator {parse,8:F0} ms, commit one EVSE change {commitOne,8:F0} ms, effective pools {effective,6:F1} ms");
+                TestContext.Out.WriteLine($"{(withTemplates ? "with templates   " : "without templates")}: parse operator {parse,8:F0} ms, commit one EVSE change {commitOne,8:F0} ms, effective pools {effective,6:F1} ms");
 
-                if (withGroups)
+                if (withTemplates)
                 {
-                    // A change of the EVSE group, which every EVSE takes.
-                    var commitGroup = Time(() => {
+                    // A change of the EVSE template, which every EVSE takes.
+                    var commitTemplate = Time(() => {
                         var head  = history.Head.RoamingNetwork;
-                        head.TryGetEVSEGroupById(EVSEGroup_Id.Parse("DE*GEF*EG1"), out var group);
-                        var r = history.Commit(head.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(group!, "maxPower", null, 11000 + (++minutes)) ],
+                        head.GetChargingStationOperatorById(GEF)!.TryGetEVSETemplate(EVSETemplate_Id.Parse("DE*GEF*ET1"), out var template);
+                        var r = history.Commit(head.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(template!, "maxPower", null, 11000 + (++minutes)) ],
                                                                           CreatedAt: Created.AddMinutes(++minutes)));
                         Assert.That(r.IsCommitted, r.ErrorResponse);
                     }, 2);
-                    TestContext.Out.WriteLine($"with groups   : commit a change of the EVSE group of all EVSEs {commitGroup,8:F0} ms");
+                    TestContext.Out.WriteLine($"with templates   : commit a change of the EVSE template of all EVSEs {commitTemplate,8:F0} ms");
                 }
 
             }

@@ -101,6 +101,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.EnergyMeter).OfType<EnergyMeter>();
 
         /// <summary>
+        /// The templates of the energy meters of its grid connection points, embedded completely, in the order of their
+        /// identifications.
+        /// </summary>
+        public POICollection<EnergyMeterTemplate_Id, EnergyMeterTemplate>  EnergyMeterTemplates    { get; }
+
+        /// <summary>
         /// The groups of the energy meters of its grid connection points, embedded completely, in the order of their
         /// identifications.
         /// </summary>
@@ -108,7 +114,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The grid connection points as they are at runtime, with their energy meters taking the properties of their
-        /// groups, in the order of their identifications: a grid connection point whose energy meter they give nothing
+        /// templates, in the order of their identifications: a grid connection point whose energy meter names no templates
         /// is itself.
         /// </summary>
         public POICollection<GridConnectionPoint_Id, GridConnectionPoint>  EffectiveGridConnectionPoints
@@ -145,6 +151,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<POIPublicKey>?                    SigningKeys                  = null,
                             IEnumerable<POIPublicKey>?                    IdentityKeys                 = null,
                             IEnumerable<EnergyMeterGroup>?                EnergyMeterGroups            = null,
+                            IEnumerable<EnergyMeterTemplate>?             EnergyMeterTemplates         = null,
 
                             Timestamped<GridOperatorAdminStatusType>?     InitialAdminStatus           = null,
                             Timestamped<GridOperatorStatusType>?          InitialStatus                = null,
@@ -204,7 +211,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region Effective grid connection points, with their energy meters taking the properties of their groups
+            #region Energy meter templates, of the energy meters of its grid connection points
+
+            this.EnergyMeterTemplates = new (EnergyMeterTemplates, template => template.Id, "energy meter template", $"the grid operator '{Id}'");
+
+            foreach (var energyMeter in this.EnergyMeters)
+                foreach (var templateId in energyMeter.TemplateIds)
+                    if (!this.EnergyMeterTemplates.Contains(templateId))
+                        throw new ArgumentException($"The template '{templateId}' of the energy meter '{energyMeter.Id}' is unknown at the grid operator '{Id}'!", nameof(EnergyMeterTemplates));
+
+            #endregion
+
+            #region Effective grid connection points, with their energy meters taking the properties of their templates
 
             this.effectiveGridConnectionPointIndex  = CalculateEffective();
             this.effectiveGridConnectionPoints      = new (() => effectiveGridConnectionPointIndex.IsEmpty
@@ -234,7 +252,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The given grid connection point of this grid operator as it is at runtime, with its energy meter taking the
-        /// properties of its groups: the grid connection point itself, when they give it none.
+        /// properties of its templates: the grid connection point itself, when it names none.
         /// </summary>
         /// <param name="GridConnectionPoint">A grid connection point of this grid operator.</param>
         public GridConnectionPoint EffectiveGridConnectionPoint(GridConnectionPoint GridConnectionPoint)
@@ -261,6 +279,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return true;
 
         }
+
+        #endregion
+
+        #region TryGetEnergyMeterTemplate(EnergyMeterTemplateId, out EnergyMeterTemplate)
+
+        /// <summary>
+        /// Try to return the energy meter template with the given identification.
+        /// </summary>
+        public Boolean TryGetEnergyMeterTemplate(EnergyMeterTemplate_Id                        EnergyMeterTemplateId,
+                                                 [NotNullWhen(true)] out EnergyMeterTemplate?  EnergyMeterTemplate)
+
+            => EnergyMeterTemplates.TryGet(EnergyMeterTemplateId, out EnergyMeterTemplate);
+
+        #endregion
+
+        #region TemplatesOf(EnergyMeter)
+
+        /// <summary>
+        /// The templates the given energy meter of one of its grid connection points names, in its order.
+        /// </summary>
+        public IEnumerable<EnergyMeterTemplate> TemplatesOf(EnergyMeter EnergyMeter)
+
+            => ChargingStationOperator.TemplatesOf(EnergyMeter.TemplateIds, EnergyMeterTemplates);
 
         #endregion
 
@@ -325,43 +366,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The effective grid connection points differing from the grid connection points, by their identifications:
-        /// those whose energy meter takes properties of its groups. Grid connection points have no timestamps; the energy
-        /// meter has the latest last change of it and its groups.
+        /// those whose energy meter names templates. Grid connection points have no timestamps; the energy meter has the
+        /// latest last change of it and its templates.
         /// </summary>
         private ImmutableDictionary<GridConnectionPoint_Id, GridConnectionPoint> CalculateEffective()
         {
-
-            var energyMeterGroupsOf = EnergyMeterGroups.Where     (energyMeterGroup => energyMeterGroup.HasEnergyMeterProperties).
-                                                        SelectMany(energyMeterGroup => energyMeterGroup.EnergyMeterIds.Select(memberId => (MemberId: memberId, Group: energyMeterGroup))).
-                                                        GroupBy   (membership => membership.MemberId).
-                                                        ToDictionary(members => members.Key,
-                                                                     members => members.Select(membership => membership.Group).ToArray());
-
-            if (energyMeterGroupsOf.Count == 0)
-                return ImmutableDictionary<GridConnectionPoint_Id, GridConnectionPoint>.Empty;
-
-            // The JSON of a group, calculated once for all its members.
-            var groupsJSON  = new Dictionary<EnergyMeterGroup, JObject>(ReferenceEqualityComparer.Instance);
-
-            JObject JSONOf(EnergyMeterGroup Group)
-            {
-                if (!groupsJSON.TryGetValue(Group, out var json))
-                {
-                    json = Group.ToJSON();
-                    groupsJSON.Add(Group, json);
-                }
-                return json;
-            }
 
             var effective = ImmutableDictionary.CreateBuilder<GridConnectionPoint_Id, GridConnectionPoint>();
 
             foreach (var gridConnectionPoint in GridConnectionPoints)
                 if (gridConnectionPoint.EnergyMeter is EnergyMeter energyMeter &&
-                    energyMeterGroupsOf.TryGetValue(energyMeter.Id, out var groups))
+                    energyMeter.TemplateIds.Length > 0)
                 {
                     effective.Add(gridConnectionPoint.Id,
-                                  gridConnectionPoint.WithEnergyMeter(EnergyMeterGroup.Effective(energyMeter,
-                                                                                                 new POIGroupValues<EnergyMeterGroup>($"the energy meter '{energyMeter.Id}'", groups, JSONOf))));
+                                  gridConnectionPoint.WithEnergyMeter(EnergyMeterTemplate.Effective(energyMeter,
+                                                                                                    ChargingStationOperator.Values(energyMeter.TemplateIds, EnergyMeterTemplates))));
                 }
 
             return effective.ToImmutable();
@@ -455,6 +474,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (GridConnectionPoints.Count > 0)
                 json.Add("gridConnectionPoints", new JArray(GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.ToJSON())));
 
+            if (EnergyMeterTemplates.Count > 0)
+                json.Add("energyMeterTemplates", new JArray(EnergyMeterTemplates.Select(energyMeterTemplate => energyMeterTemplate.ToJSON())));
+
             if (EnergyMeterGroups.Count > 0)
                 json.Add("energyMeterGroups",    new JArray(EnergyMeterGroups.   Select(energyMeterGroup    => energyMeterGroup.   ToJSON())));
 
@@ -519,6 +541,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseChildren<GridConnectionPoint>(JSON, "gridConnectionPoints", "gridConnectionPointIds", "grid connection points", GridConnectionPoint.TryParse, out var gridConnectionPoints, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseChildren<EnergyMeterTemplate>(JSON, "energyMeterTemplates", "energyMeterTemplateIds", "energy meter templates", EnergyMeterTemplate.TryParse, out var energyMeterTemplates, out ErrorResponse))
+                    return false;
+
                 if (!POIJSON.TryParseChildren<EnergyMeterGroup>   (JSON, "energyMeterGroups",    "energyMeterGroupIds",    "energy meter groups",    EnergyMeterGroup.   TryParse, out var energyMeterGroups,    out ErrorResponse))
                     return false;
 
@@ -543,7 +568,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 gridConnectionPoints,
                                                 SigningKeys:        signingKeys,
                                                 IdentityKeys:       identityKeys,
-                                                EnergyMeterGroups:  energyMeterGroups,
+                                                EnergyMeterGroups:     energyMeterGroups,
+                                                EnergyMeterTemplates:  energyMeterTemplates,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,

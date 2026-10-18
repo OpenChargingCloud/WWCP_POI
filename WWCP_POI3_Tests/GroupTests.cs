@@ -29,7 +29,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// Groups of EVSEs, charging stations, charging pools, charging tariffs and parking spaces.
+    /// Groups of EVSEs, charging stations, charging pools, charging tariffs and parking spaces: collections of members,
+    /// with a runtime status, that give them nothing.
     /// </summary>
     [TestFixture]
     public class GroupTests
@@ -73,7 +74,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                                  Created:  Created,
                                                                                                                                                                  EVSEs:    [ new EVSE(E1, Created: Created),
                                                                                                                                                                              new EVSE(E2, Created: Created) ]) ]) ],
-                                                                             EVSEGroups:             [ new EVSEGroup           (EG1, I18NString.Create(Languages.en, "Fast"), EVSEIds:            [ E2, E1 ], ChargingTariffId: T1, Created: Created) ],
+                                                                             EVSEGroups:             [ new EVSEGroup           (EG1, I18NString.Create(Languages.en, "Fast"), EVSEIds:            [ E2, E1 ],                       Created: Created) ],
                                                                              ChargingStationGroups:  [ new ChargingStationGroup(SG1,                                          ChargingStationIds: [ S1 ],                             Created: Created) ],
                                                                              ChargingPoolGroups:     [ new ChargingPoolGroup   (PG1,                                          ChargingPoolIds:    [ P1 ],                             Created: Created) ],
                                                                              ChargingTariffGroups:   [ new ChargingTariffGroup (TG1,                                          ChargingTariffIds:  [ T1 ],                             Created: Created) ]) ],
@@ -119,14 +120,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(fromJSON.CalcETags(),                                              Is.EqualTo(rn1.CalcETags()));
 
                 Assert.That(gef["EVSEGroups"]![0]!["EVSEIds"]!.Values<String>(),               Is.EqualTo(new[] { "DE*GEF*E1*1", "DE*GEF*E1*2" }));
-                Assert.That(gef["EVSEGroups"]![0]!["chargingTariffId"]!.ToString(),           Is.EqualTo("DE*GEF*T1"));
+                Assert.That(gef["EVSEGroups"]![0]!["chargingTariffId"],                        Is.Null);
                 Assert.That(gef["chargingStationGroups"]![0]!["chargingStationIds"]!.Values<String>(),  Is.EqualTo(new[] { "DE*GEF*S1" }));
                 Assert.That(gef["chargingPoolGroups"]![0]!["chargingPoolIds"]!.Values<String>(),        Is.EqualTo(new[] { "DE*GEF*P1" }));
                 Assert.That(gef["chargingTariffGroups"]![0]!["chargingTariffIds"]!.Values<String>(),    Is.EqualTo(new[] { "DE*GEF*T1" }));
                 Assert.That(json["parkingOperators"]![0]!["parkingSpaceGroups"]![0]!["parkingSpaceIds"]!.Values<String>(),  Is.EqualTo(new[] { "space-1", "space-2" }));
 
                 Assert.That(fromJSON.TryGetEVSEGroupById(EG1, out var eg1),                    Is.True);
-                Assert.That(eg1!.ChargingTariffId,                                             Is.EqualTo(T1));
+                Assert.That(eg1!.EVSEIds,                                                      Is.EqualTo(new[] { E1, E2 }));
                 Assert.That(fromJSON.TryGetChargingStationGroupById(SG1, out _),               Is.True);
                 Assert.That(fromJSON.TryGetChargingPoolGroupById(PG1, out _),                  Is.True);
                 Assert.That(fromJSON.TryGetChargingTariffGroupById(TG1, out _),                Is.True);
@@ -158,7 +159,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var cases = new (String Name, JObject JSON, String Error)[] {
                 ("unknown EVSE",           Changed(network => GEFJSON(network)["EVSEGroups"]![0]!["EVSEIds"] = new JArray("DE*GEF*E9*1")),           "member 'DE*GEF*E9*1' of the group 'DE*GEF*EG1'"),
-                ("unknown tariff",         Changed(network => GEFJSON(network)["EVSEGroups"]![0]!["chargingTariffId"] = "DE*GEF*T9"),              "charging tariff 'DE*GEF*T9' of the group"),
                 ("foreign group",          Changed(network => GEFJSON(network)["chargingPoolGroups"]![0]!["@id"] = "DE*XYZ*PG1"),                    "does not belong to the operator"),
                 ("unknown station",        Changed(network => GEFJSON(network)["chargingStationGroups"]![0]!["chargingStationIds"] = new JArray("DE*GEF*S9")), "member 'DE*GEF*S9'"),
                 ("unknown parking space",  Changed(network => network["parkingOperators"]![0]!["parkingSpaceGroups"]![0]!["parkingSpaceIds"] = new JArray("space-9")), "parking space 'space-9' of the parking space group 'level-1'")
@@ -195,7 +195,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             history.Commit(rn1.CreateSignedChangeSet([
                                 RoamingNetworkChange.Add           (new EVSEGroup(eg2, EVSEIds: [ E1 ])),
                                 RoamingNetworkChange.UpdateProperty(eg1!,    "EVSEIds",          null, new JArray(E1.ToString())),
-                                RoamingNetworkChange.RemoveProperty(eg1!,    "chargingTariffId"),
                                 RoamingNetworkChange.UpdateProperty(level1!, "parkingSpaceIds",  null, new JArray("space-2")),
                                 RoamingNetworkChange.Remove        (SG1)
                             ], CreatedAt: T0.AddMinutes(1)));
@@ -208,7 +207,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(rn2.EVSEGroups.Select(group => group.Id.ToString()),               Is.EqualTo(new[] { "DE*GEF*EG1", "DE*GEF*EG2" }));
                 Assert.That(rn2.TryGetEVSEGroupById(EG1, out var changedEG1),                  Is.True);
                 Assert.That(changedEG1!.EVSEIds,                                               Is.EqualTo(new[] { E1 }));
-                Assert.That(changedEG1.ChargingTariffId,                                       Is.Null);
                 Assert.That(rn2.TryGetChargingStationGroupById(SG1, out _),                    Is.False);
                 Assert.That(rn2.TryGetParkingSpaceGroupById(Level1, out var changedLevel1),    Is.True);
                 Assert.That(changedLevel1!.ParkingSpaceIds.Select(id => id.ToString()),        Is.EqualTo(new[] { "space-2" }));
@@ -216,6 +214,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 // The status of the group survived its change.
                 Assert.That(history.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, nameof(EVSEGroup), EG1.ToString(), out var groupStatus),  Is.True);
                 Assert.That(groupStatus!.Value,                                                                                                 Is.EqualTo("charging"));
+
+                // A group gives its members nothing: a change set can not give it a property of them.
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(changedEG1, "maxPower", null, 22000)),
+                            Throws.ArgumentException.With.Message.Contains("the property 'maxPower' of a EVSE group can not be changed"));
 
                 // A member of a group can not be removed, nor a tariff of a tariff group.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(E1)),

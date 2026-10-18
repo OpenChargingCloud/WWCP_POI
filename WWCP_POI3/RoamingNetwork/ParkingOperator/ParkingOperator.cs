@@ -109,6 +109,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public POICollection<ParkingSensor_Id, ParkingSensor>  ParkingSensors        { get; }
 
         /// <summary>
+        /// The templates of its parking spaces, in the order of their identifications.
+        /// </summary>
+        public POICollection<ParkingSpaceTemplate_Id, ParkingSpaceTemplate>  ParkingSpaceTemplates  { get; }
+
+        /// <summary>
         /// The groups of its parking spaces, in the order of their identifications; they may overlap.
         /// </summary>
         public POICollection<ParkingSpaceGroup_Id, ParkingSpaceGroup>  ParkingSpaceGroups  { get; }
@@ -138,6 +143,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                IEnumerable<ParkingProduct>?                    ParkingProducts              = null,
                                IEnumerable<POIPublicKey>?                      SigningKeys                  = null,
                                IEnumerable<POIPublicKey>?                      IdentityKeys                 = null,
+                               IEnumerable<ParkingSpaceTemplate>?              ParkingSpaceTemplates        = null,
 
                                Timestamped<ParkingOperatorAdminStatusType>?    InitialAdminStatus           = null,
                                Timestamped<ParkingOperatorStatusType>?         InitialStatus                = null,
@@ -182,12 +188,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ParkingGarages      = new (ParkingGarages,     garage  => garage. Id, "parking garage",      owner);
             this.ParkingSpaces       = new (ParkingSpaces,      space   => space.  Id, "parking space",       owner);
             this.ParkingSensors      = new (ParkingSensors,     sensor  => sensor. Id, "parking sensor",      owner);
+            this.ParkingSpaceTemplates  = new (ParkingSpaceTemplates, template => template.Id, "parking space template", owner);
             this.ParkingSpaceGroups  = new (ParkingSpaceGroups, group   => group.  Id, "parking space group", owner);
             this.ParkingProducts     = new (ParkingProducts,    product => product.Id, "parking product",     owner);
 
             foreach (var (kind, ownerId, productIds) in this.ParkingGarages.    Select(garage => ("parking garage",      garage.Id.ToString(), garage.ParkingProductIds)).
                                                    Concat(this.ParkingSpaces.     Select(space  => ("parking space",       space. Id.ToString(), space. ParkingProductIds))).
-                                                   Concat(this.ParkingSpaceGroups.Select(group  => ("parking space group", group. Id.ToString(), group. ParkingProductIds))))
+                                                   Concat(this.ParkingSpaceTemplates.Select(template => ("parking space template", template.Id.ToString(), template.ParkingProductIds))))
                 foreach (var productId in productIds)
                     if (!this.ParkingProducts.Contains(productId))
                         throw new ArgumentException($"The parking product '{productId}' of the {kind} '{ownerId}' is unknown at the parking operator '{Id}'!", nameof(ParkingProducts));
@@ -213,23 +220,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            // So does a parking space group, for its members.
-            foreach (var parkingSpaceGroup in this.ParkingSpaceGroups)
+            // So does a parking space template, for its members.
+            foreach (var parkingSpaceTemplate in this.ParkingSpaceTemplates)
             {
 
-                if (parkingSpaceGroup.ParkingGarageId.HasValue &&
-                    !this.ParkingGarages.Contains(parkingSpaceGroup.ParkingGarageId.Value))
+                if (parkingSpaceTemplate.ParkingGarageId.HasValue &&
+                    !this.ParkingGarages.Contains(parkingSpaceTemplate.ParkingGarageId.Value))
                 {
-                    throw new ArgumentException($"The parking garage '{parkingSpaceGroup.ParkingGarageId}' of the parking space group '{parkingSpaceGroup.Id}' is unknown at the parking operator '{Id}'!", nameof(ParkingSpaceGroups));
+                    throw new ArgumentException($"The parking garage '{parkingSpaceTemplate.ParkingGarageId}' of the parking space template '{parkingSpaceTemplate.Id}' is unknown at the parking operator '{Id}'!", nameof(ParkingSpaceTemplates));
                 }
 
-                foreach (var parkingSensorId in parkingSpaceGroup.ParkingSensorIds)
+                foreach (var parkingSensorId in parkingSpaceTemplate.ParkingSensorIds)
                     if (!this.ParkingSensors.Contains(parkingSensorId))
-                        throw new ArgumentException($"The parking sensor '{parkingSensorId}' of the parking space group '{parkingSpaceGroup.Id}' is unknown at the parking operator '{Id}'!", nameof(ParkingSpaceGroups));
+                        throw new ArgumentException($"The parking sensor '{parkingSensorId}' of the parking space template '{parkingSpaceTemplate.Id}' is unknown at the parking operator '{Id}'!", nameof(ParkingSpaceTemplates));
 
             }
 
-            // The effective parking spaces, with the properties their groups give them.
+            // The templates its parking spaces name, its own.
+            foreach (var parkingSpace in this.ParkingSpaces)
+                foreach (var templateId in parkingSpace.TemplateIds)
+                    if (!this.ParkingSpaceTemplates.Contains(templateId))
+                        throw new ArgumentException($"The template '{templateId}' of the parking space '{parkingSpace.Id}' is unknown at the parking operator '{Id}'!", nameof(ParkingSpaceTemplates));
+
+            // The effective parking spaces, with the properties their templates give them.
             this.effectiveParkingSpaceIndex  = CalculateEffective();
             this.effectiveParkingSpaces      = new (CalculateEffectiveParkingSpaces);
 
@@ -271,6 +284,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            [NotNullWhen(true)] out ParkingSensor?   ParkingSensor)
 
             => ParkingSensors.TryGet(ParkingSensorId, out ParkingSensor);
+
+        #endregion
+
+        #region TryGetParkingSpaceTemplate(ParkingSpaceTemplateId, out ParkingSpaceTemplate)
+
+        /// <summary>
+        /// Try to return the parking space template with the given identification.
+        /// </summary>
+        public Boolean TryGetParkingSpaceTemplate(ParkingSpaceTemplate_Id                        ParkingSpaceTemplateId,
+                                                  [NotNullWhen(true)] out ParkingSpaceTemplate?  ParkingSpaceTemplate)
+
+            => ParkingSpaceTemplates.TryGet(ParkingSpaceTemplateId, out ParkingSpaceTemplate);
 
         #endregion
 
@@ -424,6 +449,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ParkingSensors.Count > 0)
                 json.Add("parkingSensors",  new JArray(ParkingSensors.Select(parkingSensor => parkingSensor.ToJSON())));
 
+            if (ParkingSpaceTemplates.Count > 0)
+                json.Add("parkingSpaceTemplates", new JArray(ParkingSpaceTemplates.Select(parkingSpaceTemplate => parkingSpaceTemplate.ToJSON())));
+
             if (ParkingSpaceGroups.Count > 0)
                 json.Add("parkingSpaceGroups", new JArray(ParkingSpaceGroups.Select(parkingSpaceGroup => parkingSpaceGroup.ToJSON())));
 
@@ -492,6 +520,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseChildren<ParkingGarage>(JSON, "parkingGarages", "parkingGarageIds", "parking garages", ParkingGarage.TryParse, out var parkingGarages, out ErrorResponse) ||
                     !POIJSON.TryParseChildren<ParkingSpace> (JSON, "parkingSpaces",  "parkingSpaceIds",  "parking spaces",  ParkingSpace. TryParse, out var parkingSpaces,  out ErrorResponse) ||
                     !POIJSON.TryParseChildren<ParkingSensor>(JSON, "parkingSensors", "parkingSensorIds", "parking sensors", ParkingSensor.TryParse, out var parkingSensors, out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ParkingSpaceTemplate>(JSON, "parkingSpaceTemplates", "parkingSpaceTemplateIds", "parking space templates", ParkingSpaceTemplate.TryParse, out var parkingSpaceTemplates, out ErrorResponse) ||
                     !POIJSON.TryParseChildren<ParkingSpaceGroup>(JSON, "parkingSpaceGroups", "parkingSpaceGroupIds", "parking space groups", ParkingSpaceGroup.TryParse, out var parkingSpaceGroups, out ErrorResponse) ||
                     !POIJSON.TryParseChildren<ParkingProduct>(JSON, "parkingProducts", "parkingProductIds", "parking products", ParkingProduct.TryParse, out var parkingProducts, out ErrorResponse))
                 {
@@ -523,6 +552,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       parkingProducts,
                                                       signingKeys,
                                                       identityKeys,
+                                                      parkingSpaceTemplates,
                                                       DataSource:  dataSource,
                                                       Created:     created,
                                                       LastChange:  lastChange,

@@ -297,6 +297,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseChildren<EnergyMeterGroup>(JSON, "energyMeterGroups", "energyMeterGroupIds", "energy meter groups", EnergyMeterGroup.TryParse, out var energyMeterGroups, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseChildren<EVSETemplate>           (JSON, "EVSETemplates",            "EVSETemplateIds",            "EVSE templates",             EVSETemplate.           TryParse, out var evseTemplates,            out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingStationTemplate>(JSON, "chargingStationTemplates", "chargingStationTemplateIds", "charging station templates", ChargingStationTemplate.TryParse, out var chargingStationTemplates, out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingPoolTemplate>   (JSON, "chargingPoolTemplates",    "chargingPoolTemplateIds",    "charging pool templates",    ChargingPoolTemplate.   TryParse, out var chargingPoolTemplates,    out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingTariffTemplate> (JSON, "chargingTariffTemplates",  "chargingTariffTemplateIds",  "charging tariff templates",  ChargingTariffTemplate. TryParse, out var chargingTariffTemplates,  out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<EnergyMeterTemplate>    (JSON, "energyMeterTemplates",     "energyMeterTemplateIds",     "energy meter templates",     EnergyMeterTemplate.    TryParse, out var energyMeterTemplates,     out ErrorResponse))
+                {
+                    return false;
+                }
+
                 if (!POIJSON.TryParseChildren<ParkingSpace>(JSON, "parkingSpaces", "parkingSpaceIds", "parking spaces", ParkingSpace.TryParse, out var parkingSpaces, out ErrorResponse))
                     return false;
 
@@ -365,6 +374,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               SigningKeys:  signingKeys,
                                               IdentityKeys: identityKeys,
                                               EnergyMeterGroups:    energyMeterGroups,
+                                              EVSETemplates:             evseTemplates,
+                                              ChargingStationTemplates:  chargingStationTemplates,
+                                              ChargingPoolTemplates:     chargingPoolTemplates,
+                                              ChargingTariffTemplates:   chargingTariffTemplates,
+                                              EnergyMeterTemplates:      energyMeterTemplates,
                                               DataSource:  dataSource,
                                               Created:     created,
                                               LastChange:  lastChange,

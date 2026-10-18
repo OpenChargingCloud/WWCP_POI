@@ -66,9 +66,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
-        /// The currency of all its prices, by its ISO 4217 code.
+        /// The currency of all its prices, by its ISO 4217 code: its own, if any; the effective tariff, with what its
+        /// templates give it, has one.
         /// </summary>
-        public Currency                               Currency       { get; }
+        public Currency?                              Currency       { get; }
 
         /// <summary>
         /// For which charging sessions it is; for every one, unless given.
@@ -81,9 +82,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public URL?                                   TariffURL      { get; }
 
         /// <summary>
-        /// The elements, in their given order; at least one.
+        /// The elements, in their given order: its own, if any; the effective tariff, with what its templates give it,
+        /// has at least one.
         /// </summary>
         public ImmutableArray<ChargingTariffElement>  Elements       { get; }
+
+        /// <summary>
+        /// Whether it has a currency and elements, as an effective tariff must: of its own, or of its templates.
+        /// </summary>
+        public Boolean                                IsComplete
+            => Currency is not null && Elements.Length > 0;
 
         /// <summary>
         /// The least a charging session costs: a session costing less costs this.
@@ -121,6 +129,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public EnergyMix?  EnergyMix  { get; }
 
+        /// <summary>
+        /// The charging tariff templates it takes, each once, in its order: of every property they give, the first one giving it
+        /// decides, unless it has its own. It names them; they do not name their members.
+        /// </summary>
+        public ImmutableArray<ChargingTariffTemplate_Id>  TemplateIds  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -129,8 +143,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Create a new charging tariff.
         /// </summary>
         public ChargingTariff(ChargingTariff_Id                              Id,
-                              Currency                                       Currency,
-                              IEnumerable<ChargingTariffElement>             Elements,
+                              Currency?                                      Currency,
+                              IEnumerable<ChargingTariffElement>?            Elements,
                               I18NString?                                    Name                         = null,
                               I18NString?                                    Description                  = null,
                               URL?                                           TariffURL                    = null,
@@ -142,6 +156,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               IEnumerable<PaymentBrand>?                     PaymentBrands                = null,
                               DateTimeOffset?                                ValidFrom                    = null,
                               DateTimeOffset?                                ValidUntil                   = null,
+
+                              IEnumerable<ChargingTariffTemplate_Id>?        TemplateIds                  = null,
 
                               Timestamped<ChargingTariffAdminStatusType>?    InitialAdminStatus           = null,
                               Timestamped<ChargingTariffStatusType>?         InitialStatus                = null,
@@ -174,14 +190,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
-            ArgumentNullException.ThrowIfNull(Currency);
+            this.TemplateIds  = POIJSON.UniqueIds(TemplateIds, $"template of the charging tariff '{Id}'");
 
+            // A currency and elements of its own, or of its templates: the effective tariff is checked by its operator.
             var elements = (Elements ?? []).ToArray();
 
-            if (elements.Length == 0 || elements.Any(element => element is null))
-                throw new ArgumentException($"The charging tariff '{Id}' needs at least one element, and no null entries!", nameof(Elements));
+            if (elements.Any(element => element is null))
+                throw new ArgumentException($"The elements of the charging tariff '{Id}' must not contain null entries!", nameof(Elements));
 
-            if (ValidatePriceLimits(Id, MinPrice, MaxPrice) is String error)
+            if (ValidatePriceLimits($"the charging tariff '{Id}'", MinPrice, MaxPrice) is String error)
                 throw new ArgumentException(error, nameof(MinPrice));
 
             // To the millisecond, as every timestamp of the content.
@@ -208,27 +225,79 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) ValidatePriceLimits(Id, MinPrice, MaxPrice)
+        #region (internal static) TryParseElements(JSON, Owner, out Elements, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the optional elements of the given JSON of a charging tariff or a charging tariff template.
+        /// </summary>
+        /// <param name="JSON">The JSON of a charging tariff or a charging tariff template.</param>
+        /// <param name="Owner">What it is, for a message, e.g. "the charging tariff 'DE*GEF*T1'".</param>
+        /// <param name="Elements">The elements, in their given order; none when absent.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        internal static Boolean TryParseElements(JObject                                    JSON,
+                                                 String                                     Owner,
+                                                 out List<ChargingTariffElement>            Elements,
+                                                 [NotNullWhen(false)] out String?           ErrorResponse)
+        {
+
+            Elements = [];
+
+            if (JSON["elements"] is not JToken elementsToken)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            if (elementsToken is not JArray elementsJSON)
+            {
+                ErrorResponse = $"The elements of {Owner} must be a JSON array!";
+                return false;
+            }
+
+            foreach (var elementJSON in elementsJSON)
+            {
+
+                if (elementJSON is not JObject elementObject)
+                {
+                    ErrorResponse = "A charging tariff element must be a JSON object!";
+                    return false;
+                }
+
+                if (!ChargingTariffElement.TryParse(elementObject, out var element, out ErrorResponse))
+                    return false;
+
+                Elements.Add(element);
+
+            }
+
+            ErrorResponse = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region (internal static) ValidatePriceLimits(Owner, MinPrice, MaxPrice)
 
         /// <summary>
         /// The error, when the given price limits are invalid each, or the minimum exceeds the maximum.
         /// </summary>
-        private static String? ValidatePriceLimits(ChargingTariff_Id    Id,
+        internal static String? ValidatePriceLimits(String               Owner,
                                                    ChargingPriceLimit?  MinPrice,
                                                    ChargingPriceLimit?  MaxPrice)
         {
 
             if (MinPrice?.Validate() is String minError)
-                return $"The minimum price of the charging tariff '{Id}' is invalid: {minError}";
+                return $"The minimum price of {Owner} is invalid: {minError}";
 
             if (MaxPrice?.Validate() is String maxError)
-                return $"The maximum price of the charging tariff '{Id}' is invalid: {maxError}";
+                return $"The maximum price of {Owner} is invalid: {maxError}";
 
             if (MinPrice is not null && MaxPrice is not null &&
                (MinPrice.ExcludingVAT > MaxPrice.ExcludingVAT ||
                 MinPrice.IncludingVAT > MaxPrice.IncludingVAT))
             {
-                return $"The minimum price of the charging tariff '{Id}' must not exceed its maximum price!";
+                return $"The minimum price of {Owner} must not exceed its maximum price!";
             }
 
             return null;
@@ -310,7 +379,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (DataSource is not null)
                 json.Add("dataSource",   DataSource);
 
-            json.Add("currency",         Currency.ISOCode);
+            if (Currency is not null)
+                json.Add("currency",     Currency.ISOCode);
 
             if (TariffType.HasValue)
                 json.Add("tariffType",   TariffType.Value.ToString());
@@ -318,7 +388,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (TariffURL.HasValue)
                 json.Add("tariffURL",    TariffURL.Value.ToString());
 
-            json.Add("elements",         new JArray(Elements.Select(element => element.ToJSON())));
+            if (Elements.Length > 0)
+                json.Add("elements",     new JArray(Elements.Select(element => element.ToJSON())));
 
             if (MinPrice is not null)
                 json.Add("minPrice",     MinPrice.ToJSON());
@@ -340,6 +411,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (EnergyMix is not null)
                 json.Add("energyMix",    EnergyMix.ToJSON(Embedded: true));
+
+            if (TemplateIds.Length > 0)
+                json.Add("templateIds", POIJSON.IdsToJSON(TemplateIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
@@ -376,10 +450,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (JSON["currency"]?.Type != JTokenType.String ||
-                    !Currency.TryParseISO(JSON["currency"]!.Value<String>()!, out var currency))
+                // Its currency and elements, unless its templates give them.
+                Currency? currency = null;
+
+                if (JSON["currency"] is JToken currencyJSON &&
+                   (currencyJSON.Type != JTokenType.String ||
+                    !Currency.TryParseISO(currencyJSON.Value<String>()!, out currency)))
                 {
-                    ErrorResponse = $"The charging tariff '{id}' needs its currency, an ISO 4217 code, not '{JSON["currency"]}'!";
+                    ErrorResponse = $"The currency of the charging tariff '{id}' must be an ISO 4217 code, not '{currencyJSON}'!";
                     return false;
                 }
 
@@ -391,29 +469,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (JSON["elements"] is not JArray elementsJSON)
-                {
-                    ErrorResponse = $"The charging tariff '{id}' needs its elements as a JSON array!";
+                if (!TryParseElements(JSON, $"the charging tariff '{id}'", out var elements, out ErrorResponse))
                     return false;
-                }
-
-                var elements = new List<ChargingTariffElement>();
-
-                foreach (var elementJSON in elementsJSON)
-                {
-
-                    if (elementJSON is not JObject elementObject)
-                    {
-                        ErrorResponse = "A charging tariff element must be a JSON object!";
-                        return false;
-                    }
-
-                    if (!ChargingTariffElement.TryParse(elementObject, out var element, out ErrorResponse))
-                        return false;
-
-                    elements.Add(element);
-
-                }
 
                 if (!POIJSON.TryParseObject<EnergyMix>(JSON, "energyMix", "energy mix", (JObject json, out EnergyMix? energyMix, out String? error) => POI.EnergyMix.TryParse(json, out energyMix, out error), out var energyMix, out ErrorResponse))
                     return false;
@@ -433,7 +490,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (ValidatePriceLimits(id, minPrice, maxPrice) is String priceLimitsError)
+                if (ValidatePriceLimits($"the charging tariff '{id}'", minPrice, maxPrice) is String priceLimitsError)
                 {
                     ErrorResponse = priceLimitsError;
                     return false;
@@ -450,6 +507,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     ErrorResponse = $"The charging tariff '{id}' must be valid from before it is valid until!";
                     return false;
                 }
+
+                if (!POIJSON.TryParseIds(JSON, "templateIds", "template identification", ChargingTariffTemplate_Id.TryParse, out ImmutableArray<ChargingTariffTemplate_Id> templateIds, out ErrorResponse))
+                    return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
@@ -474,6 +534,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     paymentBrands,
                                                     validFrom,
                                                     validUntil,
+                                                    TemplateIds:  templateIds,
                                                     DataSource:  dataSource,
                                                     Created:     created,
                                                     LastChange:  lastChange,

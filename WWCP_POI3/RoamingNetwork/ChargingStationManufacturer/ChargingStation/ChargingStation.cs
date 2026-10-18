@@ -197,6 +197,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ParkingSpace_Id>         ParkingSpaceIds       { get; }
 
+        /// <summary>
+        /// The charging station templates it takes, each once, in its order: of every property they give, the first one giving it
+        /// decides, unless it has its own. It names them; they do not name their members.
+        /// </summary>
+        public ImmutableArray<ChargingStationTemplate_Id>  TemplateIds  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -226,6 +232,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                Watt?                                           MaxPower                     = null,
                                IEnumerable<ParkingSpace_Id>?                   ParkingSpaceIds              = null,
                                IEnumerable<EUVehicleCategory>?                 EUVehicleCategories          = null,
+
+                               IEnumerable<ChargingStationTemplate_Id>?        TemplateIds                  = null,
 
                                Timestamped<ChargingStationAdminStatusType>?    InitialAdminStatus           = null,
                                Timestamped<ChargingStationStatusType>?         InitialStatus                = null,
@@ -257,6 +265,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    InternalData)
 
         {
+
+            this.TemplateIds  = POIJSON.UniqueIds(TemplateIds, $"template of the charging station '{Id}'");
 
             if (MaxPower?.Value < 0)
                 throw new ArgumentException($"The maximum power of the charging station '{Id}' must not be negative!", nameof(MaxPower));
@@ -594,6 +604,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ParkingSpaceIds.Length > 0)
                 json.Add("parkingSpaceIds",    POIJSON.IdsToJSON(ParkingSpaceIds));
 
+            if (TemplateIds.Length > 0)
+                json.Add("templateIds", POIJSON.IdsToJSON(TemplateIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -687,6 +700,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (JSON.ParseOptional("maxPower", "maximum power", out Watt? maxPower, out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
+                if (!POIJSON.TryParseIds(JSON, "templateIds", "template identification", ChargingStationTemplate_Id.TryParse, out ImmutableArray<ChargingStationTemplate_Id> templateIds, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -718,6 +734,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       maxPower,
                                                       parkingSpaceIds,
                                                       euVehicleCategories,
+                                                      TemplateIds:  templateIds,
                                                       DataSource:  dataSource,
                                                       Created:     created,
                                                       LastChange:  lastChange,

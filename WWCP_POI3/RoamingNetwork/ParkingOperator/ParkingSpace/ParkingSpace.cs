@@ -222,6 +222,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<Image>                    Images                    { get; }
 
+        /// <summary>
+        /// The parking space templates it takes, each once, in its order: of every property they give, the first one giving it
+        /// decides, unless it has its own. It names them; they do not name their members.
+        /// </summary>
+        public ImmutableArray<ParkingSpaceTemplate_Id>  TemplateIds  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -264,6 +270,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<Standard>?                       Standards                    = null,
                             IEnumerable<Image>?                          Images                       = null,
 
+                            IEnumerable<ParkingSpaceTemplate_Id>?        TemplateIds                  = null,
+
                             Timestamped<ParkingSpaceAdminStatusType>?    InitialAdminStatus           = null,
                             Timestamped<ParkingSpaceStatusType>?         InitialStatus                = null,
                             UInt16?                                      MaxAdminStatusScheduleSize   = null,
@@ -294,6 +302,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    InternalData)
 
         {
+
+            this.TemplateIds  = POIJSON.UniqueIds(TemplateIds, $"template of the parking space '{Id}'");
 
             this.GeoLocation         = GeoLocation;
             this.ParkingGarageId     = ParkingGarageId;
@@ -519,6 +529,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Images.Length > 0)
                 json.Add("images",                    new JArray(Images.Select(image => image.ToJSON())));
 
+            if (TemplateIds.Length > 0)
+                json.Add("templateIds", POIJSON.IdsToJSON(TemplateIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -618,6 +631,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
                 }
 
+                if (!POIJSON.TryParseIds(JSON, "templateIds", "template identification", ParkingSpaceTemplate_Id.TryParse, out ImmutableArray<ParkingSpaceTemplate_Id> templateIds, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -661,6 +677,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 apdsReference,
                                                 standards,
                                                 images,
+                                                TemplateIds:  templateIds,
                                                 DataSource:  dataSource,
                                                 Created:     created,
                                                 LastChange:  lastChange,

@@ -452,7 +452,73 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly System.Collections.Immutable.ImmutableDictionary<EnergyMeter_Id,     EnergyMeter>      energyMeterIndex;
 
         /// <summary>
-        /// The EVSEGroup groups, embedded completely, in the order of their identifications.
+        /// The EVSE templates, embedded completely, in the order of their identifications.
+        /// </summary>
+        public POICollection<EVSETemplate_Id, EVSETemplate>                        EVSETemplates             { get; } = POICollection<EVSETemplate_Id, EVSETemplate>.Empty;
+
+        /// <summary>
+        /// The charging station templates, embedded completely, in the order of their identifications.
+        /// </summary>
+        public POICollection<ChargingStationTemplate_Id, ChargingStationTemplate>  ChargingStationTemplates  { get; } = POICollection<ChargingStationTemplate_Id, ChargingStationTemplate>.Empty;
+
+        /// <summary>
+        /// The charging pool templates, embedded completely, in the order of their identifications.
+        /// </summary>
+        public POICollection<ChargingPoolTemplate_Id, ChargingPoolTemplate>        ChargingPoolTemplates     { get; } = POICollection<ChargingPoolTemplate_Id, ChargingPoolTemplate>.Empty;
+
+        /// <summary>
+        /// The charging tariff templates, embedded completely, in the order of their identifications.
+        /// </summary>
+        public POICollection<ChargingTariffTemplate_Id, ChargingTariffTemplate>    ChargingTariffTemplates   { get; } = POICollection<ChargingTariffTemplate_Id, ChargingTariffTemplate>.Empty;
+
+        /// <summary>
+        /// The templates of the energy meters of its charging pools, charging stations and EVSEs, embedded completely,
+        /// in the order of their identifications.
+        /// </summary>
+        public POICollection<EnergyMeterTemplate_Id, EnergyMeterTemplate>          EnergyMeterTemplates      { get; } = POICollection<EnergyMeterTemplate_Id, EnergyMeterTemplate>.Empty;
+
+        /// <summary>
+        /// Try to return the EVSE template with the given identification.
+        /// </summary>
+        public Boolean TryGetEVSETemplate(EVSETemplate_Id                                                    EVSETemplateId,
+                                          [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EVSETemplate?  EVSETemplate)
+
+            => EVSETemplates.TryGet(EVSETemplateId, out EVSETemplate);
+
+        /// <summary>
+        /// Try to return the charging station template with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingStationTemplate(ChargingStationTemplate_Id                                                    ChargingStationTemplateId,
+                                                     [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ChargingStationTemplate?  ChargingStationTemplate)
+
+            => ChargingStationTemplates.TryGet(ChargingStationTemplateId, out ChargingStationTemplate);
+
+        /// <summary>
+        /// Try to return the charging pool template with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingPoolTemplate(ChargingPoolTemplate_Id                                                    ChargingPoolTemplateId,
+                                                  [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ChargingPoolTemplate?  ChargingPoolTemplate)
+
+            => ChargingPoolTemplates.TryGet(ChargingPoolTemplateId, out ChargingPoolTemplate);
+
+        /// <summary>
+        /// Try to return the charging tariff template with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingTariffTemplate(ChargingTariffTemplate_Id                                                    ChargingTariffTemplateId,
+                                                    [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out ChargingTariffTemplate?  ChargingTariffTemplate)
+
+            => ChargingTariffTemplates.TryGet(ChargingTariffTemplateId, out ChargingTariffTemplate);
+
+        /// <summary>
+        /// Try to return the energy meter template with the given identification.
+        /// </summary>
+        public Boolean TryGetEnergyMeterTemplate(EnergyMeterTemplate_Id                                                    EnergyMeterTemplateId,
+                                                 [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EnergyMeterTemplate?  EnergyMeterTemplate)
+
+            => EnergyMeterTemplates.TryGet(EnergyMeterTemplateId, out EnergyMeterTemplate);
+
+        /// <summary>
+        /// The EVSE groups, embedded completely, in the order of their identifications.
         /// </summary>
         public POICollection<EVSEGroup_Id, EVSEGroup>  EVSEGroups  { get; } = POICollection<EVSEGroup_Id, EVSEGroup>.Empty;
 
@@ -465,7 +531,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => EVSEGroups.TryGet(EVSEGroupId, out EVSEGroup);
 
         /// <summary>
-        /// The ChargingStationGroup groups, embedded completely, in the order of their identifications.
+        /// The charging station groups, embedded completely, in the order of their identifications.
         /// </summary>
         public POICollection<ChargingStationGroup_Id, ChargingStationGroup>  ChargingStationGroups  { get; } = POICollection<ChargingStationGroup_Id, ChargingStationGroup>.Empty;
 
@@ -478,7 +544,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => ChargingStationGroups.TryGet(ChargingStationGroupId, out ChargingStationGroup);
 
         /// <summary>
-        /// The ChargingPoolGroup groups, embedded completely, in the order of their identifications.
+        /// The charging pool groups, embedded completely, in the order of their identifications.
         /// </summary>
         public POICollection<ChargingPoolGroup_Id, ChargingPoolGroup>  ChargingPoolGroups  { get; } = POICollection<ChargingPoolGroup_Id, ChargingPoolGroup>.Empty;
 
@@ -491,7 +557,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => ChargingPoolGroups.TryGet(ChargingPoolGroupId, out ChargingPoolGroup);
 
         /// <summary>
-        /// The ChargingTariffGroup groups, embedded completely, in the order of their identifications.
+        /// The charging tariff groups, embedded completely, in the order of their identifications.
         /// </summary>
         public POICollection<ChargingTariffGroup_Id, ChargingTariffGroup>  ChargingTariffGroups  { get; } = POICollection<ChargingTariffGroup_Id, ChargingTariffGroup>.Empty;
 
@@ -711,6 +777,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        IEnumerable<POIPublicKey>?                            SigningKeys                             = null,
                                        IEnumerable<POIPublicKey>?                            IdentityKeys                            = null,
                                        IEnumerable<EnergyMeterGroup>?                        EnergyMeterGroups                       = null,
+                                       IEnumerable<EVSETemplate>?                            EVSETemplates                           = null,
+                                       IEnumerable<ChargingStationTemplate>?                 ChargingStationTemplates                = null,
+                                       IEnumerable<ChargingPoolTemplate>?                    ChargingPoolTemplates                   = null,
+                                       IEnumerable<ChargingTariffTemplate>?                  ChargingTariffTemplates                 = null,
+                                       IEnumerable<EnergyMeterTemplate>?                     EnergyMeterTemplates                    = null,
 
                                        Timestamped<ChargingStationOperatorAdminStatusType>?  InitialAdminStatus                     = null,
                                        Timestamped<ChargingStationOperatorStatusType>?       InitialStatus                          = null,
@@ -842,9 +913,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         if (!evseIndex.ContainsKey(memberId))
                             throw new ArgumentException($"The member '{memberId}' of the group '{evseGroup.Id}' is unknown at the operator '{Id}'!", nameof(EVSEGroups));
 
-                if (evseGroup.ChargingTariffId.HasValue && !this.ChargingTariffs.Contains(evseGroup.ChargingTariffId.Value))
-                    throw new ArgumentException($"The charging tariff '{evseGroup.ChargingTariffId}' of the group '{evseGroup.Id}' is unknown at the operator '{Id}'!", nameof(EVSEGroups));
-
                 }
 
             }
@@ -868,9 +936,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         if (!chargingStationIndex.ContainsKey(memberId))
                             throw new ArgumentException($"The member '{memberId}' of the group '{chargingStationGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingStationGroups));
 
-                if (chargingStationGroup.ChargingTariffId.HasValue && !this.ChargingTariffs.Contains(chargingStationGroup.ChargingTariffId.Value))
-                    throw new ArgumentException($"The charging tariff '{chargingStationGroup.ChargingTariffId}' of the group '{chargingStationGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingStationGroups));
-
                 }
 
             }
@@ -893,9 +958,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     foreach (var memberId in chargingPoolGroup.ChargingPoolIds)
                         if (!this.ChargingPools.Contains(memberId))
                             throw new ArgumentException($"The member '{memberId}' of the group '{chargingPoolGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingPoolGroups));
-
-                if (chargingPoolGroup.ChargingTariffId.HasValue && !this.ChargingTariffs.Contains(chargingPoolGroup.ChargingTariffId.Value))
-                    throw new ArgumentException($"The charging tariff '{chargingPoolGroup.ChargingTariffId}' of the group '{chargingPoolGroup.Id}' is unknown at the operator '{Id}'!", nameof(ChargingPoolGroups));
 
                 }
 
@@ -961,8 +1023,82 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region Effective charging pools, charging stations and EVSEs, with the properties their groups give them
+            #region Templates, of this operator, and those its members name
 
+            this.EVSETemplates             = new (EVSETemplates,            template => template.Id, "EVSE template",             $"the operator '{Id}'");
+            this.ChargingStationTemplates  = new (ChargingStationTemplates, template => template.Id, "charging station template", $"the operator '{Id}'");
+            this.ChargingPoolTemplates     = new (ChargingPoolTemplates,    template => template.Id, "charging pool template",    $"the operator '{Id}'");
+            this.ChargingTariffTemplates   = new (ChargingTariffTemplates,  template => template.Id, "charging tariff template",  $"the operator '{Id}'");
+            this.EnergyMeterTemplates      = new (EnergyMeterTemplates,     template => template.Id, "energy meter template",     $"the operator '{Id}'");
+
+            foreach (var template in this.EVSETemplates)
+            {
+
+                if (template.Id.OperatorId != Id)
+                    throw new ArgumentException($"The template '{template.Id}' does not belong to the operator '{Id}'!", nameof(EVSETemplates));
+
+                if (template.ChargingTariffId.HasValue && !this.ChargingTariffs.Contains(template.ChargingTariffId.Value))
+                    throw new ArgumentException($"The charging tariff '{template.ChargingTariffId}' of the template '{template.Id}' is unknown at the operator '{Id}'!", nameof(EVSETemplates));
+
+            }
+
+            foreach (var template in this.ChargingStationTemplates)
+            {
+
+                if (template.Id.OperatorId != Id)
+                    throw new ArgumentException($"The template '{template.Id}' does not belong to the operator '{Id}'!", nameof(ChargingStationTemplates));
+
+                if (template.ChargingTariffId.HasValue && !this.ChargingTariffs.Contains(template.ChargingTariffId.Value))
+                    throw new ArgumentException($"The charging tariff '{template.ChargingTariffId}' of the template '{template.Id}' is unknown at the operator '{Id}'!", nameof(ChargingStationTemplates));
+
+            }
+
+            foreach (var template in this.ChargingPoolTemplates)
+            {
+
+                if (template.Id.OperatorId != Id)
+                    throw new ArgumentException($"The template '{template.Id}' does not belong to the operator '{Id}'!", nameof(ChargingPoolTemplates));
+
+                if (template.ChargingTariffId.HasValue && !this.ChargingTariffs.Contains(template.ChargingTariffId.Value))
+                    throw new ArgumentException($"The charging tariff '{template.ChargingTariffId}' of the template '{template.Id}' is unknown at the operator '{Id}'!", nameof(ChargingPoolTemplates));
+
+            }
+
+            foreach (var template in this.ChargingTariffTemplates)
+                if (template.Id.OperatorId != Id)
+                    throw new ArgumentException($"The template '{template.Id}' does not belong to the operator '{Id}'!", nameof(ChargingTariffTemplates));
+
+            // The templates its members name, of this operator.
+            foreach (var evse in EVSEs)
+                foreach (var templateId in evse.TemplateIds)
+                    if (!this.EVSETemplates.Contains(templateId))
+                        throw new ArgumentException($"The template '{templateId}' of the EVSE '{evse.Id}' is unknown at the operator '{Id}'!", nameof(EVSETemplates));
+
+            foreach (var chargingStation in ChargingStations)
+                foreach (var templateId in chargingStation.TemplateIds)
+                    if (!this.ChargingStationTemplates.Contains(templateId))
+                        throw new ArgumentException($"The template '{templateId}' of the charging station '{chargingStation.Id}' is unknown at the operator '{Id}'!", nameof(ChargingStationTemplates));
+
+            foreach (var chargingPool in this.ChargingPools)
+                foreach (var templateId in chargingPool.TemplateIds)
+                    if (!this.ChargingPoolTemplates.Contains(templateId))
+                        throw new ArgumentException($"The template '{templateId}' of the charging pool '{chargingPool.Id}' is unknown at the operator '{Id}'!", nameof(ChargingPoolTemplates));
+
+            foreach (var chargingTariff in this.ChargingTariffs)
+                foreach (var templateId in chargingTariff.TemplateIds)
+                    if (!this.ChargingTariffTemplates.Contains(templateId))
+                        throw new ArgumentException($"The template '{templateId}' of the charging tariff '{chargingTariff.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffTemplates));
+
+            foreach (var energyMeter in EnergyMeters)
+                foreach (var templateId in energyMeter.TemplateIds)
+                    if (!this.EnergyMeterTemplates.Contains(templateId))
+                        throw new ArgumentException($"The template '{templateId}' of the energy meter '{energyMeter.Id}' is unknown at the operator '{Id}'!", nameof(EnergyMeterTemplates));
+
+            #endregion
+
+            #region Effective charging tariffs, charging pools, charging stations and EVSEs, with the properties their templates give them
+
+            this.effectiveChargingTariffs = CalculateEffectiveChargingTariffs();
             (this.effectiveEVSEs, this.effectiveChargingStations, this.effectiveChargingPoolIndex) = CalculateEffective();
             this.effectiveChargingPools = new (CalculateEffectiveChargingPools);
 
@@ -1289,6 +1425,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (ChargingPools.Count > 0)
                     json.Add("chargingPools", new JArray(ChargingPools.Select(chargingPool => chargingPool.ToJSON())));
+
+                if (EVSETemplates.Count > 0)
+                    json.Add("EVSETemplates", new JArray(EVSETemplates.Select(template => template.ToJSON())));
+
+                if (ChargingStationTemplates.Count > 0)
+                    json.Add("chargingStationTemplates", new JArray(ChargingStationTemplates.Select(template => template.ToJSON())));
+
+                if (ChargingPoolTemplates.Count > 0)
+                    json.Add("chargingPoolTemplates", new JArray(ChargingPoolTemplates.Select(template => template.ToJSON())));
+
+                if (ChargingTariffTemplates.Count > 0)
+                    json.Add("chargingTariffTemplates", new JArray(ChargingTariffTemplates.Select(template => template.ToJSON())));
+
+                if (EnergyMeterTemplates.Count > 0)
+                    json.Add("energyMeterTemplates", new JArray(EnergyMeterTemplates.Select(template => template.ToJSON())));
 
                 if (EVSEGroups.Count > 0)
                     json.Add("EVSEGroups", new JArray(EVSEGroups.Select(group => group.ToJSON())));

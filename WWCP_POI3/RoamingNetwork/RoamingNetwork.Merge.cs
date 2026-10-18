@@ -255,7 +255,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   ("energyMeterManufacturers",          nameof(EnergyMeterManufacturer)),
                                                   ("transparencySoftware",              nameof(TransparencySoftware)),
                                                   ("transparencySoftwareCertificates",  nameof(TransparencySoftwareCertificate)) ] },
-            { nameof(ChargingStationOperator),  [ ("chargingTariffs",                   nameof(ChargingTariff)),
+            { nameof(ChargingStationOperator),  [ ("chargingTariffTemplates",           nameof(ChargingTariffTemplate)),
+                                                  ("chargingTariffs",                   nameof(ChargingTariff)),
+                                                  ("EVSETemplates",                     nameof(EVSETemplate)),
+                                                  ("chargingStationTemplates",          nameof(ChargingStationTemplate)),
+                                                  ("chargingPoolTemplates",             nameof(ChargingPoolTemplate)),
+                                                  ("energyMeterTemplates",              nameof(EnergyMeterTemplate)),
                                                   ("chargingPools",                     nameof(ChargingPool)),
                                                   ("EVSEGroups",                        nameof(EVSEGroup)),
                                                   ("chargingStationGroups",             nameof(ChargingStationGroup)),
@@ -265,9 +270,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   ("parkingSpaces",                     nameof(ParkingSpace)) ] },
             { nameof(ChargingPool),             [ ("chargingStations",                  nameof(ChargingStation)) ] },
             { nameof(ChargingStation),          [ ("EVSEs",                             nameof(EVSE)) ] },
-            { nameof(GridOperator),             [ ("gridConnectionPoints",              nameof(GridConnectionPoint)),
+            { nameof(GridOperator),             [ ("energyMeterTemplates",              nameof(EnergyMeterTemplate)),
+                                                  ("gridConnectionPoints",              nameof(GridConnectionPoint)),
                                                   ("energyMeterGroups",                 nameof(EnergyMeterGroup)) ] },
             { nameof(ParkingOperator),          [ ("parkingGarages",                    nameof(ParkingGarage)),
+                                                  ("parkingSpaceTemplates",             nameof(ParkingSpaceTemplate)),
                                                   ("parkingSpaces",                     nameof(ParkingSpace)),
                                                   ("parkingSensors",                    nameof(ParkingSensor)),
                                                   ("parkingSpaceGroups",                nameof(ParkingSpaceGroup)),
@@ -900,7 +907,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Merge a property both versions changed differently element by element, when it is an array of
-        /// identified elements (see POIElements.TryMerge). The keys of a party are merged as a whole.
+        /// identified elements (see POIElements.TryMerge). The keys of a party and the templates of a member, whose order
+        /// is content, are merged as a whole.
         /// </summary>
         private static Boolean TryMergeElements(String       PropertyName,
                                                 JToken?      Base,
@@ -912,6 +920,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Merged = null;
 
             return !POIPartyKeys.IsKeyProperty(PropertyName) &&
+                   PropertyName != POIElements.TemplateIdsProperty &&
                    POIElements.TryMerge(PropertyName, Base, Left, Right, out Merged);
 
         }
@@ -922,7 +931,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The changes of a property leading from the value of the left version to the merged one: element by element,
-        /// where they can be (see POIElements.Diff), the keys of a party as a whole; without old values,
+        /// where they can be (see POIElements.Diff), the keys of a party and the templates of a member as a whole; without old values,
         /// so that they get the values they find.
         /// </summary>
         private static IEnumerable<RoamingNetworkChange> PropertyChanges(String   EntityType,
@@ -932,7 +941,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                          JToken?  NewValue)
         {
 
-            if (POIPartyKeys.IsKeyProperty(PropertyName))
+            if (POIPartyKeys.IsKeyProperty(PropertyName) || PropertyName == POIElements.TemplateIdsProperty)
                 return [ NewValue is not null
                              ? RoamingNetworkChange.UpdateProperty(EntityType, EntityId, PropertyName, null, NewValue.DeepClone())
                              : RoamingNetworkChange.RemoveProperty(EntityType, EntityId, PropertyName) ];
@@ -1037,6 +1046,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 nameof(ChargingPool)                     => ChargingPool_Id.                   TryParse(EntityId, out var poolId)            ? poolId            : null,
                 nameof(ChargingStation)                  => ChargingStation_Id.                TryParse(EntityId, out var stationId)         ? stationId         : null,
                 nameof(EVSE)                             => EVSE_Id.                           TryParse(EntityId, out var evseId)            ? evseId            : null,
+                nameof(EVSETemplate)                     => EVSETemplate_Id.                   TryParse(EntityId, out var evseTemplateId)    ? evseTemplateId    : null,
+                nameof(ChargingStationTemplate)          => ChargingStationTemplate_Id.        TryParse(EntityId, out var stationTemplateId) ? stationTemplateId : null,
+                nameof(ChargingPoolTemplate)             => ChargingPoolTemplate_Id.           TryParse(EntityId, out var poolTemplateId)    ? poolTemplateId    : null,
+                nameof(ChargingTariffTemplate)           => ChargingTariffTemplate_Id.         TryParse(EntityId, out var tariffTemplateId)  ? tariffTemplateId  : null,
+                nameof(EnergyMeterTemplate)              => EnergyMeterTemplate_Id.            TryParse(EntityId, out var meterTemplateId)   ? meterTemplateId   : null,
                 nameof(EVSEGroup)                        => EVSEGroup_Id.                      TryParse(EntityId, out var evseGroupId)       ? evseGroupId       : null,
                 nameof(ChargingStationGroup)             => ChargingStationGroup_Id.           TryParse(EntityId, out var stationGroupId)    ? stationGroupId    : null,
                 nameof(ChargingPoolGroup)                => ChargingPoolGroup_Id.              TryParse(EntityId, out var poolGroupId)       ? poolGroupId       : null,
@@ -1090,12 +1104,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    nameof(ParkingGarage)                    => ChangeableParkingGarageProperties,
                    nameof(ParkingSpace)                     => ChangeableParkingSpaceProperties,
                    nameof(ParkingSensor)                    => ChangeableParkingSensorProperties,
+                   nameof(ParkingSpaceTemplate)             => ChangeableParkingSpaceTemplateProperties,
                    nameof(ParkingSpaceGroup)                => ChangeableParkingSpaceGroupProperties,
                    nameof(ParkingProduct)                   => ChangeableParkingProductProperties,
                    nameof(GridConnectionPoint)              => ChangeableGridConnectionPointProperties,
+                   nameof(EnergyMeterTemplate)              => ChangeableEnergyMeterTemplateProperties,
                    nameof(EnergyMeterGroup)                 => ChangeableEnergyMeterGroupProperties,
                    _ when ChangeableGroupProperties.TryGetValue(EntityType, out var groupProperties)
                                                             => groupProperties,
+                   _ when ChangeableTemplateProperties.TryGetValue(EntityType, out var templateProperties)
+                                                            => templateProperties,
                    _                                        => []
                };
 

@@ -35,7 +35,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 {
 
     /// <summary>
-    /// The charging tariffs and the groups of a charging station operator: left out of it on request,
+    /// The charging tariffs, the templates and the groups of a charging station operator: left out of it on request,
     /// listed below it, and served one by one, each the part of the operator it is.
     /// </summary>
     [TestFixture]
@@ -49,6 +49,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
         private static readonly ChargingTariff_Id       T1       = ChargingTariff_Id.     Parse("DE*GEF*T1");
         private static readonly ChargingTariffGroup_Id  TG1      = ChargingTariffGroup_Id.Parse("DE*GEF*TG1");
         private static readonly EVSEGroup_Id            EG1      = EVSEGroup_Id.          Parse("DE*GEF*EG1");
+        private static readonly EVSETemplate_Id         ET1      = EVSETemplate_Id.       Parse("DE*GEF*ET1");
         private static readonly ChargingPoolGroup_Id    PG1      = ChargingPoolGroup_Id.  Parse("DE*GEF*PG1");
         private static readonly ChargingPool_Id         P1       = ChargingPool_Id.       Parse("DE*GEF*P1");
         private static readonly EVSE_Id                 E1       = EVSE_Id.               Parse("DE*GEF*E1*1");
@@ -103,7 +104,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
         #region NewNetwork()
 
         /// <summary>
-        /// An operator with a charging tariff, a group of it, a group of EVSEs and a group of charging pools.
+        /// An operator with a charging tariff, a group of it, a template of EVSEs naming it, a group of EVSEs and a group
+        /// of charging pools.
         /// </summary>
         private static RoamingNetwork NewNetwork()
 
@@ -120,9 +122,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                                                                               Created:           Created,
                                                                                               ChargingStations:  [ new ChargingStation(ChargingStation_Id.Parse("DE*GEF*S1"),
                                                                                                                                        Created:  Created,
-                                                                                                                                       EVSEs:    [ new EVSE(E1, Created: Created) ]) ]) ],
-                                                    EVSEGroups:            [ new EVSEGroup          (EG1, EVSEIds:           [ E1 ], ChargingTariffId: T1, Created: Created) ],
-                                                    ChargingPoolGroups:    [ new ChargingPoolGroup  (PG1, ChargingPoolIds:   [ P1 ], ChargingTariffId: T1, Created: Created) ],
+                                                                                                                                       EVSEs:    [ new EVSE(E1, TemplateIds: [ ET1 ], Created: Created) ]) ]) ],
+                                                    EVSETemplates:         [ new EVSETemplate       (ET1, ChargingTariffId: T1,          Created: Created) ],
+                                                    EVSEGroups:            [ new EVSEGroup          (EG1, EVSEIds:           [ E1 ], Created: Created) ],
+                                                    ChargingPoolGroups:    [ new ChargingPoolGroup  (PG1, ChargingPoolIds:   [ P1 ], Created: Created) ],
                                                     ChargingTariffGroups:  [ new ChargingTariffGroup(TG1, ChargingTariffIds: [ T1 ],                        Created: Created) ]) ]).WithKeys();
 
         #endregion
@@ -167,14 +170,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
         #endregion
 
 
-        #region An_operator_leaves_out_its_tariffs_and_groups_which_are_listed()
+        #region An_operator_leaves_out_its_tariffs_templates_and_groups_which_are_listed()
 
         [Test]
-        public async Task An_operator_leaves_out_its_tariffs_and_groups_which_are_listed()
+        public async Task An_operator_leaves_out_its_tariffs_templates_and_groups_which_are_listed()
         {
 
             var (_,       _, whole)     = await Get(CSO);
-            var (slim,    _, slimJSON)  = await Get(CSO + "?without=chargingPools,chargingTariffs,chargingTariffGroups,chargingPoolGroups,chargingStationGroups,EVSEGroups");
+            var (slim,    _, slimJSON)  = await Get(CSO + "?without=chargingPools,chargingTariffs,EVSETemplates,chargingTariffGroups,chargingPoolGroups,chargingStationGroups,EVSEGroups");
+            var (_,       _, templList) = await Get(CSO + "/EVSETs");
             var (tariffs, _, tariffList)= await Get(CSO + "/CTs");
             var (groups,  _, groupList) = await Get(CSO + "/EVSEGs?match=EG1");
             var (none,    _, noneList)  = await Get(CSO + "/CSGs");
@@ -184,7 +188,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
                 Assert.That(slim.StatusCode,                                   Is.EqualTo(HttpStatusCode.OK));
 
-                foreach (var property in new[] { "chargingPools", "chargingTariffs", "chargingTariffGroups", "chargingPoolGroups", "EVSEGroups" })
+                foreach (var property in new[] { "chargingPools", "chargingTariffs", "EVSETemplates", "chargingTariffGroups", "chargingPoolGroups", "EVSEGroups" })
                 {
                     Assert.That(whole![property],                              Is.Not.Null, property);
                     Assert.That(slimJSON![property],                           Is.Null,     property);
@@ -196,6 +200,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(JToken.DeepEquals(tariffList, whole!["chargingTariffs"]),   Is.True);
                 Assert.That(HeaderOf(tariffs, "X-Total-Count"),                Is.EqualTo("1"));
                 Assert.That(JToken.DeepEquals(groupList,  whole["EVSEGroups"]),         Is.True);
+                Assert.That(JToken.DeepEquals(templList,  whole["EVSETemplates"]),      Is.True);
                 Assert.That(HeaderOf(groups,  "X-Filtered-Count"),             Is.EqualTo("1"));
 
                 Assert.That(none.StatusCode,                                   Is.EqualTo(HttpStatusCode.OK));
@@ -207,10 +212,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
         #endregion
 
-        #region Tariffs_and_groups_are_served_one_by_one()
+        #region Tariffs_templates_and_groups_are_served_one_by_one()
 
         [Test]
-        public async Task Tariffs_and_groups_are_served_one_by_one()
+        public async Task Tariffs_templates_and_groups_are_served_one_by_one()
         {
 
             var (_,          _,             whole)      = await Get(CSO);
@@ -218,6 +223,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
             var (tariffGroup, _,            groupJSON)  = await Get(CSO + "/CTGs/DE*GEF*TG1");
             var (poolGroup,  _,             poolJSON)   = await Get(CSO + "/CPGs/DE*GEF*PG1");
             var (evseGroup,  _,             evseJSON)   = await Get(CSO + "/EVSEGs/DE*GEF*EG1");
+            var (template,   _,             templJSON)  = await Get(CSO + "/EVSETs/DE*GEF*ET1");
+            var (noTemplate, _,             _)          = await Get(CSO + "/EVSETs/DE*GEF*ET9");
             var (unknown,    _,             _)          = await Get(CSO + "/CTs/DE*GEF*T9");
             var (nobody,     _,             _)          = await Get("RNs/rn1/CSOs/DE*XXX/CTs/DE*GEF*T1");
 
@@ -234,6 +241,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(tariffGroup.StatusCode,                            Is.EqualTo(HttpStatusCode.OK));
                 Assert.That(poolGroup.StatusCode,                              Is.EqualTo(HttpStatusCode.OK));
                 Assert.That(evseGroup.StatusCode,                              Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(template.StatusCode,                               Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(JToken.DeepEquals(templJSON, whole["EVSETemplates"]![0]),         Is.True);
+                Assert.That(noTemplate.StatusCode,                             Is.EqualTo(HttpStatusCode.NotFound));
 
                 Assert.That(unknown.StatusCode,                                Is.EqualTo(HttpStatusCode.NotFound));
                 Assert.That(nobody.StatusCode,                                 Is.EqualTo(HttpStatusCode.NotFound));

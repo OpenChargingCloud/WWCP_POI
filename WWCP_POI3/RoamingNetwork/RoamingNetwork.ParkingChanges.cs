@@ -98,6 +98,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "apdsReference",
             "standards",
             "images",
+            "templateIds",
             "customData"
         ];
 
@@ -113,16 +114,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ];
 
         /// <summary>
-        /// The properties of a parking space group a change set can update or remove: also those of a parking space it
-        /// gives its members, all but its identification, name, description, data source, custom data and APDS reference.
+        /// The properties of a parking space group a change set can update or remove: its members, as it gives them nothing.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableParkingSpaceGroupProperties = [
             "name",
             "description",
             "dataSource",
             "parkingSpaceIds",
+            "customData"
+        ];
+
+        /// <summary>
+        /// The properties of a parking space template a change set can update or remove: those of a parking space it gives
+        /// its members, all but its identification, name, description, data source, custom data, templates and APDS reference.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> ChangeableParkingSpaceTemplateProperties = [
+            "name",
+            "description",
+            "dataSource",
             "parkingProductIds",
-            "priority",
             "customData",
             "geoLocation",
             "parkingGarageId",
@@ -180,6 +190,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => EntityType is nameof(ParkingGarage)
                           or nameof(ParkingSpace)
                           or nameof(ParkingSensor)
+                          or nameof(ParkingSpaceTemplate)
                           or nameof(ParkingSpaceGroup)
                           or nameof(ParkingProduct);
 
@@ -198,6 +209,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    nameof(ParkingGarage)      => ParkingGarage_Id.    TryParse(EntityId, out var garageId)  ? garageId  : null,
                    nameof(ParkingSpace)       => ParkingSpace_Id.     TryParse(EntityId, out var spaceId)   ? spaceId   : null,
                    nameof(ParkingSensor)      => ParkingSensor_Id.    TryParse(EntityId, out var sensorId)  ? sensorId  : null,
+                   nameof(ParkingSpaceTemplate)  => ParkingSpaceTemplate_Id.TryParse(EntityId, out var templateId)  ? templateId : null,
                    nameof(ParkingSpaceGroup)  => ParkingSpaceGroup_Id.TryParse(EntityId, out var groupId)   ? groupId   : null,
                    nameof(ParkingProduct)     => ParkingProduct_Id.   TryParse(EntityId, out var productId) ? productId : null,
                    _                          => null
@@ -220,6 +232,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    nameof(ParkingGarage)      => ParkingGarage_Id.    TryParse(EntityId, out var garageId)  && ParkingOperator.TryGetParkingGarage    (garageId,  out var garage)  ? garage. Id.ToString() : null,
                    nameof(ParkingSpace)       => ParkingSpace_Id.     TryParse(EntityId, out var spaceId)   && ParkingOperator.TryGetParkingSpace     (spaceId,   out var space)   ? space.  Id.ToString() : null,
                    nameof(ParkingSensor)      => ParkingSensor_Id.    TryParse(EntityId, out var sensorId)  && ParkingOperator.TryGetParkingSensor    (sensorId,  out var sensor)  ? sensor. Id.ToString() : null,
+                   nameof(ParkingSpaceTemplate)  => ParkingSpaceTemplate_Id.TryParse(EntityId, out var templateId) && ParkingOperator.TryGetParkingSpaceTemplate(templateId, out var template) ? template.Id.ToString() : null,
                    nameof(ParkingSpaceGroup)  => ParkingSpaceGroup_Id.TryParse(EntityId, out var groupId)   && ParkingOperator.TryGetParkingSpaceGroup(groupId,   out var group)   ? group.  Id.ToString() : null,
                    nameof(ParkingProduct)     => ParkingProduct_Id.   TryParse(EntityId, out var productId) && ParkingOperator.TryGetParkingProduct   (productId, out var product) ? product.Id.ToString() : null,
                    _                          => null
@@ -246,7 +259,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) TryApplyParkingChange(Change, Index, CreatedAt, ParkingOperators, ChargingStationOperators, out CurrentValue, out ErrorResponse)
 
         /// <summary>
-        /// Apply a change of a parking garage, parking space, parking sensor, parking space group or parking product
+        /// Apply a change of a parking garage, parking space, parking sensor, parking space template or group, or parking product
         /// to the given parking operators; of a parking space a charging station operator defines, to the given
         /// charging station operators.
         /// </summary>
@@ -264,6 +277,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var (description, arrayName, changeable) = Change.EntityType switch {
                 nameof(ParkingGarage)  => ("parking garage", "parkingGarages", ChangeableParkingGarageProperties),
                 nameof(ParkingSpace)   => ("parking space",  "parkingSpaces",  ChangeableParkingSpaceProperties),
+                nameof(ParkingSpaceTemplate) => ("parking space template", "parkingSpaceTemplates", ChangeableParkingSpaceTemplateProperties),
                 nameof(ParkingSpaceGroup) => ("parking space group", "parkingSpaceGroups", ChangeableParkingSpaceGroupProperties),
                 nameof(ParkingProduct)    => ("parking product",     "parkingProducts",    ChangeableParkingProductProperties),
                 _                      => ("parking sensor", "parkingSensors", ChangeableParkingSensorProperties)

@@ -194,6 +194,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<EMobilityProvider_Id>  AcceptedEMobilityProviderIds  { get; }
 
+        /// <summary>
+        /// The EVSE templates it takes, each once, in its order: of every property they give, the first one giving it
+        /// decides, unless it has its own. It names them; they do not name their members.
+        /// </summary>
+        public ImmutableArray<EVSETemplate_Id>  TemplateIds  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -223,6 +229,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     IEnumerable<Standard>?               Standards                    = null,
                     String?                              FloorLevel                   = null,
                     IEnumerable<EMobilityProvider_Id>?   AcceptedEMobilityProviderIds = null,
+
+                    IEnumerable<EVSETemplate_Id>?        TemplateIds                  = null,
 
                     Timestamped<EVSEAdminStatusType>?    InitialAdminStatus           = null,
                     Timestamped<EVSEStatusType>?         InitialStatus                = null,
@@ -254,6 +262,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    InternalData)
 
         {
+
+            this.TemplateIds  = POIJSON.UniqueIds(TemplateIds, $"template of the EVSE '{Id}'");
 
             if (MaxVoltage?.Value < 0 || MaxCurrent?.Value < 0 || MaxPower?.Value < 0)
                 throw new ArgumentException($"The electrical limits of the EVSE '{Id}' must not be negative!");
@@ -568,6 +578,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (AcceptedEMobilityProviderIds.Length > 0)
                 json.Add("acceptedEMobilityProviderIds",  POIJSON.IdsToJSON(AcceptedEMobilityProviderIds));
 
+            if (TemplateIds.Length > 0)
+                json.Add("templateIds", POIJSON.IdsToJSON(TemplateIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -663,6 +676,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (JSON.ParseOptional("extendedOperationTimeout", "extended operation timeout", out Boolean? extendedOperationTimeout, out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
+                if (!POIJSON.TryParseIds(JSON, "templateIds", "template identification", EVSETemplate_Id.TryParse, out ImmutableArray<EVSETemplate_Id> templateIds, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -694,6 +710,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 standards,
                                 floorLevel,
                                 acceptedEMobilityProviderIds,
+                                TemplateIds:  templateIds,
                                 DataSource:  dataSource,
                                 Created:     created,
                                 LastChange:  lastChange,
