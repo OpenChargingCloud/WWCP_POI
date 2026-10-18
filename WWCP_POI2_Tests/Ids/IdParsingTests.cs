@@ -131,6 +131,28 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Ids
 
         #endregion
 
+        #region Group_IDs_of_providers_take_their_prefix()
+
+        /// <summary>
+        /// The EVSE, charging station and charging pool groups of an e-mobility provider are named by its identification,
+        /// also with a '-' separator: written with a '*' separator, the same as in any other spelling.
+        /// </summary>
+        [Test]
+        public void Group_IDs_of_providers_take_their_prefix()
+        {
+
+            Assert.That(EVSEGroup_Id.           Parse("DE-GDF*EG1").ToString(),  Is.EqualTo("DE*GDF*EG1"));
+            Assert.That(ChargingStationGroup_Id.Parse("de-gdf*SG1").ToString(),  Is.EqualTo("DE*GDF*SG1"));
+            Assert.That(ChargingPoolGroup_Id.   Parse("DE-GDFPG1"). ToString(),  Is.EqualTo("DE*GDF*PG1"));
+
+            Assert.That(EVSEGroup_Id.Parse("DE-GDF*EG1"),                        Is.EqualTo(EVSEGroup_Id.Parse("DEGDF*EG1")));
+            Assert.That(EVSEGroup_Id.TryParse("DE--GDF*EG1", out _),             Is.False);
+            Assert.That(EVSEGroup_Id.TryParse("DE+GDF*EG1",  out _),             Is.False);
+
+        }
+
+        #endregion
+
         #region Charging_pool_group_IDs_use_their_own_prefix()
 
         /// <summary>

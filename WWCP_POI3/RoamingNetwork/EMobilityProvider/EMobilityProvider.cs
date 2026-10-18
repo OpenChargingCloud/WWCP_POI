@@ -55,6 +55,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// An e-mobility provider, embedded completely in its roaming network:
     /// it offers charging to EV drivers, e.g. by their contracts and authentication tokens.
+    /// Its groups of EVSEs, charging stations and charging pools name members of any operator of the network, by weak
+    /// references: a member that does not exist (any more) is left out, and its operator removes it without the provider.
     /// </summary>
     public sealed class EMobilityProvider : AImmutableEMobilityEntity<EMobilityProvider_Id,
                                                                       EMobilityProviderAdminStatusType,
@@ -87,6 +89,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <inheritdoc/>
         public ImmutableArray<POIPublicKey>  IdentityKeys    { get; }
 
+        /// <summary>
+        /// Its groups of EVSEs of any operator.
+        /// </summary>
+        public POICollection<EVSEGroup_Id,            EVSEGroup>             EVSEGroups               { get; } = POICollection<EVSEGroup_Id,            EVSEGroup>.           Empty;
+
+        /// <summary>
+        /// Its groups of charging stations of any operator.
+        /// </summary>
+        public POICollection<ChargingStationGroup_Id, ChargingStationGroup>  ChargingStationGroups    { get; } = POICollection<ChargingStationGroup_Id, ChargingStationGroup>.Empty;
+
+        /// <summary>
+        /// Its groups of charging pools of any operator.
+        /// </summary>
+        public POICollection<ChargingPoolGroup_Id,    ChargingPoolGroup>     ChargingPoolGroups       { get; } = POICollection<ChargingPoolGroup_Id,    ChargingPoolGroup>.   Empty;
+
         #endregion
 
         #region Constructor(s)
@@ -102,6 +119,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  PhoneNumber?                                      HotlinePhoneNumber           = null,
                                  IEnumerable<POIPublicKey>?                        SigningKeys                  = null,
                                  IEnumerable<POIPublicKey>?                        IdentityKeys                 = null,
+                                 IEnumerable<EVSEGroup>?                           EVSEGroups                   = null,
+                                 IEnumerable<ChargingStationGroup>?                ChargingStationGroups        = null,
+                                 IEnumerable<ChargingPoolGroup>?                   ChargingPoolGroups           = null,
 
                                  Timestamped<EMobilityProviderAdminStatusType>?    InitialAdminStatus           = null,
                                  Timestamped<EMobilityProviderStatusType>?         InitialStatus                = null,
@@ -139,6 +159,92 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.HotlinePhoneNumber  = HotlinePhoneNumber;
 
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the e-mobility provider '{Id}'");
+
+            #region Its groups: named by its own identification, of members of any operator
+
+            this.EVSEGroups             = new (EVSEGroups,            group => group.Id, "EVSE group",             $"the e-mobility provider '{Id}'");
+            this.ChargingStationGroups  = new (ChargingStationGroups, group => group.Id, "charging station group", $"the e-mobility provider '{Id}'");
+            this.ChargingPoolGroups     = new (ChargingPoolGroups,    group => group.Id, "charging pool group",    $"the e-mobility provider '{Id}'");
+
+            foreach (var groupId in this.EVSEGroups.           Select(group => (Id: group.Id.ToString(), group.Id.OperatorId)).
+                             Concat(this.ChargingStationGroups.Select(group => (Id: group.Id.ToString(), group.Id.OperatorId))).
+                             Concat(this.ChargingPoolGroups.   Select(group => (Id: group.Id.ToString(), group.Id.OperatorId))))
+            {
+                if (!IsOwnPrefix(groupId.OperatorId))
+                    throw new ArgumentException($"The group '{groupId.Id}' does not belong to the e-mobility provider '{Id}'!", nameof(EVSEGroups));
+            }
+
+            #endregion
+
+        }
+
+        #endregion
+
+
+        #region IsOwnPrefix(Prefix)
+
+        /// <summary>
+        /// Whether the given prefix of the identification of a group, written as the identification of a charging station
+        /// operator, is the identification of this e-mobility provider.
+        /// </summary>
+        /// <param name="Prefix">The prefix of the identification of a group.</param>
+        public Boolean IsOwnPrefix(ChargingStationOperator_Id Prefix)
+
+            => EMobilityProvider_Id.TryParse(Prefix.ToString(), out var providerId) &&
+               providerId == Id;
+
+        #endregion
+
+        #region TryGetEVSEGroup / TryGetChargingStationGroup / TryGetChargingPoolGroup
+
+        /// <summary>
+        /// Try to get its EVSE group with the given identification.
+        /// </summary>
+        public Boolean TryGetEVSEGroup(EVSEGroup_Id                        EVSEGroupId,
+                                       [NotNullWhen(true)] out EVSEGroup?  EVSEGroup)
+
+            => EVSEGroups.TryGet(EVSEGroupId, out EVSEGroup);
+
+        /// <summary>
+        /// Try to get its charging station group with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingStationGroup(ChargingStationGroup_Id                        ChargingStationGroupId,
+                                                  [NotNullWhen(true)] out ChargingStationGroup?  ChargingStationGroup)
+
+            => ChargingStationGroups.TryGet(ChargingStationGroupId, out ChargingStationGroup);
+
+        /// <summary>
+        /// Try to get its charging pool group with the given identification.
+        /// </summary>
+        public Boolean TryGetChargingPoolGroup(ChargingPoolGroup_Id                        ChargingPoolGroupId,
+                                               [NotNullWhen(true)] out ChargingPoolGroup?  ChargingPoolGroup)
+
+            => ChargingPoolGroups.TryGet(ChargingPoolGroupId, out ChargingPoolGroup);
+
+        #endregion
+
+        #region (internal) ShareRuntimeOfAll(Previous)
+
+        /// <summary>
+        /// Take the runtime status and internal data of the given previous version of this e-mobility provider, and of
+        /// every group it had, by their identifications.
+        /// </summary>
+        internal void ShareRuntimeOfAll(EMobilityProvider Previous)
+        {
+
+            ShareRuntimeOf(Previous);
+
+            foreach (var evseGroup in EVSEGroups)
+                if (Previous.TryGetEVSEGroup(evseGroup.Id, out var previousEVSEGroup))
+                    evseGroup.ShareRuntimeOf(previousEVSEGroup);
+
+            foreach (var chargingStationGroup in ChargingStationGroups)
+                if (Previous.TryGetChargingStationGroup(chargingStationGroup.Id, out var previousChargingStationGroup))
+                    chargingStationGroup.ShareRuntimeOf(previousChargingStationGroup);
+
+            foreach (var chargingPoolGroup in ChargingPoolGroups)
+                if (Previous.TryGetChargingPoolGroup(chargingPoolGroup.Id, out var previousChargingPoolGroup))
+                    chargingPoolGroup.ShareRuntimeOf(previousChargingPoolGroup);
 
         }
 
@@ -226,6 +332,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (HotlinePhoneNumber.HasValue)
                 json.Add("hotline",      HotlinePhoneNumber.Value.ToString());
 
+            if (EVSEGroups.Count > 0)
+                json.Add("EVSEGroups",             new JArray(EVSEGroups.           Select(group => group.ToJSON())));
+
+            if (ChargingStationGroups.Count > 0)
+                json.Add("chargingStationGroups",  new JArray(ChargingStationGroups.Select(group => group.ToJSON())));
+
+            if (ChargingPoolGroups.Count > 0)
+                json.Add("chargingPoolGroups",     new JArray(ChargingPoolGroups.   Select(group => group.ToJSON())));
+
             POIPartyKeys.AddTo(json, this);
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
@@ -287,6 +402,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
                     return false;
 
+                if (!POIJSON.TryParseChildren<EVSEGroup>           (JSON, "EVSEGroups",            "EVSEGroupIds",            "EVSEGroups",            EVSEGroup.           TryParse, out var evseGroups,            out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingStationGroup>(JSON, "chargingStationGroups", "chargingStationGroupIds", "ChargingStationGroups", ChargingStationGroup.TryParse, out var chargingStationGroups, out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingPoolGroup>   (JSON, "chargingPoolGroups",    "chargingPoolGroupIds",    "ChargingPoolGroups",    ChargingPoolGroup.   TryParse, out var chargingPoolGroups,    out ErrorResponse))
+                {
+                    return false;
+                }
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -302,8 +424,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           address,
                                                           homepage,
                                                           hotline,
-                                                          SigningKeys:   signingKeys,
-                                                          IdentityKeys:  identityKeys,
+                                                          SigningKeys:            signingKeys,
+                                                          IdentityKeys:           identityKeys,
+                                                          EVSEGroups:             evseGroups,
+                                                          ChargingStationGroups:  chargingStationGroups,
+                                                          ChargingPoolGroups:     chargingPoolGroups,
                                                           DataSource:  dataSource,
                                                           Created:     created,
                                                           LastChange:  lastChange,

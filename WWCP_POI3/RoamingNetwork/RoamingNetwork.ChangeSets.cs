@@ -896,6 +896,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                 }
 
+                // Groups of e-mobility providers; those of charging station operators are part of their infrastructure.
+                else if (IsProviderGroupChange(change, providers.Values))
+                {
+                    if (!TryApplyProviderGroupChange(change, index, ChangeSet.CreatedAt, providers, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
                 else if (change.EntityType == nameof(GridOperator))
                 {
                     if (!TryApplyRegistryChange(GridOperatorRegistry,      change, index, ChangeSet.CreatedAt, gridOps,       out currentValue, out ErrorResponse))
@@ -1026,6 +1033,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  UnknownTransparencyReference(allEnergyMeters, softwares, certificates, manufacturers) ??
                  UnknownEnergyMeterManufacturer(allEnergyMeters, meterManufacturers) ??
                  DuplicateEnergyMeterGroup(allEnergyMeterGroups)       ??
+                 DuplicateProviderGroup(operators.Values, providers.Values) ??
                  DuplicateEnergyMeterTemplate(allEnergyMeterTemplates) ??
                  UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, meterManufacturers, softwares, certificates)) is String referenceError)
             {

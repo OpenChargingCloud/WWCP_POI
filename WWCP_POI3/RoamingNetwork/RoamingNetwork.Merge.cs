@@ -270,6 +270,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   ("parkingSpaces",                     nameof(ParkingSpace)) ] },
             { nameof(ChargingPool),             [ ("chargingStations",                  nameof(ChargingStation)) ] },
             { nameof(ChargingStation),          [ ("EVSEs",                             nameof(EVSE)) ] },
+            { nameof(EMobilityProvider),        [ ("EVSEGroups",                        nameof(EVSEGroup)),
+                                                  ("chargingStationGroups",             nameof(ChargingStationGroup)),
+                                                  ("chargingPoolGroups",                nameof(ChargingPoolGroup)) ] },
             { nameof(GridOperator),             [ ("energyMeterTemplates",              nameof(EnergyMeterTemplate)),
                                                   ("gridConnectionPoints",              nameof(GridConnectionPoint)),
                                                   ("energyMeterGroups",                 nameof(EnergyMeterGroup)) ] },
@@ -1163,8 +1166,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             foreach (var eMobilityProvider in eMobilityProviders)
-                if (!Left.eMobilityProviders.Contains(eMobilityProvider.Id) && Right.eMobilityProviders.TryGet(eMobilityProvider.Id, out var right))
-                    eMobilityProvider.ShareRuntimeOf(right);
+            {
+
+                Left.eMobilityProviders.TryGet(eMobilityProvider.Id, out var left);
+
+                if (ReferenceEquals(eMobilityProvider, left))
+                    continue;
+
+                if (Right.eMobilityProviders.TryGet(eMobilityProvider.Id, out var right))
+                    eMobilityProvider.ShareRuntimeOfAll(right);
+
+                if (left is not null)
+                    eMobilityProvider.ShareRuntimeOfAll(left);
+
+            }
 
             foreach (var gridOperator in gridOperators)
             {

@@ -542,7 +542,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.EMobilityProvider),
                    EMobilityProvider.Id.ToString(),
-                   EMobilityProvider.ToJSON());
+                   WithoutChildren(nameof(POI.EMobilityProvider),
+                                   EMobilityProvider.ToJSON()));
+
+        /// <summary>
+        /// Add the EVSE groups, charging station groups and charging pool groups of the given e-mobility provider, in this
+        /// order, to the provider once added: a change set the provider signs.
+        /// </summary>
+        /// <param name="EMobilityProvider">The e-mobility provider with its groups.</param>
+        public static IReadOnlyList<RoamingNetworkChange> AddChildren(EMobilityProvider EMobilityProvider)
+
+            => [
+                   .. EMobilityProvider.EVSEGroups.           Select(evseGroup            => Add(evseGroup,            EMobilityProvider.Id)),
+                   .. EMobilityProvider.ChargingStationGroups.Select(chargingStationGroup => Add(chargingStationGroup, EMobilityProvider.Id)),
+                   .. EMobilityProvider.ChargingPoolGroups.   Select(chargingPoolGroup    => Add(chargingPoolGroup,    EMobilityProvider.Id))
+               ];
 
         /// <summary>
         /// Remove the given e-mobility provider, optionally checking its complete previous JSON representation.
@@ -1331,6 +1345,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           JToken?                    OldValue   = null)
 
             => RemoveProperty(nameof(POI.ChargingTariffTemplate), ChargingTariffTemplate.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (EVSEGroup / ChargingStationGroup / ChargingPoolGroup, EMobilityProviderId)
+
+        /// <summary>
+        /// Add the given EVSE group to the given e-mobility provider, naming EVSEs of any operator.
+        /// </summary>
+        public static RoamingNetworkChange Add(EVSEGroup             EVSEGroup,
+                                               EMobilityProvider_Id  EMobilityProviderId)
+
+            => Add(nameof(POI.EVSEGroup), EVSEGroup.Id.ToString(), EVSEGroup.ToJSON(), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
+
+        /// <summary>
+        /// Add the given charging station group to the given e-mobility provider, naming charging stations of any operator.
+        /// </summary>
+        public static RoamingNetworkChange Add(ChargingStationGroup  ChargingStationGroup,
+                                               EMobilityProvider_Id  EMobilityProviderId)
+
+            => Add(nameof(POI.ChargingStationGroup), ChargingStationGroup.Id.ToString(), ChargingStationGroup.ToJSON(), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
+
+        /// <summary>
+        /// Add the given charging pool group to the given e-mobility provider, naming charging pools of any operator.
+        /// </summary>
+        public static RoamingNetworkChange Add(ChargingPoolGroup     ChargingPoolGroup,
+                                               EMobilityProvider_Id  EMobilityProviderId)
+
+            => Add(nameof(POI.ChargingPoolGroup), ChargingPoolGroup.Id.ToString(), ChargingPoolGroup.ToJSON(), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
 
         #endregion
 

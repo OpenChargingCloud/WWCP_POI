@@ -118,7 +118,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             EMobilityProvider.TryParse,
             eMobilityProvider => eMobilityProvider.Id,
             eMobilityProvider => eMobilityProvider.ToJSON(),
-            (changed, previous) => changed.ShareRuntimeOf(previous)
+            // Its groups are embedded: theirs go along too.
+            (changed, previous) => changed.ShareRuntimeOfAll(previous)
         );
 
         private static readonly Registry<GridOperator_Id, GridOperator> GridOperatorRegistry = new (

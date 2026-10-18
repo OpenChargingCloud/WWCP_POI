@@ -102,7 +102,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMGs                                         its energy meter groups, as it embeds them
     /// GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMGs/{EMG_Id}                                an energy meter group of the grid operator
     /// GET ~/RNs/{RN_Id}/EMPs                                                     its e-mobility providers, in short
-    /// GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}                                            an e-mobility provider
+    /// GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}                                            an e-mobility provider;
+    ///     ?without=EVSEGroups,chargingStationGroups,chargingPoolGroups, or any of them, leaves them out, which
+    ///     ~/RNs/{RN_Id}/EMPs/{EMP_Id}/{EVSEGs|CSGs|CPGs} list, each of them below it, e.g. …/EVSEGs/{EVSEG_Id}
     /// GET ~/RNs/{RN_Id}/CSMs                                                     its charging station manufacturers, in short
     /// GET ~/RNs/{RN_Id}/CSMs/{CSM_Id}                                            a charging station manufacturer
     /// GET ~/RNs/{RN_Id}/POs                                                      its parking operators, in short
@@ -240,6 +242,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var chargingStationPath          = chargingPoolPath            + "/CSs/{chargingStationId}";
             var gridOperatorPath             = roamingNetworkPath          + "/GOs/{gridOperatorId}";
             var parkingOperatorPath          = roamingNetworkPath          + "/POs/{parkingOperatorId}";
+            var eMobilityProviderPath        = roamingNetworkPath          + "/EMPs/{eMobilityProviderId}";
 
             #region ~/RNs
 
@@ -728,13 +731,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region The groups of a charging pool, station, EVSE and parking space: ~/…/CPGs, CSGs, EVSEGs, PSGs below it
 
-            // The groups a member is in, which give it properties at runtime, as its operator embeds them, each with its
-            // page below the operator: so a client tells which of the values of the member come from which group.
+            // The groups a member is in, which give it nothing, of its operator and of e-mobility providers, as their owners
+            // embed them, each with its page below its owner.
             AddEmbeddedListHandlers<ChargingPoolGroup_Id, ChargingPoolGroup>(
                 chargingPoolPath + "/CPGs",
-                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse) &&
-                           TryGetRequestedChargingPool           (request, out var chargingPool,            out errorResponse)
-                               ? (new POICollection<ChargingPoolGroup_Id, ChargingPoolGroup>(chargingStationOperator.ChargingPoolGroupsOf(chargingPool.Id),
+                request => TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse) &&
+                           TryGetRequestedChargingPool  (request, out var chargingPool,   out errorResponse)
+                               ? (new POICollection<ChargingPoolGroup_Id, ChargingPoolGroup>(roamingNetwork.ChargingPoolGroupsOf(chargingPool.Id),
                                                                                              chargingPoolGroup => chargingPoolGroup.Id,
                                                                                              "charging pool group",
                                                                                              $"the charging pool '{chargingPool.Id}'"),
@@ -744,9 +747,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddEmbeddedListHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
                 chargingStationPath + "/CSGs",
-                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse) &&
-                           TryGetRequestedChargingStation        (request, out var chargingStation,         out errorResponse)
-                               ? (new POICollection<ChargingStationGroup_Id, ChargingStationGroup>(chargingStationOperator.ChargingStationGroupsOf(chargingStation.Id),
+                request => TryGetRequestedRoamingNetwork (request, out var roamingNetwork,  out var errorResponse) &&
+                           TryGetRequestedChargingStation(request, out var chargingStation, out errorResponse)
+                               ? (new POICollection<ChargingStationGroup_Id, ChargingStationGroup>(roamingNetwork.ChargingStationGroupsOf(chargingStation.Id),
                                                                                                    chargingStationGroup => chargingStationGroup.Id,
                                                                                                    "charging station group",
                                                                                                    $"the charging station '{chargingStation.Id}'"),
@@ -756,9 +759,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddEmbeddedListHandlers<EVSEGroup_Id, EVSEGroup>(
                 chargingStationPath + "/EVSEs/{evseId}" + "/EVSEGs",
-                request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse) &&
-                           TryGetRequestedEVSE                   (request, out var evse,                    out errorResponse)
-                               ? (new POICollection<EVSEGroup_Id, EVSEGroup>(chargingStationOperator.EVSEGroupsOf(evse.Id),
+                request => TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse) &&
+                           TryGetRequestedEVSE          (request, out var evse,           out errorResponse)
+                               ? (new POICollection<EVSEGroup_Id, EVSEGroup>(roamingNetwork.EVSEGroupsOf(evse.Id),
                                                                              evseGroup => evseGroup.Id,
                                                                              "EVSE group",
                                                                              $"the EVSE '{evse.Id}'"),
@@ -881,20 +884,67 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region ~/RNs/{RN_Id}/EMPs/{EMP_Id}
 
-            AddEntityHandlers(roamingNetworkPath + "/EMPs/{eMobilityProviderId}",
-                              request => {
+            AddEntityHandlers(eMobilityProviderPath,
+                              request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
+                                             ? CachedEntityResponseWithout(request,
+                                                                           eMobilityProvider,
+                                                                           eMobilityProvider.ToJSON,
+                                                                           [ "EVSEGroups", "chargingStationGroups", "chargingPoolGroups" ],
+                                                                           "an e-mobility provider")
+                                             : errorResponse);
 
-                                  if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
-                                      return errorResponse;
+            #endregion
 
-                                  if (!EMobilityProvider_Id.TryParse(request.ParsedURLParameters[1], out var eMobilityProviderId))
-                                      return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid e-mobility provider identification!");
+            #region ~/RNs/{RN_Id}/EMPs/{EMP_Id}/EVSEGs, CSGs, CPGs, and each of them below
 
-                                  return roamingNetwork.TryGetEMobilityProviderById(eMobilityProviderId, out var eMobilityProvider)
-                                             ? CachedEntityResponse(request, eMobilityProvider, eMobilityProvider.ToJSON)
-                                             : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The e-mobility provider '{eMobilityProviderId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+            // Its groups, of members of any operator: a list each, and each of them on its own.
+            AddEmbeddedListHandlers<EVSEGroup_Id, EVSEGroup>(
+                eMobilityProviderPath + "/EVSEGs",
+                request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
+                               ? (eMobilityProvider.EVSEGroups, null)
+                               : (null, errorResponse),
+                evseGroup => evseGroup.ToJSON());
 
-                              });
+            AddEmbeddedEntityHandlers<EVSEGroup_Id, EVSEGroup>(
+                eMobilityProviderPath + "/EVSEGs/{EVSEGroupId}",
+                request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
+                               ? (eMobilityProvider.EVSEGroups, null)
+                               : (null, errorResponse),
+                EVSEGroup_Id.TryParse,
+                "EVSE group",
+                evseGroup => evseGroup.ToJSON());
+
+            AddEmbeddedListHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
+                eMobilityProviderPath + "/CSGs",
+                request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
+                               ? (eMobilityProvider.ChargingStationGroups, null)
+                               : (null, errorResponse),
+                chargingStationGroup => chargingStationGroup.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
+                eMobilityProviderPath + "/CSGs/{chargingStationGroupId}",
+                request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
+                               ? (eMobilityProvider.ChargingStationGroups, null)
+                               : (null, errorResponse),
+                ChargingStationGroup_Id.TryParse,
+                "charging station group",
+                chargingStationGroup => chargingStationGroup.ToJSON());
+
+            AddEmbeddedListHandlers<ChargingPoolGroup_Id, ChargingPoolGroup>(
+                eMobilityProviderPath + "/CPGs",
+                request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
+                               ? (eMobilityProvider.ChargingPoolGroups, null)
+                               : (null, errorResponse),
+                chargingPoolGroup => chargingPoolGroup.ToJSON());
+
+            AddEmbeddedEntityHandlers<ChargingPoolGroup_Id, ChargingPoolGroup>(
+                eMobilityProviderPath + "/CPGs/{chargingPoolGroupId}",
+                request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
+                               ? (eMobilityProvider.ChargingPoolGroups, null)
+                               : (null, errorResponse),
+                ChargingPoolGroup_Id.TryParse,
+                "charging pool group",
+                chargingPoolGroup => chargingPoolGroup.ToJSON());
 
             #endregion
 
@@ -1308,6 +1358,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!roamingNetwork.TryGetParkingOperatorById(parkingOperatorId, out ParkingOperator))
             {
                 ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The parking operator '{parkingOperatorId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+                return false;
+            }
+
+            return true;
+
+        }
+
+        #endregion
+
+        #region (private) TryGetRequestedEMobilityProvider      (Request, out EMobilityProvider,                    out ErrorResponse)
+
+        /// <summary>
+        /// Try to get the e-mobility provider the given request names, in the roaming network it names.
+        /// </summary>
+        private Boolean TryGetRequestedEMobilityProvider(HTTPRequest                                  Request,
+                                                         [NotNullWhen(true)]  out EMobilityProvider?  EMobilityProvider,
+                                                         [NotNullWhen(false)] out HTTPResponse?       ErrorResponse)
+        {
+
+            EMobilityProvider = null;
+
+            if (!TryGetRequestedRoamingNetwork(Request, out var roamingNetwork, out ErrorResponse))
+                return false;
+
+            if (!EMobilityProvider_Id.TryParse(Request.ParsedURLParameters[1], out var eMobilityProviderId))
+            {
+                ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid e-mobility provider identification!");
+                return false;
+            }
+
+            if (!roamingNetwork.TryGetEMobilityProviderById(eMobilityProviderId, out EMobilityProvider))
+            {
+                ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The e-mobility provider '{eMobilityProviderId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
                 return false;
             }
 

@@ -38,7 +38,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for parsing a charging station group identification.
         /// </summary>
-        public static readonly Regex ChargingStationGroupId_RegEx  = new (@"^([A-Za-z]{2}\*?[A-Za-z0-9]{3})\*?SG([a-zA-Z0-9_][a-zA-Z0-9_\*\-\.€\$]{0,49})$",
+        public static readonly Regex ChargingStationGroupId_RegEx  = new (@"^([A-Za-z]{2}[\*\-]?[A-Za-z0-9]{3})\*?SG([a-zA-Z0-9_][a-zA-Z0-9_\*\-\.€\$]{0,49})$",
                                                                           RegexOptions.IgnorePatternWhitespace);
 
         #endregion
@@ -46,7 +46,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
-        /// The charging station operator identification.
+        /// The identification of the party embedding the group: its charging station operator, or its e-mobility
+        /// provider, whose identification is written as one of a charging station operator, with a '*' separator.
         /// </summary>
         public ChargingStationOperator_Id  OperatorId   { get; }
 
@@ -140,7 +141,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("Illegal text representation of a charging station group identification: '{Text}'!",
                                             nameof(Text));
 
-            if (ChargingStationOperator_Id.TryParse(matchCollection[0].Groups[1].Value, out ChargingStationOperator_Id chargingStationOperatorId))
+            if (ChargingStationOperator_Id.TryParse(matchCollection[0].Groups[1].Value.Replace('-', '*'), out ChargingStationOperator_Id chargingStationOperatorId))
                 return new ChargingStationGroup_Id(chargingStationOperatorId,
                                                    matchCollection[0].Groups[2].Value);
 
@@ -205,7 +206,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (matchCollection.Count != 1)
                     return false;
 
-                if (ChargingStationOperator_Id.TryParse(matchCollection[0].Groups[1].Value, out ChargingStationOperator_Id chargingStationOperatorId))
+                if (ChargingStationOperator_Id.TryParse(matchCollection[0].Groups[1].Value.Replace('-', '*'), out ChargingStationOperator_Id chargingStationOperatorId))
                 {
 
                     ChargingStationGroupId = new ChargingStationGroup_Id(chargingStationOperatorId,

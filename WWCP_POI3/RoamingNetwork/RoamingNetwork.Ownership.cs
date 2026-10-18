@@ -156,7 +156,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         internal static readonly Dictionary<String, String[]> PartyChildren = new () {
             { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSETemplates", "chargingStationTemplates", "chargingPoolTemplates", "chargingTariffTemplates", "energyMeterTemplates",
                                                  "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups", "energyMeterGroups", "parkingSpaces" ] },
-            { nameof(EMobilityProvider),       [] },
+            { nameof(EMobilityProvider),       [ "EVSEGroups", "chargingStationGroups", "chargingPoolGroups" ] },
             { nameof(GridOperator),            [ "gridConnectionPoints", "energyMeterTemplates", "energyMeterGroups" ] },
             { nameof(ParkingOperator),         [ "parkingGarages", "parkingSpaces", "parkingSensors", "parkingSpaceTemplates", "parkingSpaceGroups", "parkingProducts" ] }
         };
@@ -340,12 +340,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // keyed by their typed identifications, so that a later change may name them in another spelling.
             var addedEnergyMeterChildren = new Dictionary<(String, Object), POIPartyId>();
 
+            // Groups of e-mobility providers added by an earlier change of this change set, by their providers.
+            var addedProviderGroups      = new Dictionary<(String, Object), POIPartyId>();
+
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
             {
 
                 var change = ChangeSet.Changes[index];
 
-                if (!TryGetOwners(change, addedParking, addedGridConnectionPoints, addedEnergyMeterChildren, out var owners, out ErrorResponse))
+                if (!TryGetOwners(change, addedParking, addedGridConnectionPoints, addedEnergyMeterChildren, addedProviderGroups, out var owners, out ErrorResponse))
                 {
                     ErrorResponse = $"Change {index}: {ErrorResponse}";
                     return false;
@@ -403,7 +406,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryGetOwners(Change, AddedParking, AddedGridConnectionPoints, AddedEnergyMeterChildren, out Owners, out ErrorResponse)
+        #region (private) TryGetOwners(Change, AddedParking, AddedGridConnectionPoints, AddedEnergyMeterChildren, AddedProviderGroups, out Owners, out ErrorResponse)
 
         /// <summary>
         /// The parties and kinds of keys of which one must sign the given change.
@@ -412,6 +415,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      Dictionary<(String, Object), POIPartyId>                                                AddedParking,
                                      Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>  AddedGridConnectionPoints,
                                      Dictionary<(String, Object), POIPartyId>                                                AddedEnergyMeterChildren,
+                                     Dictionary<(String, Object), POIPartyId>                                                AddedProviderGroups,
                                      [NotNullWhen(true)]  out (POIPartyId, POIKeyKind)[]?                                    Owners,
                                      [NotNullWhen(false)] out String?                                                        ErrorResponse)
         {
@@ -479,6 +483,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 Owners = [ (roamingNetworkOperator, POIKeyKind.Signing) ];
                 return true;
+            }
+
+            #endregion
+
+            #region The groups of an e-mobility provider: added to it, or found in it
+
+            if (ProviderGroupKind(Change.EntityType) is not null &&
+                TypedId(Change.EntityType, Change.EntityId) is Object providerGroupId)
+            {
+
+                POIPartyId? provider = null;
+
+                if (Change.Kind == RoamingNetworkChangeKind.Add)
+                {
+                    if (Change.ParentEntityType == nameof(EMobilityProvider) && Change.ParentEntityId is not null)
+                    {
+                        // The provider as the keys of the parties name it.
+                        provider = PartyIdOf(new POIPartyId(nameof(EMobilityProvider), Change.ParentEntityId));
+                        AddedProviderGroups[(Change.EntityType, providerGroupId)] = provider.Value;
+                    }
+                }
+
+                else if (AddedProviderGroups.TryGetValue((Change.EntityType, providerGroupId), out var addedProvider))
+                    provider = addedProvider;
+
+                else if (ProviderOfGroup(eMobilityProviders, Change.EntityType, Change.EntityId).EMobilityProvider is EMobilityProvider eMobilityProvider)
+                    provider = new POIPartyId(nameof(EMobilityProvider), eMobilityProvider.Id.ToString());
+
+                if (provider.HasValue)
+                {
+                    Owners = [ SignerOf(provider.Value) ];
+                    return true;
+                }
+
             }
 
             #endregion

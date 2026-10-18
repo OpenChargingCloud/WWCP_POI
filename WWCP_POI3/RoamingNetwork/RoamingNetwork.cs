@@ -291,6 +291,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (UnknownMaintainer(gridOperators, chargingStationOperators.Index, parkingOperators.Index) is String maintainerError)
                 throw new ArgumentException(maintainerError, nameof(GridOperators));
 
+            // Groups of e-mobility providers and charging station operators are unique within the network.
+            if (DuplicateProviderGroup(chargingStationOperators, eMobilityProviders) is String providerGroupError)
+                throw new ArgumentException(providerGroupError, nameof(EMobilityProviders));
+
             this.transparencySoftware = new (TransparencySoftware, entity => entity.Id, "transparency software release");
 
             this.transparencySoftwareCertificates = new (TransparencySoftwareCertificates, entity => entity.Id, "transparency software certificate");
@@ -1982,20 +1986,103 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Groups
 
         /// <summary>
-        /// The EVSEGroups of all charging station operators.
+        /// The groups the given EVSE is a member of: of its operator, then of e-mobility providers, each in the order of
+        /// their identifications.
         /// </summary>
-        public IEnumerable<EVSEGroup> EVSEGroups
-            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EVSEGroups);
+        public IEnumerable<EVSEGroup> EVSEGroupsOf(EVSE_Id EVSEId)
+
+            => (chargingStationOperators.TryGet(EVSEId.OperatorId, out var chargingStationOperator)
+                    ? chargingStationOperator.EVSEGroupsOf(EVSEId)
+                    : []).
+               Concat(eMobilityProviders.SelectMany(eMobilityProvider => eMobilityProvider.EVSEGroups.Where(evseGroup => evseGroup.EVSEIds.Contains(EVSEId))));
 
         /// <summary>
-        /// Try to get the EVSEGroup having the given identification, of the operator it names.
+        /// The groups the given charging station is a member of: of its operator, then of e-mobility providers, each in the
+        /// order of their identifications.
+        /// </summary>
+        public IEnumerable<ChargingStationGroup> ChargingStationGroupsOf(ChargingStation_Id ChargingStationId)
+
+            => (chargingStationOperators.TryGet(ChargingStationId.OperatorId, out var chargingStationOperator)
+                    ? chargingStationOperator.ChargingStationGroupsOf(ChargingStationId)
+                    : []).
+               Concat(eMobilityProviders.SelectMany(eMobilityProvider => eMobilityProvider.ChargingStationGroups.Where(chargingStationGroup => chargingStationGroup.ChargingStationIds.Contains(ChargingStationId))));
+
+        /// <summary>
+        /// The groups the given charging pool is a member of: of its operator, then of e-mobility providers, each in the
+        /// order of their identifications.
+        /// </summary>
+        public IEnumerable<ChargingPoolGroup> ChargingPoolGroupsOf(ChargingPool_Id ChargingPoolId)
+
+            => (chargingStationOperators.TryGet(ChargingPoolId.OperatorId, out var chargingStationOperator)
+                    ? chargingStationOperator.ChargingPoolGroupsOf(ChargingPoolId)
+                    : []).
+               Concat(eMobilityProviders.SelectMany(eMobilityProvider => eMobilityProvider.ChargingPoolGroups.Where(chargingPoolGroup => chargingPoolGroup.ChargingPoolIds.Contains(ChargingPoolId))));
+
+        /// <summary>
+        /// The e-mobility provider the given prefix of the identification of a group names, if any.
+        /// </summary>
+        private EMobilityProvider? ProviderOf(ChargingStationOperator_Id Prefix)
+
+            => EMobilityProvider_Id.TryParse(Prefix.ToString(), out var providerId) &&
+               eMobilityProviders.TryGet(providerId, out var eMobilityProvider)
+                   ? eMobilityProvider
+                   : null;
+
+        /// <summary>
+        /// The error, when a group of an e-mobility provider has the identification of a group of a charging station
+        /// operator: the identifications of groups are unique in the roaming network, and a provider and an operator
+        /// may have the same prefix.
+        /// </summary>
+        internal static String? DuplicateProviderGroup(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
+                                                       IEnumerable<EMobilityProvider>        EMobilityProviders)
+        {
+
+            var operators = ChargingStationOperators.ToArray();
+
+            foreach (var eMobilityProvider in EMobilityProviders)
+            {
+
+                foreach (var evseGroup in eMobilityProvider.EVSEGroups)
+                    if (operators.Any(chargingStationOperator => chargingStationOperator.TryGetEVSEGroup(evseGroup.Id, out _)))
+                        return $"The EVSE group '{evseGroup.Id}' must not be given twice in the roaming network!";
+
+                foreach (var chargingStationGroup in eMobilityProvider.ChargingStationGroups)
+                    if (operators.Any(chargingStationOperator => chargingStationOperator.TryGetChargingStationGroup(chargingStationGroup.Id, out _)))
+                        return $"The charging station group '{chargingStationGroup.Id}' must not be given twice in the roaming network!";
+
+                foreach (var chargingPoolGroup in eMobilityProvider.ChargingPoolGroups)
+                    if (operators.Any(chargingStationOperator => chargingStationOperator.TryGetChargingPoolGroup(chargingPoolGroup.Id, out _)))
+                        return $"The charging pool group '{chargingPoolGroup.Id}' must not be given twice in the roaming network!";
+
+            }
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The EVSEGroups of all charging station operators and e-mobility providers.
+        /// </summary>
+        public IEnumerable<EVSEGroup> EVSEGroups
+            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EVSEGroups).
+                   Concat(eMobilityProviders.SelectMany(eMobilityProvider => eMobilityProvider.EVSEGroups));
+
+        /// <summary>
+        /// Try to get the EVSEGroup having the given identification, of the charging station operator or the e-mobility
+        /// provider it names: unique in the roaming network, one of them has it.
         /// </summary>
         public Boolean TryGetEVSEGroupById(EVSEGroup_Id  EVSEGroupId,
                                      [NotNullWhen(true)] out EVSEGroup?  EVSEGroup)
         {
 
-            if (chargingStationOperators.TryGet(EVSEGroupId.OperatorId, out var chargingStationOperator))
-                return chargingStationOperator.TryGetEVSEGroup(EVSEGroupId, out EVSEGroup);
+            if (chargingStationOperators.TryGet(EVSEGroupId.OperatorId, out var chargingStationOperator) &&
+                chargingStationOperator.TryGetEVSEGroup(EVSEGroupId, out EVSEGroup))
+            {
+                return true;
+            }
+
+            if (ProviderOf(EVSEGroupId.OperatorId) is EMobilityProvider eMobilityProvider)
+                return eMobilityProvider.TryGetEVSEGroup(EVSEGroupId, out EVSEGroup);
 
             EVSEGroup = null;
             return false;
@@ -2003,20 +2090,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The ChargingStationGroups of all charging station operators.
+        /// The ChargingStationGroups of all charging station operators and e-mobility providers.
         /// </summary>
         public IEnumerable<ChargingStationGroup> ChargingStationGroups
-            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationGroups);
+            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationGroups).
+                   Concat(eMobilityProviders.SelectMany(eMobilityProvider => eMobilityProvider.ChargingStationGroups));
 
         /// <summary>
-        /// Try to get the ChargingStationGroup having the given identification, of the operator it names.
+        /// Try to get the ChargingStationGroup having the given identification, of the charging station operator or the e-mobility
+        /// provider it names: unique in the roaming network, one of them has it.
         /// </summary>
         public Boolean TryGetChargingStationGroupById(ChargingStationGroup_Id  ChargingStationGroupId,
                                      [NotNullWhen(true)] out ChargingStationGroup?  ChargingStationGroup)
         {
 
-            if (chargingStationOperators.TryGet(ChargingStationGroupId.OperatorId, out var chargingStationOperator))
-                return chargingStationOperator.TryGetChargingStationGroup(ChargingStationGroupId, out ChargingStationGroup);
+            if (chargingStationOperators.TryGet(ChargingStationGroupId.OperatorId, out var chargingStationOperator) &&
+                chargingStationOperator.TryGetChargingStationGroup(ChargingStationGroupId, out ChargingStationGroup))
+            {
+                return true;
+            }
+
+            if (ProviderOf(ChargingStationGroupId.OperatorId) is EMobilityProvider eMobilityProvider)
+                return eMobilityProvider.TryGetChargingStationGroup(ChargingStationGroupId, out ChargingStationGroup);
 
             ChargingStationGroup = null;
             return false;
@@ -2024,20 +2119,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The ChargingPoolGroups of all charging station operators.
+        /// The ChargingPoolGroups of all charging station operators and e-mobility providers.
         /// </summary>
         public IEnumerable<ChargingPoolGroup> ChargingPoolGroups
-            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPoolGroups);
+            => chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPoolGroups).
+                   Concat(eMobilityProviders.SelectMany(eMobilityProvider => eMobilityProvider.ChargingPoolGroups));
 
         /// <summary>
-        /// Try to get the ChargingPoolGroup having the given identification, of the operator it names.
+        /// Try to get the ChargingPoolGroup having the given identification, of the charging station operator or the e-mobility
+        /// provider it names: unique in the roaming network, one of them has it.
         /// </summary>
         public Boolean TryGetChargingPoolGroupById(ChargingPoolGroup_Id  ChargingPoolGroupId,
                                      [NotNullWhen(true)] out ChargingPoolGroup?  ChargingPoolGroup)
         {
 
-            if (chargingStationOperators.TryGet(ChargingPoolGroupId.OperatorId, out var chargingStationOperator))
-                return chargingStationOperator.TryGetChargingPoolGroup(ChargingPoolGroupId, out ChargingPoolGroup);
+            if (chargingStationOperators.TryGet(ChargingPoolGroupId.OperatorId, out var chargingStationOperator) &&
+                chargingStationOperator.TryGetChargingPoolGroup(ChargingPoolGroupId, out ChargingPoolGroup))
+            {
+                return true;
+            }
+
+            if (ProviderOf(ChargingPoolGroupId.OperatorId) is EMobilityProvider eMobilityProvider)
+                return eMobilityProvider.TryGetChargingPoolGroup(ChargingPoolGroupId, out ChargingPoolGroup);
 
             ChargingPoolGroup = null;
             return false;
