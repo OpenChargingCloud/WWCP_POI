@@ -22,10 +22,10 @@ two identifications are equal when they differ only in case or in the `*` of the
 | Owner | the [ChargingStationOperator](ChargingStationOperator.md) its identification names (signing key) |
 | HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}`, `GET …/EVSEs/{EVSE_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET …/EVSEs/{EVSE_Id}/Brands/{Brand_Id}` |
 
-An [EVSEGroup](EVSEGroup.md) may give its members most of the properties below, so that an EVSE has only few of its
-own: at runtime it takes them, as the effective EVSE of its operator,
+The [EVSE templates](EVSETemplate.md) it names in `templateIds` may give it most of the properties below, so that an
+EVSE has only few of its own: at runtime it takes them, as the effective EVSE of its operator,
 `chargingStationOperator.TryGetEffectiveEVSE(evseId, out var evse)`. See
-[properties of its members](EVSEGroup.md#properties-of-its-members). POI_API serves the effective EVSE;
+[templates and effective members](README.md#templates-and-effective-members). POI_API serves the effective EVSE;
 `?view=stored` the EVSE as it is given.
 
 
@@ -57,6 +57,7 @@ See [common properties](README.md#common-properties). An EVSE does not write `eT
 | `chargingConnectors` | `ChargingConnectors` | `ImmutableArray<ChargingConnector>` | update/remove | Its plugs and sockets; see [chargingConnectors](#chargingconnectors). |
 | `energyMeter` | `EnergyMeter` | `EnergyMeter?` | update/remove | Its energy meter, 0..1; see [energyMeter](#energymeter). |
 | `chargingTariffIds` | `ChargingTariffIds` | `ImmutableArray<ChargingTariff_Id>` | update/remove | The tariffs of its operator that apply; see [chargingTariffIds](#chargingtariffids). |
+| `templateIds` | `TemplateIds` | `ImmutableArray<EVSETemplate_Id>` | update/remove, element changes | The [EVSE templates](EVSETemplate.md) of its operator it takes, each once, in its order, the first deciding; see [templates and effective members](README.md#templates-and-effective-members). |
 | `brands` | `Brands` | `POICollection<Brand_Id, Brand>` | update/remove | The [brands](Brand.md) it also appears under, its own, embedded completely, each once, in the ordinal order of their identifications; not those of its station, pool or operator. Changed as a whole or [brand by brand](Brand.md#change-sets). |
 | `images` | `Images` | `ImmutableArray<Image>` | update/remove | Its images, in their given order; see [images](#images). |
 | `geoLocation` | `GeoLocation` | `GeoCoordinate?` | update/remove | `{lat, lng, alt?}`, only when it differs from the one of its station. |
@@ -129,13 +130,12 @@ It is not an entity of change sets: the EVSE's `energyMeter` is updated or remov
 
 `chargingTariffIds`: the [charging tariffs](ChargingTariff.md) that apply, each once, in the ordinal order of
 their identifications. Every one must be a tariff of the same operator (`DE*GEF*T3` for an EVSE of `DE*GEF`);
-a tariff can not be removed while an EVSE names it. [EVSEGroup](EVSEGroup.md),
-[ChargingStationGroup](ChargingStationGroup.md) and [ChargingPoolGroup](ChargingPoolGroup.md) may name a
-`chargingTariffId` for the EVSEs of their members. At runtime, as the effective EVSE of its operator, an EVSE has its
-own tariffs; without any, the one of its EVSE groups, else of the charging station groups of its station, else of the
-charging pool groups of its pool: the most specific groups decide, of these the one with the highest `priority`. Groups
-of the same level and priority must not give it different tariffs; the operator is refused. The OCPI and DATEX II
-publishers publish these tariffs.
+a tariff can not be removed while an EVSE names it. [EVSE templates](EVSETemplate.md),
+[charging station templates](ChargingStationTemplate.md) and [charging pool templates](ChargingPoolTemplate.md) may
+name a `chargingTariffId` for the EVSEs of their members. At runtime, as the effective EVSE of its operator, an EVSE
+has its own tariffs; without any, the one of the first of its templates naming one, else of the first template of its
+station naming one, else of the first template of its pool naming one: the most specific templates decide. The OCPI
+and DATEX II publishers publish these tariffs, as effective tariffs.
 
 
 ## images

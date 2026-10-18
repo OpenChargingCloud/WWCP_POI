@@ -32,11 +32,17 @@ flowchart TD
     ParkingOperator --> ParkingGarage
     ParkingOperator --> ParkingSpace
     ParkingOperator --> ParkingSensor
-    ParkingOperator --> ParkingSpaceGroup
+    ParkingOperator --> ParkingTemplatesGroups["ParkingSpaceTemplate,<br/>ParkingSpaceGroup"]
     ParkingOperator --> ParkingProduct
     ChargingStationOperator --> ChargingTariff
-    ChargingStationOperator --> Groups["EVSEGroup, ChargingStationGroup,<br/>ChargingPoolGroup, ChargingTariffGroup,<br/>EnergyMeterGroup"]
-    GridOperator --> EnergyMeterGroup
+    ChargingStationOperator --> Templates["EVSETemplate, ChargingStationTemplate,<br/>ChargingPoolTemplate, ChargingTariffTemplate"]
+    ChargingStationOperator --> Groups["EVSEGroup, ChargingStationGroup,<br/>ChargingPoolGroup"]
+    ChargingStationOperator --> ChargingTariffGroup
+    ChargingStationOperator --> ChargingTariffOffer
+    ChargingStationOperator --> MeterTemplatesGroups["EnergyMeterTemplate,<br/>EnergyMeterGroup"]
+    GridOperator --> MeterTemplatesGroups
+    EMobilityProvider --> Groups
+    EMobilityProvider --> ChargingTariffOffer
     ChargingStationOperator --> ChargingPool
     ChargingStationOperator --> Brand
     ChargingPool --> Brand
@@ -59,6 +65,8 @@ flowchart TD
     ParkingSpace -. parkingProductIds .-> ParkingProduct
     ChargingStation -. parkingSpaceIds .-> ParkingSpace
     EVSE -. chargingTariffIds .-> ChargingTariff
+    EVSE -. templateIds .-> Templates
+    ChargingTariffOffer -. groupIds .-> Groups
     EnergyMeter -. manufacturerId .-> EnergyMeterManufacturer
     EnergyMeter -. transparencySoftwareStatus .-> TransparencySoftware
     TransparencySoftwareCertificate -. verified/compatible .-> TransparencySoftware
@@ -69,14 +77,16 @@ flowchart TD
 
 Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`,
 `gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
-`EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `energyMeterGroups`, `chargingPools`, `chargingStations`,
-`EVSEs`, `chargingConnectors`, `energyMeters`, `gridConnectionPoints`, `parkingGarages`, `parkingSpaces`, `parkingSensors`,
-`parkingSpaceGroups`, `parkingProducts`, `brands`), each 0..n
+`EVSETemplates`, `chargingStationTemplates`, `chargingPoolTemplates`, `chargingTariffTemplates`, `energyMeterTemplates`,
+`EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `energyMeterGroups`, `chargingTariffOffers`,
+`chargingPools`, `chargingStations`, `EVSEs`, `chargingConnectors`, `energyMeters`, `gridConnectionPoints`, `parkingGarages`,
+`parkingSpaces`, `parkingSensors`, `parkingSpaceTemplates`, `parkingSpaceGroups`, `parkingProducts`, `brands`), each 0..n
 in the order of their ids; a grid connection point and an EVSE each have 0..1 `energyMeter`.
 Dotted lines are references, which must exist in the network.
-A pool, station, EVSE, tariff or group belongs to the operator its id names; ids are unique within the operator.
-Energy meter groups, of a charging station operator or of a grid operator, have ids unique within the network.
-Energy meter, grid connection point, parking garage, space, sensor, space group and product ids are unique within the network;
+A pool, station, EVSE, tariff or template belongs to the operator its id names; ids are unique within the operator.
+Groups and charging tariff offers belong to the party embedding them, a group's id naming that party; their ids are
+unique within the network, as those of energy meter templates and groups, of a charging station operator or of a grid operator.
+Energy meter, grid connection point, parking garage, space, sensor, space template, space group and product ids are unique within the network;
 parking product ids compare case-sensitively.
 
 - **Content:** everything in the JSON and CBOR representations, completely, in a fixed order:
@@ -119,7 +129,7 @@ parking product ids compare case-sensitively.
   vehicles (`euVehicleCategories`) may park there; garages, spaces and sensors may name
   `chargingStationIds` of the network. All have admin status and status. Parking products (`minDuration`,
   `stopParkingAfterTime` in s, without status and timestamps) are named by `parkingProductIds` of garages,
-  spaces and space groups of the same operator; they offer, they do not calculate prices. A space also tells what an
+  spaces and space templates of the same operator; they offer, they do not calculate prices. A space also tells what an
   OCPI 2.3 `Parking` does: `vehicleTypes`, maximum vehicle measures (kg, m), its `length`/`width`, `evsePosition`,
   `direction`, `surface`, `slope`, `timeLimit`, `roofed`, `illuminated` and further flags, `standards` and `images`.
   Where no parking operator defines the spaces of a charging station, its charging station operator can, as
@@ -145,25 +155,33 @@ parking product ids compare case-sensitively.
   (`[]` means unknown), `supplierName`, `productName`, `additionalRemarks`.
 - **Images:** `images` of charging pools, stations, EVSEs and parking garages, in their given order:
   `url`, `category` (e.g. `LOCATION`, `CHARGER`), `type`, `width`, `height`, `thumbnail`; a URL only once.
-- **Groups:** EVSE, charging station, charging pool and charging tariff groups name members of their
-  operator (`EVSEIds`, `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`), the first three
-  optionally a `chargingTariffId`; parking space groups name `parkingSpaceIds`; energy meter groups name
-  `energyMeterIds`, of a charging station operator those of its pools, stations and EVSEs, of a grid operator those of
-  its grid connection points. Groups may overlap and
-  have admin status and status, and a `priority` (0 unless given): where groups of a member give it different
-  values, the higher decides, and the same priority must not disagree.
-- **Effective members:** an EVSE, charging station, charging pool or parking space group may give its members any
-  property of theirs but their identification, name, description, what they embed and their energy meters, e.g. the
-  connectors of all EVSEs of a type, the model and the hotline of all stations of a model, the payment options of all
-  pools of a site partner, the dimensions and the roof of all parking spaces of a level, given once. An energy meter
-  group gives its meters the properties of an energy meter but their serial number and public keys, e.g. the
-  manufacturer, model and firmware of a series; the effective members embed the effective energy meters, and so do the
-  effective grid connection points of a grid operator. The members take them at runtime: `chargingStationOperator.EffectiveChargingPools`, with
-  their effective stations and EVSEs, `TryGetEffectiveEVSE(id, out var evse)` and alike. A single value is the member's
-  own, else the one of its group with the highest priority; arrays are united. POI_API serves and searches them, with
-  the ETag a precondition names as `X-Stored-ETag`, the
-  OCPI and DATEX II publishers publish them, their importers keep in the groups what they give; the network, its ETags
-  and change sets keep the properties where they are given. See [docs/](docs/README.md#group-priority-and-effective-members).
+- **Templates:** EVSEs, charging stations, charging pools, charging tariffs, parking spaces and energy meters name
+  templates of their owner in `templateIds`, in an order of their own, the first deciding: EVSE, charging station,
+  charging pool and charging tariff templates of their charging station operator, parking space templates of their
+  parking operator, energy meter templates of a charging station operator or, of a grid connection point, of its grid
+  operator. A template gives any property of its members but their identification, name, description, what they embed
+  and their energy meters, e.g. the connectors of all EVSEs of a type, the model and the hotline of all stations of a
+  model, the payment options of all pools of a site partner, the currency of many tariffs, the dimensions and the roof
+  of all parking spaces of a level, the manufacturer, model and firmware of a series of energy meters, given once; EVSE,
+  charging station and charging pool templates also a `chargingTariffId` for the EVSEs. Templates have no status.
+- **Effective members:** the members take what their templates give at runtime:
+  `chargingStationOperator.EffectiveChargingPools`, with their effective stations and EVSEs,
+  `TryGetEffectiveEVSE(id, out var evse)` and alike; the effective members embed the effective energy meters, and so
+  do the effective grid connection points of a grid operator. A single value is the member's own, else the one of the
+  first of its templates giving one; arrays are united. POI_API serves and searches them, with the ETag a precondition
+  names as `X-Stored-ETag`, the OCPI and DATEX II publishers publish them, their importers keep in the templates what
+  they give; the network, its ETags and change sets keep the properties where they are given. See
+  [docs/](docs/README.md#templates-and-effective-members).
+- **Groups:** EVSE, charging station, charging pool and charging tariff groups name members (`EVSEIds`,
+  `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`): of their charging station operator, or, the first
+  three, of an e-mobility provider, members of any operator by weak references. Parking space groups name
+  `parkingSpaceIds`; energy meter groups name `energyMeterIds`, of a charging station operator those of its pools,
+  stations and EVSEs, of a grid operator those of its grid connection points. Groups may overlap, give their members
+  nothing, and have admin status and status.
+- **Charging tariff offers:** another price for a time at the EVSEs of groups or of operators, of a charging station
+  operator for its own EVSEs, or of an e-mobility provider for its customers at the EVSEs of any operator: a
+  `chargingTariff` of its own or a `discount`, `notBefore`/`notAfter`, `openingTimes`, and for which sessions; two
+  offers of one owner must not overlap. They change no member. See [docs/ChargingTariffOffer.md](docs/ChargingTariffOffer.md).
 - **Transparency software:** releases (`TransparencySoftware`, one per version) and their certificates
   are embedded in the network, without status and timestamps. A certificate names the releases it
   verifies or finds compatible, and optionally a manufacturer. An energy meter's `transparencySoftwareStatus`
@@ -200,25 +218,32 @@ a change set can manage:
 |---|---|
 | [RoamingNetwork](docs/RoamingNetwork.md) | The root: one version of a roaming network with everything it embeds and its ETags. |
 | [RoamingNetworkOperator](docs/RoamingNetworkOperator.md) | Its operator, the RNO, with the keys of the network; one may operate many networks. |
-| [ChargingStationOperator](docs/ChargingStationOperator.md) | A charge point operator with its charging pools, tariffs and groups. |
+| [ChargingStationOperator](docs/ChargingStationOperator.md) | A charge point operator with its charging pools, tariffs, templates, groups and offers. |
 | [ChargingPool](docs/ChargingPool.md) | A charging location: address, opening times, facilities, grid connection point and charging stations. |
 | [ChargingStation](docs/ChargingStation.md) | A charger with its EVSEs, manufacturer and model, energy meters and energy status. |
 | [EVSE](docs/EVSE.md) | One charging point: power, voltage, current, connectors, tariffs and energy status. |
 | [ChargingTariff](docs/ChargingTariff.md) | A price as in OCPI: currency, elements with price components and restrictions. |
-| [EVSEGroup](docs/EVSEGroup.md) | EVSEs of one operator, optionally with a common tariff and properties they take at runtime. |
-| [ChargingStationGroup](docs/ChargingStationGroup.md) | Charging stations of one operator, optionally with a common tariff and properties they take at runtime. |
-| [ChargingPoolGroup](docs/ChargingPoolGroup.md) | Charging pools of one operator, optionally with a common tariff and properties they take at runtime. |
-| [ChargingTariffGroup](docs/ChargingTariffGroup.md) | Charging tariffs of one operator. |
+| [EVSETemplate](docs/EVSETemplate.md) | What the EVSEs naming it share, e.g. connectors and power, and a tariff for them. |
+| [ChargingStationTemplate](docs/ChargingStationTemplate.md) | What the charging stations naming it share, e.g. model and hotline. |
+| [ChargingPoolTemplate](docs/ChargingPoolTemplate.md) | What the charging pools naming it share, e.g. hotline and facilities. |
+| [ChargingTariffTemplate](docs/ChargingTariffTemplate.md) | What the charging tariffs naming it share, e.g. currency and payment means. |
+| [EVSEGroup](docs/EVSEGroup.md) | EVSEs of one operator, or of any operator for an e-mobility provider; a collection. |
+| [ChargingStationGroup](docs/ChargingStationGroup.md) | Charging stations of one operator, or of any operator for an e-mobility provider; a collection. |
+| [ChargingPoolGroup](docs/ChargingPoolGroup.md) | Charging pools of one operator, or of any operator for an e-mobility provider; a collection. |
+| [ChargingTariffGroup](docs/ChargingTariffGroup.md) | Charging tariffs of one operator; a collection. |
+| [ChargingTariffOffer](docs/ChargingTariffOffer.md) | Another price for a time at the EVSEs of groups or of operators, of an operator or an e-mobility provider. |
 | [EnergyMeter](docs/EnergyMeter.md) | A meter of a pool, grid connection point, station or EVSE, with its transparency software. |
-| [EnergyMeterGroup](docs/EnergyMeterGroup.md) | Energy meters of one charging station operator or grid operator, with properties they take at runtime. |
+| [EnergyMeterTemplate](docs/EnergyMeterTemplate.md) | What a series of energy meters naming it shares, e.g. manufacturer, model and firmware. |
+| [EnergyMeterGroup](docs/EnergyMeterGroup.md) | Energy meters of one charging station operator or grid operator; a collection. |
 | [ChargingStationManufacturer](docs/ChargingStationManufacturer.md) | A maker of charging stations, named by the stations it built. |
-| [EMobilityProvider](docs/EMobilityProvider.md) | An e-mobility service provider with its keys. |
+| [EMobilityProvider](docs/EMobilityProvider.md) | An e-mobility service provider with its keys, groups and offers. |
 | [GridOperator](docs/GridOperator.md) | A distribution system operator with its grid connection points, each signed by its maintainer. |
 | [ParkingOperator](docs/ParkingOperator.md) | Runs parking garages, spaces and sensors and offers parking products. |
 | [ParkingGarage](docs/ParkingGarage.md) | A car park with opening times, images and parking products. |
 | [ParkingSpace](docs/ParkingSpace.md) | One parking space, possibly in a garage, with its sensors and charging stations. |
 | [ParkingSensor](docs/ParkingSensor.md) | A sensor detecting whether parking spaces are occupied, named by the spaces it watches. |
-| [ParkingSpaceGroup](docs/ParkingSpaceGroup.md) | Parking spaces of one operator, e.g. a level or a zone, with properties they take at runtime. |
+| [ParkingSpaceTemplate](docs/ParkingSpaceTemplate.md) | What the parking spaces naming it share, e.g. garage, dimensions and roof. |
+| [ParkingSpaceGroup](docs/ParkingSpaceGroup.md) | Parking spaces of one operator, e.g. a level or a zone; a collection. |
 
 ## Change sets
 
@@ -259,8 +284,8 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
   `Add`/`Remove` of operators, manufacturers, energy meter manufacturers, e-mobility providers, grid operators, parking operators,
-  transparency software releases and certificates, pools, tariffs, groups, stations (`Add(station, poolId)`),
-  EVSEs (`Add(evse, stationId)`), parking garages, spaces, sensors and space groups
+  transparency software releases and certificates, pools, tariffs, templates, groups, offers, stations
+  (`Add(station, poolId)`), EVSEs (`Add(evse, stationId)`), parking garages, spaces, sensors, space templates and space groups
   (`Add(space, parkingOperatorId)`) and grid connection points (`Add(point, gridOperatorId)`). Energy meters
   are properties of what embeds them (`energyMeters`, `energyMeter`).
   Every reference must exist; a referenced entity can not be removed. The overload by the entity's
@@ -298,9 +323,10 @@ var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
     signs to add them. The RNO decides
     who is a member: removing a party removes all its data with it, without the party's signature; the history
     keeps the versions before.
-  - A **charging station operator** owns its properties, brands, pools, stations, EVSEs, tariffs and groups,
-    named by their ids, and the brands embedded in them; a **parking operator** its parking data; e-mobility
-    providers and grid operators their properties.
+  - A **charging station operator** owns its properties, brands, pools, stations, EVSEs, tariffs, templates, groups
+    and offers, and the brands embedded in them; a **parking operator** its parking data; an **e-mobility provider**
+    its properties, groups and offers, which name data of others without changing it; grid operators their
+    properties, energy meter templates and groups.
   - A **grid connection point** is owned by its maintainer: its grid operator, or the charging station operator
     or parking operator its `maintainedBy` names, e.g. while the grid operator does not take part. The grid
     operator takes it over or hands it on by changing `maintainedBy`; the maintainer can hand it on; an identity
@@ -368,7 +394,7 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   runtimeStatus}`. `TryFromSnapshot` checks the commit id, recomputes the ETags of the network and takes the runtime
   status as the server's; changes follow as commits since. `runtimeStatus=false` leaves the status out.
   `effectiveLastChanges` are the floors of the last changes of effective members, which are not content either, so
-  that their last changes never go back ([docs/](docs/README.md#group-priority-and-effective-members)).
+  that their last changes never go back ([docs/](docs/README.md#templates-and-effective-members)).
 - **Announcements:** `OnCommitAnnouncement` tells of every commit a history takes, in order:
   timestamp, commit id, parent ids, revision, description.
 - **Runtime status:** `history.RuntimeStatus` sets and reads the status of the head's entities by name,
@@ -409,7 +435,7 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
   decimal without decimal places as the integer it is, as canonical JSON does: `ToString()` of it reads back as
   it was, too, with its ETags, signatures and identification, where Newtonsoft would write `150000.0` for the
   decimal. And the JSON of an entity is the very JSON read again from its text, also for `JToken.DeepEquals`.
-  Whether something changed - of a merge, of the differences an importer commits, of what groups give - compares
+  Whether something changed - of a merge, of the differences an importer commits, of what templates give - compares
   numbers by what they are worth: an importer computing a price of 6.0 per hour from 0.1 per minute does not change
   the price 6. Whether a value is still the old value of a change compares it as content (see Old values).
 - **Loading:** `TryLoad` checks every commit again (owners' signatures, merges calculated again, ETags) and
@@ -455,7 +481,7 @@ JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json
 | `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer or parking operator |
 | `GET ~/RNs/{RN_Id}/{CPs\|CSs\|EVSEs}/{Id}` | `307 Temporary Redirect` to where a charging pool, station or EVSE is, below its operator, the query kept |
 
-What names a charging station or an EVSE names it by its identification only: a group of its operator, a parking
+What names a charging station or an EVSE names it by its identification only: a group or an offer, a parking
 garage, space or sensor of a parking operator. `~/RNs/{RN_Id}/CSs/{CS_Id}` finds it in the roaming network, e.g. for
 a link, and redirects to `~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}`, a browser as well; temporarily, as a
 station may move to another pool of its operator. One not there is `404`.
@@ -474,22 +500,27 @@ without them, so that a large one is not read whole to show what it says of itse
 without any of `chargingStationOperators`, `gridOperators`, `eMobilityProviders`, `chargingStationManufacturers` and
 `parkingOperators`, each listed by `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}`, with its `eTags`, the ones of all of it;
 and
-`GET ~/RNs/{RN_Id}/GOs/{GO_Id}?without=gridConnectionPoints,energyMeterGroups`, and `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/{GCPs|EMGs}`
+`GET ~/RNs/{RN_Id}/GOs/{GO_Id}?without=gridConnectionPoints,energyMeterTemplates,energyMeterGroups`, and `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/{GCPs|EMTs|EMGs}`
 lists them, the grid connection points as they are at runtime, `?view=stored` as the grid operator embeds them; a
-charging station operator without any of `chargingTariffs`, `chargingTariffGroups`, `chargingPoolGroups`,
-`chargingStationGroups`, `EVSEGroups` and `energyMeterGroups` as well, listed by
-`~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|CTGs|CPGs|CSGs|EVSEGs|EMGs}`, each of them below it, e.g. `…/CTs/{CT_Id}`; and a
-parking operator without any of `parkingGarages`, `parkingSpaces`,
-`parkingSpaceGroups`, `parkingSensors` and `parkingProducts`, e.g. `?without=parkingSpaces,parkingSensors`, listed by
-`~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSGs|PSNs|PPs}`, each of them below it, e.g. `…/PSs/{PS_Id}`. The parking spaces a
+charging station operator without any of `chargingTariffs`, its templates (`EVSETemplates`, `chargingStationTemplates`,
+`chargingPoolTemplates`, `chargingTariffTemplates`, `energyMeterTemplates`), its groups (`chargingTariffGroups`,
+`chargingPoolGroups`, `chargingStationGroups`, `EVSEGroups`, `energyMeterGroups`) and `chargingTariffOffers` as well,
+listed by `~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs|EVSETs|CSTs|CPTs|CTTs|EMTs|CTGs|CPGs|CSGs|EVSEGs|EMGs|CTOs}`, each of them
+below it, e.g. `…/CTs/{CT_Id}`; an e-mobility provider without any of its groups and `chargingTariffOffers`, listed by
+`~/RNs/{RN_Id}/EMPs/{EMP_Id}/{EVSEGs|CSGs|CPGs|CTOs}`; and a parking operator without any of `parkingGarages`,
+`parkingSpaces`, `parkingSpaceTemplates`, `parkingSpaceGroups`, `parkingSensors` and `parkingProducts`, e.g.
+`?without=parkingSpaces,parkingSensors`, listed by `~/RNs/{RN_Id}/POs/{PO_Id}/{PGs|PSs|PSTs|PSGs|PSNs|PPs}`, each of
+them below it, e.g. `…/PSs/{PS_Id}`. The parking spaces a
 charging station names, whoever defines them, are listed by `…/CSs/{CS_Id}/PSs`. A charging pool, a charging
-station, an EVSE and `CPs` are served with the properties their groups give them, the effective ones; a charging
+station, an EVSE, a charging tariff and `CPs` are served with the properties their templates give them, the effective ones; a charging
 pool, and what it embeds, with `?view=stored` as its operator embeds it, with the ETag a precondition names (`CPs`,
 the search, refuses it). The brands of a charging station
 operator, pool, station or EVSE, its own, are listed by `…/Brands` below it, e.g.
-`~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands`, each of them below it, `…/Brands/{Brand_Id}`. The groups a member
-is in, which give it properties, are listed below it, each with its page below its operator: `…/CPs/{CP_Id}/CPGs`,
-`…/CSs/{CS_Id}/CSGs`, `…/EVSEs/{EVSE_Id}/EVSEGs` and `~/RNs/{RN_Id}/POs/{PO_Id}/PSs/{PS_Id}/PSGs`. Every list, `~/RNs`,
+`~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands`, each of them below it, `…/Brands/{Brand_Id}`. The templates a member
+names, in its order, are listed below it, each with its page below its owner: `…/CPs/{CP_Id}/CPTs`,
+`…/CSs/{CS_Id}/CSTs`, `…/EVSEs/{EVSE_Id}/EVSETs`, `…/CTs/{CT_Id}/CTTs` and `~/RNs/{RN_Id}/POs/{PO_Id}/PSs/{PS_Id}/PSTs`;
+so are the groups it is in, `…/CPGs`, `…/CSGs`, `…/EVSEGs` and `…/PSGs`, and the charging tariff offers covering it,
+`…/CTOs`. Every list, `~/RNs`,
 `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` and
 the lists of what an operator embeds as well, takes:
 
@@ -599,7 +630,7 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 | Directory | What it is |
 |---|---|
 | `WWCP_POI2` | Shared lower layer: identifications, status values, predefined strings, energy information, transparency software |
-| `WWCP_POI3` | Roaming networks with their operators, pools, stations, EVSEs, tariffs, groups, manufacturers, e-mobility providers, grid operators, energy meters, transparency software and parking; change sets, history, sync |
+| `WWCP_POI3` | Roaming networks with their operators, pools, stations, EVSEs, tariffs, templates, groups, offers, manufacturers, e-mobility providers, grid operators, energy meters, transparency software and parking; change sets, history, sync |
 | `old` | The earlier implementation, for reference only; not developed further |
 
 

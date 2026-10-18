@@ -6,11 +6,12 @@ signing and identity keys and signs every change of its data itself.
 
 It is embedded completely in its [RoamingNetwork](RoamingNetwork.md) under `chargingStationOperators`, in the
 ordinal order of the identifications, and embeds completely its charging pools (with their stations and EVSEs),
-its charging tariffs, its groups and its brands. The roaming network operator (RNO) adds and removes it; everything
+its charging tariffs, its templates, groups and charging tariff offers, and its brands. The roaming network operator (RNO) adds and removes it; everything
 else of it, its properties and all it embeds, the operator changes itself.
 
 Its identification is a country code and three characters, e.g. `DE*GEF`, unique within the roaming network.
-The pools, stations, EVSEs, tariffs and groups it embeds all begin with it: `DE*GEF*P1`, `DE*GEF*S1`, `DE*GEF*TAC1`, …
+The pools, stations, EVSEs, tariffs, templates and groups it embeds, but those of energy meters, all begin with it:
+`DE*GEF*P1`, `DE*GEF*S1`, `DE*GEF*TAC1`, `DE*GEF*ETHYC300`, …
 
 | | |
 |---|---|
@@ -20,7 +21,7 @@ The pools, stations, EVSEs, tariffs and groups it embeds all begin with it: `DE*
 | Status | `ChargingStationOperatorStatusType`, initially `Available` |
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `chargingStationOperators` |
 | Owner | itself (a signing key; its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO); added and removed by the RNO |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs` (all, as `{@id, name, description}`), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` (`?without=chargingPools` without its charging pools, which `GET ~/RNs/{RN_Id}/CPs?operatorId={CSO_Id}` lists; `?without=` also any of `chargingTariffs`, `chargingTariffGroups`, `chargingPoolGroups`, `chargingStationGroups`, `EVSEGroups`, `energyMeterGroups`, and `parkingSpaces`, its own parking spaces, which `…/CSs/{CS_Id}/PSs` list as its charging stations name them), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs\|CTGs\|CPGs\|CSGs\|EVSEGs\|EMGs}` (each of them, searched and paged), and one of them below it, e.g. `…/CTs/{CT_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands/{Brand_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs` (all, as `{@id, name, description}`), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` (`?without=chargingPools` without its charging pools, which `GET ~/RNs/{RN_Id}/CPs?operatorId={CSO_Id}` lists; `?without=` also any of `chargingTariffs`, `EVSETemplates`, `chargingStationTemplates`, `chargingPoolTemplates`, `chargingTariffTemplates`, `energyMeterTemplates`, `chargingTariffGroups`, `chargingPoolGroups`, `chargingStationGroups`, `EVSEGroups`, `energyMeterGroups`, `chargingTariffOffers`, and `parkingSpaces`, its own parking spaces, which `…/CSs/{CS_Id}/PSs` list as its charging stations name them), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/{CTs\|EVSETs\|CSTs\|CPTs\|CTTs\|EMTs\|CTGs\|CPGs\|CSGs\|EVSEGs\|EMGs\|CTOs}` (each of them, searched and paged), and one of them below it, e.g. `…/CTs/{CT_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/Brands/{Brand_Id}` |
 
 
 ## Common properties
@@ -34,7 +35,7 @@ See [Common properties](README.md#common-properties).
 | `description` | update/remove | |
 | `dataSource` | update/remove | |
 | `created` | — | |
-| `lastChange` | — | Set to the change set's `createdAt` by every change of the operator's own properties and of everything it embeds: pools, stations, EVSEs, tariffs and groups. |
+| `lastChange` | — | Set to the change set's `createdAt` by every change of the operator's own properties and of everything it embeds: pools, stations, EVSEs, tariffs, templates, groups and offers. |
 | `customData` | update/remove | |
 
 The operator writes no `eTags`.
@@ -58,11 +59,17 @@ The operator writes no `eTags`.
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update | 1..n long-term keys signing changes of its identity keys. |
 | `chargingTariffs` | `ChargingTariffs` | `POICollection<ChargingTariff_Id, ChargingTariff>` | add/remove | Its [charging tariffs](#charging-tariffs). |
 | `chargingPools` | `ChargingPools` | `POICollection<ChargingPool_Id, ChargingPool>` | add/remove | Its [charging pools](#charging-pools). |
+| `EVSETemplates` | `EVSETemplates` | `POICollection<EVSETemplate_Id, EVSETemplate>` | add/remove | See [Templates](#templates). |
+| `chargingStationTemplates` | `ChargingStationTemplates` | `POICollection<ChargingStationTemplate_Id, ChargingStationTemplate>` | add/remove | See [Templates](#templates). |
+| `chargingPoolTemplates` | `ChargingPoolTemplates` | `POICollection<ChargingPoolTemplate_Id, ChargingPoolTemplate>` | add/remove | See [Templates](#templates). |
+| `chargingTariffTemplates` | `ChargingTariffTemplates` | `POICollection<ChargingTariffTemplate_Id, ChargingTariffTemplate>` | add/remove | See [Templates](#templates). |
+| `energyMeterTemplates` | `EnergyMeterTemplates` | `POICollection<EnergyMeterTemplate_Id, EnergyMeterTemplate>` | add/remove | Templates of the energy meters of its pools, stations and EVSEs, see [Templates](#templates). |
 | `EVSEGroups` | `EVSEGroups` | `POICollection<EVSEGroup_Id, EVSEGroup>` | add/remove | See [Groups](#groups). |
 | `chargingStationGroups` | `ChargingStationGroups` | `POICollection<ChargingStationGroup_Id, ChargingStationGroup>` | add/remove | See [Groups](#groups). |
 | `chargingPoolGroups` | `ChargingPoolGroups` | `POICollection<ChargingPoolGroup_Id, ChargingPoolGroup>` | add/remove | See [Groups](#groups). |
 | `chargingTariffGroups` | `ChargingTariffGroups` | `POICollection<ChargingTariffGroup_Id, ChargingTariffGroup>` | add/remove | See [Groups](#groups). |
 | `energyMeterGroups` | `EnergyMeterGroups` | `POICollection<EnergyMeterGroup_Id, EnergyMeterGroup>` | add/remove | Groups of the energy meters of its pools, stations and EVSEs, see [Groups](#groups). |
+| `chargingTariffOffers` | `ChargingTariffOffers` | `POICollection<ChargingTariffOffer_Id, ChargingTariffOffer>` | add/remove | See [Charging tariff offers](#charging-tariff-offers). |
 | `parkingSpaces` | `ParkingSpaces` | `POICollection<ParkingSpace_Id, ParkingSpace>` | add/remove | The [parking spaces](ParkingSpace.md) it defines itself where no parking operator does: in no parking garage, without parking sensors or parking products; identifications unique within the network, parking operators' as well. |
 
 Children are written only when there are any; collections in the ordinal order of their identifications.
@@ -73,9 +80,10 @@ Children are written only when there are any; collections in the ordinal order o
 - `EVSEs`: the EVSEs of all its pools.
 - `EnergyMeters`: the energy meters of all its pools, their grid connection points, stations and EVSEs.
 - `TryGetChargingPool`, `TryGetChargingStation`, `TryGetEVSE`, `TryGetEnergyMeter`, `TryGetChargingTariff`,
-  `TryGetEVSEGroup`, `TryGetChargingStationGroup`, `TryGetChargingPoolGroup`, `TryGetChargingTariffGroup`,
-  `TryGetEnergyMeterGroup`: lookups by identification, across all pools; `EnergyMeterGroupsOf(energyMeterId)` and
-  the like: the groups of a member.
+  `TryGetEVSETemplate`, `TryGetChargingStationTemplate`, `TryGetChargingPoolTemplate`, `TryGetChargingTariffTemplate`,
+  `TryGetEnergyMeterTemplate`, `TryGetEVSEGroup`, `TryGetChargingStationGroup`, `TryGetChargingPoolGroup`,
+  `TryGetChargingTariffGroup`, `TryGetEnergyMeterGroup`, `TryGetChargingTariffOffer`: lookups by identification, across
+  all pools; `EnergyMeterGroupsOf(energyMeterId)` and the like: the groups of a member.
 - No reference to its roaming network: versions share the operators they did not change, so it would be the
   wrong version for all but one of them. An operator is always reached through its roaming network.
 
@@ -103,7 +111,7 @@ operator, not only within their parent.
   it. Its parent, if named, must be the operator. `created` is taken from the pool or else set to the change set's
   `createdAt`, `lastChange` always to `createdAt`.
 - **Remove:** `RoamingNetworkChange.Remove(chargingPoolId)` removes the pool with everything it embeds; removing the
-  last one removes `chargingPools`. A pool, station or EVSE a group names can not be removed.
+  last one removes `chargingPools`. A pool, station or EVSE a group of the operator names can not be removed.
 - **Change:** `UpdateProperty`/`RemoveProperty` of the pool itself; stations are added to a pool with
   `Add(station, poolId)`.
 - Signed with a signing key of the operator.
@@ -114,26 +122,52 @@ See [ChargingPool](ChargingPool.md).
 ## Charging tariffs
 
 The prices of the operator, `chargingTariffs`, as in OCPI, in the ordinal order of their identifications, e.g.
-`DE*GEF*TAC1`. They belong to the operator their identification names; EVSEs (`chargingTariffIds`) and groups
+`DE*GEF*TAC1`. They belong to the operator their identification names; EVSEs (`chargingTariffIds`) and templates
 (`chargingTariffId`) name only tariffs of their own operator. Added with `RoamingNetworkChange.Add(chargingTariff)`,
-removed with `Remove(chargingTariffId)`; a tariff an EVSE or group names can not be removed.
+removed with `Remove(chargingTariffId)`; a tariff an EVSE or template names can not be removed.
 See [ChargingTariff](ChargingTariff.md).
+
+
+## Templates
+
+Five kinds of templates, each giving what members of this operator naming it in their `templateIds` share,
+embedded completely in the ordinal order of their identifications; see
+[templates and effective members](README.md#templates-and-effective-members). Added with
+`RoamingNetworkChange.Add(template)`, an energy meter template with `Add(template, operatorId)`, removed with
+`Remove(templateId)`; a template can not be removed while a member names it.
+
+| JSON key | Type | Identification, e.g. | Named by | Tariff for EVSEs |
+|---|---|---|---|---|
+| `EVSETemplates` | [EVSETemplate](EVSETemplate.md) | `DE*GEF*ETHYC300` | EVSEs | `chargingTariffId` |
+| `chargingStationTemplates` | [ChargingStationTemplate](ChargingStationTemplate.md) | `DE*GEF*STWALLBOX22` | charging stations | `chargingTariffId` |
+| `chargingPoolTemplates` | [ChargingPoolTemplate](ChargingPoolTemplate.md) | `DE*GEF*PTJENA` | charging pools | `chargingTariffId` |
+| `chargingTariffTemplates` | [ChargingTariffTemplate](ChargingTariffTemplate.md) | `DE*GEF*TTEUR` | charging tariffs | — |
+| `energyMeterTemplates` | [EnergyMeterTemplate](EnergyMeterTemplate.md) | `acme-3000`, any text unique within the network | energy meters of its pools, stations and EVSEs | — |
 
 
 ## Groups
 
 Five kinds of groups, each a list of members of this operator, embedded completely in the ordinal order of their
-identifications. Groups may overlap; members must exist at the operator. Added with
-`RoamingNetworkChange.Add(group)`, an energy meter group with `Add(group, operatorId)`, removed with
-`Remove(groupId)`; a member can not be removed while a group names it.
+identifications; they give their members nothing. Groups may overlap; members must exist at the operator. Added
+with `RoamingNetworkChange.Add(group)`, an energy meter group with `Add(group, operatorId)`, removed with
+`Remove(groupId)`; a member can not be removed while a group of the operator names it. Groups of e-mobility
+providers may name its members as well, by weak references, see [EMobilityProvider](EMobilityProvider.md).
 
-| JSON key | Type | Identification, e.g. | Members | Common tariff |
-|---|---|---|---|---|
-| `EVSEGroups` | [EVSEGroup](EVSEGroup.md) | `DE*GEF*EG1` | `EVSEIds` | `chargingTariffId` |
-| `chargingStationGroups` | [ChargingStationGroup](ChargingStationGroup.md) | `DE*GEF*SG1` | `chargingStationIds` | `chargingTariffId` |
-| `chargingPoolGroups` | [ChargingPoolGroup](ChargingPoolGroup.md) | `DE*GEF*PG1` | `chargingPoolIds` | `chargingTariffId` |
-| `chargingTariffGroups` | [ChargingTariffGroup](ChargingTariffGroup.md) | `DE*GEF*TG1` | `chargingTariffIds` | — |
-| `energyMeterGroups` | [EnergyMeterGroup](EnergyMeterGroup.md) | `gef-evse-meters`, any text unique within the network | `energyMeterIds`, of its pools, stations and EVSEs | — |
+| JSON key | Type | Identification, e.g. | Members |
+|---|---|---|---|
+| `EVSEGroups` | [EVSEGroup](EVSEGroup.md) | `DE*GEF*EG1` | `EVSEIds` |
+| `chargingStationGroups` | [ChargingStationGroup](ChargingStationGroup.md) | `DE*GEF*SG1` | `chargingStationIds` |
+| `chargingPoolGroups` | [ChargingPoolGroup](ChargingPoolGroup.md) | `DE*GEF*PG1` | `chargingPoolIds` |
+| `chargingTariffGroups` | [ChargingTariffGroup](ChargingTariffGroup.md) | `DE*GEF*TG1` | `chargingTariffIds` |
+| `energyMeterGroups` | [EnergyMeterGroup](EnergyMeterGroup.md) | `gef-evse-meters`, any text unique within the network | `energyMeterIds`, of its pools, stations and EVSEs |
+
+
+## Charging tariff offers
+
+`chargingTariffOffers`: other prices of the operator for a time at the EVSEs of its groups or at all its EVSEs, e.g.
+promotions, in the ordinal order of their identifications; two of them must not overlap. Added with
+`RoamingNetworkChange.Add(offer, operatorId)`, removed with `Remove(offerId)`; a group an offer names can not be
+removed. See [ChargingTariffOffer](ChargingTariffOffer.md).
 
 
 ## Logos
@@ -201,11 +235,12 @@ Each key:
   and an identity key. An array is written only when it is not empty.
 - A key signs only a change set whose `createdAt` lies within its validity, and only in the version the change set
   is applied to.
-- **Add:** the RNO adds the operator with at least one key of each kind and without charging pools, tariffs or
-  groups: those are the operator's own to add. `RoamingNetworkChange.Add(operator)` leaves them out;
-  `RoamingNetworkChange.AddChildren(operator)` gives the changes adding them, tariffs first and groups last, for a
+- **Add:** the RNO adds the operator with at least one key of each kind and without charging pools, tariffs,
+  templates, groups or offers: those are the operator's own to add. `RoamingNetworkChange.Add(operator)` leaves them
+  out; `RoamingNetworkChange.AddChildren(operator)` gives the changes adding them, tariffs and templates first, groups
+  and offers last, for a
   change set the operator signs once it is a member.
-- **Remove:** the RNO removes the operator with its pools, stations, EVSEs, tariffs and groups, with one of its
+- **Remove:** the RNO removes the operator with its pools, stations, EVSEs, tariffs, templates, groups and offers, with one of its
   signing keys and without the operator's signature: the RNO decides who is a member of the roaming network.
   The history keeps the versions before.
 - **Change:** `signingKeys` are rotated with a signature by one of the operator's current signing keys or, when none
@@ -271,11 +306,15 @@ the runtime status and internal data of the operator and of everything it embeds
 - **Data licenses:** no null entry, none twice; `dataLicenseIds` only of well-known licenses.
 - **Logos:** an array of at most one object with `uri`.
 - **Children:** given completely: `chargingPoolIds`, `chargingTariffIds`, `EVSEGroupIds`, `chargingStationGroupIds`,
-  `chargingPoolGroupIds`, `chargingTariffGroupIds` and `energyMeterGroupIds` are refused. No null entries.
+  `chargingPoolGroupIds`, `chargingTariffGroupIds` and `energyMeterGroupIds`, and those of templates and offers, are
+  refused. No null entries.
 - **Brands:** complete, each `@id` once; `brandIds` is refused. See [Brand](Brand.md#validation).
-- **Belonging:** every pool, tariff and group but an energy meter group names this operator in its identification.
-- **Uniqueness within the operator:** pools, stations, EVSEs, energy meters, tariffs and each kind of group.
-- **References within the operator:** every `chargingTariffIds` of an EVSE, every member and `chargingTariffId` of a group exists at it.
+- **Belonging:** every pool, tariff, template and group but those of energy meters names this operator in its identification.
+- **Uniqueness within the operator:** pools, stations, EVSEs, energy meters, tariffs and each kind of template; groups
+  and offers within the roaming network.
+- **References within the operator:** every `chargingTariffIds` of an EVSE, `templateIds` of a member, member of a
+  group, `chargingTariffId` of a template and group of an offer exists at it; its templates make no member invalid, and
+  its offers do not overlap.
 - **References within the network** (when the network is built or a change set applied): station manufacturers,
   grid operators of grid connection points,
   energy meter manufacturers, transparency software and certificates, parking spaces of stations; energy meters
@@ -287,7 +326,7 @@ the runtime status and internal data of the operator and of everything it embeds
 
 ## Example
 
-`ToEmbeddedJSON()` of an operator with one brand, one pool, one tariff and one pool group; the key values are
+`ToEmbeddedJSON()` of an operator with one brand, one pool, one tariff, one pool template and one pool group; the key values are
 abbreviated, real ones are 64 hex digits and the full Base64 of a COSE key.
 
 ```json
@@ -326,11 +365,15 @@ abbreviated, real ones are 64 hex digits and the full Base64 of a COSE key.
       "created": "2026-01-01T00:00:00.000Z", "lastChange": "2026-01-01T00:00:00.000Z" }
   ],
   "chargingPools": [
-    { "@id": "DE*GEF*P1", "name": { "en": "Jena Paradies" },
+    { "@id": "DE*GEF*P1", "name": { "en": "Jena Paradies" }, "templateIds": [ "DE*GEF*PTJENA" ],
+      "created": "2026-01-01T00:00:00.000Z", "lastChange": "2026-01-01T00:00:00.000Z" }
+  ],
+  "chargingPoolTemplates": [
+    { "@id": "DE*GEF*PTJENA", "chargingTariffId": "DE*GEF*TAC1", "hotline": "+49 3641 7654321",
       "created": "2026-01-01T00:00:00.000Z", "lastChange": "2026-01-01T00:00:00.000Z" }
   ],
   "chargingPoolGroups": [
-    { "@id": "DE*GEF*PGJENA", "chargingPoolIds": [ "DE*GEF*P1" ], "chargingTariffId": "DE*GEF*TAC1",
+    { "@id": "DE*GEF*PGJENA", "chargingPoolIds": [ "DE*GEF*P1" ],
       "created": "2026-01-01T00:00:00.000Z", "lastChange": "2026-01-01T00:00:00.000Z" }
   ],
   "signingKeys":  [ { "@id": "5b1c…", "key": "pQECIAEh…" } ],

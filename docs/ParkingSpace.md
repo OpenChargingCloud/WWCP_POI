@@ -27,10 +27,11 @@ with all it says; the charging stations naming it go on naming it.
 | Owner | the operator embedding it (signing key) |
 | HTTP | `GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs/{PS_Id}`; embedded in its parking operator, `GET ~/RNs/{RN_Id}/POs/{PO_Id}`, and listed by `GET ~/RNs/{RN_Id}/POs/{PO_Id}/PSs`; one of a charging station operator embedded in it, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}`. Either below the charging stations naming it, `GET …/CSs/{CS_Id}/PSs[/{PS_Id}]` |
 
-A [ParkingSpaceGroup](ParkingSpaceGroup.md) of its parking operator may give it most of the properties below, so that a
-space has only few of its own: at runtime it takes them, as the effective parking space of its parking operator. See
-[properties of its members](ParkingSpaceGroup.md#properties-of-its-members). POI_API serves the effective parking space;
-`?view=stored` the space as it is given. The parking spaces of charging station operators have no groups.
+The [parking space templates](ParkingSpaceTemplate.md) of its parking operator it names in `templateIds` may give it
+most of the properties below, so that a space has only few of its own: at runtime it takes them, as the effective
+parking space of its parking operator. See [templates and effective members](README.md#templates-and-effective-members).
+POI_API serves the effective parking space; `?view=stored` the space as it is given. The parking spaces of charging
+station operators name no templates and are in no groups.
 
 
 ## Common properties
@@ -74,6 +75,7 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `apdsReference` | `APDSReference` | `String?` | update/remove | Its reference in an automated parking data system, e.g. of a truck parking. |
 | `standards` | `Standards` | `ImmutableArray<Standard>` | update/remove | The standards it conforms to, e.g. `PAS 1899:2022`; ordinal order, each once. |
 | `images` | `Images` | `Image[]` | update/remove | Images of it, each URL once, in their given order. |
+| `templateIds` | `TemplateIds` | `ImmutableArray<ParkingSpaceTemplate_Id>` | update/remove, element changes | The [parking space templates](ParkingSpaceTemplate.md) of its parking operator it takes, each once, in its order, the first deciding; see [templates and effective members](README.md#templates-and-effective-members). |
 
 Enumerations (`evsePosition`, `direction`, `surface`, `slope`) are read in upper case only; these properties are those
 of an OCPI 2.3 `Parking`.

@@ -8,9 +8,11 @@ calculate prices.
 
 A tariff is embedded completely in its [ChargingStationOperator](ChargingStationOperator.md) under
 `chargingTariffs`, and belongs to the operator its identification names. That operator owns it and signs
-every change of it. [EVSE](EVSE.md)s name tariffs of their operator in `chargingTariffIds`, groups in
-`chargingTariffId`, [ChargingTariffGroup](ChargingTariffGroup.md)s in `chargingTariffIds`
-([below](#how-tariffs-are-named)).
+every change of it. [EVSE](EVSE.md)s name tariffs of their operator in `chargingTariffIds`, EVSE, charging station
+and charging pool templates in `chargingTariffId`, [ChargingTariffGroup](ChargingTariffGroup.md)s in
+`chargingTariffIds` ([below](#how-tariffs-are-named)). The [charging tariff templates](ChargingTariffTemplate.md) it
+names in `templateIds` may give it its properties, so that a tariff has only few of its own: at runtime it takes
+them, as the effective tariff of its operator, which POI_API serves by default and publishers publish.
 
 The identification is a `ChargingTariff_Id`: the operator identification, `*T` and a suffix of 1..50 characters
 (`[A-Za-z0-9_]` first, then also `*`, `-`, `.`, `€`, `$`), e.g. `DE*GEF*T1`. When reading, the `*` before
@@ -46,10 +48,10 @@ See [README.md](README.md#common-properties). No `eTags`.
 
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
-| `currency` | `Currency` | string | update | Mandatory: the ISO 4217 code of all its prices, e.g. `EUR`; an unknown code such as `XXX` is refused. Removing it is refused. |
+| `currency` | `Currency` | string | update/remove | Mandatory as it is at runtime, its own or of its templates: the ISO 4217 code of all its prices, e.g. `EUR`; an unknown code such as `XXX` is refused. |
 | `tariffType` | `TariffType` | string | update/remove | For which charging sessions it is, as in OCPI: `ChargingTariffType` `AD_HOC_PAYMENT` (paid ad hoc, without a contract), `PROFILE_CHEAP`, `PROFILE_FAST`, `PROFILE_GREEN` (drivers preferring to charge cheaply, fast or green), `REGULAR` (with a contract, without a preference); upper case only. Absent: for every charging session. An EVSE may name several tariffs, one per type. |
 | `tariffURL` | `TariffURL` | URL | update/remove | A web page about the tariff, e.g. for EV drivers. |
-| `elements` | `Elements` | [ChargingTariffElement](#elements)[] | update | Mandatory, at least one, in their given order. Changed as a whole; removing it is refused. |
+| `elements` | `Elements` | [ChargingTariffElement](#elements)[] | update/remove | Mandatory as it is at runtime, its own or of its templates, as a whole: at least one, in their given order. Changed as a whole. |
 | `minPrice` | `MinPrice` | [ChargingPriceLimit](#minprice-and-maxprice) | update/remove | The least a charging session costs: one costing less costs this. Not a flat fee, which every session pays. |
 | `maxPrice` | `MaxPrice` | [ChargingPriceLimit](#minprice-and-maxprice) | update/remove | The most a charging session costs: one costing more costs this. |
 | `paymentMeans` | `PaymentMeans` | `ImmutableArray<PaymentMeans>` | update/remove | The means it can be paid with, each once, in the ordinal order of their names. Predefined: `CREDIT_CARD`, `DEBIT_CARD`, `VALUE_CARD` (a prepaid card), `CASH` (coins and bills), `CASH_COINS`, `CASH_BILLS`, `MOBILE_ACCOUNT`, `TOLL_TAG`, `PREPAY`, `NFC` (contactless), `EMV` (a card with a chip), `QR_CODE`, `WEBSITE`; other nonempty texts are read as well. |
@@ -57,6 +59,7 @@ See [README.md](README.md#common-properties). No `eTags`.
 | `validFrom` | `ValidFrom` | timestamp | update/remove | From when it is valid, inclusive, as OCPI's `start_date_time`; absent: always since. Written as every timestamp of the content (`yyyy-MM-ddTHH:mm:ss.fffZ`), to the millisecond. |
 | `validUntil` | `ValidUntil` | timestamp | update/remove | Until when it is valid, exclusive, as OCPI's `end_date_time`; absent: for good. After `validFrom`. |
 | `energyMix` | `EnergyMix` | [EnergyMix](#energymix) | update/remove | The mix of the energy it delivers. |
+| `templateIds` | `TemplateIds` | `ImmutableArray<ChargingTariffTemplate_Id>` | update/remove, element changes | The [charging tariff templates](ChargingTariffTemplate.md) of its operator it takes, each once, in its order, the first deciding; see [templates and effective members](README.md#templates-and-effective-members). |
 
 The tariff is changed only through its operator's change sets: `RoamingNetworkChange.Add(tariff)` (no parent
 needed), `RoamingNetworkChange.Remove(tariffId)`, `UpdateProperty(tariff, "elements", oldValue, newValue)`,
@@ -166,9 +169,9 @@ reference to a tariff of another operator is refused.
 | Who | JSON key | Type | Change set |
 |---|---|---|---|
 | [EVSE](EVSE.md) | `chargingTariffIds` | `ChargingTariff_Id`[] | `UpdateProperty(evse, "chargingTariffIds", …)`; ordered (ordinal), each at most once, omitted when empty |
-| [EVSEGroup](EVSEGroup.md) | `chargingTariffId` | `ChargingTariff_Id` | `UpdateProperty(group, "chargingTariffId", …)`, optional |
-| [ChargingStationGroup](ChargingStationGroup.md) | `chargingTariffId` | `ChargingTariff_Id` | as above |
-| [ChargingPoolGroup](ChargingPoolGroup.md) | `chargingTariffId` | `ChargingTariff_Id` | as above |
+| [EVSETemplate](EVSETemplate.md) | `chargingTariffId` | `ChargingTariff_Id` | `UpdateProperty(template, "chargingTariffId", …)`, optional |
+| [ChargingStationTemplate](ChargingStationTemplate.md) | `chargingTariffId` | `ChargingTariff_Id` | as above |
+| [ChargingPoolTemplate](ChargingPoolTemplate.md) | `chargingTariffId` | `ChargingTariff_Id` | as above |
 | [ChargingTariffGroup](ChargingTariffGroup.md) | `chargingTariffIds` | `ChargingTariff_Id`[] | its members |
 
 The operator is read again after every single change, so within one change set a tariff must be added before
@@ -192,8 +195,9 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
 ## Validation
 
 - `@id` mandatory, a valid `ChargingTariff_Id`; its operator must be the embedding operator; unique within the operator.
-- `currency` mandatory, a known ISO 4217 code.
-- `elements` mandatory, a JSON array of objects, at least one, no null entries.
+- `currency` mandatory as it is at runtime, its own or of its templates, a known ISO 4217 code.
+- `elements` mandatory as it is at runtime, its own or of its templates, a JSON array of objects, at least one, no
+  null entries.
 - Every element: `priceComponents` a JSON array with at least one price component; `restrictions`, when given, a JSON object.
 - Every price component: `type` mandatory and known; `price` mandatory, ≥ 0; `vat` 0..100; `stepSize` > 0 for every type
   but `FLAT`, absent for `FLAT`.
@@ -201,7 +205,8 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
   minimum ≤ maximum; `daysOfWeek` upper-case day names, each at most once.
 - `paymentMeans` and `paymentBrands` must not name a value twice (case-insensitively).
 - `energyMix`, when given, a valid [energy mix](#energymix).
-- Network level: every `chargingTariffIds`/`chargingTariffId` of the operator's EVSEs and groups names one of its tariffs.
+- Network level: every `chargingTariffIds`/`chargingTariffId` of the operator's EVSEs and templates names one of its
+  tariffs; every `templateIds` of a tariff a charging tariff template of the operator.
 
 
 ## Example

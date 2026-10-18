@@ -1,20 +1,22 @@
 # EVSEGroup
 
-An EVSE group names [EVSEs](EVSE.md) of one charging station operator, e.g. all EVSEs of a fleet depot, of a
-product line or of a contract, and may name one charging tariff for all of them. It does not embed its members,
-it names them: groups may overlap, and an EVSE may be in no group or in several. It is embedded in its
-[ChargingStationOperator](ChargingStationOperator.md), under `EVSEGroups`.
+An EVSE group names [EVSEs](EVSE.md), e.g. all EVSEs of a fleet depot, of a contract or of a partner network. It
+gives them nothing: what an EVSE is, it has of its own and of its [templates](EVSETemplate.md). Groups are for sets
+that do not follow from properties: for a status of their own, for searches, or to name the EVSEs of a
+[charging tariff offer](ChargingTariffOffer.md). A group does not embed its members, it names them: groups may
+overlap, and an EVSE may be in no group or in several.
 
-It may give its members any property of an EVSE but its identification, name, description, energy meter and
-charging tariffs: e.g. the current types, the power and the connectors of all EVSEs of a type, given once. The
-network keeps them in the group; the EVSEs take them at runtime, as the
-[effective EVSEs](#properties-of-its-members) of their operator.
+Two parties have EVSE groups, under `EVSEGroups`:
 
-The group belongs to the charging station operator its identification names: `DE*GEF*EG2` belongs to `DE*GEF`,
-and every change of it, and every `Add`/`Remove` of it, must be signed with a signing key of that operator.
-The identification is `{operatorId}*EG{suffix}`, the suffix up to 50 characters, starting with a letter, digit
-or `_`, followed by letters, digits and `_ * - . € $`, e.g. `DE*GEF*EG2`. It is unique within the operator;
-two identifications are equal when they differ only in case.
+- a [ChargingStationOperator](ChargingStationOperator.md), of its own EVSEs;
+- an [EMobilityProvider](EMobilityProvider.md), of EVSEs of any operator, e.g. for its offers.
+
+The group belongs to the party embedding it: every change of it, and every `Add`/`Remove` of it, must be signed
+with a signing key of that party. The identification is `{partyId}*EG{suffix}`, the identification of that party
+followed by `*EG` and a suffix of up to 50 characters, starting with a letter, digit or `_`, followed by letters,
+digits and `_ * - . € $`, e.g. `DE*GEF*EG2`. It is unique within the roaming network, so that a group of an operator
+and a group of a provider with the same identification can not both exist; two identifications are equal when they
+differ only in case.
 
 | | |
 |---|---|
@@ -22,8 +24,8 @@ two identifications are equal when they differ only in case.
 | Identification | `EVSEGroup_Id`, e.g. `DE*GEF*EG2` |
 | Admin status | `EVSEGroupAdminStatusType`, initially `Operational` |
 | Status | `EVSEGroupStatusType`, initially `Available` |
-| Embedded in | [ChargingStationOperator](ChargingStationOperator.md) as `EVSEGroups` |
-| Owner | the [ChargingStationOperator](ChargingStationOperator.md) its identification names (signing key) |
+| Embedded in | [ChargingStationOperator](ChargingStationOperator.md) or [EMobilityProvider](EMobilityProvider.md) as `EVSEGroups` |
+| Owner | the party embedding it (signing key) |
 
 
 ## Common properties
@@ -46,66 +48,34 @@ See [common properties](README.md#common-properties). An EVSE group does not wri
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
 | `EVSEIds` | `EVSEIds` | `ImmutableArray<EVSE_Id>` | update/remove | Its members; see [EVSEIds](#evseids). |
-| `chargingTariffId` | `ChargingTariffId` | `ChargingTariff_Id?` | update/remove | The [charging tariff](ChargingTariff.md) of its operator for its members without tariffs of their own: an EVSE takes the one of its EVSE groups, else of the groups of its charging station, else of the groups of its charging pool, of these the one with the highest priority; see [chargingTariffIds](EVSE.md#chargingtariffids). It must exist at the operator. |
-| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-members). |
 
-The properties of an EVSE it gives its members, each written and read as an [EVSE](EVSE.md#properties) writes and
-reads it, and each updated or removed by a change set:
-
-| JSON key | C# property | Its members take it |
-|---|---|---|
-| `physicalReference` | `PhysicalReference` | unless they have their own |
-| `currentTypes` | `CurrentTypes` | unless they tell their own |
-| `chargingModes` | `ChargingModes` | unless they tell their own |
-| `maxVoltage` | `MaxVoltage` | unless they have their own |
-| `maxCurrent` | `MaxCurrent` | unless they have their own |
-| `maxPower` | `MaxPower` | unless they have their own |
-| `geoLocation` | `GeoLocation` | unless they have their own |
-| `maxReservationDuration` | `MaxReservationDuration` | unless they have their own |
-| `reachDistance` | `ReachDistance` | unless they have their own |
-| `operationTimeout` | `OperationTimeout` | unless they have their own |
-| `extendedOperationTimeout` | `ExtendedOperationTimeout` | unless they tell their own |
-| `chargingConnectors` | `ChargingConnectors` | besides their own; of the same identification their own |
-| `brands` | `Brands` | besides their own; of the same identification their own |
-| `images` | `Images` | besides their own; of the same URL their own |
-| `standards` | `Standards` | besides their own |
-| `floorLevel` | `FloorLevel` | unless they have their own |
-| `acceptedEMobilityProviderIds` | `AcceptedEMobilityProviderIds` | besides their own |
-
-Absent values are left out; an empty `EVSEIds` is not written, nor an empty array or unspecified flags of the
-properties above.
-
-
-## Properties of its members
-
-An EVSE takes the properties its groups give it at runtime: its **effective EVSE**, which its operator calculates
-once per version, `chargingStationOperator.TryGetEffectiveEVSE(evseId, out var evse)`. A single value is the EVSE's
-own, else the one of its group with the highest `priority`; an array is its own united with those of all its groups.
-Groups of the same priority must not give it different values that decide, nor make it invalid; the effective
-charging station of its station has it, and is checked with it, e.g. its `maxPower` against those of its EVSEs. See
-[group priority and effective members](README.md#group-priority-and-effective-members).
+An empty `EVSEIds` is not written.
 
 
 ## EVSEIds
 
-`EVSEIds`: the members, each once, in the ordinal order of their identifications. Every one must be an
-[EVSE](EVSE.md) of the same operator, in any of its stations; an EVSE of another operator is unknown there and
-refused. The array is updated or removed as a whole, e.g.
-`RoamingNetworkChange.UpdateProperty(group, "EVSEIds", old, new)`, or [element by element](README.md#element-changes), e.g.
-`AddElement("EVSEGroup", groupId, [ new ("EVSEIds", evseId) ], evseId)`. An EVSE can not be removed while a group
-names it: update the group first, in the same change set.
+`EVSEIds`: the members, each once, in the ordinal order of their identifications. The array is updated or removed as
+a whole, e.g. `RoamingNetworkChange.UpdateProperty(group, "EVSEIds", old, new)`, or
+[element by element](README.md#element-changes), e.g. `AddElement("EVSEGroup", groupId, [ new ("EVSEIds", evseId) ], evseId)`.
+
+- **A group of an operator** names EVSEs of that operator, in any of its stations; an EVSE of another operator is
+  unknown there and refused. An EVSE can not be removed while a group of its operator names it: update the group
+  first, in the same change set.
+- **A group of an e-mobility provider** names EVSEs of any operator, by weak references: an EVSE that does not exist
+  (any more) is left out, and its operator removes it without the provider.
 
 
 ## Adding and removing
 
-An EVSE group is a child of its operator, added and removed as an entity:
+An EVSE group is a child of the party embedding it, added and removed as an entity:
 
 ```csharp
-RoamingNetworkChange.Add   (evseGroup)      // the parent is the operator its identification names
+RoamingNetworkChange.Add   (evseGroup, partyId)      // a charging station operator or an e-mobility provider
 RoamingNetworkChange.Remove(evseGroupId)
 ```
 
-Nothing else names an EVSE group, so it can always be removed.
+A group a [charging tariff offer](ChargingTariffOffer.md) of the same party names can not be removed: update the offer
+first, in the same change set. An offer of an e-mobility provider naming a group of an operator does not keep it.
 
 
 ## Runtime status
@@ -127,32 +97,24 @@ In a history it is set and read by `history.RuntimeStatus` with the entity type 
 
 ## Validation
 
-- `@id` is mandatory and a valid EVSE group identification.
-- `EVSEIds` must not name an EVSE twice.
-- `priority` must be an integer; electrical limits, durations and the reach distance must not be negative; a
-  charging connector must be valid and not be given twice; `brands`, `standards` and `acceptedEMobilityProviderIds` must not name a value twice, an
-  image URL must not be given twice.
-- In its operator: the group belongs to the operator its identification names; a group must not be given
-  twice; every member must be an EVSE of the operator; `chargingTariffId` must be a tariff of the operator; every
-  effective EVSE, and the effective charging station with it, must be valid, and groups of the same priority must agree.
-- A change set applies each change to the embedded JSON of the operator and reads the operator again, so these
-  rules hold after every single change.
-- `Add(evseGroup)` refuses a parent other than the operator; the group must not exist yet. It gets the change
-  set's `createdAt` as `lastChange`, and as `created` unless given.
+- `@id` is mandatory, a valid EVSE group identification naming the party embedding it, and unique in the roaming
+  network.
+- `EVSEIds` must not name an EVSE twice; a group of an operator names only EVSEs of the operator.
+- A change set applies each change to the embedded JSON of the party and reads it again, so these rules hold after
+  every single change.
+- `Add(evseGroup, partyId)` refuses a parent other than a charging station operator or an e-mobility provider whose
+  identification the group's names; the group must not exist yet. It gets the change set's `createdAt` as
+  `lastChange`, and as `created` unless given.
 
 
 ## Example
 
 ```json
 {
-  "@id":              "DE*GEF*EG2",
-  "name":             { "en": "Depot Jena" },
-  "EVSEIds":          [ "DE*GEF*E1*1", "DE*GEF*E1*2" ],
-  "chargingTariffId": "DE*GEF*T3",
-  "priority":         10,
-  "currentTypes":     [ "AC_ThreePhases" ],
-  "maxPower":         22000,
-  "created":          "2026-01-01T00:00:00.000Z",
-  "lastChange":       "2026-10-11T12:00:00.000Z"
+  "@id":        "DE*GEF*EG2",
+  "name":       { "en": "Depot Jena" },
+  "EVSEIds":    [ "DE*GEF*E1*1", "DE*GEF*E1*2" ],
+  "created":    "2026-01-01T00:00:00.000Z",
+  "lastChange": "2026-10-11T12:00:00.000Z"
 }
 ```

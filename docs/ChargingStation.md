@@ -14,10 +14,10 @@ operator. The identification is `{operatorId}*S{suffix}`, the suffix 1–30 lett
 differ only in case or in the `*` of the suffix. The station's address, geo location and accessibility are
 those of its pool unless given.
 
-A [ChargingStationGroup](ChargingStationGroup.md) may give its members most of the properties below, so that a
-station has only few of its own: at runtime it takes them, as the effective charging station of its operator, with
-its effective EVSEs, `chargingStationOperator.TryGetEffectiveChargingStation(stationId, out var station)`. See
-[properties of its members](ChargingStationGroup.md#properties-of-its-members). POI_API serves the effective
+The [charging station templates](ChargingStationTemplate.md) it names in `templateIds` may give it most of the
+properties below, so that a station has only few of its own: at runtime it takes them, as the effective charging
+station of its operator, with its effective EVSEs, `chargingStationOperator.TryGetEffectiveChargingStation(stationId,
+out var station)`. See [templates and effective members](README.md#templates-and-effective-members). POI_API serves the effective
 charging station; `?view=stored` the station as it is given.
 
 | | |
@@ -70,6 +70,7 @@ See [common properties](README.md#common-properties). A charging station does no
 | `certificationInfo` | `CertificationInfo` | `URL?` | update/remove | Where to find information on its certification, e.g. its conformity with calibration law. |
 | `maxPower` | `MaxPower` | `Watt?` | update/remove | The power it can deliver at once, in W, not negative: with load management often less than the sum of its EVSEs, never more. It is given, not calculated. |
 | `parkingSpaceIds` | `ParkingSpaceIds` | `ImmutableArray<ParkingSpace_Id>` | update/remove | The parking spaces it charges at; see [parkingSpaceIds](#parkingspaceids). |
+| `templateIds` | `TemplateIds` | `ImmutableArray<ChargingStationTemplate_Id>` | update/remove, element changes | The [charging station templates](ChargingStationTemplate.md) of its operator it takes, each once, in its order, the first deciding; see [templates and effective members](README.md#templates-and-effective-members). |
 
 Absent values are left out; empty arrays are not written.
 
@@ -258,8 +259,9 @@ The station's status is set on its own; it is not calculated from the status of 
   may only name stations of the operator.
 - In its roaming network: `manufacturerId` must name a manufacturer and `parkingSpaceIds` parking spaces of the
   network.
-- With the properties its groups give it, it must be valid as well, e.g. their `maxPower`; see
-  [properties of its members](ChargingStationGroup.md#properties-of-its-members).
+- With the properties its templates give it, it must be valid as well, e.g. their `maxPower`; see
+  [templates and effective members](README.md#templates-and-effective-members). Its `templateIds` must name charging
+  station templates of the operator.
 - A change set applies each change to the embedded JSON of the operator and reads the operator again, so the
   operator must be valid after every single change (e.g. remove a station from its groups before removing it);
   the references into the network are checked after the last change.

@@ -2,8 +2,8 @@
 
 An e-mobility provider (EMSP, eMSP) offers charging to EV drivers, e.g. by their contracts and authentication
 tokens. In POI 3 it is a party of the roaming network: embedded completely in the
-[RoamingNetwork](RoamingNetwork.md) under `eMobilityProviders`, in the order of its identification, without
-children of its own. Nothing in the network references it yet.
+[RoamingNetwork](RoamingNetwork.md) under `eMobilityProviders`, in the order of its identification, with its
+[groups and charging tariff offers](#groups-and-offers): the price its customers pay at the EVSEs of many operators.
 
 It owns its own properties and signs their changes with one of its `signingKeys`; it rotates its
 `signingKeys` with one of them, or with one of its `identityKeys` when none of them can sign any more, and its
@@ -19,7 +19,7 @@ removes it. Its identification is an EMSP id, a country code and three letters o
 | Status | `EMobilityProviderStatusType`, initially `available` |
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `eMobilityProviders` |
 | Owner | itself (signing key); its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO; added and removed by the RNO |
-| HTTP | `GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}` (`?without=` any of `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffOffers`), `GET ~/RNs/{RN_Id}/EMPs/{EMP_Id}/{EVSEGs\|CSGs\|CPGs\|CTOs}` (each of them, searched and paged), and one of them below it |
 
 
 ## Common properties
@@ -47,6 +47,13 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update (signing or identity key) | Keys signing its change sets, see [Keys](#keys). |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update (identity key) | Long-term keys signing changes of its identity keys, see [Keys](#keys). |
 
+| `EVSEGroups` | `EVSEGroups` | `POICollection<EVSEGroup_Id, EVSEGroup>` | add/remove | See [Groups and offers](#groups-and-offers). |
+| `chargingStationGroups` | `ChargingStationGroups` | `POICollection<ChargingStationGroup_Id, ChargingStationGroup>` | add/remove | See [Groups and offers](#groups-and-offers). |
+| `chargingPoolGroups` | `ChargingPoolGroups` | `POICollection<ChargingPoolGroup_Id, ChargingPoolGroup>` | add/remove | See [Groups and offers](#groups-and-offers). |
+| `chargingTariffOffers` | `ChargingTariffOffers` | `POICollection<ChargingTariffOffer_Id, ChargingTariffOffer>` | add/remove | See [Groups and offers](#groups-and-offers). |
+
+Children are written only when there are any; collections in the ordinal order of their identifications.
+
 A change set names the properties above by their JSON keys (`EMobilityProviderRegistry` in
 [RoamingNetwork.RegistryChanges.cs](../WWCP_POI3/RoamingNetwork/RoamingNetwork.RegistryChanges.cs)):
 
@@ -55,6 +62,24 @@ RoamingNetworkChange.Add           (provider)                                   
 RoamingNetworkChange.UpdateProperty(provider, "hotline", null, "+49 3641 1234567")     // signed by the provider
 RoamingNetworkChange.Remove        (providerId)                                        // signed by the RNO
 ```
+
+
+## Groups and offers
+
+An e-mobility provider announces the price its customers pay at the EVSEs of many operators by
+[charging tariff offers](ChargingTariffOffer.md), `chargingTariffOffers`, e.g. 39 ct/kWh at all EVSEs of one operator
+and at its partner sites. Its offers name groups, of its own or of any operator, and whole operators. Its own groups,
+[EVSE groups](EVSEGroup.md), [charging station groups](ChargingStationGroup.md) and
+[charging pool groups](ChargingPoolGroup.md), name members of any operator; their identifications start with its
+identification, e.g. `DE*GDF*PGPARTNER`, and are unique in the roaming network.
+
+- **Owner:** it signs its groups and offers itself; they change nothing of an operator's, so no operator signs them.
+- **Weak references:** a member, group or operator its groups and offers name that does not exist (any more) is left
+  out, and its owner removes it without the provider. A group an offer of its own names can not be removed.
+- **No overlap:** a change set of the provider must not make two of its offers overlap; offers coming to overlap by
+  the changes of others are decided by their `notBefore`, see [no overlap](ChargingTariffOffer.md#no-overlap).
+- **Add:** the RNO adds the provider without groups and offers: they are its own to add, with
+  `RoamingNetworkChange.Add(group, providerId)` and `Add(offer, providerId)`, removed with `Remove(id)`.
 
 
 ## Keys
@@ -104,6 +129,8 @@ Events: `OnAdminStatusChanged` (`OnEMobilityProviderAdminStatusChangedDelegate`)
 - `name`/`description` must be multi-language objects, `homepage` a URL, `hotline` a phone number,
   `address` an object.
 - Keys: see [Keys](#keys).
+- Groups and offers: given completely, none twice; group identifications naming this provider, unique in the roaming
+  network, as offer identifications are; see [Groups and offers](#groups-and-offers).
 - Change sets: only the properties listed above can be updated or removed; a change names no parent but the
   roaming network; the provider of an `Add` must not exist yet and must have the change's `entityId`.
 

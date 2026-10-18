@@ -3,7 +3,8 @@
 A grid operator (DSO) runs the electricity grid that charging pools are connected to. In POI 3 it is a party
 of the roaming network: embedded completely in the [RoamingNetwork](RoamingNetwork.md) under `gridOperators`,
 in the order of its identification, with its [grid connection points](#grid-connection-points) under
-`gridConnectionPoints`, and the groups of their energy meters under `energyMeterGroups`. Charging pools name a grid
+`gridConnectionPoints`, and the templates and groups of their energy meters under `energyMeterTemplates` and
+`energyMeterGroups`. Charging pools name a grid
 connection point by `gridConnectionPointId`.
 
 A grid operator may have **no keys**: it does not take part (yet). Then the roaming network operator (RNO)
@@ -24,8 +25,8 @@ unique within the roaming network.
 | Status | `GridOperatorStatusType`, initially `available` |
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `gridOperators` |
 | Owner | itself (signing key), or the RNO while it has no signing keys; its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO; added and removed by the RNO |
-| Embeds | its grid connection points, `gridConnectionPoints`, each owned by its maintainer; the [energy meter groups](EnergyMeterGroup.md) of their energy meters, `energyMeterGroups`, its own |
-| HTTP | `GET ~/RNs/{RN_Id}/GOs`, `GET ~/RNs/{RN_Id}/GOs/{GO_Id}` (`?without=gridConnectionPoints,energyMeterGroups`, or either of them, without them), `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs` (them, searched and paged), `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}`, each as it is at runtime, `?view=stored` as it embeds them; `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMGs` and `…/EMGs/{EMG_Id}` |
+| Embeds | its grid connection points, `gridConnectionPoints`, each owned by its maintainer; the [energy meter templates](EnergyMeterTemplate.md) and [energy meter groups](EnergyMeterGroup.md) of their energy meters, `energyMeterTemplates` and `energyMeterGroups`, its own |
+| HTTP | `GET ~/RNs/{RN_Id}/GOs`, `GET ~/RNs/{RN_Id}/GOs/{GO_Id}` (`?without=gridConnectionPoints,energyMeterTemplates,energyMeterGroups`, or any of them, without them), `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs` (them, searched and paged), `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/GCPs/{GCP_Id}`, each as it is at runtime, `?view=stored` as it embeds them; `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/EMTs`, `…/EMTs/{EMT_Id}`, `…/EMGs` and `…/EMGs/{EMG_Id}` |
 
 
 ## Common properties
@@ -39,7 +40,7 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — (set on `Add` unless given) |
-| `lastChange` | — (set to the change set's `createdAt` by every change of the grid operator, of its grid connection points and of its energy meter groups) |
+| `lastChange` | — (set to the change set's `createdAt` by every change of the grid operator, of its grid connection points and of its energy meter templates and groups) |
 | `customData` | update/remove |
 
 
@@ -53,20 +54,21 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update (signing or identity key) | Keys signing its change sets, see [Keys](#keys). |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update (identity key) | Long-term keys signing changes of its identity keys, see [Keys](#keys). |
 | `gridConnectionPoints` | `GridConnectionPoints` | `POICollection<GridConnectionPoint_Id, GridConnectionPoint>` | add/remove | Its [grid connection points](#grid-connection-points), in the ordinal order of their identifications. |
+| `energyMeterTemplates` | `EnergyMeterTemplates` | `POICollection<EnergyMeterTemplate_Id, EnergyMeterTemplate>` | add/remove | [Templates](EnergyMeterTemplate.md) the energy meters of its grid connection points name, whoever maintains them; owned by the grid operator, or by the RNO while it has no signing keys. |
 | `energyMeterGroups` | `EnergyMeterGroups` | `POICollection<EnergyMeterGroup_Id, EnergyMeterGroup>` | add/remove | [Groups](EnergyMeterGroup.md) of the energy meters of its grid connection points, whoever maintains them; owned by the grid operator, or by the RNO while it has no signing keys. |
 
 **Derived (not serialized):** `EnergyMeters`, the meters of its grid connection points;
 `TryGetGridConnectionPoint(id, out point)`; `EffectiveGridConnectionPoints` and
 `TryGetEffectiveGridConnectionPoint(id, out point)`, its grid connection points as they are at runtime, their energy
-meters with the properties of their groups; `TryGetEnergyMeterGroup(id, out group)` and
-`EnergyMeterGroupsOf(energyMeterId)`.
+meters with the properties of their templates; `TryGetEnergyMeterTemplate(id, out template)`,
+`TryGetEnergyMeterGroup(id, out group)` and `EnergyMeterGroupsOf(energyMeterId)`.
 
 A change set names the properties above by their JSON keys (`GridOperatorRegistry` in
 [RoamingNetwork.RegistryChanges.cs](../WWCP_POI3/RoamingNetwork/RoamingNetwork.RegistryChanges.cs)):
 
 ```csharp
 RoamingNetworkChange.Add           (gridOperator)                                           // signed by the RNO, with or without keys, without its points
-RoamingNetworkChange.AddChildren   (gridOperator)                                           // its points, signed by their maintainers or the grid operator, then its energy meter groups
+RoamingNetworkChange.AddChildren   (gridOperator)                                           // its energy meter templates, its points, signed by their maintainers or the grid operator, then its energy meter groups
 RoamingNetworkChange.UpdateProperty(gridOperator, "homepage", null, "https://netz.example.org")  // signed by the grid operator, or the RNO while it has no signing keys
 RoamingNetworkChange.Remove        (gridOperatorId)                                         // signed by the RNO
 ```

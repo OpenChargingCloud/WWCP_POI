@@ -1,9 +1,10 @@
 # WWCP POI 3: content, ETags, commits and signatures
 
 This document specifies which bytes POI 3 hashes and signs, so that a client can check a version,
-a commit or a signature without this library. It describes POI 3 as implemented; the examples in
-section 6 are checked by `WWCP_POI3_Tests/SpecificationVectorsTests.cs`. Section 8 is a draft, not
-implemented yet: proofs of single entities, e.g. of one charging station, by a signed hash tree.
+a commit or a signature without this library, and what a version tells where it gives something once
+for many entities: templates, groups and offers (section 9). The examples in section 6 are checked by
+`WWCP_POI3_Tests/SpecificationVectorsTests.cs`. Section 8 is a draft: proofs of single entities, e.g. of
+one charging station, by a signed hash tree.
 
 The words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
 
@@ -31,9 +32,10 @@ A version of a roaming network is identified by its **content**: its JSON repres
 - **Included:** `@context`
   (`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork`), `@id`, `name`, `description`,
   `dataSource`, `dataLicenses`, its operator `roamingNetworkOperator`, every embedded entity completely (operators with their pools,
-  stations, EVSEs, connectors, energy meters, tariffs and groups; manufacturers, e-mobility
-  providers, grid operators with their grid connection points, parking operators, energy meter
-  manufacturers, transparency software releases and certificates), the brands of operators, pools,
+  stations, EVSEs, connectors, energy meters, tariffs, templates, groups and offers; manufacturers;
+  e-mobility providers with their groups and offers; grid operators with their grid connection points,
+  energy meter templates and groups; parking operators; energy meter manufacturers, transparency
+  software releases and certificates), the brands of operators, pools,
   stations, EVSEs and RFID authentication modes, the `signingKeys` and `identityKeys` of its
   operator and of its parties, `created`, `lastChange` and `customData`.
 - **Excluded:** `eTags`; the runtime status (admin status, status, energy status); the local
@@ -46,12 +48,12 @@ A version of a roaming network is identified by its **content**: its JSON repres
 - **Absent values** are left out. Some arrays are written also when empty, as empty means
   something there (e.g. `energySources: []`, unknown); an implementation MUST keep arrays as it
   read them.
-- **Properties given by groups** are part of the content where they are given: an EVSE, charging station,
-  charging pool or parking space group may give its members their properties, which they take at runtime only (the
-  *effective* members; a single value is the member's own, else the one of its group with the highest
-  `priority`, 0 unless given; arrays are united). The content, the ETags of the network and of its
-  entities, change sets and merges know them only in the group. A version whose groups of one member give
-  it different values with the same priority, where these decide, or make it invalid, is invalid.
+- **Properties given by templates** are part of the content where they are given: an EVSE, charging
+  station, charging pool, charging tariff, parking space or energy meter names its templates in
+  `templateIds`, in an order that is content, and takes their properties at runtime only (the
+  *effective* members, section 9.2). The content, the ETags of the network and of its entities, change
+  sets and merges know them only in the template. A version whose templates make an effective member
+  invalid, or whose offers overlap (section 9.4), is invalid.
 
 
 ## 3. ETags
@@ -101,9 +103,9 @@ A change set leads from the version of its `beforeETags` to the version of its `
 entity MUST still have for the change set to apply, or to be rebased onto another version. The ETag of an
 entity is the one of its representation as the roaming network embeds it, with everything it embeds: over
 its canonical JSON (section 1), or the canonical CBOR of its keys and values, with the hash algorithm the
-ETag names; the HTTP `ETag` an entity is served with as it is given (POI_API: `?view=stored` for charging
-pools, stations, EVSEs and parking spaces, which it serves with the properties their groups give them by
-default, telling this ETag as `X-Stored-ETag` as well). The entity
+ETag names; the HTTP `ETag` an entity is served with as it is given (POI_API: `?view=stored` for what it
+serves as it is at runtime by default, with the properties its templates give it, section 9.2, telling
+this ETag as `X-Stored-ETag` as well). The entity
 is found by its type and identification, compared as the type compares it. A change set whose preconditions
 do not all hold in the version it is applied to MUST be refused; a rebased change set keeps them. They hold
 in a merge as well (section 5.3): a change set committed for a version older than a tip it will be merged
@@ -116,12 +118,13 @@ and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `Update
 
 - the first segment names a property of the entity, every further one a property of the value the segment before
   names. A segment on an array MUST name an element by `elementId`: the `@id` text of an object, a text itself,
-  compared as the identification type of the property compares them, any other ordinally: `EVSEIds`, `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`, `parkingSpaceIds`, `parkingSensorIds`, `parkingProductIds` and `eMobilityProviderIds` hold identifications of their entity types, `brands`, `chargingConnectors` and `energyMeters` objects with identifications of theirs, `signatureMethods` signature methods (without case);
+  compared as the identification type of the property compares them, any other ordinally: `EVSEIds`, `chargingStationIds`, `chargingPoolIds`, `chargingTariffIds`, `energyMeterIds`, `parkingSpaceIds`, `parkingSensorIds`, `parkingProductIds`, `eMobilityProviderIds`, `chargingStationOperatorIds`, `EVSEGroupIds`, `chargingStationGroupIds`, `chargingPoolGroupIds` and `templateIds` hold identifications of their entity types, `brands`, `chargingConnectors` and `energyMeters` objects with identifications of theirs, `signatureMethods` signature methods (without case);
   every element of the array MUST have one and no two the same, else the change is refused.
   A segment on any other value MAY name its `@id`, which it then MUST have;
 - `AddElement` names an element that does not exist yet, or an absent property, and its `newValue` MUST have the
   `elementId` of the segment; it goes where the ordinal order of the identifications puts it, when the array is in
-  that order, otherwise at its end. `ReplaceElement` keeps the identification. `UpdateElementProperty` and
+  that order, otherwise at its end; to `templateIds`, whose order is content, always at its end. `ReplaceElement`
+  keeps the identification. `UpdateElementProperty` and
   `RemoveElementProperty` change `propertyName` of the object named, never `@id`. An array left empty is removed;
 - an element change MUST be checked as the `UpdateProperty`, or `RemoveProperty` when nothing is left, of the
   property its first segment names: owners (section 4.1), changeable properties, the result. The `signingKeys` and
@@ -181,13 +184,15 @@ Every change has exactly one **owner**:
 | the RNO itself, the roaming network itself, charging station and energy meter manufacturers, transparency software releases and certificates | the RNO |
 | `Add` and `Remove` of a charging station operator, e-mobility provider, grid operator or parking operator | the RNO |
 | the other properties of such a party | the party; the RNO for a party without signing keys |
-| pools, stations, EVSEs, tariffs and groups | the charging station operator their identification names |
+| pools, stations, EVSEs and tariffs | the charging station operator their identification names |
+| templates, groups and charging tariff offers | the party embedding them (the parent of an `Add`): a charging station operator, an e-mobility provider (its groups and offers), a grid operator (its energy meter templates and groups) or a parking operator (its parking space templates and groups) |
 | brands | the owner of what embeds them: the charging station operator |
-| parking garages, spaces, sensors, space groups and products | their parking operator (the parent of an `Add`) |
+| parking garages, spaces, sensors and products | their parking operator (the parent of an `Add`) |
 | a grid connection point | its maintainer: the party its `maintainedBy` names, else its grid operator; an `Add` also its grid operator |
 | `maintainedBy` of a grid connection point | its grid operator, its maintainer, or an identity key of the RNO |
 
-"Its grid operator" signs with its signing key, or the RNO in its place while it has none. A
+A grid operator signs its templates and groups, and "its grid operator" signs, with its signing key,
+or the RNO in its place while it has none. A
 grid connection point's `maintainedBy` names a charging station operator or parking operator of
 the network; its identification is unique within the network.
 
@@ -292,7 +297,7 @@ it, and an added entity names its parent as the second version writes it:
 - a property only one version changed takes that change; both changed it alike, it is kept once;
   both changed it differently, they **conflict**, unless it is an array of identified elements (section 4)
   in all three, an absent one counting as empty (but not in an entity that is a conflict marker as a whole,
-  see above), and its keys are not those of a party: then the merge is
+  see above), and it is neither the keys of a party nor `templateIds`, whose order is content: then the merge is
   the first version's array with the changes of the second one against the base, element by element,
   taken in the order of the second one: an element it removed is removed, unless the first one changed it; one it
   added is added (section 4), unless the first one added it differently; one it changed is replaced, unless
@@ -308,7 +313,7 @@ The changes are written in this order: `Add` (of the topmost added entities, wit
 embed, in the order of the second version), the changes of properties (in the order of the first
 version, properties in the order of the union of their names), removals and additions of moved
 entities, `Remove` (of the topmost removed entities). A property whose old and new values are both
-arrays of identified elements (absent counting as empty), except the keys of a party, is changed by
+arrays of identified elements (absent counting as empty), except the keys of a party and `templateIds`, is changed by
 `RemoveElement` of the removed elements (in their old order), then `AddElement` of the added ones and
 `UpdateElementProperty`/`RemoveElementProperty` of the changed objects, property by property in the
 order of the union of their names, or `ReplaceElement` of other changed elements (in the new order),
@@ -402,20 +407,20 @@ embeds it, and change sets name it as a precondition (section 4).
 
 ## 8. Draft: proofs of entities by a signed hash tree
 
-> **Status:** draft, not implemented, without test vectors; it may still change. Sections 1 to 7 do
+> **Status:** draft, not implemented, without test vectors; it may still change. The other sections do
 > not depend on it.
 
 **Purpose.** An e-mobility driver's app that has found a charging station gets one small document:
 everything the roaming network says about this station as it is at runtime - the station with its
-EVSEs, charging connectors and energy meters with their public keys, the properties its groups give
+EVSEs, charging connectors and energy meters with their public keys, the properties its templates give
 it, its pool, its operator, the charging tariffs its EVSEs take, the manufacturers and transparency
 software of its energy meters - signed by the roaming network operator. The app checks it offline,
 before charging, without the rest of the network.
 
 **Priorities.** With millions of charging stations, a proof grows with the logarithm of the size of
 the network, and checking one costs some dozen hash calculations and one signature verification.
-Writing may cost more: every commit hashes again what it changed, also every member of a group it
-changed.
+Writing may cost more: every commit hashes again what it changed, also every member naming a template
+it changed.
 
 The ETags of section 3 hash a version as one document; a proof of one entity against them needs the
 whole version. A commit signature (section 5.4) covers the whole change set, which may be megabytes.
@@ -425,14 +430,14 @@ pruned versions (8.4), and small signed statements of a tree's root (8.5).
 ### 8.1 The effective content
 
 The tree is calculated over the **effective content** of a version: its content (section 2) with
-every charging pool, charging station, EVSE and parking space replaced by its effective one, as
-section 2 and [docs/](docs/README.md#group-priority-and-effective-members) define them: the
-properties its groups give it taken in, an effective pool embedding its effective stations, an
-effective station its effective EVSEs, an effective EVSE the charging tariffs that apply to it
-(`chargingTariffIds`). Groups, tariffs and every other entity are as in the content.
+every charging pool, charging station, EVSE, charging tariff, parking space and energy meter replaced
+by its effective one, as section 9.2 defines them: the properties its templates give it taken in, an
+effective pool embedding its effective stations, an effective station its effective EVSEs, an effective
+EVSE the charging tariffs that apply to it (`chargingTariffIds`). Templates, groups, offers and every
+other entity are as in the content.
 
-The `lastChange` of an effective member is the latest of its own, the ones of its groups giving it
-properties and the ones of what it embeds, without the floors POI_API keeps at runtime (8.7). So the
+The `lastChange` of an effective member is the latest of its own, the ones of the templates it names
+and the ones of what it embeds, without the floors POI_API keeps at runtime (8.7). So the
 effective content follows from the version alone, and every server calculates the same tree.
 
 ### 8.2 The tree
@@ -450,11 +455,12 @@ RFC 9162, section 2.1.1:
 | Parent | Child arrays |
 |---|---|
 | roaming network | `chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`, `gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `transparencySoftware`, `transparencySoftwareCertificates` |
-| charging station operator | `chargingPools`, `chargingTariffs`, `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `parkingSpaces` |
+| charging station operator | `chargingPools`, `chargingTariffs`, `EVSETemplates`, `chargingStationTemplates`, `chargingPoolTemplates`, `chargingTariffTemplates`, `energyMeterTemplates`, `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `energyMeterGroups`, `chargingTariffOffers`, `parkingSpaces` |
 | charging pool | `chargingStations` |
 | charging station | `EVSEs` |
-| grid operator | `gridConnectionPoints` |
-| parking operator | `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups`, `parkingProducts` |
+| e-mobility provider | `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffOffers` |
+| grid operator | `gridConnectionPoints`, `energyMeterTemplates`, `energyMeterGroups` |
+| parking operator | `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceTemplates`, `parkingSpaceGroups`, `parkingProducts` |
 
 Everything else is part of the entity that embeds it: its roaming network operator with its keys,
 brands, charging connectors, energy meters, images, keys of parties, opening times.
@@ -577,7 +583,7 @@ are as in section 4; timestamps are written as in section 5.4.
 - **Subject:** an attestation MAY attest the digest of one entity instead of the root:
   `"subject": {"entityType": "ChargingStationOperator", "entityId": "DE*GEF", "digest": "<hex>"}`, with
   the `eTag` still naming the root. The effective members of a charging station operator depend only
-  on its own groups. So the operator can attest its own node with one of its signing keys (role
+  on its own templates. So the operator can attest its own node with one of its signing keys (role
   `chargingStationOperator`), and a proof checked against it needs only the paths below the operator.
 - POI_API serves the current attestations as `GET ~/RNs/{RN_Id}/attestations` and pushes new ones on
   the WebSocket topic `attestations`; a proof embeds those it was made for.
@@ -588,8 +594,8 @@ are as in section 4; timestamps are written as in section 5.4.
   digest is calculated once per entity object and kept with it. A child array keeps the inner nodes
   of its tree, and an entity added, changed or removed updates `O(log n)` of them. A commit changing
   one EVSE hashes its station, the path to its pool, the pool, the path to its operator, the operator,
-  the path to the network and the network: some 50 hash calculations. A commit changing a group with
-  100,000 members hashes all of them again: some 200,000 hash calculations, below a second.
+  the path to the network and the network: some 50 hash calculations. A commit changing a template
+  100,000 members name hashes all of them again: some 200,000 hash calculations, below a second.
 - **Serving:** a proof is calculated per attested version and kept until the next attestation.
 - **Verifying:** some 50 to 100 hash calculations and one signature verification per attestation,
   milliseconds on a phone.
@@ -611,11 +617,201 @@ are as in section 4; timestamps are written as in section 5.4.
 4. **Runtime:** admin status, status, energy status and price status are not content. A station
    proof tells neither whether a station is available nor its prices at runtime. Signed runtime
    statements, e.g. a price status the operator signs for some minutes, would complete it.
-5. **Rules of effective members:** they are in docs/README.md; a specification needs them here,
-   exactly.
+5. **Rules of effective members:** done, section 9.2.
 6. **Proofs of absence:** e.g. that an EVSE was removed. Two neighbouring leaves in the ordinal order
    of identifications prove it; their form is open.
 7. **Stored content:** a tree over the content as given (section 2) would prove stored entities, e.g.
    for preconditions and owners, the same way. The station proof does not need it.
 8. **CBOR skeletons:** whether the tree also hashes deterministic CBOR skeletons, for clients that read
    CBOR only.
+
+
+## 9. Templates, groups and offers
+
+Many entities share what they are, e.g. the current types, the power and the connectors of a thousand
+EVSEs of one type: **templates** give it once, and the members naming them take it at runtime. Some sets
+of entities follow from no property, e.g. the charging pools along a motorway: **groups** name them and
+give them nothing. **Charging tariff offers** announce prices for a time at the members of groups.
+
+### 9.1 Templates
+
+A template is a set of properties for the members of one level. There is a kind of template for every
+kind of group, and a type of template identification for every type of group identification:
+
+| Template | Embedded in, as | Identification | Named by |
+|---|---|---|---|
+| EVSE template | charging station operator, `EVSETemplates` | `EVSETemplate_Id`, `{operatorId}*ET{suffix}` | EVSEs of the operator |
+| charging station template | charging station operator, `chargingStationTemplates` | `ChargingStationTemplate_Id`, `{operatorId}*ST{suffix}` | charging stations of the operator |
+| charging pool template | charging station operator, `chargingPoolTemplates` | `ChargingPoolTemplate_Id`, `{operatorId}*PT{suffix}` | charging pools of the operator |
+| charging tariff template | charging station operator, `chargingTariffTemplates` | `ChargingTariffTemplate_Id`, `{operatorId}*TT{suffix}` | charging tariffs of the operator |
+| parking space template | parking operator, `parkingSpaceTemplates` | `ParkingSpaceTemplate_Id`, free text, unique in the roaming network | parking spaces of the parking operator |
+| energy meter template | charging station operator or grid operator, `energyMeterTemplates` | `EnergyMeterTemplate_Id`, free text, unique in the roaming network | energy meters of the operator's pools, stations and EVSEs, or of the grid operator's grid connection points |
+
+A suffix is up to 50 characters, a letter, digit or `_` first, then also `* - . € $`. Identifications
+are compared without case.
+
+- **Content:** `@id`, `name`, `description`, `dataSource`, `created`, `lastChange`, `customData`, and
+  any property of its members but their identification, name, description, data source, custom data,
+  `templateIds`, what they embed (charging stations, EVSEs) and their energy meters. Neither the
+  charging tariffs of an EVSE, in whose place EVSE, charging station and charging pool templates name a
+  `chargingTariffId` of their own (9.2), nor the APDS reference of a parking space, nor what belongs to
+  the single energy meter, its serial number and its public keys. A charging tariff template gives any
+  property of a charging tariff but those above. A template names no members and has no runtime status.
+- **Owner** (section 4.1): the party embedding it.
+- **`templateIds`** of a member: the templates it takes, of its level, embedded in its owner; for an
+  energy meter in the owner of what embeds it, for an energy meter of a grid connection point in its
+  grid operator. Each at most once, **in the order the member gives**: unlike every other array of
+  identifications, its order is content, and an implementation MUST keep it. A member MUST NOT name a
+  template that does not exist; a template a member names can not be removed.
+
+### 9.2 Effective members
+
+An effective member takes, of every property a template may give:
+
+- a single value: its own, else the one of the first of its templates giving one;
+- an array: its own united with those of all its templates; of elements with the same key (brands,
+  charging connectors and data licenses of the same identification, authentication modes of the same
+  type, images of the same URL) its own, else the one of the first template giving it. The current
+  types and charging modes of an EVSE are taken as single values;
+- the `elements` of a charging tariff: its own, else those of the first of its templates giving
+  them, as a whole. A charging tariff MUST have a `currency` and `elements` as it is at runtime, not
+  necessarily as it is given;
+- the charging tariffs of an EVSE: its own; without any, the `chargingTariffId` of the first of its
+  templates giving one, else of the first template of its charging station giving one, else of the
+  first template of its charging pool giving one.
+
+An effective charging station has the effective EVSEs, an effective charging pool the effective
+charging stations, and every effective member its effective energy meters. Charging tariffs are
+effective as well: publishers publish them so, and proofs (8.4) give them so. An effective member keeps
+its `templateIds`, so that it tells where its values may come from.
+
+Templates never disagree: their order decides. A version is invalid where a member names a template
+that does not exist, or where its templates make an effective member invalid, e.g. a charging station
+with a `maxPower` above the one of its effective EVSEs together. Both are checked per member; a change
+of a template for the members naming it.
+
+The **`lastChange`** of an effective member is the latest of its own, those of the templates it names
+and those of what it embeds. Naming a template more or less is a change of the member itself; the
+floors (8.7, point 3) keep it from going back where the timestamps of a version do not grow, e.g. after
+merges.
+
+**Cost** (informative): what a member takes follows from the member and the few templates it names.
+Templates have no member lists, are small and few, and a client keeps them by their ETags. A change of
+a template changes every member naming it: publishers publish them again, and the effective tree (8.6)
+hashes them again. Giving 10,000 EVSEs a template changes 10,000 EVSEs.
+
+### 9.3 Groups
+
+A group names members and gives them nothing: no effective member depends on a group, and a change of
+a group changes neither a member, nor its ETag, nor its effective content. Besides `@id`, `name`,
+`description`, `dataSource`, `created`, `lastChange` and `customData` it has its members, and a runtime
+status, set manually or calculated from the status of its members. Groups may overlap.
+
+| Group | Embedded in, as | Identification | Members |
+|---|---|---|---|
+| EVSE group | charging station operator or e-mobility provider, `EVSEGroups` | `EVSEGroup_Id`, `{partyId}*EG{suffix}` | `EVSEIds` |
+| charging station group | charging station operator or e-mobility provider, `chargingStationGroups` | `ChargingStationGroup_Id`, `{partyId}*SG{suffix}` | `chargingStationIds` |
+| charging pool group | charging station operator or e-mobility provider, `chargingPoolGroups` | `ChargingPoolGroup_Id`, `{partyId}*PG{suffix}` | `chargingPoolIds` |
+| charging tariff group | charging station operator, `chargingTariffGroups` | `ChargingTariffGroup_Id`, `{operatorId}*TG{suffix}` | `chargingTariffIds` |
+| parking space group | parking operator, `parkingSpaceGroups` | `ParkingSpaceGroup_Id`, free text | `parkingSpaceIds` |
+| energy meter group | charging station operator or grid operator, `energyMeterGroups` | `EnergyMeterGroup_Id`, free text | `energyMeterIds` |
+
+`{partyId}` is the identification of the party embedding it. The identification of a group is unique in
+the roaming network, so that a provider's group and an operator's group of the same identification can
+not both exist; a group belongs to the party embedding it. A group of an operator names members of its
+own, of a parking operator its parking spaces, of a grid operator the energy meters of its grid
+connection points; a group of an e-mobility provider names members of any operator of the network, e.g.
+for its offers, by weak references (9.4).
+
+Groups are for sets that do not follow from properties, e.g. the charging pools along a motorway, of a
+funding programme or of a partner network, or those of an offer. A selection by properties, e.g. EVSEs
+with direct current and at least 150 kW, is a query (POI_API), not a group.
+
+### 9.4 Charging tariff offers
+
+A **charging tariff offer** announces another price for a time at the EVSEs of groups or of operators:
+e.g. a promotion of a charging station operator at its EVSEs, or the price an e-mobility provider gives
+its customers at the EVSEs of many operators. Which EVSEs, is a business decision that does not follow
+from their properties: groups name them, and the offer names the groups. Neither the groups nor the
+EVSEs change; no effective member takes an offer.
+
+| | |
+|---|---|
+| Embedded in, as | a charging station operator or an e-mobility provider, `chargingTariffOffers` |
+| Identification | `ChargingTariffOffer_Id`, free text, compared without case, unique in the roaming network |
+| Owner | the party embedding it (section 4.1), the parent of an `Add` |
+
+Its content is `@id`, `name`, `description`, `dataSource`, `created`, `lastChange`, `customData`, and:
+
+- **What**, exactly one of: `chargingTariff`, a price of its own, as a charging tariff writes it,
+  without its identification, `tariffType`, validity and timestamps; or `discount`,
+  `{"percent": <decimal above 0, at most 100>, "dimensions": [ … ]}`, which reduces a price by the
+  percentage: the price components of the dimensions named (`ChargingDimensionTypes`), or, without
+  `dimensions`, all of them and its `minPrice` and `maxPrice`.
+- **Where**, at least one of: `EVSEGroupIds`, `chargingStationGroupIds` and `chargingPoolGroupIds`;
+  `chargingStationOperatorIds`, all EVSEs of these operators. An operator's offer names groups of its own
+  and no operator but itself; a provider's offer groups of its own or of any operator, and any operator.
+  An EVSE is **covered** where it, its charging station or its charging pool is a member of one of these
+  groups, or where its operator is named.
+- **When:** `notBefore` and `notAfter`, both inclusive, as of keys (section 4.1); absent, always since
+  and for good. `openingTimes`, as a charging pool writes them, e.g. every day from 18:00 to 06:00;
+  absent, at any time. An offer applies to the part of a session within these times, as the
+  restrictions of a tariff element do: a session from 17:30 to 19:00 takes an offer opening at 18:00
+  from 18:00 on.
+- **For which sessions:** `maxSessionsPerContract`, how often one contract, or ad hoc one means of
+  payment, takes it; of an operator's offer also `sessions`, `adHoc` (paid without a contract) or
+  `contract`, both when absent, and `eMobilityProviderIds`, only for contracts of these providers. A
+  provider's offer is for sessions with its own contracts.
+
+**What it changes.** An operator's offer changes the operator's price: at a covered EVSE, the regular
+tariffs (its effective `chargingTariffIds`, 9.2) for the sessions it names (of the `tariffType`
+`AD_HOC_PAYMENT` for ad hoc sessions, of any other type for sessions with a contract, without a type for
+both) are replaced by its tariff, or reduced by its discount. A provider's offer changes the price its
+customers pay at a covered EVSE: its tariff, or their usual price reduced, which the provider knows and
+the roaming network does not. It needs no signature of the operator, as it changes nothing of the
+operator's. An operator's offer and a provider's offer at the same EVSE are prices of two parties and
+do not overlap. An offer applies while it is `active` (below) and within its times. Whether a session
+meets its conditions, e.g. is the first of its contract, its owner decides when the session starts, and
+the charge detail record tells the price: the roaming network announces offers, it does not enforce
+them.
+
+**No overlap.** Two offers of one owner overlap where they cover the same EVSE, for sessions both apply
+to (ad hoc, or with a contract of a provider both name, or one of them names none), at times both apply
+in, by their `notBefore`, `notAfter` and `openingTimes`. A version where two offers of an operator
+overlap is invalid: they and what they cover are its own data, checked per EVSE. A change set of a
+provider MUST NOT make two of its offers overlap; where they come to overlap by the changes of others,
+e.g. an operator adding an EVSE to a group both name, the one with the later `notBefore` applies, of the
+same `notBefore` the one with the ordinal lower identification.
+
+**References across owners are weak.** A provider's groups and offers name members, groups and
+operators of others without asking them. A member, group or operator that does not exist (any more) is
+left out, and its owner removes it without the provider. References within one owner are strong: a
+member or group an operator's group or offer names can not be removed.
+
+- **Runtime status** (not content): `planned` before its `notBefore`, `active`, `expired` after its
+  `notAfter`, unless its owner sets `exhausted` before, e.g. when its budget is used up.
+- **Effective content:** offers are content, child arrays of their owners (8.2), but they change no
+  effective member, and a station proof (8.4) gives none (9.5).
+- **Publishers** (informative): OCPI knows no offers. An operator's active offer without
+  `maxSessionsPerContract` can be published as tariffs taking the place of the regular ones while it is
+  valid (to the providers it names, where it names some), a discount as the regular tariff with the
+  reduced prices, and its regular opening times as restrictions of their elements; one with
+  `maxSessionsPerContract` only as text, as a tariff would show its price also to drivers who no longer
+  get it. A provider's offers are no tariffs of an operator; POI_API serves them.
+
+### 9.5 Open points
+
+1. **Templates of others:** e.g. the templates of a charging station manufacturer for its models,
+   named by charging stations of many operators. A member takes them by naming them, but their owner
+   would then change what the member takes, unless the member names them with their ETag.
+2. **Proofs of offers:** a station proof could give the offers covering it only together with a proof
+   that no other does, e.g. by a tree over the member lists of groups.
+3. **Groups of other parties:** grid operators, parking operators or a funding authority, which is no
+   party of the network yet, might collect EVSEs of operators as providers do (9.3).
+4. **Removing what a template gives:** arrays are united; a member can not drop a connector or a brand
+   its templates give, only stop naming the template.
+5. **Templates naming templates:** not proposed. The list of a member is flat, so the member tells
+   everything it takes; an order of several templates many members share is repeated in each.
+6. **A tree over the stored content** (8.7, point 7): a proof could give the stored member and the
+   templates it names in place of the effective member. A change of a template would then hash
+   `O(log n)` in place of every member naming it, but a verifier would need the rules of 9.2.

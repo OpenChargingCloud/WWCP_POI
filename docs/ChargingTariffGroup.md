@@ -2,8 +2,8 @@
 
 A charging tariff group names a set of [ChargingTariff](ChargingTariff.md)s of one charging station operator,
 e.g. all tariffs of a product line or a region. Groups may overlap; a tariff may be a member of any number of
-groups. A group has no prices of its own and, unlike EVSE, charging station and charging pool groups, no
-`chargingTariffId`.
+groups. A group has no prices of its own and gives its members nothing: what tariffs share, e.g. their currency,
+payment means and energy mix, [charging tariff templates](ChargingTariffTemplate.md) give them.
 
 A group is embedded completely in its [ChargingStationOperator](ChargingStationOperator.md) under
 `chargingTariffGroups` and belongs to the operator its identification names. That operator owns it and signs
@@ -44,7 +44,6 @@ See [README.md](README.md#common-properties). No `eTags`.
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
 | `chargingTariffIds` | `ChargingTariffIds` | `ChargingTariff_Id`[] | update/remove | Its members: tariffs of the same operator, ordered by identification (ordinal), each at most once. Omitted when empty; a group may have no members. |
-| `priority` | `Priority` | `Int32?` | update/remove | Which of the groups of a member decides where they give it different values: the higher wins; 0 unless given. An integer, neither a text nor a fraction; see [group priority](README.md#group-priority-and-effective-members). |
 
 
 ## chargingTariffIds

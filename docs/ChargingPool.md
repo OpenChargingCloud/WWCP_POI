@@ -21,10 +21,10 @@ Its identification is the operator's identification, `*P` and a suffix, e.g. `DE
 | Owner | the charging station operator its identification names (a signing key) |
 | HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands/{Brand_Id}` |
 
-A [ChargingPoolGroup](ChargingPoolGroup.md) may give its members most of the properties below, so that a pool has
-only few of its own: at runtime it takes them, as the effective charging pool of its operator, with its effective
-charging stations and EVSEs, `chargingStationOperator.TryGetEffectiveChargingPool(poolId, out var pool)`. See
-[properties of its members](ChargingPoolGroup.md#properties-of-its-members). POI_API serves the effective charging
+The [charging pool templates](ChargingPoolTemplate.md) it names in `templateIds` may give it most of the properties
+below, so that a pool has only few of its own: at runtime it takes them, as the effective charging pool of its
+operator, with its effective charging stations and EVSEs, `chargingStationOperator.TryGetEffectiveChargingPool(poolId,
+out var pool)`. See [templates and effective members](README.md#templates-and-effective-members). POI_API serves the effective charging
 pool; `?view=stored` the pool as it is given.
 
 
@@ -83,6 +83,7 @@ All optional; absent values and empty arrays are not written.
 | `assistanceServiceDetails` | `AssistanceServiceDetails` | I18N text | update/remove | How to get assistance there: how to reach it, when, and what kind of support it offers. Omitted when empty. |
 | `standards` | `Standards` | `ImmutableArray<Standard>` | update/remove | The standards it conforms to, e.g. `PAS 1899:2022` for accessible charging; a set of names as `services`. |
 | `nutsCodes` | `NUTSCodes` | `ImmutableArray<NUTSCode>` | update/remove | The NUTS regions of the EU it is in, e.g. `DEG` (NUTS 1, Thüringen) and `DEG03` (NUTS 3, Jena): two letters of the country and up to three letters or digits, the level being their number; read case-insensitively, written in upper case; each once, in their ordinal order. |
+| `templateIds` | `TemplateIds` | `ImmutableArray<ChargingPoolTemplate_Id>` | update/remove, element changes | The [charging pool templates](ChargingPoolTemplate.md) of its operator it takes, each once, in its order, the first deciding; see [templates and effective members](README.md#templates-and-effective-members). |
 
 The values of `parkingType`, `accessibility`, `facilities`, `uiFeatures`, `features` and `parkingRestrictions`
 are open sets of names: the ones listed are predefined, others are read as given. `paymentOptions` and
@@ -106,7 +107,7 @@ not only within the pool.
 
 - **Add:** `RoamingNetworkChange.Add(chargingStation, chargingPoolId)`; the parent pool must exist.
 - **Remove:** `RoamingNetworkChange.Remove(chargingStationId)`; removing the last one removes `chargingStations`.
-  A station a charging station group names can not be removed.
+  A station a charging station group of its operator names can not be removed.
 - **Move** to another pool of the operator: `Remove` and `Add`.
 
 See [ChargingStation](ChargingStation.md).
@@ -284,7 +285,8 @@ Events: `OnAdminStatusChanged` (`OnChargingPoolAdminStatusChangedDelegate`) and 
   `stationCode` only for `SMS`.
 - **Brands:** given completely in `brands`, of the pool and of its RFID authentication modes; `brandIds` is refused.
 - **References within the network:** what its stations, EVSEs and energy meters name must exist.
-- **Removal:** a pool a charging pool group names, or whose stations or EVSEs a group names, can not be removed.
+- **Removal:** a pool a charging pool group of its operator names, or whose stations or EVSEs a group of its operator
+  names, can not be removed; groups of e-mobility providers name it by weak references.
 - **Change sets:** `UpdateProperty`/`RemoveProperty` only of the properties marked above; a given parent must be the
   actual one. After every change, the whole operator is read again (`ChargingStationOperator.TryParse`), so all rules
   above hold for the result.

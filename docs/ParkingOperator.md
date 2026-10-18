@@ -3,7 +3,7 @@
 A parking operator runs car parks and parking spaces, e.g. those at or around charging stations. In POI 3 it is
 a party of the roaming network: embedded completely in the [RoamingNetwork](RoamingNetwork.md) under
 `parkingOperators`, in the order of its identification. It embeds its parking garages, parking spaces,
-parking sensors, parking space groups and parking products directly; a parking space names its garage, it is
+parking sensors, parking space templates and groups and parking products directly; a parking space names its garage, it is
 not embedded in it.
 
 It owns its own properties and all its parking data, and signs their changes with one of its `signingKeys`;
@@ -21,7 +21,7 @@ compared case-insensitively, e.g. `DE*PRK`, unique within the roaming network.
 | Status | `ParkingOperatorStatusType`, initially `available` |
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `parkingOperators` |
 | Owner | itself (signing key), also for everything it embeds; its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO; added and removed by the RNO |
-| HTTP | `GET ~/RNs/{RN_Id}/POs/{PO_Id}` (with everything it embeds, or `?without=` any of `parkingGarages`, `parkingSpaces`, `parkingSpaceGroups`, `parkingSensors`, `parkingProducts`), `GET ~/RNs/{RN_Id}/POs/{PO_Id}/{PGs\|PSs\|PSGs\|PSNs\|PPs}` (each of them, searched and paged), and one of them below it, e.g. `…/PSs/{PS_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/POs/{PO_Id}` (with everything it embeds, or `?without=` any of `parkingGarages`, `parkingSpaces`, `parkingSpaceTemplates`, `parkingSpaceGroups`, `parkingSensors`, `parkingProducts`), `GET ~/RNs/{RN_Id}/POs/{PO_Id}/{PGs\|PSs\|PSTs\|PSGs\|PSNs\|PPs}` (each of them, searched and paged), and one of them below it, e.g. `…/PSs/{PS_Id}` |
 
 
 ## Common properties
@@ -49,6 +49,7 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `parkingGarages` | `ParkingGarages` | `POICollection<ParkingGarage_Id, ParkingGarage>` | add/remove | Its [parking garages](#parking-garages), ordered by identification. |
 | `parkingSpaces` | `ParkingSpaces` | `POICollection<ParkingSpace_Id, ParkingSpace>` | add/remove | Its [parking spaces](#parking-spaces), ordered by identification. |
 | `parkingSensors` | `ParkingSensors` | `POICollection<ParkingSensor_Id, ParkingSensor>` | add/remove | Its [parking sensors](#parking-sensors), ordered by identification. |
+| `parkingSpaceTemplates` | `ParkingSpaceTemplates` | `POICollection<ParkingSpaceTemplate_Id, ParkingSpaceTemplate>` | add/remove | Its [parking space templates](#parking-space-templates), ordered by identification. |
 | `parkingSpaceGroups` | `ParkingSpaceGroups` | `POICollection<ParkingSpaceGroup_Id, ParkingSpaceGroup>` | add/remove | Its [parking space groups](#parking-space-groups), ordered by identification; they may overlap. |
 | `parkingProducts` | `ParkingProducts` | `POICollection<ParkingProduct_Id, ParkingProduct>` | add/remove | Its [parking products](#parking-products), ordered by identification (ordinal, case-sensitive). |
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update (signing or identity key) | Keys signing its change sets, see [Keys](#keys). |
@@ -95,7 +96,8 @@ JSON key `parkingGarages`, ordered by identification. `RoamingNetworkChange.Add(
 [ParkingSpace](ParkingSpace.md): one parking space, optionally in a garage of the operator, watched by its
 sensors. JSON key `parkingSpaces`, ordered by identification. `RoamingNetworkChange.Add(space, parkingOperatorId)`,
 `Remove(spaceId)`. A space that a parking space group or a charging station (`parkingSpaceIds`) names can not be
-removed.
+removed. A space takes what the templates it names in `templateIds` give it, see
+[templates and effective members](README.md#templates-and-effective-members).
 
 ### Parking sensors
 
@@ -103,17 +105,24 @@ removed.
 `parkingSensors`, ordered by identification. `RoamingNetworkChange.Add(sensor, parkingOperatorId)`,
 `Remove(sensorId)`. A sensor that a parking space names can not be removed.
 
+### Parking space templates
+
+[ParkingSpaceTemplate](ParkingSpaceTemplate.md): what parking spaces of the operator naming it share, e.g. the garage,
+the dimensions and the roof of all spaces of a level, and the parking products offered at them. JSON key
+`parkingSpaceTemplates`, ordered by identification. `RoamingNetworkChange.Add(template, parkingOperatorId)`,
+`Remove(templateId)`. A template that a parking space names can not be removed.
+
 ### Parking space groups
 
 [ParkingSpaceGroup](ParkingSpaceGroup.md): parking spaces of the operator, e.g. one level or zone; groups may
-overlap. JSON key `parkingSpaceGroups`, ordered by identification.
+overlap and give their members nothing. JSON key `parkingSpaceGroups`, ordered by identification.
 `RoamingNetworkChange.Add(group, parkingOperatorId)`, `Remove(groupId)`.
 
 ### Parking products
 
 A parking product is what a parking operator offers for parking, e.g. short-term parking with a minimum
 duration. It is no entity: no admin status, no status, no `created`/`lastChange`, no `dataSource`. Garages,
-spaces and space groups of the same operator name it by `parkingProductIds`. It offers, it does not calculate
+spaces and space templates of the same operator name it by `parkingProductIds`. It offers, it does not calculate
 prices.
 
 Class `ParkingProduct` — [source](../WWCP_POI3/RoamingNetwork/ParkingOperator/ParkingProduct/ParkingProduct.cs).
@@ -130,7 +139,7 @@ JSON key `parkingProducts`, ordered by identification (ordinal).
 
 - `RoamingNetworkChange.Add(product, parkingOperatorId)`, `Remove(productId)`, `UpdateProperty(product, …)`,
   `RemoveProperty(product, …)`, owned by the parking operator. Its changes set no timestamps.
-- A product that a garage, space or space group names can not be removed.
+- A product that a garage, space or space template names can not be removed.
 - It has no timestamps: `created` and `lastChange` are refused.
 
 
@@ -176,18 +185,19 @@ Events: `OnAdminStatusChanged` (`OnParkingOperatorAdminStatusChangedDelegate`) a
 ## Validation
 
 - `@id` is mandatory, any non-empty text (trimmed); a parking operator must not be given twice in a network.
-- Garages, spaces, sensors and space groups: no null entries, none given twice (identifications compared
+- Garages, spaces, sensors, space templates and space groups: no null entries, none given twice (identifications compared
   case-insensitively); products: none given twice (case-sensitively).
 - The embedded arrays must contain complete objects; `parkingGarageIds`, `parkingSpaceIds`, `parkingSensorIds`,
-  `parkingSpaceGroupIds` or `parkingProductIds` at the operator are refused.
-- Every `parkingProductIds` of a garage, space or space group names a product of this operator.
+  `parkingSpaceTemplateIds`, `parkingSpaceGroupIds` or `parkingProductIds` at the operator are refused.
+- Every `parkingProductIds` of a garage, space or space template names a product of this operator.
+- Every `templateIds` of a space names a space template of this operator; its templates make no space invalid.
 - Every `parkingSpaceIds` of a space group names a space of this operator.
 - Every `parkingGarageId` and `parkingSensorIds` of a space names a garage or sensor of this operator.
-- In the network: garage, space, sensor, space group and product identifications are unique across all parking
+- In the network: garage, space, sensor, space template, space group and product identifications are unique across all parking
   operators; every `chargingStationIds` of a garage, space or sensor names a charging station of the network;
   every `parkingSpaceIds` of a charging station names a parking space of the network.
 - `Add` of a parking operator: with at least one signing and one identity key and without any non-empty
-  `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceGroups` or `parkingProducts`, as its parking
+  `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceTemplates`, `parkingSpaceGroups` or `parkingProducts`, as its parking
   data is its own to add. A change names no parent but the roaming network. `RoamingNetworkChange.Add(parkingOperator)`
   leaves the parking data out; `RoamingNetworkChange.AddChildren(parkingOperator)` gives the changes adding it, for a
   change set the parking operator signs once it is a member.

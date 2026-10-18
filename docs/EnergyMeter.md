@@ -58,6 +58,7 @@ is replaced or removed as a whole ([below](#change-sets)).
 | `transparencySoftwareStatus` | `TransparencySoftwareStatus` | [TransparencySoftwareAssignment](#transparencysoftwarestatus)[] | via parent | The transparency software releases for its measurements, with their legal status; ordered by `transparencySoftwareId` (ordinal), at most one per release. Omitted when empty. |
 | `signatureMethods` | `SignatureMethods` | [SignatureMethod](#signaturemethods)[] | via parent | How it signs its measurements, e.g. `OCMF`; ordered by name (ordinal), each once. Omitted when empty. |
 | `publicKeys` | `PublicKeys` | [EnergyMeterPublicKey](#publickeys)[] | via parent | The public keys it signs its measurements with, with their certificate chains; ordered by `@id` (ordinal), each once. Omitted when empty. |
+| `templateIds` | `TemplateIds` | `ImmutableArray<EnergyMeterTemplate_Id>` | via parent | The [energy meter templates](EnergyMeterTemplate.md) it takes, each once, in its order, the first deciding; see [templates and groups](#templates-and-groups). |
 
 All are optional and omitted when absent.
 
@@ -82,14 +83,17 @@ stations' and EVSEs'), `ChargingStation.AllEnergyMeters`, `EVSE.AllEnergyMeters`
   as a whole.
 
 
-## Energy meter groups
+## Templates and groups
 
-A charging station operator groups the energy meters of its pools, stations and EVSEs, a grid operator those of its
-grid connection points, in [EnergyMeterGroups](EnergyMeterGroup.md), `energyMeterGroups`. A group may give its members
+An energy meter names [energy meter templates](EnergyMeterTemplate.md) in `templateIds`: of the charging station
+operator of its pool, station or EVSE, or, of a grid connection point, of its grid operator. A template may give it
 `role`, `manufacturerId`, `modelId`, `modelURL`, `hardwareVersion`, `firmwareVersion`, `transparencySoftwareStatus`
-and `signatureMethods`, but never `serialNumber` or `publicKeys`: a value of their own wins, arrays are united. The
-meters keep only their own; they take the others at runtime, as the effective energy meters the effective EVSEs,
-charging stations, charging pools and grid connection points embed. A meter still named by a group can not be removed.
+and `signatureMethods`, but never `serialNumber` or `publicKeys`: a value of its own wins, else the first template's;
+arrays are united. The meter keeps only its own; it takes the others at runtime, as the effective energy meter the
+effective EVSEs, charging stations, charging pools and grid connection points embed.
+
+[Energy meter groups](EnergyMeterGroup.md) of the same owners collect energy meters and give them nothing. A meter
+still named by a group can not be removed.
 
 
 ## Change sets
