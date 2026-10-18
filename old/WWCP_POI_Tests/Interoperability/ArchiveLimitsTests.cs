@@ -54,7 +54,7 @@ public sealed class ArchiveLimitsTests
                   RoamingNetworkHistory.Parse(File.ReadAllText(FilePath(name + ".json")), spy.Batch, spy.Commit,
                       authorizeSnapshotBoundary: spy.Boundary, limits: limits);
 
-    private static void Violation(TestDelegate action, RoamingNetworkHistoryLimitKind kind, Int64 maximum, Int64 observed)
+    private static void Violation(Action action, RoamingNetworkHistoryLimitKind kind, Int64 maximum, Int64 observed)
     {
         var exception = Assert.Throws<RoamingNetworkHistoryLimitException>(action)!;
         Assert.That(exception.Violation, Is.EqualTo(new RoamingNetworkHistoryLimitViolation(kind, maximum, observed)));

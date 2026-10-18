@@ -57,7 +57,7 @@ public sealed class DirectPOICBORTests
         var json = JObject.Parse("""
             {
               "energySources":        [ [ "solar", "50 %" ], [ "wind", "50 %" ] ],
-              "environmentalImpacts": [ [ "CO2",   "25 %" ] ],
+              "environmentalImpacts": [ [ "CO2",   "250 g/kWh" ] ],
               "customData":           { "energySources": [ [ "solar", "50 %" ] ] }
             }
             """);
@@ -67,6 +67,8 @@ public sealed class DirectPOICBORTests
         var pair = entries.Single(e => e.Key.AsText() == "energySources").Value.AsArray()[0].AsArray();
         Assert.That(pair[0].Kind, Is.EqualTo(CBORValueKind.TextString));
         Assert.That(pair[1].Kind, Is.EqualTo(CBORValueKind.Tagged));
+        var impact = entries.Single(e => e.Key.AsText() == "environmentalImpacts").Value.AsArray()[0].AsArray();
+        Assert.That(impact[1].Kind, Is.EqualTo(CBORValueKind.TextString), "an amount per kWh, no Styx reading");
         var custom = entries.Single(e => e.Key.AsText() == "customData").Value.AsMap()[0].Value.AsArray()[0].AsArray();
         Assert.That(custom[1].Kind, Is.EqualTo(CBORValueKind.TextString));
     }
