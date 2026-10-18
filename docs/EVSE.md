@@ -111,9 +111,17 @@ changed only as the EVSE's `chargingConnectors`: as a whole, e.g.
 | `cableManagementSystem` | boolean | Optional; whether a system helps to store, lift or guide its cable, if known. |
 | `standards` | string[] | Optional; the standards it conforms to, e.g. `PAS 1899:2022`, each once, in their ordinal order. |
 | `images` | Image[] | Optional; images of it, e.g. photos, each URL once, in their given order. |
+| `currentTypes` | string[] | Optional; its current types, as those of its EVSE, unless its EVSE's. |
+| `maxVoltage`, `maxCurrent`, `maxPower` | decimal | Optional; its maximum voltage (V), current (A) and power (W), not negative, unless its EVSE's. |
+| `chargingTariffIds` | `ChargingTariff_Id`[] | Optional; its charging tariffs, each once, in the order of their identifications, tariffs of the operator; none: its EVSE's (as it is at runtime, with those of its templates). |
 
 A connector whose `format` is `SOCKET` has no cable of its own: `cableLength`, `cableWeight` and
 `cableManagementSystem` are refused for it. Connectors are equal when their JSON representations are.
+
+The current types, maximum voltage, current and power and the charging tariffs of a connector are those of its EVSE,
+unless it has its own, e.g. a CHAdeMO connector of 50 kW with a tariff of its own beside a CCS connector of the 150 kW
+of the EVSE: `CurrentTypesAt(evse)`, `MaxVoltageAt(evse)`, `MaxCurrentAt(evse)`, `MaxPowerAt(evse)` and
+`ChargingTariffIdsAt(evse)` tell them, given its (effective) EVSE. A tariff a connector names can not be removed.
 
 The connectors must be given completely: a JSON object naming `chargingConnectorIds` instead is refused.
 

@@ -997,9 +997,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ChargingTariffs = new (chargingTariffs, chargingTariff => chargingTariff.Id, "charging tariff", $"the operator '{Id}'");
 
             foreach (var evse in EVSEs)
+            {
+
                 foreach (var chargingTariffId in evse.ChargingTariffIds)
                     if (!this.ChargingTariffs.Contains(chargingTariffId))
                         throw new ArgumentException($"The charging tariff '{chargingTariffId}' of the EVSE '{evse.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffs));
+
+                foreach (var chargingConnector in evse.ChargingConnectors)
+                    foreach (var chargingTariffId in chargingConnector.ChargingTariffIds)
+                        if (!this.ChargingTariffs.Contains(chargingTariffId))
+                            throw new ArgumentException($"The charging tariff '{chargingTariffId}' of the charging connector '{chargingConnector.Id}' of the EVSE '{evse.Id}' is unknown at the operator '{Id}'!", nameof(ChargingTariffs));
+
+            }
 
             #endregion
 
