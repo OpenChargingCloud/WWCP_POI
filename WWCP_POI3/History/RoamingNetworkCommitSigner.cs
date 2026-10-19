@@ -123,6 +123,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Sign(Checkpoint, SignedAt = null)
+
+        /// <summary>
+        /// Create a signature of the given checkpoint.
+        /// </summary>
+        /// <param name="Checkpoint">A checkpoint.</param>
+        /// <param name="SignedAt">When the checkpoint is signed, now otherwise.</param>
+        public RoamingNetworkCommitSignature Sign(RoamingNetworkCheckpoint  Checkpoint,
+                                                  DateTimeOffset?           SignedAt   = null)
+
+            => Checkpoint.CreateSignature(privateKey,
+                                          KeyId,
+                                          Algorithm,
+                                          Role,
+                                          Signer,
+                                          SignedAt);
+
+        #endregion
+
 
         #region (override) ToString()
 

@@ -409,6 +409,33 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   members, e.g. `history.RuntimeStatus.CalculateStatus(groupId, POIGroupStatus.OfEVSEs)`; then the delegate has
   the say, and every other status of the group is refused. See [docs/](docs/README.md#calculated-status-of-groups).
 
+### Checkpoints
+
+A checkpoint is a signed statement that a commit, and every commit it follows, is part of the history
+([SPECIFICATION.md](SPECIFICATION.md), section 10). Checkpoints form one line per roaming network, each naming
+the one before, while the commits form a graph; they are lasting evidence, e.g. for a driver who disputes an
+invoice months later, and starting points for servers that join.
+
+```csharp
+history.CheckpointSigners = [ new RoamingNetworkCommitSigner(rnoKey, rnoKeyId, COSEAlgorithm.ES256,
+                                                             RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator) ];
+
+history.TryMakeCheckpoint(out var checkpoint, out _);          // e.g. every hour, when there are new commits
+history.TryGetCommitProof(commitId, out var proof, out _);       // { checkpointId, leaf, @index, @size, @auditPath }
+proof.Verify(checkpoint, out _);
+```
+
+- **Content:** `epoch` (1), `sequence`, `previousId`, the commit with its revision and ETags, and `commits`, the
+  RFC 9162 Merkle tree hash of the commits since the previous checkpoint, each leaf `{commitId, eTags, revision}`.
+  The id is the SHA-256 of its canonical JSON without signatures (profile `wwcp-poi-checkpoint-v1`).
+- **Signatures:** the roaming network operator signs first (`CheckpointSigners`), witnesses later
+  (`TryWitness(checkpointId, witnessSigner, …)`, which signs only checkpoints the history checked, one per
+  sequence). `TryAddCheckpoint` checks a checkpoint of another server against the history: its commit, the
+  commits since the previous one, its place in the line, every signature (`VerifyCheckpointSignature`) and the
+  roles required; another checkpoint of a sequence held is refused as a split view.
+- **Joining:** `TryGetCheckpointSnapshotJSON(checkpointId, …)` gives the version of its commit, without runtime status.
+- **Persistence:** checkpoints are written to the log and kept when compacting, also those of commits dropped.
+
 ### Persistence and retention
 
 A history keeps itself in a store, an `IRoamingNetworkHistoryStore`, and is loaded from it after a restart:
@@ -446,7 +473,8 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
   revision and its `RecentVersions` latest commits, and calculates others again when needed.
   `Compact()`, or the history itself once the log has `CompactAfterLogEntries` entries, drops the commits
   before a new root, the latest commit all tips follow at least `RetainCommits` revisions behind the head,
-  and folds the runtime status into the new base. A server knowing only older commits starts from a
+  and folds the runtime status into the new base. A history with checkpoints compacts only to the commit of
+  one of them, so that every root is a checkpoint's commit. A server knowing only older commits starts from a
   snapshot then, and a branch older than the root can no longer be appended.
 - **Peers** keep a history started from a snapshot in `RoamingNetworkPeerOptions.Store`, with its `Retention`.
   `RoamingNetworkHistoryMemoryStore` keeps the same content in memory, e.g. for tests.
@@ -466,6 +494,13 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
 | `GET ~/RNs/{id}/history/commits/{commitId}` | one commit |
 | `COMMIT ~/RNs/{id}/history/changeSets` | 201 committed, 200 already committed (the commit, the `head`, the `conflicts` left), 422 refused |
 | `POST ~/RNs/{id}/history/commits/{commitId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403, 404, 422 invalid |
+| `GET ~/RNs/{id}/history/checkpoints?since={sequence}&max={n}` | the checkpoints after the sequence |
+| `GET ~/RNs/{id}/history/checkpoints/{checkpointId}` | one checkpoint |
+| `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/snapshot` | the version of its commit, to join from |
+| `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/commits/{commitId}/proof` | the proof of a commit in it |
+| `GET ~/RNs/{id}/history/commits/{commitId}/proof` | the proof of a commit in the first checkpoint including it |
+| `POST ~/RNs/{id}/history/checkpoints` `{checkpoints: […]}` | 200 taken, 403 (`AuthorizeCheckpointPush`), 422 refused |
+| `POST ~/RNs/{id}/history/checkpoints/{checkpointId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403 (`AuthorizeCheckpointSignature`), 404, 422 invalid |
 
 It also serves the roaming networks and their entities, readable from every origin (CORS `*`), each in canonical
 JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json:sha256:hex:…"`); a known
@@ -567,10 +602,12 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 - **Actions:** `head`, `tips`, `haveIds`, `snapshot`, `commitInfos`, `commits {since? | have?, max?}`, `commit {commitId}`,
   `pushCommits {commits}` → `{appended, head, tips, conflicts?, description?}`, `pushStatusUpdates` (below),
   `commitChangeSet {changeSet}` → `{status, …, head, conflicts?}`, `runtimeStatus`,
-  `signCommit {commitId, signatures}` → `{commitId, signatures, added}`.
+  `signCommit {commitId, signatures}` → `{commitId, signatures, added}`; checkpoints: `checkpoints {since?, max?}`
+  or `{latest: true}`, `checkpoint {checkpointId}`, `checkpointSnapshot {checkpointId}`, `commitProof {commitId,
+  checkpointId?}`, `signCheckpoint {checkpointId, signatures}`, `pushCheckpoints {checkpoints}`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
   `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced),
-  `commitSignatures` (`{commitId, signatures}` added later), `adminStatusUpdates`,
+  `commitSignatures` (`{commitId, signatures}` added later), `checkpoints`, `checkpointSignatures`, `adminStatusUpdates`,
   `statusUpdates`, `energyStatusUpdates`. Pushes are sends, `[6, "p1", action, payload]`,
   in the format of the last `subscribe`. They end with the connection; a client that falls more than
   `MaxQueuedPushes` pushes or `MaxQueuedPushBytes` behind is disconnected and catches up after reconnecting.
@@ -629,6 +666,11 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   the roles every commit must be signed in, limits.
 - **Signing:** `SignCommitAsync(commitId, signatures)` sends the signatures of, e.g., a roaming network
   operator to the other server; every peer takes them from the `commitSignatures` topic.
+- **Checkpoints:** after the commits, it takes the checkpoints of the other server it misses, checked against
+  its history and signed as `RequiredCheckpointSignatureRoles` require (the roaming network operator by
+  default, `VerifyCheckpointSignature`), and pushes those the other server misses (`FollowCheckpoints`,
+  `PushCheckpoints`). A history started from a snapshot begins its line with the first checkpoint of a commit
+  it holds. A witness running a peer signs with `history.TryWitness(…)`; the signature goes to the other server.
 
 ## Submodules
 
@@ -643,6 +685,8 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 
 - Finer subscription filters
 - Further entities: as the use cases need them
+- Archives of compacted commits; a peer joining from the latest checkpoint rather than the head
+- Epochs (crypto agility) and signed prices at runtime: drafted in [SPECIFICATION.md](SPECIFICATION.md), sections 11 and 12
 
 ## Tests
 

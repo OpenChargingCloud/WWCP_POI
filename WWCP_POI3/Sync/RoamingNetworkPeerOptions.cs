@@ -122,6 +122,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IReadOnlyCollection<String>?        RequiredSignatureRoles      { get; init; }
 
         /// <summary>
+        /// <summary>
+        /// Whether to take the checkpoints of the other server, checked against this history. Default: yes.
+        /// </summary>
+        public Boolean                             FollowCheckpoints           { get; init; } = true;
+
+        /// <summary>
+        /// Whether to push the checkpoints made or taken here, and new signatures of checkpoints, e.g. of a witness. Default: yes.
+        /// </summary>
+        public Boolean                             PushCheckpoints             { get; init; } = true;
+
+        /// <summary>
+        /// Verifies the signatures of checkpoints with trusted keys; without it, signed checkpoints are not taken.
+        /// </summary>
+        public VerifyCheckpointSignatureDelegate?  VerifyCheckpointSignature   { get; init; }
+
+        /// <summary>
+        /// The roles every checkpoint must be signed in: the roaming network operator by default.
+        /// </summary>
+        public IReadOnlyCollection<String>?        RequiredCheckpointSignatureRoles  { get; init; } = [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ];
+
         /// The limits for reading change sets, the default ones otherwise.
         /// </summary>
         public RoamingNetworkChangeSetLimits?      ChangeSetLimits             { get; init; }

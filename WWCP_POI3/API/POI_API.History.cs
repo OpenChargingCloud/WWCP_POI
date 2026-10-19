@@ -366,6 +366,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            RegisterCheckpointURLTemplates(history);
+
         }
 
         #endregion

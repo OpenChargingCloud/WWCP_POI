@@ -95,14 +95,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// A change of the runtime status.
         /// </summary>
-        Status
+        Status,
+
+        /// <summary>
+        /// A checkpoint the history took.
+        /// </summary>
+        Checkpoint,
+
+        /// <summary>
+        /// Signatures added to a checkpoint later.
+        /// </summary>
+        CheckpointSignatures
 
     }
 
 
     /// <summary>
-    /// One entry of the log of a history: a commit, signatures added to one, or a status update.
-    /// One line of JSON in a file: { type, commit } | { type, commitId, signatures } | { type, statusUpdate }.
+    /// One entry of the log of a history: a commit, signatures added to one, a status update, a checkpoint,
+    /// or signatures added to one.
+    /// One line of JSON in a file: { type, commit } | { type, commitId, signatures } | { type, statusUpdate } |
+    /// { type, checkpoint } | { type, checkpointId, signatures }.
     /// </summary>
     public sealed class RoamingNetworkHistoryLogEntry
     {
@@ -134,6 +146,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public POIStatusUpdate?                                 StatusUpdate    { get; }
 
+        /// <summary>
+        /// The checkpoint of a Checkpoint entry.
+        /// </summary>
+        public RoamingNetworkCheckpoint?                        Checkpoint      { get; }
+
+        /// <summary>
+        /// The checkpoint of a CheckpointSignatures entry.
+        /// </summary>
+        public RoamingNetworkCheckpoint_Id?                     CheckpointId    { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -142,13 +164,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               RoamingNetworkCommit?                         Commit         = null,
                                               RoamingNetworkCommit_Id?                      CommitId       = null,
                                               IReadOnlyList<RoamingNetworkCommitSignature>? Signatures     = null,
-                                              POIStatusUpdate?                              StatusUpdate   = null)
+                                              POIStatusUpdate?                              StatusUpdate   = null,
+                                              RoamingNetworkCheckpoint?                     Checkpoint     = null,
+                                              RoamingNetworkCheckpoint_Id?                  CheckpointId   = null)
         {
             this.Type          = Type;
             this.Commit        = Commit;
             this.CommitId      = CommitId;
             this.Signatures    = Signatures ?? [];
             this.StatusUpdate  = StatusUpdate;
+            this.Checkpoint    = Checkpoint;
+            this.CheckpointId  = CheckpointId;
         }
 
         /// <summary>
@@ -170,6 +196,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkHistoryLogEntry ForStatus(POIStatusUpdate StatusUpdate)
             => new (RoamingNetworkHistoryLogEntryType.Status, StatusUpdate: StatusUpdate);
 
+        /// <summary>
+        /// The entry of the given checkpoint.
+        /// </summary>
+        public static RoamingNetworkHistoryLogEntry ForCheckpoint(RoamingNetworkCheckpoint Checkpoint)
+            => new (RoamingNetworkHistoryLogEntryType.Checkpoint, Checkpoint: Checkpoint);
+
+        /// <summary>
+        /// The entry of the given signatures added to the given checkpoint.
+        /// </summary>
+        public static RoamingNetworkHistoryLogEntry ForCheckpointSignatures(RoamingNetworkCheckpoint_Id                   CheckpointId,
+                                                                           IReadOnlyList<RoamingNetworkCommitSignature>  Signatures)
+            => new (RoamingNetworkHistoryLogEntryType.CheckpointSignatures, Signatures: Signatures, CheckpointId: CheckpointId);
+
         #endregion
 
 
@@ -190,6 +229,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    RoamingNetworkHistoryLogEntryType.Signatures  => new JObject(
                                                                         new JProperty("type",          "signatures"),
                                                                         new JProperty("commitId",      CommitId!.Value.ToString()),
+                                                                        new JProperty("signatures",    new JArray(Signatures.Select(signature => signature.ToJSON())))
+                                                                    ),
+
+                   RoamingNetworkHistoryLogEntryType.Checkpoint  => new JObject(
+                                                                        new JProperty("type",          "checkpoint"),
+                                                                        new JProperty("checkpoint",    Checkpoint!.ToJSON())
+                                                                    ),
+
+                   RoamingNetworkHistoryLogEntryType.CheckpointSignatures
+                                                                 => new JObject(
+                                                                        new JProperty("type",          "checkpointSignatures"),
+                                                                        new JProperty("checkpointId",  CheckpointId!.Value.ToString()),
                                                                         new JProperty("signatures",    new JArray(Signatures.Select(signature => signature.ToJSON())))
                                                                     ),
 
@@ -248,6 +299,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     Entry = ForStatus(statusUpdate);
+                    return true;
+
+                case "checkpoint":
+
+                    if (JSON["checkpoint"] is not JObject checkpointJSON ||
+                        !RoamingNetworkCheckpoint.TryParse(checkpointJSON, out var checkpoint, out ErrorResponse))
+                    {
+                        ErrorResponse = "Invalid checkpoint entry!";
+                        return false;
+                    }
+
+                    Entry = ForCheckpoint(checkpoint);
+                    return true;
+
+                case "checkpointSignatures":
+
+                    if (!RoamingNetworkCheckpoint_Id.TryParse(JSON["checkpointId"]?.Value<String>() ?? "", out var checkpointId))
+                    {
+                        ErrorResponse = "Invalid checkpoint signatures entry!";
+                        return false;
+                    }
+
+                    // The same signatures as of a commit, of another checkpoint than one named by its commit.
+                    if (!RoamingNetworkCommitSignature.TryParseCommitSignatures(new JObject(
+                                                                                    new JProperty("commitId",    checkpointId.ToString()),
+                                                                                    new JProperty("signatures",  JSON["signatures"])
+                                                                                ),
+                                                                                out _,
+                                                                                out var checkpointSignatures,
+                                                                                out ErrorResponse))
+                    {
+                        return false;
+                    }
+
+                    Entry = ForCheckpointSignatures(checkpointId, checkpointSignatures);
                     return true;
 
                 default:

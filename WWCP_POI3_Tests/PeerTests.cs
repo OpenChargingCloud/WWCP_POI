@@ -175,6 +175,65 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
         #endregion
 
 
+        #region Checkpoints_reach_peers_and_witness_signatures_come_back()
+
+        [Test]
+        public async Task Checkpoints_reach_peers_and_witness_signatures_come_back()
+        {
+
+            var verify = History.CheckpointTests.Verify;
+
+            leader!.CheckpointSigners          = [ History.CheckpointTests.RNOSigner ];
+            poiAPI!.VerifyCheckpointSignature  = verify;
+            poiAPI.AuthorizeCheckpointSignature = (request, checkpoint, signature) => signature.Role == RoamingNetworkCommitSignatureRoles.Witness;
+
+            Publish("v1");
+
+            Assert.That(leader.TryMakeCheckpoint(out var cp0, out var cp0Error, CreatedAt: T0.AddHours(1)),  Is.True, cp0Error);
+
+            var peer      = await StartFollower(Options: new RoamingNetworkPeerOptions {
+                                                             VerifyCheckpointSignature  = verify,
+                                                             MinReconnectDelay          = TimeSpan.FromMilliseconds(50),
+                                                             MaxReconnectDelay          = TimeSpan.FromMilliseconds(200)
+                                                         });
+
+            var tookFirst = await Eventually(() => peer.History?.LatestCheckpoint?.Id == cp0!.Id);
+
+            var c2        = Publish("v2");
+            Assert.That(leader.TryMakeCheckpoint(out var cp1, out var cp1Error, CreatedAt: T0.AddHours(2)),  Is.True, cp1Error);
+
+            var tookNext  = await Eventually(() => peer.History?.LatestCheckpoint?.Id == cp1!.Id);
+
+            // The peer is run by a witness: its signature goes back to the server that made the checkpoint.
+            Assert.That(peer.History!.TryWitness(cp1!.Id, History.CheckpointTests.WitnessSigner, out _, out _, out var witnessError),  Is.True, witnessError);
+
+            var signedThere = await Eventually(() => leader.LatestCheckpoint!.Signatures.Any(signature => signature.Role == RoamingNetworkCommitSignatureRoles.Witness));
+
+            using var httpClient = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/") };
+
+            var proofText        = await httpClient.GetStringAsync($"commits/{c2.Commit!.Id}/proof");
+            var checkpointsText  = await httpClient.GetStringAsync("checkpoints?since=0");
+
+            Assert.That(RoamingNetworkCheckpointProof.TryParse(JObject.Parse(proofText), out var proof, out var proofError),  Is.True, proofError);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(tookFirst,                                         Is.True, "The peer did not take the checkpoint of the commit it started from.");
+                Assert.That(tookNext,                                          Is.True, "The peer did not take the pushed checkpoint.");
+                Assert.That(signedThere,                                       Is.True, "The signature of the witness did not reach the server that made the checkpoint.");
+
+                Assert.That(proof!.CheckpointId,                               Is.EqualTo(cp1.Id));
+                Assert.That(proof.Verify(leader.LatestCheckpoint!, out var verifyError),  Is.True, verifyError);
+                Assert.That(JArray.Parse(checkpointsText).Select(checkpoint => checkpoint["@id"]!.Value<String>()),
+                            Is.EqualTo(new[] { cp1.Id.ToString() }));
+
+            }
+
+        }
+
+        #endregion
+
         #region A_follower_starts_from_a_snapshot_and_follows()
 
         [Test]

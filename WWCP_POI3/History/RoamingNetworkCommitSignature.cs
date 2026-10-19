@@ -49,6 +49,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String ChargingStationOperator  = "chargingStationOperator";
 
+        /// <summary>
+        /// An independent third party signing checkpoints it checked against its own history (SPECIFICATION.md, section 10.2).
+        /// </summary>
+        public const String Witness                  = "witness";
+
     }
 
 

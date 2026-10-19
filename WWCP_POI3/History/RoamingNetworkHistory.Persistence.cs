@@ -113,7 +113,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     this.Retention = Retention;
 
                 var snapshot  = RootSnapshotJSON();
-                var entries   = commits.Skip(1).Select(RoamingNetworkHistoryLogEntry.ForCommit).ToArray();
+                var entries   = commits.Skip(1).Select(RoamingNetworkHistoryLogEntry.ForCommit).Concat(CheckpointLogEntries()).ToArray();
 
                 if (Store.Load() is null)
                 {
@@ -228,6 +228,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 history.TakeKnownSignatures(entry.CommitId!.Value, entry.Signatures);
                                 break;
 
+                            case RoamingNetworkHistoryLogEntryType.Checkpoint:
+                                history.TakeStoredCheckpoint(entry.Checkpoint!);
+                                break;
+
+                            case RoamingNetworkHistoryLogEntryType.CheckpointSignatures:
+                                history.TakeStoredCheckpointSignatures(entry.CheckpointId!.Value, entry.Signatures);
+                                break;
+
                             default:
                                 history.RuntimeStatus.TryUpdate(entry.StatusUpdate!, out _);
                                 break;
@@ -299,8 +307,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     var kept     = commits.Where(commit => !dropped.Contains(commit.Id)).ToList();
 
+                    // The checkpoints are all kept, also those of the commits dropped: they are the evidence of what was.
                     Store?.Compact(SnapshotJSON(newRoot, rootVersion, Head.RoamingNetwork),
-                                   kept.Skip(1).Select(RoamingNetworkHistoryLogEntry.ForCommit));
+                                   kept.Skip(1).Select(RoamingNetworkHistoryLogEntry.ForCommit).Concat(CheckpointLogEntries()));
 
                     #region Drop them from memory, too
 
@@ -329,7 +338,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     #endregion
 
-                    Interlocked.Exchange(ref logEntries, kept.Count - 1);
+                    Interlocked.Exchange(ref logEntries, kept.Count - 1 + checkpoints.Count);
 
                     ErrorResponse = null;
                     return true;
@@ -362,6 +371,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return commits[0];
 
             var maxRevision  = head.Revision - Retention.RetainCommits;
+            var checkpointCommits = CheckpointCommitIds();
             HashSet<RoamingNetworkCommit_Id>? common = null;
 
             foreach (var tip in tips)
@@ -374,6 +384,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var candidates = (common ?? []).
                                  Select (commitId => commits[commitIndex[commitId]]).
                                  Where  (commit   => commit.Revision <= maxRevision).
+                                 // A history with checkpoints compacts only to the commit of one of them (SPECIFICATION.md, section 10.6).
+                                 Where  (commit   => checkpointCommits.Count == 0 || checkpointCommits.Contains(commit.Id)).
                                  ToList();
 
             candidates.Sort((commit1, commit2) => IsCanonicalOrder(commit1, commit2) ? (commit1.Id == commit2.Id ? 0 : -1) : 1);

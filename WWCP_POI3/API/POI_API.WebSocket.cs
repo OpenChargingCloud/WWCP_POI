@@ -472,6 +472,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Topics
 
+            AddCheckpointCommands(webSocketServer, History);
+
             webSocketServer.AddTopic(new POIWebSocketTopic(CommitAnnouncementsTopic,
                                                            "commitAnnouncement",
                                                            "A slim notice of every new commit: timestamp, commitId, parentIds, revision and description."));
@@ -559,10 +561,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             History.OnCommitSignatures            += onCommitSignatures;
             History.RuntimeStatus.OnStatusUpdate  += onStatusUpdate;
 
+            var disconnectCheckpoints = ConnectCheckpoints(History, WebSocketServer);
+
             historyDisconnects[History.RoamingNetworkId] = () => {
                 History.OnCommitAnnouncement          -= onCommitAnnouncement;
                 History.OnCommitSignatures            -= onCommitSignatures;
                 History.RuntimeStatus.OnStatusUpdate  -= onStatusUpdate;
+                disconnectCheckpoints();
             };
 
         }

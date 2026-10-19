@@ -77,7 +77,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// When the connection breaks it connects again, waiting longer after every failure, and catches up.
     /// Change sets and status updates can also be sent to the other server, which pushes them back.
     /// </remarks>
-    public sealed class RoamingNetworkPeer : IAsyncDisposable
+    public sealed partial class RoamingNetworkPeer : IAsyncDisposable
     {
 
         #region Data
@@ -426,7 +426,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 if (!IsReceived(statusUpdate))
                                     pushes.Writer.TryWrite(statusUpdate);
 
-                        var pushing = options.PushCommits || options.PushStatus
+                        var pushing = options.PushCommits || options.PushStatus || options.PushCheckpoints
                                           ? PushAsync(currentConnection, pushes.Reader, following.Token)
                                           : Task.CompletedTask;
 
@@ -512,6 +512,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 topics.Add(POI_API.PriceStatusUpdatesTopic);
             }
 
+            if (options.FollowCheckpoints)
+            {
+                topics.Add(POI_API.CheckpointsTopic);
+                topics.Add(POI_API.CheckpointSignaturesTopic);
+            }
+
             await Expect(Connection, "subscribe", new JObject(new JProperty("topics", topics)), CancellationToken);
 
             statusFromSnapshot = false;
@@ -523,6 +529,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (options.PushCommits)
                 await PushMissingCommitsAsync(Connection, CancellationToken);
+
+            // After the commits: a checkpoint names commits, which must be there first.
+            if (options.FollowCheckpoints || options.PushCheckpoints)
+                await SynchronizeCheckpointsAsync(Connection, CancellationToken);
 
             // A snapshot brought the runtime status of its moment; what changed since was pushed.
             // Without following it, the status there is still asked for: to push only what differs.
@@ -573,6 +583,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         case "commitSignatures":
                             TakeCommitSignatures(payload);
+                            break;
+
+                        case "checkpoint":
+                            TakeCheckpoint(payload);
+                            break;
+
+                        case "checkpointSignatures":
+                            TakeCheckpointSignatures(payload);
                             break;
 
                         case "commitAnnouncement":
@@ -722,6 +740,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 watched.OnCommitAnnouncement          -= Announced;
                 watched.RuntimeStatus.OnStatusUpdate  -= StatusUpdated;
+                WatchCheckpoints(watched, false);
             }
 
             watched = outgoing is not null ? History : null;
@@ -734,6 +753,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (options.PushStatus)
                     watched.RuntimeStatus.OnStatusUpdate  += StatusUpdated;
+
+                WatchCheckpoints(watched, true);
 
             }
 
@@ -913,9 +934,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var pushCommits  = options.PushCommits;
             var pushStatus   = options.PushStatus;
+            var pushCheckpoints = options.PushCheckpoints;
             Object? next     = null;
 
-            while (pushCommits || pushStatus)
+            while (pushCommits || pushStatus || pushCheckpoints)
             {
 
                 if (next is null)
@@ -960,6 +982,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (pushStatus && !await TryPushStatusAsync(Connection, statusUpdates, CancellationToken))
                         pushStatus = false;
+
+                }
+
+                else if (next is RoamingNetworkCheckpoint checkpoint)
+                {
+
+                    next = null;
+
+                    if (pushCheckpoints && !await TryPushCheckpointsAsync(Connection, [ checkpoint ], CancellationToken))
+                        pushCheckpoints = false;
+
+                }
+
+                else if (next is CheckpointSignaturesPush checkpointSignatures)
+                {
+
+                    next = null;
+
+                    if (pushCheckpoints && !await TryPushCheckpointSignaturesAsync(Connection, checkpointSignatures, CancellationToken))
+                        pushCheckpoints = false;
 
                 }
 

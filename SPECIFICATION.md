@@ -4,7 +4,8 @@ This document specifies which bytes POI 3 hashes and signs, so that a client can
 a commit or a signature without this library, and what a version tells where it gives something once
 for many entities: templates, groups and offers (section 9). The examples in section 6 are checked by
 `WWCP_POI3_Tests/SpecificationVectorsTests.cs`. Section 8 is a draft: proofs of single entities, e.g. of
-one charging station, by a signed hash tree.
+one charging station, by a signed hash tree. Section 10 specifies checkpoints, the witnessed and lasting
+evidence of a history; sections 11 (epochs) and 12 (prices at runtime) are drafts.
 
 The words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
 
@@ -616,7 +617,8 @@ are as in section 4; timestamps are written as in section 5.4.
    values.
 4. **Runtime:** admin status, status, energy status and price status are not content. A station
    proof tells neither whether a station is available nor its prices at runtime. Signed runtime
-   statements, e.g. a price status the operator signs for some minutes, would complete it.
+   statements, e.g. a price status the operator signs for some minutes, would complete it. Section 12
+   drafts them.
 5. **Rules of effective members:** done, section 9.2.
 6. **Proofs of absence:** e.g. that an EVSE was removed. Two neighbouring leaves in the ordinal order
    of identifications prove it; their form is open.
@@ -829,3 +831,195 @@ EVSEs throughout.
 6. **A tree over the stored content** (8.7, point 7): a proof could give the stored member and the
    templates it names in place of the effective member. A change of a template would then hash
    `O(log n)` in place of every member naming it, but a verifier would need the rules of 9.2.
+
+
+## 10. Checkpoints
+
+A **checkpoint** is a signed statement that a commit, and every commit it follows, is part of the
+history of a roaming network. Checkpoints form one line per roaming network and epoch (section 11),
+each naming the one before it, while the commits form a graph (section 5). They serve three purposes:
+
+- **Witnessed evidence:** independent third parties, **witnesses**, sign a checkpoint only after they
+  checked it against their own copy of the history. Whoever kept a proof of a charging station and
+  its tariffs (8.4) for an attested commit (8.5) shows months later, e.g. disputing an invoice, that
+  this commit is part of the history the witnesses saw, without asking the server that made it.
+  Charging tariffs as content change slowly, so witnesses have the time between two checkpoints.
+- **Starting points:** a server or client that joins starts from the version of the latest
+  checkpoint and takes the commits since, instead of all commits since the genesis.
+- **Compaction:** a history drops older commits only before the commit of a checkpoint (10.6).
+
+A checkpoint is not a version of its own and changes nothing: the content, the commits and their
+identifications are as without it.
+
+### 10.1 Representation and identification
+
+```json
+{ "@id": "<checkpoint id>", "roamingNetworkId": "rn1", "epoch": 1, "sequence": 42,
+  "previousId": "<id of checkpoint 41>", "commitId": "<commit id>", "revision": 4711,
+  "eTags": [ <the ETags of the version of the commit> ],
+  "commits": { "@merkleRoot": "<hex>", "@size": 118 },
+  "createdAt": "2026-10-19T12:00:00.000Z",
+  "signatures": [ … ] }
+```
+
+- **sequence:** 0 for the first checkpoint of an epoch, one more for every next one; `previousId` names
+  the one before and is absent for sequence 0.
+- **commitId, revision, eTags:** the commit, its revision and the ETags of its version, as in the commit.
+- **commits:** the Merkle tree hash (8.2, RFC 9162) of the **commits of the checkpoint**: the commit
+  itself and every commit it follows, that neither the commit of the previous checkpoint is nor
+  follows; for sequence 0 every commit since the genesis. In ascending order of their revisions, among
+  equal revisions in the ordinal order of their identifications. A leaf is the UTF-8 encoded canonical
+  JSON of `{"commitId": "…", "eTags": [ … ], "revision": …}`, so that a proof of one commit (10.4) binds
+  its ETags as well. `@size` is their number.
+- **createdAt:** when it was made, written as in section 5.4.
+
+The checkpoint identification is the SHA-256 of the canonical JSON of the checkpoint without `@id` and
+without `signatures`, with `"profile": "wwcp-poi-checkpoint-v1"` added, as 64 lowercase hexadecimal
+digits. A reader MUST calculate it and refuse the checkpoint when it differs from `@id`. The CBOR
+representation has the keys and values of the JSON one; ETags are written in hex (section 3.1).
+
+A server MUST refuse a checkpoint unless it has its commit and all commits of the checkpoint, the
+commit follows the commit of the previous checkpoint (or is it, which then is no new checkpoint and is
+refused), `revision` and `eTags` are those of the commit, `commits` is the tree of the commits of the
+checkpoint, and `previousId` names the latest checkpoint it holds of this epoch with `sequence` one less.
+A server that holds no checkpoint yet, e.g. one started from a snapshot, takes as its first one a checkpoint
+of a commit it holds, without the commits before its root; its signatures carry it.
+
+### 10.2 Signatures
+
+A checkpoint is signed as a commit is (section 5.4), with the profile
+`wwcp-poi-checkpoint-signature-v1` and the checkpoint, with `@id` and without its signatures, as
+`"checkpoint"` in place of `"commit"`:
+
+```json
+{ "profile": "wwcp-poi-checkpoint-signature-v1", "algorithm": "…", "keyId": "…", "encoding": "base64",
+  "role": "…", "signer": "…", "signedAt": "…",
+  "checkpoint": <the checkpoint without its signatures> }
+```
+
+- **roamingNetworkOperator:** the RNO makes the checkpoints of its roaming network and signs them first,
+  with one of its signing keys (section 4.1).
+- **witness:** an independent third party, e.g. an association of operators, a calibration authority or
+  another roaming network operator. A witness signs a checkpoint only after it refused nothing of 10.1
+  in its own history, which it took commit by commit, each checked as section 5.2 says. A witness MUST
+  NOT sign two different checkpoints of the same roaming network, epoch and `sequence`: that is what
+  makes a split view, one history shown to some and another one to others, visible.
+- Signatures may be added later, as to commits: `signCheckpoint` over the WebSocket or
+  `POST …/history/checkpoints/{checkpointId}/signatures`; they do not change the identification.
+
+A verifier decides which signatures it requires, e.g. the RNO's and two of the witnesses it trusts.
+Witness keys are trusted independently of the network, as attestation keys are (8.5).
+
+### 10.3 Intervals (informative)
+
+A server of the RNO makes a checkpoint when there are new commits and the last one is older than an
+interval, e.g. one hour, and SHOULD make one of a commit that all tips follow, so that a joining server
+starts without open branches. Witnesses sign within the interval. Attestations (8.5) stay the fresh,
+short-lived statements of the current head; checkpoints are the lasting ones.
+
+### 10.4 Proofs of commits
+
+A proof that a commit is part of a checkpoint is its leaf with its audit path (RFC 9162, section 2.1.3):
+
+```json
+{ "checkpointId": "<checkpoint id>",
+  "leaf": { "commitId": "…", "eTags": [ … ], "revision": 4711 },
+  "@index": 17, "@size": 118, "@auditPath": [ "<hex>", … ] }
+```
+
+The verifier calculates the root from the leaf, `@index`, `@size` and the audit path, and MUST refuse
+the proof unless it is the `commits` root of the checkpoint, and that checkpoint carries the signatures
+it requires. With the proof of a charging station (8.4) against an attestation of `commitId`, whose
+`eTag` MUST be one of the leaf's `eTags`, the station, its EVSEs and the tariffs they take are then
+witnessed as part of the history. POI_API serves it as
+`GET ~/RNs/{RN_Id}/history/checkpoints/{checkpointId}/commits/{commitId}/proof`, and
+`GET ~/RNs/{RN_Id}/history/commits/{commitId}/proof` for the first checkpoint whose commits include it.
+
+### 10.5 Joining from a checkpoint
+
+A server or client that has no history takes the latest checkpoint carrying the signatures it requires,
+the version of its commit (`GET ~/RNs/{RN_Id}/history/checkpoints/{checkpointId}/snapshot`), checks the
+version against the checkpoint's `eTags`, and then the commits since, as from a snapshot of the head.
+
+### 10.6 Compaction and archives
+
+A history that has checkpoints drops older commits only before the commit of one of them, so that
+every root is the commit of a checkpoint, and keeps all checkpoints. A server SHOULD archive the commits
+it drops, not delete them: a checkpoint proves only what someone can still show. Personal data that
+must be erased (GDPR) is removed from the archive, its commits and versions keep their identifications
+and ETags, and a proof of what was erased is no longer possible.
+
+### 10.7 Open points
+
+1. **Archives:** where archived commits are served from, and for how long.
+2. **Statements of prices at runtime** in a checkpoint (section 12).
+3. **Witness discovery:** how a client learns which witnesses there are, and their keys.
+
+
+## 11. Epochs
+
+> **Status:** draft, not implemented: every history is epoch 1, and checkpoints name it.
+
+An **epoch** is one history of a roaming network under one set of **profiles**: the algorithms and
+formats its identifications, ETags, trees and signatures are calculated with. A new epoch begins only
+when these must change, not periodically: when an algorithm becomes weak (crypto agility, e.g. from
+SHA-256 or ECDSA to SHA-3 or ML-DSA), when the canonicalization changes, or after the RNO lost control of
+its keys. Checkpoints make periodic restarts unnecessary (section 10).
+
+```json
+{ "epoch": 2,
+  "profiles": { "canonicalization": "styx-canonical-json-v1", "commitIdHash": "sha256",
+                "commit": "wwcp-poi-commit-v2", "checkpoint": "wwcp-poi-checkpoint-v1",
+                "treeHashAlgorithms": [ "sha3-256" ],
+                "signatureAlgorithms": [ "ML-DSA-65", "ES256" ] } }
+```
+
+- **End of an epoch:** its last checkpoint is **final**, `"final": true` with
+  `"next": <the epoch and profiles above>`, made by the RNO and signed by the witnesses with the
+  algorithms of the ending epoch. A final checkpoint names a commit all tips follow; the epoch takes no
+  commit after it.
+- **Start of the next one:** its genesis has the version of the final checkpoint's commit, its
+  identifications and ETags calculated under the new profiles; its commit identifications include
+  `"epoch"` from epoch 2 on, so that no commit of one epoch is one of another, and commits of different
+  epochs are never merged. Its first checkpoint (sequence 0) names
+  `"previous": {"epoch": 1, "checkpointId": "…", "eTags": [ … ]}` and is signed with the algorithms of
+  both epochs, so that a verifier trusting only the old ones follows into the new epoch.
+- **Moving on:** a server applies nothing; it starts the new epoch from the version it has and checks
+  the new genesis against the final checkpoint. Servers and clients move when they see the final
+  checkpoint, not all at once.
+- **Old epochs** stay readable and archived (10.6). Before one of their algorithms becomes weak, their
+  checkpoints are signed again, or their identifications hashed and signed, under the new profiles
+  (evidence records as in RFC 4998), so that what they prove stays provable.
+- **Runtime status of an epoch:** `active`, `closing` (final checkpoint made, waiting for witnesses),
+  `closed`, `archived`.
+
+
+## 12. Prices at runtime
+
+> **Status:** draft, not implemented.
+
+Charging tariffs are content: they change slowly and are proved by checkpoints (section 10). Ad hoc
+prices that change by the minute, like status messages in DATEX II, are the **price status** of
+charging pools, charging stations and EVSEs, runtime data without versions. Their evidence differs:
+a **price statement**, signed by the charging station operator with one of its signing keys (section
+4.1), at the moment it sets the price.
+
+```json
+{ "roamingNetworkId": "rn1", "entityType": "EVSE", "entityId": "DE*GEF*E1*1",
+  "priceStatus": { "prices": [ … ] },
+  "validFrom": "2026-10-19T12:00:00.000Z", "validUntil": "2026-10-19T12:15:00.000Z",
+  "sequence": 1017, "previous": "<hex digest of statement 1016 of this entity>",
+  "after": "<id of the latest checkpoint the operator knew>",
+  "role": "chargingStationOperator", "signer": "DE*GEF", "signedAt": "2026-10-19T11:59:58.000Z",
+  "algorithm": "ES256", "keyId": "<key @id>", "value": "<Base64>",
+  "profile": "wwcp-poi-price-statement-v1", "encoding": "base64" }
+```
+
+- **Chain per entity:** `sequence` and `previous`, the SHA-256 of the canonical JSON of the statement
+  before, signature included. Statements are neither reordered nor withdrawn unnoticed.
+- **Not before:** `after` names a checkpoint; the statement was made after it.
+- **Not after:** a checkpoint MAY carry `"statements": {"@merkleRoot": …, "@size": …}`, the tree of the
+  digests of the statements its server received since the previous checkpoint, in the order of their
+  entities and sequences; witnesses check their signatures. A statement in it was made before it.
+- **Evidence:** the driver's app keeps the statement valid when charging began, the proof of the
+  operator's signing keys (8.4) and later the proof of the statement in a checkpoint.
