@@ -119,8 +119,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(rn2.Revision,                 Is.EqualTo(1));
                 Assert.That(rn2.Created,                  Is.EqualTo(rn1.Created));
                 Assert.That(rn2.LastChangeDate,           Is.EqualTo(CommitTime));
-                Assert.That(rn2.ETags,                    Is.EqualTo(cs1.AfterETags));
-                Assert.That(cs1.BeforeETags,              Is.EqualTo(rn1.ETags));
+                Assert.That(rn2.ETags.Where(eTag => eTag.Format != ETagFormat.EffectiveTree),                    Is.EqualTo(cs1.AfterETags));
+                Assert.That(cs1.BeforeETags,              Is.EqualTo(rn1.CalcChangeSetETags()));
 
                 // The old version stays as it was.
                 Assert.That(rn1.DataSource,               Is.EqualTo("test"));
@@ -330,7 +330,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(rn2.ChargingStationOperators.Select(o => o.Id.ToString()).Order(),  Is.EqualTo(new[] { "DE*GEF", "DE*NEW" }));
                 Assert.That(rn2.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*NEW"))!.Telephone,
                             Is.EqualTo(PhoneNumber.Parse("+49 3641 123456")));
-                Assert.That(rn2.ETags,                                                          Is.EqualTo(cs1.AfterETags));
+                Assert.That(rn2.ETags.Where(eTag => eTag.Format != ETagFormat.EffectiveTree),                                                          Is.EqualTo(cs1.AfterETags));
 
                 // The removal remembers the operator it removed.
                 Assert.That(cs1.Changes[0].OldValue,                                            Is.Null);
@@ -409,7 +409,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(gef2.DataLicenses.Select(l => l.Id.ToString()),  Is.EqualTo(new[] { "ODbL" }));
                 Assert.That(gef2.Homepage,                                Is.Null);
                 Assert.That(gef2.EMailAddress,                            Is.EqualTo(gef.EMailAddress));
-                Assert.That(rn2.ETags,                                    Is.EqualTo(cs1.AfterETags));
+                Assert.That(rn2.ETags.Where(eTag => eTag.Format != ETagFormat.EffectiveTree),                                    Is.EqualTo(cs1.AfterETags));
 
                 // The changes remember the values they found.
                 Assert.That(cs1.Changes[0].OldValue!.Value<String>(),     Is.EqualTo(gef.Telephone.ToString()));
@@ -516,7 +516,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             {
 
                 Assert.That(rn2.DataLicenses.Ordered().Select(l => l.Id.ToString()),  Is.EqualTo(new[] { "CC BY 4.0", "own-1.0" }));
-                Assert.That(rn2.ETags,                                                 Is.EqualTo(cs1.AfterETags));
+                Assert.That(rn2.ETags.Where(eTag => eTag.Format != ETagFormat.EffectiveTree),                                                 Is.EqualTo(cs1.AfterETags));
                 Assert.That(cs1.Changes[0].OldValue,                                   Is.EqualTo(rn1.DataLicenses.ToPOIJSON()).Using<JToken>(JToken.DeepEquals));
 
                 Assert.That(rn3.DataLicenses,                                          Is.Empty);

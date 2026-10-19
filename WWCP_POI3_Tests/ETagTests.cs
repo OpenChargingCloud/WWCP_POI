@@ -124,7 +124,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
 
             var expected  = new[] {
                                 ETag.Compute(ETagFormat.JSON, CanonicalJSON.ToUTF8Bytes(rn1.ToJSON(IncludeETags: false))),
-                                ETag.Compute(ETagFormat.CBOR, rn1.ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical))
+                                ETag.Compute(ETagFormat.CBOR, rn1.ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical)),
+                                rn1.EffectiveTreeETag(ETagHashAlgorithm.SHA256)
                             };
 
             // ToJSON() and ToCBOR() write only stored ETags!

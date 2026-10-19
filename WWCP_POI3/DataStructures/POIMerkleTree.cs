@@ -26,37 +26,75 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// The Merkle tree hash of a list of byte strings and the audit paths of its leaves,
-    /// as RFC 9162, sections 2.1.1 and 2.1.3 define them, with SHA-256.
+    /// as RFC 9162, sections 2.1.1 and 2.1.3 define them, with SHA-256 unless another hash algorithm is given.
     /// </summary>
     public static class POIMerkleTree
     {
 
-        #region LeafHash(Data)
+        #region Hash(HashAlgorithm, Data)
+
+        /// <summary>
+        /// The digest of the given data with the given hash algorithm.
+        /// </summary>
+        /// <param name="HashAlgorithm">The hash algorithm.</param>
+        /// <param name="Data">The data.</param>
+        public static Byte[] Hash(ETagHashAlgorithm   HashAlgorithm,
+                                  ReadOnlySpan<Byte>  Data)
+
+            => HashAlgorithm switch {
+                   ETagHashAlgorithm.SHA256  => SHA256.HashData(Data),
+                   ETagHashAlgorithm.SHA384  => SHA384.HashData(Data),
+                   ETagHashAlgorithm.SHA512  => SHA512.HashData(Data),
+                   _                         => throw new ArgumentOutOfRangeException(nameof(HashAlgorithm), "Unsupported hash algorithm!")
+               };
+
+        #endregion
+
+        #region LeafHash(Data) / LeafHash(HashAlgorithm, Data)
 
         /// <summary>
         /// The hash of one leaf: SHA-256(0x00 || data).
         /// </summary>
         /// <param name="Data">The data of the leaf.</param>
         public static Byte[] LeafHash(ReadOnlySpan<Byte> Data)
+
+            => LeafHash(ETagHashAlgorithm.SHA256, Data);
+
+        /// <summary>
+        /// The hash of one leaf: H(0x00 || data).
+        /// </summary>
+        /// <param name="HashAlgorithm">The hash algorithm.</param>
+        /// <param name="Data">The data of the leaf.</param>
+        public static Byte[] LeafHash(ETagHashAlgorithm   HashAlgorithm,
+                                      ReadOnlySpan<Byte>  Data)
         {
 
             var input = new Byte[Data.Length + 1];
             input[0]  = 0x00;
             Data.CopyTo(input.AsSpan(1));
 
-            return SHA256.HashData(input);
+            return Hash(HashAlgorithm, input);
 
         }
 
         #endregion
 
-        #region NodeHash(Left, Right)
+        #region NodeHash(Left, Right) / NodeHash(HashAlgorithm, Left, Right)
 
         /// <summary>
         /// The hash of an inner node: SHA-256(0x01 || left || right).
         /// </summary>
         public static Byte[] NodeHash(ReadOnlySpan<Byte> Left,
                                       ReadOnlySpan<Byte> Right)
+
+            => NodeHash(ETagHashAlgorithm.SHA256, Left, Right);
+
+        /// <summary>
+        /// The hash of an inner node: H(0x01 || left || right).
+        /// </summary>
+        public static Byte[] NodeHash(ETagHashAlgorithm   HashAlgorithm,
+                                      ReadOnlySpan<Byte>  Left,
+                                      ReadOnlySpan<Byte>  Right)
         {
 
             var input = new Byte[1 + Left.Length + Right.Length];
@@ -64,7 +102,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Left. CopyTo(input.AsSpan(1));
             Right.CopyTo(input.AsSpan(1 + Left.Length));
 
-            return SHA256.HashData(input);
+            return Hash(HashAlgorithm, input);
 
         }
 
@@ -77,16 +115,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Leaves">The data of the leaves.</param>
         public static Byte[] RootHash(IReadOnlyList<Byte[]> Leaves)
-        {
 
-            if (Leaves.Count == 0)
-                return SHA256.HashData([]);
+            => RootOfLeafHashes(ETagHashAlgorithm.SHA256,
+                                [ .. Leaves.Select(leaf => LeafHash(leaf)) ]);
 
-            var hashes = Leaves.Select(leaf => LeafHash(leaf)).ToArray();
+        #endregion
 
-            return Root(hashes, 0, hashes.Length);
+        #region RootOfLeafHashes(HashAlgorithm, LeafHashes)
 
-        }
+        /// <summary>
+        /// The Merkle tree hash of the leaves of the given leaf hashes, in their order: H("") for none.
+        /// </summary>
+        /// <param name="HashAlgorithm">The hash algorithm.</param>
+        /// <param name="LeafHashes">The hashes of the leaves, H(0x00 || data) each.</param>
+        public static Byte[] RootOfLeafHashes(ETagHashAlgorithm      HashAlgorithm,
+                                              IReadOnlyList<Byte[]>  LeafHashes)
+
+            => LeafHashes.Count == 0
+                   ? Hash(HashAlgorithm, [])
+                   : Root(HashAlgorithm, LeafHashes, 0, LeafHashes.Count);
 
         #endregion
 
@@ -100,15 +147,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Index">The index of the leaf.</param>
         public static IReadOnlyList<Byte[]> AuditPath(IReadOnlyList<Byte[]>  Leaves,
                                                       Int32                  Index)
+
+            => AuditPathOfLeafHashes(ETagHashAlgorithm.SHA256,
+                                     [ .. Leaves.Select(leaf => LeafHash(leaf)) ],
+                                     Index);
+
+        #endregion
+
+        #region AuditPathOfLeafHashes(HashAlgorithm, LeafHashes, Index)
+
+        /// <summary>
+        /// The audit path of the leaf at the given index of the leaves of the given leaf hashes, from the bottom up
+        /// (RFC 9162, section 2.1.3.1).
+        /// </summary>
+        /// <param name="HashAlgorithm">The hash algorithm.</param>
+        /// <param name="LeafHashes">The hashes of the leaves, H(0x00 || data) each.</param>
+        /// <param name="Index">The index of the leaf.</param>
+        public static IReadOnlyList<Byte[]> AuditPathOfLeafHashes(ETagHashAlgorithm      HashAlgorithm,
+                                                                  IReadOnlyList<Byte[]>  LeafHashes,
+                                                                  Int32                  Index)
         {
 
-            if (Index < 0 || Index >= Leaves.Count)
+            if (Index < 0 || Index >= LeafHashes.Count)
                 throw new ArgumentOutOfRangeException(nameof(Index), "The index must be one of a leaf!");
 
-            var hashes  = Leaves.Select(leaf => LeafHash(leaf)).ToArray();
-            var path    = new List<Byte[]>();
+            var path = new List<Byte[]>();
 
-            Path(hashes, Index, 0, hashes.Length, path);
+            Path(HashAlgorithm, LeafHashes, Index, 0, LeafHashes.Count, path);
 
             return path;
 
@@ -132,16 +197,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                UInt64                 Size,
                                                IReadOnlyList<Byte[]>  AuditPath,
                                                out Byte[]             Root)
+
+            => TryCalculateRootOfLeafHash(ETagHashAlgorithm.SHA256,
+                                          LeafHash(LeafData),
+                                          Index,
+                                          Size,
+                                          AuditPath,
+                                          out Root);
+
+        #endregion
+
+        #region TryCalculateRootOfLeafHash(HashAlgorithm, LeafHash, Index, Size, AuditPath, out Root)
+
+        /// <summary>
+        /// Calculate the root from the hash of one leaf, its index, the size of the tree and the audit path of the leaf
+        /// (RFC 9162, section 2.1.3.2). False when the audit path does not fit the index and size, or its hashes are not
+        /// of the length of the hash algorithm.
+        /// </summary>
+        /// <param name="HashAlgorithm">The hash algorithm.</param>
+        /// <param name="LeafHash">The hash of the leaf, H(0x00 || data).</param>
+        /// <param name="Index">The index of the leaf.</param>
+        /// <param name="Size">The number of leaves.</param>
+        /// <param name="AuditPath">The audit path of the leaf.</param>
+        /// <param name="Root">The root, when it could be calculated.</param>
+        public static Boolean TryCalculateRootOfLeafHash(ETagHashAlgorithm      HashAlgorithm,
+                                                         Byte[]                 LeafHash,
+                                                         UInt64                 Index,
+                                                         UInt64                 Size,
+                                                         IReadOnlyList<Byte[]>  AuditPath,
+                                                         out Byte[]             Root)
         {
 
             Root = [];
 
-            if (Index >= Size)
+            var length = ETag.DigestLength(HashAlgorithm);
+
+            if (Index >= Size || LeafHash.Length != length || AuditPath.Any(hash => hash.Length != length))
                 return false;
 
             var fn  = Index;
             var sn  = Size - 1;
-            var r   = LeafHash(LeafData);
+            var r   = LeafHash;
 
             foreach (var p in AuditPath)
             {
@@ -152,7 +248,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if ((fn & 1) == 1 || fn == sn)
                 {
 
-                    r = NodeHash(p, r);
+                    r = NodeHash(HashAlgorithm, p, r);
 
                     if ((fn & 1) == 0)
                         while ((fn & 1) == 0 && fn != 0)
@@ -163,7 +259,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
                 else
-                    r = NodeHash(r, p);
+                    r = NodeHash(HashAlgorithm, r, p);
 
                 fn >>= 1;
                 sn >>= 1;
@@ -181,9 +277,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) Root(Hashes, Start, End)
+        #region (private static) Root(HashAlgorithm, Hashes, Start, End)
 
-        private static Byte[] Root(Byte[][] Hashes, Int32 Start, Int32 End)
+        private static Byte[] Root(ETagHashAlgorithm HashAlgorithm, IReadOnlyList<Byte[]> Hashes, Int32 Start, Int32 End)
         {
 
             var n = End - Start;
@@ -193,16 +289,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var k = LargestPowerOfTwoBelow(n);
 
-            return NodeHash(Root(Hashes, Start,     Start + k),
-                            Root(Hashes, Start + k, End));
+            return NodeHash(HashAlgorithm,
+                            Root(HashAlgorithm, Hashes, Start,     Start + k),
+                            Root(HashAlgorithm, Hashes, Start + k, End));
 
         }
 
         #endregion
 
-        #region (private static) Path(Hashes, Index, Start, End, Path)
+        #region (private static) Path(HashAlgorithm, Hashes, Index, Start, End, Collected)
 
-        private static void Path(Byte[][] Hashes, Int32 Index, Int32 Start, Int32 End, List<Byte[]> Collected)
+        private static void Path(ETagHashAlgorithm HashAlgorithm, IReadOnlyList<Byte[]> Hashes, Int32 Index, Int32 Start, Int32 End, List<Byte[]> Collected)
         {
 
             var n = End - Start;
@@ -214,13 +311,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (Index - Start < k)
             {
-                Path(Hashes, Index, Start, Start + k, Collected);
-                Collected.Add(Root(Hashes, Start + k, End));
+                Path(HashAlgorithm, Hashes, Index, Start, Start + k, Collected);
+                Collected.Add(Root(HashAlgorithm, Hashes, Start + k, End));
             }
             else
             {
-                Path(Hashes, Index, Start + k, End, Collected);
-                Collected.Add(Root(Hashes, Start, Start + k));
+                Path(HashAlgorithm, Hashes, Index, Start + k, End, Collected);
+                Collected.Add(Root(HashAlgorithm, Hashes, Start, Start + k));
             }
 
         }

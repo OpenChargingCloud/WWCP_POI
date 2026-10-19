@@ -294,6 +294,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "description",
             "dataSource",
             "dataLicenses",
+            POITreeHashAlgorithms.JSONProperty,
             "customData"
         ];
 
@@ -369,8 +370,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         Left.Id,
                                                         createdAt,
                                                         [ .. changes ],
-                                                        Left.CalcETags(),
-                                                        Left.CalcETags(),
+                                                        Left.CalcChangeSetETags(),
+                                                        Left.CalcChangeSetETags(),
                                                         new ImmutableI18NString(I18NString.Create(Languages.en, "Merge")));
 
             if (!Left.TryApplyChanges(pending, out var merge, out var changesWithOldValues, out var applyError))
@@ -388,12 +389,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             merge.ShareRuntimeOfMerged(Left, Right);
 
+            // The ETags of the merged version, its effectiveTree ETags as well; its change set names those of its representations.
+            var mergeETags = merge.CalcETags();
+
             ChangeSet  = new RoamingNetworkChangeSet(pending.Id,
                                                      pending.RoamingNetworkId,
                                                      pending.CreatedAt,
                                                      changesWithOldValues,
                                                      pending.BeforeETags,
-                                                     merge.CalcETags(),
+                                                     [ .. mergeETags.Where(eTag => eTag.Format != ETagFormat.EffectiveTree) ],
                                                      pending.Description);
             Merge      = merge;
             Conflicts  = [];
@@ -912,8 +916,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Merge a property both versions changed differently element by element, when it is an array of
-        /// identified elements (see POIElements.TryMerge). The keys of a party and the templates of a member, whose order
-        /// is content, are merged as a whole.
+        /// identified elements (see POIElements.TryMerge). The keys of a party, the templates of a member and the tree hash
+        /// algorithms of a roaming network, whose order is content, are merged as a whole.
         /// </summary>
         private static Boolean TryMergeElements(String       PropertyName,
                                                 JToken?      Base,
@@ -926,6 +930,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             return !POIPartyKeys.IsKeyProperty(PropertyName) &&
                    PropertyName != POIElements.TemplateIdsProperty &&
+                   PropertyName != POITreeHashAlgorithms.JSONProperty &&
                    POIElements.TryMerge(PropertyName, Base, Left, Right, out Merged);
 
         }
@@ -936,7 +941,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The changes of a property leading from the value of the left version to the merged one: element by element,
-        /// where they can be (see POIElements.Diff), the keys of a party and the templates of a member as a whole; without old values,
+        /// where they can be (see POIElements.Diff), the keys of a party, the templates of a member and the tree hash
+        /// algorithms as a whole; without old values,
         /// so that they get the values they find.
         /// </summary>
         private static IEnumerable<RoamingNetworkChange> PropertyChanges(String   EntityType,
@@ -946,7 +952,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                          JToken?  NewValue)
         {
 
-            if (POIPartyKeys.IsKeyProperty(PropertyName) || PropertyName == POIElements.TemplateIdsProperty)
+            if (POIPartyKeys.IsKeyProperty(PropertyName) || PropertyName == POIElements.TemplateIdsProperty || PropertyName == POITreeHashAlgorithms.JSONProperty)
                 return [ NewValue is not null
                              ? RoamingNetworkChange.UpdateProperty(EntityType, EntityId, PropertyName, null, NewValue.DeepClone())
                              : RoamingNetworkChange.RemoveProperty(EntityType, EntityId, PropertyName) ];

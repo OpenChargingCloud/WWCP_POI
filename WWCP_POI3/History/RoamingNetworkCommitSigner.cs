@@ -142,6 +142,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Attest(RoamingNetworkId, CommitId, Revision, ETag, SignedAt = null, ValidUntil = null, Subject = null)
+
+        /// <summary>
+        /// Attest the version of the given commit with its given effectiveTree ETag (SPECIFICATION.md, section 8.5).
+        /// </summary>
+        /// <param name="RoamingNetworkId">The roaming network.</param>
+        /// <param name="CommitId">The commit of the attested version.</param>
+        /// <param name="Revision">The revision of the commit.</param>
+        /// <param name="ETag">The effectiveTree ETag of the attested version.</param>
+        /// <param name="SignedAt">When it is signed, now otherwise.</param>
+        /// <param name="ValidUntil">Until when it is valid, if it says.</param>
+        /// <param name="Subject">The digest of the one entity it attests instead of the root, if any.</param>
+        public RoamingNetworkAttestation Attest(RoamingNetwork_Id                  RoamingNetworkId,
+                                                RoamingNetworkCommit_Id            CommitId,
+                                                UInt64                             Revision,
+                                                ETag                               ETag,
+                                                DateTimeOffset?                    SignedAt     = null,
+                                                DateTimeOffset?                    ValidUntil   = null,
+                                                RoamingNetworkAttestationSubject?  Subject      = null)
+
+            => RoamingNetworkAttestation.Create(privateKey,
+                                                KeyId,
+                                                Algorithm,
+                                                Role,
+                                                RoamingNetworkId,
+                                                CommitId,
+                                                Revision,
+                                                ETag,
+                                                Signer,
+                                                SignedAt,
+                                                ValidUntil,
+                                                Subject);
+
+        #endregion
+
 
         #region (override) ToString()
 

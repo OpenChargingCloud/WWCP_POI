@@ -234,6 +234,39 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
         #endregion
 
+        #region Attestations_reach_peers_that_trust_their_key()
+
+        [Test]
+        public async Task Attestations_reach_peers_that_trust_their_key()
+        {
+
+            leader!.AttestationSigners = [ Proofs.StationProofTests.RNOSigner ];
+
+            Assert.That(leader.TryAttest(out var first, out var attestError), Is.True, attestError);
+
+            var peer       = await StartFollower(Options: new RoamingNetworkPeerOptions {
+                                                              VerifyAttestation  = Proofs.StationProofTests.Trusted,
+                                                              MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
+                                                              MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
+                                                          });
+
+            var tookFirst  = await Eventually(() => peer.History?.CurrentAttestations().Any(attestation => attestation.Value == first!.Single().Value) == true);
+
+            // A new head is attested there, and the attestation follows the commit.
+            var c2         = Publish("v2");
+            var tookNext   = await Eventually(() => peer.History?.CurrentAttestations().Any(attestation => attestation.CommitId == c2.Commit!.Id) == true);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(tookFirst,                                            Is.True, "The peer did not take the attestation of the head it started from.");
+                Assert.That(tookNext,                                             Is.True, "The peer did not take the attestation of the new head.");
+                Assert.That(peer.History!.CurrentAttestations().Single().ETag,    Is.EqualTo(leader.Head.RoamingNetwork.EffectiveTreeETag(ETagHashAlgorithm.SHA256)));
+            }
+
+        }
+
+        #endregion
+
         #region A_follower_starts_from_a_snapshot_and_follows()
 
         [Test]

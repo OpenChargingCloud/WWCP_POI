@@ -89,7 +89,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      transparencySoftware,
                                      transparencySoftwareCertificates,
                                      energyMeterManufacturers,
-                                     Operator
+                                     Operator,
+                                     GivenTreeHashAlgorithms
                                  ) {
                                      Revision = Revision
                                  };
@@ -130,7 +131,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!TryCheckPreconditions(preconditions, out var preconditionError))
                 throw new ArgumentException(preconditionError, nameof(Preconditions));
 
-            var beforeETags  = CalcETags();
+            var beforeETags  = CalcChangeSetETags();
 
             var pending      = new RoamingNetworkChangeSet(
                                    Id ?? ChangeSet_Id.NewRandom(),
@@ -153,7 +154,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        pending.CreatedAt,
                        changesWithOldValues,
                        pending.BeforeETags,
-                       result.CalcETags(),
+                       result.CalcChangeSetETags(),
                        pending.Description,
                        pending.Metadata,
                        Preconditions: preconditions
@@ -188,6 +189,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean MatchesETags(ImmutableArray<ETag> ETags)
 
             => MatchETags(ETags, this, out _);
+
+        #endregion
+
+        #region MatchesCommitETags(ETags)
+
+        /// <summary>
+        /// Whether the given ETags of a commit are those of this version: every one of them matches, and its effectiveTree
+        /// ETags, where it has any, are those of the tree hash algorithms of this version, in their order. A commit made
+        /// before effective trees has none (SPECIFICATION.md, section 8.3).
+        /// </summary>
+        /// <param name="ETags">The ETags of a commit.</param>
+        public Boolean MatchesCommitETags(ImmutableArray<ETag> ETags)
+        {
+
+            if (!MatchETags(ETags, this, out _))
+                return false;
+
+            var treeHashAlgorithms = ETags.Where(eTag => eTag.Format == ETagFormat.EffectiveTree).Select(eTag => eTag.HashAlgorithm).ToArray();
+
+            return treeHashAlgorithms.Length == 0 ||
+                   treeHashAlgorithms.SequenceEqual(TreeHashAlgorithms);
+
+        }
 
         #endregion
 
@@ -438,7 +462,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 metadata["rebasedFrom"] = rebasedFrom;
 
-                var beforeETags  = CalcETags();
+                var beforeETags  = CalcChangeSetETags();
 
                 var pending      = new RoamingNetworkChangeSet(
                                        ChangeSet_Id.NewRandom(),
@@ -464,7 +488,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        pending.CreatedAt,
                                        pending.Changes,
                                        pending.BeforeETags,
-                                       result.CalcETags(),
+                                       result.CalcChangeSetETags(),
                                        pending.Description,
                                        pending.Metadata,
                                        Preconditions: pending.Preconditions
@@ -514,6 +538,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var dataSource            = DataSource;
             var licenses              = DataLicenses.ToImmutableArray();
             var customData            = CustomData;
+            var treeHashAlgorithms    = GivenTreeHashAlgorithms;
             var networkOperators      = new Dictionary<RoamingNetworkOperator_Id, RoamingNetworkOperator>();
             var operators             = new Dictionary<ChargingStationOperator_Id, ChargingStationOperator>(chargingStationOperators.Index);
             var manufacturers         = new Dictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>(chargingStationManufacturers.Index);
@@ -714,7 +739,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         var networkJSON = new JObject();
 
-                        if (CurrentValue(change.EntityPropertyName!, name, description, dataSource, licenses, customData) is JToken networkPropertyValue)
+                        if (CurrentValue(change.EntityPropertyName!, name, description, dataSource, licenses, customData, treeHashAlgorithms) is JToken networkPropertyValue)
                             networkJSON[change.EntityPropertyName!] = networkPropertyValue;
 
                         if (!TryResolveElementChange(ref applied, networkJSON, "roaming network", out networkElementValue, out var networkElementError))
@@ -726,7 +751,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     var propertyName  = applied.PropertyName ?? "";
-                    currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses, customData);
+                    currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses, customData, treeHashAlgorithms);
 
                     if (applied.OldValue is JToken oldValue &&
                         !OldValueMatches(oldValue, currentValue))
@@ -783,6 +808,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     licenses = newLicenses;
                                     break;
 
+                                case POITreeHashAlgorithms.JSONProperty:
+                                    if (!POITreeHashAlgorithms.TryParse(newValue, out var newTreeHashAlgorithms, out var treeHashAlgorithmsError) || newTreeHashAlgorithms is null)
+                                    {
+                                        ErrorResponse = $"Change {index}: {treeHashAlgorithmsError ?? "the tree hash algorithms must be an array of hash algorithms!"}";
+                                        return false;
+                                    }
+                                    treeHashAlgorithms = newTreeHashAlgorithms;
+                                    break;
+
                                 case "customData":
                                     if (newValue is not JObject newCustomData)
                                     {
@@ -834,6 +868,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                 case "dataLicenses":
                                     licenses     = [];
+                                    break;
+
+                                case POITreeHashAlgorithms.JSONProperty:
+                                    treeHashAlgorithms = null;
                                     break;
 
                                 case "customData":
@@ -1082,7 +1120,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  softwares.Values,
                                  certificates.Values,
                                  meterManufacturers.Values,
-                                 networkOperators.Values.SingleOrDefault()
+                                 networkOperators.Values.SingleOrDefault(),
+                                 treeHashAlgorithms
                              ) {
                                  Revision = Revision + 1
                              };
@@ -1154,9 +1193,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             ImmutableI18NString        Description,
                                             String?                    DataSource,
                                             ImmutableArray<DataLicense>  DataLicenses,
-                                            CustomDataNew              CustomData)
+                                            CustomDataNew              CustomData,
+                                            ImmutableArray<ETagHashAlgorithm>?  TreeHashAlgorithms)
 
             => PropertyName switch {
+                   POITreeHashAlgorithms.JSONProperty  => TreeHashAlgorithms.HasValue ? POITreeHashAlgorithms.ToJSON(TreeHashAlgorithms.Value) : null,
                    "name"          => Name.       IsNotNullOrEmpty()       ? Name.       ToJSON()      : null,
                    "description"   => Description.IsNotNullOrEmpty()       ? Description.ToJSON()      : null,
                    "dataSource"    => DataSource.IsNeitherNullNorEmpty()   ? DataSource                : null,
@@ -1194,6 +1235,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// At least one ETag must be declared, and every declared ETag must equal the ETag
         /// calculated with its own format and hash algorithm over the given roaming network.
+        /// An effectiveTree ETag is the root of the tree of its hash algorithm over the effective content.
         /// Formats not declared are not checked: JSON and CBOR carry the same content.
         /// </summary>
         private static Boolean MatchETags(ImmutableArray<ETag>              Declared,
@@ -1210,9 +1252,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var declared in Declared)
             {
 
-                var calculated = ETag.Compute(declared.Format,
-                                              declared.HashAlgorithm,
-                                              RoamingNetwork.CanonicalContent(declared.Format));
+                var calculated = declared.Format == ETagFormat.EffectiveTree
+                                     ? RoamingNetwork.EffectiveTreeETag(declared.HashAlgorithm)
+                                     : ETag.Compute(declared.Format,
+                                                    declared.HashAlgorithm,
+                                                    RoamingNetwork.CanonicalContent(declared.Format));
 
                 if (!calculated.Equals(declared))
                 {

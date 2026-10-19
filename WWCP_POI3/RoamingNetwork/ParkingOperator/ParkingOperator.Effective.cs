@@ -109,6 +109,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (internal) EffectiveParkingSpacesOfTheContent()
+
+        /// <summary>
+        /// The effective parking spaces differing from the parking spaces, by their identifications, as the effective content
+        /// of a version has them (SPECIFICATION.md, section 8.1): their last changes without the floors kept at runtime.
+        /// </summary>
+        internal IReadOnlyDictionary<ParkingSpace_Id, ParkingSpace> EffectiveParkingSpacesOfTheContent()
+
+            => effectiveFloors.Count == 0
+                   ? effectiveParkingSpaceIndex
+                   : CalculateEffective();
+
+        #endregion
+
         #region TemplatesOf                 (ParkingSpace)
 
         /// <summary>

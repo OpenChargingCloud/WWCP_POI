@@ -421,7 +421,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!RoamingNetwork.MatchesETags(Commit.ETags))
+            if (!RoamingNetwork.MatchesCommitETags(Commit.ETags))
             {
                 ErrorResponse = "The roaming network does not have the ETags of the commit!";
                 return false;
@@ -812,7 +812,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!roamingNetwork.MatchesETags(Commit.ETags))
+                if (!roamingNetwork.MatchesCommitETags(Commit.ETags))
                 {
                     ErrorResponse = "The change set of the commit does not lead to the ETags of the commit!";
                     return false;
@@ -1091,7 +1091,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var newHead = new RoamingNetworkHead(commits[commitIndex[tips[0]]], VersionOf(tips[0]));
 
-            if (newHead.Commit.Id != Head.Commit.Id)
+            var headChanged = newHead.Commit.Id != Head.Commit.Id;
+
+            if (headChanged)
             {
                 Volatile.Write(ref head, newHead);
                 RuntimeStatus.Attach(newHead.RoamingNetwork);
@@ -1111,6 +1113,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 catch
                 { }
             }
+
+            // Attested after it was announced, so that whoever learns of the attestation knows the commit.
+            if (headChanged)
+                AttestNewHead();
 
         }
 

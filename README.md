@@ -363,7 +363,9 @@ server1.TryGetMissingCommits(server2!.HaveIds(), out var commits, out _);
 server2.TryAppend(commits!, out _, out _);                // and merged with the tips of server 2
 ```
 
-- **Commits:** a change set, its `parentIds`, its revision and the ETags of the result.
+- **Commits:** a change set, its `parentIds`, its revision and the ETags of the result: `json`, `cbor` and its
+  `effectiveTree` ETags (below), so that a commit is identified with `wwcp-poi-commit-v3`; one made before effective
+  trees, without them, stays readable (`wwcp-poi-commit-v2`).
   The id is the SHA-256 of the commit's canonical JSON without signatures; it is checked when read.
   The revision is one more than the highest one of the parents.
 - **Commit:** `Commit(cs)` commits a change set to the version it was made for, named by its before
@@ -435,6 +437,40 @@ proof.Verify(checkpoint, out _);
   roles required; another checkpoint of a sequence held is refused as a split view.
 - **Joining:** `TryGetCheckpointSnapshotJSON(checkpointId, …)` gives the version of its commit, without runtime status.
 - **Persistence:** checkpoints are written to the log and kept when compacting, also those of commits dropped.
+
+### Proofs of charging stations
+
+A driver's app gets one small document with everything the roaming network says about a charging station as it is
+at runtime, and checks it offline against an attestation of the roaming network operator
+([SPECIFICATION.md](SPECIFICATION.md), section 8):
+
+```csharp
+history.AttestationSigners = [ new RoamingNetworkCommitSigner(rnoKey, rnoKeyId, COSEAlgorithm.ES256,
+                                                              RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator) ];
+
+history.TryGetChargingStationProof(stationId, out var proof, out _);       // or of an EVSE, or ?hashAlgorithm=sha512
+
+// In the app, with the key of the roaming network operator it trusts:
+RoamingNetworkProof.TryParse(text, out var received, out _);
+received.Verify(attestation => attestation.VerifySignature(rnoPublicKey, rnoKeyId, out _), out var by, out _);
+received.Given("chargingStationOperators", "chargingPools", "chargingStations");   // the station, attested
+```
+
+- **Effective tree:** a hash tree along the entities of the effective content of a version, each child array (the
+  operators of the network, the pools of an operator, …) an RFC 9162 Merkle tree of its children's skeletons. Its root
+  is the `effectiveTree` ETag of the version and of its commit, one per hash algorithm the roaming network names in
+  `treeHashAlgorithms` (`["sha256"]` by default, changed by the roaming network operator). `ToEffectiveContentJSON()`
+  is what it hashes, `EffectiveTree(algorithm)` the tree.
+- **Proofs:** the roaming network pruned, every child array complete, pruned to its root, or partial with the leaves
+  it gives and their audit paths. A charging station proof gives the station with its EVSEs completely, the
+  skeletons of its pool and operator, the charging tariffs its EVSEs take, the manufacturers, transparency software
+  and certificates it and its energy meters name, its parking spaces and the grid connection point of its pool, and
+  embeds `commitId` and `revision`, so that the proof of the commit in a checkpoint keeps it evidence for months.
+- **Attestations:** `{roamingNetworkId, commitId, revision, eTag, role, signer, signedAt, validUntil}`, signed
+  (profile `wwcp-poi-attestation-v1`). The `AttestationSigners` attest every new head, valid for
+  `AttestationValidity` (15 minutes); `RefreshAttestations()` attests it again after `AttestationInterval` (5
+  minutes), e.g. called every minute. `TryAddAttestation(…)` takes those of another server for a commit held, whose
+  version has the attested ETag, with a signature `VerifyAttestation` trusts; `OnAttestation` tells of every one.
 
 ### Persistence and retention
 
@@ -511,6 +547,10 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `POST ~/RNs/{id}/history/checkpoints/{checkpointId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403 (`AuthorizeCheckpointSignature`), 404, 422 invalid |
 | `GET ~/RNs/{id}/history/archive` | the segments of the archive, without their commit ids |
 | `GET ~/RNs/{id}/history/archive/{number}` | one segment: `{info, base, commits}` |
+| `GET ~/RNs/{id}/attestations` | the attestations of the head valid now: `{attestations: […]}` |
+| `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/proof` | the proof of a charging station of the head, `?hashAlgorithm=` one of the network's |
+| `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/proof` | the proof of the charging station of an EVSE |
+| `GET ~/RNs/{id}/CSs/{CS_Id}/proof`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/proof` | the same, found by the identification alone |
 
 Archived commits are served by `GET …/commits/{commitId}` and proved by `GET …/commits/{commitId}/proof` as well.
 
@@ -616,10 +656,11 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   `commitChangeSet {changeSet}` → `{status, …, head, conflicts?}`, `runtimeStatus`,
   `signCommit {commitId, signatures}` → `{commitId, signatures, added}`; checkpoints: `checkpoints {since?, max?}`
   or `{latest: true}`, `checkpoint {checkpointId}`, `checkpointSnapshot {checkpointId}`, `commitProof {commitId,
-  checkpointId?}`, `signCheckpoint {checkpointId, signatures}`, `pushCheckpoints {checkpoints}`; archive: `archive`, `archiveSegment {number}`.
+  checkpointId?}`, `signCheckpoint {checkpointId, signatures}`, `pushCheckpoints {checkpoints}`; archive: `archive`, `archiveSegment {number}`;
+  proofs: `attestations`, `chargingStationProof {chargingStationId | EVSEId, hashAlgorithm?}`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
   `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced),
-  `commitSignatures` (`{commitId, signatures}` added later), `checkpoints`, `checkpointSignatures`, `adminStatusUpdates`,
+  `commitSignatures` (`{commitId, signatures}` added later), `checkpoints`, `checkpointSignatures`, `attestations`, `adminStatusUpdates`,
   `statusUpdates`, `energyStatusUpdates`. Pushes are sends, `[6, "p1", action, payload]`,
   in the format of the last `subscribe`. They end with the connection; a client that falls more than
   `MaxQueuedPushes` pushes or `MaxQueuedPushBytes` behind is disconnected and catches up after reconnecting.
@@ -683,6 +724,8 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   default, `VerifyCheckpointSignature`), and pushes those the other server misses (`FollowCheckpoints`,
   `PushCheckpoints`). A history started from a snapshot begins its line with the first checkpoint of a commit
   it holds. A witness running a peer signs with `history.TryWitness(…)`; the signature goes to the other server.
+- **Attestations:** with `VerifyAttestation`, a verifier of the keys of the roaming network operator, it takes the
+  attestations of the other server, so that it serves proofs of charging stations with them as well.
 
 ## Submodules
 
@@ -699,6 +742,8 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 - Further entities: as the use cases need them
 - A peer joining from the latest checkpoint rather than the head; how long archives are kept, and erasing personal data from them
 - Epochs (crypto agility) and signed prices at runtime: drafted in [SPECIFICATION.md](SPECIFICATION.md), sections 11 and 12
+- Proofs: a trust anchor for the keys of roaming network operators, proofs of absence, an incremental tree
+  ([SPECIFICATION.md](SPECIFICATION.md), section 8.7)
 
 ## Tests
 

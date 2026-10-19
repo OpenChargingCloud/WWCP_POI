@@ -48,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                           DataSource:   "test"
                       ).WithKeys();
 
-            var e1  = rn1.CalcETags();
+            var e1  = rn1.CalcChangeSetETags();
 
             System.Collections.Immutable.ImmutableArray<RoamingNetworkChange> c1 = [
                 RoamingNetworkChange.UpdateProperty(
@@ -68,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                       );
 
             var rn2 = rn1.ApplyChangeSet(cs1);
-            var e2  = rn2.CalcETags();
+            var e2  = rn2.CalcChangeSetETags();
 
             // Written by hand, it has to know them too: with the ETags before as the ETags after, it is refused.
             var wrongAfterETags = new RoamingNetworkChangeSet(
@@ -95,7 +95,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
 
                 // The given version stays as it is.
                 Assert.That(rn1.DataSource,                  Is.EqualTo("test"));
-                Assert.That(rn1.CalcETags(),                 Is.EqualTo(e1));
+                Assert.That(rn1.CalcChangeSetETags(),                 Is.EqualTo(e1));
 
                 Assert.That(cs1.BeforeETags,                 Is.EqualTo(e1));
                 Assert.That(cs1.AfterETags,                  Is.EqualTo(e2));

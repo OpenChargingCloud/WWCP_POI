@@ -268,6 +268,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (internal) EffectiveChargingPoolsOfTheContent() / EffectiveChargingTariffsOfTheContent()
+
+        /// <summary>
+        /// The effective charging pools differing from the charging pools, by their identifications, as the effective content
+        /// of a version has them (SPECIFICATION.md, section 8.1): their last changes without the floors kept at runtime, so
+        /// that they follow from the version alone.
+        /// </summary>
+        internal IReadOnlyDictionary<ChargingPool_Id, ChargingPool> EffectiveChargingPoolsOfTheContent()
+
+            => effectiveFloors.EVSEs.Count == 0 && effectiveFloors.ChargingStations.Count == 0 && effectiveFloors.ChargingPools.Count == 0
+                   ? effectiveChargingPoolIndex
+                   : CalculateEffective().ChargingPools;
+
+        /// <summary>
+        /// The effective charging tariffs differing from the charging tariffs, by their identifications: they have no floors.
+        /// </summary>
+        internal IReadOnlyDictionary<ChargingTariff_Id, ChargingTariff> EffectiveChargingTariffsOfTheContent()
+
+            => effectiveChargingTariffs;
+
+        #endregion
+
         #region ChargingPoolGroupsOf / ChargingStationGroupsOf / EVSEGroupsOf / EnergyMeterGroupsOf
 
         /// <summary>

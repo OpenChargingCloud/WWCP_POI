@@ -147,6 +147,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IReadOnlyCollection<String>?        RequiredCheckpointSignatureRoles  { get; init; } = [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ];
 
+        /// <summary>
+        /// Verifies the signatures of attestations with keys trusted independently of the network, e.g. the signing keys of
+        /// the roaming network operator: with it, the peer takes the attestations of the other server, so that this server
+        /// serves proofs of charging stations with them; without it, it takes none.
+        /// </summary>
+        public VerifyAttestationDelegate?          VerifyAttestation           { get; init; }
+
         /// The limits for reading change sets, the default ones otherwise.
         /// </summary>
         public RoamingNetworkChangeSetLimits?      ChangeSetLimits             { get; init; }

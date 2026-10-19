@@ -386,6 +386,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             AddArchiveCommands(WebSocketServer, History);
+            AddProofCommands  (WebSocketServer, History);
 
             WebSocketServer.AddCommand("checkpoints", request =>
 
@@ -536,9 +537,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             History.OnCheckpoint            += onCheckpoint;
             History.OnCheckpointSignatures  += onCheckpointSignatures;
 
+            var disconnectAttestations = ConnectAttestations(History, WebSocketServer);
+
             return () => {
                 History.OnCheckpoint            -= onCheckpoint;
                 History.OnCheckpointSignatures  -= onCheckpointSignatures;
+                disconnectAttestations();
             };
 
         }

@@ -272,7 +272,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Identifiers of the canonical JSON and deterministic CBOR representations.
         /// </summary>
-        public ImmutableArray<ETag>    ETags                    { get; private set; } = [];
+        public ImmutableArray<ETag>    ETags                    { get; protected set; } = [];
 
 
         #region AdminStatus

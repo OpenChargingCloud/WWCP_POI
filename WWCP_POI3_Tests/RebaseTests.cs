@@ -99,7 +99,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             {
 
                 Assert.That(csB2.Id,                                      Is.Not.EqualTo(csB.Id));
-                Assert.That(csB2.BeforeETags,                             Is.EqualTo(rn2.CalcETags()));
+                Assert.That(csB2.BeforeETags,                             Is.EqualTo(rn2.CalcChangeSetETags()));
                 Assert.That(csB2.Changes,                                 Is.EqualTo(csB.Changes));
                 Assert.That(csB2.Description,                             Is.EqualTo(csB.Description));
                 Assert.That(csB2.CreatedAt,                               Is.EqualTo(csB.CreatedAt));

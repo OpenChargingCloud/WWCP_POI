@@ -48,7 +48,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Styx deterministic CBOR with the POI metrology profile.
         /// </summary>
-        CBOR
+        CBOR,
+
+        /// <summary>
+        /// The root of the hash tree along the entities of the effective content of a roaming network
+        /// (SPECIFICATION.md, section 8): not the digest of one representation, but of a tree of them.
+        /// </summary>
+        EffectiveTree
 
     }
 

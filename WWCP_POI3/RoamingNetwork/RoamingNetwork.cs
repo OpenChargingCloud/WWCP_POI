@@ -173,6 +173,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Tree hash algorithms
+
+        /// <summary>
+        /// The hash algorithms of its effective tree as it names them, treeHashAlgorithms (SPECIFICATION.md, section 8.3),
+        /// or null when it names none.
+        /// </summary>
+        public ImmutableArray<ETagHashAlgorithm>?  GivenTreeHashAlgorithms    { get; }
+
+        /// <summary>
+        /// The hash algorithms of its effective tree: those it names, else SHA-256. A version has one effectiveTree ETag
+        /// per algorithm, in their order.
+        /// </summary>
+        public ImmutableArray<ETagHashAlgorithm>   TreeHashAlgorithms
+            => GivenTreeHashAlgorithms ?? POITreeHashAlgorithms.Default;
+
+        #endregion
+
         #endregion
 
         #region Constructor(s)
@@ -211,7 +228,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               IEnumerable<TransparencySoftware>?         TransparencySoftware           = null,
                               IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates  = null,
                               IEnumerable<EnergyMeterManufacturer>?      EnergyMeterManufacturers       = null,
-                              RoamingNetworkOperator?                    Operator                       = null)
+                              RoamingNetworkOperator?                    Operator                       = null,
+                              IEnumerable<ETagHashAlgorithm>?            TreeHashAlgorithms             = null)
 
             : base(Id,
                    Name,
@@ -230,6 +248,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.Operator = Operator;
+
+            if (TreeHashAlgorithms is not null)
+            {
+
+                ImmutableArray<ETagHashAlgorithm> treeHashAlgorithms = [ .. TreeHashAlgorithms ];
+
+                if (POITreeHashAlgorithms.Invalid(treeHashAlgorithms) is String treeHashAlgorithmsError)
+                    throw new ArgumentException(treeHashAlgorithmsError, nameof(TreeHashAlgorithms));
+
+                this.GivenTreeHashAlgorithms = treeHashAlgorithms;
+
+            }
 
             #region Data licenses and charging station operators
 
@@ -589,6 +619,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse TreeHashAlgorithms [optional]
+
+                if (!POITreeHashAlgorithms.TryParse(JSON[POITreeHashAlgorithms.JSONProperty],
+                                                    out var treeHashAlgorithms,
+                                                    out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Operator       [optional]
 
                 // The keys of a roaming network are the keys of its operator.
@@ -748,7 +789,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      TransparencySoftware:      transparencySoftware,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
                                      EnergyMeterManufacturers:  energyMeterManufacturers,
-                                     Operator:                  roamingNetworkOperator
+                                     Operator:                  roamingNetworkOperator,
+                                     TreeHashAlgorithms:        treeHashAlgorithms
                                  );
 
                 #region Check ETags          [optional]
@@ -984,6 +1026,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!transparencySoftwareCertificates.IsEmpty)
                 JSON.Add("transparencySoftwareCertificates", new JArray(transparencySoftwareCertificates.Select(certificate => certificate.ToJSON())));
 
+            if (GivenTreeHashAlgorithms.HasValue)
+                JSON.Add(POITreeHashAlgorithms.JSONProperty,    POITreeHashAlgorithms.ToJSON(GivenTreeHashAlgorithms.Value));
+
             POIEntityMetadata.AddTo(JSON, Created, LastChangeDate, CustomData);
 
             // The ETags describe the content without them, irrespective of the view options.
@@ -1154,6 +1199,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse TreeHashAlgorithms [optional]
+
+                if (!POITreeHashAlgorithms.TryParse(CBOR.TryGetValue(CBORValue.FromText(POITreeHashAlgorithms.JSONProperty), out var treeHashAlgorithmsCBOR)
+                                                        ? CBORJSON.ToJSON(treeHashAlgorithmsCBOR)
+                                                        : null,
+                                                    out var treeHashAlgorithms,
+                                                    out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Operator       [optional]
 
                 // The keys of a roaming network are the keys of its operator.
@@ -1303,7 +1361,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      TransparencySoftware:      transparencySoftware,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
                                      EnergyMeterManufacturers:  energyMeterManufacturers,
-                                     Operator:                  roamingNetworkOperator
+                                     Operator:                  roamingNetworkOperator,
+                                     TreeHashAlgorithms:        treeHashAlgorithms
                                  );
 
                 #region Check ETags          [optional]
@@ -1416,6 +1475,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON()))));
 
 
+            if (GivenTreeHashAlgorithms.HasValue)
+                CBOR.Add(CBORValue.FromText(POITreeHashAlgorithms.JSONProperty), CBORJSON.ToCBOR(POITreeHashAlgorithms.ToJSON(GivenTreeHashAlgorithms.Value)));
+
             // Always part of the content, with the keys and values of the JSON representation.
             foreach (var metadata in POIEntityMetadata.AddTo([], Created, LastChangeDate, CustomData).Properties())
                 CBOR.Add(CBORValue.FromText(metadata.Name),           CBORJSON.ToCBOR(metadata.Value));
@@ -1463,15 +1525,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region CalcETags()
 
         /// <summary>
-        /// Calculate the ETags of the canonical JSON and CBOR representations of this roaming network,
-        /// both without ETags, without view options and without custom serializers.
+        /// Calculate the ETags of this version and keep them: of its canonical JSON and CBOR representations, both without
+        /// ETags, without view options and without custom serializers, and its effectiveTree ETags, one per tree hash
+        /// algorithm, in their order (SPECIFICATION.md, section 8.3).
         /// </summary>
         public ImmutableArray<ETag> CalcETags()
+        {
 
-            => CalcETags(
-                   ToJSON(IncludeETags: false),
-                   ToCBOR(IncludeETags: false)
-               );
+            ETags = [ .. CalcChangeSetETags(),
+                      .. TreeHashAlgorithms.Select(EffectiveTreeETag) ];
+
+            return ETags;
+
+        }
+
+        #endregion
+
+        #region CalcChangeSetETags()
+
+        /// <summary>
+        /// Calculate the ETags change sets name of this version as their before and after ETags: of its canonical JSON and
+        /// CBOR representations. They are not kept: the ETags of the version are those of CalcETags().
+        /// </summary>
+        public ImmutableArray<ETag> CalcChangeSetETags()
+
+            => [ ETag.Compute(ETagFormat.JSON, CanonicalJSON.ToUTF8Bytes(ToJSON(IncludeETags: false))),
+                 ETag.Compute(ETagFormat.CBOR, ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical)) ];
 
         #endregion
 

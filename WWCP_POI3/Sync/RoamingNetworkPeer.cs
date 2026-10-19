@@ -518,6 +518,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 topics.Add(POI_API.CheckpointSignaturesTopic);
             }
 
+            if (options.VerifyAttestation is not null)
+                topics.Add(POI_API.AttestationsTopic);
+
             await Expect(Connection, "subscribe", new JObject(new JProperty("topics", topics)), CancellationToken);
 
             statusFromSnapshot = false;
@@ -533,6 +536,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // After the commits: a checkpoint names commits, which must be there first.
             if (options.FollowCheckpoints || options.PushCheckpoints)
                 await SynchronizeCheckpointsAsync(Connection, CancellationToken);
+
+            // After the commits as well: an attestation names a commit.
+            if (options.VerifyAttestation is not null)
+                await SynchronizeAttestationsAsync(Connection, CancellationToken);
 
             // A snapshot brought the runtime status of its moment; what changed since was pushed.
             // Without following it, the status there is still asked for: to push only what differs.
@@ -591,6 +598,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         case "checkpointSignatures":
                             TakeCheckpointSignatures(payload);
+                            break;
+
+                        case "attestation":
+                            TakeAttestation(payload);
                             break;
 
                         case "commitAnnouncement":

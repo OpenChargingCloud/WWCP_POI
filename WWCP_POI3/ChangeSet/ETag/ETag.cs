@@ -62,7 +62,7 @@ public readonly struct ETag : IEquatable<ETag>
     /// The default struct value is invalid and cannot be serialized or used as a precondition.
     /// </summary>
     public Boolean IsValid => !HashDigest.IsDefault &&
-                              Format is ETagFormat.JSON or ETagFormat.CBOR &&
+                              Format is ETagFormat.JSON or ETagFormat.CBOR or ETagFormat.EffectiveTree &&
                               HashDigest.Length == DigestLength(HashAlgorithm);
 
     /// <summary>
@@ -101,8 +101,8 @@ public readonly struct ETag : IEquatable<ETag>
                 ReadOnlySpan<Byte>  HashDigest)
     {
 
-        if (Format is not (ETagFormat.JSON or ETagFormat.CBOR))
-            throw new ArgumentOutOfRangeException(nameof(Format),         "The only supported formats are JSON and CBOR!");
+        if (Format is not (ETagFormat.JSON or ETagFormat.CBOR or ETagFormat.EffectiveTree))
+            throw new ArgumentOutOfRangeException(nameof(Format),         "The only supported formats are JSON, CBOR and the effective tree!");
 
         if (HashAlgorithm is not (ETagHashAlgorithm.SHA256 or ETagHashAlgorithm.SHA384 or ETagHashAlgorithm.SHA512))
             throw new ArgumentOutOfRangeException(nameof(HashAlgorithm),  "The only supported hash algorithms are SHA-256, SHA-384 and SHA-512!");
@@ -392,7 +392,7 @@ public readonly struct ETag : IEquatable<ETag>
     public static Boolean operator !=(ETag left, ETag right) => !left.Equals(right);
 
     internal String FormatText => Format switch {
-        ETagFormat.JSON => "json", ETagFormat.CBOR => "cbor", _ => throw new InvalidOperationException("Unsupported ETag format.")
+        ETagFormat.JSON => "json", ETagFormat.CBOR => "cbor", ETagFormat.EffectiveTree => "effectiveTree", _ => throw new InvalidOperationException("Unsupported ETag format.")
     };
     internal String AlgorithmText => HashAlgorithm switch {
         ETagHashAlgorithm.SHA256 => "sha256", ETagHashAlgorithm.SHA384 => "sha384", ETagHashAlgorithm.SHA512 => "sha512",
@@ -457,7 +457,7 @@ public readonly struct ETag : IEquatable<ETag>
     };
 
     private static ETagFormat ParseFormat(String format) => format switch {
-        "json" => ETagFormat.JSON, "cbor" => ETagFormat.CBOR,
+        "json" => ETagFormat.JSON, "cbor" => ETagFormat.CBOR, "effectiveTree" => ETagFormat.EffectiveTree,
         _ => throw new ArgumentException("Unsupported ETag format.", nameof(format))
     };
     private static ETagHashAlgorithm ParseAlgorithm(String algorithm)

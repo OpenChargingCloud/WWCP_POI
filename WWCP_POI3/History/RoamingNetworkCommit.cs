@@ -48,7 +48,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The versioned profile of the content a commit identification is calculated over.
         /// </summary>
-        public const String IdentityProfile = "wwcp-poi-commit-v2";
+        public const String IdentityProfile      = "wwcp-poi-commit-v2";
+
+        /// <summary>
+        /// The versioned profile of the content the identification of a commit with effectiveTree ETags is calculated over
+        /// (SPECIFICATION.md, section 8.3).
+        /// </summary>
+        public const String TreeIdentityProfile  = "wwcp-poi-commit-v3";
 
         #endregion
 
@@ -83,7 +89,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public UInt64                     Revision            { get; }
 
         /// <summary>
-        /// The ETags of the version this commit leads to, in JSON and CBOR.
+        /// The profile its identification is calculated with: wwcp-poi-commit-v3 when its ETags include effectiveTree ETags,
+        /// as every commit made since effective trees, else wwcp-poi-commit-v2.
+        /// </summary>
+        public String                     Profile
+            => ETags.Any(eTag => eTag.Format == ETagFormat.EffectiveTree)
+                   ? TreeIdentityProfile
+                   : IdentityProfile;
+
+        /// <summary>
+        /// The ETags of the version this commit leads to, in JSON and CBOR, and its effectiveTree ETags.
         /// </summary>
         public ImmutableArray<ETag>       ETags               { get; }
 
@@ -571,7 +586,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("profile",           IdentityProfile),
+                           new JProperty("profile",           Profile),
                            new JProperty("roamingNetworkId",  RoamingNetworkId.ToString()),
                            new JProperty("revision",          Revision),
                            new JProperty("eTags",             new JArray(ETags.Select(eTag => eTag.ToJSON())))
