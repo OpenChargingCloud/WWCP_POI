@@ -945,13 +945,32 @@ version against the checkpoint's `eTags`, and then the commits since, as from a 
 
 A history that has checkpoints drops older commits only before the commit of one of them, so that
 every root is the commit of a checkpoint, and keeps all checkpoints. A server SHOULD archive the commits
-it drops, not delete them: a checkpoint proves only what someone can still show. Personal data that
-must be erased (GDPR) is removed from the archive, its commits and versions keep their identifications
-and ETags, and a proof of what was erased is no longer possible.
+it drops, not delete them: a checkpoint proves only what someone can still show.
+
+The **archive** of a history has one **segment** per compaction, numbered from 1, never changed once
+written: the snapshot of the root before the compaction (`commit`, `roamingNetwork`, `effectiveLastChanges`,
+without runtime status) and every commit dropped after it, in their order, ending with the new root.
+A segment alone gives every version from its root to its end again, and its commits, with the root, prove
+the commits of every checkpoint between them (10.4). Segments follow each other: the root of one is the end
+of the one before. What a segment holds:
+
+```json
+{ "number": 1, "rootId": "<root before>", "endId": "<new root>", "fromRevision": 0, "toRevision": 4711,
+  "size": 4711, "commitIds": [ "…" ], "archivedAt": "2026-10-19T12:00:00.000Z" }
+```
+
+A server archives before it drops: an archive failing fails the compaction. It serves archived commits as
+it serves the commits it holds (`GET ~/RNs/{RN_Id}/history/commits/{commitId}`, and their proofs), the list
+of the segments as `GET ~/RNs/{RN_Id}/history/archive` and a segment as
+`GET ~/RNs/{RN_Id}/history/archive/{number}` (`{info, base, commits}`).
+
+Personal data that must be erased (GDPR) is removed from the archive, its commits and versions keep their
+identifications and ETags, and a proof of what was erased is no longer possible.
 
 ### 10.7 Open points
 
-1. **Archives:** where archived commits are served from, and for how long.
+1. **Archives:** how long they are kept; how personal data is removed from a segment, keeping the
+   identifications of its commits.
 2. **Statements of prices at runtime** in a checkpoint (section 12).
 3. **Witness discovery:** how a client learns which witnesses there are, and their keys.
 

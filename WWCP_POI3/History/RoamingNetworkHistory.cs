@@ -250,7 +250,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) Start        (RoamingNetwork, Signers = null, Store = null, Retention = null)
+        #region (static) Start        (RoamingNetwork, Signers = null, Store = null, Retention = null, Archive = null)
 
         /// <summary>
         /// Start the history of the given first version of a roaming network with its genesis commit.
@@ -259,10 +259,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Signers">The optional keys that sign the genesis commit and every commit made here.</param>
         /// <param name="Store">An optional empty store to keep the history in.</param>
         /// <param name="Retention">What to keep; everything, unless given.</param>
+        /// <param name="Archive">Where to keep the commits dropped when compacting.</param>
         public static RoamingNetworkHistory Start(RoamingNetwork                            RoamingNetwork,
                                                   IEnumerable<RoamingNetworkCommitSigner>?  Signers     = null,
                                                   IRoamingNetworkHistoryStore?              Store       = null,
-                                                  RoamingNetworkHistoryRetention?           Retention   = null)
+                                                  RoamingNetworkHistoryRetention?           Retention   = null,
+                                                  IRoamingNetworkHistoryArchive?            Archive     = null)
         {
 
             var signers = Signers?.ToImmutableArray() ?? [];
@@ -270,7 +272,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var history = new RoamingNetworkHistory(SignedBy(signers, RoamingNetworkCommit.Genesis(RoamingNetwork)),
                                                     RoamingNetwork) {
                               Signers    = signers,
-                              Retention  = Retention ?? RoamingNetworkHistoryRetention.KeepEverything
+                              Retention  = Retention ?? RoamingNetworkHistoryRetention.KeepEverything,
+                              Archive    = Archive
                           };
 
             if (Store is not null)

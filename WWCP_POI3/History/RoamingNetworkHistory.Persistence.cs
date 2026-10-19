@@ -149,7 +149,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) TryLoad(Store, out History, out ErrorResponse, Retention = null, Signers = null, Limits = null)
+        #region (static) TryLoad(Store, out History, out ErrorResponse, Retention = null, Signers = null, Limits = null, Archive = null)
 
         /// <summary>
         /// Load a history from the given store: its base, and every log entry again, in their order.
@@ -163,12 +163,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Retention">What to keep; everything, unless given.</param>
         /// <param name="Signers">The keys that sign every commit made here.</param>
         /// <param name="Limits">Optional limits for reading change sets.</param>
+        /// <param name="Archive">Where to keep the commits dropped when compacting.</param>
         public static Boolean TryLoad(IRoamingNetworkHistoryStore                       Store,
                                       [NotNullWhen(true)]  out RoamingNetworkHistory?   History,
                                       [NotNullWhen(false)] out String?                  ErrorResponse,
                                       RoamingNetworkHistoryRetention?                   Retention   = null,
                                       IEnumerable<RoamingNetworkCommitSigner>?          Signers     = null,
-                                      RoamingNetworkChangeSetLimits?                    Limits      = null)
+                                      RoamingNetworkChangeSetLimits?                    Limits      = null,
+                                      IRoamingNetworkHistoryArchive?                    Archive     = null)
         {
 
             History = null;
@@ -199,6 +201,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             history.Retention  = Retention ?? RoamingNetworkHistoryRetention.KeepEverything;
             history.Signers    = Signers?.ToImmutableArray() ?? [];
+            history.Archive    = Archive;
 
             lock (history.historyLock)
             {
@@ -306,6 +309,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
 
                     var kept     = commits.Where(commit => !dropped.Contains(commit.Id)).ToList();
+
+                    // Archived before the store forgets them: an archive failing fails the compaction, and nothing is dropped.
+                    ArchiveDropped(newRoot, dropped);
 
                     // The checkpoints are all kept, also those of the commits dropped: they are the evidence of what was.
                     Store?.Compact(SnapshotJSON(newRoot, rootVersion, Head.RoamingNetwork),

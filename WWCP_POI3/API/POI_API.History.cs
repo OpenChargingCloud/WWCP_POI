@@ -358,7 +358,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  !RoamingNetworkCommit_Id.TryParse(request.ParsedURLParameters[1], out var commitId)
                                      ? ErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid commit identification!")
 
-                                     : roamingNetworkHistory.TryGetCommit(commitId, out var commit)
+                                     : roamingNetworkHistory.TryGetCommit(commitId, out var commit) || roamingNetworkHistory.TryGetArchivedCommit(commitId, out commit)
                                            ? JSONResponse(request, HTTPStatusCode.OK, commit.ToJSON())
                                            : ErrorResponse(request, HTTPStatusCode.NotFound, $"The commit '{commitId}' is unknown here!")
 

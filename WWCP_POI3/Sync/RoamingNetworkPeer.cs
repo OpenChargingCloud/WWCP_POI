@@ -868,6 +868,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (store is not null)
                 newHistory.AttachStore(store);
 
+            // So does the archive: the segments of the history replaced stay where they are.
+            newHistory.Archive = History?.Archive ?? options.Archive;
+
             // The status of the snapshot is the one there.
             receivedStatus.Clear();
 

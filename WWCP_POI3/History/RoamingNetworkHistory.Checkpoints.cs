@@ -443,12 +443,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
             lock (historyLock)
             {
 
-                if (!commitIndex.ContainsKey(CommitId))
+                // A commit held is proved from the commits held, else, or e.g. when it is the root of the history and its
+                // checkpoint covers commits dropped when compacting, from the segment of the archive holding it.
+                var lookups = new List<Func<RoamingNetworkCommit_Id, RoamingNetworkCommit?>>();
+
+                if (commitIndex.ContainsKey(CommitId))
+                    lookups.Add(HeldLookup);
+
+                if (TryLoadArchiveSegmentOf(CommitId, out var segment))
+                    lookups.Add(ArchiveLookup(segment));
+
+                if (lookups.Count == 0)
                 {
                     ErrorResponse = $"The commit '{CommitId}' is unknown here!";
                     return false;
                 }
 
+                foreach (var lookup in lookups)
                 for (var position = 0; position < checkpoints.Count; position++)
                 {
 
@@ -464,11 +475,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (checkpoint.Sequence > 0 && previous is null)
                         continue;
 
-                    if (!commitIndex.ContainsKey(checkpoint.CommitId) ||
-                        CommitsOf(checkpoint.CommitId, previous) is not IReadOnlyList<RoamingNetworkCommit> commitsOfCheckpoint)
-                    {
+                    if (CommitsOf(lookup, checkpoint.CommitId, previous) is not IReadOnlyList<RoamingNetworkCommit> commitsOfCheckpoint)
                         continue;
-                    }
 
                     var leafIndex = -1;
 
@@ -758,17 +766,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private IReadOnlyList<RoamingNetworkCommit>? CommitsOf(RoamingNetworkCommit_Id   CommitId,
                                                                RoamingNetworkCommit_Id?  PreviousCommitId)
+
+            => CommitsOf(HeldLookup, CommitId, PreviousCommitId);
+
+
+        /// <summary>
+        /// The commits of a checkpoint of the given commit, as the given lookup finds them, e.g. in a segment of the archive.
+        /// </summary>
+        private static IReadOnlyList<RoamingNetworkCommit>? CommitsOf(Func<RoamingNetworkCommit_Id, RoamingNetworkCommit?>  Lookup,
+                                                                      RoamingNetworkCommit_Id                               CommitId,
+                                                                      RoamingNetworkCommit_Id?                              PreviousCommitId)
         {
 
-            var included  = Ancestors(CommitId);
-            var excluded  = PreviousCommitId.HasValue ? Ancestors(PreviousCommitId.Value) : new HashSet<RoamingNetworkCommit_Id>();
+            if (Lookup(CommitId) is null)
+                return null;
+
+            var included  = AncestorsOf(Lookup, CommitId);
+            var excluded  = PreviousCommitId.HasValue ? AncestorsOf(Lookup, PreviousCommitId.Value) : new HashSet<RoamingNetworkCommit_Id>();
 
             if (PreviousCommitId.HasValue && !excluded.Contains(PreviousCommitId.Value))
                 return null;
 
             included.ExceptWith(excluded);
 
-            var commitsOfCheckpoint = included.Select(commitId => commits[commitIndex[commitId]]).ToList();
+            var commitsOfCheckpoint = included.Select(commitId => Lookup(commitId)!).ToList();
 
             // Complete: every parent is one of them, or one the previous checkpoint covers; the first one starts at the genesis.
             foreach (var commit in commitsOfCheckpoint)
@@ -780,6 +801,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return null;
 
             return RoamingNetworkCheckpoint.InOrder(commitsOfCheckpoint);
+
+        }
+
+        #endregion
+
+        #region (private) HeldLookup(CommitId)
+
+        /// <summary>
+        /// The commit this history holds, if it does, while it is locked.
+        /// </summary>
+        private RoamingNetworkCommit? HeldLookup(RoamingNetworkCommit_Id CommitId)
+
+            => commitIndex.TryGetValue(CommitId, out var index)
+                   ? commits[index]
+                   : null;
+
+        #endregion
+
+        #region (private static) AncestorsOf(Lookup, CommitId)
+
+        /// <summary>
+        /// The given commit and all its ancestors the given lookup finds.
+        /// </summary>
+        private static HashSet<RoamingNetworkCommit_Id> AncestorsOf(Func<RoamingNetworkCommit_Id, RoamingNetworkCommit?>  Lookup,
+                                                                    RoamingNetworkCommit_Id                               CommitId)
+        {
+
+            var ancestors  = new HashSet<RoamingNetworkCommit_Id>();
+            var pending    = new Stack<RoamingNetworkCommit_Id>([ CommitId ]);
+
+            while (pending.TryPop(out var commitId))
+                if (!ancestors.Contains(commitId) && Lookup(commitId) is RoamingNetworkCommit commit)
+                {
+                    ancestors.Add(commitId);
+                    foreach (var parentId in commit.ParentIds)
+                        pending.Push(parentId);
+                }
+
+            return ancestors;
 
         }
 

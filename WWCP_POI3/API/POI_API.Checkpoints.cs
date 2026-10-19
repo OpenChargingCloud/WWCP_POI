@@ -114,6 +114,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private void RegisterCheckpointURLTemplates(HTTPPath History)
         {
 
+            RegisterArchiveURLTemplates(History);
+
             #region GET ~/RNs/{roamingNetworkId}/history/checkpoints?since={sequence}&max={n}
 
             AddHandler(History + "/checkpoints",
@@ -382,6 +384,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private void AddCheckpointCommands(POIWebSocketServer     WebSocketServer,
                                            RoamingNetworkHistory  History)
         {
+
+            AddArchiveCommands(WebSocketServer, History);
 
             WebSocketServer.AddCommand("checkpoints", request =>
 

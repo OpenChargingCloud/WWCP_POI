@@ -71,6 +71,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RoamingNetworkHistoryRetention?    Retention                   { get; init; }
 
         /// <summary>
+        /// Where the history keeps the commits it drops when compacting, e.g. a RoamingNetworkHistoryFileArchive.
+        /// </summary>
+        public IRoamingNetworkHistoryArchive?     Archive                     { get; init; }
+
+        /// <summary>
         /// The identifications of keys of the roaming network operator a snapshot must name, e.g. its identity key:
         /// the trust anchor of a history started from the snapshot of another server. Not checked, unless given.
         /// </summary>

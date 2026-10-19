@@ -401,7 +401,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 return Task.FromResult(
-                           History.TryGetCommit(commitId, out var commit)
+                           History.TryGetCommit(commitId, out var commit) || History.TryGetArchivedCommit(commitId, out commit)
                                ? request.Respond(commit.ToJSON())
                                : request.Error(POIWebSocketErrorCodes.NotFound, $"The commit '{commitId}' is unknown here!")
                        );

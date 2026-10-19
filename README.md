@@ -441,11 +441,12 @@ proof.Verify(checkpoint, out _);
 A history keeps itself in a store, an `IRoamingNetworkHistoryStore`, and is loaded from it after a restart:
 
 ```csharp
-using var store = new RoamingNetworkHistoryFileStore("data/rn1");      // one directory per roaming network
+using var store   = new RoamingNetworkHistoryFileStore  ("data/rn1");          // one directory per roaming network
+using var archive = new RoamingNetworkHistoryFileArchive("data/rn1-archive");  // what compacting drops
 
-var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
+var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archive: archive)
                   ? loaded!
-                  : RoamingNetworkHistory.Start(rn1, Store: store,
+                  : RoamingNetworkHistory.Start(rn1, Store: store, Archive: archive,
                                                 Retention: new RoamingNetworkHistoryRetention { RetainCommits = 1000 });
 ```
 
@@ -476,8 +477,15 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
   and folds the runtime status into the new base. A history with checkpoints compacts only to the commit of
   one of them, so that every root is a checkpoint's commit. A server knowing only older commits starts from a
   snapshot then, and a branch older than the root can no longer be appended.
-- **Peers** keep a history started from a snapshot in `RoamingNetworkPeerOptions.Store`, with its `Retention`.
-  `RoamingNetworkHistoryMemoryStore` keeps the same content in memory, e.g. for tests.
+- **Archive:** with an `IRoamingNetworkHistoryArchive`, compacting keeps what it drops, one segment per compaction:
+  the snapshot of the root before and the commits since, ending with the new root ([SPECIFICATION.md](SPECIFICATION.md),
+  10.6). It is written before the store forgets anything; an archive failing fails the compaction. Archived commits
+  are found by `TryGetArchivedCommit`, proved by `TryGetCommitProof` as before, and a segment alone gives every version
+  in it again. `RoamingNetworkHistoryFileArchive` writes `segment-NNNNNN.base.json`, `segment-NNNNNN.commits.jsonl` and
+  a line in `segments.jsonl` last, each synced; a last line written only partly is dropped when opening.
+- **Peers** keep a history started from a snapshot in `RoamingNetworkPeerOptions.Store`, with its `Retention` and
+  its `Archive`. `RoamingNetworkHistoryMemoryStore` and `RoamingNetworkHistoryMemoryArchive` keep the same content in
+  memory, e.g. for tests.
 
 `POI_API` serves a history in JSON, or in CBOR for `Accept: application/cbor` (also as request body):
 
@@ -501,6 +509,10 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _)
 | `GET ~/RNs/{id}/history/commits/{commitId}/proof` | the proof of a commit in the first checkpoint including it |
 | `POST ~/RNs/{id}/history/checkpoints` `{checkpoints: […]}` | 200 taken, 403 (`AuthorizeCheckpointPush`), 422 refused |
 | `POST ~/RNs/{id}/history/checkpoints/{checkpointId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403 (`AuthorizeCheckpointSignature`), 404, 422 invalid |
+| `GET ~/RNs/{id}/history/archive` | the segments of the archive, without their commit ids |
+| `GET ~/RNs/{id}/history/archive/{number}` | one segment: `{info, base, commits}` |
+
+Archived commits are served by `GET …/commits/{commitId}` and proved by `GET …/commits/{commitId}/proof` as well.
 
 It also serves the roaming networks and their entities, readable from every origin (CORS `*`), each in canonical
 JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json:sha256:hex:…"`); a known
@@ -604,7 +616,7 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   `commitChangeSet {changeSet}` → `{status, …, head, conflicts?}`, `runtimeStatus`,
   `signCommit {commitId, signatures}` → `{commitId, signatures, added}`; checkpoints: `checkpoints {since?, max?}`
   or `{latest: true}`, `checkpoint {checkpointId}`, `checkpointSnapshot {checkpointId}`, `commitProof {commitId,
-  checkpointId?}`, `signCheckpoint {checkpointId, signatures}`, `pushCheckpoints {checkpoints}`.
+  checkpointId?}`, `signCheckpoint {checkpointId, signatures}`, `pushCheckpoints {checkpoints}`; archive: `archive`, `archiveSegment {number}`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
   `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced),
   `commitSignatures` (`{commitId, signatures}` added later), `checkpoints`, `checkpointSignatures`, `adminStatusUpdates`,
@@ -685,7 +697,7 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 
 - Finer subscription filters
 - Further entities: as the use cases need them
-- Archives of compacted commits; a peer joining from the latest checkpoint rather than the head
+- A peer joining from the latest checkpoint rather than the head; how long archives are kept, and erasing personal data from them
 - Epochs (crypto agility) and signed prices at runtime: drafted in [SPECIFICATION.md](SPECIFICATION.md), sections 11 and 12
 
 ## Tests
