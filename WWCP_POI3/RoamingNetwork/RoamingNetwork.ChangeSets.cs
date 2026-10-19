@@ -196,22 +196,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Whether the given ETags of a commit are those of this version: every one of them matches, and its effectiveTree
-        /// ETags, where it has any, are those of the tree hash algorithms of this version, in their order. A commit made
-        /// before effective trees has none (SPECIFICATION.md, section 8.3).
+        /// ETags are those of the tree hash algorithms of this version, in their order (SPECIFICATION.md, section 8.3).
         /// </summary>
         /// <param name="ETags">The ETags of a commit.</param>
         public Boolean MatchesCommitETags(ImmutableArray<ETag> ETags)
-        {
 
-            if (!MatchETags(ETags, this, out _))
-                return false;
-
-            var treeHashAlgorithms = ETags.Where(eTag => eTag.Format == ETagFormat.EffectiveTree).Select(eTag => eTag.HashAlgorithm).ToArray();
-
-            return treeHashAlgorithms.Length == 0 ||
-                   treeHashAlgorithms.SequenceEqual(TreeHashAlgorithms);
-
-        }
+            => MatchETags(ETags, this, out _) &&
+               ETags.Where (eTag => eTag.Format == ETagFormat.EffectiveTree).
+                     Select(eTag => eTag.HashAlgorithm).
+                     SequenceEqual(TreeHashAlgorithms);
 
         #endregion
 
@@ -1077,7 +1070,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var allEnergyMeterGroups    = AllEnergyMeterGroups   (operators.Values, gridOps.Values).ToArray();
             var allEnergyMeterTemplates = AllEnergyMeterTemplates(operators.Values, gridOps.Values).ToArray();
 
-            if ((UnknownManufacturer (operators.Values, manufacturers) ??
+            if ((networkOperators.Values.SingleOrDefault()?.KeyStatementError(Id) ??
+                 UnknownManufacturer (operators.Values, manufacturers) ??
                  DuplicateGridConnectionPoint(gridOps.Values)          ??
                  UnknownGridConnectionPoint(operators.Values, gridOps.Values) ??
                  UnknownMaintainer(gridOps.Values, operators, parkingOps) ??

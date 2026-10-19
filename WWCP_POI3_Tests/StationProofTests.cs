@@ -211,7 +211,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(version.ETags[2],                                Is.EqualTo(new ETag(ETagFormat.EffectiveTree, ETagHashAlgorithm.SHA256, digest)));
                 Assert.That(version.ETags[2],                                Is.EqualTo(tree.ETag));
                 Assert.That(genesis.ETags,                                   Is.EqualTo(version.ETags));
-                Assert.That(genesis.Profile,                                 Is.EqualTo(RoamingNetworkCommit.TreeIdentityProfile));
+                Assert.That(RoamingNetworkCommit.IdentityProfile,             Is.EqualTo("wwcp-poi-commit-v3"));
                 Assert.That(version.ETags[2].ToString(),                     Does.StartWith("effectiveTree:sha256:hex:"));
 
                 // The effective content has the EVSE as it is at runtime, with the maximum power and tariff of its template.
@@ -225,7 +225,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 // A reader recalculates the tree: a commit with another effectiveTree ETag is refused.
                 Assert.That(version.MatchesCommitETags(genesis.ETags),                                                                         Is.True);
                 Assert.That(version.MatchesCommitETags([ .. genesis.ETags.Take(2), new ETag(ETagFormat.EffectiveTree, ETagHashAlgorithm.SHA256, new Byte[32]) ]),  Is.False);
-                Assert.That(version.MatchesCommitETags([ .. genesis.ETags.Take(2) ]),                                                          Is.True, "a commit made before effective trees");
+                Assert.That(version.MatchesCommitETags([ .. genesis.ETags.Take(2) ]),                                                          Is.False, "a commit without them");
 
             }
 

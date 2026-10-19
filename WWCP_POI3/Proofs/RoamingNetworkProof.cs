@@ -198,6 +198,89 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Verify(TrustedIdentityKeyIds, out Attestation, out ErrorResponse, At = null)
+
+        /// <summary>
+        /// Verify this proof against the identity keys of the roaming network operator the verifier trusts by their @ids,
+        /// e.g. those of a QR code it scanned (RoamingNetworkTrustAnchor): the key statement of the operator the proof gives
+        /// must be signed by one of them and valid at the given time, now by default, and one of the attestations of the
+        /// proof signed by a signing key it states, valid when the attestation was signed (SPECIFICATION.md, section 8.6).
+        /// </summary>
+        /// <param name="TrustedIdentityKeyIds">The @ids of the identity keys the verifier trusts: their SHA-256 thumbprints.</param>
+        /// <param name="Attestation">The attestation it was verified against.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="At">When it must be valid, now by default.</param>
+        public Boolean Verify(IEnumerable<String>                                   TrustedIdentityKeyIds,
+                              [NotNullWhen(true)]  out RoamingNetworkAttestation?   Attestation,
+                              [NotNullWhen(false)] out String?                      ErrorResponse,
+                              DateTimeOffset?                                       At   = null)
+        {
+
+            Attestation = null;
+
+            if (!TryGetKeyStatement(out var keyStatement, out var operatorIdentityKeys, out ErrorResponse))
+                return false;
+
+            if (!keyStatement.TryVerify(TrustedIdentityKeyIds, operatorIdentityKeys, out ErrorResponse))
+                return false;
+
+            var at = At ?? Timestamp.Now;
+
+            if (!keyStatement.IsValidAt(at))
+            {
+                ErrorResponse = $"The key statement of the roaming network operator is not valid at {at.ToISO8601()}: it was signed at {keyStatement.SignedAt.ToISO8601()} and is valid until {keyStatement.ValidUntil.ToISO8601()}!";
+                return false;
+            }
+
+            if (keyStatement.RoamingNetworkId.ToString() != RoamingNetwork["@id"]?.Value<String>())
+            {
+                ErrorResponse = $"The key statement is one of the roaming network '{keyStatement.RoamingNetworkId}'!";
+                return false;
+            }
+
+            return Verify(attestation => keyStatement.SigningKeyOf(attestation.KeyId, attestation.SignedAt) is POIPublicKey signingKey &&
+                                         attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _),
+                          out Attestation,
+                          out ErrorResponse,
+                          at);
+
+        }
+
+        #endregion
+
+        #region TryGetKeyStatement(out KeyStatement, out IdentityKeys, out ErrorResponse)
+
+        /// <summary>
+        /// The key statement of the roaming network operator this proof gives, and the identity keys of the operator.
+        /// </summary>
+        public Boolean TryGetKeyStatement([NotNullWhen(true)]  out RoamingNetworkKeyStatement?  KeyStatement,
+                                          out IEnumerable<POIPublicKey>                         IdentityKeys,
+                                          [NotNullWhen(false)] out String?                      ErrorResponse)
+        {
+
+            KeyStatement  = null;
+            IdentityKeys  = [];
+
+            if (RoamingNetwork[POI.RoamingNetworkOperator.JSONProperty] is not JObject operatorJSON ||
+                operatorJSON[RoamingNetworkKeyStatement.JSONProperty] is not JObject keyStatementJSON)
+            {
+                ErrorResponse = "The proof gives no key statement of the roaming network operator!";
+                return false;
+            }
+
+            if (!POIPartyKeys.TryParse(operatorJSON, out _, out var identityKeys, out ErrorResponse) ||
+                !RoamingNetworkKeyStatement.TryParse(keyStatementJSON, out KeyStatement, out ErrorResponse))
+            {
+                return false;
+            }
+
+            IdentityKeys = identityKeys;
+            return true;
+
+        }
+
+        #endregion
+
         #region Verify(ETag, out ErrorResponse)
 
         /// <summary>

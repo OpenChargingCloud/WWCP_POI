@@ -35,6 +35,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     /// <remarks>
     /// GET ~/RNs/{RN_Id}/attestations                                               the attestations of the head valid now
+    /// GET ~/RNs/{RN_Id}/keyStatement                                               the key statement of the operator of the head
+    /// GET ~/RNs/{RN_Id}/trustAnchor                                                what an app pins: { roamingNetworkId, identityKeyIds, uri }
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/proof                 the proof of a charging station of the head,
     ///                                                                              ?hashAlgorithm= one of the network's, its first by default
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/proof the proof of the charging station of an EVSE
@@ -76,6 +78,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                                 : []).Select(attestation => attestation.ToJSON())))
                                                               ))
                                              : errorResponse);
+
+            #endregion
+
+            #region GET ~/RNs/{RN_Id}/keyStatement
+
+            AddEntityHandlers(roamingNetworkPath + "/keyStatement",
+                              request => !TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse)
+                                             ? errorResponse
+                                             : roamingNetwork.Operator?.KeyStatement is RoamingNetworkKeyStatement keyStatement
+                                                   ? EntityResponse(request, keyStatement.ToJSON())
+                                                   : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The operator of the roaming network '{roamingNetwork.Id}' states no keys!"));
+
+            #endregion
+
+            #region GET ~/RNs/{RN_Id}/trustAnchor
+
+            // What an app pins, as a URI for a QR code: the roaming network as this request names it, and the identity
+            // keys of its operator. Over https, unless the request is one of this machine.
+            AddEntityHandlers(roamingNetworkPath + "/trustAnchor",
+                              request => {
+
+                                  if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
+                                      return errorResponse;
+
+                                  if (roamingNetwork.Operator is null || roamingNetwork.Operator.IdentityKeys.IsEmpty)
+                                      return EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The roaming network '{roamingNetwork.Id}' has no operator with identity keys!");
+
+                                  var host          = request.Host;
+                                  var local         = host.Name is "localhost" or "127.0.0.1" or "[::1]" or "::1";
+                                  var path          = request.Path.ToString();
+                                  var trustAnchor   = new RoamingNetworkTrustAnchor(new Uri($"{(local ? "http" : "https")}://{host}{path[..path.LastIndexOf("/trustAnchor", StringComparison.Ordinal)]}"),
+                                                                                    roamingNetwork.Operator.IdentityKeys.Select(identityKey => identityKey.Id));
+
+                                  return EntityResponse(request,
+                                                        new JObject(
+                                                            new JProperty("roamingNetworkId",  roamingNetwork.Id.ToString()),
+                                                            new JProperty("identityKeyIds",    new JArray(trustAnchor.IdentityKeyIds)),
+                                                            new JProperty("uri",               trustAnchor.ToURI())
+                                                        ));
+
+                              });
 
             #endregion
 

@@ -249,6 +249,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.Operator = Operator;
 
+            // A key statement of its operator states this network and the operator's own keys, signed by one of them.
+            if (Operator?.KeyStatementError(Id) is String keyStatementError)
+                throw new ArgumentException(keyStatementError, nameof(Operator));
+
             if (TreeHashAlgorithms is not null)
             {
 

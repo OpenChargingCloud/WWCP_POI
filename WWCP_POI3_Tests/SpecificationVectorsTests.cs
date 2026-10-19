@@ -48,15 +48,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private const String JSONETag        = "json:sha256:hex:8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224";
         private const String CBORETag        = "cbor:sha256:hex:291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549";
         private const String TreeETag        = "effectiveTree:sha256:hex:87923ecc05779a7440e8da51589252f95eeed4977afabd211190c7b3b6602221";
-        private const String ETagsV2JSON     = "[[\"json\",\"sha256\",\"hex\",\"8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224\"],[\"cbor\",\"sha256\",\"hex\",\"291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549\"]]";
+        private const String NoTreeETagsJSON = "[[\"json\",\"sha256\",\"hex\",\"8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224\"],[\"cbor\",\"sha256\",\"hex\",\"291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549\"]]";
         private const String TreeETagJSON    = "[\"effectiveTree\",\"sha256\",\"hex\",\"87923ecc05779a7440e8da51589252f95eeed4977afabd211190c7b3b6602221\"]";
         private const String ETagsJSON       = "[[\"json\",\"sha256\",\"hex\",\"8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224\"],[\"cbor\",\"sha256\",\"hex\",\"291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549\"]," + TreeETagJSON + "]";
 
         private const String CommitContent   = "{\"eTags\":" + ETagsJSON + ",\"profile\":\"wwcp-poi-commit-v3\",\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
         private const String CommitId        = "0471b41509fd8458152ecece3970be190d137a514d7e78f86621a63ac2d45042";
-
-        private const String CommitV2Content = "{\"eTags\":" + ETagsV2JSON + ",\"profile\":\"wwcp-poi-commit-v2\",\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
-        private const String CommitV2Id      = "d48066e0a5e68f9019c8c2e0a911ff7d99e2ff054a79e3343e5de2ea14e33117";
 
         private const String SigningInput    = "{\"algorithm\":\"Ed25519\",\"commit\":{\"@id\":\"" + CommitId + "\",\"eTags\":" + ETagsJSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"},\"encoding\":\"base64\",\"keyId\":\"leader\",\"profile\":\"wwcp-poi-commit-signature-v1\",\"role\":\"leader\",\"signedAt\":\"2026-10-12T12:00:00.000Z\",\"signer\":\"leader.example.org\"}";
         private const String SignatureValue  = "JK3c2nNFxEaf4Z4IJnC8m1tfipZMlY2D3Qbvf7ua7M7am9JwDY2CmddzTVlMkyhnVizVx41BazSLsezsmMhBAg==";
@@ -180,21 +177,20 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region A_commit_before_effective_trees()
+        #region A_commit_without_effective_trees_is_refused()
 
         [Test]
-        public void A_commit_before_effective_trees()
+        public void A_commit_without_effective_trees_is_refused()
         {
 
-            var json   = "{\"@id\":\"" + CommitV2Id + "\",\"eTags\":" + ETagsV2JSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
-            var parsed = RoamingNetworkCommit.TryParse(json, out var commit, out var error);
+            var json   = "{\"@id\":\"" + CommitId + "\",\"eTags\":" + NoTreeETagsJSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
+            var parsed = RoamingNetworkCommit.TryParse(json, out _, out var error);
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(CommitV2Content))),  Is.EqualTo(CommitV2Id));
-                Assert.That(parsed,                                                                              Is.True, error);
-                Assert.That(commit!.Profile,                                                                     Is.EqualTo(RoamingNetworkCommit.IdentityProfile));
-                Assert.That(Network().MatchesCommitETags(commit.ETags),                                          Is.True);
+                Assert.That(parsed,                                                                         Is.False);
+                Assert.That(error,                                                                          Does.Contain("effectiveTree"));
+                Assert.That(Network().MatchesCommitETags([ .. Newtonsoft.Json.Linq.JArray.Parse(NoTreeETagsJSON).Select(eTag => ETag.Parse(eTag)) ]),  Is.False);
             }
 
         }
@@ -229,6 +225,38 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(CanonicalJSON.Serialize(tree.Root.Skeleton),                              Is.EqualTo(networkSkeleton));
                 Assert.That(CanonicalJSON.Serialize(tree.Root.Arrays["chargingStationOperators"].Children![0].Skeleton),  Is.EqualTo(operatorSkeleton));
 
+            }
+
+        }
+
+        #endregion
+
+        #region A_key_statement()
+
+        [Test]
+        public void A_key_statement()
+        {
+
+            const String Input  = "{\"algorithm\":\"Ed25519\",\"encoding\":\"base64\",\"identityKeys\":[{\"@id\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"key\":\"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w==\"}],\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"profile\":\"wwcp-poi-key-statement-v1\",\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKeys\":[{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\"}],\"validUntil\":\"2026-11-16T00:00:00.000Z\"}";
+            const String Value  = "wStKI6DfjrT9oDvyenKRCUtHsyDj/7SCO2rnTq4+S5QoejTkaudDzqt+Ir8PXjXojYsiolJVdE/ZKhuyaEWVCg==";
+
+            var signingKey   = new Ed25519PrivateKeyParameters(Convert.FromHexString("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), 0);
+            var identityKey  = new Ed25519PrivateKeyParameters(Convert.FromHexString("303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f"), 0);
+            var statement    = RoamingNetworkKeyStatement.Create(identityKey,
+                                                                 COSEAlgorithm.Ed25519,
+                                                                 RoamingNetwork_Id.Parse("rn1"),
+                                                                 RoamingNetworkOperator_Id.Parse("DE*RNO"),
+                                                                 [ POIPublicKey.From(signingKey) ],
+                                                                 [ POIPublicKey.From(identityKey) ],
+                                                                 DateTimeOffset.Parse("2026-10-17T00:00:00Z"),
+                                                                 DateTimeOffset.Parse("2026-11-16T00:00:00Z"));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Encoding.UTF8.GetString(statement.GetSigningBytes()),                                                 Is.EqualTo(Input));
+                Assert.That(statement.Value,                                                                                      Is.EqualTo(Value));
+                Assert.That(statement.TryVerify([ "1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802" ], null, out var error),  Is.True, error);
+                Assert.That(statement.SigningKeyOf("ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554", DateTimeOffset.Parse("2026-10-20T00:00:00Z")),  Is.Not.Null);
             }
 
         }

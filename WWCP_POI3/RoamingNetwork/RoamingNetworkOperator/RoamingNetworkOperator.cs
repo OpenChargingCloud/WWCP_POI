@@ -108,6 +108,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<POIPublicKey>  IdentityKeys    { get; }
 
+        /// <summary>
+        /// Its key statement, if any: which signing keys it uses, signed with one of its identity keys, so that an app pinning
+        /// its identity keys trusts them (SPECIFICATION.md, section 8.6).
+        /// </summary>
+        public RoamingNetworkKeyStatement?   KeyStatement    { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -134,7 +140,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       DateTimeOffset?                                         LastChange                   = null,
 
                                       CustomDataNew?                                          CustomData                   = null,
-                                      UserDefinedDictionary?                                  InternalData                 = null)
+                                      UserDefinedDictionary?                                  InternalData                 = null,
+                                      RoamingNetworkKeyStatement?                             KeyStatement                 = null)
 
             : base(Id,
                    Name,
@@ -160,6 +167,50 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.HotlinePhoneNumber  = HotlinePhoneNumber;
 
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the roaming network operator '{Id}'");
+
+            this.KeyStatement        = KeyStatement;
+            this.keyStatementError   = new (CheckKeyStatement);
+
+        }
+
+        #endregion
+
+
+        #region (internal) KeyStatementError(RoamingNetworkId)
+
+        private readonly Lazy<String?> keyStatementError;
+
+        /// <summary>
+        /// Why its key statement does not fit it in the given roaming network, or null: it states this operator and network,
+        /// only signing and identity keys this operator names, and is signed by one of its identity keys valid then. Its
+        /// validity in time is the one of the verifier: a version keeps a key statement that expired.
+        /// </summary>
+        internal String? KeyStatementError(RoamingNetwork_Id RoamingNetworkId)
+
+            => KeyStatement is null
+                   ? null
+                   : KeyStatement.RoamingNetworkId != RoamingNetworkId
+                         ? $"The key statement of the roaming network operator '{Id}' is one of the roaming network '{KeyStatement.RoamingNetworkId}', not of '{RoamingNetworkId}'!"
+                         : keyStatementError.Value;
+
+        private String? CheckKeyStatement()
+        {
+
+            if (KeyStatement is null)
+                return null;
+
+            if (KeyStatement.RoamingNetworkOperatorId != Id)
+                return $"The key statement of the roaming network operator '{Id}' is one of '{KeyStatement.RoamingNetworkOperatorId}'!";
+
+            if (KeyStatement.SigningKeys.FirstOrDefault(key => !SigningKeys.Contains(key)) is POIPublicKey unknownSigningKey)
+                return $"The key statement of the roaming network operator '{Id}' names the signing key '{unknownSigningKey.Id}', which is not one of its signing keys!";
+
+            if (KeyStatement.IdentityKeys.FirstOrDefault(key => !IdentityKeys.Contains(key)) is POIPublicKey unknownIdentityKey)
+                return $"The key statement of the roaming network operator '{Id}' names the identity key '{unknownIdentityKey.Id}', which is not one of its identity keys!";
+
+            return KeyStatement.TryVerify(IdentityKeys.Select(key => key.Id), IdentityKeys, out var error)
+                       ? null
+                       : $"The key statement of the roaming network operator '{Id}' is not signed by one of its identity keys: {error}";
 
         }
 
@@ -249,6 +300,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             POIPartyKeys.AddTo(json, this);
 
+            if (KeyStatement is not null)
+                json.Add(RoamingNetworkKeyStatement.JSONProperty, KeyStatement.ToJSON());
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return json;
@@ -308,6 +362,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
                     return false;
 
+                RoamingNetworkKeyStatement? keyStatement = null;
+
+                if (JSON[RoamingNetworkKeyStatement.JSONProperty] is JToken keyStatementJSON)
+                {
+
+                    if (keyStatementJSON is not JObject keyStatementObject ||
+                        !RoamingNetworkKeyStatement.TryParse(keyStatementObject, out keyStatement, out ErrorResponse))
+                    {
+                        ErrorResponse ??= "The key statement must be a JSON object!";
+                        return false;
+                    }
+
+                }
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -328,7 +396,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                     DataSource:    dataSource,
                                                                     Created:       created,
                                                                     LastChange:    lastChange,
-                                                                    CustomData:    customData);
+                                                                    CustomData:    customData,
+                                                                    KeyStatement:  keyStatement);
 
                 ErrorResponse = null;
                 return true;

@@ -46,15 +46,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The versioned profile of the content a commit identification is calculated over.
+        /// The versioned profile of the content a commit identification is calculated over: its ETags include the
+        /// effectiveTree ETags of its version (SPECIFICATION.md, section 8.3).
         /// </summary>
-        public const String IdentityProfile      = "wwcp-poi-commit-v2";
-
-        /// <summary>
-        /// The versioned profile of the content the identification of a commit with effectiveTree ETags is calculated over
-        /// (SPECIFICATION.md, section 8.3).
-        /// </summary>
-        public const String TreeIdentityProfile  = "wwcp-poi-commit-v3";
+        public const String IdentityProfile = "wwcp-poi-commit-v3";
 
         #endregion
 
@@ -87,15 +82,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The revision this commit leads to: one more than the highest one of its parents.
         /// </summary>
         public UInt64                     Revision            { get; }
-
-        /// <summary>
-        /// The profile its identification is calculated with: wwcp-poi-commit-v3 when its ETags include effectiveTree ETags,
-        /// as every commit made since effective trees, else wwcp-poi-commit-v2.
-        /// </summary>
-        public String                     Profile
-            => ETags.Any(eTag => eTag.Format == ETagFormat.EffectiveTree)
-                   ? TreeIdentityProfile
-                   : IdentityProfile;
 
         /// <summary>
         /// The ETags of the version this commit leads to, in JSON and CBOR, and its effectiveTree ETags.
@@ -139,6 +125,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (ETags.IsDefaultOrEmpty || ETags.Any(eTag => !eTag.IsValid))
                 throw new ArgumentException("A commit requires valid ETags of its version.", nameof(ETags));
+
+            if (!ETags.Any(eTag => eTag.Format == ETagFormat.JSON) ||
+                !ETags.Any(eTag => eTag.Format == ETagFormat.CBOR) ||
+                !ETags.Any(eTag => eTag.Format == ETagFormat.EffectiveTree))
+            {
+                throw new ArgumentException("A commit requires the json, cbor and effectiveTree ETags of its version.", nameof(ETags));
+            }
 
             ParentIds = ParentIds.IsDefault ? [] : ParentIds;
 
@@ -586,7 +579,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("profile",           Profile),
+                           new JProperty("profile",           IdentityProfile),
                            new JProperty("roamingNetworkId",  RoamingNetworkId.ToString()),
                            new JProperty("revision",          Revision),
                            new JProperty("eTags",             new JArray(ETags.Select(eTag => eTag.ToJSON())))

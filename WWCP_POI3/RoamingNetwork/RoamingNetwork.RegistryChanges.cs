@@ -88,10 +88,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             POIPartyKeys.IdentityKeysProperty
         ]);
 
+        /// <summary>
+        /// The properties of the roaming network operator: those of a party, and its key statement.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> ChangeableRoamingNetworkOperatorProperties = ChangeablePartyProperties.Union([
+            RoamingNetworkKeyStatement.JSONProperty
+        ]);
+
         private static readonly Registry<RoamingNetworkOperator_Id, RoamingNetworkOperator> RoamingNetworkOperatorRegistry = new (
             "roaming network operator",
             "a",
-            ChangeablePartyProperties,
+            ChangeableRoamingNetworkOperatorProperties,
             RoamingNetworkOperator_Id.TryParse,
             POI.RoamingNetworkOperator.TryParse,
             roamingNetworkOperator => roamingNetworkOperator.Id,

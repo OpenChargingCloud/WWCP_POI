@@ -364,8 +364,7 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
 ```
 
 - **Commits:** a change set, its `parentIds`, its revision and the ETags of the result: `json`, `cbor` and its
-  `effectiveTree` ETags (below), so that a commit is identified with `wwcp-poi-commit-v3`; one made before effective
-  trees, without them, stays readable (`wwcp-poi-commit-v2`).
+  `effectiveTree` ETags (below); a commit without them is refused (profile `wwcp-poi-commit-v3`).
   The id is the SHA-256 of the commit's canonical JSON without signatures; it is checked when read.
   The revision is one more than the highest one of the parents.
 - **Commit:** `Commit(cs)` commits a change set to the version it was made for, named by its before
@@ -471,6 +470,11 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   `AttestationValidity` (15 minutes); `RefreshAttestations()` attests it again after `AttestationInterval` (5
   minutes), e.g. called every minute. `TryAddAttestation(…)` takes those of another server for a commit held, whose
   version has the attested ETag, with a signature `VerifyAttestation` trusts; `OnAttestation` tells of every one.
+- **Key statements and trust anchors:** the roaming network operator states its signing keys in a
+  `keyStatement`, signed with one of its identity keys (`RoamingNetworkKeyStatement.Create(…)`, committed as a property
+  of the operator), so that every proof gives it. An app scans a QR code of the trust anchor,
+  `https://hub.example/poi/RNs/rn1?identityKeys=<@id>,…` (`GET ~/RNs/{id}/trustAnchor`), and verifies proofs with
+  `proof.Verify(anchor.IdentityKeyIds, …)`: only the thumbprints of the identity keys are pinned.
 
 ### Persistence and retention
 
@@ -548,6 +552,8 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/history/archive` | the segments of the archive, without their commit ids |
 | `GET ~/RNs/{id}/history/archive/{number}` | one segment: `{info, base, commits}` |
 | `GET ~/RNs/{id}/attestations` | the attestations of the head valid now: `{attestations: […]}` |
+| `GET ~/RNs/{id}/keyStatement` | the key statement of the roaming network operator |
+| `GET ~/RNs/{id}/trustAnchor` | what an app pins: `{roamingNetworkId, identityKeyIds, uri}`, the URI for a QR code |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/proof` | the proof of a charging station of the head, `?hashAlgorithm=` one of the network's |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/proof` | the proof of the charging station of an EVSE |
 | `GET ~/RNs/{id}/CSs/{CS_Id}/proof`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/proof` | the same, found by the identification alone |
@@ -742,8 +748,8 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 - Further entities: as the use cases need them
 - A peer joining from the latest checkpoint rather than the head; how long archives are kept, and erasing personal data from them
 - Epochs (crypto agility) and signed prices at runtime: drafted in [SPECIFICATION.md](SPECIFICATION.md), sections 11 and 12
-- Proofs: a trust anchor for the keys of roaming network operators, proofs of absence, an incremental tree
-  ([SPECIFICATION.md](SPECIFICATION.md), section 8.7)
+- Proofs: signed lists of roaming network operators and their identity keys, proofs of absence, an incremental tree
+  ([SPECIFICATION.md](SPECIFICATION.md), section 8.8)
 
 ## Tests
 

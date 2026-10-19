@@ -238,12 +238,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                // The ETags of the commit tell it, else its version, as long as this history can calculate it.
-                var eTag = commit.ETags.Any(eTag => eTag.Format == ETagFormat.EffectiveTree)
-                               ? commit.ETags.FirstOrDefault(eTag => eTag.Format == ETagFormat.EffectiveTree && eTag.HashAlgorithm == Attestation.ETag.HashAlgorithm)
-                               : TryGetVersion(commit.Id, out var version, out _) && version.TreeHashAlgorithms.Contains(Attestation.ETag.HashAlgorithm)
-                                     ? version.EffectiveTreeETag(Attestation.ETag.HashAlgorithm)
-                                     : default;
+                // The ETags of the commit tell it.
+                var eTag = commit.ETags.FirstOrDefault(eTag => eTag.Format == ETagFormat.EffectiveTree && eTag.HashAlgorithm == Attestation.ETag.HashAlgorithm);
 
                 if (!eTag.IsValid || !eTag.Equals(Attestation.ETag))
                 {
@@ -347,16 +343,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Attest the head with the given signers, while the history is locked: one attestation per effectiveTree ETag of
-        /// its version, those of its commit where it has them.
+        /// its commit.
         /// </summary>
         private IReadOnlyList<RoamingNetworkAttestation> AttestHead(ImmutableArray<RoamingNetworkCommitSigner>  Signers,
                                                                     DateTimeOffset                              At)
         {
 
             var commit  = head.Commit;
-            ETag[] eTags = commit.ETags.Any(eTag => eTag.Format == ETagFormat.EffectiveTree)
-                           ? [ .. commit.ETags.Where(eTag => eTag.Format == ETagFormat.EffectiveTree) ]
-                           : [ .. head.RoamingNetwork.EffectiveTreeETags ];
+            var eTags   = commit.ETags.Where(eTag => eTag.Format == ETagFormat.EffectiveTree).ToArray();
 
             var made    = new List<RoamingNetworkAttestation>();
 

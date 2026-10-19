@@ -39,7 +39,8 @@ A version of a roaming network is identified by its **content**: its JSON repres
   energy meter templates and groups; parking operators; energy meter manufacturers, transparency
   software releases and certificates), the brands of operators, pools,
   stations, EVSEs and RFID authentication modes, the `signingKeys` and `identityKeys` of its
-  operator and of its parties, `created`, `lastChange` and `customData`.
+  operator and of its parties, the key statement of its operator (section 8.6), `created`, `lastChange`
+  and `customData`.
 - **Excluded:** `eTags`; the runtime status (admin status, status, energy status); the local
   revision counter; internal data.
 - **Order:** embedded entities in the ordinal order of their identifications; the order of
@@ -235,8 +236,7 @@ The commit identification is the SHA-256 of the canonical JSON of
 ```
 
 as 64 lowercase hexadecimal digits. A genesis commit has neither `parentIds` nor `changeSet`.
-A commit whose `eTags` name no `effectiveTree` ETag, as those made before effective trees, is identified
-with `wwcp-poi-commit-v2` in place of `wwcp-poi-commit-v3` (section 8.3).
+The `eTags` include the `effectiveTree` ETags of the version (section 8.3).
 The `revision` is one more than the highest revision of the parents, 0 for a genesis commit.
 Signatures are not part of it: neither those of the change set nor those of the commit, so that
 they can be added later without changing the identification.
@@ -406,16 +406,6 @@ Signature value:
 JK3c2nNFxEaf4Z4IJnC8m1tfipZMlY2D3Qbvf7ua7M7am9JwDY2CmddzTVlMkyhnVizVx41BazSLsezsmMhBAg==
 ```
 
-**A commit before effective trees** (section 8.3) names the `json` and `cbor` ETags only and is identified
-with `wwcp-poi-commit-v2`: the same genesis commit then is the SHA-256 of
-
-```json
-{"eTags":[["json","sha256","hex","8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224"],["cbor","sha256","hex","291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549"]],"profile":"wwcp-poi-commit-v2","revision":0,"roamingNetworkId":"rn1"}
-```
-
-`d48066e0a5e68f9019c8c2e0a911ff7d99e2ff054a79e3343e5de2ea14e33117`. A reader takes it, checking the ETags it
-names.
-
 **Effective tree** (section 8.2). The EVSE names no templates, so the effective content is the content.
 Every child array has one child, whose digest, `SHA-256(0x00 || skeleton)`, is the root of the array.
 Bottom-up, the skeletons and their digests:
@@ -466,7 +456,25 @@ Signature value:
 p8lSj39s8tNH2kaoJXIMcGqLGCHlm7x2IVrZje4IxFfakk6juMlk3QG5MDOJeYN4Q7QyNFoOmLVZcGShypK1CA==
 ```
 
-**Station proof** (section 8.4) of `DE*GEF*S1`: every child array on its path is partial with one leaf at
+**Key statement** (section 8.6) of the roaming network operator `DE*RNO`: the signing key of the attestation
+above, `@id` `ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554`, stated with the Ed25519 identity
+key of the private seed `303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f` (public key, Base64:
+`i7BOHBuD3d8xH1vN33xQ7ePAgC9H7HluKhMc9BKY2fM=`, `@id`
+`1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802`), signed at 2026-10-17T00:00:00.000Z, valid until
+2026-11-16T00:00:00.000Z. Signature input:
+
+```json
+{"algorithm":"Ed25519","encoding":"base64","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","profile":"wwcp-poi-key-statement-v1","roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKeys":[{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w=="}],"validUntil":"2026-11-16T00:00:00.000Z"}
+```
+
+Signature value:
+
+```
+wStKI6DfjrT9oDvyenKRCUtHsyDj/7SCO2rnTq4+S5QoejTkaudDzqt+Ir8PXjXojYsiolJVdE/ZKhuyaEWVCg==
+```
+
+**Station proof** (section 8.4)
+ of `DE*GEF*S1`: every child array on its path is partial with one leaf at
 index 0 and an empty audit path; the station is complete. A verifier calculates the root above from it and
 checks it against the attestation, which it embeds:
 
@@ -527,7 +535,7 @@ EVSE the charging tariffs that apply to it (`chargingTariffIds`). Templates, gro
 other entity are as in the content.
 
 The `lastChange` of an effective member follows from the version alone, without the floors POI_API keeps
-at runtime (8.7):
+at runtime (8.8):
 
 - an EVSE, charging station or charging pool naming no templates, taking no charging tariff of a
   template and embedding only EVSEs, charging stations and energy meters that are themselves, is itself,
@@ -592,10 +600,8 @@ Section 6 has an example.
 - A version has one `effectiveTree` ETag per algorithm it names, in their order, after its `json`
   and `cbor` ETags. Naming two, e.g. `["sha256", "sha512"]`, lets clients move from one to the other.
 - A commit lists them in its `eTags` (section 5.1) and is identified with the profile
-  `wwcp-poi-commit-v3`. A reader MUST refuse a commit whose `effectiveTree` ETags are not those of its
-  version, of every algorithm it names, in their order. A commit without any is identified with the
-  profile `wwcp-poi-commit-v2`: histories made before effective trees stay readable, and a server makes
-  every new commit with them.
+  `wwcp-poi-commit-v3`. A reader MUST refuse a commit without them, and one whose `effectiveTree` ETags
+  are not those of its version, of every algorithm it names, in their order.
 - Change sets name the `json` and `cbor` ETags of the versions before and after them; a change set MAY
   name `effectiveTree` ETags as well, which are then checked as the others. A precondition (section 4)
   names no `effectiveTree` ETag: an entity has none.
@@ -693,7 +699,8 @@ encoding and verification are as in section 4; timestamps are written and signed
   `RefreshAttestations()` attests the head again where the newest attestation of a signer is older than
   5 minutes. A verifier SHOULD refuse an attestation after its `validUntil`.
 - **Trust:** the verifier MUST trust the key of an attestation independently of the proof. A key the
-  attested network names proves nothing, as whoever forged the network would name their own (8.7).
+  attested network names proves nothing, as whoever forged the network would name their own; a key
+  statement (8.6) names them.
 - **Audit:** whoever has the history checks that the commit `commitId` has the attested ETag. An RNO
   attesting a version it does not have is caught by it. A server takes an attestation of another server
   only for a commit it holds, whose version has the attested ETag, with a signature of a key it trusts.
@@ -708,29 +715,74 @@ encoding and verification are as in section 4; timestamps are written and signed
   `attestations` (action `attestation`); a proof embeds those it was made for. A peer verifying attestations
   with keys it trusts takes those of the other server, so that every server serves proofs with them.
 
-### 8.6 Cost (informative)
+### 8.6 Key statements and trust anchors
+
+A verifier trusts the key of an attestation independently of the proof (8.5). So that it pins only a few
+long-lived keys, the roaming network operator states its signing keys in a **key statement**, signed with
+one of its identity keys (section 4.1):
+
+```json
+{ "roamingNetworkId": "rn1", "roamingNetworkOperatorId": "DE*RNO",
+  "signingKeys":  [ { "@id": "<thumbprint>", "key": "<Base64>", "notBefore": "…", "notAfter": "…" } ],
+  "identityKeys": [ { "@id": "<thumbprint>", "key": "<Base64>" } ],
+  "signedAt": "2026-10-17T00:00:00.000Z", "validUntil": "2026-11-16T00:00:00.000Z",
+  "algorithm": "ES512", "keyId": "<@id of the identity key>", "value": "<Base64>",
+  "profile": "wwcp-poi-key-statement-v1", "encoding": "base64" }
+```
+
+The signature input is the canonical JSON of the statement without `value`, with
+`"profile": "wwcp-poi-key-statement-v1"` and `"encoding": "base64"`; `identityKeys` is left out where
+absent. Keys are written as in section 4.1, in the order of their `@id`s, at least one signing key, none a
+signing and an identity key; timestamps as in section 5.4, `validUntil` not before `signedAt`. Section 6
+has an example.
+
+- **Content:** the roaming network operator embeds it as `keyStatement`, a property of its own (section
+  4.1). A version MUST be refused unless the statement names this roaming network and this operator, only
+  signing and identity keys the operator names, and is signed by one of its identity keys valid at
+  `signedAt`. Its validity in time is not checked there: a version keeps a statement that expired. So every
+  proof of a charging station gives it with the operator, peers take it with the commits, and witnesses see
+  it in the checkpoints: an operator stating other keys to some is a split view (10.2).
+- **Verification:** a verifier trusting identity keys by their `@id`s checks that the statement the proof
+  gives is signed by one of them, found among its `identityKeys` or those of the operator, each `@id` the
+  thumbprint of its key (section 4.1); that it is valid at the time it checks, `signedAt` ≤ time ≤
+  `validUntil`; that it names the roaming network of the proof; and that an attestation of the proof is
+  signed by one of the signing keys it states, valid at the attestation's `signedAt`. The attestation is then
+  trusted as 8.5 says.
+- **Succession:** a verifier trusting a statement MAY trust its `identityKeys` for later statements, e.g.
+  when the operator replaces an identity key before it expires.
+- **Trust anchor:** what a verifier pins of a roaming network, as one URI, e.g. for a QR code on the website
+  or in the documents of the roaming network operator:
+  `https://hub.example/poi/RNs/rn1?identityKeys=<@id>,<@id>`: the roaming network, below which its proofs
+  are served (`…/CSs/{CS_Id}/proof`), and the `@id`s of the identity keys of its operator, 64 lowercase
+  hexadecimal digits each. Only the `@id`s are trusted; the keys come with every proof. A QR code is as
+  trustworthy as the place it is found: one stuck on a charging station may be anybody's.
+- POI_API serves the key statement of the operator of the head as `GET ~/RNs/{RN_Id}/keyStatement` and its
+  trust anchor as `GET ~/RNs/{RN_Id}/trustAnchor`, `{roamingNetworkId, identityKeyIds, uri}`, the URI as
+  the request names the roaming network.
+
+### 8.7 Cost (informative)
 
 - **Writing:** a version calculates its tree once, over its whole effective content, when its ETags are
   calculated, as it calculates its `json` and `cbor` ETags: some 100,000 hash calculations per 100,000
   entities. Entities are immutable and shared by the versions that did not change them, so digests could
   be kept with them: a commit changing one EVSE would hash its station, the path to its pool, the pool,
   the path to its operator, the operator, the path to the network and the network, some 50 hash
-  calculations; a commit changing a template 100,000 members name all of them again (8.7).
+  calculations; a commit changing a template 100,000 members name all of them again (8.8).
 - **Serving:** a proof is calculated from the tree of the head, which keeps the skeletons of the network
   and of its parties and the digests of their children: a pool and its stations are calculated again,
   the audit paths from the digests.
 - **Verifying:** some 50 to 100 hash calculations and one signature verification per attestation,
   milliseconds on a phone.
 
-### 8.7 Open points
+### 8.8 Open points
 
 1. **Public keys of energy meters:** an energy meter names its `signatureMethods` and its
    `publicKeys` (`{@id, key, certificateChain?}`, the DER encoded SubjectPublicKeyInfo, identified by its
    SHA-256), see [docs/EnergyMeter.md](docs/EnergyMeter.md#publickeys). Still open is whether a
    station proof also needs the certificates of the manufacturers, beyond the chains of the keys.
-2. **Trust anchor:** how an app knows the signing keys of an RNO. Proposal: a key statement signed by
-   an identity key of the RNO, `{roamingNetworkId, signingKeys, signedAt, validUntil}`, so that an app
-   pins only the identity keys of the RNOs it trusts.
+2. **Trust lists:** an app pins the identity keys of a roaming network operator by scanning its trust
+   anchor (8.6). A signed list of operators and their identity keys, e.g. of an association or of a national
+   access point, would spare scanning one per roaming network.
 3. **Effective `lastChange`:** the floors are part of a version since POI3-ISSUES #45 and #46:
    snapshots keep them as `effectiveLastChanges`, a change set is compared with the version before it
    as a whole, a merge with both parents. How they are found is not specified here yet; until it is,
@@ -747,7 +799,7 @@ encoding and verification are as in section 4; timestamps are written and signed
 7. **CBOR skeletons:** whether the tree also hashes deterministic CBOR skeletons, for clients that read
    CBOR only.
 8. **Incremental trees:** keeping the digests with the entities, so that a commit hashes only what it
-   changed (8.6).
+   changed (8.7).
 9. **Offers:** a station proof gives no charging tariff offers (9.5, point 2).
 
 
@@ -817,12 +869,12 @@ of a template for the members naming it.
 
 The **`lastChange`** of an effective member is the latest of its own, those of the templates it names
 and those of what it embeds. Naming a template more or less is a change of the member itself; the
-floors (8.7, point 3) keep it from going back where the timestamps of a version do not grow, e.g. after
+floors (8.8, point 3) keep it from going back where the timestamps of a version do not grow, e.g. after
 merges.
 
 **Cost** (informative): what a member takes follows from the member and the few templates it names.
 Templates have no member lists, are small and few, and a client keeps them by their ETags. A change of
-a template changes every member naming it: publishers publish them again, and the effective tree (8.6)
+a template changes every member naming it: publishers publish them again, and the effective tree (8.7)
 hashes them again. Giving 10,000 EVSEs a template changes 10,000 EVSEs.
 
 ### 9.3 Groups
@@ -951,7 +1003,7 @@ EVSEs throughout.
    its templates give, only stop naming the template.
 5. **Templates naming templates:** not proposed. The list of a member is flat, so the member tells
    everything it takes; an order of several templates many members share is repeated in each.
-6. **A tree over the stored content** (8.7, point 6): a proof could give the stored member and the
+6. **A tree over the stored content** (8.8, point 6): a proof could give the stored member and the
    templates it names in place of the effective member. A change of a template would then hash
    `O(log n)` in place of every member naming it, but a verifier would need the rules of 9.2.
 
@@ -1112,7 +1164,7 @@ its keys. Checkpoints make periodic restarts unnecessary (section 10).
 ```json
 { "epoch": 2,
   "profiles": { "canonicalization": "styx-canonical-json-v1", "commitIdHash": "sha256",
-                "commit": "wwcp-poi-commit-v2", "checkpoint": "wwcp-poi-checkpoint-v1",
+                "commit": "wwcp-poi-commit-v3", "checkpoint": "wwcp-poi-checkpoint-v1",
                 "treeHashAlgorithms": [ "sha3-256" ],
                 "signatureAlgorithms": [ "ML-DSA-65", "ES256" ] } }
 ```
