@@ -193,11 +193,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            // The runtime status of the base is the one of the head when it was written, also of entities added after the
+            // root: taken as it is where the root has them, and once more after the log, for those added since.
+            var baseStatus = content.Base["runtimeStatus"] as JArray;
+            content.Base.Remove("runtimeStatus");
+
             if (!TryFromSnapshot(content.Base, out var history, out ErrorResponse, Limits))
             {
                 ErrorResponse = "Invalid base of the store: " + ErrorResponse;
                 return false;
             }
+
+            foreach (var statusJSON in baseStatus?.OfType<JObject>() ?? [])
+                if (POIStatusUpdate.TryParse(statusJSON, out var statusUpdate, out _))
+                    history.RuntimeStatus.TryUpdate(statusUpdate, out _);
 
             history.Retention  = Retention ?? RoamingNetworkHistoryRetention.KeepEverything;
             history.Signers    = Signers?.ToImmutableArray() ?? [];
@@ -263,17 +272,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     // The status of the base, for the entities added since; not authoritative,
                     // so that a later status of the log stays the current one.
-                    if (content.Base["runtimeStatus"] is JArray baseStatus)
-                        foreach (var statusJSON in baseStatus.OfType<JObject>())
-                            if (POIStatusUpdate.TryParse(statusJSON, out var statusUpdate, out _))
-                                history.RuntimeStatus.TryUpdate(statusUpdate.Kind,
-                                                                statusUpdate.EntityType,
-                                                                statusUpdate.EntityId,
-                                                                statusUpdate.Value,
-                                                                statusUpdate.Timestamp,
-                                                                out _,
-                                                                out _,
-                                                                statusUpdate.DataSource);
+                    foreach (var statusJSON in baseStatus?.OfType<JObject>() ?? [])
+                        if (POIStatusUpdate.TryParse(statusJSON, out var statusUpdate, out _))
+                            history.RuntimeStatus.TryUpdate(statusUpdate.Kind,
+                                                            statusUpdate.EntityType,
+                                                            statusUpdate.EntityId,
+                                                            statusUpdate.Value,
+                                                            statusUpdate.Timestamp,
+                                                            out _,
+                                                            out _,
+                                                            statusUpdate.DataSource);
 
                 }
                 finally

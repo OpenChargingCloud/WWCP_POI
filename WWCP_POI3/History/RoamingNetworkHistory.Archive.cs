@@ -89,7 +89,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!TryLoadArchiveSegmentOf(CommitId, out var segment))
                     return false;
 
-                Commit = segment.Commits.FirstOrDefault(commit => commit.Id == CommitId);
+                // Also the root of the first segment, which only its base holds: the genesis, or the commit of the snapshot
+                // the history started from.
+                Commit = ArchiveLookup(segment)(CommitId);
 
                 return Commit is not null;
 
@@ -192,8 +194,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 archiveIndex = [];
 
                 foreach (var info in currentArchive.Segments)
+                {
+
                     foreach (var commitId in info.CommitIds)
                         archiveIndex[commitId] = info.Number;
+
+                    // The root of every later segment is the end of the one before.
+                    archiveIndex.TryAdd(info.RootId, info.Number);
+
+                }
 
             }
 

@@ -290,6 +290,53 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region A_compacted_store_keeps_the_status_of_entities_added_after_its_root()
+
+        /// <summary>
+        /// The base of a compacted store is the snapshot of its new root with the runtime status of the head, also of
+        /// entities added by the commits after the root: loaded again, it is taken all the same.
+        /// </summary>
+        [Test]
+        public void A_compacted_store_keeps_the_status_of_entities_added_after_its_root()
+        {
+
+            var store    = new RoamingNetworkHistoryMemoryStore();
+            var history  = RoamingNetworkHistory.Start(NewNetwork(),
+                                                       Store:      store,
+                                                       Retention:  new RoamingNetworkHistoryRetention {
+                                                                       RetainCommits              = 1,
+                                                                       CompactAfterLogEntries     = Int64.MaxValue,
+                                                                       VersionCheckpointInterval  = 1,
+                                                                       RecentVersions             = 1
+                                                                   });
+
+            Assert.That(Change(history, 1, "dataSource", "v2").IsCommitted);
+            Assert.That(Change(history, 2, "dataSource", "v3").IsCommitted);
+
+            // After the root the compaction finds: one revision behind the head.
+            var added = history.Commit(history.Head.RoamingNetwork.CreateSignedChangeSet(
+                                           [ RoamingNetworkChange.Add(new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*NEW"), Created: Created).WithKeys()) ],
+                                           CreatedAt: T0.AddMinutes(3)));
+
+            Assert.That(added.IsCommitted, Is.True, added.ErrorResponse);
+
+            history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*NEW", "offline", Created.AddDays(1), out _, out _);
+            history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "offline", Created.AddDays(1), out _, out _);
+
+            Assert.That(history.Compact(out var compactError),                                   Is.True, compactError);
+            Assert.That(RoamingNetworkHistory.TryLoad(store, out var loaded, out var loadError),  Is.True, loadError);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(history.Root.Revision,                                                                                  Is.EqualTo(2));
+                Assert.That(loaded!.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, Operator, "DE*NEW", out var newStatus) ? newStatus.Value : null,  Is.EqualTo("offline"));
+                Assert.That(loaded.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, Operator, "DE*GEF", out var known)    ? known.Value  : null,  Is.EqualTo("offline"));
+            }
+
+        }
+
+        #endregion
+
         #region A_merge_lost_by_a_crash_is_made_again()
 
         [Test]

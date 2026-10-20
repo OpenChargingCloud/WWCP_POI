@@ -166,6 +166,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(history.TryGetArchivedCommit(c1.Id, out var archived),   Is.True);
                 Assert.That(archived!.ToJSON().ToString(),                           Is.EqualTo(c1.ToJSON().ToString()));
 
+                // The genesis as well, which only the base of the first segment holds.
+                Assert.That(history.TryGetCommit(genesis.Id, out _),                 Is.False);
+                Assert.That(history.TryGetArchivedCommit(genesis.Id, out var archivedGenesis) && archivedGenesis.Id == genesis.Id,  Is.True);
+                Assert.That(Proves(history, genesis, cp0),                           Is.True);
+
                 // Provable as before: a commit of the first checkpoint, and one of the second.
                 Assert.That(Proves(history, c1, cp0),                                Is.True);
                 Assert.That(Proves(history, c3, cp1),                                Is.True);
