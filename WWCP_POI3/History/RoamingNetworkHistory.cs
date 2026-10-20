@@ -231,13 +231,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Constructor(s)
 
-        private RoamingNetworkHistory(RoamingNetworkCommit  Root,
-                                      RoamingNetwork        RoamingNetwork)
+        private RoamingNetworkHistory(RoamingNetworkCommit      Root,
+                                      RoamingNetwork            RoamingNetwork,
+                                      RoamingNetworkEpoch?      Epoch           = null,
+                                      RoamingNetworkEpochLink?  PreviousEpoch   = null)
         {
 
             this.RoamingNetworkId  = RoamingNetwork.Id;
             this.head              = new RoamingNetworkHead(Root, RoamingNetwork);
             this.RuntimeStatus     = new RoamingNetworkRuntimeStatus(this);
+            this.epoch             = Epoch ?? (Root.Profiles is not null ? new RoamingNetworkEpoch(Root.Epoch, Root.Profiles) : RoamingNetworkEpoch.First);
+            this.previousEpoch     = PreviousEpoch;
+
+            if (Root.Epoch != epoch.Number || Root.IdentificationHash != epoch.Profiles.IdentificationHash)
+                throw new ArgumentException($"The root '{Root.Id}' is no commit of the epoch {epoch.Number}.", nameof(Root));
 
             RuntimeStatus.Attach(RoamingNetwork);
             RuntimeStatus.OnStatusUpdate += AppendStatusUpdate;
@@ -333,10 +340,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                // The epoch of a history after the first one: { epoch, profiles, previous? }.
+                RoamingNetworkEpoch?      epoch          = null;
+                RoamingNetworkEpochLink?  previousEpoch  = null;
+
+                if (Snapshot[EpochJSONProperty] is JToken epochJSON)
+                {
+
+                    if (!RoamingNetworkEpoch.TryParse(epochJSON, out epoch, out var epochError))
+                    {
+                        ErrorResponse = "Invalid epoch of the snapshot: " + epochError;
+                        return false;
+                    }
+
+                    if (epochJSON[RoamingNetworkEpochLink.JSONProperty] is JToken previousEpochJSON &&
+                        !RoamingNetworkEpochLink.TryParse(previousEpochJSON, out previousEpoch, out var previousEpochError))
+                    {
+                        ErrorResponse = "Invalid epoch of the snapshot: " + previousEpochError;
+                        return false;
+                    }
+
+                }
+
                 return TryFromSnapshot(roamingNetwork,
                                        commit,
                                        out History,
-                                       out ErrorResponse) &&
+                                       out ErrorResponse,
+                                       epoch,
+                                       previousEpoch) &&
 
                        TryTakeRuntimeStatus(ref History,
                                             Snapshot["runtimeStatus"],
@@ -398,7 +429,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) TryFromSnapshot(RoamingNetwork, Commit, out History, out ErrorResponse)
+        #region (static) TryFromSnapshot(RoamingNetwork, Commit, out History, out ErrorResponse, Epoch = null, PreviousEpoch = null)
 
         /// <summary>
         /// Try to start a history from the given version of a roaming network and the commit leading to it.
@@ -408,10 +439,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Commit">The commit leading to it.</param>
         /// <param name="History">The new history.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="Epoch">The epoch of the history, unless the first one or the one its genesis names.</param>
+        /// <param name="PreviousEpoch">The final checkpoint of the epoch before, if known.</param>
         public static Boolean TryFromSnapshot(RoamingNetwork                                   RoamingNetwork,
                                               RoamingNetworkCommit                             Commit,
                                               [NotNullWhen(true)]  out RoamingNetworkHistory?  History,
-                                              [NotNullWhen(false)] out String?                 ErrorResponse)
+                                              [NotNullWhen(false)] out String?                 ErrorResponse,
+                                              RoamingNetworkEpoch?                             Epoch           = null,
+                                              RoamingNetworkEpochLink?                         PreviousEpoch   = null)
         {
 
             History = null;
@@ -428,11 +463,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            var epoch = Epoch ?? (Commit.Profiles is not null ? new RoamingNetworkEpoch(Commit.Epoch, Commit.Profiles) : RoamingNetworkEpoch.First);
+
+            if (Commit.Epoch != epoch.Number || Commit.IdentificationHash != epoch.Profiles.IdentificationHash ||
+                (Commit.Profiles is not null && !Commit.Profiles.Equals(epoch.Profiles)))
+            {
+                ErrorResponse = $"The commit '{Commit.Id}' is no commit of the epoch {epoch.Number} of the snapshot, with its profiles!";
+                return false;
+            }
+
+            if (PreviousEpoch is not null && PreviousEpoch.Epoch != epoch.Number - 1)
+            {
+                ErrorResponse = $"The epoch before the epoch {epoch.Number} is not the epoch {PreviousEpoch.Epoch}!";
+                return false;
+            }
+
             // A copy, when it needs another revision: the given version stays as it is.
             var roamingNetwork = RoamingNetwork.WithRevision(Commit.Revision);
             roamingNetwork.CalcETags();
 
-            History        = new RoamingNetworkHistory(Commit, roamingNetwork);
+            History        = new RoamingNetworkHistory(Commit, roamingNetwork, epoch, PreviousEpoch);
             ErrorResponse  = null;
             return true;
 
@@ -463,6 +513,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // Not content, but part of the version as its history calculated it.
             if (head.RoamingNetwork.EffectiveFloorsJSON() is JArray effectiveLastChanges)
                 json.Add("effectiveLastChanges", effectiveLastChanges);
+
+            if (epoch.Number > 1)
+                json.Add(EpochJSONProperty, EpochJSON(epoch, previousEpoch));
 
             if (IncludeRuntimeStatus)
                 json.Add("runtimeStatus", new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON())));
@@ -658,6 +711,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (ChangeSet.RoamingNetworkId != RoamingNetworkId)
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: $"The change set is for the roaming network '{ChangeSet.RoamingNetworkId}', not for '{RoamingNetworkId}'!");
 
+                if (ClosedError() is String closed)
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: closed);
+
+                foreach (var signature in ChangeSet.Signatures)
+                    if (SignatureAlgorithmError(signature.Algorithm, "a signature of the change set") is String changeSetSignatureError)
+                        return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: changeSetSignatureError);
+
+                foreach (var signer in Signers.IsDefault ? [] : Signers.AsEnumerable())
+                    if (SignatureAlgorithmError(signer.Algorithm.Name, $"the signer {signer}") is String signerError)
+                        return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: signerError);
+
                 if (FindCommitted(ChangeSet) is RoamingNetworkCommit committed)
                     return new (RoamingNetworkCommitStatus.AlreadyCommitted, Head, committed);
 
@@ -667,6 +731,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!parentVersion.TryApplyChangeSet(ChangeSet, out var roamingNetwork, out var applyError, VerifySignature))
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: applyError);
+
+                if (VersionEpochError(roamingNetwork) is String versionError)
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: versionError);
 
                 // Made for an older version: its preconditions must also hold for the tips it will be merged with.
                 if (BrokenPreconditionOf(ChangeSet, parent.Id) is String preconditionError)
@@ -754,6 +821,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!Known && !CheckSignatures(Commit, VerifyCommitSignature, RequiredSignatureRoles, out ErrorResponse))
                     return false;
 
+                if (!Known && (ClosedError() ?? CommitEpochError(Commit)) is String epochError)
+                {
+                    ErrorResponse = epochError;
+                    return false;
+                }
+
                 if (Commit.RoamingNetworkId != RoamingNetworkId)
                 {
                     ErrorResponse = $"The commit is for the roaming network '{Commit.RoamingNetworkId}', not for '{RoamingNetworkId}'!";
@@ -816,6 +889,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!roamingNetwork.MatchesCommitETags(Commit.ETags))
                 {
                     ErrorResponse = "The change set of the commit does not lead to the ETags of the commit!";
+                    return false;
+                }
+
+                if (!Known && VersionEpochError(roamingNetwork) is String versionError)
+                {
+                    ErrorResponse = versionError;
                     return false;
                 }
 
@@ -948,6 +1027,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     ErrorResponse  = null;
                     return true;
                 }
+
+                foreach (var signature in newSignatures)
+                    if (SignatureAlgorithmError(signature.Algorithm, $"a signature of the commit '{CommitId}'") is String algorithmError)
+                    {
+                        ErrorResponse = algorithmError;
+                        return false;
+                    }
 
                 foreach (var signature in newSignatures)
                     if (!CheckSignature(commit, signature, VerifyCommitSignature, out ErrorResponse))

@@ -714,13 +714,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) SnapshotJSON(Commit, RoamingNetwork, StatusOf)
+        #region (private) SnapshotJSON(Commit, RoamingNetwork, StatusOf)
 
         /// <summary>
         /// A snapshot of the given commit and its version, with the floors of the last changes of its effective members,
         /// and with the runtime status of the given version.
         /// </summary>
-        private static JObject SnapshotJSON(RoamingNetworkCommit  Commit,
+        private JObject SnapshotJSON(RoamingNetworkCommit  Commit,
                                             RoamingNetwork        RoamingNetwork,
                                             RoamingNetwork        StatusOf)
         {
@@ -735,6 +735,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add("effectiveLastChanges", effectiveLastChanges);
 
             json.Add("runtimeStatus", new JArray(RoamingNetworkRuntimeStatus.Of(StatusOf).Select(status => status.ToJSON())));
+
+            if (epoch.Number > 1)
+                json.Add(EpochJSONProperty, EpochJSON(epoch, previousEpoch));
 
             return json;
 

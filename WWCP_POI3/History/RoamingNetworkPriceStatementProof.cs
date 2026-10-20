@@ -118,7 +118,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!POIMerkleTree.TryCalculateRoot(PriceStatement.Leaf, Index, Size, AuditPath, out var root))
+            if (!POIMerkleTree.TryCalculateRootOfLeafHash(Checkpoint.IdentificationHash,
+                                                          POIMerkleTree.LeafHash(Checkpoint.IdentificationHash, PriceStatement.Leaf),
+                                                          Index,
+                                                          Size,
+                                                          AuditPath,
+                                                          out var root))
             {
                 ErrorResponse = "The audit path does not fit the index and the number of price statements!";
                 return false;

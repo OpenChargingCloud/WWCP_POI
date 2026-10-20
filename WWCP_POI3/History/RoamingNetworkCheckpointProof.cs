@@ -126,7 +126,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!POIMerkleTree.TryCalculateRoot(RoamingNetworkCheckpoint.Leaf(CommitId, ETags, Revision), Index, Size, AuditPath, out var root))
+            if (!POIMerkleTree.TryCalculateRootOfLeafHash(Checkpoint.IdentificationHash,
+                                                          POIMerkleTree.LeafHash(Checkpoint.IdentificationHash, RoamingNetworkCheckpoint.Leaf(CommitId, ETags, Revision)),
+                                                          Index,
+                                                          Size,
+                                                          AuditPath,
+                                                          out var root))
             {
                 ErrorResponse = "The audit path does not fit the index and the number of commits!";
                 return false;

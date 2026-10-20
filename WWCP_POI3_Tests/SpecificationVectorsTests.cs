@@ -177,6 +177,35 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region The_genesis_of_a_second_epoch()
+
+        [Test]
+        public void The_genesis_of_a_second_epoch()
+        {
+
+            const String Input  = "{\"eTags\":[[\"json\",\"sha256\",\"hex\",\"8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224\"],[\"cbor\",\"sha256\",\"hex\",\"291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549\"],[\"effectiveTree\",\"sha256\",\"hex\",\"87923ecc05779a7440e8da51589252f95eeed4977afabd211190c7b3b6602221\"]],\"epoch\":2,\"profile\":\"wwcp-poi-commit-v3\",\"profiles\":{\"canonicalization\":\"styx-canonical-json-v1\",\"checkpoint\":\"wwcp-poi-checkpoint-v1\",\"commit\":\"wwcp-poi-commit-v3\",\"identificationHash\":\"sha512\",\"priceStatement\":\"wwcp-poi-price-statement-v1\",\"signatureAlgorithms\":[\"Ed25519\",\"ML-DSA-65\"]},\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
+            const String Id     = "4ce205c4e6d07d54838b0740f8b9c0ff12941a6f38c4ab37145f115f734a870cbe8b0dd429b569a59bcb34dfe3a924a066fbe2fbeee8e0c07ea2e8d983254a3f";
+
+            var genesis = RoamingNetworkCommit.Genesis(Network(),
+                                                       new RoamingNetworkEpoch(2, new RoamingNetworkEpochProfiles(ETagHashAlgorithm.SHA512, [ "Ed25519", "ML-DSA-65" ])));
+
+            var content = genesis.ToJSON();
+            content.Remove("@id");
+            content.AddFirst(new Newtonsoft.Json.Linq.JProperty("profile", RoamingNetworkCommit.IdentityProfile));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(CanonicalJSON.Serialize(content),                                                        Is.EqualTo(Input));
+                Assert.That(genesis.Id.ToString(),                                                                   Is.EqualTo(Id));
+                Assert.That(Convert.ToHexStringLower(SHA512.HashData(Encoding.UTF8.GetBytes(Input))),                Is.EqualTo(Id));
+                Assert.That(RoamingNetworkCommit.TryParse(genesis.ToJSON().ToString(), out var parsed, out var error), Is.True, error);
+                Assert.That(parsed!.Id,                                                                              Is.EqualTo(genesis.Id));
+            }
+
+        }
+
+        #endregion
+
         #region A_commit_without_effective_trees_is_refused()
 
         [Test]

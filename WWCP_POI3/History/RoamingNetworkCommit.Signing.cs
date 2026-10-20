@@ -72,6 +72,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   Revision,
                                                   ETags,
                                                   ChangeSet,
+                                                  Epoch,
+                                                  IdentificationHash,
+                                                  Profiles,
                                                   this.Signatures.AddRange(newSignatures));
 
         }

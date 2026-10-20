@@ -5,8 +5,8 @@ a commit or a signature without this library, and what a version tells where it 
 for many entities: templates, groups and offers (section 9). The examples in section 6 are checked by
 `WWCP_POI3_Tests/SpecificationVectorsTests.cs`. Section 8 specifies proofs of single entities, e.g. of
 one charging station, by a signed hash tree, checked against attestations. Section 10 specifies
-checkpoints, the witnessed and lasting evidence of a history, section 12 price statements, the signed
-evidence of prices at runtime; section 11 (epochs) is a draft.
+checkpoints, the witnessed and lasting evidence of a history, section 11 epochs, a history going on under
+new algorithms, and section 12 price statements, the signed evidence of prices at runtime.
 
 The words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
 
@@ -226,7 +226,8 @@ Every server may commit; there is no leader. The history is a graph: a commit ha
 
 ### 5.1 Identification
 
-The commit identification is the SHA-256 of the canonical JSON of
+The commit identification is the digest, with the identification hash of its epoch (11.1), SHA-256 in the
+first one, of the canonical JSON of
 
 ```json
 { "profile": "wwcp-poi-commit-v3", "roamingNetworkId": "rn1", "revision": 1,
@@ -235,7 +236,8 @@ The commit identification is the SHA-256 of the canonical JSON of
   "changeSet": <the change set without its signatures> }
 ```
 
-as 64 lowercase hexadecimal digits. A genesis commit has neither `parentIds` nor `changeSet`.
+as 64, 96 or 128 lowercase hexadecimal digits. A genesis commit has neither `parentIds` nor `changeSet`.
+From the second epoch on, the content names `"epoch"`, and the genesis of an epoch its `"profiles"` (11.3).
 The `eTags` include the `effectiveTree` ETags of the version (section 8.3).
 The `revision` is one more than the highest revision of the parents, 0 for a genesis commit.
 Signatures are not part of it: neither those of the change set nor those of the commit, so that
@@ -520,6 +522,16 @@ Signature value:
 Its digest, the SHA-256 of the signature input with `"value"` added, which the next statement of the EVSE
 names as its `previous` and a checkpoint takes as a leaf:
 `efbd7b8f0d28a0affe44a872dbaefdd37b6afa5366202d4653b8a5b58bcef772`.
+
+**Genesis of a second epoch** (section 11.3) of the example, with SHA-512 identifications and the signature
+algorithms Ed25519 and ML-DSA-65: the SHA-512 of
+
+```json
+{"eTags":[["json","sha256","hex","8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224"],["cbor","sha256","hex","291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549"],["effectiveTree","sha256","hex","87923ecc05779a7440e8da51589252f95eeed4977afabd211190c7b3b6602221"]],"epoch":2,"profile":"wwcp-poi-commit-v3","profiles":{"canonicalization":"styx-canonical-json-v1","checkpoint":"wwcp-poi-checkpoint-v1","commit":"wwcp-poi-commit-v3","identificationHash":"sha512","priceStatement":"wwcp-poi-price-statement-v1","signatureAlgorithms":["Ed25519","ML-DSA-65"]},"revision":0,"roamingNetworkId":"rn1"}
+```
+
+is its commit identification
+`4ce205c4e6d07d54838b0740f8b9c0ff12941a6f38c4ab37145f115f734a870cbe8b0dd429b569a59bcb34dfe3a924a066fbe2fbeee8e0c07ea2e8d983254a3f`.
 
 
 ## 7. Open points
@@ -1070,11 +1082,14 @@ identifications are as without it.
   its ETags as well. `@size` is their number.
 - **priceStatements:** optional, the tree of the price statements the server took since the previous
   checkpoint (section 12.3); absent when it names none.
+- **final, next:** the final checkpoint of an epoch is `"final": true` and names the next epoch (11.2).
+- **previous:** the first checkpoint of an epoch after the first one names the final checkpoint of the
+  one before (11.3).
 - **createdAt:** when it was made, written as in section 5.4.
 
-The checkpoint identification is the SHA-256 of the canonical JSON of the checkpoint without `@id` and
-without `signatures`, with `"profile": "wwcp-poi-checkpoint-v1"` added, as 64 lowercase hexadecimal
-digits. A reader MUST calculate it and refuse the checkpoint when it differs from `@id`. The CBOR
+The checkpoint identification is the digest, with the identification hash of its epoch (11.1), SHA-256 in
+the first one, of the canonical JSON of the checkpoint without `@id` and without `signatures`, with
+`"profile": "wwcp-poi-checkpoint-v1"` added, in lowercase hexadecimal digits; so are its trees. A reader MUST calculate it and refuse the checkpoint when it differs from `@id`. The CBOR
 representation has the keys and values of the JSON one; ETags are written in hex (section 3.1).
 
 A server MUST refuse a checkpoint unless it has its commit and all commits of the checkpoint, the
@@ -1189,42 +1204,102 @@ identifications and ETags, and a proof of what was erased is no longer possible.
 
 ## 11. Epochs
 
-> **Status:** draft, not implemented: every history is epoch 1, and checkpoints name it.
-
 An **epoch** is one history of a roaming network under one set of **profiles**: the algorithms and
-formats its identifications, ETags, trees and signatures are calculated with. A new epoch begins only
-when these must change, not periodically: when an algorithm becomes weak (crypto agility, e.g. from
-SHA-256 or ECDSA to SHA-3 or ML-DSA), when the canonicalization changes, or after the RNO lost control of
-its keys. Checkpoints make periodic restarts unnecessary (section 10).
+formats its identifications, trees and signatures are calculated with. A new epoch begins only when
+these must change, not periodically: when an algorithm becomes weak (crypto agility, e.g. from SHA-256
+to SHA-512 identifications, or from ECDSA to ML-DSA signatures), when the canonicalization changes, or
+after the RNO lost control of its keys. Checkpoints make periodic restarts unnecessary (section 10).
+Every history begins in epoch 1, whose commits and checkpoints do not name it.
+
+### 11.1 Profiles
 
 ```json
 { "epoch": 2,
-  "profiles": { "canonicalization": "styx-canonical-json-v1", "commitIdHash": "sha256",
+  "profiles": { "canonicalization": "styx-canonical-json-v1", "identificationHash": "sha512",
                 "commit": "wwcp-poi-commit-v3", "checkpoint": "wwcp-poi-checkpoint-v1",
                 "priceStatement": "wwcp-poi-price-statement-v1",
-                "treeHashAlgorithms": [ "sha3-256" ],
-                "signatureAlgorithms": [ "ML-DSA-65", "ES256" ] } }
+                "signatureAlgorithms": [ "Ed25519", "ML-DSA-65" ] } }
 ```
 
-- **End of an epoch:** its last checkpoint is **final**, `"final": true` with
-  `"next": <the epoch and profiles above>`, made by the RNO and signed by the witnesses with the
-  algorithms of the ending epoch. A final checkpoint names a commit all tips follow; the epoch takes no
-  commit after it.
-- **Start of the next one:** its genesis has the version of the final checkpoint's commit, its
-  identifications and ETags calculated under the new profiles; its commit identifications include
-  `"epoch"` from epoch 2 on, so that no commit of one epoch is one of another, and commits of different
-  epochs are never merged. Its first checkpoint (sequence 0) names
-  `"previous": {"epoch": 1, "checkpointId": "…", "eTags": [ … ]}` and is signed with the algorithms of
-  both epochs, so that a verifier trusting only the old ones follows into the new epoch.
-- **Moving on:** a server applies nothing; it starts the new epoch from the version it has and checks
-  the new genesis against the final checkpoint. Servers and clients move when they see the final
-  checkpoint, not all at once.
-- **Old epochs** stay readable and archived (10.6). Before one of their algorithms becomes weak, their
-  checkpoints are signed again, or their identifications hashed and signed, under the new profiles
-  (evidence records as in RFC 4998), so that what they prove stays provable.
-- **Runtime status of an epoch:** `active`, `closing` (final checkpoint made, waiting for witnesses),
-  `closed`, `archived`.
+- **canonicalization:** of everything hashed and signed; `styx-canonical-json-v1` (section 1).
+- **identificationHash:** `sha256`, `sha384` or `sha512`: the hash of the identifications of commits
+  (5.1) and checkpoints (10.1), and of the trees of checkpoints. An identification is the digest in
+  lowercase hexadecimal digits, 64, 96 or 128 of them: its length tells the hash. The first epoch has
+  `sha256`.
+- **commit, checkpoint, priceStatement:** the profiles of their contents and signatures.
+- **signatureAlgorithms:** the COSE names of the signature algorithms the epoch accepts, for the
+  signatures of change sets, commits, checkpoints, attestations, key statements and price statements;
+  every one the implementation signs with, when empty, as in the first epoch.
 
+A server MUST refuse profiles it can not calculate. The `effectiveTree` ETags follow the
+`treeHashAlgorithms` of the roaming network (8.3), which its operator changes within an epoch; the
+`json` and `cbor` ETags stay SHA-256, as the `effectiveTree` ETags bind the content with the stronger
+hashes.
+
+### 11.2 The end of an epoch
+
+The last checkpoint of an epoch is **final**: `"final": true` with `"next": {"epoch": …, "profiles": …}`,
+the next epoch, made by the RNO, signed with the algorithms of the ending epoch, and signed by the
+witnesses. Its commit is the head, when it is the only tip: open branches are merged first. It may name
+the commit of the checkpoint before it, its commits then being that commit alone. The epoch takes no
+commit and no checkpoint after it.
+
+### 11.3 The start of the next one
+
+The **genesis** of the next epoch has the version of the commit of the final checkpoint: nothing is
+applied, its `revision` is 0, and it names the epoch and its profiles:
+
+```json
+{ "profile": "wwcp-poi-commit-v3", "roamingNetworkId": "rn1", "revision": 0, "epoch": 2,
+  "eTags": [ <the ETags of the final checkpoint> ], "profiles": { … } }
+```
+
+identified with its `identificationHash`. A server MUST refuse it unless its version leads to the
+`eTags` of the final checkpoint. Every commit after it names `"epoch"` as well, so that no commit of
+one epoch is one of another, and commits of different epochs are never merged.
+
+The first checkpoint of the epoch (sequence 0) names the final checkpoint of the one before,
+`"previous": {"epoch": 1, "checkpointId": "…", "eTags": [ … ]}`, and is signed with the algorithms of
+both epochs, so that a verifier trusting only the old ones follows into the new epoch. Its signatures
+are accepted with the algorithms of either epoch, every later one only with those of its own.
+
+### 11.4 Moving on
+
+A server applies nothing: it starts the next epoch from the version it has and checks the new genesis
+against the final checkpoint. Every server doing so makes the same genesis, and takes the commits of
+the epoch from there. The runtime status and the current price statements are taken along.
+
+- **The server of the RNO** closes the epoch, starts the next one, and serves it in place of the old
+  one (`TryServeNextEpoch`): the WebSocket of the old epoch closes, the one of the new epoch answers at
+  the same URL, and the old epoch stays readable.
+- **A peer** asks the other server for its epoch (`epoch`) before it catches up. When the other server
+  is in the next epoch, a history holding the final checkpoint starts the next epoch itself; one without
+  it starts from the other server, as from its start (10.5). A history in an epoch the other server has
+  not reached yet waits for it, and asks again later.
+- **Status of an epoch:** `active`, `closing` (final checkpoint there, witnesses still signing, the next
+  epoch not started here), `closed` (the next epoch started here).
+
+### 11.5 Old epochs
+
+Old epochs stay readable, and their checkpoints keep proving their commits (10.4):
+
+```
+GET ~/RNs/{RN_Id}/history/epoch                                     the current epoch: { epoch, profiles, status,
+                                                                    previous?, finalCheckpointId? }
+GET ~/RNs/{RN_Id}/history/epochs                                    every epoch served, in their order
+GET ~/RNs/{RN_Id}/history/epochs/{epoch}/checkpoints[/{checkpointId}]  its checkpoints
+GET ~/RNs/{RN_Id}/history/epochs/{epoch}/commits/{commitId}[/proof]    a commit, and its proof in a checkpoint
+```
+
+### 11.6 Open points
+
+1. **Evidence records:** before an algorithm of an old epoch becomes weak, its checkpoints are to be
+   signed again, or their identifications hashed and signed, under the new profiles (as in RFC 4998), so
+   that what they prove stays provable.
+2. **Lost keys:** an RNO that lost control of its keys can not sign the final checkpoint of its epoch;
+   who starts the next one then, e.g. the witnesses, is open.
+3. **Price statement digests** stay SHA-256 (`wwcp-poi-price-statement-v1`); a later profile changes them.
+4. **Archived epochs:** when a server drops an old epoch, and where it is kept then.
 
 ## 12. Prices at runtime
 

@@ -448,7 +448,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                    ordered[index],
                                                                    (UInt64) index,
                                                                    (UInt64) ordered.Count,
-                                                                   POIMerkleTree.AuditPath([ .. ordered.Select(priceStatement => priceStatement.Leaf) ], index));
+                                                                   POIMerkleTree.AuditPathOfLeafHashes(checkpoint.IdentificationHash,
+                                                                                                       [ .. ordered.Select(priceStatement => POIMerkleTree.LeafHash(checkpoint.IdentificationHash, priceStatement.Leaf)) ],
+                                                                                                       index));
 
             ErrorResponse  = null;
             return true;
@@ -524,6 +526,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (PriceStatement.RoamingNetworkId != RoamingNetworkId)
             {
                 ErrorResponse = $"The price statement is one of the roaming network '{PriceStatement.RoamingNetworkId}', not of '{RoamingNetworkId}'!";
+                return false;
+            }
+
+            if (SignatureAlgorithmError(PriceStatement.Algorithm, "the price statement") is String algorithmError)
+            {
+                ErrorResponse = algorithmError;
                 return false;
             }
 
@@ -828,7 +836,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var ordered = RoamingNetworkPriceStatement.InOrder(PriceStatements);
 
             if ((UInt64) ordered.Count != Checkpoint.PriceStatementsSize ||
-                RoamingNetworkPriceStatement.RootOf(ordered) != Checkpoint.PriceStatementsRoot)
+                RoamingNetworkPriceStatement.RootOf(ordered, Checkpoint.IdentificationHash) != Checkpoint.PriceStatementsRoot)
             {
                 ErrorResponse = $"The price statements are not those the checkpoint '{Checkpoint.Id}' names!";
                 return false;

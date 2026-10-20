@@ -145,6 +145,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean                             JoinFromCheckpoint          { get; init; } = true;
 
         /// <summary>
+        /// Whether to follow the other server into its next epoch (SPECIFICATION.md, section 11): a history whose final
+        /// checkpoint closed its epoch starts the next one itself, one without it from the other server; the history of
+        /// the epoch before stays as it is (OnHistoryReplaced). Default: yes.
+        /// </summary>
+        public Boolean                             FollowEpochs                { get; init; } = true;
+
+        /// <summary>
+        /// The store to keep the history of a next epoch in, by the number of the epoch, e.g. a directory of its own: the
+        /// store of the epoch before keeps that one. None, unless given.
+        /// </summary>
+        public Func<UInt32, IRoamingNetworkHistoryStore?>?  EpochStore     { get; init; }
+
+        /// <summary>
         /// Verifies the signatures of checkpoints with trusted keys; without it, signed checkpoints are not taken.
         /// </summary>
         public VerifyCheckpointSignatureDelegate?  VerifyCheckpointSignature   { get; init; }

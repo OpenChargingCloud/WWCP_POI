@@ -49,7 +49,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// (SPECIFICATION.md, section 10). Checkpoints form one line per roaming network and epoch, each naming the one
     /// before it, while the commits form a graph. Witnesses sign them after they checked them against their own history,
     /// so that a proof of a commit (RoamingNetworkCheckpointProof) stays evidence for months.
-    /// Its identification is the SHA-256 digest of its canonical JSON content without signatures.
+    /// Its identification is the digest of its canonical JSON content without signatures, with the identification hash of
+    /// its epoch (SPECIFICATION.md, section 11), as are its trees. The final checkpoint of an epoch names the next one, the
+    /// first checkpoint of an epoch after the first one the final checkpoint of the one before.
     /// </summary>
     public sealed class RoamingNetworkCheckpoint
     {
@@ -67,7 +69,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String  SigningProfile   = "wwcp-poi-checkpoint-signature-v1";
 
         /// <summary>
-        /// The epoch of every history, until epochs are implemented (SPECIFICATION.md, section 11).
+        /// The epoch every history begins in (SPECIFICATION.md, section 11).
         /// </summary>
         public const UInt32  DefaultEpoch     = 1;
 
@@ -116,7 +118,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<ETag>                           ETags               { get; }
 
         /// <summary>
-        /// The Merkle tree hash of the commits of this checkpoint, as 64 lowercase hexadecimal digits.
+        /// The Merkle tree hash of the commits of this checkpoint, in lowercase hexadecimal digits.
         /// </summary>
         public String                                         CommitsRoot         { get; }
 
@@ -127,7 +129,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The Merkle tree hash of the price statements this checkpoint names, those its server took since the checkpoint
-        /// before (SPECIFICATION.md, section 12), as 64 lowercase hexadecimal digits; null when it names none.
+        /// before (SPECIFICATION.md, section 12), in lowercase hexadecimal digits; null when it names none.
         /// </summary>
         public String?                                        PriceStatementsRoot { get; }
 
@@ -147,6 +149,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<RoamingNetworkCommitSignature>  Signatures          { get; }
 
+        /// <summary>
+        /// The hash of the identification and of the trees of this checkpoint, the identification hash of its epoch.
+        /// </summary>
+        public ETagHashAlgorithm                              IdentificationHash  { get; }
+
+        /// <summary>
+        /// The next epoch, when this checkpoint is the final one of its epoch: the epoch takes no commit after it.
+        /// </summary>
+        public RoamingNetworkEpoch?                           Next                { get; }
+
+        /// <summary>
+        /// Whether this checkpoint is the final one of its epoch.
+        /// </summary>
+        public Boolean                                        IsFinal
+            => Next is not null;
+
+        /// <summary>
+        /// The final checkpoint of the epoch before, when this is the first checkpoint of an epoch after the first one.
+        /// </summary>
+        public RoamingNetworkEpochLink?                       PreviousEpoch       { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -163,6 +186,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          DateTimeOffset                                 CreatedAt,
                                          String?                                        PriceStatementsRoot,
                                          UInt64                                         PriceStatementsSize,
+                                         ETagHashAlgorithm                              IdentificationHash,
+                                         RoamingNetworkEpoch?                           Next,
+                                         RoamingNetworkEpochLink?                       PreviousEpoch,
                                          ImmutableArray<RoamingNetworkCommitSignature>  Signatures   = default)
         {
 
@@ -175,8 +201,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ETags.IsDefaultOrEmpty || ETags.Any(eTag => !eTag.IsValid))
                 throw new ArgumentException("A checkpoint requires valid ETags of the version of its commit.", nameof(ETags));
 
-            if (CommitsRoot is null || CommitsRoot.Length != 64 || CommitsRoot.AsSpan().IndexOfAnyExcept("0123456789abcdef") >= 0)
-                throw new ArgumentException("The root of the commits must be 64 lowercase hexadecimal digits.", nameof(CommitsRoot));
+            var digestLength = 2 * ETag.DigestLength(IdentificationHash);
+
+            if (CommitsRoot is null || CommitsRoot.Length != digestLength || CommitsRoot.AsSpan().IndexOfAnyExcept("0123456789abcdef") >= 0)
+                throw new ArgumentException($"The root of the commits must be {digestLength} lowercase hexadecimal digits, a digest of the identification hash.", nameof(CommitsRoot));
 
             if (CommitsSize == 0)
                 throw new ArgumentException("A checkpoint has at least its own commit.", nameof(CommitsSize));
@@ -184,8 +212,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if ((PriceStatementsRoot is null) != (PriceStatementsSize == 0))
                 throw new ArgumentException("A checkpoint names price statements by their root and their number, or none.", nameof(PriceStatementsRoot));
 
-            if (PriceStatementsRoot is not null && (PriceStatementsRoot.Length != 64 || PriceStatementsRoot.AsSpan().IndexOfAnyExcept("0123456789abcdef") >= 0))
-                throw new ArgumentException("The root of the price statements must be 64 lowercase hexadecimal digits.", nameof(PriceStatementsRoot));
+            if (PriceStatementsRoot is not null && (PriceStatementsRoot.Length != digestLength || PriceStatementsRoot.AsSpan().IndexOfAnyExcept("0123456789abcdef") >= 0))
+                throw new ArgumentException($"The root of the price statements must be {digestLength} lowercase hexadecimal digits, a digest of the identification hash.", nameof(PriceStatementsRoot));
+
+            if (Epoch == 1 && IdentificationHash != ETagHashAlgorithm.SHA256)
+                throw new ArgumentException("The checkpoints of the first epoch are identified with SHA-256.", nameof(IdentificationHash));
+
+            if (CommitId.HashAlgorithm != IdentificationHash || (PreviousId.HasValue && PreviousId.Value.HashAlgorithm != IdentificationHash))
+                throw new ArgumentException("A checkpoint, its commit and the checkpoint before are identified with the same hash: the one of their epoch.", nameof(IdentificationHash));
+
+            if (Next is not null && Next.Number != Epoch + 1)
+                throw new ArgumentException("The final checkpoint of an epoch names the next one.", nameof(Next));
+
+            if ((PreviousEpoch is not null) != (Sequence == 0 && Epoch > 1))
+                throw new ArgumentException("The first checkpoint of an epoch after the first one names the final checkpoint of the one before, no other checkpoint does.", nameof(PreviousEpoch));
+
+            if (PreviousEpoch is not null && PreviousEpoch.Epoch != Epoch - 1)
+                throw new ArgumentException("The first checkpoint of an epoch names the final checkpoint of the epoch just before.", nameof(PreviousEpoch));
 
             this.RoamingNetworkId     = RoamingNetworkId;
             this.Epoch                = Epoch;
@@ -198,6 +241,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.CommitsSize          = CommitsSize;
             this.PriceStatementsRoot  = PriceStatementsRoot;
             this.PriceStatementsSize  = PriceStatementsSize;
+            this.IdentificationHash   = IdentificationHash;
+            this.Next                 = Next;
+            this.PreviousEpoch        = PreviousEpoch;
             this.CreatedAt            = DateTimeOffset.FromUnixTimeMilliseconds(CreatedAt.ToUnixTimeMilliseconds());
             this.Signatures           = Signatures.IsDefault ? [] : Signatures;
             this.Id                   = CalcId();
@@ -207,7 +253,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) Create  (RoamingNetworkId, Epoch, Sequence, PreviousId, Commit, Commits, CreatedAt, PriceStatements = null)
+        #region (static) Create  (RoamingNetworkId, Epoch, Sequence, PreviousId, Commit, Commits, CreatedAt, PriceStatements = null, Next = null, PreviousEpoch = null)
 
         /// <summary>
         /// Make a checkpoint of the given commit, unsigned.
@@ -220,6 +266,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Commits">The commits of the checkpoint, the commit among them, in any order.</param>
         /// <param name="CreatedAt">When it is made.</param>
         /// <param name="PriceStatements">The price statements it names, in any order: those taken since the checkpoint before.</param>
+        /// <param name="Next">The next epoch, when it is the final checkpoint of its epoch.</param>
+        /// <param name="PreviousEpoch">The final checkpoint of the epoch before, when it is the first checkpoint of an epoch after the first one.</param>
         public static RoamingNetworkCheckpoint Create(RoamingNetwork_Id                           RoamingNetworkId,
                                                       UInt32                                      Epoch,
                                                       UInt64                                      Sequence,
@@ -227,7 +275,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       RoamingNetworkCommit                        Commit,
                                                       IEnumerable<RoamingNetworkCommit>           Commits,
                                                       DateTimeOffset                              CreatedAt,
-                                                      IEnumerable<RoamingNetworkPriceStatement>?  PriceStatements   = null)
+                                                      IEnumerable<RoamingNetworkPriceStatement>?  PriceStatements   = null,
+                                                      RoamingNetworkEpoch?                        Next              = null,
+                                                      RoamingNetworkEpochLink?                    PreviousEpoch     = null)
         {
 
             var ordered = InOrder(Commits);
@@ -244,11 +294,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         Commit.Id,
                         Commit.Revision,
                         Commit.ETags,
-                        CommitsRootOf(ordered),
+                        CommitsRootOf(ordered, Commit.IdentificationHash),
                         (UInt64) ordered.Count,
                         CreatedAt,
-                        priceStatements.Count > 0 ? RoamingNetworkPriceStatement.RootOf(priceStatements) : null,
-                        (UInt64) priceStatements.Count);
+                        priceStatements.Count > 0 ? RoamingNetworkPriceStatement.RootOf(priceStatements, Commit.IdentificationHash) : null,
+                        (UInt64) priceStatements.Count,
+                        Commit.IdentificationHash,
+                        Next,
+                        PreviousEpoch);
 
         }
 
@@ -309,14 +362,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) CommitsRootOf(OrderedCommits)
+        #region (static) CommitsRootOf(OrderedCommits, IdentificationHash = SHA256)
 
         /// <summary>
-        /// The Merkle tree hash of the given commits, already in the order of a checkpoint.
+        /// The Merkle tree hash of the given commits, already in the order of a checkpoint, with the given hash.
         /// </summary>
-        public static String CommitsRootOf(IReadOnlyList<RoamingNetworkCommit> OrderedCommits)
+        public static String CommitsRootOf(IReadOnlyList<RoamingNetworkCommit>  OrderedCommits,
+                                           ETagHashAlgorithm                    IdentificationHash   = ETagHashAlgorithm.SHA256)
 
-            => Convert.ToHexStringLower(POIMerkleTree.RootHash([.. OrderedCommits.Select(Leaf)]));
+            => Convert.ToHexStringLower(POIMerkleTree.RootOfLeafHashes(IdentificationHash,
+                                                                       [ .. OrderedCommits.Select(commit => POIMerkleTree.LeafHash(IdentificationHash, Leaf(commit))) ]));
 
         #endregion
 
@@ -347,6 +402,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       CreatedAt,
                                                       PriceStatementsRoot,
                                                       PriceStatementsSize,
+                                                      IdentificationHash,
+                                                      Next,
+                                                      PreviousEpoch,
                                                       this.Signatures.AddRange(newSignatures));
 
         }
@@ -651,6 +709,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
+                RoamingNetworkEpoch? next = null;
+
+                if (JSON["final"] is JToken finalJSON)
+                {
+
+                    if (finalJSON.Type != JTokenType.Boolean || !finalJSON.Value<Boolean>())
+                    {
+                        ErrorResponse = "A final checkpoint is \"final\": true, with the next epoch as \"next\"!";
+                        return false;
+                    }
+
+                    if (!RoamingNetworkEpoch.TryParse(JSON["next"], out next, out var nextError))
+                    {
+                        ErrorResponse = "Invalid next epoch of the final checkpoint: " + nextError;
+                        return false;
+                    }
+
+                }
+
+                else if (JSON["next"] is not null)
+                {
+                    ErrorResponse = "Only a final checkpoint names the next epoch!";
+                    return false;
+                }
+
+                RoamingNetworkEpochLink? previousEpoch = null;
+
+                if (JSON[RoamingNetworkEpochLink.JSONProperty] is JToken previousEpochJSON &&
+                    !RoamingNetworkEpochLink.TryParse(previousEpochJSON, out previousEpoch, out var previousEpochError))
+                {
+                    ErrorResponse = previousEpochError;
+                    return false;
+                }
+
                 if (Text(JSON, "createdAt") is not String createdAtText ||
                     !DateTimeOffset.TryParse(createdAtText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var createdAt) ||
                     createdAt.ToISO8601() != createdAtText)
@@ -703,6 +795,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                               createdAt,
                                                               priceStatementsRoot,
                                                               priceStatementsSize,
+                                                              id.HashAlgorithm,
+                                                              next,
+                                                              previousEpoch,
                                                               [ .. signatures.Distinct() ]);
 
                 if (checkpoint.Id != id)
@@ -830,6 +925,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             json.Add("createdAt",       CreatedAt.ToISO8601());
 
+            if (Next is not null)
+            {
+                json.Add("final",       true);
+                json.Add("next",        Next.ToJSON());
+            }
+
+            if (PreviousEpoch is not null)
+                json.Add(RoamingNetworkEpochLink.JSONProperty, PreviousEpoch.ToJSON());
+
             return json;
 
         }
@@ -841,7 +945,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private RoamingNetworkCheckpoint_Id CalcId()
 
             => RoamingNetworkCheckpoint_Id.FromDigest(
-                   SHA256.HashData(
+                   POIMerkleTree.Hash(
+                       IdentificationHash,
                        CanonicalJSON.ToUTF8Bytes(
                            Content()
                        )
@@ -894,7 +999,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"Checkpoint {Sequence} of epoch {Epoch} ({Id}) of commit {CommitId}, {CommitsSize} commits, {PriceStatementsSize} price statements, {Signatures.Length} signatures";
+            => $"{(IsFinal ? "Final checkpoint" : "Checkpoint")} {Sequence} of epoch {Epoch} ({Id}) of commit {CommitId}, {CommitsSize} commits, {PriceStatementsSize} price statements, {Signatures.Length} signatures";
 
         #endregion
 

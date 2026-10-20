@@ -25,8 +25,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// The identification of a checkpoint: the SHA-256 digest of its canonical JSON content without signatures,
-    /// as 64 lowercase hexadecimal digits.
+    /// The identification of a checkpoint: the digest of its canonical JSON content without signatures,
+    /// with the identification hash of its epoch (SPECIFICATION.md, section 11), SHA-256, SHA-384 or SHA-512,
+    /// as 64, 96 or 128 lowercase hexadecimal digits.
     /// </summary>
     public readonly record struct RoamingNetworkCheckpoint_Id
     {
@@ -34,9 +35,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Properties
 
         /// <summary>
-        /// The 64 lowercase hexadecimal digits of the digest.
+        /// The 64, 96 or 128 lowercase hexadecimal digits of the digest.
         /// </summary>
         public String Hex { get; }
+
+        /// <summary>
+        /// The hash algorithm of the digest, told by its length: SHA-256, SHA-384 or SHA-512.
+        /// </summary>
+        public ETagHashAlgorithm HashAlgorithm
+
+            => (Hex?.Length ?? 0) switch {
+                   96   => ETagHashAlgorithm.SHA384,
+                   128  => ETagHashAlgorithm.SHA512,
+                   _    => ETagHashAlgorithm.SHA256
+               };
 
         #endregion
 
@@ -53,14 +65,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) FromDigest(Digest)
 
         /// <summary>
-        /// The checkpoint identification of the given SHA-256 digest.
+        /// The checkpoint identification of the given SHA-256, SHA-384 or SHA-512 digest.
         /// </summary>
-        /// <param name="Digest">A SHA-256 digest.</param>
+        /// <param name="Digest">A digest of 32, 48 or 64 bytes.</param>
         public static RoamingNetworkCheckpoint_Id FromDigest(ReadOnlySpan<Byte> Digest)
 
-            => Digest.Length == 32
+            => Digest.Length is 32 or 48 or 64
                    ? new (Convert.ToHexStringLower(Digest))
-                   : throw new ArgumentException("A checkpoint identification is a SHA-256 digest of 32 bytes!", nameof(Digest));
+                   : throw new ArgumentException("A checkpoint identification is a SHA-256, SHA-384 or SHA-512 digest of 32, 48 or 64 bytes!", nameof(Digest));
 
         #endregion
 
@@ -81,7 +93,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) TryParse(Text, out CheckpointId)
 
         /// <summary>
-        /// Try to parse the given text as a checkpoint identification: 64 lowercase hexadecimal digits.
+        /// Try to parse the given text as a checkpoint identification: 64, 96 or 128 lowercase hexadecimal digits.
         /// </summary>
         /// <param name="Text">A text representation of a checkpoint identification.</param>
         /// <param name="CheckpointId">The parsed checkpoint identification.</param>
@@ -90,7 +102,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (Text is not null &&
-                Text.Length == 64 &&
+                Text.Length is 64 or 96 or 128 &&
                 Text.AsSpan().IndexOfAnyExcept("0123456789abcdef") < 0)
             {
                 CheckpointId = new (Text);

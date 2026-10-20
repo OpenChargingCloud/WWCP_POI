@@ -510,6 +510,29 @@ statement.TryVerify(proof, anchor.IdentityKeyIds, out var attestation, out var e
 - **Persistence:** statements are written to the log, and those of checkpoints kept with them when compacting, so that
   a chain goes on after a restart.
 
+### Epochs
+
+A history goes on under new algorithms in a new **epoch** ([SPECIFICATION.md](SPECIFICATION.md), section 11), e.g.
+with SHA-512 identifications and post-quantum ML-DSA signatures, instead of starting anew:
+
+```csharp
+var profiles = new RoamingNetworkEpochProfiles(ETagHashAlgorithm.SHA512, [ "Ed25519", "ML-DSA-65" ]);
+
+history.TryCloseEpoch(profiles, out var final, out _);                     // the final checkpoint names the next epoch
+history.TryStartNextEpoch(out var next, out _, Signers: [ pqSigner ]);      // its genesis: the version of the final checkpoint
+poiAPI.TryServeNextEpoch(next, out _);                                      // served in place of the old one, which stays readable
+```
+
+- **Profiles:** the hash of the identifications of commits and checkpoints and of their trees (`sha256`, `sha384`
+  or `sha512`; an identification of 64, 96 or 128 hexadecimal digits), and the signature algorithms the epoch accepts
+  for every signature, all of them when none are named. The first epoch has SHA-256 and every algorithm.
+- **Closing:** `TryCloseEpoch(…)` makes the final checkpoint of the head, the only tip, `"final": true` with
+  `"next"`; the epoch takes no commit after it (`EpochStatus`: active, closing, closed).
+- **The next epoch:** `TryStartNextEpoch(…)` starts it from the version of the final checkpoint: its genesis names the
+  epoch and its profiles, every commit after it the epoch, and its first checkpoint the final one before
+  (`PreviousEpoch`), signed with the algorithms of both epochs. Every server makes the same genesis; the runtime status
+  and the current price statements go along.
+
 ### Persistence and retention
 
 A history keeps itself in a store, an `IRoamingNetworkHistoryStore`, and is loaded from it after a restart:
@@ -596,6 +619,10 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `POST ~/RNs/{id}/history/priceStatements` `{priceStatements: […]}` | 200 `{taken, known, outdated, refused, refusals}`, 422 when one was refused |
 | `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/priceStatements` | the price statements a checkpoint names, in the order of its tree |
 | `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/priceStatements/{digest}/proof` | the proof of one of them |
+| `GET ~/RNs/{id}/history/epoch` | the current epoch: `{epoch, profiles, status, previous?, finalCheckpointId?}` |
+| `GET ~/RNs/{id}/history/epochs` | every epoch served here, in their order |
+| `GET ~/RNs/{id}/history/epochs/{epoch}/checkpoints[/{checkpointId}]` | the checkpoints of an epoch, also of one closed |
+| `GET ~/RNs/{id}/history/epochs/{epoch}/commits/{commitId}[/proof]` | a commit of an epoch, and its proof in a checkpoint |
 
 Archived commits are served by `GET …/commits/{commitId}` and proved by `GET …/commits/{commitId}/proof` as well.
 
@@ -704,7 +731,8 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   checkpointId?}`, `signCheckpoint {checkpointId, signatures}`, `pushCheckpoints {checkpoints}`; archive: `archive`, `archiveSegment {number}`;
   proofs: `attestations`, `chargingStationProof {chargingStationId | EVSEId, hashAlgorithm?}`; price statements:
   `priceStatements {chargingStationId | EVSEId}?`, `addPriceStatements {priceStatements}`, `checkpointPriceStatements
-  {checkpointId}`, `priceStatementProof {checkpointId, digest}`; `pushCheckpoints` takes `priceStatements` as well.
+  {checkpointId}`, `priceStatementProof {checkpointId, digest}`; `pushCheckpoints` takes `priceStatements` as well;
+  epochs: `epoch`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
   `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced),
   `commitSignatures` (`{commitId, signatures}` added later), `checkpoints`, `checkpointSignatures`, `attestations`, `adminStatusUpdates`,
@@ -778,6 +806,10 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 - **Price statements:** after the commits, it takes the price statements of the other server and pushes those taken
   here it misses, then every new one (`FollowPriceStatements`, `PushPriceStatements`), e.g. from a server of a charging
   station operator to the one of the roaming network operator; the price statements of a checkpoint come with it.
+- **Epochs:** before catching up, it asks for the epoch of the other server. When the other server serves the next
+  epoch, a history holding the final checkpoint starts it itself, one without it from the other server; the history of
+  the epoch before stays as it is (`OnHistoryReplaced`), and the next one is kept in `EpochStore(number)`
+  (`FollowEpochs`). A history in an epoch the other server has not reached yet waits for it.
 
 ## Submodules
 
@@ -793,8 +825,8 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 - Finer subscription filters
 - Further entities: as the use cases need them
 - How long archives are kept, and erasing personal data from them
-- Epochs (crypto agility): drafted in [SPECIFICATION.md](SPECIFICATION.md), section 11; how long the price statements of
-  checkpoints are kept (section 12.6)
+- Epochs: evidence records for old epochs, an epoch after lost keys of the RNO (section 11.6); how long the price
+  statements of checkpoints are kept (section 12.6)
 - Proofs: signed lists of roaming network operators and their identity keys, proofs of absence, an incremental tree
   ([SPECIFICATION.md](SPECIFICATION.md), section 8.8)
 

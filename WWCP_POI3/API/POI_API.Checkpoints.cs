@@ -400,6 +400,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             AddArchiveCommands(WebSocketServer, History);
             AddProofCommands  (WebSocketServer, History);
             AddPriceStatementCommands(WebSocketServer, History);
+            AddEpochCommands         (WebSocketServer, History);
 
             WebSocketServer.AddCommand("checkpoints", request =>
 

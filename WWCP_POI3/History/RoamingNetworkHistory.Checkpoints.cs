@@ -137,6 +137,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             lock (historyLock)
             {
 
+                if (ClosedError() is String closed)
+                {
+                    ErrorResponse = closed;
+                    return false;
+                }
+
                 var commitId = CommitId ?? LatestCommitAllTipsFollow();
 
                 if (!commitIndex.TryGetValue(commitId, out var index))
@@ -175,6 +181,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var createdAt                    = DateTimeOffset.FromUnixTimeMilliseconds((CreatedAt ?? Timestamp.Now).ToUnixTimeMilliseconds());
 
+                // The first checkpoint of an epoch after the first one names the final checkpoint of the one before.
+                if (latest is null && epoch.Number > 1 && previousEpoch is null)
+                {
+                    ErrorResponse = $"The first checkpoint of the epoch {epoch.Number} names the final checkpoint of the epoch before, which this history does not know!";
+                    return false;
+                }
+
+                var signers                      = CheckpointSigners;
+
+                // Signed with the algorithms of this epoch; the first one of an epoch also with those of the one before.
+                var firstOfAnEpoch               = latest is null && epoch.Number > 1;
+
+                if (!firstOfAnEpoch && !signers.IsDefaultOrEmpty)
+                    foreach (var signer in signers)
+                        if (SignatureAlgorithmError(signer.Algorithm.Name, $"the checkpoint signer {signer}") is String signerError)
+                        {
+                            ErrorResponse = signerError;
+                            return false;
+                        }
+
                 // The price statements stay locked until the checkpoint is kept: it names those taken before it.
                 lock (priceStatementLock)
                 {
@@ -182,15 +208,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     var priceStatementsOfCheckpoint  = PriceStatementsForCheckpoint(createdAt);
 
                     var checkpoint                   = RoamingNetworkCheckpoint.Create(RoamingNetworkId,
-                                                                                       RoamingNetworkCheckpoint.DefaultEpoch,
+                                                                                       epoch.Number,
                                                                                        latest is null ? 0 : latest.Sequence + 1,
                                                                                        latest?.Id,
                                                                                        commit,
                                                                                        commitsOfCheckpoint,
                                                                                        createdAt,
-                                                                                       priceStatementsOfCheckpoint);
-
-                    var signers                      = CheckpointSigners;
+                                                                                       priceStatementsOfCheckpoint,
+                                                                                       null,
+                                                                                       latest is null ? previousEpoch : null);
 
                     if (!signers.IsDefaultOrEmpty)
                         checkpoint = checkpoint.WithSignatures(signers.Select(signer => signer.Sign(checkpoint)));
@@ -256,8 +282,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
 
                 foreach (var signature in Checkpoint.Signatures)
-                    if (!CheckCheckpointSignature(Checkpoint, signature, VerifyCheckpointSignature, out ErrorResponse))
+                {
+
+                    if (CheckpointSignatureAlgorithmError(Checkpoint, signature) is String algorithmError)
+                    {
+                        ErrorResponse = algorithmError;
                         return false;
+                    }
+
+                        if (!CheckCheckpointSignature(Checkpoint, signature, VerifyCheckpointSignature, out ErrorResponse))
+                        return false;
+
+                }
 
                 foreach (var role in RequiredSignatureRoles ?? [])
                     if (!Checkpoint.Signatures.Any(signature => signature.Role == role))
@@ -331,8 +367,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 foreach (var signature in newSignatures)
-                    if (!CheckCheckpointSignature(checkpoint, signature, VerifyCheckpointSignature, out ErrorResponse))
+                {
+
+                    if (CheckpointSignatureAlgorithmError(checkpoint, signature) is String algorithmError)
+                    {
+                        ErrorResponse = algorithmError;
                         return false;
+                    }
+
+                        if (!CheckCheckpointSignature(checkpoint, signature, VerifyCheckpointSignature, out ErrorResponse))
+                        return false;
+
+                }
 
                 // Kept before it is shown: a store failing keeps it from the history.
                 StoreAppend(RoamingNetworkHistoryLogEntry.ForCheckpointSignatures(CheckpointId, newSignatures));
@@ -540,7 +586,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                               commit.Revision,
                                                               (UInt64) leafIndex,
                                                               (UInt64) commitsOfCheckpoint.Count,
-                                                              POIMerkleTree.AuditPath([ .. commitsOfCheckpoint.Select(RoamingNetworkCheckpoint.Leaf) ], leafIndex));
+                                                              POIMerkleTree.AuditPathOfLeafHashes(checkpoint.IdentificationHash,
+                                                                                                  [ .. commitsOfCheckpoint.Select(commitOfCheckpoint => POIMerkleTree.LeafHash(checkpoint.IdentificationHash, RoamingNetworkCheckpoint.Leaf(commitOfCheckpoint))) ],
+                                                                                                  leafIndex));
 
                     ErrorResponse = null;
                     return true;
@@ -652,6 +700,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Snapshot["effectiveLastChanges"] is JToken effectiveLastChanges)
                 version.Add("effectiveLastChanges", effectiveLastChanges);
 
+            if (Snapshot[EpochJSONProperty] is JToken epochOfSnapshot)
+                version.Add(EpochJSONProperty, epochOfSnapshot);
+
             if (!TryFromSnapshot(version, out var history, out var snapshotError, Limits))
             {
                 ErrorResponse = "Invalid snapshot of the checkpoint: " + snapshotError;
@@ -754,9 +805,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (Checkpoint.Epoch != RoamingNetworkCheckpoint.DefaultEpoch)
+            if (Checkpoint.Epoch != epoch.Number)
             {
-                ErrorResponse = $"The checkpoint is of the epoch {Checkpoint.Epoch}, but this history is of epoch {RoamingNetworkCheckpoint.DefaultEpoch}!";
+                ErrorResponse = $"The checkpoint is of the epoch {Checkpoint.Epoch}, but this history is of the epoch {epoch.Number}!";
+                return false;
+            }
+
+            if (Checkpoint.IdentificationHash != epoch.Profiles.IdentificationHash)
+            {
+                ErrorResponse = $"The checkpoint is identified with {Checkpoint.IdentificationHash.ToText()}, but the epoch {epoch.Number} with {epoch.Profiles.IdentificationHash.ToText()}!";
+                return false;
+            }
+
+            if (ClosedError() is String closed)
+            {
+                ErrorResponse = closed;
+                return false;
+            }
+
+            if (Checkpoint.PreviousEpoch is not null && previousEpoch is not null && !Checkpoint.PreviousEpoch.Equals(previousEpoch))
+            {
+                ErrorResponse = $"The checkpoint names the final checkpoint '{Checkpoint.PreviousEpoch.CheckpointId}' of the epoch before, but this epoch starts from '{previousEpoch.CheckpointId}'!";
                 return false;
             }
 
@@ -793,18 +862,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (latest is not null &&
+            // A final checkpoint may name the commit of the checkpoint before: its commits are then that commit alone.
+            var finalOfTheSameCommit = Checkpoint.IsFinal && latest?.CommitId == Checkpoint.CommitId;
+
+            if (latest is not null && !finalOfTheSameCommit &&
                (latest.CommitId == Checkpoint.CommitId || !Ancestors(Checkpoint.CommitId).Contains(latest.CommitId)))
             {
                 ErrorResponse = $"The commit of the checkpoint does not follow the commit '{latest.CommitId}' of the latest checkpoint!";
                 return false;
             }
 
-            if (CommitsOf(Checkpoint.CommitId, latest?.CommitId) is IReadOnlyList<RoamingNetworkCommit> commitsOfCheckpoint)
+            IReadOnlyList<RoamingNetworkCommit>? expectedCommits = finalOfTheSameCommit
+                                                                       ? [ commit ]
+                                                                       : CommitsOf(Checkpoint.CommitId, latest?.CommitId);
+
+            if (expectedCommits is IReadOnlyList<RoamingNetworkCommit> commitsOfCheckpoint)
             {
 
                 if ((UInt64) commitsOfCheckpoint.Count != Checkpoint.CommitsSize ||
-                    RoamingNetworkCheckpoint.CommitsRootOf(commitsOfCheckpoint) != Checkpoint.CommitsRoot)
+                    RoamingNetworkCheckpoint.CommitsRootOf(commitsOfCheckpoint, Checkpoint.IdentificationHash) != Checkpoint.CommitsRoot)
                 {
                     ErrorResponse = "The commits of the checkpoint are not the commits since the latest checkpoint here!";
                     return false;
@@ -878,6 +954,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             PrunePendingPriceStatements(Checkpoint);
 
+            previousEpoch ??= Checkpoint.PreviousEpoch;
+
             // One failing subscriber must neither fail the checkpoint nor keep it from the others.
             foreach (var subscriber in OnCheckpoint?.GetInvocationList().Cast<OnRoamingNetworkCheckpointDelegate>() ?? [])
             {
@@ -911,6 +989,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 PrunePendingPriceStatements(Checkpoint);
             }
+
+            previousEpoch ??= Checkpoint.PreviousEpoch;
 
         }
 

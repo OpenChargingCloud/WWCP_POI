@@ -209,6 +209,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            if (SignatureAlgorithmError(Attestation.Algorithm, "the attestation") is String algorithmError)
+            {
+                ErrorResponse = algorithmError;
+                return false;
+            }
+
             if (!Attestation.IsValidAt(At ?? Timestamp.Now))
             {
                 ErrorResponse = "The attestation is no longer valid!";
@@ -354,7 +360,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var made    = new List<RoamingNetworkAttestation>();
 
-            foreach (var signer in Signers)
+            // Only with the signature algorithms of the epoch.
+            foreach (var signer in Signers.Where(signer => epoch.Profiles.AllowsSignatureAlgorithm(signer.Algorithm.Name)))
                 foreach (var eTag in eTags)
                 {
 

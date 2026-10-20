@@ -621,15 +621,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) RootOf(OrderedPriceStatements)
+        #region (static) RootOf(OrderedPriceStatements, IdentificationHash = SHA256)
 
         /// <summary>
-        /// The Merkle tree hash of the given price statements, already in the order of a checkpoint: each leaf the 32 bytes
-        /// of the digest of a statement, as 64 lowercase hexadecimal digits.
+        /// The Merkle tree hash of the given price statements, already in the order of a checkpoint, with the identification
+        /// hash of its epoch: each leaf the 32 bytes of the digest of a statement, in lowercase hexadecimal digits.
         /// </summary>
-        public static String RootOf(IReadOnlyList<RoamingNetworkPriceStatement> OrderedPriceStatements)
+        public static String RootOf(IReadOnlyList<RoamingNetworkPriceStatement>  OrderedPriceStatements,
+                                    ETagHashAlgorithm                            IdentificationHash   = ETagHashAlgorithm.SHA256)
 
-            => Convert.ToHexStringLower(POIMerkleTree.RootHash([ .. OrderedPriceStatements.Select(priceStatement => priceStatement.Leaf) ]));
+            => Convert.ToHexStringLower(POIMerkleTree.RootOfLeafHashes(IdentificationHash,
+                                                                       [ .. OrderedPriceStatements.Select(priceStatement => POIMerkleTree.LeafHash(IdentificationHash, priceStatement.Leaf)) ]));
 
         #endregion
 

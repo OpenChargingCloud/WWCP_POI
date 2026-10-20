@@ -535,6 +535,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (History is null)
                 await StartFromSnapshotAsync(Connection, CancellationToken);
 
+            // In the epoch of the other server, from the final checkpoint of the one before.
+            else
+                await FollowEpochAsync(Connection, CancellationToken);
+
             await CatchUpAsync(Connection, CancellationToken);
 
             if (options.PushCommits)
@@ -907,8 +911,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (options.Retention is not null)
                 newHistory.Retention = options.Retention;
 
-            // The store, of the history replaced or given, keeps the new one from now on.
-            var store = History?.DetachStore() ?? options.Store;
+            // The store, of the history replaced or given, keeps the new one from now on; one of another epoch a store of its own.
+            var store = History is not null && History.Epoch.Number != newHistory.Epoch.Number
+                            ? options.EpochStore?.Invoke(newHistory.Epoch.Number)
+                            : History?.DetachStore() ?? options.Store;
 
             if (store is not null)
                 newHistory.AttachStore(store);

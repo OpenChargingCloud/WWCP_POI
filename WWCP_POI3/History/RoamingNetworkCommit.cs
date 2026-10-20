@@ -37,8 +37,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// A genesis commit has neither parents nor a change set: it names the version a history starts with.
     /// A merge commit has two parents, its change set leads from the version of the first one to the merge of both,
     /// as everyone calculates it: it is not signed by owners, but checked by calculating it again.
-    /// Its identification is the SHA-256 digest of its canonical JSON content without signatures,
-    /// so it names its whole ancestry, and signatures added later do not change it.
+    /// Its identification is the digest of its canonical JSON content without signatures, with the identification hash
+    /// of its epoch, SHA-256 in the first one, so it names its whole ancestry, and signatures added later do not change it.
+    /// From the second epoch on, its content names its epoch, and the genesis of an epoch the profiles of the epoch.
     /// </summary>
     public sealed partial class RoamingNetworkCommit
     {
@@ -100,6 +101,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<RoamingNetworkCommitSignature>  Signatures  { get; }
 
         /// <summary>
+        /// The epoch of this commit (SPECIFICATION.md, section 11): 1 for the first one, which its content does not name.
+        /// </summary>
+        public UInt32                     Epoch               { get; }
+
+        /// <summary>
+        /// The hash its identification is calculated with, the identification hash of its epoch.
+        /// </summary>
+        public ETagHashAlgorithm          IdentificationHash  { get; }
+
+        /// <summary>
+        /// The profiles of the epoch this commit starts, for the genesis of an epoch after the first one; null otherwise.
+        /// </summary>
+        public RoamingNetworkEpochProfiles?  Profiles         { get; }
+
+        /// <summary>
         /// Whether this commit starts a history.
         /// </summary>
         public Boolean                    IsGenesis
@@ -120,6 +136,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      UInt64                    Revision,
                                      ImmutableArray<ETag>      ETags,
                                      RoamingNetworkChangeSet?  ChangeSet,
+                                     UInt32                    Epoch,
+                                     ETagHashAlgorithm         IdentificationHash,
+                                     RoamingNetworkEpochProfiles?  Profiles,
                                      ImmutableArray<RoamingNetworkCommitSignature>  Signatures   = default)
         {
 
@@ -147,6 +166,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChangeSet is not null && ChangeSet.RoamingNetworkId != RoamingNetworkId)
                 throw new ArgumentException("The change set is for another roaming network.", nameof(ChangeSet));
 
+            if (Epoch == 0)
+                throw new ArgumentException("The first epoch is 1.", nameof(Epoch));
+
+            if ((Profiles is not null) != (ParentIds.IsEmpty && Epoch > 1))
+                throw new ArgumentException("The genesis of an epoch after the first one names the profiles of the epoch, no other commit does.", nameof(Profiles));
+
+            if (Profiles is not null ? Profiles.IdentificationHash != IdentificationHash : Epoch == 1 && IdentificationHash != ETagHashAlgorithm.SHA256)
+                throw new ArgumentException("A commit is identified with the identification hash of its epoch.", nameof(IdentificationHash));
+
+            if (ParentIds.Any(parentId => parentId.HashAlgorithm != IdentificationHash))
+                throw new ArgumentException("A commit and its parents are identified with the same hash: the one of their epoch.", nameof(ParentIds));
+
+            this.Epoch               = Epoch;
+            this.IdentificationHash  = IdentificationHash;
+            this.Profiles            = Profiles;
+
             this.ParentIds         = ParentIds;
             this.RoamingNetworkId  = RoamingNetworkId;
             this.Revision          = Revision;
@@ -172,7 +207,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     RoamingNetwork.Id,
                     RoamingNetwork.Revision,
                     RoamingNetwork.CalcETags(),
+                    null,
+                    1,
+                    ETagHashAlgorithm.SHA256,
                     null);
+
+        #endregion
+
+        #region (static) Genesis(RoamingNetwork, Epoch)
+
+        /// <summary>
+        /// The genesis commit of the given epoch, starting it with the given version of a roaming network
+        /// (SPECIFICATION.md, section 11): it names the epoch and its profiles, and is identified with its identification hash.
+        /// </summary>
+        /// <param name="RoamingNetwork">The version the epoch starts with.</param>
+        /// <param name="Epoch">The epoch, after the first one.</param>
+        public static RoamingNetworkCommit Genesis(RoamingNetwork       RoamingNetwork,
+                                                   RoamingNetworkEpoch  Epoch)
+
+            => Epoch.Number == 1
+                   ? Genesis(RoamingNetwork)
+                   : new ([],
+                          RoamingNetwork.Id,
+                          RoamingNetwork.Revision,
+                          RoamingNetwork.CalcETags(),
+                          null,
+                          Epoch.Number,
+                          Epoch.Profiles.IdentificationHash,
+                          Epoch.Profiles);
 
         #endregion
 
@@ -192,7 +254,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     Parent.RoamingNetworkId,
                     Parent.Revision + 1,
                     RoamingNetwork.CalcETags(),
-                    ChangeSet);
+                    ChangeSet,
+                    Parent.Epoch,
+                    Parent.IdentificationHash,
+                    null);
 
         #endregion
 
@@ -211,11 +276,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  RoamingNetworkChangeSet  ChangeSet,
                                                  RoamingNetwork           RoamingNetwork)
 
-            => new ([ Left.Id, Right.Id ],
-                    Left.RoamingNetworkId,
-                    Math.Max(Left.Revision, Right.Revision) + 1,
-                    RoamingNetwork.CalcETags(),
-                    ChangeSet);
+            => Left.Epoch == Right.Epoch
+                   ? new ([ Left.Id, Right.Id ],
+                          Left.RoamingNetworkId,
+                          Math.Max(Left.Revision, Right.Revision) + 1,
+                          RoamingNetwork.CalcETags(),
+                          ChangeSet,
+                          Left.Epoch,
+                          Left.IdentificationHash,
+                          null)
+                   : throw new ArgumentException("Commits of different epochs are never merged.", nameof(Right));
 
         #endregion
 
@@ -460,12 +530,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #endregion
 
 
+                #region Parse Epoch, Profiles     [optional]
+
+                UInt32 epoch = 1;
+
+                if (JSON["epoch"] is JToken epochJSON)
+                {
+
+                    if (epochJSON is not JValue { Type: JTokenType.Integer } epochValue ||
+                        epochValue.Value<Decimal>() < 2 || epochValue.Value<Decimal>() > UInt32.MaxValue)
+                    {
+                        ErrorResponse = "Invalid epoch: a commit names it from the second one on!";
+                        return false;
+                    }
+
+                    epoch = epochValue.Value<UInt32>();
+
+                }
+
+                RoamingNetworkEpochProfiles? profiles = null;
+
+                if (JSON[RoamingNetworkEpochProfiles.JSONProperty] is JToken profilesJSON &&
+                    !RoamingNetworkEpochProfiles.TryParse(profilesJSON, out profiles, out var profilesError))
+                {
+                    ErrorResponse = "Invalid profiles of the epoch: " + profilesError;
+                    return false;
+                }
+
+                #endregion
+
+
                 var commit = new RoamingNetworkCommit(
                                  parentIds.ToImmutable(),
                                  roamingNetworkId,
                                  revision,
                                  eTags.MoveToImmutable(),
                                  changeSet,
+                                 epoch,
+                                 id.HashAlgorithm,
+                                 profiles,
                                  [ .. signatures.Distinct() ]
                              );
 
@@ -585,6 +688,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            new JProperty("eTags",             new JArray(ETags.Select(eTag => eTag.ToJSON())))
                        );
 
+            if (Epoch > 1)
+                json.Add("epoch",      Epoch);
+
+            if (Profiles is not null)
+                json.Add(RoamingNetworkEpochProfiles.JSONProperty, Profiles.ToJSON());
+
             if (!ParentIds.IsEmpty)
                 json.Add("parentIds",  new JArray(ParentIds.Select(parentId => parentId.ToString())));
 
@@ -602,7 +711,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private RoamingNetworkCommit_Id CalcId()
 
             => RoamingNetworkCommit_Id.FromDigest(
-                   SHA256.HashData(
+                   POIMerkleTree.Hash(
+                       IdentificationHash,
                        CanonicalJSON.ToUTF8Bytes(
                            Content(IncludeSignatures: false)
                        )
@@ -619,7 +729,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"Commit {Id} (revision {Revision}{(ParentIds.IsEmpty ? ", genesis" : $", parents {String.Join(", ", ParentIds)}")})";
+            => $"Commit {Id} ({(Epoch > 1 ? $"epoch {Epoch}, " : "")}revision {Revision}{(ParentIds.IsEmpty ? ", genesis" : $", parents {String.Join(", ", ParentIds)}")})";
 
         #endregion
 
