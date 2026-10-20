@@ -609,7 +609,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(topics.Payload!["topics"]!.Select(topic => topic["name"]!.Value<String>()),
-                            Is.EqualTo(new[] { "adminStatusUpdates", "attestations", "checkpointSignatures", "checkpoints", "commitAnnouncements", "commitSignatures", "commits", "energyStatusUpdates", "priceStatusUpdates", "statusUpdates" }));
+                            Is.EqualTo(new[] { "adminStatusUpdates", "attestations", "checkpointSignatures", "checkpoints", "commitAnnouncements", "commitSignatures", "commits", "energyStatusUpdates", "priceStatements", "priceStatusUpdates", "statusUpdates" }));
                 Assert.That(topics.Payload["topics"]![4]!["action"]!.Value<String>(),  Is.EqualTo("commitAnnouncement"));
             }
 

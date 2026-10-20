@@ -426,7 +426,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 if (!IsReceived(statusUpdate))
                                     pushes.Writer.TryWrite(statusUpdate);
 
-                        var pushing = options.PushCommits || options.PushStatus || options.PushCheckpoints
+                        // The price statements taken here while not connected, or not known there.
+                        if (options.PushPriceStatements)
+                            PushMissingPriceStatements(pushes.Writer);
+
+                        var pushing = options.PushCommits || options.PushStatus || options.PushCheckpoints || options.PushPriceStatements
                                           ? PushAsync(currentConnection, pushes.Reader, following.Token)
                                           : Task.CompletedTask;
 
@@ -521,6 +525,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (options.VerifyAttestation is not null)
                 topics.Add(POI_API.AttestationsTopic);
 
+            if (options.FollowPriceStatements)
+                topics.Add(POI_API.PriceStatementsTopic);
+
             await Expect(Connection, "subscribe", new JObject(new JProperty("topics", topics)), CancellationToken);
 
             statusFromSnapshot = false;
@@ -540,6 +547,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // After the commits as well: an attestation names a commit.
             if (options.VerifyAttestation is not null)
                 await SynchronizeAttestationsAsync(Connection, CancellationToken);
+
+            // After the commits as well: a price statement names an entity.
+            if (options.FollowPriceStatements || options.PushPriceStatements)
+                await SynchronizePriceStatementsAsync(Connection, CancellationToken);
 
             // A snapshot brought the runtime status of its moment; what changed since was pushed.
             // Without following it, the status there is still asked for: to push only what differs.
@@ -593,7 +604,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             break;
 
                         case "checkpoint":
-                            TakeCheckpoint(payload);
+                            await TakeCheckpointAsync(Connection, payload, CancellationToken);
                             break;
 
                         case "checkpointSignatures":
@@ -602,6 +613,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         case "attestation":
                             TakeAttestation(payload);
+                            break;
+
+                        case "priceStatement":
+                            TakePriceStatement(payload);
                             break;
 
                         case "commitAnnouncement":
@@ -751,6 +766,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 watched.OnCommitAnnouncement          -= Announced;
                 watched.RuntimeStatus.OnStatusUpdate  -= StatusUpdated;
+                watched.OnPriceStatement              -= PriceStatementTaken;
                 WatchCheckpoints(watched, false);
             }
 
@@ -764,6 +780,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (options.PushStatus)
                     watched.RuntimeStatus.OnStatusUpdate  += StatusUpdated;
+
+                if (options.PushPriceStatements)
+                    watched.OnPriceStatement              += PriceStatementTaken;
 
                 WatchCheckpoints(watched, true);
 
@@ -937,7 +956,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) PushAsync(Connection, Pushes, CancellationToken)
 
         /// <summary>
-        /// Push the new commits and status updates of this history to the other server, as they come, in their order,
+        /// Push the new commits, status updates, checkpoints and price statements of this history to the other server, as they come, in their order,
         /// e.g. a new EVSE before its status; those of a kind waiting together at once.
         /// A kind the other server does not take is not pushed any more.
         /// </summary>
@@ -946,12 +965,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      CancellationToken      CancellationToken)
         {
 
-            var pushCommits  = options.PushCommits;
-            var pushStatus   = options.PushStatus;
-            var pushCheckpoints = options.PushCheckpoints;
-            Object? next     = null;
+            var pushCommits          = options.PushCommits;
+            var pushStatus           = options.PushStatus;
+            var pushCheckpoints      = options.PushCheckpoints;
+            var pushPriceStatements  = options.PushPriceStatements;
+            Object? next             = null;
 
-            while (pushCommits || pushStatus || pushCheckpoints)
+            while (pushCommits || pushStatus || pushCheckpoints || pushPriceStatements)
             {
 
                 if (next is null)
@@ -996,6 +1016,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (pushStatus && !await TryPushStatusAsync(Connection, statusUpdates, CancellationToken))
                         pushStatus = false;
+
+                }
+
+                else if (next is RoamingNetworkPriceStatement firstPriceStatement)
+                {
+
+                    var priceStatements = new List<RoamingNetworkPriceStatement> { firstPriceStatement };
+                    next = null;
+
+                    while (priceStatements.Count < options.MaxStatusUpdatesPerRequest && Pushes.TryRead(out next) && next is RoamingNetworkPriceStatement priceStatement)
+                    {
+                        priceStatements.Add(priceStatement);
+                        next = null;
+                    }
+
+                    if (pushPriceStatements && !await TryPushPriceStatementsAsync(Connection, priceStatements, CancellationToken))
+                        pushPriceStatements = false;
 
                 }
 

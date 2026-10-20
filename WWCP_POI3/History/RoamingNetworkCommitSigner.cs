@@ -177,6 +177,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region StatePrices(RoamingNetworkId, EntityType, EntityId, PriceStatus, Sequence, Previous, SignedAt = null, ValidFrom = null, ValidUntil = null, After = null)
+
+        /// <summary>
+        /// Sign a price statement of the given charging pool, charging station or EVSE (SPECIFICATION.md, section 12):
+        /// a signing key of its charging station operator.
+        /// </summary>
+        /// <param name="RoamingNetworkId">The roaming network.</param>
+        /// <param name="EntityType">ChargingPool, ChargingStation or EVSE.</param>
+        /// <param name="EntityId">The identification of the entity.</param>
+        /// <param name="PriceStatus">The price status.</param>
+        /// <param name="Sequence">The position in the chain of the statements of the entity.</param>
+        /// <param name="Previous">The digest of the statement before, absent for sequence 0.</param>
+        /// <param name="SignedAt">When it is signed, now otherwise.</param>
+        /// <param name="ValidFrom">Since when it is valid, when it is signed otherwise.</param>
+        /// <param name="ValidUntil">Until when it is valid, if it says.</param>
+        /// <param name="After">The latest checkpoint known, if any.</param>
+        public RoamingNetworkPriceStatement StatePrices(RoamingNetwork_Id             RoamingNetworkId,
+                                                        String                        EntityType,
+                                                        String                        EntityId,
+                                                        ChargingPrices                PriceStatus,
+                                                        UInt64                        Sequence,
+                                                        String?                       Previous,
+                                                        DateTimeOffset?               SignedAt     = null,
+                                                        DateTimeOffset?               ValidFrom    = null,
+                                                        DateTimeOffset?               ValidUntil   = null,
+                                                        RoamingNetworkCheckpoint_Id?  After        = null)
+
+            => RoamingNetworkPriceStatement.Create(privateKey,
+                                                   KeyId,
+                                                   Algorithm,
+                                                   RoamingNetworkId,
+                                                   EntityType,
+                                                   EntityId,
+                                                   PriceStatus,
+                                                   Sequence,
+                                                   Previous,
+                                                   SignedAt,
+                                                   ValidFrom,
+                                                   ValidUntil,
+                                                   After);
+
+        #endregion
+
 
         #region (override) ToString()
 

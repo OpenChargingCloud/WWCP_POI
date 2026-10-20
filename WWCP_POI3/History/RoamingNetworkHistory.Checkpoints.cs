@@ -119,6 +119,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Make the next checkpoint, signed by the CheckpointSigners: of the given commit, or of the latest commit all tips follow.
         /// The commit must follow the commit of the latest checkpoint, and this history must hold all commits of the checkpoint:
         /// the first one of a history is made only where the history holds its genesis.
+        /// It names the price statements taken since the latest checkpoint, signed before it (SPECIFICATION.md, section 12).
         /// </summary>
         /// <param name="Checkpoint">The new checkpoint.</param>
         /// <param name="ErrorResponse">Why none was made, e.g. as there is no new commit.</param>
@@ -171,22 +172,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                var checkpoint = RoamingNetworkCheckpoint.Create(RoamingNetworkId,
-                                                                 RoamingNetworkCheckpoint.DefaultEpoch,
-                                                                 latest is null ? 0 : latest.Sequence + 1,
-                                                                 latest?.Id,
-                                                                 commit,
-                                                                 commitsOfCheckpoint,
-                                                                 CreatedAt ?? Timestamp.Now);
+                var createdAt                    = DateTimeOffset.FromUnixTimeMilliseconds((CreatedAt ?? Timestamp.Now).ToUnixTimeMilliseconds());
 
-                var signers = CheckpointSigners;
+                // The price statements stay locked until the checkpoint is kept: it names those taken before it.
+                lock (priceStatementLock)
+                {
 
-                if (!signers.IsDefaultOrEmpty)
-                    checkpoint = checkpoint.WithSignatures(signers.Select(signer => signer.Sign(checkpoint)));
+                    var priceStatementsOfCheckpoint  = PriceStatementsForCheckpoint(createdAt);
 
-                TakeCheckpoint(checkpoint);
+                    var checkpoint                   = RoamingNetworkCheckpoint.Create(RoamingNetworkId,
+                                                                                       RoamingNetworkCheckpoint.DefaultEpoch,
+                                                                                       latest is null ? 0 : latest.Sequence + 1,
+                                                                                       latest?.Id,
+                                                                                       commit,
+                                                                                       commitsOfCheckpoint,
+                                                                                       createdAt,
+                                                                                       priceStatementsOfCheckpoint);
 
-                Checkpoint     = checkpoint;
+                    var signers                      = CheckpointSigners;
+
+                    if (!signers.IsDefaultOrEmpty)
+                        checkpoint = checkpoint.WithSignatures(signers.Select(signer => signer.Sign(checkpoint)));
+
+                    TakeCheckpoint(checkpoint, priceStatementsOfCheckpoint);
+
+                    Checkpoint                       = checkpoint;
+
+                }
+
                 ErrorResponse  = null;
                 return true;
 
@@ -196,7 +209,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryAddCheckpoint (Checkpoint, out ErrorResponse, VerifyCheckpointSignature = null, RequiredSignatureRoles = null)
+        #region TryAddCheckpoint (Checkpoint, out ErrorResponse, VerifyCheckpointSignature = null, RequiredSignatureRoles = null, PriceStatements = null)
 
         /// <summary>
         /// Take a checkpoint of another server, after checking it against this history (SPECIFICATION.md, section 10.1):
@@ -204,15 +217,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// since, it names the latest checkpoint as the one before and every signature is valid. A checkpoint held already only
         /// brings its signatures in addition. A history without checkpoints takes any one of a commit it holds as its first,
         /// e.g. after it started from a snapshot, without checking its commits it does not hold.
+        /// The price statements it names are checked when they are given, TryAddCheckpointPriceStatements(…) takes them later.
         /// </summary>
         /// <param name="Checkpoint">The checkpoint.</param>
         /// <param name="ErrorResponse">Why it was refused.</param>
         /// <param name="VerifyCheckpointSignature">A verifier of checkpoint signatures using trusted keys, required for signed checkpoints.</param>
         /// <param name="RequiredSignatureRoles">The roles a checkpoint must be signed in, e.g. roamingNetworkOperator.</param>
-        public Boolean TryAddCheckpoint(RoamingNetworkCheckpoint             Checkpoint,
-                                        [NotNullWhen(false)] out String?     ErrorResponse,
-                                        VerifyCheckpointSignatureDelegate?   VerifyCheckpointSignature   = null,
-                                        IReadOnlyCollection<String>?         RequiredSignatureRoles      = null)
+        /// <param name="PriceStatements">The price statements it names, if they are given.</param>
+        public Boolean TryAddCheckpoint(RoamingNetworkCheckpoint                    Checkpoint,
+                                        [NotNullWhen(false)] out String?            ErrorResponse,
+                                        VerifyCheckpointSignatureDelegate?          VerifyCheckpointSignature   = null,
+                                        IReadOnlyCollection<String>?                RequiredSignatureRoles      = null,
+                                        IEnumerable<RoamingNetworkPriceStatement>?  PriceStatements             = null)
         {
 
             lock (historyLock)
@@ -225,7 +241,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 if (checkpointIndex.ContainsKey(Checkpoint.Id))
-                    return TryAddCheckpointSignatures(Checkpoint.Id, Checkpoint.Signatures, VerifyCheckpointSignature, out _, out _, out ErrorResponse);
+                {
+
+                    if (!TryAddCheckpointSignatures(Checkpoint.Id, Checkpoint.Signatures, VerifyCheckpointSignature, out _, out _, out ErrorResponse))
+                        return false;
+
+                    return PriceStatements is null || Checkpoint.PriceStatementsSize == 0 ||
+                           TryAddCheckpointPriceStatements(Checkpoint.Id, PriceStatements, out ErrorResponse);
+
+                }
 
                 if (!CheckCheckpoint(Checkpoint, out ErrorResponse))
                     return false;
@@ -241,7 +265,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                TakeCheckpoint(Checkpoint);
+                IReadOnlyList<RoamingNetworkPriceStatement>? priceStatementsOfCheckpoint = null;
+
+                if (PriceStatements is not null && Checkpoint.PriceStatementsSize > 0 &&
+                    !CheckCheckpointPriceStatements(Checkpoint, PriceStatements, out priceStatementsOfCheckpoint, out ErrorResponse))
+                {
+                    return false;
+                }
+
+                lock (priceStatementLock)
+                {
+                    TakeCheckpoint(Checkpoint, priceStatementsOfCheckpoint);
+                }
 
                 ErrorResponse = null;
                 return true;
@@ -356,6 +391,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!checkpointIndex.TryGetValue(CheckpointId, out var index))
                 {
                     ErrorResponse = $"The checkpoint '{CheckpointId}' is unknown here; a witness signs only checkpoints it checked!";
+                    return false;
+                }
+
+                if (checkpoints[index].PriceStatementsSize > 0 && PriceStatementsOf(CheckpointId) is null)
+                {
+                    ErrorResponse = $"The price statements of the checkpoint '{CheckpointId}' are not checked here; a witness signs only checkpoints it checked!";
                     return false;
                 }
 
@@ -676,19 +717,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TakeCheckpoint(Checkpoint)
+        #region (private) TakeCheckpoint(Checkpoint, PriceStatements = null)
 
         /// <summary>
-        /// Take the given checkpoint, while the history is locked: keep it in the store, hold it, and announce it.
+        /// Take the given checkpoint, while the history and its price statements are locked: keep it in the store, with the
+        /// price statements it names when they are given, hold it, and announce it. The price statements signed before it
+        /// are no longer those for the next checkpoint.
         /// </summary>
-        private void TakeCheckpoint(RoamingNetworkCheckpoint Checkpoint)
+        private void TakeCheckpoint(RoamingNetworkCheckpoint                      Checkpoint,
+                                    IReadOnlyList<RoamingNetworkPriceStatement>?  PriceStatements   = null)
         {
 
             // Kept before it is shown: a store failing keeps it from the history.
             StoreAppend(RoamingNetworkHistoryLogEntry.ForCheckpoint(Checkpoint));
 
+            if (PriceStatements is not null && Checkpoint.PriceStatementsSize > 0)
+                StoreAppend(RoamingNetworkHistoryLogEntry.ForCheckpointPriceStatements(Checkpoint.Id, PriceStatements));
+
             checkpointIndex[Checkpoint.Id] = checkpoints.Count;
             checkpoints.Add(Checkpoint);
+
+            if (PriceStatements is not null && Checkpoint.PriceStatementsSize > 0)
+                TakeCheckpointPriceStatements(Checkpoint.Id, PriceStatements);
+
+            PrunePendingPriceStatements(Checkpoint);
 
             // One failing subscriber must neither fail the checkpoint nor keep it from the others.
             foreach (var subscriber in OnCheckpoint?.GetInvocationList().Cast<OnRoamingNetworkCheckpointDelegate>() ?? [])
@@ -719,6 +771,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             checkpointIndex[Checkpoint.Id] = checkpoints.Count;
             checkpoints.Add(Checkpoint);
 
+            lock (priceStatementLock)
+            {
+                PrunePendingPriceStatements(Checkpoint);
+            }
+
         }
 
         #endregion
@@ -739,11 +796,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) CheckpointLogEntries()
 
         /// <summary>
-        /// The log entries of all checkpoints, with their signatures, e.g. for a compacted log.
+        /// The log entries of all checkpoints, with their signatures and the price statements they name, and of the other
+        /// price statements held, e.g. for a compacted log: those for the next checkpoint after the checkpoints.
         /// </summary>
         private IEnumerable<RoamingNetworkHistoryLogEntry> CheckpointLogEntries()
+        {
 
-            => [ .. checkpoints.Select(RoamingNetworkHistoryLogEntry.ForCheckpoint) ];
+            var (before, after)  = PriceStatementLogEntries();
+            var entries          = new List<RoamingNetworkHistoryLogEntry>(before);
+
+            foreach (var checkpoint in checkpoints)
+            {
+
+                entries.Add(RoamingNetworkHistoryLogEntry.ForCheckpoint(checkpoint));
+
+                if (PriceStatementsOf(checkpoint.Id) is IReadOnlyList<RoamingNetworkPriceStatement> priceStatementsOfCheckpoint)
+                    entries.Add(RoamingNetworkHistoryLogEntry.ForCheckpointPriceStatements(checkpoint.Id, priceStatementsOfCheckpoint));
+
+            }
+
+            entries.AddRange(after);
+
+            return entries;
+
+        }
 
         #endregion
 

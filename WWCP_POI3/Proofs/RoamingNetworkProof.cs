@@ -330,6 +330,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region GivenBelow(Entity, ChildArrays)
+
+        /// <summary>
+        /// The entities this proof gives along the given child arrays from the given entity of it on, e.g.
+        /// GivenBelow(chargingStationOperator, "chargingPools", "chargingStations") for the charging stations of one
+        /// charging station operator it gives.
+        /// </summary>
+        /// <param name="Entity">An entity this proof gives.</param>
+        /// <param name="ChildArrays">The names of child arrays, one per level.</param>
+        public IEnumerable<JObject> GivenBelow(JObject          Entity,
+                                               params String[]  ChildArrays)
+        {
+
+            IEnumerable<JObject> entities = [ Entity ];
+
+            foreach (var childArray in ChildArrays)
+                entities = entities.SelectMany(entity => Children(entity, childArray)).ToArray();
+
+            return entities;
+
+        }
+
+        #endregion
+
 
         #region (static) TryParse(Text, out Proof, out ErrorResponse)
 

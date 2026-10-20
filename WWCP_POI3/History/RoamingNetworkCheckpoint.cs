@@ -126,6 +126,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public UInt64                                         CommitsSize         { get; }
 
         /// <summary>
+        /// The Merkle tree hash of the price statements this checkpoint names, those its server took since the checkpoint
+        /// before (SPECIFICATION.md, section 12), as 64 lowercase hexadecimal digits; null when it names none.
+        /// </summary>
+        public String?                                        PriceStatementsRoot { get; }
+
+        /// <summary>
+        /// The number of price statements this checkpoint names: 0 when it names none.
+        /// </summary>
+        public UInt64                                         PriceStatementsSize { get; }
+
+        /// <summary>
         /// When this checkpoint was made, to the millisecond.
         /// </summary>
         public DateTimeOffset                                 CreatedAt           { get; }
@@ -150,6 +161,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          String                                         CommitsRoot,
                                          UInt64                                         CommitsSize,
                                          DateTimeOffset                                 CreatedAt,
+                                         String?                                        PriceStatementsRoot,
+                                         UInt64                                         PriceStatementsSize,
                                          ImmutableArray<RoamingNetworkCommitSignature>  Signatures   = default)
         {
 
@@ -168,25 +181,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (CommitsSize == 0)
                 throw new ArgumentException("A checkpoint has at least its own commit.", nameof(CommitsSize));
 
-            this.RoamingNetworkId  = RoamingNetworkId;
-            this.Epoch             = Epoch;
-            this.Sequence          = Sequence;
-            this.PreviousId        = PreviousId;
-            this.CommitId          = CommitId;
-            this.Revision          = Revision;
-            this.ETags             = ETags;
-            this.CommitsRoot       = CommitsRoot;
-            this.CommitsSize       = CommitsSize;
-            this.CreatedAt         = DateTimeOffset.FromUnixTimeMilliseconds(CreatedAt.ToUnixTimeMilliseconds());
-            this.Signatures        = Signatures.IsDefault ? [] : Signatures;
-            this.Id                = CalcId();
+            if ((PriceStatementsRoot is null) != (PriceStatementsSize == 0))
+                throw new ArgumentException("A checkpoint names price statements by their root and their number, or none.", nameof(PriceStatementsRoot));
+
+            if (PriceStatementsRoot is not null && (PriceStatementsRoot.Length != 64 || PriceStatementsRoot.AsSpan().IndexOfAnyExcept("0123456789abcdef") >= 0))
+                throw new ArgumentException("The root of the price statements must be 64 lowercase hexadecimal digits.", nameof(PriceStatementsRoot));
+
+            this.RoamingNetworkId     = RoamingNetworkId;
+            this.Epoch                = Epoch;
+            this.Sequence             = Sequence;
+            this.PreviousId           = PreviousId;
+            this.CommitId             = CommitId;
+            this.Revision             = Revision;
+            this.ETags                = ETags;
+            this.CommitsRoot          = CommitsRoot;
+            this.CommitsSize          = CommitsSize;
+            this.PriceStatementsRoot  = PriceStatementsRoot;
+            this.PriceStatementsSize  = PriceStatementsSize;
+            this.CreatedAt            = DateTimeOffset.FromUnixTimeMilliseconds(CreatedAt.ToUnixTimeMilliseconds());
+            this.Signatures           = Signatures.IsDefault ? [] : Signatures;
+            this.Id                   = CalcId();
 
         }
 
         #endregion
 
 
-        #region (static) Create  (RoamingNetworkId, Epoch, Sequence, PreviousId, Commit, Commits, CreatedAt)
+        #region (static) Create  (RoamingNetworkId, Epoch, Sequence, PreviousId, Commit, Commits, CreatedAt, PriceStatements = null)
 
         /// <summary>
         /// Make a checkpoint of the given commit, unsigned.
@@ -198,19 +219,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Commit">The commit.</param>
         /// <param name="Commits">The commits of the checkpoint, the commit among them, in any order.</param>
         /// <param name="CreatedAt">When it is made.</param>
-        public static RoamingNetworkCheckpoint Create(RoamingNetwork_Id                  RoamingNetworkId,
-                                                      UInt32                             Epoch,
-                                                      UInt64                             Sequence,
-                                                      RoamingNetworkCheckpoint_Id?       PreviousId,
-                                                      RoamingNetworkCommit               Commit,
-                                                      IEnumerable<RoamingNetworkCommit>  Commits,
-                                                      DateTimeOffset                     CreatedAt)
+        /// <param name="PriceStatements">The price statements it names, in any order: those taken since the checkpoint before.</param>
+        public static RoamingNetworkCheckpoint Create(RoamingNetwork_Id                           RoamingNetworkId,
+                                                      UInt32                                      Epoch,
+                                                      UInt64                                      Sequence,
+                                                      RoamingNetworkCheckpoint_Id?                PreviousId,
+                                                      RoamingNetworkCommit                        Commit,
+                                                      IEnumerable<RoamingNetworkCommit>           Commits,
+                                                      DateTimeOffset                              CreatedAt,
+                                                      IEnumerable<RoamingNetworkPriceStatement>?  PriceStatements   = null)
         {
 
             var ordered = InOrder(Commits);
 
             if (!ordered.Any(commit => commit.Id == Commit.Id))
                 throw new ArgumentException("The commits of a checkpoint include its own commit.", nameof(Commits));
+
+            var priceStatements = RoamingNetworkPriceStatement.InOrder(PriceStatements ?? []);
 
             return new (RoamingNetworkId,
                         Epoch,
@@ -221,7 +246,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         Commit.ETags,
                         CommitsRootOf(ordered),
                         (UInt64) ordered.Count,
-                        CreatedAt);
+                        CreatedAt,
+                        priceStatements.Count > 0 ? RoamingNetworkPriceStatement.RootOf(priceStatements) : null,
+                        (UInt64) priceStatements.Count);
 
         }
 
@@ -318,6 +345,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       CommitsRoot,
                                                       CommitsSize,
                                                       CreatedAt,
+                                                      PriceStatementsRoot,
+                                                      PriceStatementsSize,
                                                       this.Signatures.AddRange(newSignatures));
 
         }
@@ -603,6 +632,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                String? priceStatementsRoot = null;
+                UInt64  priceStatementsSize = 0;
+
+                if (JSON["priceStatements"] is JToken priceStatementsJSON)
+                {
+
+                    if (priceStatementsJSON is not JObject priceStatementsObject ||
+                        Text(priceStatementsObject, "@merkleRoot") is not String root ||
+                        !TryParseUInt(priceStatementsObject, "@size", out priceStatementsSize, out _) ||
+                        priceStatementsSize == 0)
+                    {
+                        ErrorResponse = "The price statements must be { @merkleRoot, @size }, at least one!";
+                        return false;
+                    }
+
+                    priceStatementsRoot = root;
+
+                }
+
                 if (Text(JSON, "createdAt") is not String createdAtText ||
                     !DateTimeOffset.TryParse(createdAtText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var createdAt) ||
                     createdAt.ToISO8601() != createdAtText)
@@ -653,6 +701,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                               commitsRoot,
                                                               commitsSize,
                                                               createdAt,
+                                                              priceStatementsRoot,
+                                                              priceStatementsSize,
                                                               [ .. signatures.Distinct() ]);
 
                 if (checkpoint.Id != id)
@@ -771,6 +821,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             new JProperty("@merkleRoot",  CommitsRoot),
                                             new JProperty("@size",        CommitsSize)
                                         ));
+
+            if (PriceStatementsRoot is not null)
+                json.Add("priceStatements", new JObject(
+                                                new JProperty("@merkleRoot",  PriceStatementsRoot),
+                                                new JProperty("@size",        PriceStatementsSize)
+                                            ));
+
             json.Add("createdAt",       CreatedAt.ToISO8601());
 
             return json;
@@ -837,7 +894,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"Checkpoint {Sequence} of epoch {Epoch} ({Id}) of commit {CommitId}, {CommitsSize} commits, {Signatures.Length} signatures";
+            => $"Checkpoint {Sequence} of epoch {Epoch} ({Id}) of commit {CommitId}, {CommitsSize} commits, {PriceStatementsSize} price statements, {Signatures.Length} signatures";
 
         #endregion
 

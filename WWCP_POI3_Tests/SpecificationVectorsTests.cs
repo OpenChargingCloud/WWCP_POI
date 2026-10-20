@@ -263,6 +263,55 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_price_statement()
+
+        [Test]
+        public void A_price_statement()
+        {
+
+            const String OperatorPublicKey  = "JUO5L/EJVRFHatyDadtt3JM2ZaEZeN2hQE7hBmypVZ0=";
+            const String KeyId              = "8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d";
+            const String Input              = "{\"algorithm\":\"Ed25519\",\"encoding\":\"base64\",\"entityId\":\"DE*GEF*E1*1\",\"entityType\":\"EVSE\",\"keyId\":\"8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d\",\"priceStatus\":{\"prices\":[{\"chargingTariffId\":\"DE*GEF*T1\",\"elements\":[{\"priceComponents\":[{\"price\":0.39,\"stepSize\":1,\"type\":\"ENERGY\"}]}]}]},\"profile\":\"wwcp-poi-price-statement-v1\",\"roamingNetworkId\":\"rn1\",\"role\":\"chargingStationOperator\",\"sequence\":0,\"signedAt\":\"2026-10-19T11:59:58.000Z\",\"signer\":\"DE*GEF\",\"validFrom\":\"2026-10-19T12:00:00.000Z\",\"validUntil\":\"2026-10-19T12:15:00.000Z\"}";
+            const String Value              = "95n+aTF2ZF3WqdHA8BSZPWqfSvxkMhzSQjCScPsZn13Jhehdi4d/aokA4507iZBy9fmuHRj9vNq5dfiaa0NQDw==";
+            const String Digest             = "efbd7b8f0d28a0affe44a872dbaefdd37b6afa5366202d4653b8a5b58bcef772";
+
+            var operatorKey  = new Ed25519PrivateKeyParameters(Convert.FromHexString("404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"), 0);
+            var publicKey    = POIPublicKey.From(operatorKey);
+            var prices       = new ChargingPrices([ new ChargingTariffPrices(ChargingTariff_Id.Parse("DE*GEF*T1"),
+                                                                             [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.39m, StepSize: 1) ]) ]) ]);
+
+            var statement    = RoamingNetworkPriceStatement.Create(operatorKey,
+                                                                   publicKey.Id,
+                                                                   COSEAlgorithm.Ed25519,
+                                                                   RoamingNetwork_Id.Parse("rn1"),
+                                                                   nameof(EVSE),
+                                                                   "DE*GEF*E1*1",
+                                                                   prices,
+                                                                   0,
+                                                                   null,
+                                                                   DateTimeOffset.Parse("2026-10-19T11:59:58Z"),
+                                                                   DateTimeOffset.Parse("2026-10-19T12:00:00Z"),
+                                                                   DateTimeOffset.Parse("2026-10-19T12:15:00Z"));
+
+            // The digest is the SHA-256 of the canonical JSON of the statement, its signature value included.
+            var withValue    = Input[..^1] + ",\"value\":\"" + Value + "\"}";
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Convert.ToBase64String(operatorKey.GeneratePublicKey().GetEncoded()),               Is.EqualTo(OperatorPublicKey));
+                Assert.That(publicKey.Id,                                                                       Is.EqualTo(KeyId));
+                Assert.That(Encoding.UTF8.GetString(statement.GetSigningBytes()),                               Is.EqualTo(Input));
+                Assert.That(statement.Value,                                                                    Is.EqualTo(Value));
+                Assert.That(CanonicalJSON.Serialize(statement.ToJSON()),                                        Is.EqualTo(withValue));
+                Assert.That(statement.Digest,                                                                   Is.EqualTo(Digest));
+                Assert.That(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(withValue))),       Is.EqualTo(Digest));
+                Assert.That(statement.TryVerify([ publicKey ], out var error),                                  Is.True, error);
+            }
+
+        }
+
+        #endregion
+
         #region An_attestation_and_a_station_proof()
 
         [Test]

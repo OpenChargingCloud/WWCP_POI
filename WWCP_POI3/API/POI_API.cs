@@ -81,6 +81,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             RegisterLocationURLTemplates();
             RegisterHistoryURLTemplates();
             RegisterProofURLTemplates();
+            RegisterPriceStatementURLTemplates();
             RegisterPeerURLTemplates();
             RegisterWebSocketURLTemplates();
 

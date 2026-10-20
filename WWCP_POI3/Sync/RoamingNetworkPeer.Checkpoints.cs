@@ -100,7 +100,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         if (currentHistory.LatestCheckpoint is null && !currentHistory.Contains(checkpoint.CommitId))
                             continue;
 
-                        if (!TakeCheckpoint(checkpoint))
+                        if (!TakeCheckpoint(checkpoint, await TryGetCheckpointPriceStatementsAsync(Connection, checkpoint, CancellationToken)))
                             return;
 
                     }
@@ -136,12 +136,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TakeCheckpoint(CheckpointJSON)
+        #region (private) TakeCheckpointAsync(Connection, CheckpointJSON, CancellationToken)
 
         /// <summary>
-        /// Take a checkpoint of the other server; one this history refuses is told by an error.
+        /// Take a checkpoint of the other server, with the price statements it names; one this history refuses is told by
+        /// an error.
         /// </summary>
-        private Boolean TakeCheckpoint(JObject CheckpointJSON)
+        private async Task<Boolean> TakeCheckpointAsync(Connection         Connection,
+                                                        JObject            CheckpointJSON,
+                                                        CancellationToken  CancellationToken)
         {
 
             if (!RoamingNetworkCheckpoint.TryParse(CheckpointJSON, out var checkpoint, out var errorResponse))
@@ -150,11 +153,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            return TakeCheckpoint(checkpoint);
+            return TakeCheckpoint(checkpoint, await TryGetCheckpointPriceStatementsAsync(Connection, checkpoint, CancellationToken));
 
         }
 
-        private Boolean TakeCheckpoint(RoamingNetworkCheckpoint Checkpoint)
+        private Boolean TakeCheckpoint(RoamingNetworkCheckpoint                      Checkpoint,
+                                       IReadOnlyList<RoamingNetworkPriceStatement>?  PriceStatements)
         {
 
             var checkpoint = Checkpoint;
@@ -164,7 +168,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var signature in checkpoint.Signatures)
                 receivedCheckpointSignatures.TryAdd((checkpoint.Id, signature), 0);
 
-            if (!History!.TryAddCheckpoint(checkpoint, out var errorResponse, options.VerifyCheckpointSignature, options.RequiredCheckpointSignatureRoles))
+            if (!History!.TryAddCheckpoint(checkpoint, out var errorResponse, options.VerifyCheckpointSignature, options.RequiredCheckpointSignatureRoles, PriceStatements))
             {
                 RaiseError("The checkpoint of the other server can not be taken: " + errorResponse, null);
                 return false;
@@ -263,8 +267,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                             CancellationToken                        CancellationToken)
         {
 
+            var currentHistory   = History!;
+            var priceStatements  = new JArray(Checkpoints.Select(checkpoint => (checkpoint.Id, PriceStatements: currentHistory.PriceStatementsOf(checkpoint.Id))).
+                                                          Where (ofCheckpoint => ofCheckpoint.PriceStatements is not null).
+                                                          Select(ofCheckpoint => new JObject(
+                                                                                     new JProperty("checkpointId",     ofCheckpoint.Id.ToString()),
+                                                                                     new JProperty("priceStatements",  new JArray(ofCheckpoint.PriceStatements!.Select(priceStatement => priceStatement.ToJSON())))
+                                                                                 )));
+
+            var payload          = new JObject(new JProperty("checkpoints", new JArray(Checkpoints.Select(checkpoint => checkpoint.ToJSON()))));
+
+            // With the price statements they name, so that the other server checks them as well.
+            if (priceStatements.Count > 0)
+                payload.Add("priceStatements", priceStatements);
+
             var answer = await Connection.RequestAsync("pushCheckpoints",
-                                                       new JObject(new JProperty("checkpoints", new JArray(Checkpoints.Select(checkpoint => checkpoint.ToJSON())))),
+                                                       payload,
                                                        CancellationToken);
 
             if (answer.IsError)

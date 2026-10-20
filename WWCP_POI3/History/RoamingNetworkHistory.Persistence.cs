@@ -239,6 +239,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 history.TakeStoredCheckpointSignatures(entry.CheckpointId!.Value, entry.Signatures);
                                 break;
 
+                            case RoamingNetworkHistoryLogEntryType.PriceStatement:
+                                lock (history.priceStatementLock)
+                                {
+                                    history.TakeStoredPriceStatement(entry.PriceStatement!);
+                                }
+                                break;
+
+                            case RoamingNetworkHistoryLogEntryType.CheckpointPriceStatements:
+                                lock (history.priceStatementLock)
+                                {
+                                    history.TakeCheckpointPriceStatements(entry.CheckpointId!.Value, entry.PriceStatements);
+                                }
+                                break;
+
                             default:
                                 history.RuntimeStatus.TryUpdate(entry.StatusUpdate!, out _);
                                 break;

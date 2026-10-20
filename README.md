@@ -476,6 +476,38 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   `https://hub.example/poi/RNs/rn1?identityKeys=<@id>,…` (`GET ~/RNs/{id}/trustAnchor`), and verifies proofs with
   `proof.Verify(anchor.IdentityKeyIds, …)`: only the thumbprints of the identity keys are pinned.
 
+### Price statements
+
+The price status of a charging pool, a charging station or an EVSE, signed by its charging station operator when it
+sets it ([SPECIFICATION.md](SPECIFICATION.md), section 12): a driver's app keeps the price of its charging session as
+evidence, checked offline with the proof of the station.
+
+```csharp
+history.PriceStatementSigners = [ new RoamingNetworkCommitSigner(operatorKey, operatorKeyId, COSEAlgorithm.ES256,
+                                                                 RoamingNetworkCommitSignatureRoles.ChargingStationOperator, "DE*GEF") ];
+
+// Every change of a price status of an entity of DE*GEF is stated now:
+history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.PriceStatus, "EVSE", "DE*GEF*E1*1", prices.Text, now, out _, out _);
+
+// In the app, with the proof of the station and the identity keys of the trust anchor:
+RoamingNetworkPriceStatement.TryParse(text, out var statement, out _);
+statement.TryVerify(proof, anchor.IdentityKeyIds, out var attestation, out var error);
+```
+
+- **Chain:** every entity has one of its own: `sequence` 0, 1, …, each statement naming the digest of the one before
+  (`previous`) and the latest checkpoint known (`after`). `TryAddPriceStatement(…)` takes those of another server:
+  signed by a signing key of the operator of the entity, naming its tariffs, not over, and following the current one;
+  another one of the same sequence is refused as a split view. Taken, it sets the price status. With a
+  `PriceStatementValidity` (none by default: valid until the next one), `RefreshPriceStatements()` states the price
+  status anew before a statement ends. `OnPriceStatement` tells of every one; `PriceStatementsOf(stationId)` gives
+  those of the pool, the station and its EVSEs.
+- **Checkpoints:** a checkpoint names the price statements taken since the one before by their tree,
+  `priceStatements: {@merkleRoot, @size}`, and `TryGetPriceStatementProof(checkpointId, digest, …)` proves one of them.
+  Taking a checkpoint along with its statements checks them, `TryAddCheckpointPriceStatements(…)` later; a witness signs
+  a checkpoint naming statements only then.
+- **Persistence:** statements are written to the log, and those of checkpoints kept with them when compacting, so that
+  a chain goes on after a restart.
+
 ### Persistence and retention
 
 A history keeps itself in a store, an `IRoamingNetworkHistoryStore`, and is loaded from it after a restart:
@@ -557,6 +589,11 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/proof` | the proof of a charging station of the head, `?hashAlgorithm=` one of the network's |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/proof` | the proof of the charging station of an EVSE |
 | `GET ~/RNs/{id}/CSs/{CS_Id}/proof`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/proof` | the same, found by the identification alone |
+| `GET ~/RNs/{id}/CSs/{CS_Id}/priceStatements`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/priceStatements` | the price statements of the pool, the station and its EVSEs, or the EVSE; also below the full path of the station |
+| `GET ~/RNs/{id}/history/priceStatements` | the current price statement of every entity |
+| `POST ~/RNs/{id}/history/priceStatements` `{priceStatements: […]}` | 200 `{taken, known, outdated, refused, refusals}`, 422 when one was refused |
+| `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/priceStatements` | the price statements a checkpoint names, in the order of its tree |
+| `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/priceStatements/{digest}/proof` | the proof of one of them |
 
 Archived commits are served by `GET …/commits/{commitId}` and proved by `GET …/commits/{commitId}/proof` as well.
 
@@ -663,11 +700,13 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   `signCommit {commitId, signatures}` → `{commitId, signatures, added}`; checkpoints: `checkpoints {since?, max?}`
   or `{latest: true}`, `checkpoint {checkpointId}`, `checkpointSnapshot {checkpointId}`, `commitProof {commitId,
   checkpointId?}`, `signCheckpoint {checkpointId, signatures}`, `pushCheckpoints {checkpoints}`; archive: `archive`, `archiveSegment {number}`;
-  proofs: `attestations`, `chargingStationProof {chargingStationId | EVSEId, hashAlgorithm?}`.
+  proofs: `attestations`, `chargingStationProof {chargingStationId | EVSEId, hashAlgorithm?}`; price statements:
+  `priceStatements {chargingStationId | EVSEId}?`, `addPriceStatements {priceStatements}`, `checkpointPriceStatements
+  {checkpointId}`, `priceStatementProof {checkpointId, digest}`; `pushCheckpoints` takes `priceStatements` as well.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
   `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced),
   `commitSignatures` (`{commitId, signatures}` added later), `checkpoints`, `checkpointSignatures`, `attestations`, `adminStatusUpdates`,
-  `statusUpdates`, `energyStatusUpdates`. Pushes are sends, `[6, "p1", action, payload]`,
+  `statusUpdates`, `energyStatusUpdates`, `priceStatusUpdates`, `priceStatements`. Pushes are sends, `[6, "p1", action, payload]`,
   in the format of the last `subscribe`. They end with the connection; a client that falls more than
   `MaxQueuedPushes` pushes or `MaxQueuedPushBytes` behind is disconnected and catches up after reconnecting.
 - **Async:** requests are processed concurrently, up to `MaxConcurrentRequests` per connection;
@@ -732,6 +771,9 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   it holds. A witness running a peer signs with `history.TryWitness(…)`; the signature goes to the other server.
 - **Attestations:** with `VerifyAttestation`, a verifier of the keys of the roaming network operator, it takes the
   attestations of the other server, so that it serves proofs of charging stations with them as well.
+- **Price statements:** after the commits, it takes the price statements of the other server and pushes those taken
+  here it misses, then every new one (`FollowPriceStatements`, `PushPriceStatements`), e.g. from a server of a charging
+  station operator to the one of the roaming network operator; the price statements of a checkpoint come with it.
 
 ## Submodules
 
@@ -747,7 +789,8 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 - Finer subscription filters
 - Further entities: as the use cases need them
 - A peer joining from the latest checkpoint rather than the head; how long archives are kept, and erasing personal data from them
-- Epochs (crypto agility) and signed prices at runtime: drafted in [SPECIFICATION.md](SPECIFICATION.md), sections 11 and 12
+- Epochs (crypto agility): drafted in [SPECIFICATION.md](SPECIFICATION.md), section 11; how long the price statements of
+  checkpoints are kept (section 12.6)
 - Proofs: signed lists of roaming network operators and their identity keys, proofs of absence, an incremental tree
   ([SPECIFICATION.md](SPECIFICATION.md), section 8.8)
 

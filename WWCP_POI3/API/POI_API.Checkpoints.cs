@@ -59,11 +59,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET    ~/RNs/{roamingNetworkId}/history/checkpoints/{checkpointId}/snapshot                the version of its commit, to join from
     /// GET    ~/RNs/{roamingNetworkId}/history/checkpoints/{checkpointId}/commits/{commitId}/proof the proof of a commit in it
     /// GET    ~/RNs/{roamingNetworkId}/history/commits/{commitId}/proof                           the proof of a commit in the first checkpoint including it
-    /// POST   ~/RNs/{roamingNetworkId}/history/checkpoints                                        push checkpoints: { checkpoints: [ … ] }
+    /// POST   ~/RNs/{roamingNetworkId}/history/checkpoints                                        push checkpoints: { checkpoints: [ … ], priceStatements? }
     /// POST   ~/RNs/{roamingNetworkId}/history/checkpoints/{checkpointId}/signatures              add signatures, e.g. of witnesses: { signatures: [ … ] }
     ///
     /// WebSocket actions: checkpoints { since?, max? } or { latest: true }, checkpoint { checkpointId }, checkpointSnapshot { checkpointId },
-    /// commitProof { commitId, checkpointId? }, signCheckpoint { checkpointId, signatures }, pushCheckpoints { checkpoints };
+    /// commitProof { commitId, checkpointId? }, signCheckpoint { checkpointId, signatures }, pushCheckpoints { checkpoints, priceStatements? };
+    /// priceStatements? are those the checkpoints name: [ { checkpointId, priceStatements: [ … ] }, … ];
     /// topics: checkpoints (action checkpoint), checkpointSignatures (action checkpointSignatures, { checkpointId, signatures }).
     /// </remarks>
     public partial class POI_API
@@ -115,6 +116,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             RegisterArchiveURLTemplates(History);
+            RegisterHistoryPriceStatementURLTemplates(History);
 
             #region GET ~/RNs/{roamingNetworkId}/history/checkpoints?since={sequence}&max={n}
 
@@ -234,7 +236,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) SubmitCheckpoints(Request)
 
         /// <summary>
-        /// Take the checkpoints in the body of the request, { checkpoints: [ … ] }, in their order.
+        /// Take the checkpoints in the body of the request, { checkpoints: [ … ], priceStatements? }, in their order, with the
+        /// price statements they name when given: [ { checkpointId, priceStatements: [ … ] }, … ].
         /// 200 OK:             all taken, or held already; { checkpoints: [ ids ] }
         /// 400 Bad Request:    no valid checkpoints
         /// 403 Forbidden:      pushing checkpoints is not enabled, or not allowed for the sender
@@ -252,7 +255,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!TryParseCheckpoints(checkpointsJSON, out var checkpoints, out var parseError))
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, parseError);
 
-            var result = PushCheckpoints(Request, history, checkpoints);
+            if (!TryParseCheckpointPriceStatements(json["priceStatements"], out var priceStatements, out var priceStatementsError))
+                return ErrorResponse(Request, HTTPStatusCode.BadRequest, priceStatementsError);
+
+            var result = PushCheckpoints(Request, history, checkpoints, priceStatements);
 
             return result.Error is null
                        ? JSONResponse (Request, HTTPStatusCode.OK, result.Answer)
@@ -339,16 +345,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region PushCheckpoints(Request, History, Checkpoints)
+        #region PushCheckpoints(Request, History, Checkpoints, PriceStatements = null)
 
         /// <summary>
         /// Take the given checkpoints of the sender of the given request, in their order, when allowed for the sender,
-        /// checked against the history and signed in the RequiredCheckpointSignatureRoles.
+        /// checked against the history and signed in the RequiredCheckpointSignatureRoles, with the price statements they name when
+        /// given.
         /// </summary>
         /// <returns>The answer { checkpoints: [ ids ] }, whether it was forbidden, and why it failed.</returns>
-        public (JObject Answer, Boolean Forbidden, String? Error) PushCheckpoints(HTTPRequest                              Request,
-                                                                                  RoamingNetworkHistory                    History,
-                                                                                  IReadOnlyList<RoamingNetworkCheckpoint>  Checkpoints)
+        public (JObject Answer, Boolean Forbidden, String? Error) PushCheckpoints(HTTPRequest                                                                                Request,
+                                                                                  RoamingNetworkHistory                                                                      History,
+                                                                                  IReadOnlyList<RoamingNetworkCheckpoint>                                                    Checkpoints,
+                                                                                  IReadOnlyDictionary<RoamingNetworkCheckpoint_Id, IReadOnlyList<RoamingNetworkPriceStatement>>?  PriceStatements   = null)
         {
 
             if (AuthorizeCheckpointPush is null)
@@ -362,7 +370,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var checkpoint in Checkpoints)
             {
 
-                if (!History.TryAddCheckpoint(checkpoint, out var errorResponse, VerifyCheckpointSignature, RequiredCheckpointSignatureRoles))
+                if (!History.TryAddCheckpoint(checkpoint,
+                                              out var errorResponse,
+                                              VerifyCheckpointSignature,
+                                              RequiredCheckpointSignatureRoles,
+                                              PriceStatements?.GetValueOrDefault(checkpoint.Id)))
                     return ([], false, $"Checkpoint {taken.Count}: {errorResponse}");
 
                 taken.Add(checkpoint.Id.ToString());
@@ -387,6 +399,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddArchiveCommands(WebSocketServer, History);
             AddProofCommands  (WebSocketServer, History);
+            AddPriceStatementCommands(WebSocketServer, History);
 
             WebSocketServer.AddCommand("checkpoints", request =>
 
@@ -495,7 +508,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, "The request must contain { checkpoints: [ … ] }!"));
                 }
 
-                var result = PushCheckpoints(upgradeRequest, History, checkpoints);
+                if (!TryParseCheckpointPriceStatements(request.Payload["priceStatements"], out var priceStatements, out var priceStatementsError))
+                    return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, priceStatementsError));
+
+                var result = PushCheckpoints(upgradeRequest, History, checkpoints, priceStatements);
 
                 return Task.FromResult(result.Error is null
                                            ? request.Respond(result.Answer)
@@ -537,12 +553,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             History.OnCheckpoint            += onCheckpoint;
             History.OnCheckpointSignatures  += onCheckpointSignatures;
 
-            var disconnectAttestations = ConnectAttestations(History, WebSocketServer);
+            var disconnectAttestations     = ConnectAttestations   (History, WebSocketServer);
+            var disconnectPriceStatements  = ConnectPriceStatements(History, WebSocketServer);
 
             return () => {
                 History.OnCheckpoint            -= onCheckpoint;
                 History.OnCheckpointSignatures  -= onCheckpointSignatures;
                 disconnectAttestations();
+                disconnectPriceStatements();
             };
 
         }

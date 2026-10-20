@@ -127,7 +127,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IReadOnlyCollection<String>?        RequiredSignatureRoles      { get; init; }
 
         /// <summary>
-        /// <summary>
         /// Whether to take the checkpoints of the other server, checked against this history. Default: yes.
         /// </summary>
         public Boolean                             FollowCheckpoints           { get; init; } = true;
@@ -154,6 +153,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public VerifyAttestationDelegate?          VerifyAttestation           { get; init; }
 
+        /// <summary>
+        /// Whether to take the price statements of the other server, checked against this history, and those of its
+        /// checkpoints, so that this server serves them as well. Default: yes.
+        /// </summary>
+        public Boolean                             FollowPriceStatements       { get; init; } = true;
+
+        /// <summary>
+        /// Whether to push the price statements taken here, made here or taken from elsewhere, but not from the other server:
+        /// after connecting those it misses, then every new one, e.g. from a server of a charging station operator to the
+        /// one of the roaming network operator. Default: yes.
+        /// </summary>
+        public Boolean                             PushPriceStatements         { get; init; } = true;
+
+        /// <summary>
         /// The limits for reading change sets, the default ones otherwise.
         /// </summary>
         public RoamingNetworkChangeSetLimits?      ChangeSetLimits             { get; init; }

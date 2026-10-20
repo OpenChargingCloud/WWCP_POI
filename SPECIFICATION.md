@@ -5,8 +5,8 @@ a commit or a signature without this library, and what a version tells where it 
 for many entities: templates, groups and offers (section 9). The examples in section 6 are checked by
 `WWCP_POI3_Tests/SpecificationVectorsTests.cs`. Section 8 specifies proofs of single entities, e.g. of
 one charging station, by a signed hash tree, checked against attestations. Section 10 specifies
-checkpoints, the witnessed and lasting evidence of a history; sections 11 (epochs) and 12 (prices at
-runtime) are drafts.
+checkpoints, the witnessed and lasting evidence of a history, section 12 price statements, the signed
+evidence of prices at runtime; section 11 (epochs) is a draft.
 
 The words MUST, MUST NOT, SHOULD and MAY are used as in RFC 2119.
 
@@ -499,6 +499,28 @@ checks it against the attestation, which it embeds:
   "attestations": [ <the attestation above> ] }
 ```
 
+**Price statement** (section 12) of the EVSE `DE*GEF*E1*1` by its operator `DE*GEF`: the energy price of its
+charging tariff `DE*GEF*T1` is 0.39 per kWh, valid from 2026-10-19T12:00:00.000Z until
+2026-10-19T12:15:00.000Z, the first statement of the EVSE. Signed with the Ed25519 signing key of the
+private seed `404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f` (public key, Base64:
+`JUO5L/EJVRFHatyDadtt3JM2ZaEZeN2hQE7hBmypVZ0=`, `@id`
+`8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d`), signed at 2026-10-19T11:59:58.000Z.
+Signature input:
+
+```json
+{"algorithm":"Ed25519","encoding":"base64","entityId":"DE*GEF*E1*1","entityType":"EVSE","keyId":"8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d","priceStatus":{"prices":[{"chargingTariffId":"DE*GEF*T1","elements":[{"priceComponents":[{"price":0.39,"stepSize":1,"type":"ENERGY"}]}]}]},"profile":"wwcp-poi-price-statement-v1","roamingNetworkId":"rn1","role":"chargingStationOperator","sequence":0,"signedAt":"2026-10-19T11:59:58.000Z","signer":"DE*GEF","validFrom":"2026-10-19T12:00:00.000Z","validUntil":"2026-10-19T12:15:00.000Z"}
+```
+
+Signature value:
+
+```
+95n+aTF2ZF3WqdHA8BSZPWqfSvxkMhzSQjCScPsZn13Jhehdi4d/aokA4507iZBy9fmuHRj9vNq5dfiaa0NQDw==
+```
+
+Its digest, the SHA-256 of the signature input with `"value"` added, which the next statement of the EVSE
+names as its `previous` and a checkpoint takes as a leaf:
+`efbd7b8f0d28a0affe44a872dbaefdd37b6afa5366202d4653b8a5b58bcef772`.
+
 
 ## 7. Open points
 
@@ -789,9 +811,8 @@ has an example.
    the tree takes the effective `lastChange` without them (8.1), and the tree and POI_API may tell
    different values.
 4. **Runtime:** admin status, status, energy status and price status are not content. A station
-   proof tells neither whether a station is available nor its prices at runtime. Signed runtime
-   statements, e.g. a price status the operator signs for some minutes, would complete it. Section 12
-   drafts them.
+   proof tells neither whether a station is available nor its prices at runtime: price statements
+   (section 12) give the prices, signed by the operator; signed statements of the status are open.
 5. **Proofs of absence:** e.g. that an EVSE was removed. Two neighbouring leaves in the ordinal order
    of identifications prove it; their form is open.
 6. **Stored content:** a tree over the content as given (section 2) would prove stored entities, e.g.
@@ -1033,6 +1054,7 @@ identifications are as without it.
   "previousId": "<id of checkpoint 41>", "commitId": "<commit id>", "revision": 4711,
   "eTags": [ <the ETags of the version of the commit> ],
   "commits": { "@merkleRoot": "<hex>", "@size": 118 },
+  "priceStatements": { "@merkleRoot": "<hex>", "@size": 2400 },
   "createdAt": "2026-10-19T12:00:00.000Z",
   "signatures": [ … ] }
 ```
@@ -1046,6 +1068,8 @@ identifications are as without it.
   equal revisions in the ordinal order of their identifications. A leaf is the UTF-8 encoded canonical
   JSON of `{"commitId": "…", "eTags": [ … ], "revision": …}`, so that a proof of one commit (10.4) binds
   its ETags as well. `@size` is their number.
+- **priceStatements:** optional, the tree of the price statements the server took since the previous
+  checkpoint (section 12.3); absent when it names none.
 - **createdAt:** when it was made, written as in section 5.4.
 
 The checkpoint identification is the SHA-256 of the canonical JSON of the checkpoint without `@id` and
@@ -1057,6 +1081,7 @@ A server MUST refuse a checkpoint unless it has its commit and all commits of th
 commit follows the commit of the previous checkpoint (or is it, which then is no new checkpoint and is
 refused), `revision` and `eTags` are those of the commit, `commits` is the tree of the commits of the
 checkpoint, and `previousId` names the latest checkpoint it holds of this epoch with `sequence` one less.
+The price statements a checkpoint names are checked when they are given along with it (12.3).
 A server that holds no checkpoint yet, e.g. one started from a snapshot, takes as its first one a checkpoint
 of a commit it holds, without the commits before its root; its signatures carry it.
 
@@ -1076,7 +1101,8 @@ A checkpoint is signed as a commit is (section 5.4), with the profile
   with one of its signing keys (section 4.1).
 - **witness:** an independent third party, e.g. an association of operators, a calibration authority or
   another roaming network operator. A witness signs a checkpoint only after it refused nothing of 10.1
-  in its own history, which it took commit by commit, each checked as section 5.2 says. A witness MUST
+  in its own history, which it took commit by commit, each checked as section 5.2 says, and, when the
+  checkpoint names price statements, after it checked them (12.3). A witness MUST
   NOT sign two different checkpoints of the same roaming network, epoch and `sequence`: that is what
   makes a split view, one history shown to some and another one to others, visible.
 - Signatures may be added later, as to commits: `signCheckpoint` over the WebSocket or
@@ -1147,8 +1173,7 @@ identifications and ETags, and a proof of what was erased is no longer possible.
 
 1. **Archives:** how long they are kept; how personal data is removed from a segment, keeping the
    identifications of its commits.
-2. **Statements of prices at runtime** in a checkpoint (section 12).
-3. **Witness discovery:** how a client learns which witnesses there are, and their keys.
+2. **Witness discovery:** how a client learns which witnesses there are, and their keys.
 
 
 ## 11. Epochs
@@ -1165,6 +1190,7 @@ its keys. Checkpoints make periodic restarts unnecessary (section 10).
 { "epoch": 2,
   "profiles": { "canonicalization": "styx-canonical-json-v1", "commitIdHash": "sha256",
                 "commit": "wwcp-poi-commit-v3", "checkpoint": "wwcp-poi-checkpoint-v1",
+                "priceStatement": "wwcp-poi-price-statement-v1",
                 "treeHashAlgorithms": [ "sha3-256" ],
                 "signatureAlgorithms": [ "ML-DSA-65", "ES256" ] } }
 ```
@@ -1191,30 +1217,125 @@ its keys. Checkpoints make periodic restarts unnecessary (section 10).
 
 ## 12. Prices at runtime
 
-> **Status:** draft, not implemented.
-
 Charging tariffs are content: they change slowly and are proved by checkpoints (section 10). Ad hoc
 prices that change by the minute, like status messages in DATEX II, are the **price status** of
-charging pools, charging stations and EVSEs, runtime data without versions. Their evidence differs:
-a **price statement**, signed by the charging station operator with one of its signing keys (section
-4.1), at the moment it sets the price.
+charging pools, charging stations and EVSEs: runtime data without versions,
+`{"prices": [{"chargingTariffId": …, "elements": [ … ]}, …]}`, the elements replacing those of charging
+tariffs of their operator. Their evidence differs: a **price statement**, signed by the charging station
+operator with one of its signing keys (section 4.1) when it sets the price.
 
 ```json
 { "roamingNetworkId": "rn1", "entityType": "EVSE", "entityId": "DE*GEF*E1*1",
   "priceStatus": { "prices": [ … ] },
   "validFrom": "2026-10-19T12:00:00.000Z", "validUntil": "2026-10-19T12:15:00.000Z",
-  "sequence": 1017, "previous": "<hex digest of statement 1016 of this entity>",
+  "sequence": 1017, "previous": "<digest of statement 1016 of this entity>",
   "after": "<id of the latest checkpoint the operator knew>",
   "role": "chargingStationOperator", "signer": "DE*GEF", "signedAt": "2026-10-19T11:59:58.000Z",
   "algorithm": "ES256", "keyId": "<key @id>", "value": "<Base64>",
   "profile": "wwcp-poi-price-statement-v1", "encoding": "base64" }
 ```
 
-- **Chain per entity:** `sequence` and `previous`, the SHA-256 of the canonical JSON of the statement
-  before, signature included. Statements are neither reordered nor withdrawn unnoticed.
-- **Not before:** `after` names a checkpoint; the statement was made after it.
-- **Not after:** a checkpoint MAY carry `"statements": {"@merkleRoot": …, "@size": …}`, the tree of the
-  digests of the statements its server received since the previous checkpoint, in the order of their
-  entities and sequences; witnesses check their signatures. A statement in it was made before it.
-- **Evidence:** the driver's app keeps the statement valid when charging began, the proof of the
-  operator's signing keys (8.4) and later the proof of the statement in a checkpoint.
+### 12.1 Representation and signature
+
+- **entityType, entityId:** `ChargingPool`, `ChargingStation` or `EVSE`, and its identification. Its
+  operator is the one of the identification: `signer` names it, `role` is `chargingStationOperator`.
+- **priceStatus:** the price status, signed as it is written. A reader keeps it as given, numbers with a
+  fraction as decimals, and checks that it is one.
+- **validFrom, validUntil:** when it is valid, written as in section 5.4. `validFrom` is not before
+  `signedAt`; without `validUntil`, it is valid until the next statement of its entity.
+- **Chain per entity:** `sequence` is 0 for the first statement of an entity and one more for every next
+  one; `previous` is the digest of the statement before, absent for sequence 0. The **digest** of a
+  statement is the SHA-256 of its canonical JSON, signature value included, as 64 lowercase hexadecimal
+  digits. Statements are neither reordered nor withdrawn unnoticed.
+- **Not before:** `after`, if given, names the latest checkpoint the operator knew: the statement was made
+  after it.
+
+The signature input is the canonical JSON of the statement without `value`, its `profile`, `algorithm`,
+`keyId` and `encoding` included, as for an attestation (8.5). The key MUST be a signing key of the
+operator of the entity, valid at `signedAt`. The CBOR representation has the keys and values of the JSON
+one.
+
+### 12.2 Taking a statement
+
+A server takes a price statement only when it is one of its roaming network, its entity is one of the
+head, it is signed by a signing key of the operator of the entity in the head, valid at `signedAt`, every
+charging tariff it names is one of that operator, and it is not over (`validUntil`). Against the current
+statement of its entity, if there is one:
+
+- the same statement again is known already;
+- one of a lower sequence is out of date;
+- another one of the same sequence is refused: two statements of one sequence are a split view;
+- the next one MUST name the digest of the current one;
+- a later one is taken: the statements in between did not reach this server.
+
+Taken, it is the current statement of its entity and sets its price status as of `validFrom`. A server
+holding a signing key of an operator states every change of the price status of the entities of that
+operator, following their current statements; when its statements have a `validUntil`, it states the
+price status anew before they end. Servers keep the statements they take in their store, so that a chain
+goes on after a restart.
+
+### 12.3 Checkpoints
+
+A checkpoint (section 10.1) MAY carry `"priceStatements": {"@merkleRoot": …, "@size": …}`: the Merkle tree
+hash (8.2, RFC 9162) of the price statements its server took since the previous checkpoint and that were
+signed before it (`signedAt` not after `createdAt`), in the ordinal order of their entity types and
+identifications, then of their sequences; a leaf is the 32 bytes of the digest of a statement. It is part
+of the content the checkpoint identification is calculated over. A checkpoint naming no statements has
+no `priceStatements` and is identified as before.
+
+A server checks the statements a checkpoint names when it gets them along with it
+(`GET ~/RNs/{RN_Id}/history/checkpoints/{checkpointId}/priceStatements`, or `priceStatements` of
+`pushCheckpoints`): their tree is the one of the checkpoint, and every one was signed before it by a
+signing key of its operator in the version of the commit of the checkpoint or of the checkpoint before,
+valid at `signedAt`. A server that does not get them takes the checkpoint all the same; a witness signs a
+checkpoint naming price statements only after it checked them (10.2).
+
+A proof that a statement is named by a checkpoint is the statement with its index and audit path:
+
+```json
+{ "checkpointId": "<checkpoint id>", "priceStatement": <the statement>,
+  "@index": 17, "@size": 118, "@auditPath": [ "<hex>", … ] }
+```
+
+The verifier calculates the root from the digest of the statement, `@index`, `@size` and the audit path,
+and MUST refuse the proof unless it is the `priceStatements` root of the checkpoint, and that checkpoint
+carries the signatures it requires: then the statement was made before the checkpoint.
+
+### 12.4 Evidence
+
+A driver's app gets the proof of a charging station (8.4) and the current statements of its pool, of the
+station and of its EVSEs, and checks them offline: the proof against the identity keys of the roaming
+network operator it pinned (8.6), each statement against what the proof gives: its entity below its
+operator, the signing key of the operator it is signed with, and that it is valid when charging begins.
+Its prices apply to the charging tariffs the proof gives, those of the EVSE. The app keeps the
+statement, the proof of the station and later the proof of the statement in a checkpoint: it was made
+after the checkpoint `after` names, and before the one naming it, which witnesses signed.
+
+### 12.5 Over HTTP and the WebSocket
+
+```
+GET  ~/RNs/{RN_Id}/CSs/{CS_Id}/priceStatements        the statements of the pool, the station and its EVSEs
+GET  ~/RNs/{RN_Id}/EVSEs/{EVSE_Id}/priceStatements    those of the pool, the station and the EVSE
+GET  ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/priceStatements, …/EVSEs/{EVSE_Id}/priceStatements
+GET  ~/RNs/{RN_Id}/history/priceStatements            the current statement of every entity
+POST ~/RNs/{RN_Id}/history/priceStatements            { priceStatements: [ … ] }: taken in their order;
+                                                      { taken, known, outdated, refused, refusals },
+                                                      422 when one was refused
+GET  ~/RNs/{RN_Id}/history/checkpoints/{checkpointId}/priceStatements                  those a checkpoint names
+GET  ~/RNs/{RN_Id}/history/checkpoints/{checkpointId}/priceStatements/{digest}/proof   the proof of one
+```
+
+The WebSocket of a history has the actions `priceStatements` (`{chargingStationId}`, `{EVSEId}` or all),
+`addPriceStatements`, `checkpointPriceStatements` and `priceStatementProof`, and the topic
+`priceStatements` (action `priceStatement`). A statement needs no authorization: it is signed by the
+operator of its entity. A peer takes the statements of the other server and pushes those taken here, and
+gets the statements of a checkpoint along with it.
+
+### 12.6 Open points
+
+1. **Retention:** a server keeps the statements of its checkpoints as long as the checkpoints, in its store
+   and in memory; how long, and whether the archive (10.6) takes them, is open.
+2. **A server without a store** starts the chains of its operators at 0 again after a restart, unless it
+   takes the current statements of another server first, as a peer does when it connects; the others
+   refuse what it states before as out of date.
+3. **Status:** the availability of a station is not stated yet (8.8, point 4).

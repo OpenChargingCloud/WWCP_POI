@@ -105,16 +105,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Signatures added to a checkpoint later.
         /// </summary>
-        CheckpointSignatures
+        CheckpointSignatures,
+
+        /// <summary>
+        /// A price statement the history took.
+        /// </summary>
+        PriceStatement,
+
+        /// <summary>
+        /// The price statements a checkpoint names, held since.
+        /// </summary>
+        CheckpointPriceStatements
 
     }
 
 
     /// <summary>
     /// One entry of the log of a history: a commit, signatures added to one, a status update, a checkpoint,
-    /// or signatures added to one.
+    /// signatures added to one, a price statement, or the price statements of a checkpoint.
     /// One line of JSON in a file: { type, commit } | { type, commitId, signatures } | { type, statusUpdate } |
-    /// { type, checkpoint } | { type, checkpointId, signatures }.
+    /// { type, checkpoint } | { type, checkpointId, signatures } | { type, priceStatement } |
+    /// { type, checkpointId, priceStatements }.
     /// </summary>
     public sealed class RoamingNetworkHistoryLogEntry
     {
@@ -156,25 +167,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public RoamingNetworkCheckpoint_Id?                     CheckpointId    { get; }
 
+        /// <summary>
+        /// The price statement of a PriceStatement entry.
+        /// </summary>
+        public RoamingNetworkPriceStatement?                    PriceStatement  { get; }
+
+        /// <summary>
+        /// The price statements of a CheckpointPriceStatements entry, in the order of the tree of the checkpoint.
+        /// </summary>
+        public IReadOnlyList<RoamingNetworkPriceStatement>      PriceStatements { get; }
+
         #endregion
 
         #region Constructor(s)
 
         private RoamingNetworkHistoryLogEntry(RoamingNetworkHistoryLogEntryType             Type,
-                                              RoamingNetworkCommit?                         Commit         = null,
-                                              RoamingNetworkCommit_Id?                      CommitId       = null,
-                                              IReadOnlyList<RoamingNetworkCommitSignature>? Signatures     = null,
-                                              POIStatusUpdate?                              StatusUpdate   = null,
-                                              RoamingNetworkCheckpoint?                     Checkpoint     = null,
-                                              RoamingNetworkCheckpoint_Id?                  CheckpointId   = null)
+                                              RoamingNetworkCommit?                         Commit           = null,
+                                              RoamingNetworkCommit_Id?                      CommitId         = null,
+                                              IReadOnlyList<RoamingNetworkCommitSignature>? Signatures       = null,
+                                              POIStatusUpdate?                              StatusUpdate     = null,
+                                              RoamingNetworkCheckpoint?                     Checkpoint       = null,
+                                              RoamingNetworkCheckpoint_Id?                  CheckpointId     = null,
+                                              RoamingNetworkPriceStatement?                 PriceStatement   = null,
+                                              IReadOnlyList<RoamingNetworkPriceStatement>?  PriceStatements  = null)
         {
-            this.Type          = Type;
-            this.Commit        = Commit;
-            this.CommitId      = CommitId;
-            this.Signatures    = Signatures ?? [];
-            this.StatusUpdate  = StatusUpdate;
-            this.Checkpoint    = Checkpoint;
-            this.CheckpointId  = CheckpointId;
+            this.Type             = Type;
+            this.Commit           = Commit;
+            this.CommitId         = CommitId;
+            this.Signatures       = Signatures ?? [];
+            this.StatusUpdate     = StatusUpdate;
+            this.Checkpoint       = Checkpoint;
+            this.CheckpointId     = CheckpointId;
+            this.PriceStatement   = PriceStatement;
+            this.PriceStatements  = PriceStatements ?? [];
         }
 
         /// <summary>
@@ -209,6 +234,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                            IReadOnlyList<RoamingNetworkCommitSignature>  Signatures)
             => new (RoamingNetworkHistoryLogEntryType.CheckpointSignatures, Signatures: Signatures, CheckpointId: CheckpointId);
 
+        /// <summary>
+        /// The entry of the given price statement.
+        /// </summary>
+        public static RoamingNetworkHistoryLogEntry ForPriceStatement(RoamingNetworkPriceStatement PriceStatement)
+            => new (RoamingNetworkHistoryLogEntryType.PriceStatement, PriceStatement: PriceStatement);
+
+        /// <summary>
+        /// The entry of the given price statements of the given checkpoint, in the order of its tree.
+        /// </summary>
+        public static RoamingNetworkHistoryLogEntry ForCheckpointPriceStatements(RoamingNetworkCheckpoint_Id                  CheckpointId,
+                                                                                 IReadOnlyList<RoamingNetworkPriceStatement>  PriceStatements)
+            => new (RoamingNetworkHistoryLogEntryType.CheckpointPriceStatements, CheckpointId: CheckpointId, PriceStatements: PriceStatements);
+
         #endregion
 
 
@@ -242,6 +280,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                         new JProperty("type",          "checkpointSignatures"),
                                                                         new JProperty("checkpointId",  CheckpointId!.Value.ToString()),
                                                                         new JProperty("signatures",    new JArray(Signatures.Select(signature => signature.ToJSON())))
+                                                                    ),
+
+                   RoamingNetworkHistoryLogEntryType.PriceStatement
+                                                                 => new JObject(
+                                                                        new JProperty("type",             "priceStatement"),
+                                                                        new JProperty("priceStatement",   PriceStatement!.ToJSON())
+                                                                    ),
+
+                   RoamingNetworkHistoryLogEntryType.CheckpointPriceStatements
+                                                                 => new JObject(
+                                                                        new JProperty("type",             "checkpointPriceStatements"),
+                                                                        new JProperty("checkpointId",     CheckpointId!.Value.ToString()),
+                                                                        new JProperty("priceStatements",  new JArray(PriceStatements.Select(priceStatement => priceStatement.ToJSON())))
                                                                     ),
 
                    _                                             => new JObject(
@@ -334,6 +385,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     Entry = ForCheckpointSignatures(checkpointId, checkpointSignatures);
+                    return true;
+
+                case "priceStatement":
+
+                    if (JSON["priceStatement"] is not JObject priceStatementJSON ||
+                        !RoamingNetworkPriceStatement.TryParse(priceStatementJSON, out var priceStatement, out ErrorResponse))
+                    {
+                        ErrorResponse = "Invalid price statement entry!";
+                        return false;
+                    }
+
+                    Entry = ForPriceStatement(priceStatement);
+                    return true;
+
+                case "checkpointPriceStatements":
+
+                    if (!RoamingNetworkCheckpoint_Id.TryParse(JSON["checkpointId"]?.Value<String>() ?? "", out var priceStatementsCheckpointId) ||
+                        JSON["priceStatements"] is not JArray priceStatementsJSON)
+                    {
+                        ErrorResponse = "Invalid checkpoint price statements entry!";
+                        return false;
+                    }
+
+                    var priceStatements = new List<RoamingNetworkPriceStatement>();
+
+                    foreach (var checkpointPriceStatementJSON in priceStatementsJSON)
+                    {
+
+                        if (checkpointPriceStatementJSON is not JObject checkpointPriceStatementObject ||
+                            !RoamingNetworkPriceStatement.TryParse(checkpointPriceStatementObject, out var checkpointPriceStatement, out ErrorResponse))
+                        {
+                            ErrorResponse = "Invalid checkpoint price statements entry!";
+                            return false;
+                        }
+
+                        priceStatements.Add(checkpointPriceStatement);
+
+                    }
+
+                    Entry          = ForCheckpointPriceStatements(priceStatementsCheckpointId, priceStatements);
+                    ErrorResponse  = null;
                     return true;
 
                 default:

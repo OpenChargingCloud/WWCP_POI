@@ -241,6 +241,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             RuntimeStatus.Attach(RoamingNetwork);
             RuntimeStatus.OnStatusUpdate += AppendStatusUpdate;
+            RuntimeStatus.OnStatusUpdate += PriceStatusChanged;
 
             Remember(Root, RoamingNetwork);
             tips.Add(Root.Id);
