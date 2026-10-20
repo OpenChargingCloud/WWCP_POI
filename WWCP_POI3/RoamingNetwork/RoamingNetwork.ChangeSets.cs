@@ -1248,9 +1248,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var calculated = declared.Format == ETagFormat.EffectiveTree
                                      ? RoamingNetwork.EffectiveTreeETag(declared.HashAlgorithm)
-                                     : ETag.Compute(declared.Format,
-                                                    declared.HashAlgorithm,
-                                                    RoamingNetwork.CanonicalContent(declared.Format));
+                                     : RoamingNetwork.ContentETag(declared.Format, declared.HashAlgorithm);
 
                 if (!calculated.Equals(declared))
                 {
@@ -1264,23 +1262,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return true;
 
         }
-
-        #endregion
-
-        #region (private) CanonicalContent(Format)
-
-        /// <summary>
-        /// The canonical bytes the ETags of the given format are calculated over:
-        /// canonical JSON or canonical CBOR, both without ETags.
-        /// </summary>
-        /// <param name="Format">The format.</param>
-        private Byte[] CanonicalContent(ETagFormat Format)
-
-            => Format switch {
-                   ETagFormat.JSON  => CanonicalJSON.ToUTF8Bytes(ToJSON(IncludeETags: false)),
-                   ETagFormat.CBOR  => ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical),
-                   _                => throw new ArgumentOutOfRangeException(nameof(Format), "Unsupported ETag format!")
-               };
 
         #endregion
 

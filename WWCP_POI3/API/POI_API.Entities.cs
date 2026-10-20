@@ -1998,10 +1998,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   new POIRepresentation(cbor
                                                             ? RoamingNetwork.ToCBOR().ToByteArray(CBORWriterOptions.Canonical)
                                                             : CanonicalJSON.ToUTF8Bytes(RoamingNetwork.ToJSON()),
-                                                        ETag.Compute(format,
-                                                                     cbor
-                                                                         ? RoamingNetwork.ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical)
-                                                                         : CanonicalJSON.ToUTF8Bytes(RoamingNetwork.ToJSON(IncludeETags: false)))));
+                                                        RoamingNetwork.ContentETag(format)));
 
         }
 

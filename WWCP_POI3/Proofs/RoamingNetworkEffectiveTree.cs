@@ -88,7 +88,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) Of(RoamingNetwork, HashAlgorithm)
 
         /// <summary>
-        /// Calculate the hash tree of the given version with the given hash algorithm.
+        /// The hash tree of the given version with the given hash algorithm, from the digests its entities keep: only what
+        /// the versions before did not hash yet is hashed.
         /// </summary>
         /// <param name="RoamingNetwork">A version of a roaming network.</param>
         /// <param name="HashAlgorithm">The hash algorithm of the tree.</param>
@@ -96,24 +97,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                      ETagHashAlgorithm  HashAlgorithm)
         {
 
-            var json = RoamingNetwork.EffectiveContentJSON(out var members);
-
-            if (!POIEffectiveTree.TryDigest(json,
-                                            POIEffectiveTree.RoamingNetworkKind,
-                                            HashAlgorithm,
-                                            2,
-                                            "roamingNetwork",
-                                            out _,
-                                            out var root,
-                                            out var errorResponse))
-            {
-                throw new InvalidOperationException($"The effective content of the roaming network '{RoamingNetwork.Id}' has no tree: {errorResponse}");
-            }
-
             return new RoamingNetworkEffectiveTree(RoamingNetwork,
                                                    HashAlgorithm,
-                                                   root!,
-                                                   members);
+                                                   POIEffectiveDigests.Root(RoamingNetwork, HashAlgorithm),
+                                                   RoamingNetwork.EffectiveMembersOfTheContent());
 
         }
 

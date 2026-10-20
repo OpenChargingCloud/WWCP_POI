@@ -798,15 +798,16 @@ has an example.
 
 ### 8.7 Cost (informative)
 
-- **Writing:** a version calculates its tree once, over its whole effective content, when its ETags are
-  calculated, as it calculates its `json` and `cbor` ETags: some 100,000 hash calculations per 100,000
-  entities. Entities are immutable and shared by the versions that did not change them, so digests could
-  be kept with them: a commit changing one EVSE would hash its station, the path to its pool, the pool,
-  the path to its operator, the operator, the path to the network and the network, some 50 hash
-  calculations; a commit changing a template 100,000 members name all of them again (8.8).
-- **Serving:** a proof is calculated from the tree of the head, which keeps the skeletons of the network
-  and of its parties and the digests of their children: a pool and its stations are calculated again,
-  the audit paths from the digests.
+- **Writing:** a version calculates its tree once, when its ETags are calculated. Entities are
+  immutable and shared by the versions that did not change them, and keep their digests: a version
+  hashes only the entities that are new in it and the paths from them to the root, e.g. for one changed
+  EVSE of one of 50 operators of 1,000 EVSEs each some milliseconds instead of a second for all of them.
+  A change reads its charging station operator again as a whole, so all entities of that operator are
+  new and hashed again (8.8); a commit changing a template 100,000 members name changes all of them. The
+  `json` and `cbor` ETags hash the whole version, once per version.
+- **Serving:** a proof is calculated from the tree of the head, made of the digests and the skeletons
+  the network and its parties keep: a pool and its stations are calculated again, the audit paths from
+  the digests.
 - **Verifying:** some 50 to 100 hash calculations and one signature verification per attestation,
   milliseconds on a phone.
 
@@ -833,8 +834,9 @@ has an example.
    for preconditions and owners, the same way. The station proof does not need it.
 7. **CBOR skeletons:** whether the tree also hashes deterministic CBOR skeletons, for clients that read
    CBOR only.
-8. **Incremental trees:** keeping the digests with the entities, so that a commit hashes only what it
-   changed (8.7).
+8. **Incremental trees within an operator:** the entities keep their digests (8.7), but a change reads
+   its charging station operator again as a whole, so its entities are new and hashed again. Keeping
+   those it did not change would make a commit hash only what it changed there as well.
 9. **Offers:** a station proof gives no charging tariff offers (9.5, point 2).
 
 

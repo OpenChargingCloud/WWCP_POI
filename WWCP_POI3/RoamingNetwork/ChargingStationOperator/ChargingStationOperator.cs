@@ -1427,6 +1427,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               InfoStatus                                                 ExpandBrandIds                            = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.Expanded,
                               CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null)
+
+            => ToJSON(Embedded,
+                      ExpandChargingPoolIds,
+                      ExpandChargingStationIds,
+                      ExpandEVSEIds,
+                      ExpandBrandIds,
+                      ExpandDataLicenses,
+                      CustomChargingStationOperatorSerializer,
+                      IncludeChildArrays: true);
+
+        /// <summary>
+        /// The JSON representation of this charging station operator, with or without its child arrays: without them for the skeleton of its
+        /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
+        /// </summary>
+        /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
+        internal JObject ToJSON(Boolean                                                    Embedded,
+                                InfoStatus                                                 ExpandChargingPoolIds,
+                                InfoStatus                                                 ExpandChargingStationIds,
+                                InfoStatus                                                 ExpandEVSEIds,
+                                InfoStatus                                                 ExpandBrandIds,
+                                InfoStatus                                                 ExpandDataLicenses,
+                                CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer,
+                                Boolean                                                    IncludeChildArrays)
         {
 
             try
@@ -1581,46 +1604,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Brands.Count > 0)
                     json.Add("brands", new JArray(Brands.Select(brand => brand.ToJSON())));
 
-                if (ChargingTariffs.Count > 0)
+                if (IncludeChildArrays && ChargingTariffs.Count > 0)
                     json.Add("chargingTariffs", new JArray(ChargingTariffs.Select(chargingTariff => chargingTariff.ToJSON())));
 
-                if (ChargingPools.Count > 0)
+                if (IncludeChildArrays && ChargingPools.Count > 0)
                     json.Add("chargingPools", new JArray(ChargingPools.Select(chargingPool => chargingPool.ToJSON())));
 
-                if (EVSETemplates.Count > 0)
+                if (IncludeChildArrays && EVSETemplates.Count > 0)
                     json.Add("EVSETemplates", new JArray(EVSETemplates.Select(template => template.ToJSON())));
 
-                if (ChargingStationTemplates.Count > 0)
+                if (IncludeChildArrays && ChargingStationTemplates.Count > 0)
                     json.Add("chargingStationTemplates", new JArray(ChargingStationTemplates.Select(template => template.ToJSON())));
 
-                if (ChargingPoolTemplates.Count > 0)
+                if (IncludeChildArrays && ChargingPoolTemplates.Count > 0)
                     json.Add("chargingPoolTemplates", new JArray(ChargingPoolTemplates.Select(template => template.ToJSON())));
 
-                if (ChargingTariffTemplates.Count > 0)
+                if (IncludeChildArrays && ChargingTariffTemplates.Count > 0)
                     json.Add("chargingTariffTemplates", new JArray(ChargingTariffTemplates.Select(template => template.ToJSON())));
 
-                if (EnergyMeterTemplates.Count > 0)
+                if (IncludeChildArrays && EnergyMeterTemplates.Count > 0)
                     json.Add("energyMeterTemplates", new JArray(EnergyMeterTemplates.Select(template => template.ToJSON())));
 
-                if (EVSEGroups.Count > 0)
+                if (IncludeChildArrays && EVSEGroups.Count > 0)
                     json.Add("EVSEGroups", new JArray(EVSEGroups.Select(group => group.ToJSON())));
 
-                if (ChargingStationGroups.Count > 0)
+                if (IncludeChildArrays && ChargingStationGroups.Count > 0)
                     json.Add("chargingStationGroups", new JArray(ChargingStationGroups.Select(group => group.ToJSON())));
 
-                if (ChargingPoolGroups.Count > 0)
+                if (IncludeChildArrays && ChargingPoolGroups.Count > 0)
                     json.Add("chargingPoolGroups", new JArray(ChargingPoolGroups.Select(group => group.ToJSON())));
 
-                if (ChargingTariffGroups.Count > 0)
+                if (IncludeChildArrays && ChargingTariffGroups.Count > 0)
                     json.Add("chargingTariffGroups", new JArray(ChargingTariffGroups.Select(group => group.ToJSON())));
 
-                if (EnergyMeterGroups.Count > 0)
+                if (IncludeChildArrays && EnergyMeterGroups.Count > 0)
                     json.Add("energyMeterGroups", new JArray(EnergyMeterGroups.Select(group => group.ToJSON())));
 
-                if (ChargingTariffOffers.Count > 0)
+                if (IncludeChildArrays && ChargingTariffOffers.Count > 0)
                     json.Add("chargingTariffOffers", new JArray(ChargingTariffOffers.Select(offer => offer.ToJSON())));
 
-                if (ParkingSpaces.Count > 0)
+                if (IncludeChildArrays && ParkingSpaces.Count > 0)
                     json.Add("parkingSpaces", new JArray(ParkingSpaces.Select(parkingSpace => parkingSpace.ToJSON())));
 
                 POIPartyKeys.AddTo(json, this);

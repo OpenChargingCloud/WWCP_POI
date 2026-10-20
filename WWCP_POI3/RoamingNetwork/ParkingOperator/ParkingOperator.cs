@@ -416,6 +416,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// with its parking garages, parking spaces, parking sensors, parking space groups and parking products.
         /// </summary>
         public JObject ToJSON()
+
+            => ToJSON(IncludeChildArrays: true);
+
+        /// <summary>
+        /// The JSON representation of this parking operator, with or without its child arrays: without them for the skeleton of its
+        /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
+        /// </summary>
+        /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
+        internal JObject ToJSON(Boolean IncludeChildArrays)
         {
 
             var json = new JObject(
@@ -440,22 +449,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (HotlinePhoneNumber.HasValue)
                 json.Add("hotline",         HotlinePhoneNumber.Value.ToString());
 
-            if (ParkingGarages.Count > 0)
+            if (IncludeChildArrays && ParkingGarages.Count > 0)
                 json.Add("parkingGarages",  new JArray(ParkingGarages.Select(parkingGarage => parkingGarage.ToJSON())));
 
-            if (ParkingSpaces.Count > 0)
+            if (IncludeChildArrays && ParkingSpaces.Count > 0)
                 json.Add("parkingSpaces",   new JArray(ParkingSpaces. Select(parkingSpace  => parkingSpace. ToJSON())));
 
-            if (ParkingSensors.Count > 0)
+            if (IncludeChildArrays && ParkingSensors.Count > 0)
                 json.Add("parkingSensors",  new JArray(ParkingSensors.Select(parkingSensor => parkingSensor.ToJSON())));
 
-            if (ParkingSpaceTemplates.Count > 0)
+            if (IncludeChildArrays && ParkingSpaceTemplates.Count > 0)
                 json.Add("parkingSpaceTemplates", new JArray(ParkingSpaceTemplates.Select(parkingSpaceTemplate => parkingSpaceTemplate.ToJSON())));
 
-            if (ParkingSpaceGroups.Count > 0)
+            if (IncludeChildArrays && ParkingSpaceGroups.Count > 0)
                 json.Add("parkingSpaceGroups", new JArray(ParkingSpaceGroups.Select(parkingSpaceGroup => parkingSpaceGroup.ToJSON())));
 
-            if (ParkingProducts.Count > 0)
+            if (IncludeChildArrays && ParkingProducts.Count > 0)
                 json.Add("parkingProducts", new JArray(ParkingProducts.Select(parkingProduct => parkingProduct.ToJSON())));
 
             POIPartyKeys.AddTo(json, this);

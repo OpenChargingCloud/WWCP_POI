@@ -336,6 +336,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return the JSON representation of this e-mobility provider, as its roaming network embeds it.
         /// </summary>
         public JObject ToJSON()
+
+            => ToJSON(IncludeChildArrays: true);
+
+        /// <summary>
+        /// The JSON representation of this e-mobility provider, with or without its child arrays: without them for the skeleton of its
+        /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
+        /// </summary>
+        /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
+        internal JObject ToJSON(Boolean IncludeChildArrays)
         {
 
             var json = new JObject(
@@ -360,16 +369,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (HotlinePhoneNumber.HasValue)
                 json.Add("hotline",      HotlinePhoneNumber.Value.ToString());
 
-            if (EVSEGroups.Count > 0)
+            if (IncludeChildArrays && EVSEGroups.Count > 0)
                 json.Add("EVSEGroups",             new JArray(EVSEGroups.           Select(group => group.ToJSON())));
 
-            if (ChargingStationGroups.Count > 0)
+            if (IncludeChildArrays && ChargingStationGroups.Count > 0)
                 json.Add("chargingStationGroups",  new JArray(ChargingStationGroups.Select(group => group.ToJSON())));
 
-            if (ChargingPoolGroups.Count > 0)
+            if (IncludeChildArrays && ChargingPoolGroups.Count > 0)
                 json.Add("chargingPoolGroups",     new JArray(ChargingPoolGroups.   Select(group => group.ToJSON())));
 
-            if (ChargingTariffOffers.Count > 0)
+            if (IncludeChildArrays && ChargingTariffOffers.Count > 0)
                 json.Add("chargingTariffOffers",   new JArray(ChargingTariffOffers. Select(offer => offer.ToJSON())));
 
             POIPartyKeys.AddTo(json, this);

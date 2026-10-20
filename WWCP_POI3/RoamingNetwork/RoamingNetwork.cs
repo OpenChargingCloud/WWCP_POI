@@ -146,6 +146,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         protected static readonly  Byte                                               MinChargingStationOperatorIdLength     = 5;
         protected static readonly  Byte                                               MinChargingStationOperatorNameLength   = 5;
 
+        /// <summary>
+        /// The ETags of the canonical JSON and CBOR representations of this version, by their formats and hash algorithms,
+        /// calculated when asked for: a version never changes.
+        /// </summary>
+        private readonly ConcurrentDictionary<(ETagFormat Format, ETagHashAlgorithm HashAlgorithm), ETag>  contentETags = new ();
+
         #endregion
 
         #region Properties
@@ -856,6 +862,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               Boolean                                                    IncludeETags                              = true,
                               ETagDigestEncoding?                                        ETagDigestEncoding                        = null)
 
+            => ToJSON(Embedded,
+                      ExpandRoamingNetworkIds,
+                      ExpandChargingStationOperatorIds,
+                      ExpandChargingPoolIds,
+                      ExpandChargingStationIds,
+                      ExpandEVSEIds,
+                      ExpandBrandIds,
+                      ExpandDataLicenses,
+                      ExpandEMobilityProviderId,
+                      CustomRoamingNetworkSerializer,
+                      CustomChargingStationOperatorSerializer,
+                      IncludeETags,
+                      ETagDigestEncoding,
+                      IncludeChildArrays: true);
+
+        /// <summary>
+        /// The JSON representation of this roaming network, with or without its child arrays: without them for the skeleton of its
+        /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
+        /// </summary>
+        /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
+        internal JObject ToJSON(Boolean                                                    Embedded,
+                                InfoStatus                                                 ExpandRoamingNetworkIds,
+                                InfoStatus                                                 ExpandChargingStationOperatorIds,
+                                InfoStatus                                                 ExpandChargingPoolIds,
+                                InfoStatus                                                 ExpandChargingStationIds,
+                                InfoStatus                                                 ExpandEVSEIds,
+                                InfoStatus                                                 ExpandBrandIds,
+                                InfoStatus                                                 ExpandDataLicenses,
+                                InfoStatus                                                 ExpandEMobilityProviderId,
+                                CustomJObjectSerializerDelegate<RoamingNetwork>?           CustomRoamingNetworkSerializer,
+                                CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer,
+                                Boolean                                                    IncludeETags,
+                                ETagDigestEncoding?                                        ETagDigestEncoding,
+                                Boolean                                                    IncludeChildArrays)
         {
 
             var JSON = JSONObject.Create(
@@ -894,7 +934,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              ? new JProperty(RoamingNetworkOperator.JSONProperty, Operator.ToJSON())
                              : null,
 
-                         ChargingStationOperators.Any() && ExpandChargingStationOperatorIds != InfoStatus.Hidden
+                         IncludeChildArrays && ChargingStationOperators.Any() && ExpandChargingStationOperatorIds != InfoStatus.Hidden
                              ? ExpandChargingStationOperatorIds.Switch(
 
                                    () => new JProperty(
@@ -1009,25 +1049,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                              );
 
             // Always part of the content.
-            if (!chargingStationManufacturers.IsEmpty)
+            if (IncludeChildArrays && !chargingStationManufacturers.IsEmpty)
                 JSON.Add("chargingStationManufacturers", new JArray(chargingStationManufacturers.Select(chargingStationManufacturer => chargingStationManufacturer.ToJSON())));
 
-            if (!eMobilityProviders.IsEmpty)
+            if (IncludeChildArrays && !eMobilityProviders.IsEmpty)
                 JSON.Add("eMobilityProviders",           new JArray(eMobilityProviders.Select(eMobilityProvider => eMobilityProvider.ToJSON())));
 
-            if (!gridOperators.IsEmpty)
+            if (IncludeChildArrays && !gridOperators.IsEmpty)
                 JSON.Add("gridOperators",                new JArray(gridOperators.Select(gridOperator => gridOperator.ToJSON())));
 
-            if (!parkingOperators.IsEmpty)
+            if (IncludeChildArrays && !parkingOperators.IsEmpty)
                 JSON.Add("parkingOperators",             new JArray(parkingOperators.Select(parkingOperator => parkingOperator.ToJSON())));
 
-            if (!energyMeterManufacturers.IsEmpty)
+            if (IncludeChildArrays && !energyMeterManufacturers.IsEmpty)
                 JSON.Add("energyMeterManufacturers",     new JArray(energyMeterManufacturers.Select(energyMeterManufacturer => energyMeterManufacturer.ToJSON())));
 
-            if (!transparencySoftware.IsEmpty)
+            if (IncludeChildArrays && !transparencySoftware.IsEmpty)
                 JSON.Add("transparencySoftware",         new JArray(transparencySoftware.Select(release => release.ToJSON())));
 
-            if (!transparencySoftwareCertificates.IsEmpty)
+            if (IncludeChildArrays && !transparencySoftwareCertificates.IsEmpty)
                 JSON.Add("transparencySoftwareCertificates", new JArray(transparencySoftwareCertificates.Select(certificate => certificate.ToJSON())));
 
             if (GivenTreeHashAlgorithms.HasValue)
@@ -1553,8 +1593,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<ETag> CalcChangeSetETags()
 
-            => [ ETag.Compute(ETagFormat.JSON, CanonicalJSON.ToUTF8Bytes(ToJSON(IncludeETags: false))),
-                 ETag.Compute(ETagFormat.CBOR, ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical)) ];
+            => [ ContentETag(ETagFormat.JSON),
+                 ContentETag(ETagFormat.CBOR) ];
+
+        #endregion
+
+        #region ContentETag(Format, HashAlgorithm = SHA256)
+
+        /// <summary>
+        /// The ETag of the canonical JSON or CBOR representation of this version, without ETags, without view options and
+        /// without custom serializers, calculated once per hash algorithm. Applying a change set checked those of the version
+        /// before it and calculated those after it twice, each time a serialization of the whole roaming network.
+        /// </summary>
+        /// <param name="Format">The format, JSON or CBOR.</param>
+        /// <param name="HashAlgorithm">The hash algorithm.</param>
+        public ETag ContentETag(ETagFormat         Format,
+                                ETagHashAlgorithm  HashAlgorithm   = ETagHashAlgorithm.SHA256)
+
+            => contentETags.GetOrAdd((Format, HashAlgorithm),
+                                     key => ETag.Compute(key.Format,
+                                                         key.HashAlgorithm,
+                                                         key.Format switch {
+                                                             ETagFormat.JSON  => CanonicalJSON.ToUTF8Bytes(ToJSON(IncludeETags: false)),
+                                                             ETagFormat.CBOR  => ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical),
+                                                             _                => throw new ArgumentOutOfRangeException(nameof(Format), "Only the JSON and CBOR representations have content ETags!")
+                                                         }));
 
         #endregion
 

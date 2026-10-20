@@ -49,19 +49,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The effectiveTree ETag of this version with the given hash algorithm: the root of the hash tree along the entities
-        /// of its effective content, calculated once.
+        /// of its effective content, calculated once, from the digests its entities keep (POIEffectiveDigests): those the
+        /// versions before did not change are not hashed again.
         /// </summary>
         /// <param name="HashAlgorithm">The hash algorithm of the tree.</param>
         public ETag EffectiveTreeETag(ETagHashAlgorithm HashAlgorithm)
 
             => effectiveTreeETags.GetOrAdd(HashAlgorithm,
-                                           hashAlgorithm => POIEffectiveTree.TryDigest(ToEffectiveContentJSON(),
-                                                                                       POIEffectiveTree.RoamingNetworkKind,
-                                                                                       hashAlgorithm,
-                                                                                       out var digest,
-                                                                                       out var errorResponse)
-                                                                ? new ETag(ETagFormat.EffectiveTree, hashAlgorithm, digest)
-                                                                : throw new InvalidOperationException($"The effective content of the roaming network '{Id}' has no tree: {errorResponse}"));
+                                           hashAlgorithm => new ETag(ETagFormat.EffectiveTree,
+                                                                     hashAlgorithm,
+                                                                     POIEffectiveDigests.Digest(this, hashAlgorithm)));
 
         #endregion
 
@@ -79,7 +76,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region EffectiveTree     (HashAlgorithm)
 
         /// <summary>
-        /// The hash tree of this version with the given hash algorithm, with what proofs of its entities need, calculated anew.
+        /// The hash tree of this version with the given hash algorithm, with what proofs of its entities need, from the
+        /// digests its entities keep.
         /// </summary>
         /// <param name="HashAlgorithm">The hash algorithm of the tree.</param>
         public RoamingNetworkEffectiveTree EffectiveTree(ETagHashAlgorithm HashAlgorithm)
@@ -111,7 +109,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json     = ToJSON(IncludeETags: false);
-            var members  = new RoamingNetworkEffectiveMembers();
+            var members  = EffectiveMembersOfTheContent();
 
             #region Charging station operators: their effective charging pools and charging tariffs
 
@@ -122,11 +120,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     var chargingStationOperator  = chargingStationOperators[operatorIndex];
                     var operatorJSON             = (JObject) operatorsJSON[operatorIndex];
-                    var effectivePools           = chargingStationOperator.EffectiveChargingPoolsOfTheContent();
-                    var effectiveTariffs         = chargingStationOperator.EffectiveChargingTariffsOfTheContent();
-
-                    members.ChargingPools.  Add(chargingStationOperator.Id, effectivePools);
-                    members.ChargingTariffs.Add(chargingStationOperator.Id, effectiveTariffs);
+                    var effectivePools           = members.ChargingPools  [chargingStationOperator.Id];
+                    var effectiveTariffs         = members.ChargingTariffs[chargingStationOperator.Id];
 
                     // Only those differing are written again; the others are as the operator embeds them.
                     if (effectivePools.Count > 0 && operatorJSON["chargingPools"] is JArray poolsJSON)
@@ -152,9 +147,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
 
                     var parkingOperator  = parkingOperators[operatorIndex];
-                    var effectiveSpaces  = parkingOperator.EffectiveParkingSpacesOfTheContent();
-
-                    members.ParkingSpaces.Add(parkingOperator.Id, effectiveSpaces);
+                    var effectiveSpaces  = members.ParkingSpaces[parkingOperator.Id];
 
                     if (effectiveSpaces.Count > 0 && parkingOperatorsJSON[operatorIndex]["parkingSpaces"] is JArray spacesJSON)
                         for (var spaceIndex = 0; spaceIndex < parkingOperator.ParkingSpaces.Count; spaceIndex++)
@@ -194,6 +187,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Members = members;
             return json;
+
+        }
+
+        #endregion
+
+        #region (internal) EffectiveMembersOfTheContent()
+
+        /// <summary>
+        /// The effective members of the effective content of this version differing from those of its content, for proofs.
+        /// </summary>
+        internal RoamingNetworkEffectiveMembers EffectiveMembersOfTheContent()
+        {
+
+            var members = new RoamingNetworkEffectiveMembers();
+
+            foreach (var chargingStationOperator in chargingStationOperators)
+            {
+                members.ChargingPools.  Add(chargingStationOperator.Id, chargingStationOperator.EffectiveChargingPoolsOfTheContent());
+                members.ChargingTariffs.Add(chargingStationOperator.Id, chargingStationOperator.EffectiveChargingTariffsOfTheContent());
+            }
+
+            foreach (var parkingOperator in parkingOperators)
+                members.ParkingSpaces.Add(parkingOperator.Id, parkingOperator.EffectiveParkingSpacesOfTheContent());
+
+            return members;
 
         }
 

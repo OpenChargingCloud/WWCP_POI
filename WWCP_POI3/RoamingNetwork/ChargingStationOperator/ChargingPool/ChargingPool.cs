@@ -538,6 +538,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// with its data licenses and charging stations.
         /// </summary>
         public JObject ToJSON()
+
+            => ToJSON(IncludeChildArrays: true);
+
+        /// <summary>
+        /// The JSON representation of this charging pool, with or without its child arrays: without them for the skeleton of its
+        /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
+        /// </summary>
+        /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
+        internal JObject ToJSON(Boolean IncludeChildArrays)
         {
 
             var json = new JObject(
@@ -577,7 +586,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (EnergyMeters.Length > 0)
                 json.Add("energyMeters",      new JArray(EnergyMeters.Select(energyMeter => energyMeter.ToJSON())));
 
-            if (ChargingStations.Count > 0)
+            if (IncludeChildArrays && ChargingStations.Count > 0)
                 json.Add("chargingStations",  new JArray(ChargingStations.Select(chargingStation => chargingStation.ToJSON())));
 
             if (Brands.Count > 0)

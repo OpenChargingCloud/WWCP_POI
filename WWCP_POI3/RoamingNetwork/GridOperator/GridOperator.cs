@@ -447,6 +447,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return the JSON representation of this grid operator, as its roaming network embeds it.
         /// </summary>
         public JObject ToJSON()
+
+            => ToJSON(IncludeChildArrays: true);
+
+        /// <summary>
+        /// The JSON representation of this grid operator, with or without its child arrays: without them for the skeleton of its
+        /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
+        /// </summary>
+        /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
+        internal JObject ToJSON(Boolean IncludeChildArrays)
         {
 
             var json = new JObject(
@@ -471,13 +480,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (HotlinePhoneNumber.HasValue)
                 json.Add("hotline",      HotlinePhoneNumber.Value.ToString());
 
-            if (GridConnectionPoints.Count > 0)
+            if (IncludeChildArrays && GridConnectionPoints.Count > 0)
                 json.Add("gridConnectionPoints", new JArray(GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.ToJSON())));
 
-            if (EnergyMeterTemplates.Count > 0)
+            if (IncludeChildArrays && EnergyMeterTemplates.Count > 0)
                 json.Add("energyMeterTemplates", new JArray(EnergyMeterTemplates.Select(energyMeterTemplate => energyMeterTemplate.ToJSON())));
 
-            if (EnergyMeterGroups.Count > 0)
+            if (IncludeChildArrays && EnergyMeterGroups.Count > 0)
                 json.Add("energyMeterGroups",    new JArray(EnergyMeterGroups.   Select(energyMeterGroup    => energyMeterGroup.   ToJSON())));
 
             POIPartyKeys.AddTo(json, this);

@@ -469,7 +469,8 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   operators of the network, the pools of an operator, …) an RFC 9162 Merkle tree of its children's skeletons. Its root
   is the `effectiveTree` ETag of the version and of its commit, one per hash algorithm the roaming network names in
   `treeHashAlgorithms` (`["sha256"]` by default, changed by the roaming network operator). `ToEffectiveContentJSON()`
-  is what it hashes, `EffectiveTree(algorithm)` the tree.
+  is what it hashes, `EffectiveTree(algorithm)` the tree. Entities keep their digests, so a version hashes only the
+  entities new in it and the paths to the root.
 - **Proofs:** the roaming network pruned, every child array complete, pruned to its root, or partial with the leaves
   it gives and their audit paths. A charging station proof gives the station with its EVSEs completely, the
   skeletons of its pool and operator, the charging tariffs its EVSEs take, the manufacturers, transparency software
@@ -835,8 +836,8 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 - How long archives are kept, and erasing personal data from them
 - Epochs: evidence records for old epochs, an epoch after lost keys of the RNO (section 11.6); how long the price
   statements of checkpoints are kept (section 12.6)
-- Proofs: signed lists of roaming network operators and their identity keys, proofs of absence, an incremental tree
-  ([SPECIFICATION.md](SPECIFICATION.md), section 8.8)
+- Proofs: signed lists of roaming network operators and their identity keys, proofs of absence, a tree incremental
+  within a changed operator as well ([SPECIFICATION.md](SPECIFICATION.md), section 8.8)
 
 ## Tests
 
