@@ -1,23 +1,31 @@
 # WWCP POI
 
-WWCP/POI is the *"git of EV infrastructure information sharing"*. It synchronizes points of interest data within
-e-mobility as immutable, versioned data sets between servers and servers and (smartphone) clients.
+WWCP/POI is the *"Git of EV charging related information sharing"*.
 
-- **Static data is immutable.** A roaming network with everything it embeds is one version,
-  named by its ETags. A change set leads from one version to the next; nothing is changed in place.
-- **Dynamic data is kept strictly apart.** Admin status, status and energy status are
-  not content: they have no ETags, change without a new version and are shared by all versions
-  of their entity.
-- **Signed by the owners.** Every change set is signed by the owners of what it changes, with keys the
-  data names: a charging station operator changes only its own data. Everyone can check every commit.
-- **No leader.** Every server commits; the history is a graph of commits, and tips that do not conflict
-  are merged deterministically, so that all servers make the same merge commits.
-- **WebSocket first.** Peers subscribe to commits and status updates over one WebSocket and push
-  their own commits, for fast, low-latency sync; HTTP serves the same reads.
-- **JSON and CBOR.** Every representation exists in both, with the same keys and values;
-  ETags exist for canonical JSON and canonical CBOR.
+It provides a decentralized, cryptographically verifiable approach to synchronizing EV charging infrastructure information between different actors, including Charging Station Operators (CSOs/CPOs), E-Mobility Providers (EMPs), Grid Operators (GOs), roaming platforms, and ultimately EV drivers using their smartphones.
 
-## Data
+These datasets include physical infrastructure information, such as charging pools, charging stations, EVSEs, connectors and energy meters, as well as logical information, such as charging tariffs, grid connection points, cryptographic identities, trust anchors for legally relevant measurements and commercial offers.
+
+Inspired by Git and Merkle-tree-based distributed systems, WWCP/POI introduces a fundamentally new approach to EV charging infrastructure information sharing, making it possible to answer several critical questions that traditional EV roaming protocols have left unresolved:
+
+1. ***"Are the 10,000,000 charging stations on this server really identical to those on another server?"*** Traditional EV roaming protocols, such as OICP, OCHP and OCPI, largely follow a SQL database-oriented synchronization model: exchange objects, use (additional) identifiers and modification timestamps, and hope that every participant eventually arrives at the same state. WWCP/POI in contrast provides immutable snapshots and changesets and calculates a hirachical hash value of the entire roaming network. By this participants now can compare a single digest, instead of comparing millions of database records. If the hashes differ, the hierarchical structure helps to identify the affected subtrees. Missing commits and changesets can then be exchanged without retransmitting the entire network over and over again.
+
+2. ***"Who is allowed to change charging infrastructure information, and can anyone verify it?"*** In conventional roaming architectures, a receiving platform must largely trust that its upstream data provider was authorized to publish or modify the information it forwarded. This becomes especially problematic with roaming hubs, aggregators and other intermediaries *(men-in-the-middle)*. Data may pass through several independent organizations before it reaches an EMP or an EV driver. Transport channel authentication like *Transport Layer Security (TLS)* alone does not establish who originally authorized a particular data modification. WWCP/POI therefore uses digitally signed changesets with explicit ownership rules.
+
+3. ***"Is this charging station information and charging tariff authentic, up-to-date and still verifiable months later?"*** Today, EV drivers often have little reliable evidence that the charging station information and tariffs displayed by their navigation system or charging application genuinely originated from the responsible operator. Even worse, when a charging invoice arrives weeks later, how can a driver establish which tariff had actually been published when charging began? An EV driver normally wants to know only a few things: *"Is this the correct charging station? Does it support my vehicle? What will charging cost? Can I trust the information being presented to me?"* Therefore there is no reason for a smartphone to download millions of unrelated charging station records just to answer those few questions, but on the other hand a screenshot of the charging station display or app is hardly a satisfactory solution to **digital consumer protection**. WWCP/POI enables cryptographically verifiable chain of trust and hierarchical inclusion proofs before, during and after a charging session.
+
+4. ***"Why Germany's digital metrology failed to deliver trustworthy measurement data?"*** The famous *German Calibration Law (Eichrecht)* is a well-known example how well-intentioned approaches fail in practice. Digital signatures on calibrated measurement data alone do not provide additional security, when the public keys to validate the measurements are sent along the measurement data, as every internal attacker can easily modify the measurements, replace the public keys and recalculate the signatures. WWCP/POI therefore also acts as *domain-specific public key infrastructure* providing trustworthy cryptographic anchors for validating metrological measurements.
+
+5. ***Why are slowly changing infrastructure data and rapidly changing operational data still mixed together?*** Traditional EV roaming protocols like OICP, OCHP and OCPI often use substantially similar REST-based communication patterns for two fundamentally different categories of information: **Slowly changing data** includes charging station locations, connector types, installed hardware, infrastructure ownership, general charging tariffs and cryptographic trust anchors and therefore requires *reproducible consistency*. **Fast-changing data** includes EVSE availability, operational status, reservations, live energy information and dynamic tariffs and therefore requires *low latency*. These categories have different requirements for caching, synchronization, consistency, latency and historical retention and should not be forced into the same synchronization model with the poor result that most dynamic status and tariff information today is often much older than the exspected 1 minute dead-line defined by the *Alternative Fuels Infrastructure Regulation (AFIR)*. WWCP/POI builds upon the EVQI overlay communication protocol stack allowing to use HTTP/1.1 WebSockets and multiple concurrent data streams of HTTP/2 and HTTP/3.
+
+7. ***"How can we enable future use cases and services without breaking compatibility with older hard- and software?"*** One major design flaw of traditional EV charging protocols are overly strict message schema restrictions and ignoring that true *interoperability* also means to be interoperable with their past and future protocol versions. WWCP/POI makes *vendor extensions* a first-class use case allowing everyone to extend messages and data structures in a controlled way. For serialization WWCP/POI uses canonical JSON and CBOR with metrological and linked data extensions.
+
+8. ***"Can existing EV roaming systems benefit without being fully replaced?"*** WWCP/POI as a *GNU-inspired* Open Source project is not intended to require the immediate replacement of OICP, OCHP, OCPI or the European DATEX II ecosystem. Existing systems can import data into the WWCP/POI domain model or expose synchronized information through established interfaces, including OCPI and DATEX II. WWCP/POI enables practical uses beyond conventional roaming, such as independently verifiable AFIR open-data publications, historical infrastructure audits, synchronization diagnostics and consumer-facing tariff transparency.
+
+9. ***"Is WWCP/POI yet-another-centralized-infrastructure?"*** Just like within Git in WWCP/POI there is no leader! Every server commits; the history is a graph of commits, and tips that do not conflict are merged deterministically, so that all servers make the same merge commits.
+
+
+## The Domain Model
 
 ```mermaid
 flowchart TD
@@ -251,35 +259,35 @@ A change set is an ordered list of changes against one version, named by its bef
 leading to the version named by its after ETags.
 
 ```csharp
-// The public halves of the private keys of the parties.
-var gef = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"),
-                                      I18NString.Create(Languages.en, "GraphDefined"),
-                                      SigningKeys:   [ POIPublicKey.From(gefSigningKey)  ],   // e.g. secp256r1
-                                      IdentityKeys:  [ POIPublicKey.From(gefIdentityKey) ]);  // e.g. secp521r1
+var rno = new RoamingNetworkOperator(
+              RoamingNetworkOperator_Id.Parse("GraphDefined"),
+              IdentityKeys:  [ POIPublicKey.From(rnoIdentityKey) ],  // e.g. secp521r1
+              SigningKeys:   [ POIPublicKey.From(rnoSigningKey)  ]   // e.g. secp256r1
+          );
 
-// The operator of the roaming network, who may operate other roaming networks as well.
-var rno = new RoamingNetworkOperator(RoamingNetworkOperator_Id.Parse("GraphDefined"),
-                                     SigningKeys:   [ POIPublicKey.From(rnoSigningKey)  ],
-                                     IdentityKeys:  [ POIPublicKey.From(rnoIdentityKey) ]);
+var gef = new ChargingStationOperator(
+              ChargingStationOperator_Id.Parse("DE*GEF"),
+              I18NString.Create(Languages.en, "GraphDefined"),
+              IdentityKeys:  [ POIPublicKey.From(gefIdentityKey) ],  // e.g. secp521r1
+              SigningKeys:   [ POIPublicKey.From(gefSigningKey)  ]   // e.g. secp256r1
+          );
 
-var rn1 = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
-                             DataSource:                "v1",
-                             ChargingStationOperators:  [ gef ],
-                             Operator:                  rno);
+var qa1 = new RoamingNetwork(
+              RoamingNetwork_Id.Parse("QA"),
+              DataSource:                "Quality Assurance",
+              Operator:                  rno,
+              ChargingStationOperators:  [ gef ]
+          );
 
-var newOperator = new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*NEW"),
-                                              SigningKeys:   [ POIPublicKey.From(newSigningKey)  ],
-                                              IdentityKeys:  [ POIPublicKey.From(newIdentityKey) ]);
+var cs1 = qa1.CreateChangeSet(
+              [
+                  RoamingNetworkChange.UpdateProperty(gef, "telephone",  null, "+49 555 12345678")
+              ])
+              Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256).
+              Sign(rnoSigningKey, POIPublicKey.From(rnoSigningKey).Id, COSEAlgorithm.ES256)
+          );
 
-var cs  = rn1.CreateChangeSet([
-              RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "v2"),             // the network
-              RoamingNetworkChange.Add           (newOperator),                               // a new operator
-              RoamingNetworkChange.UpdateProperty(gef, "telephone",  null, "+49 30 7654321")  // the operator DE*GEF
-          ]).
-          Sign(rnoSigningKey, POIPublicKey.From(rnoSigningKey).Id, COSEAlgorithm.ES256).      // owns the network and adds operators
-          Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);      // owns DE*GEF
-
-var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
+var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
 ```
 
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
