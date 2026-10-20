@@ -137,6 +137,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean                             PushCheckpoints             { get; init; } = true;
 
         /// <summary>
+        /// Whether a history the peer starts begins with the version of the latest checkpoint of the other server carrying
+        /// the signatures required, and takes the commits since from there (SPECIFICATION.md, section 10.5), rather than with
+        /// the head: a witnessed version to start from, and its line of checkpoints with it. Only while following
+        /// checkpoints with a VerifyCheckpointSignature; without such a checkpoint, it starts from the head. Default: yes.
+        /// </summary>
+        public Boolean                             JoinFromCheckpoint          { get; init; } = true;
+
+        /// <summary>
         /// Verifies the signatures of checkpoints with trusted keys; without it, signed checkpoints are not taken.
         /// </summary>
         public VerifyCheckpointSignatureDelegate?  VerifyCheckpointSignature   { get; init; }

@@ -1143,6 +1143,17 @@ A server or client that has no history takes the latest checkpoint carrying the 
 the version of its commit (`GET ~/RNs/{RN_Id}/history/checkpoints/{checkpointId}/snapshot`), checks the
 version against the checkpoint's `eTags`, and then the commits since, as from a snapshot of the head.
 
+- **The snapshot of a checkpoint** is `{commit, roamingNetwork, effectiveLastChanges?, checkpoint}`, also
+  `checkpointSnapshot {checkpointId}` over the WebSocket, without runtime status: the version is not the
+  head. A joining server MUST refuse it unless every signature of the checkpoint is valid and of the roles
+  it requires, `commit` is the commit of the checkpoint with its `revision` and `eTags`, and the version
+  leads to them (section 3).
+- **Which checkpoint:** the latest one, or, when it does not carry the signatures required yet, e.g. of
+  witnesses, the latest one before that does. Without one, the server starts from the head.
+- **Afterwards:** the checkpoint is the first of its line (10.1), the price statements it names are checked
+  when they come along with it (12.3), the commits since are taken as they come (5.2), and the runtime
+  status is the one of the head of the other server.
+
 ### 10.6 Compaction and archives
 
 A history that has checkpoints drops older commits only before the commit of one of them, so that

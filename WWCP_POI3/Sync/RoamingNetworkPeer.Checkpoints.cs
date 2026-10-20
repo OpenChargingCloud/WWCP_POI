@@ -136,6 +136,110 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private) TryJoinFromCheckpointAsync(Connection, CancellationToken)
+
+        /// <summary>
+        /// A new history from the version of the latest checkpoint of the other server carrying the signatures required, or
+        /// of the latest one before that does, with the price statements it names (SPECIFICATION.md, section 10.5); null when
+        /// the peer does not join from checkpoints, or there is no such checkpoint: it starts from the head then.
+        /// </summary>
+        private async Task<RoamingNetworkHistory?> TryJoinFromCheckpointAsync(Connection         Connection,
+                                                                             CancellationToken  CancellationToken)
+        {
+
+            if (!options.JoinFromCheckpoint || !options.FollowCheckpoints || options.VerifyCheckpointSignature is not VerifyCheckpointSignatureDelegate verify)
+                return null;
+
+            var latestAnswer = await Connection.RequestAsync("checkpoints", new JObject(new JProperty("latest", true)), CancellationToken);
+
+            if (latestAnswer.IsError ||
+                latestAnswer.GetPayloadJSON()?["checkpoints"]?.OfType<JObject>().FirstOrDefault() is not JObject latestJSON ||
+                !RoamingNetworkCheckpoint.TryParse(latestJSON, out var latest, out _))
+            {
+                return null;
+            }
+
+            // The latest one first; when it does not carry the signatures required, e.g. of witnesses not there yet, those before.
+            var candidates = new List<RoamingNetworkCheckpoint> { latest };
+
+            if (latest.Sequence > 0 && !CarriesRequiredSignatures(latest, verify))
+            {
+
+                var max      = (UInt64) Math.Max(options.MaxCommitsPerRequest, 1);
+                var payload  = new JObject(new JProperty("max", max));
+
+                if (latest.Sequence > max)
+                    payload.Add("since", latest.Sequence - max - 1);
+
+                var before   = await Connection.RequestAsync("checkpoints", payload, CancellationToken);
+
+                foreach (var checkpointJSON in before.IsError ? [] : before.GetPayloadJSON()?["checkpoints"]?.OfType<JObject>() ?? [])
+                    if (RoamingNetworkCheckpoint.TryParse(checkpointJSON, out var checkpoint, out _) && checkpoint.Sequence < latest.Sequence)
+                        candidates.Add(checkpoint);
+
+                candidates = [ .. candidates.OrderByDescending(checkpoint => checkpoint.Sequence) ];
+
+            }
+
+            foreach (var checkpoint in candidates)
+            {
+
+                if (!CarriesRequiredSignatures(checkpoint, verify))
+                    continue;
+
+                var snapshot = await Connection.RequestAsync("checkpointSnapshot",
+                                                             new JObject(new JProperty("checkpointId", checkpoint.Id.ToString())),
+                                                             CancellationToken);
+
+                if (snapshot.IsError || snapshot.GetPayloadJSON() is not JObject snapshotJSON)
+                {
+                    RaiseError($"The other server gives no snapshot of the checkpoint '{checkpoint.Id}': {snapshot.ErrorDescription}", null);
+                    continue;
+                }
+
+                var priceStatements = await TryGetCheckpointPriceStatementsAsync(Connection, checkpoint, CancellationToken);
+
+                if (!RoamingNetworkHistory.TryFromCheckpointSnapshot(snapshotJSON,
+                                                                     out var joined,
+                                                                     out var errorResponse,
+                                                                     verify,
+                                                                     options.RequiredCheckpointSignatureRoles,
+                                                                     priceStatements,
+                                                                     options.ChangeSetLimits))
+                {
+                    RaiseError($"The snapshot of the checkpoint '{checkpoint.Id}' of the other server can not be taken: {errorResponse}", null);
+                    continue;
+                }
+
+                // From there: not to be pushed back.
+                receivedCheckpoints.TryAdd(checkpoint.Id, 0);
+
+                foreach (var signature in checkpoint.Signatures)
+                    receivedCheckpointSignatures.TryAdd((checkpoint.Id, signature), 0);
+
+                return joined;
+
+            }
+
+            return null;
+
+        }
+
+        #endregion
+
+        #region (private) CarriesRequiredSignatures(Checkpoint, Verify)
+
+        /// <summary>
+        /// Whether every signature of the given checkpoint is valid and it is signed in every role required.
+        /// </summary>
+        private Boolean CarriesRequiredSignatures(RoamingNetworkCheckpoint           Checkpoint,
+                                                  VerifyCheckpointSignatureDelegate  Verify)
+
+            => Checkpoint.Signatures.All(signature => Verify(Checkpoint, signature)) &&
+               (options.RequiredCheckpointSignatureRoles ?? []).All(role => Checkpoint.Signatures.Any(signature => signature.Role == role));
+
+        #endregion
+
         #region (private) TakeCheckpointAsync(Connection, CheckpointJSON, CancellationToken)
 
         /// <summary>

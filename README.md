@@ -434,7 +434,9 @@ proof.Verify(checkpoint, out _);
   sequence). `TryAddCheckpoint` checks a checkpoint of another server against the history: its commit, the
   commits since the previous one, its place in the line, every signature (`VerifyCheckpointSignature`) and the
   roles required; another checkpoint of a sequence held is refused as a split view.
-- **Joining:** `TryGetCheckpointSnapshotJSON(checkpointId, …)` gives the version of its commit, without runtime status.
+- **Joining:** `TryGetCheckpointSnapshotJSON(checkpointId, …)` gives the version of its commit, without runtime status;
+  `RoamingNetworkHistory.TryFromCheckpointSnapshot(snapshot, …)` starts a history from it, the checkpoint checked as the
+  first of its line.
 - **Persistence:** checkpoints are written to the log and kept when compacting, also those of commits dropped.
 
 ### Proofs of charging stations
@@ -747,7 +749,8 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
           ]).Sign(rnoSigningKey, rnoSigningKeyId, COSEAlgorithm.ES256));
 ```
 
-- **Sync:** subscribe first, then a snapshot (when it has no history yet), the commits it misses, naming
+- **Sync:** subscribe first, then a snapshot (when it has no history yet: of the latest checkpoint carrying the signatures
+  required, of the head otherwise), the commits it misses, naming
   those it holds (`have`), the runtime status, and then it pushes the commits the other server misses.
   Pushed commits whose parents it holds are appended, others make it fetch; new commits of its own
   history, made here or taken from elsewhere, are pushed as they come (`PushCommits`).
@@ -767,8 +770,9 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 - **Checkpoints:** after the commits, it takes the checkpoints of the other server it misses, checked against
   its history and signed as `RequiredCheckpointSignatureRoles` require (the roaming network operator by
   default, `VerifyCheckpointSignature`), and pushes those the other server misses (`FollowCheckpoints`,
-  `PushCheckpoints`). A history started from a snapshot begins its line with the first checkpoint of a commit
-  it holds. A witness running a peer signs with `history.TryWitness(…)`; the signature goes to the other server.
+  `PushCheckpoints`). A history it starts begins with the version of the latest checkpoint carrying the signatures
+  required, or the latest one before that does, and takes the commits since (`JoinFromCheckpoint`); without a verifier
+  or such a checkpoint, from the head, and its line with the first checkpoint of a commit it holds. A witness running a peer signs with `history.TryWitness(…)`; the signature goes to the other server.
 - **Attestations:** with `VerifyAttestation`, a verifier of the keys of the roaming network operator, it takes the
   attestations of the other server, so that it serves proofs of charging stations with them as well.
 - **Price statements:** after the commits, it takes the price statements of the other server and pushes those taken
@@ -788,7 +792,7 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 
 - Finer subscription filters
 - Further entities: as the use cases need them
-- A peer joining from the latest checkpoint rather than the head; how long archives are kept, and erasing personal data from them
+- How long archives are kept, and erasing personal data from them
 - Epochs (crypto agility): drafted in [SPECIFICATION.md](SPECIFICATION.md), section 11; how long the price statements of
   checkpoints are kept (section 12.6)
 - Proofs: signed lists of roaming network operators and their identity keys, proofs of absence, an incremental tree

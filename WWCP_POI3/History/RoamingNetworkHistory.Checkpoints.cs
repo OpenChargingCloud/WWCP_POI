@@ -20,6 +20,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
@@ -596,6 +597,141 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ErrorResponse = null;
                 return true;
 
+            }
+
+        }
+
+        #endregion
+
+
+        #region (static) TryFromCheckpointSnapshot(Snapshot, out History, out ErrorResponse, VerifyCheckpointSignature = null, RequiredSignatureRoles = null, PriceStatements = null, Limits = null)
+
+        /// <summary>
+        /// Try to start a history from the snapshot of a checkpoint of another server, as TryGetCheckpointSnapshotJSON writes
+        /// it (SPECIFICATION.md, section 10.5): the version of the commit of the checkpoint, which must lead to its ETags, and
+        /// the checkpoint, whose signatures must be valid and of the required roles. The history begins its line of
+        /// checkpoints with it, takes the price statements it names when they are given, and the commits since from there.
+        /// A runtime status of the snapshot is not taken: the version is not the head.
+        /// </summary>
+        /// <param name="Snapshot">The snapshot of a checkpoint: { commit, roamingNetwork, effectiveLastChanges?, checkpoint }.</param>
+        /// <param name="History">The new history.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="VerifyCheckpointSignature">A verifier of checkpoint signatures using trusted keys, required for a signed checkpoint.</param>
+        /// <param name="RequiredSignatureRoles">The roles the checkpoint must be signed in, e.g. roamingNetworkOperator.</param>
+        /// <param name="PriceStatements">The price statements the checkpoint names, if they are given.</param>
+        /// <param name="Limits">Optional limits for the change set of the commit, the default ones otherwise.</param>
+        public static Boolean TryFromCheckpointSnapshot(JObject                                          Snapshot,
+                                                        [NotNullWhen(true)]  out RoamingNetworkHistory?  History,
+                                                        [NotNullWhen(false)] out String?                 ErrorResponse,
+                                                        VerifyCheckpointSignatureDelegate?               VerifyCheckpointSignature   = null,
+                                                        IReadOnlyCollection<String>?                     RequiredSignatureRoles      = null,
+                                                        IEnumerable<RoamingNetworkPriceStatement>?       PriceStatements             = null,
+                                                        RoamingNetworkChangeSetLimits?                   Limits                      = null)
+        {
+
+            History = null;
+
+            if (Snapshot?["checkpoint"] is not JObject checkpointJSON)
+            {
+                ErrorResponse = "The snapshot of a checkpoint needs its checkpoint!";
+                return false;
+            }
+
+            if (!RoamingNetworkCheckpoint.TryParse(checkpointJSON, out var checkpoint, out var checkpointError))
+            {
+                ErrorResponse = "Invalid checkpoint of the snapshot: " + checkpointError;
+                return false;
+            }
+
+            // The version and its commit only: a runtime status would be the one of another version.
+            var version = new JObject(
+                              new JProperty("commit",          Snapshot["commit"]),
+                              new JProperty("roamingNetwork",  Snapshot["roamingNetwork"])
+                          );
+
+            if (Snapshot["effectiveLastChanges"] is JToken effectiveLastChanges)
+                version.Add("effectiveLastChanges", effectiveLastChanges);
+
+            if (!TryFromSnapshot(version, out var history, out var snapshotError, Limits))
+            {
+                ErrorResponse = "Invalid snapshot of the checkpoint: " + snapshotError;
+                return false;
+            }
+
+            var commit = history.Head.Commit;
+
+            if (commit.Id != checkpoint.CommitId || commit.Revision != checkpoint.Revision || !commit.ETags.SequenceEqual(checkpoint.ETags))
+            {
+                ErrorResponse = $"The snapshot is not the version of the commit '{checkpoint.CommitId}' of its checkpoint, with its revision and ETags!";
+                return false;
+            }
+
+            if (!history.TryAddCheckpoint(checkpoint, out var addError, VerifyCheckpointSignature, RequiredSignatureRoles, PriceStatements))
+            {
+                ErrorResponse = "The checkpoint of the snapshot can not be taken: " + addError;
+                return false;
+            }
+
+            History        = history;
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region (static) TryFromCheckpointSnapshot(Text,     out History, out ErrorResponse, VerifyCheckpointSignature = null, RequiredSignatureRoles = null, PriceStatements = null, Limits = null)
+
+        /// <summary>
+        /// Try to start a history from the JSON text of the snapshot of a checkpoint of another server, e.g. of
+        /// GET ~/RNs/{RN_Id}/history/checkpoints/{checkpointId}/snapshot. Dates stay text, so signed values keep their exact
+        /// representation.
+        /// </summary>
+        /// <param name="Text">The JSON text of the snapshot of a checkpoint.</param>
+        /// <param name="History">The new history.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="VerifyCheckpointSignature">A verifier of checkpoint signatures using trusted keys, required for a signed checkpoint.</param>
+        /// <param name="RequiredSignatureRoles">The roles the checkpoint must be signed in, e.g. roamingNetworkOperator.</param>
+        /// <param name="PriceStatements">The price statements the checkpoint names, if they are given.</param>
+        /// <param name="Limits">Optional limits for the change set of the commit, the default ones otherwise.</param>
+        public static Boolean TryFromCheckpointSnapshot(String                                           Text,
+                                                        [NotNullWhen(true)]  out RoamingNetworkHistory?  History,
+                                                        [NotNullWhen(false)] out String?                 ErrorResponse,
+                                                        VerifyCheckpointSignatureDelegate?               VerifyCheckpointSignature   = null,
+                                                        IReadOnlyCollection<String>?                     RequiredSignatureRoles      = null,
+                                                        IEnumerable<RoamingNetworkPriceStatement>?       PriceStatements             = null,
+                                                        RoamingNetworkChangeSetLimits?                   Limits                      = null)
+        {
+
+            History = null;
+
+            try
+            {
+
+                using var reader = new JsonTextReader(new StringReader(Text)) {
+                                       DateParseHandling   = DateParseHandling.None,
+                                       FloatParseHandling  = FloatParseHandling.Decimal
+                                   };
+
+                if (JToken.ReadFrom(reader) is not JObject snapshot)
+                {
+                    ErrorResponse = "The given JSON text must be a JSON object!";
+                    return false;
+                }
+
+                return TryFromCheckpointSnapshot(snapshot,
+                                                 out History,
+                                                 out ErrorResponse,
+                                                 VerifyCheckpointSignature,
+                                                 RequiredSignatureRoles,
+                                                 PriceStatements,
+                                                 Limits);
+
+            }
+            catch (Exception e)
+            {
+                ErrorResponse = e.Message;
+                return false;
             }
 
         }

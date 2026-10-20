@@ -866,17 +866,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region (private) StartFromSnapshotAsync(Connection, CancellationToken)
 
+        /// <summary>
+        /// Start a history anew: from the version of the latest checkpoint of the other server carrying the signatures
+        /// required, when the peer joins from checkpoints (SPECIFICATION.md, section 10.5), from a snapshot of its head
+        /// otherwise. The commits since come with catching up.
+        /// </summary>
         private async Task StartFromSnapshotAsync(Connection         Connection,
                                                   CancellationToken  CancellationToken)
         {
 
-            var snapshot = await Expect(Connection,
-                                        "snapshot",
-                                        new JObject(new JProperty("runtimeStatus", options.FollowStatus)),
-                                        CancellationToken);
+            var newHistory      = await TryJoinFromCheckpointAsync(Connection, CancellationToken);
+            var statusSnapshot  = false;
 
-            if (!RoamingNetworkHistory.TryFromSnapshot(snapshot, out var newHistory, out var errorResponse, options.ChangeSetLimits))
-                throw new InvalidOperationException("Invalid snapshot of the other server: " + errorResponse);
+            if (newHistory is null)
+            {
+
+                var snapshot = await Expect(Connection,
+                                            "snapshot",
+                                            new JObject(new JProperty("runtimeStatus", options.FollowStatus)),
+                                            CancellationToken);
+
+                if (!RoamingNetworkHistory.TryFromSnapshot(snapshot, out newHistory, out var errorResponse, options.ChangeSetLimits))
+                    throw new InvalidOperationException("Invalid snapshot of the other server: " + errorResponse);
+
+                statusSnapshot = options.FollowStatus;
+
+            }
 
             if (!RoamingNetworkHistory.CheckSignatures(newHistory.Head.Commit, options.VerifyCommitSignature, options.RequiredSignatureRoles, out var signatureError))
                 throw new InvalidOperationException("The snapshot of the other server is not signed as required: " + signatureError);
@@ -915,7 +930,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Watch(newHistory);
             }
 
-            statusFromSnapshot = options.FollowStatus;
+            statusFromSnapshot = statusSnapshot;
 
             OnHistoryReplaced?.Invoke(this, oldHistory, newHistory);
 
