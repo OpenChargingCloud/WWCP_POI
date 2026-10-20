@@ -296,6 +296,14 @@ public sealed class MappedArchiveRecoveryTests
         File.WriteAllLines(control.ArchivePath + ".paths", [staging.DirectoryPath, work.DirectoryPath]);
         using (var initial = RoamingNetworkBootstrapReceiver.Create(staging.DirectoryPath, transfer.Manifest)) Finish(initial, transfer, true);
         await ArchiveCrashTestSupport.Run(control.ArchivePath, "MappedTrust", operation);
+        // Windows deletes the spool of the exited worker with its handle; elsewhere .NET deletes it on Dispose only,
+        // which an exit skips: its one file is left, and removed here as an operator would.
+        if (!OperatingSystem.IsWindows())
+        {
+            var left = Directory.GetFiles(work.DirectoryPath, "wwcp-poi-input.cbor.tmp-*");
+            Assert.That(left.Length, Is.LessThanOrEqualTo(operation == "MappedBootstrap" ? 1 : 0));
+            foreach (var spool in left) File.Delete(spool);
+        }
         Clean(work); Assert.That(File.ReadAllBytes(control.ArchivePath), Is.EqualTo(Bytes(profile)));
         using (var history = RoamingNetworkHistory.Open(control.ArchivePath, VerifyBatch, VerifyCommit, authorizeSnapshotBoundary: _ => true)) Replica(history, Bytes(profile));
         using var receiver = RoamingNetworkBootstrapReceiver.Open(staging.DirectoryPath, transfer.Manifest.Id);

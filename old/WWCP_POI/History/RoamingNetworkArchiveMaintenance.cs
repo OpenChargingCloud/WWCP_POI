@@ -121,7 +121,8 @@ public static class RoamingNetworkArchiveMaintenance
         var path = scope == RoamingNetworkArchiveCleanupScope.Archive ? target + ".lock" : Path.Combine(target, "bootstrap.lock");
         try { RequireRegular(path); }
         catch (FileNotFoundException) { }
-        return new(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+        // Exclusive, as the lease of an archive, see RoamingNetworkHistory.AcquireLease.
+        return new(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
     }
 
     private static RoamingNetworkArchiveCleanupPlan Scan(RoamingNetworkArchiveCleanupScope scope, String target,

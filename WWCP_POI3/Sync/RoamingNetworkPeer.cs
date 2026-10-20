@@ -97,6 +97,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         // The latest status of every entity known at the other server: not to be pushed back.
         private readonly ConcurrentDictionary<(POIRuntimeStatusKind Kind, String EntityType, String EntityId), (DateTimeOffset Timestamp, String Value)>  receivedStatus  = [];
 
+        // While connected: the status updates and price statements queued to be pushed, each once - one made while
+        // connecting is seen by its event and by the look at all of them after the watching began.
+        private readonly Lock                                                                                          queueLock              = new ();
+        private readonly Dictionary<(POIRuntimeStatusKind Kind, String EntityType, String EntityId), (Int64 Timestamp, String Value)>  queuedStatus  = [];
+        private readonly HashSet<String>                                                                               queuedPriceStatements  = [];
+
         // While connected: the commits and status updates of the watched history to push, in their order.
         private readonly Lock                                                 watchLock        = new ();
         private          Channel<Object>?                                     outgoing;
@@ -414,6 +420,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     try
                     {
 
+                        lock (queueLock)
+                        {
+                            queuedStatus.Clear();
+                            queuedPriceStatements.Clear();
+                        }
+
                         lock (watchLock)
                         {
                             outgoing = pushes;
@@ -423,8 +435,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         // The status set here while not connected, or differently than there.
                         if (options.PushStatus)
                             foreach (var statusUpdate in History!.RuntimeStatus.All)
-                                if (!IsReceived(statusUpdate))
-                                    pushes.Writer.TryWrite(statusUpdate);
+                                QueueStatus(statusUpdate, pushes.Writer);
 
                         // The price statements taken here while not connected, or not known there.
                         if (options.PushPriceStatements)
@@ -802,8 +813,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         private void StatusUpdated(POIStatusUpdate StatusUpdate)
         {
-            if (!IsReceived(StatusUpdate))
-                Volatile.Read(ref outgoing)?.Writer.TryWrite(StatusUpdate);
+            if (Volatile.Read(ref outgoing) is Channel<Object> pushes)
+                QueueStatus(StatusUpdate, pushes.Writer);
+        }
+
+        #endregion
+
+        #region (private) QueueStatus(StatusUpdate, Pushes)
+
+        /// <summary>
+        /// Queue the given status update to be pushed, unless the other server knows it or it is queued already.
+        /// Pushed twice, a refused one was refused twice, and "refused 2 of 4" told of two refusals of one.
+        /// </summary>
+        private void QueueStatus(POIStatusUpdate        StatusUpdate,
+                                 ChannelWriter<Object>  Pushes)
+        {
+
+            lock (queueLock)
+            {
+
+                var key = (StatusUpdate.Kind, StatusUpdate.EntityType, StatusUpdate.EntityId);
+
+                if (IsReceived(StatusUpdate) ||
+                    queuedStatus.TryGetValue(key, out var queued) &&
+                    queued.Timestamp == StatusUpdate.Timestamp.ToUnixTimeMilliseconds() &&
+                    String.Equals(queued.Value, StatusUpdate.Value, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                queuedStatus[key] = (StatusUpdate.Timestamp.ToUnixTimeMilliseconds(), StatusUpdate.Value);
+                Pushes.TryWrite(StatusUpdate);
+
+            }
+
         }
 
         #endregion

@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Globalization;
 using System.Net;
 using System.Text;
 
@@ -289,6 +290,26 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(noSigner,                                        Does.Contain("no price statement signer"));
 
             }
+
+        }
+
+        #endregion
+
+        #region A_price_statement_states_the_prices_as_they_were_set(Price)
+
+        /// <summary>
+        /// The price status is read as JSON text: its prices were read as doubles, and the statement signed 0.39 for
+        /// 0.390 and 0.123456789012346 for 0.1234567890123456789.
+        /// </summary>
+        [TestCase("0.390")]
+        [TestCase("0.1234567890123456789")]
+        public void A_price_statement_states_the_prices_as_they_were_set(String Price)
+        {
+
+            var history    = NewHistory();
+            var statement  = SetPrice(history, EVSEType, E11, Decimal.Parse(Price, CultureInfo.InvariantCulture), 1);
+
+            Assert.That(CanonicalJSON.Serialize(statement.PriceStatus.ToJSON()), Does.Contain("\"price\":" + Price + ","));
 
         }
 

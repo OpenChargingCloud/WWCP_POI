@@ -61,6 +61,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String  LogFileName      = "log.jsonl";
 
+        /// <summary>
+        /// The size of the buffer the log is read with: a line may be longer.
+        /// </summary>
+        private const Int32  ReadBufferSize   = 64 * 1024;
+
         private static readonly UTF8Encoding  utf8  = new (encoderShouldEmitUTF8Identifier: false);
 
         private readonly Lock         storeLock  = new ();
@@ -145,21 +150,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var logFile   = Path.Combine(Directory, generation, LogFileName);
                 var entries   = new List<RoamingNetworkHistoryLogEntry>();
 
-                var bytes     = File.Exists(logFile) ? File.ReadAllBytes(logFile) : [];
-                var start     = 0;
-                var lineNo    = 0;
+                Int64? cutAt  = null;
 
-                while (start < bytes.Length)
+                // Read line by line: the log grows with every entry, also beyond the 2 GiB File.ReadAllBytes reads.
+                if (File.Exists(logFile))
                 {
 
-                    var end       = Array.IndexOf(bytes, (Byte) '\n', start);
-                    var complete  = end >= 0;
-                    var line      = utf8.GetString(bytes, start, (complete ? end : bytes.Length) - start);
+                    using var stream  = new FileStream(logFile, FileMode.Open, FileAccess.Read, FileShare.Read, ReadBufferSize);
+                    using var lines   = ReadLines(stream).GetEnumerator();
+                    var lineNo        = 0;
 
-                    lineNo++;
-
-                    if (line.Trim().Length > 0)
+                    while (lines.MoveNext())
                     {
+
+                        var (start, bytes, complete) = lines.Current;
+                        var line = utf8.GetString(bytes);
+
+                        lineNo++;
+
+                        if (line.Trim().Length == 0)
+                            continue;
 
                         RoamingNetworkHistoryLogEntry? entry = null;
                         String?                        error = null;
@@ -177,11 +187,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         {
 
                             // Written only partly, e.g. by a crash: dropped, and the log cut there.
-                            if (!complete || bytes.Skip(end + 1).All(b => b is (Byte) '\n' or (Byte) '\r' or (Byte) ' '))
+                            if (!complete || OnlyBlankLinesFollow(lines))
                             {
-                                using var cut = new FileStream(logFile, FileMode.Open, FileAccess.Write, FileShare.None);
-                                cut.SetLength(start);
-                                cut.Flush(true);
+                                cutAt = start;
                                 break;
                             }
 
@@ -193,11 +201,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     }
 
-                    if (!complete)
-                        break;
+                }
 
-                    start = end + 1;
-
+                if (cutAt.HasValue)
+                {
+                    using var cut = new FileStream(logFile, FileMode.Open, FileAccess.Write, FileShare.None);
+                    cut.SetLength(cutAt.Value);
+                    cut.Flush(true);
                 }
 
                 OpenLog();
@@ -307,6 +317,76 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private static) ReadLines(Stream)
+
+        /// <summary>
+        /// The lines of the given stream, without their '\n', each with the position it starts at, and whether it ends
+        /// with a '\n': only the last one may not, e.g. when it was written only partly.
+        /// </summary>
+        private static IEnumerable<(Int64 Start, Byte[] Line, Boolean Complete)> ReadLines(Stream Stream)
+        {
+
+            var buffer    = new Byte[ReadBufferSize];
+            var line      = new MemoryStream();
+            var start     = 0L;
+            var position  = 0L;
+            Int32 read;
+
+            while ((read = Stream.Read(buffer, 0, buffer.Length)) > 0)
+            {
+
+                var offset = 0;
+
+                while (offset < read)
+                {
+
+                    var end = Array.IndexOf(buffer, (Byte) '\n', offset, read - offset);
+
+                    if (end < 0)
+                    {
+                        line.Write(buffer, offset, read - offset);
+                        position += read - offset;
+                        break;
+                    }
+
+                    line.Write(buffer, offset, end - offset);
+                    position += end - offset + 1;
+
+                    yield return (start, line.ToArray(), true);
+
+                    line.SetLength(0);
+                    start   = position;
+                    offset  = end + 1;
+
+                }
+
+            }
+
+            if (line.Length > 0)
+                yield return (start, line.ToArray(), false);
+
+        }
+
+        #endregion
+
+        #region (private static) OnlyBlankLinesFollow(Lines)
+
+        /// <summary>
+        /// Whether the lines still to come hold nothing but spaces and carriage returns.
+        /// </summary>
+        private static Boolean OnlyBlankLinesFollow(IEnumerator<(Int64 Start, Byte[] Line, Boolean Complete)> Lines)
+        {
+
+            while (Lines.MoveNext())
+                if (Lines.Current.Line.Any(b => b is not ((Byte) '\r' or (Byte) ' ')))
+                    return false;
+
+            return true;
+
+        }
+
+        #endregion
+
         #region (internal static) ParseLine(Text)
 
         /// <summary>
@@ -315,12 +395,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         internal static JObject ParseLine(String Text)
         {
 
-            using var reader = new JsonTextReader(new StringReader(Text)) {
-                                   DateParseHandling   = DateParseHandling.None,
-                                   FloatParseHandling  = FloatParseHandling.Decimal
-                               };
-
-            return JToken.ReadFrom(reader) as JObject
+            return POIJSON.Read(Text) as JObject
                        ?? throw new InvalidOperationException("A JSON object was expected!");
 
         }

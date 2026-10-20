@@ -480,6 +480,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                 Assert.That(await Eventually(() => Status(serverA!).Value == "offline"),                                               Is.True);
                 Assert.That(await Eventually(() => { lock (errors) return errors.Any(error => error.Contains("refused 1 of")); }),      Is.True);
                 Assert.That(Status(serverA!, POIRuntimeStatusKind.AdminStatus).Value,                                                   Is.Not.EqualTo("outOfService"));
+
+                // Set while the peer connected, they were pushed twice, by their events and by the look at all status
+                // after it: "refused 2 of 4", now and then.
+                lock (errors)
+                    Assert.That(errors.Where(error => error.Contains("refused") && !error.Contains("refused 1 of")),                      Is.Empty);
             }
 
         }

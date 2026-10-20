@@ -218,6 +218,49 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region A_log_of_lines_longer_than_its_read_buffer_is_read_again()
+
+        /// <summary>
+        /// The log is read line by line, in pieces of 64 KiB: commits of more, lines across the pieces, and a line
+        /// written only partly at its end.
+        /// </summary>
+        [Test]
+        public void A_log_of_lines_longer_than_its_read_buffer_is_read_again()
+        {
+
+            RoamingNetworkHistory original;
+
+            using (var store = new RoamingNetworkHistoryFileStore(directory!))
+            {
+
+                original = RoamingNetworkHistory.Start(NewNetwork(), Store: store);
+
+                for (var minutes = 1; minutes <= 5; minutes++)
+                    Assert.That(Change(original, minutes, "dataSource", new String((Char) ('a' + minutes), 30000 * minutes)).IsCommitted);
+
+                Fill(original);
+                original.DetachStore();
+
+            }
+
+            var log     = Path.Combine(directory!, File.ReadAllText(Path.Combine(directory!, RoamingNetworkHistoryFileStore.CurrentFileName)).Trim(), RoamingNetworkHistoryFileStore.LogFileName);
+            var length  = new FileInfo(log).Length;
+
+            Assert.That(length, Is.GreaterThan(3 * 64 * 1024));
+
+            File.AppendAllText(log, "{\"type\":\"commit\",\"commit\":{\"@id\":\"" + new String('1', 100000), Encoding.UTF8);
+
+            using var store2 = new RoamingNetworkHistoryFileStore(directory!);
+
+            Assert.That(RoamingNetworkHistory.TryLoad(store2, out var loaded, out var error), Is.True, error);
+
+            AssertSame(loaded!, original);
+            Assert.That(new FileInfo(log).Length, Is.EqualTo(length), "The part is cut off.");
+
+        }
+
+        #endregion
+
         #region An_invalid_line_before_the_last_one_is_an_error()
 
         [Test]

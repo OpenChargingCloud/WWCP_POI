@@ -257,7 +257,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             try
             {
-                return TryParse(JToken.Parse(Text), out ChargingPrices, out _);
+                return TryParse(POIJSON.Read(Text), out ChargingPrices, out _);
             }
             catch
             {

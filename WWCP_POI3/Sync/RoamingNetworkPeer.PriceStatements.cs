@@ -108,8 +108,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private void PushMissingPriceStatements(ChannelWriter<Object> Pushes)
         {
             foreach (var priceStatement in History!.PriceStatements)
-                if (!receivedPriceStatements.ContainsKey(priceStatement.Digest))
-                    Pushes.TryWrite(priceStatement);
+                QueuePriceStatement(priceStatement, Pushes);
         }
 
         #endregion
@@ -118,8 +117,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         private void PriceStatementTaken(RoamingNetworkPriceStatement PriceStatement)
         {
-            if (!receivedPriceStatements.ContainsKey(PriceStatement.Digest))
-                Volatile.Read(ref outgoing)?.Writer.TryWrite(PriceStatement);
+            if (Volatile.Read(ref outgoing) is Channel<Object> pushes)
+                QueuePriceStatement(PriceStatement, pushes.Writer);
+        }
+
+        #endregion
+
+        #region (private) QueuePriceStatement(PriceStatement, Pushes)
+
+        /// <summary>
+        /// Queue the given price statement to be pushed, unless the other server knows it or it is queued already.
+        /// </summary>
+        private void QueuePriceStatement(RoamingNetworkPriceStatement  PriceStatement,
+                                         ChannelWriter<Object>         Pushes)
+        {
+
+            lock (queueLock)
+            {
+                if (!receivedPriceStatements.ContainsKey(PriceStatement.Digest) &&
+                    queuedPriceStatements.Add(PriceStatement.Digest))
+                {
+                    Pushes.TryWrite(PriceStatement);
+                }
+            }
+
         }
 
         #endregion

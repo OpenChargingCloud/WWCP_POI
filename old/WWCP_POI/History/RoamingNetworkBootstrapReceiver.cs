@@ -300,8 +300,9 @@ public sealed class RoamingNetworkBootstrapReceiver : IDisposable
     }
 
     private String ChunkPath(Int32 index) => Path.Combine(directory, index.ToString("D8", System.Globalization.CultureInfo.InvariantCulture) + ".chunk");
+    // Exclusive, as the lease of an archive, see RoamingNetworkHistory.AcquireLease.
     private static FileStream AcquireLease(String directory)
-        => new(Path.Combine(directory, "bootstrap.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+        => new(Path.Combine(directory, "bootstrap.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
 
     private Boolean Begin(out RoamingNetworkBootstrapResult result)
     {

@@ -389,12 +389,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                using var reader = new JsonTextReader(new StringReader(Text)) {
-                                       DateParseHandling   = DateParseHandling.None,
-                                       FloatParseHandling  = FloatParseHandling.Decimal
-                                   };
-
-                if (JToken.ReadFrom(reader) is not JObject json)
+                if (POIJSON.Read(Text) is not JObject json)
                 {
                     ErrorResponse = "The given JSON text must be a JSON object!";
                     return false;

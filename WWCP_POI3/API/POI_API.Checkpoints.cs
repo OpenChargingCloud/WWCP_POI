@@ -619,10 +619,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var json = Request.ContentType == HTTPContentType.Application.CBOR
                                ? CBORJSON.ToJSON(CBORValue.Parse(body)) as JObject
-                               : JToken.ReadFrom(new JsonTextReader(new StringReader(Encoding.UTF8.GetString(body))) {
-                                     DateParseHandling   = DateParseHandling.None,
-                                     FloatParseHandling  = FloatParseHandling.Decimal
-                                 }) as JObject;
+                               : POIJSON.Read(Encoding.UTF8.GetString(body)) as JObject;
 
                 if (json is null)
                     return false;

@@ -23,7 +23,9 @@ POI uses the two byte representations of a JSON document that
   integers.
 
 Whoever reads JSON in order to hash it again MUST read numbers with a fraction as decimals and
-strings as strings, never as points in time.
+strings as strings, never as points in time. A number with a fraction or an exponent that a decimal
+cannot hold as written - more than 28 decimal places, as `1e-30`, or a mantissa above 96 bits -
+MUST be refused, not rounded; so MUST an object that names a property twice.
 
 
 ## 2. The content of a version

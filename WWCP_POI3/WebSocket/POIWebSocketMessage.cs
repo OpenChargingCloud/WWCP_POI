@@ -442,13 +442,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                using var reader = new JsonTextReader(new StringReader(Text)) {
-                                       DateParseHandling   = DateParseHandling.None,
-                                       FloatParseHandling  = FloatParseHandling.Decimal,
-                                       MaxDepth            = MaxDepth
-                                   };
+                using var reader = POIJSON.Reader(Text, MaxDepth);
 
-                json = JToken.ReadFrom(reader);
+                json = POIJSON.ReadFrom(reader, Text);
 
                 if (reader.Read())
                 {

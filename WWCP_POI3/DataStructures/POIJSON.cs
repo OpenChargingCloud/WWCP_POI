@@ -20,7 +20,10 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Numerics;
+using System.Text;
 
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Aegir;
@@ -63,6 +66,172 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static String ToText(JToken JSON)
 
             => CanonicalJSON.Serialize(JSON);
+
+        #endregion
+
+        #region Read                (Text, MaxDepth = 64)
+
+        /// <summary>
+        /// JSON text read as it was written, for whatever is hashed or signed again (section 1 of the specification):
+        /// strings stay strings, also those that look like a point in time, numbers with a fraction or an exponent are
+        /// decimals, as written, and an object names each of its properties once.
+        /// </summary>
+        /// <remarks>
+        /// A number a decimal cannot hold as written is refused, not rounded: one with more than 28 decimal places, as
+        /// 1e-30, or with a mantissa above 96 bits, as 7922816251426433759354395033.6. Read as decimals they were 0 and
+        /// 7922816251426433759354395034, and a change set with such a value was taken with a content its sender had
+        /// not signed. Of a property named twice the last one was taken, where other readers take the first.
+        /// </remarks>
+        /// <param name="Text">The JSON text.</param>
+        /// <param name="MaxDepth">The maximum depth of the JSON.</param>
+        /// <exception cref="JsonReaderException">When the text is no JSON, or no JSON so read.</exception>
+        public static JToken Read(String  Text,
+                                  Int32   MaxDepth   = 64)
+        {
+
+            using var reader = Reader(Text, MaxDepth);
+
+            return ReadFrom(reader, Text);
+
+        }
+
+        #endregion
+
+        #region Reader              (Text, MaxDepth = 64)
+
+        /// <summary>
+        /// A reader of the given JSON text, as Read() reads it: dates stay text, numbers with a fraction decimals.
+        /// </summary>
+        /// <param name="Text">The JSON text.</param>
+        /// <param name="MaxDepth">The maximum depth of the JSON.</param>
+        public static JsonTextReader Reader(String  Text,
+                                            Int32   MaxDepth   = 64)
+
+            => new (new StringReader(Text)) {
+                   DateParseHandling   = DateParseHandling.None,
+                   FloatParseHandling  = FloatParseHandling.Decimal,
+                   MaxDepth            = MaxDepth
+               };
+
+        #endregion
+
+        #region ReadFrom            (Reader, Text)
+
+        /// <summary>
+        /// The next JSON value of the given reader of the given JSON text, as Read() reads it, for a reader that goes on
+        /// after it, e.g. to find out whether there is more.
+        /// </summary>
+        /// <param name="Reader">A reader of the JSON text, from Reader().</param>
+        /// <param name="Text">The JSON text the reader reads.</param>
+        /// <exception cref="JsonReaderException">When the text is no JSON, or no JSON so read.</exception>
+        public static JToken ReadFrom(JsonTextReader  Reader,
+                                      String          Text)
+        {
+
+            var json = JToken.ReadFrom(Reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+
+            if (HasDecimals(json))
+                CheckDecimals(Text, Reader.MaxDepth ?? 64);
+
+            return json;
+
+        }
+
+        #endregion
+
+        #region (private static) HasDecimals  (JSON)
+
+        private static Boolean HasDecimals(JToken JSON)
+
+            => JSON.Type == JTokenType.Float ||
+               (JSON is JContainer container && container.Descendants().Any(token => token.Type == JTokenType.Float));
+
+        #endregion
+
+        #region (private static) CheckDecimals(Text, MaxDepth)
+
+        /// <summary>
+        /// Whether a decimal holds each number of the first JSON value of the given text as written, for Newtonsoft,
+        /// which has read them, does not tell which it has rounded.
+        /// </summary>
+        private static void CheckDecimals(String  Text,
+                                          Int32   MaxDepth)
+        {
+
+            var reader = new System.Text.Json.Utf8JsonReader(Encoding.UTF8.GetBytes(Text),
+                                                              new System.Text.Json.JsonReaderOptions {
+                                                                  CommentHandling      = System.Text.Json.JsonCommentHandling.Skip,
+                                                                  AllowTrailingCommas  = true,
+                                                                  AllowMultipleValues  = true,
+                                                                  MaxDepth             = MaxDepth + 1
+                                                              });
+
+            while (reader.Read())
+            {
+
+                if (reader.TokenType == System.Text.Json.JsonTokenType.Number &&
+                    !IsHeldByADecimal(reader.ValueSpan))
+                {
+                    throw new JsonReaderException($"The number {Encoding.UTF8.GetString(reader.ValueSpan)} is no decimal as written: it has more than 28 decimal places or a mantissa above 96 bits!");
+                }
+
+                if (reader.CurrentDepth == 0 &&
+                    reader.TokenType is not System.Text.Json.JsonTokenType.StartObject
+                                     and not System.Text.Json.JsonTokenType.StartArray
+                                     and not System.Text.Json.JsonTokenType.PropertyName)
+                {
+                    break;
+                }
+
+            }
+
+        }
+
+        #endregion
+
+        #region (private static) IsHeldByADecimal(Number)
+
+        private static readonly BigInteger MaxDecimalMantissa = (BigInteger.One << 96) - 1;
+
+        /// <summary>
+        /// Whether a decimal holds the given JSON number as written, with as many decimal places: an integer, which
+        /// Newtonsoft reads as an integer, always.
+        /// </summary>
+        private static Boolean IsHeldByADecimal(ReadOnlySpan<Byte> Number)
+        {
+
+            var text         = Encoding.ASCII.GetString(Number);
+            var e            = text.IndexOfAny(['e', 'E']);
+            var significand  = e < 0 ? text : text[..e];
+            var point        = significand.IndexOf('.');
+
+            if (e < 0 && point < 0)
+                return true;
+
+            if (!Int32.TryParse(e < 0 ? "0" : text[(e + 1)..], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var exponent))
+                return false;
+
+            var mantissa     = BigInteger.Abs(BigInteger.Parse(point < 0 ? significand : significand.Remove(point, 1), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture));
+            var scale        = (Int64) (point < 0 ? 0 : significand.Length - point - 1) - exponent;
+
+            if (mantissa.IsZero)
+                return scale <= 28;
+
+            if (scale < 0)
+            {
+
+                if (scale < -29)
+                    return false;
+
+                mantissa *= BigInteger.Pow(10, (Int32) (-scale));
+                scale     = 0;
+
+            }
+
+            return scale    <= 28 &&
+                   mantissa <= MaxDecimalMantissa;
+
+        }
 
         #endregion
 

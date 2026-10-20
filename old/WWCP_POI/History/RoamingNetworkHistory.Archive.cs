@@ -312,8 +312,9 @@ public sealed partial class RoamingNetworkHistory
         archivePath = resolved;
     }
 
+    // FileShare.None: on Unix only an exclusive lock (flock LOCK_EX) keeps a second writer out, FileShare.Read takes a shared one.
     private static FileStream AcquireLease(String path)
-        => new(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+        => new(path + ".lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
 
     private void Persist(ImmutableDictionary<RoamingNetworkCommitId, Entry> source, RoamingNetworkCommitId headId)
     {

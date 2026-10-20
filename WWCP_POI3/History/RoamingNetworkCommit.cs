@@ -337,13 +337,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                using var reader = new JsonTextReader(new StringReader(Text)) {
-                                       DateParseHandling   = DateParseHandling.None,
-                                       FloatParseHandling  = FloatParseHandling.Decimal,
-                                       MaxDepth            = Limits.MaxDepth + 1
-                                   };
-
-                if (JToken.ReadFrom(reader) is not JObject json)
+                if (POIJSON.Read(Text, Limits.MaxDepth + 1) is not JObject json)
                 {
                     ErrorResponse = "The given JSON text must be a JSON object!";
                     return false;

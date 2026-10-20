@@ -127,8 +127,9 @@ internal sealed class DomainRecoveryFixture : IDisposable
         Publish(Edit("GridOperator", "DE*GRD", "name", Json(new JObject { ["en"] = "Grid " + ordinal, ["de"] = "Netz" })));
         Publish(Edit("TransparencySoftware", "verifier-1", "vendor", Text("Vendor " + ordinal)));
         Publish(Edit("TransparencySoftwareCertificate", "approval-1", "documentNumber", Text("Document " + ordinal)));
-        var point = JToken.Parse(History.Head.Snapshot.GetEntity(InfrastructureEntityType.ChargingPool, "DE*ABC*P1")
-            .Properties["gridConnectionPoint"].GetRawText());
+        // Its timestamps stay text: parsed as dates, they would come back in the local time zone of the machine.
+        var point = Newtonsoft.Json.JsonConvert.DeserializeObject<JToken>(History.Head.Snapshot.GetEntity(InfrastructureEntityType.ChargingPool, "DE*ABC*P1")
+            .Properties["gridConnectionPoint"].GetRawText(), new Newtonsoft.Json.JsonSerializerSettings { DateParseHandling = Newtonsoft.Json.DateParseHandling.None })!;
         point["gridOperatorId"] = point["gridOperatorId"]!.Value<String>() == "DE*GRD" ? "DE*ALT" : "DE*GRD";
         Publish(Edit("ChargingPool", "DE*ABC*P1", "gridConnectionPoint", Json(point)));
         var tariff = History.Head.Snapshot.GetEntity(InfrastructureEntityType.EVSE, "DE*ABC*E1").Properties["tariffIds"]
