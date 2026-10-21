@@ -288,15 +288,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false)
 
-        /// <summary>
-        /// Return the JSON representation of this charging tariff template as its operator embeds it, without a JSON-LD
-        /// context: the one of every template, see IPOITemplate.
-        /// </summary>
-        public override JObject ToJSON()
+        /// <inheritdoc/>
+        public override JObject ToJSON(Boolean Embedded = false)
 
-            => ToJSON(Embedded: true);
+            => ToJSON(Embedded,
+                      CustomChargingTariffTemplateSerializer: null);
 
         #endregion
 

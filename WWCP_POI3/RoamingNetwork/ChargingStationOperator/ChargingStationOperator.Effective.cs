@@ -743,7 +743,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var changed = new HashSet<TTemplateId>();
 
             foreach (var template in Current)
-                if (!Before.TryGet(IdOf(template), out var before) || !POIJSON.SameValue(template.ToJSON(), before.ToJSON()))
+                if (!Before.TryGet(IdOf(template), out var before) || !POIJSON.SameValue(template.ToJSON(Embedded: true), before.ToJSON(Embedded: true)))
                     changed.Add(IdOf(template));
 
             foreach (var before in Before)

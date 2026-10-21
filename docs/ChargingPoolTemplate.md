@@ -69,9 +69,9 @@ with its effective charging stations and EVSEs. Its templates must not make it i
 
 ## Adding and removing
 
-The template is added with `RoamingNetworkChange.Add(chargingPoolTemplate)`, as `ToJSON()` writes it, and removed
-with `RoamingNetworkChange.Remove(chargingPoolTemplateId)`; a given parent must be its operator. A template a pool
-names can not be removed: update the pool first, in the same or an earlier change set.
+The template is added with `RoamingNetworkChange.Add(chargingPoolTemplate)`, as `ToJSON(Embedded: true)` writes it,
+and removed with `RoamingNetworkChange.Remove(chargingPoolTemplateId)`; a given parent must be its operator. A template
+a pool names can not be removed: update the pool first, in the same or an earlier change set.
 
 
 ## Validation

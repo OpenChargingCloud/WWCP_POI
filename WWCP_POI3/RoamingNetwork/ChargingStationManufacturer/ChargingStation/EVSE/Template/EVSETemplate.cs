@@ -394,14 +394,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false)
 
-        /// <summary>
-        /// Return the JSON representation of this EVSE template, as its charging station operator embeds it.
-        /// </summary>
-        public override JObject ToJSON()
+        /// <inheritdoc/>
+        public override JObject ToJSON(Boolean Embedded = false)
 
-            => ToJSON(Embedded: true);
+            => ToJSON(Embedded,
+                      CustomEVSETemplateSerializer: null);
 
         #endregion
 

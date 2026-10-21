@@ -46,7 +46,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Its JSON representation, writing the properties it gives its members as they write them.
         /// </summary>
-        JObject         ToJSON();
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        JObject         ToJSON(Boolean Embedded = false);
 
     }
 
@@ -154,10 +155,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false)
 
         /// <inheritdoc/>
-        public abstract JObject ToJSON();
+        public abstract JObject ToJSON(Boolean Embedded = false);
 
         #endregion
 

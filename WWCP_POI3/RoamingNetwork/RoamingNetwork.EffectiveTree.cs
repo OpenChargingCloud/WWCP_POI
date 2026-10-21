@@ -55,10 +55,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="HashAlgorithm">The hash algorithm of the tree.</param>
         public ETag EffectiveTreeETag(ETagHashAlgorithm HashAlgorithm)
 
-            => effectiveTreeETags.GetOrAdd(HashAlgorithm,
-                                           hashAlgorithm => new ETag(ETagFormat.EffectiveTree,
-                                                                     hashAlgorithm,
-                                                                     POIEffectiveDigests.Digest(this, hashAlgorithm)));
+            => effectiveTreeETags.GetOrAdd(
+                   HashAlgorithm,
+                   hashAlgorithm => new ETag(
+                                        ETagFormat.EffectiveTree,
+                                        hashAlgorithm,
+                                        POIEffectiveDigests.Digest(this, hashAlgorithm)
+                                    )
+               );
 
         #endregion
 
@@ -82,7 +86,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="HashAlgorithm">The hash algorithm of the tree.</param>
         public RoamingNetworkEffectiveTree EffectiveTree(ETagHashAlgorithm HashAlgorithm)
 
-            => RoamingNetworkEffectiveTree.Of(this, HashAlgorithm);
+            => RoamingNetworkEffectiveTree.Of(
+                   this,
+                   HashAlgorithm
+               );
 
         #endregion
 
