@@ -221,7 +221,7 @@ readable by everyone, `GET /poi/RNs/QA`. The network embeds its operator with it
   },
   "created":    "2026-10-17T18:16:11.065Z",
   "lastChange": "2026-10-17T18:16:11.065Z",
-  "eTags": [ [ "json", "sha256", "hex", "…" ], [ "cbor", "sha256", "hex", "…" ] ]
+  "eTags": [ [ "json", "sha256", "base64", "…" ], [ "cbor", "sha256", "base64", "…" ] ]
 }
 ```
 
