@@ -502,8 +502,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (static) Parse    (JSON, ...)
+
+        /// <summary>
+        /// Parse the given JSON representation of a roaming network.
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="CustomRoamingNetworkOperatorParser">An optional delegate to parse custom roaming network operator JSON objects.</param>
+        public static RoamingNetworkOperator Parse(JObject                                               JSON,
+                                                   CustomJObjectParserDelegate<RoamingNetworkOperator>?  CustomRoamingNetworkOperatorParser   = null)
+        {
+
+            if (TryParse(JSON,
+                         out var roamingNetworkOperator,
+                         out var errorResponse,
+                         CustomRoamingNetworkOperatorParser))
+            {
+                return roamingNetworkOperator;
+            }
+
+            throw new ArgumentException("The given JSON representation of a roaming network operator is invalid: " + errorResponse,
+                                        nameof(JSON));
+
+        }
+
+        #endregion
 
         #region (static) TryParse (JSON, out RoamingNetworkOperator, out ErrorResponse)
+
+        public static Boolean TryParse(JObject                                               JSON,
+                                       [NotNullWhen(true)]  out RoamingNetworkOperator?      RoamingNetworkOperator,
+                                       [NotNullWhen(false)] out String?                      ErrorResponse)
+
+            => TryParse(JSON,
+                        out RoamingNetworkOperator,
+                        out ErrorResponse,
+                        null);
+
 
         /// <summary>
         /// Try to parse the given JSON representation of a roaming network operator.
@@ -511,15 +546,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="RoamingNetworkOperator">The parsed roaming network operator.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
-        public static Boolean TryParse(JObject                                           JSON,
-                                       [NotNullWhen(true)]  out RoamingNetworkOperator?  RoamingNetworkOperator,
-                                       [NotNullWhen(false)] out String?                  ErrorResponse)
+        /// <param name="CustomRoamingNetworkOperatorParser">An optional custom parser.</param>
+        public static Boolean TryParse(JObject                                               JSON,
+                                       [NotNullWhen(true)]  out RoamingNetworkOperator?      RoamingNetworkOperator,
+                                       [NotNullWhen(false)] out String?                      ErrorResponse,
+                                       CustomJObjectParserDelegate<RoamingNetworkOperator>?  CustomRoamingNetworkOperatorParser)
         {
 
-            RoamingNetworkOperator = null;
+            RoamingNetworkOperator  = null;
+            ErrorResponse           = null;
 
             try
             {
+
+                if (JSON?.HasValues != true)
+                {
+                    ErrorResponse = "The given JSON object must not be null or empty!";
+                    return false;
+                }
+
+                #region Parse Id                 [mandatory]
 
                 if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "roaming network operator identification",
@@ -530,14 +576,69 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Name,                  "roaming network operator name",         out var name,          out ErrorResponse) ||
-                    !POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Description,           "roaming network operator description",  out var description,   out ErrorResponse) ||
-                    !POIJSON.TryParseString (JSON, BasePropertyKeys.DataSource,            "data source",                           out var dataSource,    out ErrorResponse) ||
-                    !POIJSON.TryParseAddress(JSON, PropertyKeys.    Address,               "address",                               out var address,       out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, PropertyKeys.    Homepage,              "homepage",                              URL.        TryParse,  out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, PropertyKeys.    HotlinePhoneNumber,    "hotline phone number",                  PhoneNumber.TryParse,  out PhoneNumber?  hotline,   out ErrorResponse) ||
-                    !TryParseEMailAddress   (JSON[ PropertyKeys.    EMailAddress],         "e-mail address",                        out var eMail,         out ErrorResponse) ||
-                    !TryParseEMailAddress   (JSON[ PropertyKeys.    HotlineEMailAddress],  "hotline e-mail address",                out var hotlineEMail,  out ErrorResponse))
+                #endregion
+
+                #region Check JSON-LD context    [optional]
+
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the roaming network operator '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse Name               [optional]
+
+                if (JSON.ParseOptionalJSON(BasePropertyKeys.Name,
+                                           "roaming network operator name",
+                                           ImmutableI18NString.TryParse,
+                                           out ImmutableI18NString? name,
+                                           out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+                #region Parse Description        [optional]
+
+                if (JSON.ParseOptionalJSON(BasePropertyKeys.Description,
+                                           "network description",
+                                           I18NString.TryParse,
+                                           out I18NString? description,
+                                           out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+
+
+
+                #region Parse DataSource         [optional]
+
+                if (JSON.ParseOptional(BasePropertyKeys.DataSource,
+                                       "data source",
+                                       out String? dataSource,
+                                       out ErrorResponse))
+                {
+                    if (ErrorResponse is not null)
+                        return false;
+                }
+
+                #endregion
+
+
+                if (!POIJSON.TryParseAddress(JSON, PropertyKeys.Address,              "address",                out var address,      out ErrorResponse) ||
+                    !POIJSON.TryParseText   (JSON, PropertyKeys.Homepage,             "homepage",               URL.        TryParse, out URL?          homepage, out ErrorResponse) ||
+                    !POIJSON.TryParseText   (JSON, PropertyKeys.HotlinePhoneNumber,   "hotline phone number",   PhoneNumber.TryParse, out PhoneNumber?  hotline,  out ErrorResponse) ||
+                    !TryParseEMailAddress   (JSON[ PropertyKeys.EMailAddress],        "e-mail address",         out var eMail,        out ErrorResponse) ||
+                    !TryParseEMailAddress   (JSON[ PropertyKeys.HotlineEMailAddress], "hotline e-mail address", out var hotlineEMail, out ErrorResponse))
                 {
                     return false;
                 }
@@ -590,7 +691,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                          );
 
-                ErrorResponse = null;
+                #region Check ETags          [optional]
+
+                //if (JSON[BasePropertyKeys.ETags] is JToken eTagsJSON &&
+                //    !TryCheckETags(RoamingNetworkOperator,
+                //                   eTagsJSON is JArray eTagsArray
+                //                       ? [ .. eTagsArray.Select(eTag => ETag.Parse(eTag)) ]
+                //                       : [],
+                //                   out ErrorResponse))
+                //{
+                //    RoamingNetworkOperator = null;
+                //    return false;
+                //}
+
+                #endregion
+
+                if (CustomRoamingNetworkOperatorParser is not null)
+                    RoamingNetworkOperator = CustomRoamingNetworkOperatorParser(JSON,
+                                                                                RoamingNetworkOperator);
+
                 return true;
 
             }
@@ -605,6 +724,106 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region ToJSON (Embedded = false, ...)
+
+        /// <summary>
+        /// Return the JSON representation of this roaming network operator.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        public JObject ToJSON(Boolean                                                   Embedded                                 = false,
+                              Boolean                                                   IncludeETags                             = false,
+                              ETagDigestEncoding?                                       ETagDigestEncoding                       = null,
+                              CustomJObjectSerializerDelegate<RoamingNetworkOperator>?  CustomRoamingNetworkOperatorSerializer   = null)
+        {
+
+            var json = JSONObject.Create(
+
+                                 new JProperty(BasePropertyKeys.Id,                    Id.                      ToString()),
+
+                          !Embedded
+                               ? new JProperty(BasePropertyKeys.Context,               JSONLDContext)
+                               : null,
+
+                           Name.IsNotNullOrEmpty()
+                               ? new JProperty(BasePropertyKeys.Name,                  Name.                    ToJSON())
+                               : null,
+
+                           Description.IsNotNullOrEmpty()
+                               ? new JProperty(BasePropertyKeys.Description,           Description.             ToJSON())
+                               : null,
+
+                           DataSource is not null
+                               ? new JProperty(BasePropertyKeys.DataSource,            DataSource)
+                               : null,
+
+                           Address is not null
+                               ? new JProperty(PropertyKeys.    Address,               Address.                 ToJSON(Embedded: true))
+                               : null,
+
+                           Homepage.HasValue
+                               ? new JProperty(PropertyKeys.    Homepage,              Homepage.Value.          ToString())
+                               : null,
+
+                           EMail is not null
+                               ? new JProperty(PropertyKeys.    EMailAddress,          EMail.                   ToString())
+                               : null,
+
+                           HotlinePhoneNumber.HasValue
+                               ? new JProperty(PropertyKeys.    HotlinePhoneNumber,    HotlinePhoneNumber.Value.ToString())
+                               : null,
+
+                           HotlineEMail is not null
+                               ? new JProperty(PropertyKeys.    HotlineEMailAddress,   HotlineEMail.            ToString())
+                               : null,
+
+                           KeyStatement is not null
+                               ? new JProperty(PropertyKeys.    KeyStatement,          KeyStatement.            ToJSON(Embedded: true))
+                               : null,
+
+                           IncludeETags && ETags.Length > 0
+                               ? new JProperty(BasePropertyKeys.ETags,                 new JArray(ETags.Select(eTag => eTag.ToJSON(ETagDigestEncoding ?? DefaultETagDigestEncoding))))
+                               : null
+
+            );
+
+            POIPartyKeys.     AddTo(json, this);
+            POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
+
+            return CustomRoamingNetworkOperatorSerializer is not null
+                       ? CustomRoamingNetworkOperatorSerializer(this, json)
+                       : json;
+
+        }
+
+        #endregion
+
+
+        #region (static) Parse    (CBOR, ...)
+
+        /// <summary>
+        /// Parse the given CBOR representation of a roaming network operator.
+        /// </summary>
+        /// <param name="CBOR">The CBOR to parse.</param>
+        /// <param name="CustomRoamingNetworkOperatorParser">An optional delegate to parse custom roaming network operator CBOR maps.</param>
+        public static RoamingNetworkOperator Parse(CBORValue                                          CBOR,
+                                                   CustomCBORParserDelegate<RoamingNetworkOperator>?  CustomRoamingNetworkOperatorParser   = null)
+        {
+
+            if (TryParse(CBOR,
+                         out var roamingNetworkOperator,
+                         out var errorResponse,
+                         CustomRoamingNetworkOperatorParser))
+            {
+                return roamingNetworkOperator;
+            }
+
+            throw new ArgumentException("The given CBOR representation of a roaming network operator is invalid: " + errorResponse,
+                                        nameof(CBOR));
+
+        }
+
+        #endregion
+
         #region (static) TryParse (CBOR, out RoamingNetworkOperator, out ErrorResponse)
 
         /// <summary>
@@ -614,9 +833,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="CBOR">The CBOR to parse.</param>
         /// <param name="RoamingNetworkOperator">The parsed roaming network operator.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
-        public static Boolean TryParse(CBORValue                                         CBOR,
-                                       [NotNullWhen(true)]  out RoamingNetworkOperator?  RoamingNetworkOperator,
-                                       [NotNullWhen(false)] out String?                  ErrorResponse)
+        public static Boolean TryParse(CBORValue                                          CBOR,
+                                       [NotNullWhen(true)]  out RoamingNetworkOperator?   RoamingNetworkOperator,
+                                       [NotNullWhen(false)] out String?                   ErrorResponse,
+                                       CustomCBORParserDelegate<RoamingNetworkOperator>?  CustomRoamingNetworkOperatorParser   = null)
         {
 
             RoamingNetworkOperator = null;
@@ -759,80 +979,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON (Embedded = false, ...)
-
-        /// <summary>
-        /// Return the JSON representation of this roaming network operator.
-        /// </summary>
-        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        public JObject ToJSON(Boolean                                                   Embedded                                 = false,
-                              CustomJObjectSerializerDelegate<RoamingNetworkOperator>?  CustomRoamingNetworkOperatorSerializer   = null)
-        {
-
-            var json = JSONObject.Create(
-
-                                  new JProperty(BasePropertyKeys.Id,                    Id.                      ToString()),
-
-                           !Embedded
-                                ? new JProperty(BasePropertyKeys.Context,               JSONLDContext)
-                                : null,
-
-                            Name.IsNotNullOrEmpty()
-                                ? new JProperty(BasePropertyKeys.Name,                  Name.                    ToJSON())
-                                : null,
-
-                            Description.IsNotNullOrEmpty()
-                                ? new JProperty(BasePropertyKeys.Description,           Description.             ToJSON())
-                                : null,
-
-                            DataSource is not null
-                                ? new JProperty(BasePropertyKeys.DataSource,            DataSource)
-                                : null,
-
-                            Address is not null
-                                ? new JProperty(PropertyKeys.    Address,               Address.                 ToJSON(Embedded: true))
-                                : null,
-
-                            Homepage.HasValue
-                                ? new JProperty(PropertyKeys.    Homepage,              Homepage.Value.          ToString())
-                                : null,
-
-                            EMail is not null
-                                ? new JProperty(PropertyKeys.    EMailAddress,          EMail.                   ToString())
-                                : null,
-
-                            HotlinePhoneNumber.HasValue
-                                ? new JProperty(PropertyKeys.    HotlinePhoneNumber,    HotlinePhoneNumber.Value.ToString())
-                                : null,
-
-                            HotlineEMail is not null
-                                ? new JProperty(PropertyKeys.    HotlineEMailAddress,   HotlineEMail.            ToString())
-                                : null,
-
-                            KeyStatement is not null
-                                ? new JProperty(PropertyKeys.    KeyStatement,          KeyStatement.            ToJSON(Embedded: true))
-                                : null
-
-            );
-
-            POIPartyKeys.     AddTo(json, this);
-            POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
-
-            return CustomRoamingNetworkOperatorSerializer is not null
-                       ? CustomRoamingNetworkOperatorSerializer(this, json)
-                       : json;
-
-        }
-
-        #endregion
-
         #region ToCBOR (Embedded = false, ...)
 
         /// <summary>
         /// Return the CBOR representation of this roaming network operator.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        public CBORValue ToCBOR(Boolean Embedded = false)
+        public CBORValue ToCBOR(Boolean                                                Embedded                                 = false,
+                                Boolean                                                IncludeETags                             = false,
+                                ETagDigestEncoding?                                    ETagDigestEncoding                       = null,
+                                CustomCBORSerializerDelegate<RoamingNetworkOperator>?  CustomRoamingNetworkOperatorSerializer   = null)
         {
 
             var cbor = new CBORMap {
@@ -886,7 +1042,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (CustomData.HasValues)
                 cbor.Add(CBORValue.FromText(PropertyKeys.CustomData),             CBORJSON.ToCBOR(CustomData.ToJObject()));
 
-            return cbor;
+            // The ETags describe the content without them, irrespective of the view options.
+            if (IncludeETags && ETags.Length > 0)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.ETags),              CBORValue.FromArray(ETags.Select(eTag => eTag.ToCBOR())));
+
+            return CustomRoamingNetworkOperatorSerializer is not null
+                       ? CustomRoamingNetworkOperatorSerializer(this, cbor)
+                       : cbor;
 
         }
 
@@ -975,7 +1137,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             try
             {
-                EMailAddress = org.GraphDefined.Vanaheimr.Hermod.Mail.EMailAddress.Parse(Text);
+                EMailAddress = EMailAddress.Parse(Text);
             }
             catch (Exception)
             { }

@@ -53,12 +53,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The default max size of the admin status schedule/history.
         /// </summary>
-        public const  UInt16  DefaultMaxAdminStatusScheduleSize    = 50;
+        public const  UInt16              DefaultMaxAdminStatusScheduleSize    = 50;
 
         /// <summary>
         /// The default max size of the status schedule/history.
         /// </summary>
-        public const  UInt16  DefaultMaxStatusScheduleSize         = 50;
+        public const  UInt16              DefaultMaxStatusScheduleSize         = 50;
+
+        /// <summary>
+        /// Specifies the default encoding used for ETag digests.
+        /// </summary>
+        public const  ETagDigestEncoding  DefaultETagDigestEncoding            = ETagDigestEncoding.Base64;
 
         #endregion
 

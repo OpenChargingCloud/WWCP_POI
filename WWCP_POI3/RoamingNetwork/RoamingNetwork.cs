@@ -592,7 +592,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
 
-        #region Parse    (JSON, ...)
+        #region (static) Parse    (JSON, ...)
 
         /// <summary>
         /// Parse the given JSON representation of a roaming network.
@@ -618,7 +618,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryParse (JSON, out RoamingNetwork, out ErrorResponse, ...)
+        #region (static) TryParse (JSON, out RoamingNetwork, out ErrorResponse, ...)
 
         /// <summary>
         /// Try to parse the given JSON representation of a roaming network.
@@ -645,7 +645,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                #region Parse Id             [mandatory]
+                #region Parse Id                 [mandatory]
 
                 if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "roaming network identification",
@@ -658,7 +658,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Check JSON-LD context [optional]
+                #region Check JSON-LD context    [optional]
 
                 if (JSON[BasePropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
@@ -669,7 +669,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Parse Name           [optional]
+                #region Parse Name               [optional]
 
                 if (JSON.ParseOptionalJSON(BasePropertyKeys.Name,
                                            "network name",
@@ -683,7 +683,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Parse Description    [optional]
+                #region Parse Description        [optional]
 
                 if (JSON.ParseOptionalJSON(BasePropertyKeys.Description,
                                            "network description",
@@ -697,7 +697,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Parse DataSource     [optional]
+                #region Parse DataSource         [optional]
 
                 if (JSON.ParseOptional(BasePropertyKeys.DataSource,
                                        "data source",
@@ -709,6 +709,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 #endregion
+
 
                 #region Parse Created, LastChange, CustomData [optional]
 
@@ -936,7 +937,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             catch (Exception e)
             {
                 RoamingNetwork  = null;
-                ErrorResponse   = e.Message;
+                ErrorResponse   = "The given JSON representation of a roaming network is invalid: " + e.Message;
                 return false;
             }
 
@@ -944,7 +945,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON   (Embedded = false, ...)
+        #region ToJSON (Embedded = false, ...)
 
         /// <summary>
         /// Return a JSON representation of the given roaming network.
@@ -1199,7 +1200,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region Parse    (CBOR, ...)
+        #region (static) Parse    (CBOR, ...)
 
         /// <summary>
         /// Parse the given CBOR representation of a roaming network.
@@ -1225,7 +1226,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryParse (CBOR, out RoamingNetwork, out ErrorResponse, ...)
+        #region (static) TryParse (CBOR, out RoamingNetwork, out ErrorResponse, ...)
 
         /// <summary>
         /// Try to parse the given CBOR representation of a roaming network.
@@ -1550,7 +1551,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToCBOR   (Embedded = false, ...)
+        #region ToCBOR (Embedded = false, ...)
 
         /// <summary>
         /// Return a CBOR representation of the given roaming network,
@@ -1564,87 +1565,87 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 Boolean                                        IncludeETags                     = true)
         {
 
-            var CBOR = new CBORMap {
+            var cbor = new CBORMap {
                            { CBORValue.FromText(BasePropertyKeys.Id),                  CBORValue.FromText(Id.ToString()) }
                        };
 
             if (!Embedded)
-                CBOR.Add(CBORValue.FromText(BasePropertyKeys.Context),             CBORValue.FromText(JSONLDContext));
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Context),             CBORValue.FromText(JSONLDContext));
 
             if (Name.IsNotNullOrEmpty())
-                CBOR.Add(CBORValue.FromText(BasePropertyKeys.Name),                Name.ToCBOR());
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Name),                Name.ToCBOR());
 
             if (Description.IsNotNullOrEmpty())
-                CBOR.Add(CBORValue.FromText(BasePropertyKeys.Description),         Description.ToCBOR());
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Description),         Description.ToCBOR());
 
             if (DataSource is not null && DataSource.IsNeitherNullNorEmpty())
-                CBOR.Add(CBORValue.FromText(BasePropertyKeys.DataSource),          CBORValue.FromText(DataSource));
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),          CBORValue.FromText(DataSource));
 
             if (DataLicenses.Any())
-                CBOR.Add(CBORValue.FromText(BasePropertyKeys.DataLicenses),        DataLicenses.ToPOICBOR());
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataLicenses),        DataLicenses.ToPOICBOR());
 
             if (Operator is not null)
-                CBOR.Add(CBORValue.FromText(PropertyKeys.Operator),                Operator.ToCBOR(Embedded: true));
+                cbor.Add(CBORValue.FromText(PropertyKeys.Operator),                Operator.ToCBOR(Embedded: true));
 
             if (ChargingStationOperators.Any())
-                CBOR.Add(CBORValue.FromText(PropertyKeys.ChargingStationOperators),
+                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingStationOperators),
                          CBORValue.FromArray(chargingStationOperators.
                                                  Select(chargingStationOperator => chargingStationOperator.ToCBOR(Embedded: true))));
 
             if (!chargingStationManufacturers.IsEmpty)
-                CBOR.Add(CBORValue.FromText(PropertyKeys.ChargingStationManufacturers),
+                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingStationManufacturers),
                          CBORValue.FromArray(chargingStationManufacturers.
                                                  Select(chargingStationManufacturer => chargingStationManufacturer.ToCBOR(Embedded: true))));
 
             if (!eMobilityProviders.IsEmpty)
-                CBOR.Add(CBORValue.FromText(PropertyKeys.EMobilityProviders),
+                cbor.Add(CBORValue.FromText(PropertyKeys.EMobilityProviders),
                          CBORValue.FromArray(eMobilityProviders.
                                                  Select(eMobilityProvider => eMobilityProvider.ToCBOR(Embedded: true))));
 
             if (!gridOperators.IsEmpty)
-                CBOR.Add(CBORValue.FromText(PropertyKeys.GridOperators),
+                cbor.Add(CBORValue.FromText(PropertyKeys.GridOperators),
                          CBORValue.FromArray(gridOperators.
                                                  Select(gridOperator => gridOperator.ToCBOR(Embedded: true))));
 
             if (!parkingOperators.IsEmpty)
-                CBOR.Add(CBORValue.FromText(PropertyKeys.ParkingOperators),
+                cbor.Add(CBORValue.FromText(PropertyKeys.ParkingOperators),
                          CBORValue.FromArray(parkingOperators.
                                                  Select(parkingOperator => parkingOperator.ToCBOR(Embedded: true))));
 
             if (!energyMeterManufacturers.IsEmpty)
-                CBOR.Add(CBORValue.FromText(PropertyKeys.EnergyMeterManufacturers),
+                cbor.Add(CBORValue.FromText(PropertyKeys.EnergyMeterManufacturers),
                          CBORValue.FromArray(energyMeterManufacturers.
                                                  Select(energyMeterManufacturer => energyMeterManufacturer.ToCBOR(Embedded: true))));
 
             // Transparency software releases and certificates have no CBOR representation of their own: theirs are the
             // keys and values of their JSON representation.
             if (!transparencySoftware.IsEmpty)
-                CBOR.Add(CBORValue.FromText(PropertyKeys.TransparencySoftware),
+                cbor.Add(CBORValue.FromText(PropertyKeys.TransparencySoftware),
                          CBORValue.FromArray(transparencySoftware.
                                                  Select(release => CBORJSON.ToCBOR(release.ToJSON(Embedded: true)))));
 
             if (!transparencySoftwareCertificates.IsEmpty)
-                CBOR.Add(CBORValue.FromText(PropertyKeys.TransparencySoftwareCertificates),
+                cbor.Add(CBORValue.FromText(PropertyKeys.TransparencySoftwareCertificates),
                          CBORValue.FromArray(transparencySoftwareCertificates.
                                                  Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON(Embedded: true)))));
 
             if (GivenTreeHashAlgorithms.HasValue)
-                CBOR.Add(CBORValue.FromText(PropertyKeys.TreeHashAlgorithms),  POITreeHashAlgorithms.ToCBOR(GivenTreeHashAlgorithms.Value));
+                cbor.Add(CBORValue.FromText(PropertyKeys.TreeHashAlgorithms),  POITreeHashAlgorithms.ToCBOR(GivenTreeHashAlgorithms.Value));
 
             // Always part of the content, as in the JSON representation; custom data is JSON.
-            CBOR.Add(CBORValue.FromText(BasePropertyKeys.Created),             CBORValue.FromText(Created.       ToISO8601()));
-            CBOR.Add(CBORValue.FromText(BasePropertyKeys.LastChange),          CBORValue.FromText(LastChangeDate.ToISO8601()));
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),             CBORValue.FromText(Created.       ToISO8601()));
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.LastChange),          CBORValue.FromText(LastChangeDate.ToISO8601()));
 
             if (CustomData.HasValues)
-                CBOR.Add(CBORValue.FromText(BasePropertyKeys.CustomData),      CBORJSON.ToCBOR(CustomData.ToJObject()));
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),      CBORJSON.ToCBOR(CustomData.ToJObject()));
 
             // The ETags describe the content without them, irrespective of the view options.
             if (IncludeETags && ETags.Length > 0)
-                CBOR.Add(CBORValue.FromText(BasePropertyKeys.ETags),           CBORValue.FromArray(ETags.Select(eTag => eTag.ToCBOR())));
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.ETags),           CBORValue.FromArray(ETags.Select(eTag => eTag.ToCBOR())));
 
             return CustomRoamingNetworkSerializer is not null
-                       ? CustomRoamingNetworkSerializer(this, CBOR)
-                       : CBOR;
+                       ? CustomRoamingNetworkSerializer(this, cbor)
+                       : cbor;
 
         }
 

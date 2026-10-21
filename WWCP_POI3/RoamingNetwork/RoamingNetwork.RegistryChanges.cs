@@ -102,10 +102,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "a",
             ChangeableRoamingNetworkOperatorProperties,
             RoamingNetworkOperator_Id.TryParse,
-            POI.RoamingNetworkOperator.TryParse,
+            RoamingNetworkOperator.   TryParse,
             roamingNetworkOperator => roamingNetworkOperator.Id,
             roamingNetworkOperator => roamingNetworkOperator.ToJSON(Embedded: true),
-            (changed, previous) => changed.ShareRuntimeOf(previous)
+            (changed, previous)    => changed.ShareRuntimeOf(previous)
         );
 
         private static readonly Registry<ChargingStationManufacturer_Id, ChargingStationManufacturer> ManufacturerRegistry = new (
@@ -114,8 +114,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChangeableRegistryProperties,
             ChargingStationManufacturer_Id.TryParse,
             ChargingStationManufacturer.TryParse,
-            manufacturer => manufacturer.Id,
-            manufacturer => manufacturer.ToJSON(Embedded: true),
+            manufacturer        => manufacturer.Id,
+            manufacturer        => manufacturer.ToJSON(Embedded: true),
             (changed, previous) => changed.ShareRuntimeOf(previous)
         );
 
@@ -385,6 +385,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         #endregion
+
 
     }
 

@@ -226,28 +226,4 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     }
 
-
-    /// <summary>
-    /// The effective members of the effective content of a version differing from those of its content, by their owners.
-    /// </summary>
-    internal sealed class RoamingNetworkEffectiveMembers
-    {
-
-        /// <summary>
-        /// The effective charging pools, with their effective charging stations and EVSEs, by their charging station operators.
-        /// </summary>
-        public Dictionary<ChargingStationOperator_Id, IReadOnlyDictionary<ChargingPool_Id,   ChargingPool>>    ChargingPools    { get; } = [];
-
-        /// <summary>
-        /// The effective charging tariffs, by their charging station operators.
-        /// </summary>
-        public Dictionary<ChargingStationOperator_Id, IReadOnlyDictionary<ChargingTariff_Id, ChargingTariff>>  ChargingTariffs  { get; } = [];
-
-        /// <summary>
-        /// The effective parking spaces, by their parking operators.
-        /// </summary>
-        public Dictionary<ParkingOperator_Id,         IReadOnlyDictionary<ParkingSpace_Id,   ParkingSpace>>    ParkingSpaces    { get; } = [];
-
-    }
-
 }
