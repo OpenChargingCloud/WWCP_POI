@@ -1,8 +1,6 @@
 # Example 1: the first start and the roaming network `QA`
 
-From a fresh installation of the [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) to its first
-roaming network, `QA`: what the first start makes, who may make a roaming network, and four ways to make it - at the
-prompt or over SSH, in the web interface, over HTTP with curl or C#, and in C# with POI 3 alone, without a hub. Each
+From a fresh installation of the [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) to its first roaming network, `QA`: what the first start makes, who may make a roaming network, and four ways to make it - at the prompt or over SSH, in the web interface, over HTTP with curl or C#, and in C# with POI 3 alone, without a hub. Each
 makes the same: revision 0 of `QA`, its genesis commit, signed by the hub as the roaming network operator (RNO).
 
 [Example 2](example2.md) adds the charging station operator `DE*GEF` to `QA`, [example 3](example3.md) its charging
@@ -135,7 +133,7 @@ curl -X POST http://127.0.0.1:2356/api/v1/poi/RNs \
 ```json
 {
   "message":        "The roaming network 'QA' was made, at revision 0, commit 1d728939…, operated by this hub, 'RNO-67BDC1FC'. Its parties are added now, with change sets this hub signs.",
-  "roamingNetwork": { "@id": "QA", "name": { "en": "Quality assurance" }, "roamingNetworkOperator": { "@id": "RNO-67BDC1FC" } },
+  "roamingNetwork": { "@id": "QA", "name": { "en": "Quality assurance" }, "operator": { "@id": "RNO-67BDC1FC" } },
   "revision":       0,
   "commitId":       "1d728939…"
 }
@@ -214,7 +212,7 @@ readable by everyone, `GET /poi/RNs/QA`. The network embeds its operator with it
   "@context":   "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork",
   "@id":        "QA",
   "name":       { "en": "Quality assurance" },
-  "roamingNetworkOperator": {
+  "operator":   {
     "@id":          "RNO-67BDC1FC",
     "signingKeys":  [ { "@id": "882bbf1a…", "key": "pAECIAEh…" } ],
     "identityKeys": [ { "@id": "67bdc1fc…", "key": "pAECIAMh…" } ],
@@ -233,6 +231,7 @@ roaming network operator - as every commit the hub makes of a roaming network it
 ```json
 {
   "@id":              "1d728939…",
+  "@context":         "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkCommit",
   "roamingNetworkId": "QA",
   "revision":         0,
   "eTags":            [ [ "json", "sha256", "hex", "30e444f0…" ], [ "cbor", "sha256", "hex", "f8ca0e26…" ] ],
