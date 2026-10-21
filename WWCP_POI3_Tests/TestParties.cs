@@ -118,6 +118,27 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #endregion
 
 
+        #region QuorumKey(NetworkId, Holder, Kind = Signing, Number = 1)
+
+        /// <summary>
+        /// The private key and the public key of the given kind of the given holder of the quorum of the test operator of
+        /// the given roaming network, naming its holder: secp256r1 for signing, secp521r1 for its identity. Another number
+        /// is another key of the same holder, e.g. its next one.
+        /// </summary>
+        public static (ECPrivateKeyParameters Private, POIPublicKey Public) QuorumKey(RoamingNetwork_Id  NetworkId,
+                                                                                      String             Holder,
+                                                                                      POIKeyKind         Kind     = POIKeyKind.Signing,
+                                                                                      Int32              Number   = 1)
+        {
+
+            var (privateKey, _) = Key(new POIPartyId(nameof(RoamingNetworkOperator), $"{OperatorId(NetworkId)}/{Holder}/{Number}"), Kind);
+
+            return (privateKey, POIPublicKey.From(privateKey, Holder: Holder));
+
+        }
+
+        #endregion
+
         #region WithKeys(JSON, Party)
 
         private static JObject WithKeys(JObject     JSON,

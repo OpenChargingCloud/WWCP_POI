@@ -352,6 +352,10 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
     An RNO should therefore name at least two identity keys with different `notAfter`, one of them kept
     offline, and replace an identity key well before it expires. The RNO is neither added nor removed: it comes
     with the network, and a network without one can not be changed where only the RNO may.
+  - **Quorum:** several holders, e.g. companies, may share the keys of the RNO, each key naming its `holder`, and
+    the RNO its `minConsensus`, more than half of the holders of each kind of keys: then everything it signs needs
+    keys of `minConsensus` different holders, its key statement included, and an app needs attestations of as many.
+    Holders are counted, not keys ([docs/RoamingNetworkOperator.md](docs/RoamingNetworkOperator.md#quorum)).
 - **Rebase:** `rn2.TryRebase(cs, …)` prepares a change set of an older version again, unless it conflicts;
   the rebased change set is unsigned, its owners sign it again.
 - **Signatures:** `Sign(…)` and `VerifySignature(…)` over canonical JSON (COSE algorithms of Styx);
@@ -486,10 +490,13 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   minutes), e.g. called every minute. `TryAddAttestation(…)` takes those of another server for a commit held, whose
   version has the attested ETag, with a signature `VerifyAttestation` trusts; `OnAttestation` tells of every one.
 - **Key statements and trust anchors:** the roaming network operator states its signing keys in a
-  `keyStatement`, signed with one of its identity keys (`RoamingNetworkKeyStatement.Create(…)`, committed as a property
-  of the operator), so that every proof gives it. An app scans a QR code of the trust anchor,
-  `https://hub.example/poi/RNs/rn1?identityKeys=<@id>,…` (`GET ~/RNs/{id}/trustAnchor`), and verifies proofs with
-  `proof.Verify(anchor.IdentityKeyIds, …)`: only the thumbprints of the identity keys are pinned.
+  `keyStatement`, signed with one of its identity keys, or with a quorum by those of `minConsensus` holders
+  (`RoamingNetworkKeyStatement.Create(…)`, `WithSignature(…)`, committed as a property of the operator), so that every
+  proof gives it. An app scans the QR code of the trust anchor (`GET ~/RNs/{id}/trustAnchor`): `WWCPPOI1:` and the
+  Base45 of its CBOR, with the network, its name, description and where to learn more, the thumbprints of the identity
+  keys and the `minConsensus` (`RoamingNetworkTrustAnchor.TryParse(text, …)`; the URI
+  `https://hub.example/poi/RNs/rn1?identityKeys=<@id>,…` is read as well), and verifies proofs with
+  `proof.Verify(anchor, …)`: only the thumbprints and the `minConsensus` are pinned.
 
 ### Price statements
 
@@ -506,7 +513,7 @@ history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.PriceStatus, "EVSE", "DE*GE
 
 // In the app, with the proof of the station and the identity keys of the trust anchor:
 RoamingNetworkPriceStatement.TryParse(text, out var statement, out _);
-statement.TryVerify(proof, anchor.IdentityKeyIds, out var attestation, out var error);
+statement.TryVerify(proof, anchor.IdentityKeyIds, out var attestation, out var error, MinConsensus: anchor.MinConsensus);
 ```
 
 - **Chain:** every entity has one of its own: `sequence` 0, 1, …, each statement naming the digest of the one before
@@ -623,7 +630,7 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/history/archive/{number}` | one segment: `{info, base, commits}` |
 | `GET ~/RNs/{id}/attestations` | the attestations of the head valid now: `{attestations: […]}` |
 | `GET ~/RNs/{id}/keyStatement` | the key statement of the roaming network operator |
-| `GET ~/RNs/{id}/trustAnchor` | what an app pins: `{roamingNetworkId, identityKeyIds, uri}`, the URI for a QR code |
+| `GET ~/RNs/{id}/trustAnchor` | what an app pins: `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode, trustAnchor}`, `qrCode` the text of its QR code |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/proof` | the proof of a charging station of the head, `?hashAlgorithm=` one of the network's |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/proof` | the proof of the charging station of an EVSE |
 | `GET ~/RNs/{id}/CSs/{CS_Id}/proof`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/proof` | the same, found by the identification alone |

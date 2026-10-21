@@ -94,6 +94,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly ImmutableHashSet<String> ChangeableRoamingNetworkOperatorProperties = ChangeablePartyProperties.Union([
             RoamingNetworkOperator.PropertyKeys.EMailAddress,
             RoamingNetworkOperator.PropertyKeys.HotlineEMailAddress,
+            RoamingNetworkOperator.PropertyKeys.MinConsensus,
             RoamingNetworkOperator.PropertyKeys.KeyStatement
         ]);
 

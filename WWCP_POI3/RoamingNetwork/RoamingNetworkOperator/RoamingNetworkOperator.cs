@@ -227,6 +227,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  KeyStatement          = RoamingNetworkKeyStatement.JSONProperty;
 
             /// <summary>
+            /// The property of how many holders of its keys of one kind sign what it owns: written unless one.
+            /// </summary>
+            public const String  MinConsensus          = POIPartyKeys.MinConsensusProperty;
+
+            /// <summary>
             /// The property of its creation timestamp, as of every entity.
             /// </summary>
             public const String  Created               = "created";
@@ -288,6 +293,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public RoamingNetworkKeyStatement?   KeyStatement          { get; }
 
+        /// <summary>
+        /// How many holders of its keys of one kind sign what it owns, its key statement included: one, unless several
+        /// holders, e.g. companies, share its keys as a quorum, so that none of them changes the network alone. More than
+        /// half of the holders of each kind of its keys, so that two quorums always share a holder (SPECIFICATION.md,
+        /// section 4.1).
+        /// </summary>
+        public Byte                          MinConsensus          { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -306,6 +319,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="SigningKeys">The public keys used to verify signatures created by the roaming network operator.</param>
         /// <param name="IdentityKeys">The public keys used to identify the roaming network operator.</param>
         /// <param name="KeyStatement">The key statement describing key ownership or trust information.</param>
+        /// <param name="MinConsensus">How many holders of its keys of one kind sign what it owns, one by default.</param>
         /// 
         /// <param name="InitialAdminStatus">The initial administrative status with timestamp.</param>
         /// <param name="InitialStatus">The initial operational status with timestamp.</param>
@@ -329,6 +343,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       IEnumerable<POIPublicKey>?                           SigningKeys                  = null,
                                       IEnumerable<POIPublicKey>?                           IdentityKeys                 = null,
                                       RoamingNetworkKeyStatement?                          KeyStatement                 = null,
+                                      Byte?                                                MinConsensus                 = null,
 
                                       Timestamped<RoamingNetworkOperatorAdminStatusType>?  InitialAdminStatus           = null,
                                       Timestamped<RoamingNetworkOperatorStatusType>?       InitialStatus                = null,
@@ -368,6 +383,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the roaming network operator '{Id}'");
 
+            this.MinConsensus        = MinConsensus ?? 1;
+
+            POIPartyKeys.CheckQuorum(this.MinConsensus, this.SigningKeys, this.IdentityKeys, $"the roaming network operator '{Id}'");
+
             this.KeyStatement        = KeyStatement;
             this.keyStatementError   = new (CheckKeyStatement);
 
@@ -382,7 +401,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Why its key statement does not fit it in the given roaming network, or null: it states this operator and network,
-        /// only signing and identity keys this operator names, and is signed by one of its identity keys valid then. Its
+        /// only signing and identity keys this operator names, its minConsensus, and is signed by identity keys of as many
+        /// holders valid then. Its
         /// validity in time is the one of the verifier: a version keeps a key statement that expired.
         /// </summary>
         internal String? KeyStatementError(RoamingNetwork_Id RoamingNetworkId)
@@ -408,9 +428,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (KeyStatement.IdentityKeys.FirstOrDefault(key => !IdentityKeys.Contains(key)) is POIPublicKey unknownIdentityKey)
                 return $"The key statement of the roaming network operator '{Id}' names the identity key '{unknownIdentityKey.Id}', which is not one of its identity keys!";
 
-            return KeyStatement.TryVerify(IdentityKeys.Select(key => key.Id), IdentityKeys, out var error)
+            if (KeyStatement.MinConsensus != MinConsensus)
+                return $"The key statement of the roaming network operator '{Id}' states the minConsensus {KeyStatement.MinConsensus}, not its {MinConsensus}!";
+
+            // Signed by as many holders of its identity keys as its quorum needs.
+            return KeyStatement.TryVerify(IdentityKeys.Select(key => key.Id), IdentityKeys, out var error, MinConsensus)
                        ? null
-                       : $"The key statement of the roaming network operator '{Id}' is not signed by one of its identity keys: {error}";
+                       : MinConsensus > 1
+                             ? $"The key statement of the roaming network operator '{Id}' is not signed by identity keys of {MinConsensus} of its holders: {error}"
+                             : $"The key statement of the roaming network operator '{Id}' is not signed by one of its identity keys: {error}";
 
         }
 
@@ -646,6 +672,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
                     return false;
 
+                if (!TryParseMinConsensus(JSON, out var minConsensus, out ErrorResponse))
+                    return false;
+
                 RoamingNetworkKeyStatement? keyStatement = null;
 
                 if (JSON[PropertyKeys.KeyStatement] is JToken keyStatementJSON)
@@ -682,6 +711,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              signingKeys,
                                              identityKeys,
                                              keyStatement,
+                                             minConsensus,
 
                                              DataSource:  dataSource,
                                              Created:     created,
@@ -778,6 +808,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                            HotlineEMail is not null
                                ? new JProperty(PropertyKeys.    HotlineEMailAddress,   HotlineEMail.            ToString())
+                               : null,
+
+                           MinConsensus > 1
+                               ? new JProperty(PropertyKeys.    MinConsensus,          MinConsensus)
                                : null,
 
                            KeyStatement is not null
@@ -904,6 +938,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var key in new[] { PropertyKeys.Address,
                                             PropertyKeys.SigningKeys,
                                             PropertyKeys.IdentityKeys,
+                                            PropertyKeys.MinConsensus,
                                             PropertyKeys.KeyStatement,
                                             PropertyKeys.Created,
                                             PropertyKeys.LastChange,
@@ -917,6 +952,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
 
                 if (!POIPartyKeys.TryParse(json, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
+
+                if (!TryParseMinConsensus(json, out var minConsensus, out ErrorResponse))
                     return false;
 
                 RoamingNetworkKeyStatement? keyStatement = null;
@@ -957,6 +995,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              signingKeys,
                                              identityKeys,
                                              keyStatement,
+                                             minConsensus,
 
                                              DataSource:  dataSource,
                                              Created:     created,
@@ -1040,6 +1079,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 cbor.Add(CBORValue.FromText(PropertyKeys.IdentityKeys),
                          CBORValue.FromArray(IdentityKeys.Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
 
+            if (MinConsensus > 1)
+                cbor.Add(CBORValue.FromText(PropertyKeys.MinConsensus),           CBORJSON.ToCBOR(new JValue(MinConsensus)));
+
             if (KeyStatement is not null)
                 cbor.Add(CBORValue.FromText(PropertyKeys.KeyStatement),           CBORJSON.ToCBOR(KeyStatement.ToJSON(Embedded: true)));
 
@@ -1061,6 +1103,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (private static) TryParseMinConsensus(JSON, out MinConsensus, out ErrorResponse)
+
+        /// <summary>
+        /// How many holders of its keys of one kind sign what the roaming network operator owns: one, unless given.
+        /// </summary>
+        private static Boolean TryParseMinConsensus(JObject                           JSON,
+                                                    out Byte                          MinConsensus,
+                                                    [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            MinConsensus = 1;
+
+            if (JSON[PropertyKeys.MinConsensus] is not JToken minConsensusJSON)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            if (minConsensusJSON.Type != JTokenType.Integer ||
+                minConsensusJSON.Value<Int64>() is < 1 or > Byte.MaxValue)
+            {
+                ErrorResponse = $"The {PropertyKeys.MinConsensus} of a roaming network operator must be a whole number from 1 to {Byte.MaxValue}!";
+                return false;
+            }
+
+            MinConsensus   = (Byte) minConsensusJSON.Value<Int64>();
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
 
         #region (private static) TryParseCBORText(CBOR, PropertyName, PropertyDescription, Parser, out Value, out ErrorResponse)
 

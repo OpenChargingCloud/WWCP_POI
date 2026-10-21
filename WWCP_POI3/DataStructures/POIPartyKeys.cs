@@ -45,6 +45,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         ImmutableArray<POIPublicKey>  IdentityKeys    { get; }
 
+        /// <summary>
+        /// How many holders of its keys of one kind sign what it owns: one, unless several holders share its keys as a
+        /// quorum, as the roaming network operator may (SPECIFICATION.md, section 4.1).
+        /// </summary>
+        Byte                          MinConsensus
+            => 1;
+
     }
 
 
@@ -63,6 +70,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The JSON key of the identity keys.
         /// </summary>
         public const String IdentityKeysProperty  = "identityKeys";
+
+        /// <summary>
+        /// The JSON key of how many holders of its keys of one kind sign what a party owns.
+        /// </summary>
+        public const String MinConsensusProperty  = "minConsensus";
 
         #region (static) class PropertyKeys
 
@@ -115,6 +127,56 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException($"The key '{both}' of {Party} must not be both a signing and an identity key!");
 
             return (signingKeys, identityKeys);
+
+        }
+
+        #endregion
+
+        #region Holders(Keys)
+
+        /// <summary>
+        /// The holders of the given keys, as a quorum counts them: the keys naming no holder have one.
+        /// </summary>
+        public static IReadOnlySet<String> Holders(IEnumerable<POIPublicKey> Keys)
+
+            => Keys.Select(key => key.HolderOrUnnamed).ToHashSet(StringComparer.Ordinal);
+
+        #endregion
+
+        #region CheckQuorum(MinConsensus, SigningKeys, IdentityKeys, Party)
+
+        /// <summary>
+        /// The given quorum must fit the given keys of a party: of each kind it has, at least as many holders as must sign,
+        /// and more than half of them, so that two quorums always share a holder (SPECIFICATION.md, section 4.1).
+        /// </summary>
+        internal static void CheckQuorum(Byte                       MinConsensus,
+                                         IEnumerable<POIPublicKey>  SigningKeys,
+                                         IEnumerable<POIPublicKey>  IdentityKeys,
+                                         String                     Party)
+        {
+
+            if (MinConsensus < 1)
+                throw new ArgumentException($"The minConsensus of {Party} must be at least 1!");
+
+            foreach (var (kind, keys) in new[] { ("signing", SigningKeys), ("identity", IdentityKeys) })
+            {
+
+                var holders = Holders(keys).Count;
+
+                if (holders == 0)
+                {
+                    if (MinConsensus > 1)
+                        throw new ArgumentException($"The minConsensus {MinConsensus} of {Party} needs {kind} keys of as many holders!");
+                    continue;
+                }
+
+                if (MinConsensus > holders)
+                    throw new ArgumentException($"The minConsensus {MinConsensus} of {Party} needs {kind} keys of as many holders, not of {holders}!");
+
+                if (2 * MinConsensus <= holders)
+                    throw new ArgumentException($"The minConsensus {MinConsensus} of {Party} must be more than half of the {holders} holders of its {kind} keys!");
+
+            }
 
         }
 

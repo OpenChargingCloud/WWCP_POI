@@ -204,34 +204,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!TryCalculateETag(out var eTag, out ErrorResponse))
                 return false;
 
-            var at                = At ?? Timestamp.Now;
-            var roamingNetworkId  = RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Type == JTokenType.String ? RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]!.Value<String>() : null;
+            Attestation = AttestationsOf(eTag, At ?? Timestamp.Now).FirstOrDefault(attestation => VerifyAttestation(attestation));
 
-            foreach (var attestation in Attestations)
+            if (Attestation is not null)
             {
-
-                if (attestation.RoamingNetworkId.ToString() != roamingNetworkId                ||
-                    (CommitId.HasValue && attestation.CommitId != CommitId.Value)              ||
-                    attestation.ETag.HashAlgorithm != HashAlgorithm                            ||
-                    !attestation.IsValidAt(at))
-                {
-                    continue;
-                }
-
-                if (attestation.Subject is null
-                        ? !attestation.ETag.Equals(eTag)
-                        : !AttestsSubject(attestation.Subject))
-                {
-                    continue;
-                }
-
-                if (!VerifyAttestation(attestation))
-                    continue;
-
-                Attestation    = attestation;
-                ErrorResponse  = null;
+                ErrorResponse = null;
                 return true;
-
             }
 
             ErrorResponse = $"No valid attestation of a trusted key attests the root {eTag} of the proof!";
@@ -241,22 +219,93 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Verify(TrustedIdentityKeyIds, out Attestation, out ErrorResponse, At = null)
+        #region (private) AttestationsOf(ETag, At)
+
+        /// <summary>
+        /// The attestations of this proof of its roaming network and commit, valid at the given time, that attest the given
+        /// root this proof leads to, or the digest of an entity it gives: those to verify.
+        /// </summary>
+        private IEnumerable<RoamingNetworkAttestation> AttestationsOf(ETag            ETag,
+                                                                       DateTimeOffset  At)
+        {
+
+            var roamingNetworkId = RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Type == JTokenType.String ? RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]!.Value<String>() : null;
+
+            foreach (var attestation in Attestations)
+            {
+
+                if (attestation.RoamingNetworkId.ToString() != roamingNetworkId                ||
+                    (CommitId.HasValue && attestation.CommitId != CommitId.Value)              ||
+                    attestation.ETag.HashAlgorithm != HashAlgorithm                            ||
+                    !attestation.IsValidAt(At))
+                {
+                    continue;
+                }
+
+                if (attestation.Subject is null
+                        ? !attestation.ETag.Equals(ETag)
+                        : !AttestsSubject(attestation.Subject))
+                {
+                    continue;
+                }
+
+                yield return attestation;
+
+            }
+
+        }
+
+        #endregion
+
+        #region Verify(TrustAnchor, out Attestation, out ErrorResponse, At = null)
+
+        /// <summary>
+        /// Verify this proof against the given trust anchor of its roaming network, e.g. of a QR code a verifier scanned:
+        /// against the identity keys of the roaming network operator it names, with its minConsensus.
+        /// </summary>
+        /// <param name="TrustAnchor">The trust anchor.</param>
+        /// <param name="Attestation">One of the attestations it was verified against.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="At">When it must be valid, now by default.</param>
+        public Boolean Verify(RoamingNetworkTrustAnchor                             TrustAnchor,
+                              [NotNullWhen(true)]  out RoamingNetworkAttestation?   Attestation,
+                              [NotNullWhen(false)] out String?                      ErrorResponse,
+                              DateTimeOffset?                                       At   = null)
+        {
+
+            if (TrustAnchor.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            {
+                Attestation    = null;
+                ErrorResponse  = $"The trust anchor is one of the roaming network '{TrustAnchor.RoamingNetworkId}'!";
+                return false;
+            }
+
+            return Verify(TrustAnchor.IdentityKeyIds, out Attestation, out ErrorResponse, At, TrustAnchor.MinConsensus);
+
+        }
+
+        #endregion
+
+        #region Verify(TrustedIdentityKeyIds, out Attestation, out ErrorResponse, At = null, MinConsensus = 1)
 
         /// <summary>
         /// Verify this proof against the identity keys of the roaming network operator the verifier trusts by their @ids,
         /// e.g. those of a QR code it scanned (RoamingNetworkTrustAnchor): the key statement of the operator the proof gives
-        /// must be signed by one of them and valid at the given time, now by default, and one of the attestations of the
-        /// proof signed by a signing key it states, valid when the attestation was signed (SPECIFICATION.md, section 8.6).
+        /// must be signed by trusted identity keys of as many holders as the given minConsensus and its own require, and be
+        /// valid at the given time, now by default; and the attestations of the proof signed by signing keys it states of
+        /// as many holders, valid when they were signed (SPECIFICATION.md, sections 4.1 and 8.6): so that no holder of a
+        /// quorum attests a version alone.
         /// </summary>
         /// <param name="TrustedIdentityKeyIds">The @ids of the identity keys the verifier trusts: their SHA-256 thumbprints.</param>
-        /// <param name="Attestation">The attestation it was verified against.</param>
+        /// <param name="Attestation">One of the attestations it was verified against.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="At">When it must be valid, now by default.</param>
+        /// <param name="MinConsensus">How many holders must have signed the key statement and attested the root at least, e.g. as a trust anchor names it.</param>
         public Boolean Verify(IEnumerable<String>                                   TrustedIdentityKeyIds,
                               [NotNullWhen(true)]  out RoamingNetworkAttestation?   Attestation,
                               [NotNullWhen(false)] out String?                      ErrorResponse,
-                              DateTimeOffset?                                       At   = null)
+                              DateTimeOffset?                                       At             = null,
+                              Byte                                                  MinConsensus   = 1)
         {
 
             Attestation = null;
@@ -264,7 +313,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!TryGetKeyStatement(out var keyStatement, out var operatorIdentityKeys, out ErrorResponse))
                 return false;
 
-            if (!keyStatement.TryVerify(TrustedIdentityKeyIds, operatorIdentityKeys, out ErrorResponse))
+            if (!keyStatement.TryVerify(TrustedIdentityKeyIds, operatorIdentityKeys, out ErrorResponse, MinConsensus))
                 return false;
 
             var at = At ?? Timestamp.Now;
@@ -281,11 +330,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            return Verify(attestation => keyStatement.SigningKeyOf(attestation.KeyId, attestation.SignedAt) is POIPublicKey signingKey &&
-                                         attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _),
-                          out Attestation,
-                          out ErrorResponse,
-                          at);
+            var required = Math.Max(MinConsensus, keyStatement.MinConsensus);
+
+            if (required == 1)
+                return Verify(attestation => keyStatement.SigningKeyOf(attestation.KeyId, attestation.SignedAt) is POIPublicKey signingKey &&
+                                             attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _),
+                              out Attestation,
+                              out ErrorResponse,
+                              at);
+
+            #region Attested by as many holders of the signing keys it states
+
+            if (!TryCalculateETag(out var eTag, out ErrorResponse))
+                return false;
+
+            var holders = new HashSet<String>(StringComparer.Ordinal);
+
+            foreach (var attestation in AttestationsOf(eTag, at))
+            {
+                if (keyStatement.SigningKeyOf(attestation.KeyId, attestation.SignedAt) is POIPublicKey signingKey &&
+                    attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _))
+                {
+                    Attestation ??= attestation;
+                    holders.Add(signingKey.HolderOrUnnamed);
+                }
+            }
+
+            if (holders.Count >= required)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            Attestation    = null;
+            ErrorResponse  = $"Valid attestations of trusted keys of {holders.Count} holder{(holders.Count == 1 ? "" : "s")} attest the root {eTag} of the proof, not of {required}!";
+            return false;
+
+            #endregion
 
         }
 

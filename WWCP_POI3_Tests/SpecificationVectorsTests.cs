@@ -293,6 +293,76 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_key_statement_of_a_quorum()
+
+        /// <summary>
+        /// A key statement of the profile wwcp-poi-key-statement-v2 of an operator whose keys two holders share, of which both
+        /// must sign: each signs the same input with its own keyId.
+        /// </summary>
+        [Test]
+        public void A_key_statement_of_a_quorum()
+        {
+
+            const String InputOfAlpha  = "{\"algorithm\":\"Ed25519\",\"encoding\":\"base64\",\"identityKeys\":[{\"@id\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w==\"},{\"@id\":\"a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f\",\"holder\":\"Beta\",\"key\":\"owEBIAYhWCAc5WpIyC/5kWKhS8VEYSZ05dYfuTF+ZdQFV4D9vLTcNQ==\"}],\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"minConsensus\":2,\"profile\":\"wwcp-poi-key-statement-v2\",\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKeys\":[{\"@id\":\"c1924d610e8d9f1c5efdbca564a2f19991517ab8252807651f94ac5332afe3f9\",\"holder\":\"Beta\",\"key\":\"owEBIAYhWCAXRVO0Vt3fxpCOyrHBAf5qsh4rqgYXeVt9Q6Y0gpk/1Q==\"},{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\"}],\"validUntil\":\"2026-11-16T00:00:00.000Z\"}";
+            const String ValueOfAlpha  = "+aCgAP2Y/8nIwRDpnOkx8gaRnO9SP96dq31VSocHN3v0+TXsOE0mVU2DdO9mglFjZOaHsAWtNDMrv9H3Tjx9Cg==";
+            const String ValueOfBeta   = "S9n8fy68dcR2YV08EVa1y3QllkuyqiBrAvY8iOZlGg1h7UJqUMYF6jnPmOT+tgUIFhFUAj7C8vLx3iuaYmoxBw==";
+
+            var alphaSigning   = new Ed25519PrivateKeyParameters(Convert.FromHexString("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), 0);
+            var alphaIdentity  = new Ed25519PrivateKeyParameters(Convert.FromHexString("303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f"), 0);
+            var betaSigning    = new Ed25519PrivateKeyParameters(Convert.FromHexString("606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f"), 0);
+            var betaIdentity   = new Ed25519PrivateKeyParameters(Convert.FromHexString("707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f"), 0);
+
+            var statement      = RoamingNetworkKeyStatement.Create([ (alphaIdentity, COSEAlgorithm.Ed25519) ],
+                                                                   2,
+                                                                   RoamingNetwork_Id.Parse("rn1"),
+                                                                   RoamingNetworkOperator_Id.Parse("DE*RNO"),
+                                                                   [ POIPublicKey.From(alphaSigning,  Holder: "Alpha"), POIPublicKey.From(betaSigning,  Holder: "Beta") ],
+                                                                   [ POIPublicKey.From(alphaIdentity, Holder: "Alpha"), POIPublicKey.From(betaIdentity, Holder: "Beta") ],
+                                                                   DateTimeOffset.Parse("2026-10-17T00:00:00Z"),
+                                                                   DateTimeOffset.Parse("2026-11-16T00:00:00Z")).
+                                     WithSignature(betaIdentity, COSEAlgorithm.Ed25519);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Encoding.UTF8.GetString(statement.GetSigningBytes()),  Is.EqualTo(InputOfAlpha));
+                Assert.That(statement.Signatures[0].Value,                          Is.EqualTo(ValueOfAlpha));
+                Assert.That(statement.Signatures[1].Value,                          Is.EqualTo(ValueOfBeta));
+                Assert.That(statement.TryVerify(statement.IdentityKeys.Select(key => key.Id), null, out var error),  Is.True, error);
+            }
+
+        }
+
+        #endregion
+
+        #region A_trust_anchor()
+
+        /// <summary>
+        /// The trust anchor of the example network as the text of a QR code: WWCPPOI1: and the Base45 of its CBOR.
+        /// </summary>
+        [Test]
+        public void A_trust_anchor()
+        {
+
+            const String QRCode  = "WWCPPOI1:Q1L..DF$D4IK1$CM2D$9FQ$DTVD38DUPCG/DB$CQWE-69MWEW9E0G7%:5I9E -DNPCGECD3D3/D+%5*VD$$EQ:5-3E7WEBAFCPES4FVPC:L5VQE$-D0LEBECZEDV2D7$CK4F-KEIUA7%EGVE:.D59D.KEPED1$CBWERWE-N9-FF$FGW24.+U3M0-$O1JV%LLP-T2OR-7U%J0WP7ZXAW7RI33:PKFFM%D0P$DZKEXC9X.C/KEIEC EDK/D-K3MWEW9E0G7-:5B/D.%5$9FQ$DTVD-:5S3EJ$D3/DV9ES3EJ$D3/D:+9PWE04EFPD4VC:KECB60LEBECZEDV2D7$CK4F-KEHZA/C9U/3MWEW9E0G7V:5Z$E.%5$9FQ$DTVD*:5 3E9:5D-9-:5*-D";
+
+            var anchor = new RoamingNetworkTrustAnchor(new Uri("https://hub.example/poi/RNs/rn1"),
+                                                       [ "1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802" ],
+                                                       1,
+                                                       new ImmutableI18NString(I18NString.Create(Languages.en, "Example")),
+                                                       null,
+                                                       new Uri("https://rno.example/roaming"));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(anchor.ToJSON().ToString(Formatting.None),  Is.EqualTo("{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetworkTrustAnchor\",\"roamingNetworkId\":\"rn1\",\"name\":{\"en\":\"Example\"},\"roamingNetworkURI\":\"https://hub.example/poi/RNs/rn1\",\"moreInformation\":\"https://rno.example/roaming\",\"identityKeys\":[\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\"]}"));
+                Assert.That(anchor.ToQRCode(),                          Is.EqualTo(QRCode));
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(QRCode, out var read, out var error),  Is.True, error);
+            }
+
+        }
+
+        #endregion
+
         #region A_price_statement()
 
         [Test]

@@ -7,7 +7,7 @@ A version of a roaming network with everything it embeds is one immutable data s
 [ETags](README.md#etags); a change set leads to the next version.
 
 The roaming network is owned by its **roaming network operator (RNO)**, the
-[RoamingNetworkOperator](RoamingNetworkOperator.md) it embeds as `roamingNetworkOperator`, with its keys: the
+[RoamingNetworkOperator](RoamingNetworkOperator.md) it embeds as `operator`, with its keys: the
 network has none of its own. The RNO signs changes of the network's own properties, adds and removes parties, and
 owns the registries (manufacturers, energy meter manufacturers, transparency software releases and certificates).
 Each party owns its own properties and data. There is no registry of brands: every charging station operator, pool,
@@ -24,7 +24,7 @@ change set and commit (`roamingNetworkId`).
 | Admin status | `RoamingNetworkAdminStatusType`, initially `operational` |
 | Status | `RoamingNetworkStatusType`, initially `available` |
 | Embedded in | — (root) |
-| Owner | its roaming network operator (RNO), `roamingNetworkOperator`, by its `signingKeys` / `identityKeys` |
+| Owner | its roaming network operator (RNO), `operator`, by its `signingKeys` / `identityKeys` |
 | HTTP | `GET ~/RNs` (list of `{@id, name, description}`), `GET ~/RNs/{RN_Id}`; history under `~/RNs/{RN_Id}/history/…`, see [../README.md](../README.md#history-and-sync) |
 
 `GET ~/RNs/{RN_Id}` serves the complete network as canonical JSON, or as deterministic CBOR for
@@ -53,7 +53,7 @@ See [README.md](README.md#common-properties).
 |---|---|---|---|---|
 | `@context` | `JSONLDContext` (const) | string | — | `https://open.charging.cloud/contexts/wwcp+json/roamingNetwork`, see [below](#context). |
 | `dataLicenses` | `DataLicenses` | [DataLicense](#datalicenses)[] | update/remove | The licenses of the data, ordered by `@id` (ordinal); omitted when empty. |
-| `roamingNetworkOperator` | `Operator` | [RoamingNetworkOperator](RoamingNetworkOperator.md)? | its properties: update/remove | Its operator, with the keys of the network; omitted for a network without one, which nobody can change where only the RNO may. Neither added nor removed. |
+| `operator` | `Operator` | [RoamingNetworkOperator](RoamingNetworkOperator.md)? | its properties: update/remove | Its operator, with the keys of the network; omitted for a network without one, which nobody can change where only the RNO may. Neither added nor removed. |
 | `chargingStationOperators` | `ChargingStationOperators` | [ChargingStationOperator](ChargingStationOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `chargingStationManufacturers` | `ChargingStationManufacturers` | [ChargingStationManufacturer](ChargingStationManufacturer.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `eMobilityProviders` | `EMobilityProviders` | [EMobilityProvider](EMobilityProvider.md)[] | add/remove | Ordered by `@id` (ordinal). |

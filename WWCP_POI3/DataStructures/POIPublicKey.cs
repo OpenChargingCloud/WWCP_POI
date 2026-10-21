@@ -85,6 +85,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  NotAfter    = "notAfter";
 
+            /// <summary>
+            /// The property of who holds its private key, e.g. one company of several holding the keys of a roaming
+            /// network operator together (SPECIFICATION.md, section 4.1).
+            /// </summary>
+            public const String  Holder      = "holder";
+
         }
 
         #endregion
@@ -110,6 +116,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public DateTimeOffset?  NotAfter     { get; }
 
+        /// <summary>
+        /// Who holds its private key, if named: a quorum of a roaming network operator counts the holders of its keys, not
+        /// its keys, so that a holder renewing its key has one voice (SPECIFICATION.md, section 4.1). Not part of its
+        /// identification.
+        /// </summary>
+        public String?          Holder       { get; }
+
+        /// <summary>
+        /// Who holds its private key as a quorum counts it: its holder, or the one holder of all keys naming none.
+        /// </summary>
+        public String           HolderOrUnnamed
+            => Holder ?? "";
+
         #endregion
 
         #region Constructor(s)
@@ -120,9 +139,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Key">The COSE key; private parts are dropped.</param>
         /// <param name="NotBefore">Since when it may be used, unless always.</param>
         /// <param name="NotAfter">Until when it may be used, unless always.</param>
+        /// <param name="Holder">Who holds its private key, if named.</param>
         public POIPublicKey(COSEKey          Key,
                             DateTimeOffset?  NotBefore   = null,
-                            DateTimeOffset?  NotAfter    = null)
+                            DateTimeOffset?  NotAfter    = null,
+                            String?          Holder      = null)
         {
 
             ArgumentNullException.ThrowIfNull(Key);
@@ -130,26 +151,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (NotBefore.HasValue && NotAfter.HasValue && NotBefore.Value > NotAfter.Value)
                 throw new ArgumentException("A public key must not expire before it becomes valid!");
 
+            if (Holder is not null && (Holder.Length == 0 || Holder.Trim() != Holder))
+                throw new ArgumentException("The holder of a public key must be a nonempty text without leading or trailing white space!");
+
             this.Key        = Key.IsPrivate ? Key.ToPublicCOSEKey() : Key;
             this.Id         = Convert.ToHexStringLower(this.Key.Thumbprint());
             this.NotBefore  = NotBefore?.ToUniversalTime();
             this.NotAfter   = NotAfter?. ToUniversalTime();
+            this.Holder     = Holder;
 
         }
 
         #endregion
 
 
-        #region (static) From(Key, NotBefore = null, NotAfter = null)
+        #region (static) From(Key, NotBefore = null, NotAfter = null, Holder = null)
 
         /// <summary>
         /// The public key of the given asymmetric key, e.g. of a private signing key.
         /// </summary>
         public static POIPublicKey From(AsymmetricKeyParameter  Key,
                                         DateTimeOffset?         NotBefore   = null,
-                                        DateTimeOffset?         NotAfter    = null)
+                                        DateTimeOffset?         NotAfter    = null,
+                                        String?                 Holder      = null)
 
-            => new (COSEKey.From(Key), NotBefore, NotAfter);
+            => new (COSEKey.From(Key), NotBefore, NotAfter, Holder);
 
         #endregion
 
@@ -192,6 +218,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (NotAfter.HasValue)
                 json.Add(PropertyKeys.NotAfter,   NotAfter. Value.ToISO8601());
+
+            if (Holder is not null)
+                json.Add(PropertyKeys.Holder,     Holder);
 
             return CustomPOIPublicKeySerializer is not null
                        ? CustomPOIPublicKeySerializer(this, json)
@@ -262,7 +291,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (JSON.ParseOptional(PropertyKeys.NotAfter,  "not after",  out DateTimeOffset? notAfter,  out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                var publicKey = new POIPublicKey(coseKey, notBefore, notAfter);
+                if (!POIJSON.TryParseString(JSON, PropertyKeys.Holder, "holder of a public key", out var holder, out ErrorResponse))
+                    return false;
+
+                if (holder is not null && (holder.Length == 0 || holder.Trim() != holder))
+                {
+                    ErrorResponse = $"The holder of the public key '{id}' must be a nonempty text without leading or trailing white space!";
+                    return false;
+                }
+
+                var publicKey = new POIPublicKey(coseKey, notBefore, notAfter, holder);
 
                 if (publicKey.Id != id)
                 {

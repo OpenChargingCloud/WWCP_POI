@@ -2,7 +2,7 @@
 
 The roaming network operator (RNO) runs a roaming network: it owns the network itself and its registries, and it
 decides who is a member. In POI 3 it is a party of the roaming network: embedded completely in the
-[RoamingNetwork](RoamingNetwork.md) as `roamingNetworkOperator`, a single object, with the public halves of its
+[RoamingNetwork](RoamingNetwork.md) as `operator`, a single object, with the public halves of its
 keys. A roaming network has no keys of its own: they are the keys of its operator.
 
 One operator may operate many roaming networks, e.g. `Prod` and `QA`: each of them embeds it, so that each can be
@@ -21,10 +21,10 @@ whitespace, compared case-insensitively, e.g. `GraphDefined`.
 | Identification | `RoamingNetworkOperator_Id` (WWCP_POI2), e.g. `GraphDefined` |
 | Admin status | `RoamingNetworkOperatorAdminStatusType`, initially `operational` |
 | Status | `RoamingNetworkOperatorStatusType`, initially `available` |
-| Embedded in | [RoamingNetwork](RoamingNetwork.md) as `roamingNetworkOperator` |
+| Embedded in | [RoamingNetwork](RoamingNetwork.md) as `operator` |
 | Owner | itself: its data and signing keys by a signing key, its signing keys also by an identity key, its identity keys by an identity key; neither added nor removed |
 | Embeds | nothing |
-| HTTP | in `GET ~/RNs/{RN_Id}`, as `roamingNetworkOperator` |
+| HTTP | in `GET ~/RNs/{RN_Id}`, as `operator` |
 
 
 ## Common properties
@@ -51,6 +51,8 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | Hotline phone number. |
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update (signing or identity key) | Keys signing its change sets, see [Keys](#keys). Can not be removed. |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update (identity key) | Long-term keys signing changes of keys, see [Keys](#keys). Can not be removed. |
+| `minConsensus` | `MinConsensus` | `Byte`, 1 by default, written unless 1 | update (identity keys) | How many holders of its keys of one kind sign what it owns, see [Quorum](#quorum). |
+| `keyStatement` | `KeyStatement` | `RoamingNetworkKeyStatement?` | update/remove | Its signing keys stated by its identity keys, for apps ([SPECIFICATION.md](../SPECIFICATION.md#86-key-statements-and-trust-anchors), section 8.6). |
 
 A change set names the properties above by their JSON keys (`RoamingNetworkOperatorRegistry` in
 [RoamingNetwork.RegistryChanges.cs](../WWCP_POI3/RoamingNetwork/RoamingNetwork.RegistryChanges.cs)), with
@@ -78,6 +80,7 @@ The public keys of the RNO (`POIPublicKey`, [source](../WWCP_POI3/DataStructures
 | `key` | string | Canonical Base64 of the deterministic CBOR of the public COSE key; private parts are refused. |
 | `notBefore` | timestamp | Optional start of validity (UTC, to the millisecond). |
 | `notAfter` | timestamp | Optional end of validity; not before `notBefore`. |
+| `holder` | string | Optional: who holds the private key, e.g. one company of a [quorum](#quorum). No part of `@id`. |
 
 - **signingKeys** — short keys (e.g. secp256r1) signing change sets of RNO data: its own properties, the network's
   properties, the registries, adding and removing parties, and the rotation of the `signingKeys` themselves. A
@@ -92,6 +95,32 @@ The public keys of the RNO (`POIPublicKey`, [source](../WWCP_POI3/DataStructures
 - A key counts only when valid at the `createdAt` of the change set (`IsValidAt`), and only in the version the
   change set is applied to.
 - A change set can only replace them with a nonempty array (`UpdateProperty`); `RemoveProperty` is refused.
+
+
+## Quorum
+
+Several holders, e.g. companies, may share the keys of the RNO, so that none of them changes the network alone
+([SPECIFICATION.md](../SPECIFICATION.md#41-keys-and-owners), section 4.1): each names its keys with its `holder`,
+and the RNO names its `minConsensus`, e.g. 2 of 3.
+
+- **What needs it:** everything the RNO signs needs signatures with keys of `minConsensus` different holders: its
+  data and that of the network with signing keys; its keys, its `minConsensus` and the recovery of the keys of
+  other parties with identity keys; its key statement (`wwcp-poi-key-statement-v2`, signed by identity keys of as
+  many holders). An app takes a version only when signing keys of as many holders attest it.
+- **Holders, not keys:** a holder renewing its key signs with two keys, but has one voice. Keys naming no holder
+  have one holder together: an RNO without a quorum is one holder with `minConsensus` 1.
+- **More than half:** `minConsensus` is more than half of the holders of each kind of keys and at most as many, so
+  that two quorums always share a holder (`POIPartyKeys.CheckQuorum`): 2 of 3, 3 of 4, 3 of 5. An odd number of
+  holders is not needed.
+- **Signing on one's own:** each holder signs a change set or key statement with its own key and adds its
+  signature to the others (`changeSet.Sign(…)`, `keyStatement.WithSignature(…)`); one of them commits it.
+
+```csharp
+var statement = RoamingNetworkKeyStatement.Create([ (alphaIdentityKey, COSEAlgorithm.ES512) ], 2,
+                                                  rn.Id, rn.Operator!.Id, rn.Operator.SigningKeys, rn.Operator.IdentityKeys,
+                                                  now, now.AddDays(30)).
+                    WithSignature(betaIdentityKey, COSEAlgorithm.ES512);   // at the place of Beta
+```
 
 
 ## Runtime status

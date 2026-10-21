@@ -372,9 +372,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            #region The parties and kinds of keys that signed it
+            #region The parties and kinds of keys that signed it, with the holders of the keys
 
-            var signedBy = new HashSet<(POIPartyId, POIKeyKind)>();
+            // A quorum counts holders, not keys: a holder renewing its key signs with both once.
+            var signedBy = new Dictionary<(POIPartyId, POIKeyKind), HashSet<String>>();
 
             for (var index = 0; index < ChangeSet.Signatures.Length; index++)
             {
@@ -404,7 +405,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             return false;
                         }
 
-                        signedBy.Add((partyId, kind));
+                        if (!signedBy.TryGetValue((partyId, kind), out var holders))
+                            signedBy[(partyId, kind)] = holders = new (StringComparer.Ordinal);
+
+                        holders.Add(key.HolderOrUnnamed);
 
                     }
                 }
@@ -447,11 +451,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!owners.Any(owner => signedBy.Contains(owner)))
+                // One of its owners, by as many holders of its keys of the kinds named as its quorum needs.
+                if (!owners.GroupBy(owner => owner.Item1).
+                            Any(party => party.SelectMany(owner => signedBy.TryGetValue(owner, out var holders) ? holders : []).
+                                               Distinct(StringComparer.Ordinal).
+                                               Count() >= MinConsensusOf(party.Key)))
                 {
-                    ErrorResponse = $"Change {index}: {change.Kind} of the {change.EntityType} '{change.EntityId}'{(change.EntityPropertyName is not null ? $" ('{change.EntityPropertyName}')" : "")} needs a signature by " +
-                                    String.Join(" or ", owners.Select(owner => $"a{(owner.Item2 == POIKeyKind.Identity ? "n identity" : " signing")} key of {owner.Item1}")) + "!";
+
+                    var quorums = owners.Any(owner => MinConsensusOf(owner.Item1) > 1);
+
+                    ErrorResponse = $"Change {index}: {change.Kind} of the {change.EntityType} '{change.EntityId}'{(change.EntityPropertyName is not null ? $" ('{change.EntityPropertyName}')" : "")} needs {(quorums ? "signatures" : "a signature")} by " +
+                                    String.Join(" or ", owners.Select(owner => MinConsensusOf(owner.Item1) > 1
+                                                                                   ? $"{(owner.Item2 == POIKeyKind.Identity ? "identity" : "signing")} keys of {MinConsensusOf(owner.Item1)} holders of {owner.Item1}"
+                                                                                   : $"a{(owner.Item2 == POIKeyKind.Identity ? "n identity" : " signing")} key of {owner.Item1}")) + "!";
                     return false;
+
                 }
 
                 if (!TryCheckPartyChange(change, out ErrorResponse))
@@ -468,6 +482,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return true;
 
         }
+
+        #endregion
+
+        #region (private) MinConsensusOf(PartyId)
+
+        /// <summary>
+        /// How many holders of the keys of the given party of this version sign what it owns: one, unless a quorum.
+        /// </summary>
+        private Byte MinConsensusOf(POIPartyId PartyId)
+
+            => TryGetParty(PartyId, out var party)
+                   ? party.MinConsensus
+                   : (Byte) 1;
 
         #endregion
 
@@ -533,9 +560,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (Change.EntityType == nameof(RoamingNetworkOperator))
             {
+                // Its quorum as its identity keys: who must sign is decided by those signing its keys.
                 Owners = Change.EntityPropertyName == POIPartyKeys.SigningKeysProperty
                              ? [ (roamingNetworkOperator, POIKeyKind.Signing), (roamingNetworkOperator, POIKeyKind.Identity) ]
-                             : [ (roamingNetworkOperator, POIPartyKeys.IsKeyProperty(Change.EntityPropertyName) ? POIKeyKind.Identity : POIKeyKind.Signing) ];
+                             : [ (roamingNetworkOperator, POIPartyKeys.IsKeyProperty(Change.EntityPropertyName) ||
+                                                         Change.EntityPropertyName == POIPartyKeys.MinConsensusProperty
+                                                             ? POIKeyKind.Identity
+                                                             : POIKeyKind.Signing) ];
                 return true;
             }
 

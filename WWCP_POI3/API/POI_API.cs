@@ -250,6 +250,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  URI                      = "uri";
 
             /// <summary>
+            /// The property of the minConsensus of a trust anchor: how many holders of the identity keys sign.
+            /// </summary>
+            public const String  MinConsensus             = POIPartyKeys.MinConsensusProperty;
+
+            /// <summary>
+            /// The property of the text of the QR code of a trust anchor: WWCPPOI1: and the Base45 of its CBOR.
+            /// </summary>
+            public const String  QRCode                   = "qrCode";
+
+            /// <summary>
+            /// The property of a trust anchor in its JSON representation.
+            /// </summary>
+            public const String  TrustAnchor              = "trustAnchor";
+
+            /// <summary>
             /// The property of the charging station operator of a charging pool found by a query.
             /// </summary>
             public const String  ChargingStationOperator  = "chargingStationOperator";

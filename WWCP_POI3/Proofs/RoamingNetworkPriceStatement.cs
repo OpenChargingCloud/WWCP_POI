@@ -607,7 +607,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryVerify(Proof, TrustedIdentityKeyIds, out Attestation, out ErrorResponse, At = null)
+        #region TryVerify(Proof, TrustedIdentityKeyIds, out Attestation, out ErrorResponse, At = null, MinConsensus = 1)
 
         /// <summary>
         /// Verify this price statement as a driver's app does, offline: the given proof of the charging station against the
@@ -620,16 +620,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Attestation">The attestation the proof was verified against.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="At">When they must be valid, now by default.</param>
+        /// <param name="MinConsensus">How many holders of the keys of the roaming network operator must have signed its key statement and attested the root, e.g. as a trust anchor names it.</param>
         public Boolean TryVerify(RoamingNetworkProof                                   Proof,
                                  IEnumerable<String>                                   TrustedIdentityKeyIds,
                                  [NotNullWhen(true)]  out RoamingNetworkAttestation?   Attestation,
                                  [NotNullWhen(false)] out String?                      ErrorResponse,
-                                 DateTimeOffset?                                       At   = null)
+                                 DateTimeOffset?                                       At             = null,
+                                 Byte                                                  MinConsensus   = 1)
         {
 
             var at = At ?? Timestamp.Now;
 
-            if (!Proof.Verify(TrustedIdentityKeyIds, out Attestation, out ErrorResponse, at))
+            if (!Proof.Verify(TrustedIdentityKeyIds, out Attestation, out ErrorResponse, at, MinConsensus))
                 return false;
 
             if (!TryVerify(Proof, out ErrorResponse, at))

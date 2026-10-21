@@ -198,8 +198,11 @@ A **key** of a party is a public COSE key in its static data:
 ```json
 { "@id": "<SHA-256 COSE key thumbprint [RFC 9679], 64 lowercase hex digits>",
   "key": "<Base64 of the deterministic CBOR of the public COSE key>",
-  "notBefore": "…", "notAfter": "…" }
+  "notBefore": "…", "notAfter": "…", "holder": "…" }
 ```
+
+`holder`, optional, names who holds the private key, e.g. one of several companies holding the keys of the RNO
+together; it is no part of the thumbprint.
 
 A reader MUST calculate the thumbprint and refuse a key whose `@id` differs, and a key with
 private parts. The roaming network operator (RNO), charging station operators,
@@ -243,6 +246,18 @@ RNO can not be changed where only the RNO may.
 Nobody can replace the identity keys of the RNO once they are lost or expired. An RNO SHOULD name
 at least two identity keys with different `notAfter`, and SHOULD replace an identity key before it
 expires.
+
+**Quorum.** So that no single company decides for the network, several holders MAY share the keys of the
+RNO: each names its keys with its `holder`, and the RNO names its `minConsensus`, e.g. 2 of 3 holders, written
+unless 1. Where the RNO must sign, signatures with keys of `minConsensus` different holders are needed, keys
+naming no holder having one holder together: for the data it owns signing keys, for its keys, its
+`minConsensus` and the recovery of other parties identity keys, of the kinds the rules above allow for one
+signature. Holders are counted, not keys, so a holder renewing its key has one voice. `minConsensus` MUST be
+more than half of the holders of each kind of keys of the RNO and at most as many, so that two quorums
+always share a holder: two contradicting decisions need a holder signing both, and that holder can be named;
+an odd number of holders is not needed, e.g. 3 of 4. A version that breaks this rule MUST be refused. The
+quorum of the version a change set is applied to counts, as its keys do. The key statement of an RNO with a
+quorum is signed by as many holders (8.6), and a verifier needs attestations of as many (8.5).
 
 
 ## 5. Commits
@@ -502,6 +517,37 @@ Signature value:
 wStKI6DfjrT9oDvyenKRCUtHsyDj/7SCO2rnTq4+S5QoejTkaudDzqt+Ir8PXjXojYsiolJVdE/ZKhuyaEWVCg==
 ```
 
+**Key statement of a quorum** (sections 4.1 and 8.6): the same signing and identity keys of the holder `Alpha`
+and the Ed25519 keys of the holder `Beta` of the private seeds
+`606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f` (signing, `@id`
+`c1924d610e8d9f1c5efdbca564a2f19991517ab8252807651f94ac5332afe3f9`) and
+`707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f` (identity, `@id`
+`a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f`), `minConsensus` 2, signed by both identity
+keys. Signature input of `Alpha`:
+
+```json
+{"algorithm":"Ed25519","encoding":"base64","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","holder":"Alpha","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="},{"@id":"a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f","holder":"Beta","key":"owEBIAYhWCAc5WpIyC/5kWKhS8VEYSZ05dYfuTF+ZdQFV4D9vLTcNQ=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","minConsensus":2,"profile":"wwcp-poi-key-statement-v2","roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKeys":[{"@id":"c1924d610e8d9f1c5efdbca564a2f19991517ab8252807651f94ac5332afe3f9","holder":"Beta","key":"owEBIAYhWCAXRVO0Vt3fxpCOyrHBAf5qsh4rqgYXeVt9Q6Y0gpk/1Q=="},{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","holder":"Alpha","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w=="}],"validUntil":"2026-11-16T00:00:00.000Z"}
+```
+
+Signature values of `Alpha` and of `Beta`, whose input has its own `keyId`:
+
+```
++aCgAP2Y/8nIwRDpnOkx8gaRnO9SP96dq31VSocHN3v0+TXsOE0mVU2DdO9mglFjZOaHsAWtNDMrv9H3Tjx9Cg==
+S9n8fy68dcR2YV08EVa1y3QllkuyqiBrAvY8iOZlGg1h7UJqUMYF6jnPmOT+tgUIFhFUAj7C8vLx3iuaYmoxBw==
+```
+
+**Trust anchor** (section 8.6) of the example, with the identity key of the key statement above:
+
+```json
+{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetworkTrustAnchor","roamingNetworkId":"rn1","name":{"en":"Example"},"roamingNetworkURI":"https://hub.example/poi/RNs/rn1","moreInformation":"https://rno.example/roaming","identityKeys":["1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802"]}
+```
+
+Its QR code, 266 bytes of CBOR:
+
+```
+WWCPPOI1:Q1L..DF$D4IK1$CM2D$9FQ$DTVD38DUPCG/DB$CQWE-69MWEW9E0G7%:5I9E -DNPCGECD3D3/D+%5*VD$$EQ:5-3E7WEBAFCPES4FVPC:L5VQE$-D0LEBECZEDV2D7$CK4F-KEIUA7%EGVE:.D59D.KEPED1$CBWERWE-N9-FF$FGW24.+U3M0-$O1JV%LLP-T2OR-7U%J0WP7ZXAW7RI33:PKFFM%D0P$DZKEXC9X.C/KEIEC EDK/D-K3MWEW9E0G7-:5B/D.%5$9FQ$DTVD-:5S3EJ$D3/DV9ES3EJ$D3/D:+9PWE04EFPD4VC:KECB60LEBECZEDV2D7$CK4F-KEHZA/C9U/3MWEW9E0G7V:5Z$E.%5$9FQ$DTVD*:5 3E9:5D-9-:5*-D
+```
+
 **Station proof** (section 8.4)
  of `DE*GEF*S1`: every child array on its path is partial with one leaf at
 index 0 and an empty audit path; the station is complete. A verifier calculates the root above from it and
@@ -563,8 +609,12 @@ is its commit identification
 
 ## 7. Open points
 
-None: the HTTP `ETag` of an entity is the SHA-256 of its canonical representation as the roaming network
-embeds it, and change sets name it as a precondition (section 4).
+The HTTP `ETag` of an entity is the SHA-256 of its canonical representation as the roaming network embeds it,
+and change sets name it as a precondition (section 4).
+
+1. **Co-signing:** the holders of a quorum (section 4.1) sign a change set each on its own, and one of them
+   commits it with all signatures; a place where a change set waits for the signatures still missing, e.g.
+   `…/history/changeSets/pending`, is open.
 
 
 ## 8. Proofs of entities by a signed hash tree
@@ -761,7 +811,9 @@ encoding and verification are as in section 4; timestamps are written and signed
   5 minutes. A verifier SHOULD refuse an attestation after its `validUntil`.
 - **Trust:** the verifier MUST trust the key of an attestation independently of the proof. A key the
   attested network names proves nothing, as whoever forged the network would name their own; a key
-  statement (8.6) names them.
+  statement (8.6) names them. Of an RNO with a quorum (section 4.1), the verifier MUST take a version only
+  attested by signing keys of `minConsensus` different holders the statement names, so that no holder vouches
+  for a version alone; each holder attests at its own server, and the servers exchange their attestations.
 - **Audit:** whoever has the history checks that the commit `commitId` has the attested ETag. An RNO
   attesting a version it does not have is caught by it. A server takes an attestation of another server
   only for a commit it holds, whose version has the attested ETag, with a signature of a key it trusts.
@@ -793,33 +845,64 @@ one of its identity keys (section 4.1):
 
 The signature input is the canonical JSON of the statement without `value`, with
 `"profile": "wwcp-poi-key-statement-v1"` and `"encoding": "base64"`; `identityKeys` is left out where
-absent. Keys are written as in section 4.1, in the order of their `@id`s, at least one signing key, none a
+absent.
+
+The statement of an RNO with a quorum (section 4.1) has the profile `wwcp-poi-key-statement-v2`: it names the
+`minConsensus` of the RNO, and its `signatures` replace `algorithm`, `keyId` and `value`, each signature by
+another identity key:
+
+```json
+{ "roamingNetworkId": "rn1", "roamingNetworkOperatorId": "DE*RNO",
+  "signingKeys":  [ { "@id": "…", "key": "…", "holder": "Alpha" }, { "@id": "…", "key": "…", "holder": "Beta" } ],
+  "identityKeys": [ { "@id": "…", "key": "…", "holder": "Alpha" }, { "@id": "…", "key": "…", "holder": "Beta" } ],
+  "minConsensus": 2, "signedAt": "…", "validUntil": "…",
+  "signatures": [ { "algorithm": "Ed25519", "keyId": "<@id>", "value": "<Base64>" }, … ],
+  "profile": "wwcp-poi-key-statement-v2", "encoding": "base64" }
+```
+
+The signature input of each signature is the canonical JSON of the statement without `signatures`, with its
+`algorithm` and `keyId`: every holder signs the same statement on its own and adds its signature to those of
+the others. A statement of `wwcp-poi-key-statement-v1` has a `minConsensus` of 1. Keys are written as in section 4.1, in the order of their `@id`s, at least one signing key, none a
 signing and an identity key; timestamps as in section 5.4, `validUntil` not before `signedAt`. Section 6
 has an example.
 
 - **Content:** the roaming network operator embeds it as `keyStatement`, a property of its own (section
   4.1). A version MUST be refused unless the statement names this roaming network and this operator, only
-  signing and identity keys the operator names, and is signed by one of its identity keys valid at
-  `signedAt`. Its validity in time is not checked there: a version keeps a statement that expired. So every
+  signing and identity keys the operator names, its `minConsensus`, and is signed by identity keys of
+  `minConsensus` holders valid at `signedAt`; every signature MUST be valid. Its validity in time is not checked there: a version keeps a statement that expired. So every
   proof of a charging station gives it with the operator, peers take it with the commits, and witnesses see
   it in the checkpoints: an operator stating other keys to some is a split view (10.2).
 - **Verification:** a verifier trusting identity keys by their `@id`s checks that the statement the proof
-  gives is signed by one of them, found among its `identityKeys` or those of the operator, each `@id` the
-  thumbprint of its key (section 4.1); that it is valid at the time it checks, `signedAt` ≤ time ≤
+  gives is signed by trusted ones of as many holders as the `minConsensus` it pinned and the one of the
+  statement require, found among its `identityKeys` or those of the operator, each `@id` the thumbprint of its
+  key (section 4.1); that it is valid at the time it checks, `signedAt` ≤ time ≤
   `validUntil`; that it names the roaming network of the proof; and that an attestation of the proof is
   signed by one of the signing keys it states, valid at the attestation's `signedAt`. The attestation is then
   trusted as 8.5 says.
 - **Succession:** a verifier trusting a statement MAY trust its `identityKeys` for later statements, e.g.
   when the operator replaces an identity key before it expires.
-- **Trust anchor:** what a verifier pins of a roaming network, as one URI, e.g. for a QR code on the website
-  or in the documents of the roaming network operator:
-  `https://hub.example/poi/RNs/rn1?identityKeys=<@id>,<@id>`: the roaming network, below which its proofs
-  are served (`…/CSs/{CS_Id}/proof`), and the `@id`s of the identity keys of its operator, 64 lowercase
-  hexadecimal digits each. Only the `@id`s are trusted; the keys come with every proof. A QR code is as
-  trustworthy as the place it is found: one stuck on a charging station may be anybody's.
+- **Trust anchor:** what a verifier pins of a roaming network, e.g. from a QR code on the website or in the
+  documents of the roaming network operator:
+
+  ```json
+  { "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkTrustAnchor",
+    "roamingNetworkId": "rn1", "name": { "en": "…" }, "description": { "en": "…" },
+    "roamingNetworkURI": "https://hub.example/poi/RNs/rn1", "moreInformation": "https://rno.example/roaming",
+    "identityKeys": [ "<@id>", "<@id>", "<@id>" ], "minConsensus": 2 }
+  ```
+
+  the roaming network, below whose URI its proofs are served (`…/CSs/{CS_Id}/proof`), the `@id`s of the identity
+  keys of its operator, 64 lowercase hexadecimal digits each, and its `minConsensus`, unless 1; to show, its
+  `name` and `description` and where to learn more. Only the `@id`s and the `minConsensus` are trusted: not one
+  key, which would let its holder vouch for the network alone; the keys come with every proof. The QR code holds
+  `WWCPPOI1:` and the Base45 [RFC 9285] of its deterministic CBOR, the keys and values of the JSON, the `@id`s as
+  their 32 bytes, all of the alphanumeric mode of QR codes; a reader takes the URI
+  `https://hub.example/poi/RNs/rn1?identityKeys=<@id>,<@id>&minConsensus=2` as well. A QR code is as trustworthy
+  as the place it is found: one stuck on a charging station may be anybody's.
 - POI_API serves the key statement of the operator of the head as `GET ~/RNs/{RN_Id}/keyStatement` and its
-  trust anchor as `GET ~/RNs/{RN_Id}/trustAnchor`, `{roamingNetworkId, identityKeyIds, uri}`, the URI as
-  the request names the roaming network.
+  trust anchor as `GET ~/RNs/{RN_Id}/trustAnchor`, `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode,
+  trustAnchor}`, the URIs as the request names the roaming network, the name and description of the network, and
+  the homepage of its operator as where to learn more.
 
 ### 8.7 Cost (informative)
 

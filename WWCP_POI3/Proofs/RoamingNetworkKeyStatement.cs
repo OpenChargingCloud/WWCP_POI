@@ -33,21 +33,56 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// A key statement of a roaming network operator (SPECIFICATION.md, section 8.6): which signing keys it uses, signed
-    /// with one of its identity keys. An app that pins the identity keys of the operator, e.g. by scanning the QR code of
-    /// a RoamingNetworkTrustAnchor, trusts the signing keys it names, and so the attestations they sign, without trusting
-    /// the network that names them. It is part of the content: the roaming network operator embeds it as keyStatement,
-    /// so that every proof of a charging station gives it, peers take it and witnesses see it.
+    /// One signature of a key statement: by one identity key of the roaming network operator.
     /// </summary>
+    /// <param name="Algorithm">The COSE name of the signature algorithm, e.g. ES512.</param>
+    /// <param name="KeyId">The @id of the identity key that signed it.</param>
+    /// <param name="Value">The signature value, canonical Base64.</param>
+    public sealed record RoamingNetworkKeyStatementSignature(String  Algorithm,
+                                                             String  KeyId,
+                                                             String  Value)
+    {
+
+        /// <summary>
+        /// Its JSON representation: {algorithm, keyId, value}.
+        /// </summary>
+        public JObject ToJSON()
+
+            => new (new JProperty(RoamingNetworkKeyStatement.PropertyKeys.Algorithm,  Algorithm),
+                    new JProperty(RoamingNetworkKeyStatement.PropertyKeys.KeyId,      KeyId),
+                    new JProperty(RoamingNetworkKeyStatement.PropertyKeys.Value,      Value));
+
+    }
+
+
+    /// <summary>
+    /// A key statement of a roaming network operator (SPECIFICATION.md, section 8.6): which signing keys it uses, signed
+    /// with its identity keys. An app that pins the identity keys of the operator, e.g. by scanning the QR code of a
+    /// RoamingNetworkTrustAnchor, trusts the signing keys it names, and so the attestations they sign, without trusting the
+    /// network that names them. It is part of the content: the roaming network operator embeds it as keyStatement, so that
+    /// every proof of a charging station gives it, peers take it and witnesses see it.
+    /// </summary>
+    /// <remarks>
+    /// A statement of the profile wwcp-poi-key-statement-v1 is signed by one identity key, its algorithm, keyId and value
+    /// written with its other fields. One of the profile wwcp-poi-key-statement-v2 names the minConsensus of the operator
+    /// and is signed by several identity keys, each signature in its signatures, so that the holders of a quorum sign it
+    /// together (SPECIFICATION.md, section 4.1): each signs the same input with its own algorithm and keyId, and adds its
+    /// signature to those of the others (WithSignature(…)).
+    /// </remarks>
     public sealed class RoamingNetworkKeyStatement
     {
 
         #region Data
 
         /// <summary>
-        /// The profile of the signature of a key statement.
+        /// The profile of a key statement signed by one identity key.
         /// </summary>
         public const String SigningProfile  = "wwcp-poi-key-statement-v1";
+
+        /// <summary>
+        /// The profile of a key statement naming the minConsensus of the operator, signed by several identity keys.
+        /// </summary>
+        public const String QuorumProfile   = "wwcp-poi-key-statement-v2";
 
         /// <summary>
         /// The name of the property of the roaming network operator embedding it.
@@ -97,6 +132,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  IdentityKeys              = POIPartyKeys.IdentityKeysProperty;
 
             /// <summary>
+            /// The property of how many holders of the keys of the operator of one kind sign: of a statement of the profile
+            /// wwcp-poi-key-statement-v2.
+            /// </summary>
+            public const String  MinConsensus              = POIPartyKeys.MinConsensusProperty;
+
+            /// <summary>
             /// The property of its signing timestamp.
             /// </summary>
             public const String  SignedAt                  = "signedAt";
@@ -107,27 +148,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  ValidUntil                = "validUntil";
 
             /// <summary>
-            /// The property of its signature algorithm.
+            /// The property of its signatures: of a statement of the profile wwcp-poi-key-statement-v2.
+            /// </summary>
+            public const String  Signatures                = "signatures";
+
+            /// <summary>
+            /// The property of the algorithm of a signature.
             /// </summary>
             public const String  Algorithm                 = "algorithm";
 
             /// <summary>
-            /// The property of the identification of the identity key that signed it.
+            /// The property of the identification of the identity key of a signature.
             /// </summary>
             public const String  KeyId                     = "keyId";
 
             /// <summary>
-            /// The property of its signature value.
+            /// The property of the value of a signature.
             /// </summary>
             public const String  Value                     = "value";
 
             /// <summary>
-            /// The property of the profile of its signature.
+            /// The property of the profile of its signatures.
             /// </summary>
             public const String  Profile                   = "profile";
 
             /// <summary>
-            /// The property of the encoding of its signature value.
+            /// The property of the encoding of its signature values.
             /// </summary>
             public const String  Encoding                  = "encoding";
 
@@ -139,65 +185,87 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The roaming network.
         /// </summary>
-        public RoamingNetwork_Id              RoamingNetworkId            { get; }
+        public RoamingNetwork_Id                                    RoamingNetworkId            { get; }
 
         /// <summary>
         /// The roaming network operator stating it.
         /// </summary>
-        public RoamingNetworkOperator_Id      RoamingNetworkOperatorId    { get; }
+        public RoamingNetworkOperator_Id                            RoamingNetworkOperatorId    { get; }
 
         /// <summary>
-        /// The signing keys it states, e.g. those of attestations, each with its validity.
+        /// The signing keys it states, e.g. those of attestations, each with its validity and its holder, if named.
         /// </summary>
-        public ImmutableArray<POIPublicKey>   SigningKeys                 { get; }
+        public ImmutableArray<POIPublicKey>                         SigningKeys                 { get; }
 
         /// <summary>
         /// The identity keys of the roaming network operator, which sign its next key statements: a verifier trusting this
         /// statement may trust them as well, e.g. when the operator replaces an identity key.
         /// </summary>
-        public ImmutableArray<POIPublicKey>   IdentityKeys                { get; }
+        public ImmutableArray<POIPublicKey>                         IdentityKeys                { get; }
+
+        /// <summary>
+        /// How many holders of the identity keys sign it, and of the signing keys attest a version: the minConsensus of the
+        /// roaming network operator (SPECIFICATION.md, section 4.1), one for a statement of the profile
+        /// wwcp-poi-key-statement-v1.
+        /// </summary>
+        public Byte                                                 MinConsensus                { get; }
 
         /// <summary>
         /// When it was signed, signed as text: yyyy-MM-ddTHH:mm:ss.fffZ.
         /// </summary>
-        public DateTimeOffset                 SignedAt                    { get; }
+        public DateTimeOffset                                       SignedAt                    { get; }
 
         /// <summary>
         /// Until when it is valid: a verifier refuses it afterwards.
         /// </summary>
-        public DateTimeOffset                 ValidUntil                  { get; }
+        public DateTimeOffset                                       ValidUntil                  { get; }
 
         /// <summary>
-        /// The COSE name of the signature algorithm, e.g. ES512.
+        /// Its signatures, each by another identity key: one of a statement of the profile wwcp-poi-key-statement-v1.
         /// </summary>
-        public String                         Algorithm                   { get; }
+        public ImmutableArray<RoamingNetworkKeyStatementSignature>  Signatures                  { get; }
 
         /// <summary>
-        /// The @id of the identity key that signed it.
+        /// The COSE name of the signature algorithm of its first signature, e.g. ES512.
         /// </summary>
-        public String                         KeyId                       { get; }
+        public String                                               Algorithm
+            => Signatures[0].Algorithm;
 
         /// <summary>
-        /// The signature value, canonical Base64.
+        /// The @id of the identity key of its first signature.
         /// </summary>
-        public String                         Value                       { get; }
+        public String                                               KeyId
+            => Signatures[0].KeyId;
 
         /// <summary>
-        /// The profile of the signature.
+        /// The value of its first signature, canonical Base64.
         /// </summary>
-        public String                         Profile                     { get; }
+        public String                                               Value
+            => Signatures[0].Value;
 
         /// <summary>
-        /// The encoding of the signature value: base64.
+        /// The profile of its signatures: wwcp-poi-key-statement-v1 or wwcp-poi-key-statement-v2.
         /// </summary>
-        public String                         Encoding                    { get; }
+        public String                                               Profile                     { get; }
+
+        /// <summary>
+        /// The encoding of its signature values: base64.
+        /// </summary>
+        public String                                               Encoding                    { get; }
+
+        /// <summary>
+        /// Whether it is of the profile wwcp-poi-key-statement-v2: naming the minConsensus, with its signatures.
+        /// </summary>
+        public Boolean                                              IsQuorumStatement
+            => Profile == QuorumProfile;
 
         #endregion
 
         #region Constructor(s)
 
         /// <summary>
-        /// Create a key statement of its parts; Create(…) signs a new one.
+        /// Create a key statement of the profile wwcp-poi-key-statement-v1 of its parts, signed by one identity key;
+        /// Create(…) signs a new one.
         /// </summary>
         public RoamingNetworkKeyStatement(RoamingNetwork_Id           RoamingNetworkId,
                                           RoamingNetworkOperator_Id   RoamingNetworkOperatorId,
@@ -210,10 +278,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           String                      Value,
                                           String                      Profile    = SigningProfile,
                                           String                      Encoding   = "base64")
+
+            : this(RoamingNetworkId,
+                   RoamingNetworkOperatorId,
+                   SigningKeys,
+                   IdentityKeys,
+                   1,
+                   SignedAt,
+                   ValidUntil,
+                   [ new RoamingNetworkKeyStatementSignature(Algorithm, KeyId, Value) ],
+                   Profile,
+                   Encoding)
+
+        { }
+
+        /// <summary>
+        /// Create a key statement of its parts: of the profile wwcp-poi-key-statement-v2, naming the minConsensus of the
+        /// operator and signed by several identity keys, or of the profile wwcp-poi-key-statement-v1, signed by one.
+        /// </summary>
+        public RoamingNetworkKeyStatement(RoamingNetwork_Id                                 RoamingNetworkId,
+                                          RoamingNetworkOperator_Id                         RoamingNetworkOperatorId,
+                                          IEnumerable<POIPublicKey>                         SigningKeys,
+                                          IEnumerable<POIPublicKey>?                        IdentityKeys,
+                                          Byte                                              MinConsensus,
+                                          DateTimeOffset                                    SignedAt,
+                                          DateTimeOffset                                    ValidUntil,
+                                          IEnumerable<RoamingNetworkKeyStatementSignature>  Signatures,
+                                          String                                            Profile    = QuorumProfile,
+                                          String                                            Encoding   = "base64")
         {
 
             this.SigningKeys   = POIPublicKey.Ordered(SigningKeys,  "the signing keys of a key statement");
             this.IdentityKeys  = POIPublicKey.Ordered(IdentityKeys, "the identity keys of a key statement");
+            this.Signatures    = [ .. Signatures ?? [] ];
 
             if (this.SigningKeys.IsEmpty)
                 throw new ArgumentException("A key statement names at least one signing key.", nameof(SigningKeys));
@@ -224,16 +321,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ValidUntil < SignedAt)
                 throw new ArgumentException("A key statement is not valid until before it was signed.", nameof(ValidUntil));
 
-            if (String.IsNullOrWhiteSpace(Algorithm) || String.IsNullOrWhiteSpace(KeyId) || String.IsNullOrEmpty(Value))
-                throw new ArgumentException("A key statement requires an algorithm, a key identification and a value.");
+            if (MinConsensus < 1)
+                throw new ArgumentException("The minConsensus of a key statement is at least one.", nameof(MinConsensus));
+
+            if (this.Signatures.IsEmpty ||
+                this.Signatures.Any(signature => signature is null                               ||
+                                                 String.IsNullOrWhiteSpace(signature.Algorithm)  ||
+                                                 String.IsNullOrWhiteSpace(signature.KeyId)      ||
+                                                 String.IsNullOrEmpty     (signature.Value)))
+            {
+                throw new ArgumentException("A key statement requires an algorithm, a key identification and a value of every signature.", nameof(Signatures));
+            }
+
+            if (this.Signatures.Select(signature => signature.KeyId).Distinct(StringComparer.Ordinal).Count() != this.Signatures.Length)
+                throw new ArgumentException("An identity key signs a key statement once.", nameof(Signatures));
+
+            if (Profile != QuorumProfile && (this.Signatures.Length != 1 || MinConsensus != 1))
+                throw new ArgumentException($"A key statement of the profile '{Profile}' is signed by one identity key, with a minConsensus of one.", nameof(Signatures));
 
             this.RoamingNetworkId          = RoamingNetworkId;
             this.RoamingNetworkOperatorId  = RoamingNetworkOperatorId;
+            this.MinConsensus              = MinConsensus;
             this.SignedAt                  = SignedAt;
             this.ValidUntil                = ValidUntil;
-            this.Algorithm                 = Algorithm;
-            this.KeyId                     = KeyId;
-            this.Value                     = Value;
             this.Profile                   = Profile;
             this.Encoding                  = Encoding;
 
@@ -242,10 +352,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) Create(IdentityKey, Algorithm, RoamingNetworkId, RoamingNetworkOperatorId, SigningKeys, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
+        #region (static) Create(IdentityKey,  Algorithm,  RoamingNetworkId, RoamingNetworkOperatorId, SigningKeys, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
 
         /// <summary>
-        /// Sign a new key statement with the given private identity key of the roaming network operator.
+        /// Sign a new key statement of the profile wwcp-poi-key-statement-v1 with the given private identity key of the
+        /// roaming network operator.
         /// </summary>
         /// <param name="IdentityKey">The private identity key.</param>
         /// <param name="Algorithm">The signature algorithm.</param>
@@ -297,6 +408,125 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (static) Create(IdentityKeys, MinConsensus, RoamingNetworkId, RoamingNetworkOperatorId, SigningKeys, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
+
+        /// <summary>
+        /// Sign a new key statement of the profile wwcp-poi-key-statement-v2 with the given private identity keys of the
+        /// roaming network operator, e.g. of the holders of its quorum signing it at one place. Holders signing it each at
+        /// their own place add their signatures with WithSignature(…).
+        /// </summary>
+        /// <param name="SigningIdentityKeys">The private identity keys signing it, each with its signature algorithm.</param>
+        /// <param name="MinConsensus">The minConsensus of the roaming network operator.</param>
+        /// <param name="RoamingNetworkId">The roaming network.</param>
+        /// <param name="RoamingNetworkOperatorId">The roaming network operator.</param>
+        /// <param name="SigningKeys">The signing keys it states.</param>
+        /// <param name="IdentityKeys">The identity keys of the operator, which sign its next key statements.</param>
+        /// <param name="SignedAt">When it is signed.</param>
+        /// <param name="ValidUntil">Until when it is valid.</param>
+        /// <param name="Deterministic">Whether to sign deterministically.</param>
+        public static RoamingNetworkKeyStatement Create(IEnumerable<(AsymmetricKeyParameter Key, COSEAlgorithm Algorithm)>  SigningIdentityKeys,
+                                                        Byte                                                                MinConsensus,
+                                                        RoamingNetwork_Id                                                   RoamingNetworkId,
+                                                        RoamingNetworkOperator_Id                                           RoamingNetworkOperatorId,
+                                                        IEnumerable<POIPublicKey>                                           SigningKeys,
+                                                        IEnumerable<POIPublicKey>?                                          IdentityKeys,
+                                                        DateTimeOffset                                                      SignedAt,
+                                                        DateTimeOffset                                                      ValidUntil,
+                                                        Boolean                                                             Deterministic   = true)
+        {
+
+            var signingIdentityKeys = SigningIdentityKeys?.ToArray() ?? [];
+
+            if (signingIdentityKeys.Length == 0)
+                throw new ArgumentException("A key statement is signed by at least one identity key.", nameof(SigningIdentityKeys));
+
+            // The first signature, then the others: each signs the same input with its own algorithm and keyId.
+            var statement = new RoamingNetworkKeyStatement(RoamingNetworkId,
+                                                           RoamingNetworkOperatorId,
+                                                           SigningKeys,
+                                                           IdentityKeys,
+                                                           MinConsensus,
+                                                           Truncated(SignedAt),
+                                                           Truncated(ValidUntil),
+                                                           [ new RoamingNetworkKeyStatementSignature("-", "-", "-") ]);
+
+            statement = statement.Signed(signingIdentityKeys[0].Key, signingIdentityKeys[0].Algorithm, Deterministic, Replace: true);
+
+            foreach (var (key, algorithm) in signingIdentityKeys.Skip(1))
+                statement = statement.WithSignature(key, algorithm, Deterministic);
+
+            return statement;
+
+        }
+
+        #endregion
+
+        #region WithSignature(IdentityKey, Algorithm, Deterministic = true)
+
+        /// <summary>
+        /// This key statement of the profile wwcp-poi-key-statement-v2 with the signature of one more identity key, e.g. of
+        /// another holder of the quorum of the roaming network operator: the same input, signed with its own algorithm and
+        /// keyId.
+        /// </summary>
+        /// <param name="IdentityKey">The private identity key.</param>
+        /// <param name="Algorithm">The signature algorithm.</param>
+        /// <param name="Deterministic">Whether to sign deterministically.</param>
+        public RoamingNetworkKeyStatement WithSignature(AsymmetricKeyParameter  IdentityKey,
+                                                        COSEAlgorithm           Algorithm,
+                                                        Boolean                 Deterministic   = true)
+        {
+
+            if (!IsQuorumStatement)
+                throw new InvalidOperationException($"Only a key statement of the profile '{QuorumProfile}' is signed by several identity keys!");
+
+            return Signed(IdentityKey, Algorithm, Deterministic, Replace: false);
+
+        }
+
+        #endregion
+
+        #region (private) Signed(IdentityKey, Algorithm, Deterministic, Replace)
+
+        /// <summary>
+        /// This key statement of the profile wwcp-poi-key-statement-v2 with the signature of the given identity key, in place
+        /// of its signatures or in addition to them.
+        /// </summary>
+        private RoamingNetworkKeyStatement Signed(AsymmetricKeyParameter  IdentityKey,
+                                                  COSEAlgorithm           Algorithm,
+                                                  Boolean                 Deterministic,
+                                                  Boolean                 Replace)
+        {
+
+            ArgumentNullException.ThrowIfNull(IdentityKey);
+
+            if (!IdentityKey.IsPrivate)
+                throw new ArgumentException("Signing requires a private asymmetric key.", nameof(IdentityKey));
+
+            var keyId = POIPublicKey.From(IdentityKey).Id;
+
+            if (!Replace && Signatures.Any(signature => signature.KeyId == keyId))
+                throw new ArgumentException($"The identity key '{keyId}' signed the key statement already!", nameof(IdentityKey));
+
+            var signature = new RoamingNetworkKeyStatementSignature(
+                                Algorithm.Name,
+                                keyId,
+                                Convert.ToBase64String(Algorithm.Sign(GetSigningBytes(Algorithm.Name, keyId), IdentityKey, Deterministic: Deterministic))
+                            );
+
+            return new RoamingNetworkKeyStatement(RoamingNetworkId,
+                                                  RoamingNetworkOperatorId,
+                                                  SigningKeys,
+                                                  IdentityKeys,
+                                                  MinConsensus,
+                                                  SignedAt,
+                                                  ValidUntil,
+                                                  Replace ? [ signature ] : [ .. Signatures, signature ],
+                                                  QuorumProfile);
+
+        }
+
+        #endregion
+
         #region IsValidAt(Timestamp)
 
         /// <summary>
@@ -311,8 +541,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region VerifySignature(IdentityKey, out ErrorResponse)
 
         /// <summary>
-        /// Verify the signature of this key statement with the given public identity key, whose @id it names.
-        /// Unknown profiles, noncanonical Base64, other keys and malformed inputs return false.
+        /// Verify the signature of this key statement by the given public identity key, whose @id one of its signatures
+        /// names. Unknown profiles, noncanonical Base64, other keys and malformed inputs return false.
         /// </summary>
         /// <param name="IdentityKey">The public identity key.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
@@ -320,29 +550,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
+            if (Signatures.FirstOrDefault(signature => signature.KeyId == IdentityKey.Id) is not RoamingNetworkKeyStatementSignature signature)
+            {
+                ErrorResponse = "The key statement is signed by another key.";
+                return false;
+            }
+
+            return VerifySignature(signature, IdentityKey, out ErrorResponse);
+
+        }
+
+        #endregion
+
+        #region (private) VerifySignature(Signature, IdentityKey, out ErrorResponse)
+
+        private Boolean VerifySignature(RoamingNetworkKeyStatementSignature  Signature,
+                                        POIPublicKey                         IdentityKey,
+                                        [NotNullWhen(false)] out String?     ErrorResponse)
+        {
+
             ErrorResponse = null;
 
             try
             {
 
-                if (Profile != SigningProfile || Encoding != "base64")
+                if (Profile is not (SigningProfile or QuorumProfile) || Encoding != "base64")
                     throw new ArgumentException("Unsupported key statement profile or encoding.");
 
-                if (KeyId != IdentityKey.Id)
+                if (Signature.KeyId != IdentityKey.Id)
                     throw new ArgumentException("The key statement is signed by another key.");
 
-                if (!COSEAlgorithm.TryParse(Algorithm, out var algorithm) || algorithm.Name != Algorithm)
+                if (!COSEAlgorithm.TryParse(Signature.Algorithm, out var algorithm) || algorithm.Name != Signature.Algorithm)
                     throw new ArgumentException("Unknown or noncanonical signature algorithm.");
 
-                if (IdentityKey.Key.Algorithm is { } restricted && restricted.Name != Algorithm)
+                if (IdentityKey.Key.Algorithm is { } restricted && restricted.Name != Signature.Algorithm)
                     throw new ArgumentException("The signature algorithm differs from the key's algorithm restriction.");
 
-                var value = Convert.FromBase64String(Value);
+                var value = Convert.FromBase64String(Signature.Value);
 
-                if (value.Length == 0 || Convert.ToBase64String(value) != Value)
+                if (value.Length == 0 || Convert.ToBase64String(value) != Signature.Value)
                     throw new ArgumentException("The value must contain nonempty canonical standard Base64.");
 
-                return algorithm.Verify(GetSigningBytes(), value, IdentityKey.Key.ToPublicKey(), out ErrorResponse);
+                return algorithm.Verify(GetSigningBytes(Signature.Algorithm, Signature.KeyId), value, IdentityKey.Key.ToPublicKey(), out ErrorResponse);
 
             }
             catch (Exception exception)
@@ -355,42 +604,67 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryVerify(TrustedIdentityKeyIds, OtherIdentityKeys, out ErrorResponse)
+        #region TryVerify(TrustedIdentityKeyIds, OtherIdentityKeys, out ErrorResponse, MinConsensus = 1)
 
         /// <summary>
         /// Verify this key statement against identity keys the verifier trusts by their @ids, e.g. those of a QR code it
-        /// scanned: it must be signed by one of them, given among its own identity keys or among the given other ones,
-        /// e.g. those of the roaming network operator a proof gives, each found by its @id, the SHA-256 thumbprint of the key.
+        /// scanned: it must be signed by trusted identity keys of as many holders as the given minConsensus and its own
+        /// require, the keys given among its own identity keys or among the given other ones, e.g. those of the roaming
+        /// network operator a proof gives, each found by its @id, the SHA-256 thumbprint of the key, and valid when it was
+        /// signed. Every signature must be valid; those of keys not trusted are not counted.
         /// </summary>
         /// <param name="TrustedIdentityKeyIds">The @ids of the identity keys the verifier trusts.</param>
         /// <param name="OtherIdentityKeys">Other identity keys, whose @ids the verifier may trust.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="MinConsensus">How many holders of trusted identity keys must have signed it at least, e.g. as a trust anchor names it.</param>
         public Boolean TryVerify(IEnumerable<String>                 TrustedIdentityKeyIds,
                                  IEnumerable<POIPublicKey>?          OtherIdentityKeys,
-                                 [NotNullWhen(false)] out String?    ErrorResponse)
+                                 [NotNullWhen(false)] out String?    ErrorResponse,
+                                 Byte                                MinConsensus   = 1)
         {
 
-            if (!TrustedIdentityKeyIds.Contains(KeyId))
+            var trusted   = TrustedIdentityKeyIds.ToHashSet(StringComparer.Ordinal);
+            var keys      = IdentityKeys.Concat(OtherIdentityKeys ?? []).ToArray();
+            var required  = Math.Max(MinConsensus, this.MinConsensus);
+            var holders   = new HashSet<String>(StringComparer.Ordinal);
+
+            if (Signatures.Length == 1 && required == 1 && !trusted.Contains(KeyId))
             {
                 ErrorResponse = $"The key statement is signed by the key '{KeyId}', which is not trusted!";
                 return false;
             }
 
-            var identityKey = IdentityKeys.Concat(OtherIdentityKeys ?? []).FirstOrDefault(key => key.Id == KeyId);
-
-            if (identityKey is null)
+            foreach (var signature in Signatures)
             {
-                ErrorResponse = $"The identity key '{KeyId}' that signed the key statement is not given!";
+
+                if (keys.FirstOrDefault(key => key.Id == signature.KeyId) is not POIPublicKey identityKey)
+                {
+                    ErrorResponse = $"The identity key '{signature.KeyId}' that signed the key statement is not given!";
+                    return false;
+                }
+
+                if (!identityKey.IsValidAt(SignedAt))
+                {
+                    ErrorResponse = $"The identity key '{signature.KeyId}' was not valid when the key statement was signed!";
+                    return false;
+                }
+
+                if (!VerifySignature(signature, identityKey, out ErrorResponse))
+                    return false;
+
+                if (trusted.Contains(signature.KeyId))
+                    holders.Add(identityKey.HolderOrUnnamed);
+
+            }
+
+            if (holders.Count < required)
+            {
+                ErrorResponse = $"The key statement is signed by trusted identity keys of {holders.Count} holder{(holders.Count == 1 ? "" : "s")}, not of {required}!";
                 return false;
             }
 
-            if (!identityKey.IsValidAt(SignedAt))
-            {
-                ErrorResponse = $"The identity key '{KeyId}' was not valid when the key statement was signed!";
-                return false;
-            }
-
-            return VerifySignature(identityKey, out ErrorResponse);
+            ErrorResponse = null;
+            return true;
 
         }
 
@@ -411,14 +685,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region GetSigningBytes()
 
         /// <summary>
-        /// The signature input of this key statement, as Styx canonical JSON: its signed fields, without its value.
+        /// The signature input of the first signature of this key statement, as Styx canonical JSON: its signed fields,
+        /// without its value.
         /// </summary>
         public Byte[] GetSigningBytes()
+
+            => GetSigningBytes(Algorithm, KeyId);
+
+        #endregion
+
+        #region GetSigningBytes(Algorithm, KeyId)
+
+        /// <summary>
+        /// The signature input of a signature of this key statement with the given algorithm and identity key, as Styx
+        /// canonical JSON: what it states, its profile, the algorithm, the keyId and the encoding; no signature.
+        /// </summary>
+        /// <param name="Algorithm">The COSE name of the signature algorithm.</param>
+        /// <param name="KeyId">The @id of the identity key.</param>
+        public Byte[] GetSigningBytes(String  Algorithm,
+                                      String  KeyId)
         {
 
             var json = Content();
 
-            json.Add(PropertyKeys.Profile,    SigningProfile);
+            json.Add(PropertyKeys.Profile,    Profile);
             json.Add(PropertyKeys.Algorithm,  Algorithm);
             json.Add(PropertyKeys.KeyId,      KeyId);
             json.Add(PropertyKeys.Encoding,   "base64");
@@ -433,8 +723,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) TryParse(JSON, out KeyStatement, out ErrorResponse)
 
         /// <summary>
-        /// Try to parse the given JSON representation of a key statement, read with strings as strings. Its signature is
-        /// not verified here.
+        /// Try to parse the given JSON representation of a key statement, read with strings as strings: of the profile
+        /// wwcp-poi-key-statement-v2 with its signatures, else of wwcp-poi-key-statement-v1. Its signatures are not
+        /// verified here.
         /// </summary>
         public static Boolean TryParse(JObject                                               JSON,
                                        [NotNullWhen(true)]  out RoamingNetworkKeyStatement?  KeyStatement,
@@ -480,11 +771,71 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (Text(JSON, PropertyKeys.Profile)   is not String profile ||
+                    Text(JSON, PropertyKeys.Encoding)  is not String encoding)
+                {
+                    ErrorResponse = "A key statement requires a profile and an encoding!";
+                    return false;
+                }
+
+                #region Of the profile wwcp-poi-key-statement-v2: its minConsensus and its signatures
+
+                if (profile == QuorumProfile)
+                {
+
+                    if (JSON[PropertyKeys.MinConsensus] is not JToken minConsensusJSON  ||
+                        minConsensusJSON.Type != JTokenType.Integer                     ||
+                        minConsensusJSON.Value<Int64>() is < 1 or > Byte.MaxValue)
+                    {
+                        ErrorResponse = $"A key statement of the profile '{QuorumProfile}' requires its {PropertyKeys.MinConsensus}, a whole number from 1 to {Byte.MaxValue}!";
+                        return false;
+                    }
+
+                    if (JSON[PropertyKeys.Signatures] is not JArray signaturesJSON || signaturesJSON.Count == 0)
+                    {
+                        ErrorResponse = $"A key statement of the profile '{QuorumProfile}' requires its {PropertyKeys.Signatures}!";
+                        return false;
+                    }
+
+                    var signatures = new List<RoamingNetworkKeyStatementSignature>();
+
+                    foreach (var signatureJSON in signaturesJSON)
+                    {
+
+                        if (signatureJSON is not JObject signatureObject                                                       ||
+                            Text(signatureObject, PropertyKeys.Algorithm) is not String signatureAlgorithm || signatureAlgorithm.Length == 0 ||
+                            Text(signatureObject, PropertyKeys.KeyId)     is not String signatureKeyId     || signatureKeyId.    Length == 0 ||
+                            Text(signatureObject, PropertyKeys.Value)     is not String signatureValue     || signatureValue.    Length == 0)
+                        {
+                            ErrorResponse = "Every signature of a key statement requires an algorithm, a key identification and a value!";
+                            return false;
+                        }
+
+                        signatures.Add(new RoamingNetworkKeyStatementSignature(signatureAlgorithm, signatureKeyId, signatureValue));
+
+                    }
+
+                    KeyStatement   = new RoamingNetworkKeyStatement(roamingNetworkId,
+                                                                    roamingNetworkOperatorId,
+                                                                    signingKeys,
+                                                                    identityKeys,
+                                                                    (Byte) minConsensusJSON.Value<Int64>(),
+                                                                    signedAt,
+                                                                    validUntil,
+                                                                    signatures,
+                                                                    profile,
+                                                                    encoding);
+
+                    ErrorResponse  = null;
+                    return true;
+
+                }
+
+                #endregion
+
                 if (Text(JSON, PropertyKeys.Algorithm) is not String algorithm || algorithm.Length == 0 ||
                     Text(JSON, PropertyKeys.KeyId)     is not String keyId     || keyId.    Length == 0 ||
-                    Text(JSON, PropertyKeys.Value)     is not String value     || value.    Length == 0 ||
-                    Text(JSON, PropertyKeys.Profile)   is not String profile   ||
-                    Text(JSON, PropertyKeys.Encoding)  is not String encoding)
+                    Text(JSON, PropertyKeys.Value)     is not String value     || value.    Length == 0)
                 {
                     ErrorResponse = "A key statement requires an algorithm, a key identification, a value, a profile and an encoding!";
                     return false;
@@ -520,7 +871,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region ToJSON(Embedded = false, CustomKeyStatementSerializer = null)
 
         /// <summary>
-        /// Return the JSON representation of this key statement.
+        /// Return the JSON representation of this key statement: of the profile wwcp-poi-key-statement-v2 with its
+        /// signatures, of wwcp-poi-key-statement-v1 with the algorithm, keyId and value of its one signature.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="CustomKeyStatementSerializer">An optional custom serializer of key statements.</param>
@@ -533,11 +885,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!Embedded)
                 json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
 
-            json.Add(PropertyKeys.Algorithm,  Algorithm);
-            json.Add(PropertyKeys.KeyId,      KeyId);
-            json.Add(PropertyKeys.Value,      Value);
-            json.Add(PropertyKeys.Profile,    Profile);
-            json.Add(PropertyKeys.Encoding,   Encoding);
+            if (IsQuorumStatement)
+                json.Add(PropertyKeys.Signatures,  new JArray(Signatures.Select(signature => signature.ToJSON())));
+
+            else
+            {
+                json.Add(PropertyKeys.Algorithm,   Algorithm);
+                json.Add(PropertyKeys.KeyId,       KeyId);
+                json.Add(PropertyKeys.Value,       Value);
+            }
+
+            json.Add(PropertyKeys.Profile,         Profile);
+            json.Add(PropertyKeys.Encoding,        Encoding);
 
             return CustomKeyStatementSerializer is not null
                        ? CustomKeyStatementSerializer(this, json)
@@ -551,7 +910,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) Content()
 
         /// <summary>
-        /// What this key statement states, without its signature.
+        /// What this key statement states, without its signatures: of the profile wwcp-poi-key-statement-v2 with the
+        /// minConsensus of the operator.
         /// </summary>
         private JObject Content()
         {
@@ -564,6 +924,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (!IdentityKeys.IsEmpty)
                 json.Add(PropertyKeys.IdentityKeys,  new JArray(IdentityKeys.Select(identityKey => identityKey.ToJSON(Embedded: true))));
+
+            if (IsQuorumStatement)
+                json.Add(PropertyKeys.MinConsensus,  MinConsensus);
 
             json.Add(PropertyKeys.SignedAt,          SignedAt.  ToISO8601());
             json.Add(PropertyKeys.ValidUntil,        ValidUntil.ToISO8601());
@@ -665,7 +1028,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"Key statement of {RoamingNetworkOperatorId} for {RoamingNetworkId}: {SigningKeys.Length} signing keys, valid until {ValidUntil.ToISO8601()}, signed by '{KeyId}'";
+            => $"Key statement of {RoamingNetworkOperatorId} for {RoamingNetworkId}: {SigningKeys.Length} signing keys, valid until {ValidUntil.ToISO8601()}, signed by {String.Join(", ", Signatures.Select(signature => $"'{signature.KeyId}'"))}";
 
         #endregion
 
