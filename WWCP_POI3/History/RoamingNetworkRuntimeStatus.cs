@@ -112,8 +112,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly RoamingNetworkHistory              history;
         private readonly Lock                               attachLock            = new ();
         private readonly Dictionary<Object, Action>         listeners             = new (ReferenceEqualityComparer.Instance);
+
+        /// <summary>
+        /// How to stop listening to the charging pools of the head version and to everything they have, by the charging pools.
+        /// </summary>
+        private readonly Dictionary<ChargingPool, List<Action>>  chargingPoolListeners  = new (ReferenceEqualityComparer.Instance);
         private readonly Lock                               timerLock             = new ();
         private readonly Timer                              plannedStatusTimer;
+
+        /// <summary>
+        /// When the next planned status the timer waits for is due, as SchedulePlannedStatus(…) found it last.
+        /// </summary>
+        private          DateTimeOffset?                    plannedStatusAt;
 
         /// <summary>
         /// The status of every charging tariff offer of the head version as its times tell it, as told last: an offer
@@ -1173,13 +1183,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Listen to the status events of the entities of the given new head version,
         /// and no longer to those of entities it does not have any more.
-        /// Entities a version shares with the one before are not listened to twice.
+        /// Entities a version shares with the one before are not listened to twice,
+        /// and only what it has new may plan a status not looked at yet.
+        /// A charging pool it shares is the same with everything it has: its charging stations, EVSEs and energy meters
+        /// are not looked at again, so that a new head costs what it changed (SPECIFICATION.md, section 8.7).
         /// </summary>
         internal void Attach(RoamingNetwork RoamingNetwork)
         {
 
+            var newEntities = new List<Object>();
+
             lock (attachLock)
             {
+
+                #region The charging pools, with their charging stations, EVSEs and energy meters
+
+                var chargingPools = new HashSet<ChargingPool>(RoamingNetwork.ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingPools),
+                                                              ReferenceEqualityComparer.Instance);
+
+                foreach (var gone in chargingPoolListeners.Keys.Where(chargingPool => !chargingPools.Contains(chargingPool)).ToArray())
+                {
+
+                    foreach (var stopListening in chargingPoolListeners[gone])
+                        stopListening();
+
+                    chargingPoolListeners.Remove(gone);
+
+                }
+
+                foreach (var chargingPool in chargingPools)
+                {
+
+                    if (chargingPoolListeners.ContainsKey(chargingPool))
+                        continue;
+
+                    var stopListening = new List<Action> { ListenTo(chargingPool) };
+                    newEntities.Add(chargingPool);
+
+                    foreach (var chargingStation in chargingPool.ChargingStations)
+                    {
+                        stopListening.Add(ListenTo(chargingStation));
+                        newEntities.Add(chargingStation);
+                    }
+
+                    foreach (var evse in chargingPool.EVSEs)
+                    {
+                        stopListening.Add(ListenTo(evse));
+                        newEntities.Add(evse);
+                    }
+
+                    foreach (var energyMeter in chargingPool.AllEnergyMeters)
+                    {
+                        stopListening.Add(ListenTo(energyMeter));
+                        newEntities.Add(energyMeter);
+                    }
+
+                    chargingPoolListeners.Add(chargingPool, stopListening);
+
+                }
+
+                #endregion
+
+                #region Everything else
 
                 var entities = new HashSet<Object>(ReferenceEqualityComparer.Instance) { RoamingNetwork };
 
@@ -1201,15 +1266,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 entities.UnionWith(RoamingNetwork.ParkingSensors);
                 entities.UnionWith(RoamingNetwork.EMobilityProviders);
                 entities.UnionWith(RoamingNetwork.GridOperators);
-                entities.UnionWith(RoamingNetwork.EnergyMeters);
+                entities.UnionWith(RoamingNetwork.ChargingStationOperators);
 
-                foreach (var chargingStationOperator in RoamingNetwork.ChargingStationOperators)
-                {
-                    entities.Add(chargingStationOperator);
-                    entities.UnionWith(chargingStationOperator.ChargingPools);
-                    entities.UnionWith(chargingStationOperator.ChargingStations);
-                    entities.UnionWith(chargingStationOperator.EVSEs);
-                }
+                // Those of the grid connection points: the others are those of the charging pools.
+                entities.UnionWith(RoamingNetwork.GridOperators.SelectMany(gridOperator => gridOperator.EnergyMeters));
 
                 foreach (var gone in listeners.Keys.Where(entity => !entities.Contains(entity)).ToArray())
                 {
@@ -1217,99 +1277,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     listeners.Remove(gone);
                 }
 
-                if (!listeners.ContainsKey(RoamingNetwork))
-                    listeners[RoamingNetwork] = ListenTo(RoamingNetwork);
-
-                if (RoamingNetwork.Operator is RoamingNetworkOperator roamingNetworkOperator && !listeners.ContainsKey(roamingNetworkOperator))
-                    listeners[roamingNetworkOperator] = ListenTo(roamingNetworkOperator);
-
-                foreach (var eMobilityProvider in RoamingNetwork.EMobilityProviders)
-                    if (!listeners.ContainsKey(eMobilityProvider))
-                        listeners[eMobilityProvider] = ListenTo(eMobilityProvider);
-
-                foreach (var gridOperator in RoamingNetwork.GridOperators)
-                    if (!listeners.ContainsKey(gridOperator))
-                        listeners[gridOperator] = ListenTo(gridOperator);
-
-                foreach (var energyMeter in RoamingNetwork.EnergyMeters)
-                    if (!listeners.ContainsKey(energyMeter))
-                        listeners[energyMeter] = ListenTo(energyMeter);
-
-                foreach (var parkingOperator in RoamingNetwork.ParkingOperators)
-                    if (!listeners.ContainsKey(parkingOperator))
-                        listeners[parkingOperator] = ListenTo(parkingOperator);
-
-                foreach (var parkingGarage in RoamingNetwork.ParkingGarages)
-                    if (!listeners.ContainsKey(parkingGarage))
-                        listeners[parkingGarage] = ListenTo(parkingGarage);
-
-                foreach (var parkingSpace in RoamingNetwork.ParkingSpaces)
-                    if (!listeners.ContainsKey(parkingSpace))
-                        listeners[parkingSpace] = ListenTo(parkingSpace);
-
-                foreach (var parkingSensor in RoamingNetwork.ParkingSensors)
-                    if (!listeners.ContainsKey(parkingSensor))
-                        listeners[parkingSensor] = ListenTo(parkingSensor);
-
-                foreach (var chargingTariff in RoamingNetwork.ChargingTariffs)
-                    if (!listeners.ContainsKey(chargingTariff))
-                        listeners[chargingTariff] = ListenTo(chargingTariff);
-
-                foreach (var evseGroup in RoamingNetwork.EVSEGroups)
-                    if (!listeners.ContainsKey(evseGroup))
-                        listeners[evseGroup] = ListenTo(evseGroup);
-
-                foreach (var chargingStationGroup in RoamingNetwork.ChargingStationGroups)
-                    if (!listeners.ContainsKey(chargingStationGroup))
-                        listeners[chargingStationGroup] = ListenTo(chargingStationGroup);
-
-                foreach (var chargingPoolGroup in RoamingNetwork.ChargingPoolGroups)
-                    if (!listeners.ContainsKey(chargingPoolGroup))
-                        listeners[chargingPoolGroup] = ListenTo(chargingPoolGroup);
-
-                foreach (var chargingTariffGroup in RoamingNetwork.ChargingTariffGroups)
-                    if (!listeners.ContainsKey(chargingTariffGroup))
-                        listeners[chargingTariffGroup] = ListenTo(chargingTariffGroup);
-
-                foreach (var chargingTariffOffer in RoamingNetwork.ChargingTariffOffers)
-                    if (!listeners.ContainsKey(chargingTariffOffer))
-                        listeners[chargingTariffOffer] = ListenTo(chargingTariffOffer);
-
-                foreach (var parkingSpaceGroup in RoamingNetwork.ParkingSpaceGroups)
-                    if (!listeners.ContainsKey(parkingSpaceGroup))
-                        listeners[parkingSpaceGroup] = ListenTo(parkingSpaceGroup);
-
-                foreach (var energyMeterGroup in RoamingNetwork.EnergyMeterGroups)
-                    if (!listeners.ContainsKey(energyMeterGroup))
-                        listeners[energyMeterGroup] = ListenTo(energyMeterGroup);
-
-                foreach (var manufacturer in RoamingNetwork.ChargingStationManufacturers)
-                    if (!listeners.ContainsKey(manufacturer))
-                        listeners[manufacturer] = ListenTo(manufacturer);
-
-                foreach (var chargingStationOperator in RoamingNetwork.ChargingStationOperators)
+                foreach (var entity in entities)
                 {
 
-                    if (!listeners.ContainsKey(chargingStationOperator))
-                        listeners[chargingStationOperator] = ListenTo(chargingStationOperator);
+                    if (listeners.ContainsKey(entity))
+                        continue;
 
-                    foreach (var chargingPool in chargingStationOperator.ChargingPools)
-                        if (!listeners.ContainsKey(chargingPool))
-                            listeners[chargingPool] = ListenTo(chargingPool);
+                    listeners[entity] = entity switch {
+                                            RoamingNetwork               roamingNetwork           => ListenTo(roamingNetwork),
+                                            RoamingNetworkOperator       roamingNetworkOperator   => ListenTo(roamingNetworkOperator),
+                                            EMobilityProvider            eMobilityProvider        => ListenTo(eMobilityProvider),
+                                            GridOperator                 gridOperator             => ListenTo(gridOperator),
+                                            EnergyMeter                  energyMeter              => ListenTo(energyMeter),
+                                            ParkingOperator              parkingOperator          => ListenTo(parkingOperator),
+                                            ParkingGarage                parkingGarage            => ListenTo(parkingGarage),
+                                            ParkingSpace                 parkingSpace             => ListenTo(parkingSpace),
+                                            ParkingSensor                parkingSensor            => ListenTo(parkingSensor),
+                                            ChargingTariff               chargingTariff           => ListenTo(chargingTariff),
+                                            EVSEGroup                    evseGroup                => ListenTo(evseGroup),
+                                            ChargingStationGroup         chargingStationGroup     => ListenTo(chargingStationGroup),
+                                            ChargingPoolGroup            chargingPoolGroup        => ListenTo(chargingPoolGroup),
+                                            ChargingTariffGroup          chargingTariffGroup      => ListenTo(chargingTariffGroup),
+                                            ChargingTariffOffer          chargingTariffOffer      => ListenTo(chargingTariffOffer),
+                                            ParkingSpaceGroup            parkingSpaceGroup        => ListenTo(parkingSpaceGroup),
+                                            EnergyMeterGroup             energyMeterGroup         => ListenTo(energyMeterGroup),
+                                            ChargingStationManufacturer  manufacturer             => ListenTo(manufacturer),
+                                            ChargingStationOperator      chargingStationOperator  => ListenTo(chargingStationOperator),
+                                            _                                                     => throw new InvalidOperationException($"No status events of a {entity.GetType().Name}!")
+                                        };
 
-                    foreach (var chargingStation in chargingStationOperator.ChargingStations)
-                        if (!listeners.ContainsKey(chargingStation))
-                            listeners[chargingStation] = ListenTo(chargingStation);
-
-                    foreach (var evse in chargingStationOperator.EVSEs)
-                        if (!listeners.ContainsKey(evse))
-                            listeners[evse] = ListenTo(evse);
+                    newEntities.Add(entity);
 
                 }
 
+                #endregion
+
             }
 
-            SchedulePlannedStatus();
+            SchedulePlannedStatus(newEntities);
 
             // Its offers may have other times now.
             TakeOfferStatus(RoamingNetwork);
@@ -2049,49 +2054,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) SchedulePlannedStatus()
+        #region (private) SchedulePlannedStatus(NewEntities = null)
 
         /// <summary>
-        /// Wake up when the next planned status of the head version is due.
+        /// Wake up when the next planned status of the head version is due: of all its entities, or, for a new head version,
+        /// of the given entities it has new and of its charging tariff offers, unless the timer is due earlier already. The
+        /// other entities share their schedules with the versions before, so what they plan was looked at; one the head no
+        /// longer has lets the timer look again, in vain.
         /// </summary>
-        private void SchedulePlannedStatus()
+        /// <param name="NewEntities">Optionally, the entities a new head version has new.</param>
+        private void SchedulePlannedStatus(IEnumerable<Object>? NewEntities = null)
         {
 
             var network  = history.Head.RoamingNetwork;
             var now      = Timestamp.Now;
 
-            var next     = new[] {
-                               network.NextAdminStatus?.Timestamp,
-                               network.NextStatus?.     Timestamp
-                           }.
-                           Concat(network.ChargingStationOperators.SelectMany(chargingStationOperator => new[] {
-                               chargingStationOperator.NextAdminStatus?.Timestamp,
-                               chargingStationOperator.NextStatus?.     Timestamp
-                           }.
-                           Concat(chargingStationOperator.ChargingPools.   SelectMany(chargingPool    => new[] { chargingPool.   NextAdminStatus?.Timestamp, chargingPool.   NextStatus?.Timestamp, chargingPool.   NextPriceStatus?.Timestamp })).
-                           Concat(chargingStationOperator.ChargingStations.SelectMany(chargingStation => new[] { chargingStation.NextAdminStatus?.Timestamp, chargingStation.NextStatus?.Timestamp, chargingStation.NextEnergyStatus?.Timestamp, chargingStation.NextPriceStatus?.Timestamp })).
-                           Concat(chargingStationOperator.EVSEs.           SelectMany(evse            => new[] { evse.           NextAdminStatus?.Timestamp, evse.           NextStatus?.Timestamp, evse.           NextEnergyStatus?.Timestamp, evse.           NextPriceStatus?.Timestamp })))).
-                           Concat(network.EMobilityProviders.SelectMany(eMobilityProvider => new[] { eMobilityProvider.NextAdminStatus?.Timestamp, eMobilityProvider.NextStatus?.Timestamp })).
-                           Concat(network.GridOperators.SelectMany(gridOperator => new[] { gridOperator.NextAdminStatus?.Timestamp, gridOperator.NextStatus?.Timestamp })).
-                           Concat(network.EnergyMeters.SelectMany(energyMeter => new[] { energyMeter.NextAdminStatus?.Timestamp, energyMeter.NextStatus?.Timestamp })).
-                           Concat(network.ParkingOperators.SelectMany(parkingOperator => new[] { parkingOperator.NextAdminStatus?.Timestamp, parkingOperator.NextStatus?.Timestamp })).
-                           Concat(network.ParkingGarages.SelectMany(parkingGarage => new[] { parkingGarage.NextAdminStatus?.Timestamp, parkingGarage.NextStatus?.Timestamp })).
-                           Concat(network.ParkingSpaces.SelectMany(parkingSpace => new[] { parkingSpace.NextAdminStatus?.Timestamp, parkingSpace.NextStatus?.Timestamp })).
-                           Concat(network.ParkingSensors.SelectMany(parkingSensor => new[] { parkingSensor.NextAdminStatus?.Timestamp, parkingSensor.NextStatus?.Timestamp })).
-                           Concat(network.ChargingTariffs.SelectMany(chargingTariff => new[] { chargingTariff.NextAdminStatus?.Timestamp, chargingTariff.NextStatus?.Timestamp })).
-                           Concat(network.EVSEGroups.SelectMany(evseGroup => new[] { evseGroup.NextAdminStatus?.Timestamp, evseGroup.NextStatus?.Timestamp })).
-                           Concat(network.ChargingStationGroups.SelectMany(chargingStationGroup => new[] { chargingStationGroup.NextAdminStatus?.Timestamp, chargingStationGroup.NextStatus?.Timestamp })).
-                           Concat(network.ChargingPoolGroups.SelectMany(chargingPoolGroup => new[] { chargingPoolGroup.NextAdminStatus?.Timestamp, chargingPoolGroup.NextStatus?.Timestamp })).
-                           Concat(network.ChargingTariffGroups.SelectMany(chargingTariffGroup => new[] { chargingTariffGroup.NextAdminStatus?.Timestamp, chargingTariffGroup.NextStatus?.Timestamp })).
-                           Concat(network.ChargingTariffOffers.SelectMany(chargingTariffOffer => new[] { chargingTariffOffer.NextAdminStatus?.Timestamp, chargingTariffOffer.NextStatus?.Timestamp, chargingTariffOffer.NextStatusChange(now) })).
-                           Concat(network.ParkingSpaceGroups.SelectMany(parkingSpaceGroup => new[] { parkingSpaceGroup.NextAdminStatus?.Timestamp, parkingSpaceGroup.NextStatus?.Timestamp })).
-                           Concat(network.EnergyMeterGroups.SelectMany(energyMeterGroup => new[] { energyMeterGroup.NextAdminStatus?.Timestamp, energyMeterGroup.NextStatus?.Timestamp })).
-                           Concat(network.ChargingStationManufacturers.SelectMany(manufacturer => new[] { manufacturer.NextAdminStatus?.Timestamp, manufacturer.NextStatus?.Timestamp })).
-                           Where(timestamp => timestamp.HasValue).
+            var next     = (NewEntities is null
+                                ? EntitiesOf(network)
+                                : NewEntities.Concat(network.ChargingTariffOffers)).
+                           SelectMany(entity => NextStatusOf(entity, now)).
+                           Where     (timestamp => timestamp.HasValue).
                            Min();
 
             lock (timerLock)
             {
+
+                if (NewEntities is not null && plannedStatusAt.HasValue && (!next.HasValue || plannedStatusAt.Value <= next.Value))
+                    return;
+
+                plannedStatusAt = next;
 
                 if (!next.HasValue)
                 {
@@ -2113,6 +2104,92 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
         }
+
+        #endregion
+
+        #region (private static) EntitiesOf(RoamingNetwork)
+
+        /// <summary>
+        /// The entities of the given version having a runtime status that may be planned.
+        /// </summary>
+        private static IEnumerable<Object> EntitiesOf(RoamingNetwork RoamingNetwork)
+        {
+
+            yield return RoamingNetwork;
+
+            foreach (var chargingStationOperator in RoamingNetwork.ChargingStationOperators)
+            {
+
+                yield return chargingStationOperator;
+
+                foreach (var chargingPool in chargingStationOperator.ChargingPools)
+                    yield return chargingPool;
+
+                foreach (var chargingStation in chargingStationOperator.ChargingStations)
+                    yield return chargingStation;
+
+                foreach (var evse in chargingStationOperator.EVSEs)
+                    yield return evse;
+
+            }
+
+            foreach (var entity in RoamingNetwork.EMobilityProviders.          Cast<Object>().
+                                   Concat(RoamingNetwork.GridOperators).
+                                   Concat(RoamingNetwork.EnergyMeters).
+                                   Concat(RoamingNetwork.ParkingOperators).
+                                   Concat(RoamingNetwork.ParkingGarages).
+                                   Concat(RoamingNetwork.ParkingSpaces).
+                                   Concat(RoamingNetwork.ParkingSensors).
+                                   Concat(RoamingNetwork.ChargingTariffs).
+                                   Concat(RoamingNetwork.EVSEGroups).
+                                   Concat(RoamingNetwork.ChargingStationGroups).
+                                   Concat(RoamingNetwork.ChargingPoolGroups).
+                                   Concat(RoamingNetwork.ChargingTariffGroups).
+                                   Concat(RoamingNetwork.ChargingTariffOffers).
+                                   Concat(RoamingNetwork.ParkingSpaceGroups).
+                                   Concat(RoamingNetwork.EnergyMeterGroups).
+                                   Concat(RoamingNetwork.ChargingStationManufacturers))
+            {
+                yield return entity;
+            }
+
+        }
+
+        #endregion
+
+        #region (private static) NextStatusOf(Entity, Now)
+
+        /// <summary>
+        /// When the next planned admin status, status, energy status and price status of the given entity are due, as far as
+        /// it has them; for a charging tariff offer also when its times change its status next.
+        /// </summary>
+        private static IEnumerable<DateTimeOffset?> NextStatusOf(Object          Entity,
+                                                                 DateTimeOffset  Now)
+
+            => Entity switch {
+                   RoamingNetwork               network               => [ network.              NextAdminStatus?.Timestamp, network.              NextStatus?.Timestamp ],
+                   ChargingStationOperator      chargingStationOperator => [ chargingStationOperator.NextAdminStatus?.Timestamp, chargingStationOperator.NextStatus?.Timestamp ],
+                   ChargingPool                 chargingPool          => [ chargingPool.         NextAdminStatus?.Timestamp, chargingPool.         NextStatus?.Timestamp, chargingPool.   NextPriceStatus?.Timestamp ],
+                   ChargingStation              chargingStation       => [ chargingStation.      NextAdminStatus?.Timestamp, chargingStation.      NextStatus?.Timestamp, chargingStation.NextEnergyStatus?.Timestamp, chargingStation.NextPriceStatus?.Timestamp ],
+                   EVSE                         evse                  => [ evse.                 NextAdminStatus?.Timestamp, evse.                 NextStatus?.Timestamp, evse.           NextEnergyStatus?.Timestamp, evse.           NextPriceStatus?.Timestamp ],
+                   EMobilityProvider            eMobilityProvider     => [ eMobilityProvider.    NextAdminStatus?.Timestamp, eMobilityProvider.    NextStatus?.Timestamp ],
+                   GridOperator                 gridOperator          => [ gridOperator.         NextAdminStatus?.Timestamp, gridOperator.         NextStatus?.Timestamp ],
+                   EnergyMeter                  energyMeter           => [ energyMeter.          NextAdminStatus?.Timestamp, energyMeter.          NextStatus?.Timestamp ],
+                   ParkingOperator              parkingOperator       => [ parkingOperator.      NextAdminStatus?.Timestamp, parkingOperator.      NextStatus?.Timestamp ],
+                   ParkingGarage                parkingGarage         => [ parkingGarage.        NextAdminStatus?.Timestamp, parkingGarage.        NextStatus?.Timestamp ],
+                   ParkingSpace                 parkingSpace          => [ parkingSpace.         NextAdminStatus?.Timestamp, parkingSpace.         NextStatus?.Timestamp ],
+                   ParkingSensor                parkingSensor         => [ parkingSensor.        NextAdminStatus?.Timestamp, parkingSensor.        NextStatus?.Timestamp ],
+                   ChargingTariff               chargingTariff        => [ chargingTariff.       NextAdminStatus?.Timestamp, chargingTariff.       NextStatus?.Timestamp ],
+                   EVSEGroup                    evseGroup             => [ evseGroup.            NextAdminStatus?.Timestamp, evseGroup.            NextStatus?.Timestamp ],
+                   ChargingStationGroup         chargingStationGroup  => [ chargingStationGroup. NextAdminStatus?.Timestamp, chargingStationGroup. NextStatus?.Timestamp ],
+                   ChargingPoolGroup            chargingPoolGroup     => [ chargingPoolGroup.    NextAdminStatus?.Timestamp, chargingPoolGroup.    NextStatus?.Timestamp ],
+                   ChargingTariffGroup          chargingTariffGroup   => [ chargingTariffGroup.  NextAdminStatus?.Timestamp, chargingTariffGroup.  NextStatus?.Timestamp ],
+                   ChargingTariffOffer          chargingTariffOffer   => [ chargingTariffOffer.  NextAdminStatus?.Timestamp, chargingTariffOffer.  NextStatus?.Timestamp, chargingTariffOffer.NextStatusChange(Now) ],
+                   ParkingSpaceGroup            parkingSpaceGroup     => [ parkingSpaceGroup.    NextAdminStatus?.Timestamp, parkingSpaceGroup.    NextStatus?.Timestamp ],
+                   EnergyMeterGroup             energyMeterGroup      => [ energyMeterGroup.     NextAdminStatus?.Timestamp, energyMeterGroup.     NextStatus?.Timestamp ],
+                   ChargingStationManufacturer  manufacturer          => [ manufacturer.         NextAdminStatus?.Timestamp, manufacturer.         NextStatus?.Timestamp ],
+                   _                                                  => []
+               };
 
         #endregion
 

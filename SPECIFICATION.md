@@ -821,9 +821,11 @@ has an example.
   immutable and shared by the versions that did not change them, and keep their digests: a version
   hashes only the entities that are new in it and the paths from them to the root, e.g. for one changed
   EVSE of one of 50 operators of 1,000 EVSEs each some milliseconds instead of a second for all of them.
-  A change reads its charging station operator again as a whole, so all entities of that operator are
-  new and hashed again (8.8); a commit changing a template 100,000 members name changes all of them. The
-  `json` and `cbor` ETags hash the whole version, once per version.
+  Within its charging station operator, a change reads again only the charging pools it changes: the
+  others are kept as they are, with their charging stations, EVSEs and effective members (section 9),
+  so also one changed EVSE of one operator of 50,000 EVSEs costs some milliseconds. An effective member
+  is calculated again where a template it takes changed: a commit changing a template 100,000 members
+  name changes all of them. The `json` and `cbor` ETags hash the whole version, once per version (8.8).
 - **Serving:** a proof is calculated from the tree of the head, made of the digests and the skeletons
   the network and its parties keep: a pool and its stations are calculated again, the audit paths from
   the digests.
@@ -853,9 +855,10 @@ has an example.
    for preconditions and owners, the same way. The station proof does not need it.
 7. **CBOR skeletons:** whether the tree also hashes deterministic CBOR skeletons, for clients that read
    CBOR only.
-8. **Incremental trees within an operator:** the entities keep their digests (8.7), but a change reads
-   its charging station operator again as a whole, so its entities are new and hashed again. Keeping
-   those it did not change would make a commit hash only what it changed there as well.
+8. **Incremental content ETags:** the tree hashes only what a version has new (8.7), but its `json` and
+   `cbor` ETags serialize the whole version, once per version: for 50,000 EVSEs about a second, most of
+   what a commit costs. Canonical JSON and CBOR are made of the representations of the children, so the
+   entities could keep theirs as they keep their digests.
 9. **Offers:** a station proof gives no charging tariff offers (9.5, point 2).
 
 

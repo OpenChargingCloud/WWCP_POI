@@ -394,7 +394,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            var operatorJSON = currentOperator.ToEmbeddedJSON();
+            // Only the charging pools the change may change are written and read again: the others are kept as they are,
+            // with their charging stations and EVSEs, so that a commit hashes only what it changed (SPECIFICATION.md, 8.7).
+            var writtenChargingPools  = ChargingPoolsChangedBy(Change, currentOperator);
+            var operatorJSON          = currentOperator.ToEmbeddedJSON(writtenChargingPools);
 
             #endregion
 
@@ -559,7 +562,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region The changed operator must still be a valid one
 
-            if (!ChargingStationOperator.TryParseWithinChangeSet(operatorJSON, out var changedOperator, out var changedOperatorError))
+            if (!ChargingStationOperator.TryParseWithinChangeSet(operatorJSON, out var changedOperator, out var changedOperatorError) ||
+                !TryKeepChargingPools(changedOperator, currentOperator, writtenChargingPools, out changedOperator, out changedOperatorError))
             {
                 ErrorResponse = $"Change {Index}: {changedOperatorError}";
                 return false;
@@ -578,6 +582,102 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ErrorResponse = null;
             return true;
+
+        }
+
+        #endregion
+
+        #region (private static) ChargingPoolsChangedBy(Change, Operator)
+
+        /// <summary>
+        /// The charging pools of the given operator a change of a charging pool, charging station or EVSE may change: the one
+        /// having the entity and the one having the parent it is added to, as their identifications name them. A change of a
+        /// charging tariff, template or group changes none of them.
+        /// </summary>
+        private static List<ChargingPool> ChargingPoolsChangedBy(RoamingNetworkChange     Change,
+                                                                 ChargingStationOperator  Operator)
+        {
+
+            var chargingPools = new List<ChargingPool>(2);
+
+            foreach (var chargingPool in new[] { ChargingPoolOf(Operator, Change.EntityType,       Change.EntityId),
+                                                 ChargingPoolOf(Operator, Change.ParentEntityType, Change.ParentEntityId) })
+            {
+                if (chargingPool is not null && !chargingPools.Contains(chargingPool))
+                    chargingPools.Add(chargingPool);
+            }
+
+            return chargingPools;
+
+        }
+
+        /// <summary>
+        /// The charging pool of the given operator being or having the given charging pool, charging station or EVSE, if any.
+        /// </summary>
+        private static ChargingPool? ChargingPoolOf(ChargingStationOperator  Operator,
+                                                    String?                  EntityType,
+                                                    String?                  EntityId)
+
+            => EntityId is null
+                   ? null
+                   : EntityType switch {
+                         nameof(ChargingPool)     => ChargingPool_Id.   TryParse(EntityId, out var chargingPoolId)    && Operator.TryGetChargingPool(chargingPoolId, out var chargingPool)
+                                                         ? chargingPool
+                                                         : null,
+                         nameof(ChargingStation)  => ChargingStation_Id.TryParse(EntityId, out var chargingStationId) && Operator.TryGetChargingStation(chargingStationId, out _)
+                                                         ? Operator.ChargingPools.FirstOrDefault(chargingPool => chargingPool.ChargingStations.Contains(chargingStationId))
+                                                         : null,
+                         nameof(EVSE)             => EVSE_Id.           TryParse(EntityId, out var evseId)            && Operator.TryGetEVSE(evseId, out _)
+                                                         ? Operator.ChargingPools.FirstOrDefault(chargingPool => chargingPool.ChargingStations.Any(chargingStation => chargingStation.EVSEs.Contains(evseId)))
+                                                         : null,
+                         _                        => null
+                     };
+
+        #endregion
+
+        #region (private static) TryKeepChargingPools(ChangedOperator, Previous, Written, out Operator, out ErrorResponse)
+
+        /// <summary>
+        /// The given changed operator, read again from JSON having only the given charging pools of its previous version, with
+        /// the charging pools of the previous version it did not have, as they are. Their checks are those of reading the
+        /// operator with all its charging pools, with its error.
+        /// </summary>
+        /// <param name="ChangedOperator">The changed operator, read again from JSON having only the written charging pools.</param>
+        /// <param name="Previous">The previous version of the operator.</param>
+        /// <param name="Written">The charging pools of the previous version its JSON had.</param>
+        /// <param name="Operator">The changed operator with all its charging pools.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        private static Boolean TryKeepChargingPools(ChargingStationOperator                            ChangedOperator,
+                                                    ChargingStationOperator                            Previous,
+                                                    IReadOnlyCollection<ChargingPool>                  Written,
+                                                    [NotNullWhen(true)]  out ChargingStationOperator?  Operator,
+                                                    [NotNullWhen(false)] out String?                   ErrorResponse)
+        {
+
+            if (Written.Count == Previous.ChargingPools.Count)
+            {
+                Operator       = ChangedOperator;
+                ErrorResponse  = null;
+                return true;
+            }
+
+            var written = Written.Select(chargingPool => chargingPool.Id).ToHashSet();
+
+            try
+            {
+
+                Operator       = ChangedOperator.WithKeptChargingPools([ .. Previous.ChargingPools.Where(chargingPool => !written.Contains(chargingPool.Id)) ],
+                                                                         Previous);
+                ErrorResponse  = null;
+                return true;
+
+            }
+            catch (ArgumentException e)
+            {
+                Operator       = null;
+                ErrorResponse  = "The given JSON representation of a charging station operator is invalid: " + e.Message;
+                return false;
+            }
 
         }
 

@@ -36,9 +36,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
     /// dotnet test -c Release --filter "FullyQualifiedName~CommitCostBenchmark" --logger "console;verbosity=detailed"
     /// </summary>
     /// <remarks>
-    /// The tree of a version after a change is calculated from the digests the entities keep (POIEffectiveDigests); only
-    /// a changed operator is hashed again, as a change reads it again completely. The JSON and CBOR ETags hash the whole
-    /// version, once per version.
+    /// The tree of a version after a change is calculated from the digests the entities keep (POIEffectiveDigests); a
+    /// change reads again only the charging pools it changes, the other ones of its operator are kept, with their
+    /// effective members. The JSON and CBOR ETags hash the whole version, once per version: most of what a commit costs.
     /// </remarks>
     [TestFixture, Explicit]
     public class CommitCostBenchmark

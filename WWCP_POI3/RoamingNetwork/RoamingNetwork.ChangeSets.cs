@@ -572,7 +572,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     operators.TryGetValue(operatorId, out var currentOperator);
 
-                    var currentOperatorJSON  = currentOperator?.ToEmbeddedJSON();
+                    // A change of a property of the operator itself writes and reads again none of its charging pools:
+                    // they are kept as they are (SPECIFICATION.md, section 8.7).
+                    var ofItsOwn             = change.EntityPropertyName is String operatorPropertyName &&
+                                               ChangeableOperatorProperties.Contains(operatorPropertyName);
+
+                    var currentOperatorJSON  = ofItsOwn
+                                                   ? currentOperator?.ToEmbeddedJSON([])
+                                                   : currentOperator?.ToEmbeddedJSON();
 
                     // An element change is applied as the change of the property it amounts to.
                     var applied              = change;
@@ -646,7 +653,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             currentOperatorJSON![ChargingStationOperator.BasePropertyKeys.LastChange] = ChangeSet.CreatedAt.ToISO8601();
 
                             // The changed operator must still be a valid one.
-                            if (!ChargingStationOperator.TryParseWithinChangeSet(currentOperatorJSON, out var changedOperator, out var changedOperatorError))
+                            if (!ChargingStationOperator.TryParseWithinChangeSet(currentOperatorJSON, out var changedOperator, out var changedOperatorError) ||
+                                (ofItsOwn && !TryKeepChargingPools(changedOperator, currentOperator!, [], out changedOperator, out changedOperatorError)))
                             {
                                 ErrorResponse = $"Change {index}: {changedOperatorError}";
                                 return false;

@@ -654,6 +654,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => ToJSON(Embedded:            true,
                       ExpandDataLicenses:  InfoStatus.Expanded);
 
+        /// <summary>
+        /// The JSON representation of this charging station operator as its roaming network embeds it, with only the given
+        /// charging pools of it: a change of a change set writes and reads again only those it changes (see WithKeptChargingPools).
+        /// </summary>
+        /// <param name="ChargingPools">The only charging pools of it to include.</param>
+        internal JObject ToEmbeddedJSON(IReadOnlyCollection<ChargingPool> ChargingPools)
+
+            => ToJSON(Embedded:                                 true,
+                      ExpandChargingPoolIds:                    InfoStatus.ShowIdOnly,
+                      ExpandChargingStationIds:                 InfoStatus.ShowIdOnly,
+                      ExpandEVSEIds:                            InfoStatus.ShowIdOnly,
+                      ExpandBrandIds:                           InfoStatus.ShowIdOnly,
+                      ExpandDataLicenses:                       InfoStatus.Expanded,
+                      CustomChargingStationOperatorSerializer:  null,
+                      IncludeChildArrays:                       true,
+                      OnlyChargingPools:                        ChargingPools);
+
         #endregion
 
 

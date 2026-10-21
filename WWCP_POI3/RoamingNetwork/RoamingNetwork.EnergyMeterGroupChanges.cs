@@ -292,8 +292,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            // Of a charging station operator none of its charging pools are written and read again: they are kept as they
+            // are (SPECIFICATION.md, section 8.7).
             var ownerJSON   = chargingStationOperator is not null
-                                  ? chargingStationOperator.ToEmbeddedJSON()
+                                  ? chargingStationOperator.ToEmbeddedJSON([])
                                   : gridOperator!.          ToJSON(Embedded: true);
             var children    = ownerJSON[Kind.Property] as JArray;
             // Found under the identification it is kept with: the change may name it in another spelling.
@@ -421,7 +423,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (chargingStationOperator is not null)
             {
 
-                if (!ChargingStationOperator.TryParseWithinChangeSet(ownerJSON, out var changedOperator, out var changedOperatorError))
+                if (!ChargingStationOperator.TryParseWithinChangeSet(ownerJSON, out var changedOperator, out var changedOperatorError) ||
+                    !TryKeepChargingPools(changedOperator, chargingStationOperator, [], out changedOperator, out changedOperatorError))
                 {
                     ErrorResponse = $"Change {Index}: {changedOperatorError}";
                     return false;

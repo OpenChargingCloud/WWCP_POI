@@ -908,6 +908,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Take the runtime status and internal data of the given previous version of this operator,
         /// and of every charging pool, charging station, EVSE, energy meter, charging tariff and group it had, by their identifications.
+        /// The charging pools it kept from an earlier version (see WithKeptChargingPools) have theirs already, with everything
+        /// they have, and may be listened to.
         /// </summary>
         internal void ShareRuntimeOfAll(ChargingStationOperator Previous)
         {
@@ -915,20 +917,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ShareRuntimeOf(Previous);
 
             foreach (var chargingPool in ChargingPools)
+            {
+
+                if (keptChargingPools.Contains(chargingPool))
+                    continue;
+
                 if (Previous.TryGetChargingPool(chargingPool.Id, out var previousChargingPool))
                     chargingPool.ShareRuntimeOf(previousChargingPool);
 
-            foreach (var chargingStation in ChargingStations)
-                if (Previous.TryGetChargingStation(chargingStation.Id, out var previousChargingStation))
-                    chargingStation.ShareRuntimeOf(previousChargingStation);
+                foreach (var chargingStation in chargingPool.ChargingStations)
+                    if (Previous.TryGetChargingStation(chargingStation.Id, out var previousChargingStation))
+                        chargingStation.ShareRuntimeOf(previousChargingStation);
 
-            foreach (var evse in EVSEs)
-                if (Previous.TryGetEVSE(evse.Id, out var previousEVSE))
-                    evse.ShareRuntimeOf(previousEVSE);
+                foreach (var evse in chargingPool.EVSEs)
+                    if (Previous.TryGetEVSE(evse.Id, out var previousEVSE))
+                        evse.ShareRuntimeOf(previousEVSE);
 
-            foreach (var energyMeter in EnergyMeters)
-                if (Previous.TryGetEnergyMeter(energyMeter.Id, out var previousEnergyMeter))
-                    energyMeter.ShareRuntimeOf(previousEnergyMeter);
+                foreach (var energyMeter in chargingPool.AllEnergyMeters)
+                    if (Previous.TryGetEnergyMeter(energyMeter.Id, out var previousEnergyMeter))
+                        energyMeter.ShareRuntimeOf(previousEnergyMeter);
+
+            }
 
             foreach (var chargingTariff in ChargingTariffs)
                 if (Previous.TryGetChargingTariff(chargingTariff.Id, out var previousChargingTariff))
@@ -966,6 +975,63 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ShareRuntimeOfEffective();
 
         }
+
+        /// <summary>
+        /// The charging pools this version kept from an earlier one as they were, with everything they have (see
+        /// WithKeptChargingPools): by reference, as another version of a charging pool has the same identification.
+        /// </summary>
+        private HashSet<ChargingPool> keptChargingPools = NoChargingPoolsKept;
+
+        private static readonly HashSet<ChargingPool> NoChargingPoolsKept = new (ReferenceEqualityComparer.Instance);
+
+        /// <summary>
+        /// This charging station operator with the given charging pools of an earlier version in addition to its own, within
+        /// a change set: the members of its groups, the groups of its charging tariff offers and its offers not overlapping
+        /// are checked after its last change (see InvalidGroupOrOffer()). A change writes and reads again only the charging
+        /// pools it changes; the others are kept as they are, with their charging stations and EVSEs, their digests
+        /// (SPECIFICATION.md, section 8.7), their runtime status and their listeners.
+        /// </summary>
+        /// <param name="KeptChargingPools">The charging pools of the earlier version, other than its own.</param>
+        /// <param name="KeptFrom">The earlier version: its effective members of the kept charging pools are kept as well, where nothing they are made of changed.</param>
+        /// <exception cref="ArgumentException">The charging pools do not fit this operator, e.g. naming an unknown charging tariff.</exception>
+        internal ChargingStationOperator WithKeptChargingPools(IReadOnlyCollection<ChargingPool>  KeptChargingPools,
+                                                               ChargingStationOperator            KeptFrom)
+
+            => new (false,
+                    Id,
+                    Name,
+                    Description,
+                    Logo,
+                    Address,
+                    GeoLocation,
+                    Telephone,
+                    EMailAddress,
+                    Homepage,
+                    HotlinePhoneNumber,
+                    TermsAndConditionsURL,
+                    DataLicenses,
+                    [ .. ChargingPools, .. KeptChargingPools ],
+                    ChargingTariffs,
+                    EVSEGroups:                EVSEGroups,
+                    ChargingStationGroups:     ChargingStationGroups,
+                    ChargingPoolGroups:        ChargingPoolGroups,
+                    ChargingTariffGroups:      ChargingTariffGroups,
+                    ParkingSpaces:             ParkingSpaces,
+                    Brands:                    Brands,
+                    SigningKeys:               SigningKeys,
+                    IdentityKeys:              IdentityKeys,
+                    EnergyMeterGroups:         EnergyMeterGroups,
+                    EVSETemplates:             EVSETemplates,
+                    ChargingStationTemplates:  ChargingStationTemplates,
+                    ChargingPoolTemplates:     ChargingPoolTemplates,
+                    ChargingTariffTemplates:   ChargingTariffTemplates,
+                    EnergyMeterTemplates:      EnergyMeterTemplates,
+                    ChargingTariffOffers:      ChargingTariffOffers,
+                    DataSource:                DataSource,
+                    Created:                   Created,
+                    LastChange:                LastChangeDate,
+                    CustomData:                CustomData,
+                    KeptFrom:                  KeptFrom);
 
         #endregion
 
@@ -1089,6 +1155,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// its operator between its removal and its addition.
         /// </summary>
         /// <param name="CheckGroupsAndOffers">Whether to check the members of its groups and its charging tariff offers.</param>
+        /// <param name="KeptFrom">Optionally, the earlier version it keeps charging pools of as they are, and their effective members where nothing they are made of changed.</param>
         private ChargingStationOperator(Boolean                                               CheckGroupsAndOffers,
                                         ChargingStationOperator_Id                            Id,
                                         //RoamingNetwork                                        RoamingNetwork,
@@ -1132,7 +1199,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         DateTimeOffset?                                       LastChange                             = null,
 
                                         CustomDataNew?                                        CustomData                             = null,
-                                        UserDefinedDictionary?                                InternalData                           = null)
+                                        UserDefinedDictionary?                                InternalData                           = null,
+                                        ChargingStationOperator?                              KeptFrom                               = null)
 
             : base(Id,
                    Name ?? I18NString.Create("Charging Station Operator " + Id.ToString()),
@@ -1419,7 +1487,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region Effective charging tariffs, charging pools, charging stations and EVSEs, with the properties their templates give them
 
             this.effectiveChargingTariffs = CalculateEffectiveChargingTariffs();
-            (this.effectiveEVSEs, this.effectiveChargingStations, this.effectiveChargingPoolIndex) = CalculateEffective();
+            if (KeptFrom is not null)
+                this.keptChargingPools = new (this.ChargingPools.Where(chargingPool => KeptFrom.TryGetChargingPool(chargingPool.Id, out var keptChargingPool) &&
+                                                                                         ReferenceEquals(keptChargingPool, chargingPool)),
+                                              ReferenceEqualityComparer.Instance);
+
+            (this.effectiveEVSEs, this.effectiveChargingStations, this.effectiveChargingPoolIndex) = CalculateEffective(Previous: KeptFrom);
             this.effectiveChargingPools = new (CalculateEffectiveChargingPools);
             this.evseTimeZones          = new (CalculateEVSETimeZones);
 
@@ -1669,6 +1742,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
         /// </summary>
         /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
+        /// <param name="OnlyChargingPools">Optionally, the only charging pools of it to include, e.g. those a change of a change set changes.</param>
         internal JObject ToJSON(Boolean                                                    Embedded,
                                 InfoStatus                                                 ExpandChargingPoolIds,
                                 InfoStatus                                                 ExpandChargingStationIds,
@@ -1676,7 +1750,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 InfoStatus                                                 ExpandBrandIds,
                                 InfoStatus                                                 ExpandDataLicenses,
                                 CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer,
-                                Boolean                                                    IncludeChildArrays)
+                                Boolean                                                    IncludeChildArrays,
+                                IReadOnlyCollection<ChargingPool>?                         OnlyChargingPools   = null)
         {
 
             try
@@ -1834,8 +1909,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (IncludeChildArrays && ChargingTariffs.Count > 0)
                     json.Add(PropertyKeys.ChargingTariffs, new JArray(ChargingTariffs.Select(chargingTariff => chargingTariff.ToJSON(Embedded: true))));
 
-                if (IncludeChildArrays && ChargingPools.Count > 0)
-                    json.Add(PropertyKeys.ChargingPools, new JArray(ChargingPools.Select(chargingPool => chargingPool.ToJSON(Embedded: true))));
+                var chargingPools = OnlyChargingPools ?? ChargingPools;
+
+                if (IncludeChildArrays && chargingPools.Count > 0)
+                    json.Add(PropertyKeys.ChargingPools, new JArray(chargingPools.Select(chargingPool => chargingPool.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && EVSETemplates.Count > 0)
                     json.Add(PropertyKeys.EVSETemplates, new JArray(EVSETemplates.Select(template => template.ToJSON(Embedded: true))));

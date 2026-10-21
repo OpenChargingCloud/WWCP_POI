@@ -363,9 +363,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            // Of a charging station operator none of its charging pools are written and read again: they are kept as they
+            // are (SPECIFICATION.md, section 8.7).
             var operatorJSON  = owner is not null
                                     ? owner.        ToJSON(Embedded: true)
-                                    : operatorOwner!.ToEmbeddedJSON();
+                                    : operatorOwner!.ToEmbeddedJSON([]);
             var children      = operatorJSON[arrayName] as JArray;
             // Found under the identification it is kept with: the change may name it in every spelling
             // its identification type considers equal, e.g. without case for garages, with case for products.
@@ -520,7 +522,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             else
             {
 
-                if (!ChargingStationOperator.TryParseWithinChangeSet(operatorJSON, out var changedOperator, out var changedOperatorError))
+                if (!ChargingStationOperator.TryParseWithinChangeSet(operatorJSON, out var changedOperator, out var changedOperatorError) ||
+                    !TryKeepChargingPools(changedOperator, operatorOwner!, [], out changedOperator, out changedOperatorError))
                 {
                     ErrorResponse = $"Change {Index}: {changedOperatorError}";
                     return false;

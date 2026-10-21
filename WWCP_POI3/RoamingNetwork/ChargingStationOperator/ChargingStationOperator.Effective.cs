@@ -399,7 +399,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) CalculateEffective(Changed = null)
+        #region (private) CalculateEffective(Changed = null, Previous = null)
 
         /// <summary>
         /// The last change members have at least: the one of the operator, where they are other than in the version before;
@@ -411,11 +411,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The effective EVSEs, charging stations and charging pools differing from the given ones, by their identifications;
-        /// the given changed members as well, with at least their last change.
+        /// the given changed members as well, with at least their last change. Those of the charging pools kept from the given
+        /// previous version are kept as well where nothing they are made of changed, neither their templates nor their floors,
+        /// so that they keep their digests (SPECIFICATION.md, section 8.7).
         /// </summary>
+        /// <param name="Changed">Optionally, the changed members, with at least their last change.</param>
+        /// <param name="Previous">Optionally, a previous version: the effective members of the charging pools kept from it are kept.</param>
         private (ImmutableDictionary<EVSE_Id,            EVSE>             EVSEs,
                  ImmutableDictionary<ChargingStation_Id, ChargingStation>  ChargingStations,
-                 ImmutableDictionary<ChargingPool_Id,    ChargingPool>     ChargingPools)  CalculateEffective(ChangedMembers? Changed = null)
+                 ImmutableDictionary<ChargingPool_Id,    ChargingPool>     ChargingPools)  CalculateEffective(ChangedMembers?           Changed    = null,
+                                                                                                         ChargingStationOperator?  Previous   = null)
         {
 
             #region Energy meters, with the properties of their templates
@@ -433,16 +438,86 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region What may be kept: the members of the charging pools kept from the previous version, taking no changed template
+
+            var changedEVSETemplates             = Previous is not null ? ChangedTemplates(EVSETemplates,            Previous.EVSETemplates,            template => template.Id) : [];
+            var changedChargingStationTemplates  = Previous is not null ? ChangedTemplates(ChargingStationTemplates, Previous.ChargingStationTemplates, template => template.Id) : [];
+            var changedChargingPoolTemplates     = Previous is not null ? ChangedTemplates(ChargingPoolTemplates,    Previous.ChargingPoolTemplates,    template => template.Id) : [];
+            var changedEnergyMeterTemplates      = Previous is not null ? ChangedTemplates(EnergyMeterTemplates,     Previous.EnergyMeterTemplates,     template => template.Id) : [];
+
+            // The same charging pool, with the same charging stations and EVSEs.
+            Boolean IsKept(ChargingPool ChargingPool)
+
+                => Previous is not null &&
+                   Previous.TryGetChargingPool(ChargingPool.Id, out var previousChargingPool) &&
+                   ReferenceEquals(previousChargingPool, ChargingPool);
+
+            static Boolean NoneChanged<TTemplateId>(ImmutableArray<TTemplateId>  TemplateIds,
+                                                    HashSet<TTemplateId>         ChangedTemplates)
+
+                => !TemplateIds.Any(ChangedTemplates.Contains);
+
+            Boolean MeterKept(EnergyMeter? EnergyMeter)
+
+                => EnergyMeter is null ||
+                   NoneChanged(EnergyMeter.TemplateIds, changedEnergyMeterTemplates);
+
+            static DateTimeOffset? FloorOf<TId>(ChangedMembers?                                        Floors,
+                                                Func<ChangedMembers, Dictionary<TId, DateTimeOffset>>  Of,
+                                                TId                                                    Id)
+
+                where TId : notnull
+
+                => Floors is not null && Of(Floors).TryGetValue(Id, out var floor)
+                       ? floor
+                       : null;
+
+            // The effective member is the one of the previous version, or neither has one.
+            static Boolean SameAsBefore<TId, TEntity>(ImmutableDictionary<TId, TEntity>.Builder  Current,
+                                                      ImmutableDictionary<TId, TEntity>          Before,
+                                                      TId                                        Id)
+
+                where TId     : notnull
+                where TEntity : class
+
+                => Current.TryGetValue(Id, out var current)
+                       ? Before.TryGetValue(Id, out var before) && ReferenceEquals(current, before)
+                       : !Before.ContainsKey(Id);
+
+            #endregion
+
             #region EVSEs, with the charging tariff of their templates, unless they have their own
 
             var evses = ImmutableDictionary.CreateBuilder<EVSE_Id, EVSE>();
 
             foreach (var chargingPool in ChargingPools)
             {
+
+                var kept = IsKept(chargingPool);
+
                 foreach (var chargingStation in chargingPool.ChargingStations)
                 {
                     foreach (var evse in chargingStation.EVSEs)
                     {
+
+                        DateTimeOffset? atLeast = FloorOf(Changed, floors => floors.EVSEs, evse.Id);
+
+                        // As in the previous version: so is its tariff, of its own templates or of those of its charging
+                        // station and charging pool.
+                        if (kept &&
+                            NoneChanged(evse.           TemplateIds, changedEVSETemplates)            &&
+                            NoneChanged(chargingStation.TemplateIds, changedChargingStationTemplates) &&
+                            NoneChanged(chargingPool.   TemplateIds, changedChargingPoolTemplates)    &&
+                            MeterKept(evse.EnergyMeter) &&
+                            atLeast == FloorOf(Previous!.effectiveFloors, floors => floors.EVSEs, evse.Id))
+                        {
+
+                            if (Previous.effectiveEVSEs.TryGetValue(evse.Id, out var keptEVSE))
+                                evses.Add(evse.Id, keptEVSE);
+
+                            continue;
+
+                        }
 
                         // Its own tariffs, else the one of its most specific templates naming one.
                         var tariff  = evse.ChargingTariffIds.Length > 0
@@ -450,8 +525,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           : TariffOf(Values(evse.           TemplateIds, EVSETemplates),            template => template.ChargingTariffId) ??
                                             TariffOf(Values(chargingStation.TemplateIds, ChargingStationTemplates), template => template.ChargingTariffId) ??
                                             TariffOf(Values(chargingPool.   TemplateIds, ChargingPoolTemplates),    template => template.ChargingTariffId);
-
-                        DateTimeOffset? atLeast = Changed?.EVSEs.TryGetValue(evse.Id, out var floor) == true ? floor : null;
 
                         if (evse.TemplateIds.Length == 0 && tariff is null && !atLeast.HasValue && !HasTemplates(evse.EnergyMeter))
                             continue;
@@ -464,6 +537,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     }
                 }
+
             }
 
             #endregion
@@ -472,20 +546,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var chargingStations = ImmutableDictionary.CreateBuilder<ChargingStation_Id, ChargingStation>();
 
-            foreach (var chargingStation in ChargingStations)
+            foreach (var chargingPool in ChargingPools)
             {
 
-                DateTimeOffset? atLeast = Changed?.ChargingStations.TryGetValue(chargingStation.Id, out var floor) == true ? floor : null;
+                var kept = IsKept(chargingPool);
 
-                if (chargingStation.TemplateIds.Length == 0 && !atLeast.HasValue && !chargingStation.EVSEs.Any(evse => evses.ContainsKey(evse.Id)) && !chargingStation.EnergyMeters.Any(HasTemplates))
-                    continue;
+                foreach (var chargingStation in chargingPool.ChargingStations)
+                {
 
-                chargingStations.Add(chargingStation.Id,
-                                     Effective(chargingStation,
-                                               Values(chargingStation.TemplateIds, ChargingStationTemplates),
-                                               [.. chargingStation.EVSEs.Select(evse => evses.TryGetValue(evse.Id, out var effectiveEVSE) ? effectiveEVSE : evse)],
-                                               [.. chargingStation.EnergyMeters.Select(EffectiveMeter)],
-                                               atLeast));
+                    DateTimeOffset? atLeast = FloorOf(Changed, floors => floors.ChargingStations, chargingStation.Id);
+
+                    if (kept &&
+                        NoneChanged(chargingStation.TemplateIds, changedChargingStationTemplates) &&
+                        chargingStation.EnergyMeters.All(MeterKept) &&
+                        chargingStation.EVSEs.All(evse => SameAsBefore(evses, Previous!.effectiveEVSEs, evse.Id)) &&
+                        atLeast == FloorOf(Previous!.effectiveFloors, floors => floors.ChargingStations, chargingStation.Id))
+                    {
+
+                        if (Previous.effectiveChargingStations.TryGetValue(chargingStation.Id, out var keptChargingStation))
+                            chargingStations.Add(chargingStation.Id, keptChargingStation);
+
+                        continue;
+
+                    }
+
+                    if (chargingStation.TemplateIds.Length == 0 && !atLeast.HasValue && !chargingStation.EVSEs.Any(evse => evses.ContainsKey(evse.Id)) && !chargingStation.EnergyMeters.Any(HasTemplates))
+                        continue;
+
+                    chargingStations.Add(chargingStation.Id,
+                                         Effective(chargingStation,
+                                                   Values(chargingStation.TemplateIds, ChargingStationTemplates),
+                                                   [.. chargingStation.EVSEs.Select(evse => evses.TryGetValue(evse.Id, out var effectiveEVSE) ? effectiveEVSE : evse)],
+                                                   [.. chargingStation.EnergyMeters.Select(EffectiveMeter)],
+                                                   atLeast));
+
+                }
 
             }
 
@@ -498,7 +593,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var chargingPool in ChargingPools)
             {
 
-                DateTimeOffset? atLeast = Changed?.ChargingPools.TryGetValue(chargingPool.Id, out var floor) == true ? floor : null;
+                DateTimeOffset? atLeast = FloorOf(Changed, floors => floors.ChargingPools, chargingPool.Id);
+
+                if (IsKept(chargingPool) &&
+                    NoneChanged(chargingPool.TemplateIds, changedChargingPoolTemplates) &&
+                    chargingPool.EnergyMeters.All(MeterKept) &&
+                    chargingPool.ChargingStations.All(chargingStation => SameAsBefore(chargingStations, Previous!.effectiveChargingStations, chargingStation.Id)) &&
+                    atLeast == FloorOf(Previous!.effectiveFloors, floors => floors.ChargingPools, chargingPool.Id))
+                {
+
+                    if (Previous.effectiveChargingPoolIndex.TryGetValue(chargingPool.Id, out var keptChargingPool))
+                        chargingPools.Add(chargingPool.Id, keptChargingPool);
+
+                    continue;
+
+                }
 
                 if (chargingPool.TemplateIds.Length == 0 && !atLeast.HasValue && !chargingPool.ChargingStations.Any(chargingStation => chargingStations.ContainsKey(chargingStation.Id)) && !chargingPool.EnergyMeters.Any(HasTemplates))
                     continue;
@@ -653,7 +762,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             effectiveFloors = new (evses, chargingStations, chargingPools);
 
-            (effectiveEVSEs, effectiveChargingStations, effectiveChargingPoolIndex) = CalculateEffective(effectiveFloors);
+            (effectiveEVSEs, effectiveChargingStations, effectiveChargingPoolIndex) = CalculateEffective(effectiveFloors, Previous);
             effectiveChargingPools = new (CalculateEffectiveChargingPools);
 
         }
