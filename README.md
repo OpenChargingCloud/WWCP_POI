@@ -195,8 +195,11 @@ parking product ids compare case-sensitively.
   verifies or finds compatible, and optionally a manufacturer. An energy meter's `transparencySoftwareStatus`
   assigns releases with their `legalStatus`, at most one entry per release; a given `certificateId` must cover it.
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
-  They identify a version; `CalcETags()` and `ValidateETags(…)`. Which bytes are hashed and signed
-  is specified, with examples, in [SPECIFICATION.md](SPECIFICATION.md).
+  They identify a version; `CalcETags()` and `ValidateETags(…)`. Every other entity has the ETags of its content as
+  its parent embeds it, `ContentETag(format, algorithm)`, calculated once per entity: the HTTP `ETag` of POI_API and
+  the one a precondition names. `ToJSON(IncludeETags: true)` and `ToCBOR(IncludeETags: true)` write them, in Base64
+  unless asked otherwise, and reading checks them. Which bytes are hashed and signed is specified, with examples, in
+  [SPECIFICATION.md](SPECIFICATION.md).
 - **Runtime:** admin status and status are not content and have no ETags. Each entity keeps them
   typed in its status schedules (history and planned status), shared by all its versions:
   a change set takes them along, with the internal data. New entities are operational and

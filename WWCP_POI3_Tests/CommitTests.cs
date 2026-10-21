@@ -156,12 +156,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                       ).WithKeys();
 
             var c1  = rn1.ToCBOR();
-            var e1  = rn1.CalcETags(CBOR: c1);
+            var e1  = new[] { rn1.ContentETag(ETagFormat.CBOR) };
             var b1  = c1.ToByteArray(CBORWriterOptions.Canonical);
 
             var rn2 = RoamingNetwork.Parse(CBORValue.Parse(b1));
             var c2  = rn2.ToCBOR();
-            var e2  = rn2.CalcETags(CBOR: c2);
+            var e2  = new[] { rn2.ContentETag(ETagFormat.CBOR) };
             var b2  = c2.ToByteArray(CBORWriterOptions.Canonical);
 
             using (Assert.EnterMultipleScope())

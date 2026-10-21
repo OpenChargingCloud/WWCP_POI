@@ -82,7 +82,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                ExpandEVSEIds,
                                                                ExpandBrandIds,
                                                                ExpandDataLicenses,
-                                                               CustomChargingStationOperatorSerializer
+                                                               CustomChargingStationOperatorSerializer: CustomChargingStationOperatorSerializer
                                                                //CustomChargingPoolSerializer,
                                                                //CustomChargingStationSerializer,
                                                                //CustomEVSESerializer
@@ -1714,18 +1714,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (protected override) ContentJSON()
+
+        /// <inheritdoc/>
+        protected override JObject ContentJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
         #region ToJSON(Embedded = false, ...)
 
         /// <summary>
         /// Return a JSON representation for the given charging station operator.
         /// </summary>
         /// <param name="Embedded">Whether this data is embedded into another data structure, e.g. into a roaming network.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         public JObject ToJSON(Boolean                                                    Embedded                                  = false,
                               InfoStatus                                                 ExpandChargingPoolIds                     = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandChargingStationIds                  = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandBrandIds                            = InfoStatus.ShowIdOnly,
                               InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.Expanded,
+                              Boolean                                                    IncludeETags                              = false,
+                              ETagDigestEncoding?                                        ETagDigestEncoding                        = null,
                               CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null)
 
             => ToJSON(Embedded,
@@ -1735,7 +1748,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                       ExpandBrandIds,
                       ExpandDataLicenses,
                       CustomChargingStationOperatorSerializer,
-                      IncludeChildArrays: true);
+                      IncludeChildArrays:  true,
+                      IncludeETags:        IncludeETags,
+                      ETagDigestEncoding:  ETagDigestEncoding);
 
         /// <summary>
         /// The JSON representation of this charging station operator, with or without its child arrays: without them for the skeleton of its
@@ -1743,6 +1758,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
         /// <param name="OnlyChargingPools">Optionally, the only charging pools of it to include, e.g. those a change of a change set changes.</param>
+        /// <param name="IncludeETags">Whether to include its ETags.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         internal JObject ToJSON(Boolean                                                    Embedded,
                                 InfoStatus                                                 ExpandChargingPoolIds,
                                 InfoStatus                                                 ExpandChargingStationIds,
@@ -1751,7 +1768,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 InfoStatus                                                 ExpandDataLicenses,
                                 CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer,
                                 Boolean                                                    IncludeChildArrays,
-                                IReadOnlyCollection<ChargingPool>?                         OnlyChargingPools   = null)
+                                IReadOnlyCollection<ChargingPool>?                         OnlyChargingPools   = null,
+                                Boolean                                                    IncludeETags        = false,
+                                ETagDigestEncoding?                                        ETagDigestEncoding  = null)
         {
 
             try
@@ -1954,6 +1973,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 // Always part of the content.
                 POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
+
+                if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
+                    json.Add(eTags);
 
                 //json["EVSEGroups"] = POIJSON.Children(EVSEGroups);
                 //json["chargingStationGroups"] = POIJSON.Children(ChargingStationGroups);

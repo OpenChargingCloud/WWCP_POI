@@ -147,10 +147,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         protected static readonly  Byte                                               MinChargingStationOperatorNameLength   = 5;
 
         /// <summary>
-        /// The ETags of the canonical JSON and CBOR representations of this version, by their formats and hash algorithms,
-        /// calculated when asked for: a version never changes.
+        /// The ETags of this version, as CalcETags() calculated them.
         /// </summary>
-        private readonly ConcurrentDictionary<(ETagFormat Format, ETagHashAlgorithm HashAlgorithm), ETag>  contentETags = new ();
+        private ImmutableArray<ETag> eTags = [];
 
         #endregion
 
@@ -915,8 +914,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Check ETags          [optional]
 
                 if (JSON[BasePropertyKeys.ETags] is JToken eTagsJSON &&
-                    !TryCheckETags(RoamingNetwork,
-                                   eTagsJSON is JArray eTagsArray
+                    !RoamingNetwork.TryCheckETags(eTagsJSON is JArray eTagsArray
                                        ? [ .. eTagsArray.Select(eTag => ETag.Parse(eTag)) ]
                                        : [],
                                    out ErrorResponse))
@@ -1187,7 +1185,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // The ETags describe the content without them, irrespective of the view options.
             if (IncludeETags && ETags.Length > 0)
-                json.Add(BasePropertyKeys.ETags,                             new JArray(ETags.Select(eTag => eTag.ToJSON(ETagDigestEncoding ?? POI.ETagDigestEncoding.HEX))));
+                json.Add(BasePropertyKeys.ETags,                             new JArray(ETags.Select(eTag => eTag.ToJSON(ETagDigestEncoding ?? DefaultETagDigestEncoding))));
 
             // Whole numbers are integers in it, as every writer of its entities writes them (POIJSON.Number): ToString()
             // of it is read back with its ETags.
@@ -1521,8 +1519,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Check ETags          [optional]
 
                 if (CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.ETags), out var eTagsCBOR) &&
-                    !TryCheckETags(RoamingNetwork,
-                                   eTagsCBOR.Kind == CBORValueKind.Array
+                    !RoamingNetwork.TryCheckETags(eTagsCBOR.Kind == CBORValueKind.Array
                                        ? [ .. eTagsCBOR.AsArray().Select(eTag => ETag.Parse(eTag)) ]
                                        : [],
                                    out ErrorResponse))
@@ -1652,30 +1649,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) TryCheckETags(RoamingNetwork, DeclaredETags, out ErrorResponse)
+        #region TryCheckETags(ETags, out ErrorResponse)
 
         /// <summary>
-        /// The ETags a representation declares must be the ETags of the roaming network read from it:
-        /// stale or wrong ETags are refused, not ignored.
+        /// The ETags a representation declares must be the ETags of the roaming network read from it, also its effectiveTree
+        /// ETags: stale or wrong ETags are refused, not ignored. At least one must be declared.
         /// </summary>
-        /// <param name="RoamingNetwork">The roaming network read from the representation.</param>
-        /// <param name="DeclaredETags">The ETags the representation declares.</param>
+        /// <param name="ETags">The ETags the representation declares.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
-        private static Boolean TryCheckETags(RoamingNetwork                    RoamingNetwork,
-                                             ImmutableArray<ETag>              DeclaredETags,
-                                             [NotNullWhen(false)] out String?  ErrorResponse)
+        public override Boolean TryCheckETags(IEnumerable<ETag>                 ETags,
+                                              [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
-            if (MatchETags(DeclaredETags, RoamingNetwork, out var error))
+            if (MatchETags([ .. ETags ], this, out var error))
             {
                 ErrorResponse = null;
                 return true;
             }
 
-            ErrorResponse = $"The ETags of the roaming network '{RoamingNetwork.Id}' do not match its content: {error}";
+            ErrorResponse = $"The ETags of the roaming network '{Id}' do not match its content: {error}";
             return false;
 
         }
+
+        #endregion
+
+        #region ETags
+
+        /// <summary>
+        /// The ETags of this version, once CalcETags() calculated them: of its canonical JSON and CBOR representations and
+        /// its effectiveTree ETags; none before.
+        /// </summary>
+        public override ImmutableArray<ETag> ETags
+            => eTags;
 
         #endregion
 
@@ -1689,10 +1695,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<ETag> CalcETags()
         {
 
-            ETags = [ .. CalcChangeSetETags(),
+            eTags = [ .. CalcChangeSetETags(),
                       .. TreeHashAlgorithms.Select(EffectiveTreeETag) ];
 
-            return ETags;
+            return eTags;
 
         }
 
@@ -1711,26 +1717,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ContentETag(Format, HashAlgorithm = SHA256)
+        #region (protected override) ContentJSON() / ContentCBOR() / ContentOf(JSON) / ContentOf(CBOR)
 
         /// <summary>
-        /// The ETag of the canonical JSON or CBOR representation of this version, without ETags, without view options and
-        /// without custom serializers, calculated once per hash algorithm. Applying a change set checked those of the version
-        /// before it and calculated those after it twice, each time a serialization of the whole roaming network.
+        /// The content of this version its JSON and CBOR ETags describe (see ContentETag(…)): its canonical JSON and CBOR
+        /// representations, without ETags, without view options and without custom serializers. A roaming network has no
+        /// parent: they are its own representations, with its JSON-LD context. Applying a change set checks those of the
+        /// version before it and calculates those after it, each a serialization of the whole roaming network.
         /// </summary>
-        /// <param name="Format">The format, JSON or CBOR.</param>
-        /// <param name="HashAlgorithm">The hash algorithm.</param>
-        public ETag ContentETag(ETagFormat         Format,
-                                ETagHashAlgorithm  HashAlgorithm   = ETagHashAlgorithm.SHA256)
+        protected override JObject ContentJSON()
+            => ToJSON(IncludeETags: false);
 
-            => contentETags.GetOrAdd((Format, HashAlgorithm),
-                                     key => ETag.Compute(key.Format,
-                                                         key.HashAlgorithm,
-                                                         key.Format switch {
-                                                             ETagFormat.JSON  => CanonicalJSON.ToUTF8Bytes(ToJSON(IncludeETags: false)),
-                                                             ETagFormat.CBOR  => ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical),
-                                                             _                => throw new ArgumentOutOfRangeException(nameof(Format), "Only the JSON and CBOR representations have content ETags!")
-                                                         }));
+        /// <inheritdoc cref="ContentJSON"/>
+        protected override CBORValue ContentCBOR()
+            => ToCBOR(IncludeETags: false);
+
+        /// <summary>
+        /// The content of the given representation of this version: without its ETags, with its JSON-LD context.
+        /// </summary>
+        protected override JObject ContentOf(JObject JSON)
+        {
+            var content = (JObject) JSON.DeepClone();
+            content.Remove(BasePropertyKeys.ETags);
+            return content;
+        }
+
+        /// <inheritdoc cref="ContentOf(JObject)"/>
+        protected override CBORValue ContentOf(CBORValue CBOR)
+            => CBORValue.FromMap(CBOR.AsMap().Where(entry => !(entry.Key.TryGetText(out var key) && key == BasePropertyKeys.ETags)));
 
         #endregion
 

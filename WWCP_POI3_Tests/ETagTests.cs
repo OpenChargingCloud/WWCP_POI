@@ -49,12 +49,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                       );
 
             var j1  = rn1.ToJSON();
-            var e1  = rn1.CalcETags(JSON: j1);
+            var e1  = rn1.CalcChangeSetETags();
             var t1  = j1.ToString(Newtonsoft.Json.Formatting.None);
 
             var rn2 = RoamingNetwork.Parse(JObject.Parse(t1));
             var j2  = rn2.ToJSON();
-            var e2  = rn2.CalcETags(JSON: j2);
+            var e2  = rn2.CalcChangeSetETags();
             var t2  = j2.ToString(Newtonsoft.Json.Formatting.None);
 
             using (Assert.EnterMultipleScope())
@@ -86,12 +86,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                       );
 
             var c1  = rn1.ToCBOR();
-            var e1  = rn1.CalcETags(CBOR: c1);
+            var e1  = new[] { rn1.ContentETag(ETagFormat.CBOR) };
             var b1  = c1.ToByteArray(CBORWriterOptions.Canonical);
 
             var rn2 = RoamingNetwork.Parse(CBORValue.Parse(b1));
             var c2  = rn2.ToCBOR();
-            var e2  = rn2.CalcETags(CBOR: c2);
+            var e2  = new[] { rn2.ContentETag(ETagFormat.CBOR) };
             var b2  = c2.ToByteArray(CBORWriterOptions.Canonical);
 
             using (Assert.EnterMultipleScope())
@@ -155,35 +155,154 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
 
         #endregion
 
-        #region RoamingNetwork_CalcETags_replaces_only_its_own_format()
+        #region Entities_have_the_ETags_of_their_content_as_their_parent_embeds_it()
 
+        /// <summary>
+        /// The ETags of every entity are those of its content as its parent embeds it: the ones a precondition names.
+        /// </summary>
         [Test]
-        public void RoamingNetwork_CalcETags_replaces_only_its_own_format()
+        public void Entities_have_the_ETags_of_their_content_as_their_parent_embeds_it()
         {
 
-            var rn1       = new RoamingNetwork(
-                                Id:    RoamingNetwork_Id.Parse("rn1"),
-                                Name:  I18NString.Create(Languages.en, "Roaming Network 1")
-                            );
+            var network   = Proofs.StationProofTests.NewNetwork();
+            var gef       = network.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*GEF"))!;
+            var entities  = new List<(String Type, String Id, IHasContentETags Entity)> {
+                                (nameof(ChargingStationOperator), gef.Id.ToString(), gef)
+                            };
 
-            var json      = JObject.Parse("""{ "a": 1 }""");
-            var cbor      = CBORValue.FromText("b");
+            foreach (var chargingPool in gef.ChargingPools)
+            {
 
-            var jsonETag  = ETag.Compute(ETagFormat.JSON, CanonicalJSON.ToUTF8Bytes(json));
-            var cborETag  = ETag.Compute(ETagFormat.CBOR, cbor.ToByteArray(CBORWriterOptions.Canonical));
+                entities.Add((nameof(ChargingPool), chargingPool.Id.ToString(), chargingPool));
+
+                foreach (var chargingStation in chargingPool.ChargingStations)
+                {
+
+                    entities.Add((nameof(ChargingStation), chargingStation.Id.ToString(), chargingStation));
+
+                    foreach (var evse in chargingStation.EVSEs)
+                        entities.Add((nameof(EVSE), evse.Id.ToString(), evse));
+
+                }
+
+            }
+
+            entities.AddRange(gef.    ChargingTariffs.             Select(entity => (nameof(ChargingTariff),              entity.Id.ToString(), (IHasContentETags) entity)));
+            entities.AddRange(network.GridOperators.               Select(entity => (nameof(GridOperator),                entity.Id.ToString(), (IHasContentETags) entity)));
+            entities.AddRange(network.ParkingOperators.            Select(entity => (nameof(ParkingOperator),             entity.Id.ToString(), (IHasContentETags) entity)));
+            entities.AddRange(network.ChargingStationManufacturers.Select(entity => (nameof(ChargingStationManufacturer), entity.Id.ToString(), (IHasContentETags) entity)));
+
+            using (Assert.EnterMultipleScope())
+            {
+                foreach (var (type, id, entity) in entities)
+                {
+                    foreach (var format in new[] { ETagFormat.JSON, ETagFormat.CBOR })
+                    {
+                        Assert.That(network.TryGetEntityETag(type, id, out var eTag, format),  Is.True,                         $"{type} '{id}'");
+                        Assert.That(entity.ContentETag(format),                               Is.EqualTo(eTag),                $"{type} '{id}', {format}");
+                    }
+                    Assert.That(entity.ETags,  Is.EqualTo(new[] { entity.ContentETag(ETagFormat.JSON), entity.ContentETag(ETagFormat.CBOR) }),  $"{type} '{id}'");
+                }
+            }
+
+        }
+
+        #endregion
+
+        #region An_entity_writes_and_checks_its_ETags()
+
+        /// <summary>
+        /// A representation of an entity of its own includes its ETags when asked to, in Base64 unless told otherwise; an
+        /// embedded one never by default. Reading it checks them: stale ones are refused.
+        /// </summary>
+        [Test]
+        public void An_entity_writes_and_checks_its_ETags()
+        {
+
+            var evse     = new EVSE(EVSE_Id.Parse("DE*GEF*E1*1"),
+                                    MaxPower:  Watt.FromW(22000),
+                                    Created:   DateTimeOffset.Parse("2026-01-01T00:00:00Z"));
+
+            var json     = evse.ToJSON(IncludeETags: true);
+            var hex      = evse.ToJSON(IncludeETags: true, ETagDigestEncoding: ETagDigestEncoding.HEX);
+
+            var changed  = (JObject) json.DeepClone();
+            changed["maxPower"] = 11000;
+
+            var content  = evse.ToJSON(Embedded: true);
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(rn1.CalcETags(CBOR: cbor),                  Is.EqualTo([cborETag]));
-                Assert.That(rn1.CalcETags(JSON: json, Replace: false),  Is.EqualTo([jsonETag, cborETag]));
-                Assert.That(rn1.CalcETags(CBOR: cbor, Replace: false),  Is.EqualTo([jsonETag, cborETag]));
-                Assert.That(rn1.ETags,                                  Is.EqualTo([jsonETag, cborETag]));
+                Assert.That(evse.ToJSON().             ContainsKey("eTags"),  Is.False);
+                Assert.That(evse.ToJSON(Embedded: true).ContainsKey("eTags"),  Is.False);
 
-                // Without Replace: false, the ETag of the other format is gone.
-                Assert.That(rn1.CalcETags(JSON: json),                  Is.EqualTo([jsonETag]));
-                Assert.That(rn1.ETags,                                  Is.EqualTo([jsonETag]));
+                Assert.That(evse.ETags,  Is.EqualTo(new[] {
+                                                        ETag.Compute(ETagFormat.JSON, CanonicalJSON.ToUTF8Bytes(content)),
+                                                        ETag.Compute(ETagFormat.CBOR, CBORJSON.ToCBOR(content).ToByteArray(CBORWriterOptions.Canonical))
+                                                    }));
 
+                Assert.That(json["eTags"]!.Select(ETag.Parse),          Is.EqualTo(evse.ETags));
+                Assert.That(json["eTags"]![0]![2]!.Value<String>(),     Is.EqualTo("base64"));
+                Assert.That(hex ["eTags"]![0]![2]!.Value<String>(),     Is.EqualTo("hex"));
+
+                Assert.That(EVSE.TryParse(json,    out var parsed, out var error1),  Is.True,  error1);
+                Assert.That(parsed!.ETags,                                          Is.EqualTo(evse.ETags));
+                Assert.That(EVSE.TryParse(hex,     out _,          out var error2),  Is.True,  error2);
+                Assert.That(EVSE.TryParse(changed, out _,          out var error3),  Is.False);
+                Assert.That(error3,                                                 Does.Contain("does not match its content"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region An_operator_checks_its_ETags_in_CBOR()
+
+        /// <summary>
+        /// The CBOR representation of a charging station operator includes its ETags when asked to, and reading it checks them.
+        /// </summary>
+        [Test]
+        public void An_operator_checks_its_ETags_in_CBOR()
+        {
+
+            var gef      = Proofs.StationProofTests.NewNetwork().GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*GEF"))!;
+            var cbor     = gef.ToCBOR(IncludeETags: true);
+            var changed  = CBORValue.FromMap(cbor.AsMap().Append(new KeyValuePair<CBORValue, CBORValue>(CBORValue.FromText("dataSource"), CBORValue.FromText("changed"))));
+
+            Assert.That(cbor.TryGetValue(CBORValue.FromText("eTags"), out var eTags),  Is.True);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(eTags.AsArray().Select(ETag.Parse),                                       Is.EqualTo(gef.ETags));
+                Assert.That(gef.ToCBOR().TryGetValue(CBORValue.FromText("eTags"), out _),             Is.False);
+                Assert.That(ChargingStationOperator.TryParse(cbor,    out var parsed, out var error1),  Is.True,  error1);
+                Assert.That(parsed!.ETags,                                                            Is.EqualTo(gef.ETags));
+                Assert.That(ChargingStationOperator.TryParse(changed, out _,          out var error2),  Is.False);
+                Assert.That(error2,                                                                   Does.Contain("does not match its content"));
+            }
+
+        }
+
+        #endregion
+
+        #region RoamingNetwork_writes_its_ETags_in_Base64()
+
+        [Test]
+        public void RoamingNetwork_writes_its_ETags_in_Base64()
+        {
+
+            var rn1 = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
+                                         Name: I18NString.Create(Languages.en, "Roaming Network 1"));
+
+            rn1.CalcETags();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(rn1.ToJSON()["eTags"]!.Select(eTag => eTag[2]!.Value<String>()),                                           Is.All.EqualTo("base64"));
+                Assert.That(rn1.ToJSON(ETagDigestEncoding: ETagDigestEncoding.HEX)["eTags"]!.Select(eTag => eTag[2]!.Value<String>()),  Is.All.EqualTo("hex"));
+                Assert.That(RoamingNetwork.Parse(rn1.ToJSON()).CalcETags(),                                                          Is.EqualTo(rn1.ETags));
             }
 
         }
@@ -238,7 +357,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
                 Assert.That(error5,                                           Does.Contain("CBOR ETag does not match the content"));
 
                 Assert.That(rn1.ValidateETags(wrongCBOR,   out var error6),   Is.False);
-                Assert.That(error6,                                           Does.Contain("CBOR ETag does not match the stored one"));
+                Assert.That(error6,                                           Does.Contain("do not match its content: The CBOR ETag"));
 
                 Assert.That(rn1.ValidateETags(twice,       out var error7),   Is.False);
                 Assert.That(error7,                                           Does.Contain("must not be declared twice"));

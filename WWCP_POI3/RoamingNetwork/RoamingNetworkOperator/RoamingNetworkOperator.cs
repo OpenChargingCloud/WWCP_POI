@@ -693,16 +693,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Check ETags          [optional]
 
-                //if (JSON[BasePropertyKeys.ETags] is JToken eTagsJSON &&
-                //    !TryCheckETags(RoamingNetworkOperator,
-                //                   eTagsJSON is JArray eTagsArray
-                //                       ? [ .. eTagsArray.Select(eTag => ETag.Parse(eTag)) ]
-                //                       : [],
-                //                   out ErrorResponse))
-                //{
-                //    RoamingNetworkOperator = null;
-                //    return false;
-                //}
+                if (!TryCheckETagsOf(JSON, RoamingNetworkOperator, out ErrorResponse))
+                {
+                    RoamingNetworkOperator = null;
+                    return false;
+                }
 
                 #endregion
 
@@ -721,6 +716,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
         }
+
+        #endregion
+
+        #region (protected override) ContentJSON()
+
+        /// <inheritdoc/>
+        protected override JObject ContentJSON()
+
+            => ToJSON(Embedded: true);
 
         #endregion
 
@@ -780,9 +784,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                ? new JProperty(PropertyKeys.    KeyStatement,          KeyStatement.            ToJSON(Embedded: true))
                                : null,
 
-                           IncludeETags && ETags.Length > 0
-                               ? new JProperty(BasePropertyKeys.ETags,                 new JArray(ETags.Select(eTag => eTag.ToJSON(ETagDigestEncoding ?? DefaultETagDigestEncoding))))
-                               : null
+                           ETagsProperty(IncludeETags, ETagDigestEncoding)
 
             );
 
@@ -964,6 +966,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                          );
 
+                if (!TryCheckETagsOf(CBOR, RoamingNetworkOperator, out ErrorResponse))
+                {
+                    RoamingNetworkOperator = null;
+                    return false;
+                }
+
                 ErrorResponse = null;
                 return true;
 
@@ -1043,8 +1051,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 cbor.Add(CBORValue.FromText(PropertyKeys.CustomData),             CBORJSON.ToCBOR(CustomData.ToJObject()));
 
             // The ETags describe the content without them, irrespective of the view options.
-            if (IncludeETags && ETags.Length > 0)
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.ETags),              CBORValue.FromArray(ETags.Select(eTag => eTag.ToCBOR())));
+            AddETagsTo(cbor, IncludeETags);
 
             return CustomRoamingNetworkOperatorSerializer is not null
                        ? CustomRoamingNetworkOperatorSerializer(this, cbor)

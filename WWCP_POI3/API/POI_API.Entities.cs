@@ -2054,7 +2054,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The HTTP ETag of the given entity as its parent embeds it, in the format the request prefers: the one a
-        /// precondition of a change set names, also of an entity served as it is at runtime. Calculated once per version.
+        /// precondition of a change set names, also of an entity served as it is at runtime. Calculated once per version,
+        /// by an entity having content ETags itself (IHasContentETags).
         /// </summary>
         private String StoredETagOf(HTTPRequest   Request,
                                     Object        Stored,
@@ -2062,10 +2063,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var format = FormatOf(Request);
+            var eTag   = Stored is IHasContentETags entity
+                             ? entity.ContentETag(format)
+                             : representationCache.GetValue(Stored, _ => new Representations()).
+                                                   GetOrAdd("", format, () => POIRepresentation.Of(JSON(), format)).
+                                                   ETag;
 
-            return $"\"{representationCache.GetValue(Stored, _ => new Representations()).
-                                             GetOrAdd("", format, () => POIRepresentation.Of(JSON(), format)).
-                                             ETag.ToString(ETagDigestEncoding.HEX)}\"";
+            return $"\"{eTag.ToString(ETagDigestEncoding.HEX)}\"";
 
         }
 

@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -32,11 +33,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
+    /// An entity whose ETags describe its content (SPECIFICATION.md, section 7).
+    /// </summary>
+    public interface IHasContentETags
+    {
+
+        /// <summary>
+        /// The ETag of the canonical JSON or the deterministic CBOR content of this entity.
+        /// </summary>
+        /// <param name="Format">The format, JSON or CBOR.</param>
+        /// <param name="HashAlgorithm">The hash algorithm.</param>
+        ETag                  ContentETag(ETagFormat Format, ETagHashAlgorithm HashAlgorithm = ETagHashAlgorithm.SHA256);
+
+        /// <summary>
+        /// The ETags of this entity.
+        /// </summary>
+        ImmutableArray<ETag>  ETags    { get; }
+
+    }
+
+
+    /// <summary>
     /// An abstract e-mobility entity.
     /// </summary>
     public abstract class AImmutableEMobilityEntity<TId,
                                                     TAdminStatus,
                                                     TStatus> : AImmutableInternalData,
+                                                               IHasContentETags,
                                                                IImmutableEntity<TId>,
                                                                IHasId<TId>,
                                                                IAdminStatus<TAdminStatus>,
@@ -162,11 +185,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         [Optional]
         public String?               DataSource     { get; private set; }
-
-        /// <summary>
-        /// Identifiers of the canonical JSON and deterministic CBOR representations.
-        /// </summary>
-        public ImmutableArray<ETag>  ETags          { get; protected set; } = [];
 
         #endregion
 
@@ -709,123 +727,241 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region ETags
 
-        #region (private) MergeWithETags(ETag)
+        /// <summary>
+        /// The ETags of this entity's content, by format and hash algorithm, created when one is asked for.
+        /// </summary>
+        private ConcurrentDictionary<(ETagFormat Format, ETagHashAlgorithm HashAlgorithm), ETag>? contentETags;
+
+        #region (protected abstract) ContentJSON()
 
         /// <summary>
-        /// Merge the new ETag with the existing ones, replacing only the ETag of the same format
-        /// and keeping the others, ordered by their format: JSON before CBOR.
+        /// The JSON representation of this entity its ETags describe, without them: as its parent embeds it, the one
+        /// the HTTP ETag of POI_API and a precondition of a change set name (SPECIFICATION.md, section 7).
         /// </summary>
-        /// <param name="ETag">The new ETag.</param>
-        private ImmutableArray<ETag> MergeWithETags(ETag ETag)
+        protected abstract JObject ContentJSON();
+
+        #endregion
+
+        #region (protected virtual) ContentCBOR()
+
+        /// <summary>
+        /// The CBOR representation of this entity its ETags describe, without them: the keys and values of its
+        /// JSON representation (see ContentJSON()), as POI_API serves it.
+        /// </summary>
+        protected virtual CBORValue ContentCBOR()
+
+            => CBORJSON.ToCBOR(ContentJSON());
+
+        #endregion
+
+        #region ContentETag(Format, HashAlgorithm = SHA256)
+
+        /// <summary>
+        /// The ETag of the canonical JSON or the deterministic CBOR content of this entity, calculated once per format and
+        /// hash algorithm: an entity is immutable, and shared by the versions that did not change it.
+        /// </summary>
+        /// <param name="Format">The format, JSON or CBOR.</param>
+        /// <param name="HashAlgorithm">The hash algorithm.</param>
+        public ETag ContentETag(ETagFormat         Format,
+                                ETagHashAlgorithm  HashAlgorithm   = ETagHashAlgorithm.SHA256)
         {
 
-            ETags = [ .. (ETags.IsDefault ? [] : ETags).
-                             Where  (eTag => eTag.Format != ETag.Format).
-                             Append (ETag).
-                             OrderBy(eTag => eTag.Format) ];
+            if (contentETags is null)
+                Interlocked.CompareExchange(ref contentETags, new (), null);
 
-            return ETags;
+            return contentETags.GetOrAdd((Format, HashAlgorithm),
+                                         key => ETag.Compute(key.Format,
+                                                             key.HashAlgorithm,
+                                                             key.Format switch {
+                                                                 ETagFormat.JSON  => CanonicalJSON.ToUTF8Bytes(ContentJSON()),
+                                                                 ETagFormat.CBOR  => ContentCBOR().ToByteArray(CBORWriterOptions.Canonical),
+                                                                 _                => throw new ArgumentOutOfRangeException(nameof(Format), "Only the JSON and CBOR representations have content ETags!")
+                                                             }));
 
         }
 
         #endregion
 
-        #region CalcETags (JSON, Replace = true)
+        #region ETags
 
         /// <summary>
-        /// Calculate the ETag(s) of the given canonical JSON representation and store them in this entity.
+        /// The ETags of this entity: of its JSON and of its CBOR content (see ContentETag(…)), with SHA-256.
         /// </summary>
-        /// <param name="JSON">The canonical JSON representation.</param>
-        /// <param name="Replace">Whether to replace the existing ETags or merge with them.</param>
-        public ImmutableArray<ETag> CalcETags(JObject  JSON,
-                                              Boolean  Replace   = true)
+        public virtual ImmutableArray<ETag> ETags
+
+            => [ ContentETag(ETagFormat.JSON),
+                 ContentETag(ETagFormat.CBOR) ];
+
+        #endregion
+
+        #region TryCheckETags(ETags, out ErrorResponse)
+
+        /// <summary>
+        /// Whether every given ETag is the one of the content of this entity, of its format and hash algorithm: stale or
+        /// wrong ETags are refused, not ignored.
+        /// </summary>
+        /// <param name="ETags">ETags, e.g. those a representation of this entity declares.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public virtual Boolean TryCheckETags(IEnumerable<ETag>                 ETags,
+                                             [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
-            var eTag = ETag.Compute(
-                           ETagFormat.JSON,
-                           CanonicalJSON.ToUTF8Bytes(JSON)
-                       );
-
-            if (Replace)
+            foreach (var eTag in ETags)
             {
-                ETags = [ eTag ];
-                return ETags;
+
+                if (eTag.Format is not (ETagFormat.JSON or ETagFormat.CBOR))
+                {
+                    ErrorResponse = $"The {GetType().Name} '{Id}' has no {eTag.Format} ETag!";
+                    return false;
+                }
+
+                if (!ContentETag(eTag.Format, eTag.HashAlgorithm).Equals(eTag))
+                {
+                    ErrorResponse = $"The {eTag.Format} ETag ({eTag.HashAlgorithm}) of the {GetType().Name} '{Id}' does not match its content!";
+                    return false;
+                }
+
             }
 
-            return MergeWithETags(eTag);
+            ErrorResponse = null;
+            return true;
 
         }
 
         #endregion
 
-        #region CalcETags (CBOR, Replace = true)
+        #region (protected) ETagsProperty(IncludeETags, ETagDigestEncoding)
 
         /// <summary>
-        /// Calculate the ETag(s) of the given deterministic CBOR representation and store them in this entity.
+        /// The property of the ETags of the JSON representation of this entity, when it is to include them: they describe
+        /// its content, irrespective of the view options of the representation. Base64 unless told otherwise.
         /// </summary>
-        /// <param name="CBOR">The deterministic CBOR representation.</param>
-        /// <param name="Replace">Whether to replace the existing ETags or merge with them.</param>
-        public ImmutableArray<ETag> CalcETags(CBORValue  CBOR,
-                                              Boolean    Replace   = true)
+        /// <param name="IncludeETags">Whether to include its ETags.</param>
+        /// <param name="ETagDigestEncoding">The encoding of their digests, Base64 by default.</param>
+        protected JProperty? ETagsProperty(Boolean              IncludeETags,
+                                           ETagDigestEncoding?  ETagDigestEncoding)
+
+            => IncludeETags && ETags.Length > 0
+                   ? new JProperty(BasePropertyKeys.ETags, new JArray(ETags.Select(eTag => eTag.ToJSON(ETagDigestEncoding ?? DefaultETagDigestEncoding))))
+                   : null;
+
+        #endregion
+
+        #region (protected) AddETagsTo(CBOR, IncludeETags)
+
+        /// <summary>
+        /// Add the ETags of this entity to its CBOR representation, when it is to include them: they describe its content,
+        /// irrespective of the view options of the representation.
+        /// </summary>
+        /// <param name="CBOR">The CBOR representation of this entity.</param>
+        /// <param name="IncludeETags">Whether to include its ETags.</param>
+        protected void AddETagsTo(CBORMap  CBOR,
+                                  Boolean  IncludeETags)
+        {
+            if (IncludeETags && ETags.Length > 0)
+                CBOR.Add(CBORValue.FromText(BasePropertyKeys.ETags), CBORValue.FromArray(ETags.Select(eTag => eTag.ToCBOR())));
+        }
+
+        #endregion
+
+        #region (protected static) TryCheckETagsOf(JSON, Entity, out ErrorResponse)
+
+        /// <summary>
+        /// The ETags the given JSON representation of the given entity read from it declares, if any, must be its own ones.
+        /// </summary>
+        /// <param name="JSON">The JSON representation.</param>
+        /// <param name="Entity">The entity read from it.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        protected static Boolean TryCheckETagsOf(JObject                                               JSON,
+                                                 AImmutableEMobilityEntity<TId, TAdminStatus, TStatus>  Entity,
+                                                 [NotNullWhen(false)] out String?                      ErrorResponse)
         {
 
-            var eTag = ETag.Compute(
-                           ETagFormat.CBOR,
-                           CBOR.ToByteArray(CBORWriterOptions.Canonical)
-                       );
-
-            if (Replace)
+            if (JSON[BasePropertyKeys.ETags] is not JToken eTagsJSON)
             {
-                ETags = [ eTag ];
-                return ETags;
+                ErrorResponse = null;
+                return true;
             }
 
-            return MergeWithETags(eTag);
+            if (eTagsJSON is not JArray eTagsArray)
+            {
+                ErrorResponse = $"The ETags of the {Entity.GetType().Name} '{Entity.Id}' must be a JSON array!";
+                return false;
+            }
+
+            var eTags = new List<ETag>();
+
+            foreach (var eTagJSON in eTagsArray)
+            {
+                try
+                {
+                    eTags.Add(ETag.Parse(eTagJSON));
+                }
+                catch (Exception e)
+                {
+                    ErrorResponse = $"Invalid ETag of the {Entity.GetType().Name} '{Entity.Id}': {e.Message}";
+                    return false;
+                }
+            }
+
+            return Entity.TryCheckETags(eTags, out ErrorResponse);
 
         }
 
         #endregion
 
-        #region CalcETags (JSON, CBOR)
+        #region (protected static) TryCheckETagsOf(CBOR, Entity, out ErrorResponse)
 
         /// <summary>
-        /// Calculate the ETag(s) of the given canonical JSON and deterministic CBOR representations
-        /// and store them in this entity.
+        /// The ETags the given CBOR representation of the given entity read from it declares, if any, must be its own ones.
         /// </summary>
-        /// <param name="JSON">The canonical JSON representation.</param>
-        /// <param name="CBOR">The deterministic CBOR representation.</param>
-        public ImmutableArray<ETag> CalcETags(JObject   JSON,
-                                              CBORValue CBOR)
+        /// <param name="CBOR">The CBOR representation.</param>
+        /// <param name="Entity">The entity read from it.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        protected static Boolean TryCheckETagsOf(CBORValue                                             CBOR,
+                                                 AImmutableEMobilityEntity<TId, TAdminStatus, TStatus>  Entity,
+                                                 [NotNullWhen(false)] out String?                      ErrorResponse)
         {
 
-            ETags = [
+            if (!CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.ETags), out var eTagsCBOR))
+            {
+                ErrorResponse = null;
+                return true;
+            }
 
-                        ETag.Compute(
-                            ETagFormat.JSON,
-                            CanonicalJSON.ToUTF8Bytes(JSON)
-                        ),
+            if (eTagsCBOR.Kind != CBORValueKind.Array)
+            {
+                ErrorResponse = $"The ETags of the {Entity.GetType().Name} '{Entity.Id}' must be a CBOR array!";
+                return false;
+            }
 
-                        ETag.Compute(
-                            ETagFormat.CBOR,
-                            CBOR.ToByteArray(CBORWriterOptions.Canonical)
-                        )
+            var eTags = new List<ETag>();
 
-                    ];
+            foreach (var eTagCBOR in eTagsCBOR.AsArray())
+            {
+                try
+                {
+                    eTags.Add(ETag.Parse(eTagCBOR));
+                }
+                catch (Exception e)
+                {
+                    ErrorResponse = $"Invalid ETag of the {Entity.GetType().Name} '{Entity.Id}': {e.Message}";
+                    return false;
+                }
+            }
 
-            return ETags;
+            return Entity.TryCheckETags(eTags, out ErrorResponse);
 
         }
 
         #endregion
-
 
         #region ValidateETags (JSON, out ErrorResponse)
 
         /// <summary>
-        /// Validate the ETags declared in the given JSON representation of this entity:
-        /// The JSON ETag must be the ETag of the representation without its ETags,
-        /// every other declared ETag must equal the stored ETag of its format, if one is stored.
-        /// The representation must be the one the ETags were calculated over, e.g. not an embedded one.
+        /// Validate the ETags declared in the given JSON representation of this entity, e.g. as POI_API served it: its JSON
+        /// ETags must be those of the representation without them (see ContentOf(JSON)), and every other one the one of
+        /// this entity (see TryCheckETags(…)).
         /// </summary>
         /// <param name="JSON">The JSON representation including its ETags.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
@@ -854,17 +990,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
             }
 
-            var content = (JObject) JSON.DeepClone();
-            content.Remove(BasePropertyKeys.ETags);
+            var content = CanonicalJSON.ToUTF8Bytes(ContentOf(JSON));
 
-            return ValidateETags(
-                       declaredETags,
-                       ETag.Compute(
-                           ETagFormat.JSON,
-                           CanonicalJSON.ToUTF8Bytes(content)
-                       ),
-                       out ErrorResponse
-                   );
+            return ValidateETags(declaredETags,
+                                 ETagFormat.JSON,
+                                 hashAlgorithm => ETag.Compute(ETagFormat.JSON, hashAlgorithm, content),
+                                 out ErrorResponse);
 
         }
 
@@ -873,10 +1004,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region ValidateETags (CBOR, out ErrorResponse)
 
         /// <summary>
-        /// Validate the ETags declared in the given CBOR representation of this entity:
-        /// The CBOR ETag must be the ETag of the representation without its ETags,
-        /// every other declared ETag must equal the stored ETag of its format, if one is stored.
-        /// The representation must be the one the ETags were calculated over, e.g. not an embedded one.
+        /// Validate the ETags declared in the given CBOR representation of this entity, e.g. as POI_API served it: its CBOR
+        /// ETags must be those of the representation without them (see ContentOf(CBOR)), and every other one the one of
+        /// this entity (see TryCheckETags(…)).
         /// </summary>
         /// <param name="CBOR">The CBOR representation including its ETags.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
@@ -907,72 +1037,95 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
             }
 
-            var content = CBORValue.FromMap(CBOR.AsMap().Where(entry => !(entry.Key.TryGetText(out var key) && key == BasePropertyKeys.ETags)));
+            var content = ContentOf(CBOR).ToByteArray(CBORWriterOptions.Canonical);
 
-            return ValidateETags(
-                       declaredETags,
-                       ETag.Compute(
-                           ETagFormat.CBOR,
-                           content.ToByteArray(CBORWriterOptions.Canonical)
-                       ),
-                       out ErrorResponse
-                   );
+            return ValidateETags(declaredETags,
+                                 ETagFormat.CBOR,
+                                 hashAlgorithm => ETag.Compute(ETagFormat.CBOR, hashAlgorithm, content),
+                                 out ErrorResponse);
 
         }
 
         #endregion
 
-        #region (private) ValidateETags (DeclaredETags, CalculatedETag, out ErrorResponse)
+        #region (protected virtual) ContentOf(JSON) / ContentOf(CBOR)
 
         /// <summary>
-        /// Validate the declared ETags against the ETag calculated over the content
-        /// and against the stored ETags of the other formats.
+        /// The content of the given JSON representation of this entity, as its ETags describe it: without its ETags and,
+        /// as its parent embeds it, without its JSON-LD context.
         /// </summary>
-        /// <param name="DeclaredETags">The ETags declared in a representation.</param>
-        /// <param name="CalculatedETag">The ETag calculated over the representation without its ETags.</param>
-        /// <param name="ErrorResponse">An optional error response.</param>
-        private Boolean ValidateETags(IReadOnlyList<ETag>               DeclaredETags,
-                                      ETag                              CalculatedETag,
-                                      [NotNullWhen(false)] out String?  ErrorResponse)
+        /// <param name="JSON">A JSON representation of this entity.</param>
+        protected virtual JObject ContentOf(JObject JSON)
         {
 
-            var duplicateFormat = DeclaredETags.GroupBy(eTag => eTag.Format).FirstOrDefault(group => group.Count() > 1);
+            var content = (JObject) JSON.DeepClone();
 
-            if (duplicateFormat is not null)
+            content.Remove(BasePropertyKeys.ETags);
+            content.Remove(BasePropertyKeys.Context);
+
+            return content;
+
+        }
+
+        /// <summary>
+        /// The content of the given CBOR representation of this entity, as its ETags describe it: without its ETags and,
+        /// as its parent embeds it, without its JSON-LD context.
+        /// </summary>
+        /// <param name="CBOR">A CBOR representation of this entity.</param>
+        protected virtual CBORValue ContentOf(CBORValue CBOR)
+
+            => CBORValue.FromMap(CBOR.AsMap().Where(entry => !(entry.Key.TryGetText(out var key) && key is BasePropertyKeys.ETags or BasePropertyKeys.Context)));
+
+        #endregion
+
+        #region (private) ValidateETags (DeclaredETags, Format, Calculated, out ErrorResponse)
+
+        /// <summary>
+        /// Validate the declared ETags: those of the given format against the ETags calculated over the representation,
+        /// the others against the ETags of this entity.
+        /// </summary>
+        /// <param name="DeclaredETags">The ETags declared in a representation.</param>
+        /// <param name="Format">The format of the representation.</param>
+        /// <param name="Calculated">The ETag of the representation without its ETags, by hash algorithm.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        private Boolean ValidateETags(IReadOnlyList<ETag>                  DeclaredETags,
+                                      ETagFormat                           Format,
+                                      Func<ETagHashAlgorithm, ETag>        Calculated,
+                                      [NotNullWhen(false)] out String?     ErrorResponse)
+        {
+
+            var duplicate = DeclaredETags.GroupBy(eTag => (eTag.Format, eTag.HashAlgorithm)).FirstOrDefault(group => group.Count() > 1);
+
+            if (duplicate is not null)
             {
-                ErrorResponse = $"The {duplicateFormat.Key} ETag must not be declared twice!";
+                ErrorResponse = $"The {duplicate.Key.Format} ETag ({duplicate.Key.HashAlgorithm}) must not be declared twice!";
                 return false;
             }
 
-            var declaredETags = DeclaredETags.Where(eTag => eTag.Format == CalculatedETag.Format).ToArray();
+            var ofTheFormat = DeclaredETags.Where(eTag => eTag.Format == Format).ToArray();
 
-            if (declaredETags.Length == 0)
+            if (ofTheFormat.Length == 0)
             {
-                ErrorResponse = $"The {CalculatedETag.Format} ETag is missing!";
+                ErrorResponse = $"The {Format} ETag is missing!";
                 return false;
             }
 
-            if (!declaredETags[0].Equals(CalculatedETag))
-            {
-                ErrorResponse = $"The {CalculatedETag.Format} ETag does not match the content!";
-                return false;
-            }
-
-            foreach (var declaredETag in DeclaredETags.Where(eTag => eTag.Format != CalculatedETag.Format))
-            {
-
-                var storedETags = (ETags.IsDefault ? [] : ETags).Where(eTag => eTag.Format == declaredETag.Format).ToArray();
-
-                if (storedETags.Length > 0 && !storedETags[0].Equals(declaredETag))
+            foreach (var declaredETag in ofTheFormat)
+                if (!declaredETag.Equals(Calculated(declaredETag.HashAlgorithm)))
                 {
-                    ErrorResponse = $"The {declaredETag.Format} ETag does not match the stored one!";
+                    ErrorResponse = $"The {Format} ETag does not match the content!";
                     return false;
                 }
 
+            var others = DeclaredETags.Where(eTag => eTag.Format != Format).ToArray();
+
+            if (others.Length == 0)
+            {
+                ErrorResponse = null;
+                return true;
             }
 
-            ErrorResponse = null;
-            return true;
+            return TryCheckETags(others, out ErrorResponse);
 
         }
 

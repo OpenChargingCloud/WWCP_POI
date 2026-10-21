@@ -432,6 +432,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               CustomData:  customData
                                           );
 
+                if (!TryCheckETagsOf(JSON, ChargingStationOperator, out ErrorResponse))
+                {
+                    ChargingStationOperator = null;
+                    return false;
+                }
+
                 if (CustomChargingStationOperatorParser is not null)
                     ChargingStationOperator = CustomChargingStationOperatorParser(JSON,
                                                                                   ChargingStationOperator);
@@ -506,9 +512,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                return TryParse(json,
-                                out ChargingStationOperator,
-                                out ErrorResponse);
+                // Its ETags are those of the CBOR representation, checked there.
+                json.Remove(BasePropertyKeys.ETags);
+
+                if (!TryParse(json,
+                              out ChargingStationOperator,
+                              out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!TryCheckETagsOf(CBOR, ChargingStationOperator, out ErrorResponse))
+                {
+                    ChargingStationOperator = null;
+                    return false;
+                }
+
+                return true;
 
             }
             catch (Exception e)
@@ -530,8 +550,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Write it with CBORWriterOptions.Canonical for deterministic bytes.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
         /// <param name="CustomChargingStationOperatorSerializer">An optional delegate to customize the CBOR representation.</param>
         public CBORValue ToCBOR(Boolean                                                 Embedded                                  = false,
+                                Boolean                                                 IncludeETags                              = false,
                                 CustomCBORSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null)
         {
 
@@ -612,6 +634,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (CustomData.HasValues)
                 cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),                CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            AddETagsTo(cbor, IncludeETags);
 
             return CustomChargingStationOperatorSerializer is not null
                        ? CustomChargingStationOperatorSerializer(this, cbor)

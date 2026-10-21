@@ -321,14 +321,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (protected override) ContentJSON()
+
+        /// <inheritdoc/>
+        protected override JObject ContentJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
         #region ToJSON(Embedded = false, CustomEnergyMeterSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this energy meter, as what it measures embeds it.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         /// <param name="CustomEnergyMeterSerializer">A delegate to serialize custom energy meter JSON objects.</param>
         public JObject ToJSON(Boolean                                        Embedded                      = false,
+                              Boolean                                        IncludeETags                  = false,
+                              ETagDigestEncoding?                            ETagDigestEncoding            = null,
                               CustomJObjectSerializerDelegate<EnergyMeter>?  CustomEnergyMeterSerializer   = null)
         {
 
@@ -382,6 +395,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.TemplateIds,                 POIJSON.IdsToJSON(TemplateIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
+
+            if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
+                json.Add(eTags);
 
             return CustomEnergyMeterSerializer is not null
                        ? CustomEnergyMeterSerializer(this, json)
@@ -500,6 +516,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               Created:     created,
                                               LastChange:  lastChange,
                                               CustomData:  customData);
+
+                if (!TryCheckETagsOf(JSON, EnergyMeter, out ErrorResponse))
+                {
+                    EnergyMeter = null;
+                    return false;
+                }
 
                 ErrorResponse = null;
                 return true;

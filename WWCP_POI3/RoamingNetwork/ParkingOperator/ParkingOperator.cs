@@ -511,6 +511,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (protected override) ContentJSON()
+
+        /// <inheritdoc/>
+        protected override JObject ContentJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
         #region ToJSON(Embedded = false, CustomParkingOperatorSerializer = null)
 
         /// <summary>
@@ -518,11 +527,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// with its parking garages, parking spaces, parking sensors, parking space groups and parking products.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         /// <param name="CustomParkingOperatorSerializer">A delegate to serialize custom parking operator JSON objects.</param>
         public JObject ToJSON(Boolean                                            Embedded                          = false,
+                              Boolean                                            IncludeETags                      = false,
+                              ETagDigestEncoding?                                ETagDigestEncoding                = null,
                               CustomJObjectSerializerDelegate<ParkingOperator>?  CustomParkingOperatorSerializer   = null)
 
             => ToJSON(Embedded,
+                      IncludeETags,
+                      ETagDigestEncoding,
                       CustomParkingOperatorSerializer,
                       IncludeChildArrays: true);
 
@@ -534,6 +549,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         internal JObject ToJSON(Boolean IncludeChildArrays)
 
             => ToJSON(Embedded:                         true,
+                      IncludeETags:                     false,
+                      ETagDigestEncoding:               null,
                       CustomParkingOperatorSerializer:  null,
                       IncludeChildArrays:               IncludeChildArrays);
 
@@ -541,9 +558,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The JSON representation of this parking operator, with or without its child arrays.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         /// <param name="CustomParkingOperatorSerializer">A delegate to serialize custom parking operator JSON objects.</param>
         /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
         private JObject ToJSON(Boolean                                            Embedded,
+                               Boolean                                            IncludeETags,
+                               ETagDigestEncoding?                                ETagDigestEncoding,
                                CustomJObjectSerializerDelegate<ParkingOperator>?  CustomParkingOperatorSerializer,
                                Boolean                                            IncludeChildArrays)
         {
@@ -595,6 +616,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
+            if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
+                json.Add(eTags);
+
             return CustomParkingOperatorSerializer is not null
                        ? CustomParkingOperatorSerializer(this, json)
                        : json;
@@ -609,8 +633,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return the CBOR representation of this parking operator: the keys and values of its JSON representation.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
         /// <param name="CustomParkingOperatorSerializer">A delegate to serialize custom parking operator CBOR values.</param>
         public CBORValue ToCBOR(Boolean                                          Embedded                          = false,
+                                Boolean                                          IncludeETags                      = false,
                                 CustomCBORSerializerDelegate<ParkingOperator>?   CustomParkingOperatorSerializer   = null)
         {
 
@@ -674,6 +700,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (CustomData.HasValues)
                 cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),         CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            AddETagsTo(cbor, IncludeETags);
 
             return CustomParkingOperatorSerializer is not null
                        ? CustomParkingOperatorSerializer(this, cbor)
@@ -817,11 +845,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         json.Add(key, CBORJSON.ToJSON(value));
                 }
 
-                return TryParse(id,
-                                dataSource,
-                                json,
-                                out ParkingOperator,
-                                out ErrorResponse);
+                if (!TryParse(id,
+                              dataSource,
+                              json,
+                              out ParkingOperator,
+                              out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!TryCheckETagsOf(CBOR, ParkingOperator, out ErrorResponse))
+                {
+                    ParkingOperator = null;
+                    return false;
+                }
+
+                return true;
 
             }
             catch (Exception e)
@@ -899,6 +938,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   Created:     created,
                                                   LastChange:  lastChange,
                                                   CustomData:  customData);
+
+            if (!TryCheckETagsOf(JSON, ParkingOperator, out ErrorResponse))
+            {
+                ParkingOperator = null;
+                return false;
+            }
 
             ErrorResponse = null;
             return true;

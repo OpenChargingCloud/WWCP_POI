@@ -198,14 +198,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (protected override) ContentJSON()
+
+        /// <inheritdoc/>
+        protected override JObject ContentJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
         #region ToJSON(Embedded = false, CustomParkingSpaceGroupSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this parking space group, as its owner embeds it.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         /// <param name="CustomParkingSpaceGroupSerializer">A delegate to serialize custom parking space group JSON objects.</param>
         public JObject ToJSON(Boolean                                              Embedded                            = false,
+                              Boolean                                              IncludeETags                        = false,
+                              ETagDigestEncoding?                                  ETagDigestEncoding                  = null,
                               CustomJObjectSerializerDelegate<ParkingSpaceGroup>?  CustomParkingSpaceGroupSerializer   = null)
         {
 
@@ -229,6 +242,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.ParkingSpaceIds,  POIJSON.IdsToJSON(ParkingSpaceIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
+
+            if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
+                json.Add(eTags);
 
             return CustomParkingSpaceGroupSerializer is not null
                        ? CustomParkingSpaceGroupSerializer(this, json)
@@ -297,6 +313,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           Created:     created,
                                                           LastChange:  lastChange,
                                                           CustomData:  customData);
+
+                if (!TryCheckETagsOf(JSON, ParkingSpaceGroup, out ErrorResponse))
+                {
+                    ParkingSpaceGroup = null;
+                    return false;
+                }
 
                 ErrorResponse = null;
                 return true;

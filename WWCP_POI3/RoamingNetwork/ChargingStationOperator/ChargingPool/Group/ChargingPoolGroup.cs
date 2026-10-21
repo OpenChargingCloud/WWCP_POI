@@ -198,14 +198,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (protected override) ContentJSON()
+
+        /// <inheritdoc/>
+        protected override JObject ContentJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
         #region ToJSON(Embedded = false, ...)
 
         /// <summary>
         /// Return the JSON representation of this charging pool group; its owner embeds it.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure, e.g. into its owner.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         /// <param name="CustomChargingPoolGroupSerializer">An optional delegate to customize the JSON representation.</param>
         public JObject ToJSON(Boolean                                              Embedded                            = false,
+                              Boolean                                              IncludeETags                        = false,
+                              ETagDigestEncoding?                                  ETagDigestEncoding                  = null,
                               CustomJObjectSerializerDelegate<ChargingPoolGroup>?  CustomChargingPoolGroupSerializer   = null)
         {
 
@@ -229,6 +242,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.ChargingPoolIds,   POIJSON.IdsToJSON(ChargingPoolIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
+
+            if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
+                json.Add(eTags);
 
             return CustomChargingPoolGroupSerializer is not null
                        ? CustomChargingPoolGroupSerializer(this, json)
@@ -297,6 +313,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           Created:     created,
                                                           LastChange:  lastChange,
                                                           CustomData:  customData);
+
+                if (!TryCheckETagsOf(JSON, ChargingPoolGroup, out ErrorResponse))
+                {
+                    ChargingPoolGroup = null;
+                    return false;
+                }
 
                 ErrorResponse = null;
                 return true;

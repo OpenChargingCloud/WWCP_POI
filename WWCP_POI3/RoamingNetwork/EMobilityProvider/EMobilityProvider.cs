@@ -417,17 +417,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (protected override) ContentJSON()
+
+        /// <inheritdoc/>
+        protected override JObject ContentJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
         #region ToJSON(Embedded = false, ...)
 
         /// <summary>
         /// Return the JSON representation of this e-mobility provider; embedded, as its roaming network embeds it.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         /// <param name="CustomEMobilityProviderSerializer">A delegate to serialize custom e-mobility provider JSON objects.</param>
         public JObject ToJSON(Boolean                                              Embedded                            = false,
+                              Boolean                                              IncludeETags                        = false,
+                              ETagDigestEncoding?                                  ETagDigestEncoding                  = null,
                               CustomJObjectSerializerDelegate<EMobilityProvider>?  CustomEMobilityProviderSerializer   = null)
 
             => ToJSON(Embedded,
+                      IncludeETags,
+                      ETagDigestEncoding,
                       CustomEMobilityProviderSerializer,
                       IncludeChildArrays: true);
 
@@ -436,9 +451,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         /// <param name="CustomEMobilityProviderSerializer">A delegate to serialize custom e-mobility provider JSON objects.</param>
         /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
         internal JObject ToJSON(Boolean                                              Embedded,
+                                Boolean                                              IncludeETags,
+                                ETagDigestEncoding?                                  ETagDigestEncoding,
                                 CustomJObjectSerializerDelegate<EMobilityProvider>?  CustomEMobilityProviderSerializer,
                                 Boolean                                              IncludeChildArrays)
         {
@@ -484,6 +503,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
+            if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
+                json.Add(eTags);
+
             return CustomEMobilityProviderSerializer is not null
                        ? CustomEMobilityProviderSerializer(this, json)
                        : json;
@@ -498,8 +520,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return the CBOR representation of this e-mobility provider: the keys and values of its JSON representation.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
         /// <param name="CustomEMobilityProviderSerializer">A delegate to serialize custom e-mobility provider CBOR maps.</param>
         public CBORValue ToCBOR(Boolean                                            Embedded                            = false,
+                                Boolean                                            IncludeETags                        = false,
                                 CustomCBORSerializerDelegate<EMobilityProvider>?   CustomEMobilityProviderSerializer   = null)
         {
 
@@ -560,6 +584,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (CustomData.HasValues)
                 cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),       CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            AddETagsTo(cbor, IncludeETags);
 
             return CustomEMobilityProviderSerializer is not null
                        ? CustomEMobilityProviderSerializer(this, cbor)
@@ -649,6 +675,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           Created:     created,
                                                           LastChange:  lastChange,
                                                           CustomData:  customData);
+
+                if (!TryCheckETagsOf(JSON, EMobilityProvider, out ErrorResponse))
+                {
+                    EMobilityProvider = null;
+                    return false;
+                }
 
                 ErrorResponse = null;
                 return true;
@@ -787,6 +819,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           Created:     created,
                                                           LastChange:  lastChange,
                                                           CustomData:  customData);
+
+                if (!TryCheckETagsOf(CBOR, EMobilityProvider, out ErrorResponse))
+                {
+                    EMobilityProvider = null;
+                    return false;
+                }
 
                 ErrorResponse = null;
                 return true;

@@ -728,18 +728,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (protected override) ContentJSON()
+
+        /// <inheritdoc/>
+        protected override JObject ContentJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
         #region ToJSON(Embedded = false, ...)
 
         /// <summary>
         /// Return the JSON representation of this charging pool: with its data licenses and charging stations.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure, e.g. into its operator.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         /// <param name="CustomChargingPoolSerializer">An optional delegate to customize the JSON representation.</param>
         public JObject ToJSON(Boolean                                         Embedded                       = false,
+                              Boolean                                         IncludeETags                   = false,
+                              ETagDigestEncoding?                             ETagDigestEncoding             = null,
                               CustomJObjectSerializerDelegate<ChargingPool>?  CustomChargingPoolSerializer   = null)
 
             => ToJSON(IncludeChildArrays:            true,
                       Embedded:                      Embedded,
+                      IncludeETags:                  IncludeETags,
+                      ETagDigestEncoding:            ETagDigestEncoding,
                       CustomChargingPoolSerializer:  CustomChargingPoolSerializer);
 
         /// <summary>
@@ -748,9 +763,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
         /// <param name="CustomChargingPoolSerializer">An optional delegate to customize the JSON representation.</param>
         internal JObject ToJSON(Boolean                                         IncludeChildArrays,
                                 Boolean                                         Embedded                       = true,
+                                Boolean                                         IncludeETags                   = false,
+                                ETagDigestEncoding?                             ETagDigestEncoding             = null,
                                 CustomJObjectSerializerDelegate<ChargingPool>?  CustomChargingPoolSerializer   = null)
         {
 
@@ -869,6 +888,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.TemplateIds, POIJSON.IdsToJSON(TemplateIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
+
+            if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
+                json.Add(eTags);
 
             return json;
 
@@ -1050,6 +1072,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 Created:     created,
                                                 LastChange:  lastChange,
                                                 CustomData:  customData);
+
+                if (!TryCheckETagsOf(JSON, ChargingPool, out ErrorResponse))
+                {
+                    ChargingPool = null;
+                    return false;
+                }
 
                 ErrorResponse = null;
                 return true;

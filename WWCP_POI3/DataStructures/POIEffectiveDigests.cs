@@ -210,7 +210,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    RoamingNetwork.PropertyKeys.EMobilityProviders,
 
-                   EMobilityProvider.ToJSON(Embedded: true, CustomEMobilityProviderSerializer: null, IncludeChildArrays: false),
+                   EMobilityProvider.ToJSON(Embedded: true, IncludeETags: false, ETagDigestEncoding: null, CustomEMobilityProviderSerializer: null, IncludeChildArrays: false),
 
                    [ (EMobilityProvider.PropertyKeys.EVSEGroups,             Leaves(EMobilityProvider.EVSEGroups,             value => value.ToJSON(Embedded: true), HashAlgorithm)),
                      (EMobilityProvider.PropertyKeys.ChargingStationGroups,  Leaves(EMobilityProvider.ChargingStationGroups,  value => value.ToJSON(Embedded: true), HashAlgorithm)),
@@ -302,7 +302,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => KeptDigest(ChargingStation, HashAlgorithm, () => {
 
-                   var json = ChargingStation.ToJSON(Embedded: true, CustomChargingStationSerializer: null, IncludeChildArrays: false);
+                   var json = ChargingStation.ToJSON(Embedded: true, IncludeETags: false, ETagDigestEncoding: null, CustomChargingStationSerializer: null, IncludeChildArrays: false);
 
                    if (ChargingStation.EVSEs.Count > 0)
                        json[ChargingStation.PropertyKeys.EVSEs] = Pruned(Leaves(ChargingStation.EVSEs, evse => evse.ToJSON(Embedded: true), HashAlgorithm), HashAlgorithm);

@@ -128,7 +128,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                             Is.EqualTo(JSONETag[16..]));
 
                 Assert.That(eTags.Select(eTag => eTag.ToString()),                           Is.EqualTo(new[] { JSONETag, CBORETag, TreeETag }));
-                Assert.That(network.ToJSON()["eTags"]!.ToString(Formatting.None),           Is.EqualTo(ETagsJSON));
+                // In hex, as a commit writes them; a roaming network writes them in Base64 unless asked otherwise.
+                Assert.That(network.ToJSON(ETagDigestEncoding: ETagDigestEncoding.HEX)["eTags"]!.ToString(Formatting.None),  Is.EqualTo(ETagsJSON));
 
                 // The CBOR ETag follows from the canonical JSON alone, and is the one of the CBOR the library writes.
                 Assert.That(Convert.ToHexStringLower(SHA256.HashData(CBORJSON.ToCBOR(Encoding.UTF8.GetBytes(ContentJSON)).ToByteArray(CBORWriterOptions.Canonical))),

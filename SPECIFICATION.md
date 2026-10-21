@@ -100,9 +100,15 @@ An ETag is a digest of the content in one of three formats.
 - **Text:** `json:sha256:hex:<digest>`.
 - **Algorithms:** `sha256` (default), `sha384`, `sha512`.
 - A roaming network lists its ETags in `eTags`, ordered by format: `json`, then `cbor`, then its
-  `effectiveTree` ETags in the order of its tree hash algorithms (section 8.3).
-- A reader MUST refuse a roaming network whose `eTags` are not the ETags of its content, and one with another
-  `@context`. Both MAY be left out.
+  `effectiveTree` ETags in the order of its tree hash algorithms (section 8.3); their content is its own
+  representation without them, with its `@context`.
+- Every other entity MAY list its ETags in the `eTags` of a representation of its own: `json`, then `cbor`,
+  `sha256`, over its content as its parent embeds it, without `@context` and without them (section 7), the
+  HTTP `ETag` of POI_API and the one a precondition names. An embedded entity has none: the ETags of what
+  embeds it cover it.
+- `eTags` are written in `base64` unless asked otherwise; a reader takes both encodings.
+- A reader MUST refuse a roaming network or another entity whose `eTags` are not the ETags of its content,
+  and one with another `@context`. Both MAY be left out.
 
 ### 3.2 The CBOR ETag
 
