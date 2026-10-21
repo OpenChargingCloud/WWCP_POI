@@ -240,14 +240,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 // As from a snapshot: a version of its own, with the runtime status of the head.
                 var snapshot = new JObject(
-                                   new JProperty("commit",          SignedBy(signers, genesis).ToJSON()),
-                                   new JProperty("roamingNetwork",  version.ToJSON())
+                                   new JProperty(PropertyKeys.Commit,          SignedBy(signers, genesis).ToJSON(Embedded: true)),
+                                   new JProperty(PropertyKeys.RoamingNetwork,  version.ToJSON())
                                );
 
                 if (version.EffectiveFloorsJSON() is JArray effectiveLastChanges)
-                    snapshot.Add("effectiveLastChanges", effectiveLastChanges);
+                    snapshot.Add(PropertyKeys.EffectiveLastChanges, effectiveLastChanges);
 
-                snapshot.Add("runtimeStatus", new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON())));
+                snapshot.Add(PropertyKeys.RuntimeStatus, new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON(Embedded: true))));
                 snapshot.Add(EpochJSONProperty, EpochJSON(nextEpoch, RoamingNetworkEpochLink.To(finalCheckpoint)));
 
                 if (!TryFromSnapshot(snapshot, out var nextHistory, out var snapshotError))
@@ -297,10 +297,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           RoamingNetworkEpochLink?  PreviousEpoch)
         {
 
-            var json = Epoch.ToJSON();
+            var json = Epoch.ToJSON(Embedded: true);
 
             if (PreviousEpoch is not null)
-                json.Add(RoamingNetworkEpochLink.JSONProperty, PreviousEpoch.ToJSON());
+                json.Add(RoamingNetworkEpochLink.JSONProperty, PreviousEpoch.ToJSON(Embedded: true));
 
             return json;
 

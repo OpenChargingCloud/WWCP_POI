@@ -91,10 +91,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(operatorETag,  Is.EqualTo(POIRepresentation.Of(gef.ToEmbeddedJSON(), ETagFormat.JSON).ETag));
 
                 Assert.That(rn1.TryGetEntityETag(nameof(ChargingPool), P1.ToString(), out var poolETag),                  Is.True);
-                Assert.That(poolETag,      Is.EqualTo(POIRepresentation.Of(pool.ToJSON(), ETagFormat.JSON).ETag));
+                Assert.That(poolETag,      Is.EqualTo(POIRepresentation.Of(pool.ToJSON(Embedded: true), ETagFormat.JSON).ETag));
 
                 Assert.That(rn1.TryGetEntityETag(nameof(ChargingPool), P1.ToString(), out var poolCBOR, ETagFormat.CBOR), Is.True);
-                Assert.That(poolCBOR,      Is.EqualTo(POIRepresentation.Of(pool.ToJSON(), ETagFormat.CBOR).ETag));
+                Assert.That(poolCBOR,      Is.EqualTo(POIRepresentation.Of(pool.ToJSON(Embedded: true), ETagFormat.CBOR).ETag));
 
                 // The roaming network itself has the ETag of its content.
                 Assert.That(rn1.TryGetEntityETag(nameof(RoamingNetwork), "rn1", out var networkETag),                     Is.True);

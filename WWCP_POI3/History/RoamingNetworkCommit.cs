@@ -52,9 +52,87 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String IdentityProfile = "wwcp-poi-commit-v3";
 
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkCommit";
+
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context           = "@context";
+
+            /// <summary>
+            /// The property of the profile of its content, which only the content its identification is calculated over names.
+            /// </summary>
+            public const String  Profile           = "profile";
+
+            /// <summary>
+            /// The property of the identification of its roaming network.
+            /// </summary>
+            public const String  RoamingNetworkId  = "roamingNetworkId";
+
+            /// <summary>
+            /// The property of its revision.
+            /// </summary>
+            public const String  Revision          = "revision";
+
+            /// <summary>
+            /// The property of the ETags of its version.
+            /// </summary>
+            public const String  ETags             = "eTags";
+
+            /// <summary>
+            /// The property of its epoch, from the second one on.
+            /// </summary>
+            public const String  Epoch             = "epoch";
+
+            /// <summary>
+            /// The property of the profiles of the epoch it starts.
+            /// </summary>
+            public const String  Profiles          = RoamingNetworkEpochProfiles.JSONProperty;
+
+            /// <summary>
+            /// The property of the identifications of its parent commits.
+            /// </summary>
+            public const String  ParentIds         = "parentIds";
+
+            /// <summary>
+            /// The property of its change set.
+            /// </summary>
+            public const String  ChangeSet         = "changeSet";
+
+            /// <summary>
+            /// The property of its signatures.
+            /// </summary>
+            public const String  Signatures        = "signatures";
+
+            /// <summary>
+            /// The property of the commit in the signature input of a commit signature.
+            /// </summary>
+            public const String  Commit            = "commit";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The identification of this commit, calculated from its content.
@@ -385,9 +463,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Id                  [mandatory]
 
-                if (!RoamingNetworkCommit_Id.TryParse(JSON["@id"]?.Type == JTokenType.String ? JSON["@id"]!.Value<String>() : null, out var id))
+                if (!RoamingNetworkCommit_Id.TryParse(JSON[PropertyKeys.Id]?.Type == JTokenType.String ? JSON[PropertyKeys.Id]!.Value<String>() : null, out var id))
                 {
                     ErrorResponse = "Missing or invalid commit identification!";
+                    return false;
+                }
+
+                #endregion
+
+                #region Parse Context             [optional]
+
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the commit '{id}' must be '{JSONLDContext}'!";
                     return false;
                 }
 
@@ -397,7 +486,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var parentIds = ImmutableArray.CreateBuilder<RoamingNetworkCommit_Id>();
 
-                if (JSON["parentIds"] is JToken parentIdsJSON)
+                if (JSON[PropertyKeys.ParentIds] is JToken parentIdsJSON)
                 {
 
                     if (parentIdsJSON is not JArray { Count: > 0 } parentIdsArray)
@@ -425,7 +514,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse RoamingNetworkId    [mandatory]
 
-                if (!JSON.ParseMandatory("roamingNetworkId",
+                if (!JSON.ParseMandatory(PropertyKeys.RoamingNetworkId,
                                          "roaming network identification",
                                          RoamingNetwork_Id.TryParse,
                                          out RoamingNetwork_Id roamingNetworkId,
@@ -438,7 +527,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Revision            [mandatory]
 
-                if (JSON["revision"] is not JValue { Type: JTokenType.Integer } revisionJSON ||
+                if (JSON[PropertyKeys.Revision] is not JValue { Type: JTokenType.Integer } revisionJSON ||
                     revisionJSON.Value<Int64>() < 0)
                 {
                     ErrorResponse = "Missing or invalid revision!";
@@ -451,7 +540,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse ETags               [mandatory]
 
-                if (JSON["eTags"] is not JArray eTagsJSON)
+                if (JSON[PropertyKeys.ETags] is not JArray eTagsJSON)
                 {
                     ErrorResponse = "The ETags must be a JSON array!";
                     return false;
@@ -468,7 +557,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 RoamingNetworkChangeSet? changeSet = null;
 
-                if (JSON["changeSet"] is JToken changeSetJSON)
+                if (JSON[PropertyKeys.ChangeSet] is JToken changeSetJSON)
                 {
 
                     if (changeSetJSON is not JObject changeSetObject)
@@ -491,7 +580,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var signatures = ImmutableArray.CreateBuilder<RoamingNetworkCommitSignature>();
 
-                if (JSON["signatures"] is JToken signaturesJSON)
+                if (JSON[PropertyKeys.Signatures] is JToken signaturesJSON)
                 {
 
                     if (signaturesJSON is not JArray signaturesArray)
@@ -528,7 +617,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 UInt32 epoch = 1;
 
-                if (JSON["epoch"] is JToken epochJSON)
+                if (JSON[PropertyKeys.Epoch] is JToken epochJSON)
                 {
 
                     if (epochJSON is not JValue { Type: JTokenType.Integer } epochValue ||
@@ -544,7 +633,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 RoamingNetworkEpochProfiles? profiles = null;
 
-                if (JSON[RoamingNetworkEpochProfiles.JSONProperty] is JToken profilesJSON &&
+                if (JSON[PropertyKeys.Profiles] is JToken profilesJSON &&
                     !RoamingNetworkEpochProfiles.TryParse(profilesJSON, out profiles, out var profilesError))
                 {
                     ErrorResponse = "Invalid profiles of the epoch: " + profilesError;
@@ -630,39 +719,87 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON(IncludeSignatures = true)
+        #region ToJSON(Embedded = false, IncludeSignatures = true, CustomCommitSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this commit, its change set with its signatures,
         /// and, unless excluded, with the signatures of this commit.
         /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="IncludeSignatures">Whether to include the signatures of this commit.</param>
-        public JObject ToJSON(Boolean IncludeSignatures = true)
+        /// <param name="CustomCommitSerializer">An optional custom serializer of commits.</param>
+        public JObject ToJSON(Boolean                                                 Embedded                 = false,
+                              Boolean                                                 IncludeSignatures        = true,
+                              CustomJObjectSerializerDelegate<RoamingNetworkCommit>?  CustomCommitSerializer   = null)
         {
 
             var json = Content(IncludeSignatures: true);
 
-            json.Remove("profile");
-            json.AddFirst(new JProperty("@id", Id.ToString()));
+            json.Remove(PropertyKeys.Profile);
+
+            if (!Embedded)
+                json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
+
+            json.AddFirst(new JProperty(PropertyKeys.Id, Id.ToString()));
 
             if (IncludeSignatures && !Signatures.IsEmpty)
-                json.Add("signatures", new JArray(Signatures.Select(signature => signature.ToJSON())));
+                json.Add(PropertyKeys.Signatures, new JArray(Signatures.Select(signature => signature.ToJSON(Embedded: true))));
 
-            return json;
+            return CustomCommitSerializer is not null
+                       ? CustomCommitSerializer(this, json)
+                       : json;
 
         }
 
         #endregion
 
-        #region ToCBOR()
+        #region ToCBOR(Embedded = false, CustomCommitSerializer = null)
 
         /// <summary>
         /// Return the CBOR representation of this commit: the keys and values of its JSON representation.
         /// Write it with CBORWriterOptions.Canonical for deterministic bytes.
         /// </summary>
-        public CBORValue ToCBOR()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomCommitSerializer">An optional custom serializer of commits.</param>
+        public CBORValue ToCBOR(Boolean                                              Embedded                 = false,
+                                CustomCBORSerializerDelegate<RoamingNetworkCommit>?  CustomCommitSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON());
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(PropertyKeys.Id),                CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Context),           CBORValue.FromText(JSONLDContext));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.RoamingNetworkId),      CBORValue.FromText(RoamingNetworkId.ToString()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Revision),              CBORValue.FromUInt64(Revision));
+
+            // ETags as in the JSON representation: arrays of texts, their digests in hex.
+            cbor.Add(CBORValue.FromText(PropertyKeys.ETags),                 CBORValue.FromArray(ETags.Select(eTag => CBORJSON.ToCBOR(eTag.ToJSON()))));
+
+            if (Epoch > 1)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Epoch),             CBORValue.FromUInt64(Epoch));
+
+            // The profiles and the signatures have no CBOR representation of their own: theirs are the keys and values of
+            // their JSON representation, and so is the change set's, as a commit always wrote it.
+            if (Profiles is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Profiles),          CBORJSON.ToCBOR(Profiles.ToJSON(Embedded: true)));
+
+            if (!ParentIds.IsEmpty)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ParentIds),         CBORValue.FromArray(ParentIds.Select(parentId => CBORValue.FromText(parentId.ToString()))));
+
+            if (ChangeSet is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ChangeSet),         CBORJSON.ToCBOR(ChangeSet.ToJSON(Embedded: true, IncludeSignatures: true)));
+
+            if (!Signatures.IsEmpty)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Signatures),        CBORValue.FromArray(Signatures.Select(signature => CBORJSON.ToCBOR(signature.ToJSON(Embedded: true)))));
+
+            return CustomCommitSerializer is not null
+                       ? CustomCommitSerializer(this, cbor)
+                       : cbor;
+
+        }
 
         #endregion
 
@@ -676,23 +813,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("profile",           IdentityProfile),
-                           new JProperty("roamingNetworkId",  RoamingNetworkId.ToString()),
-                           new JProperty("revision",          Revision),
-                           new JProperty("eTags",             new JArray(ETags.Select(eTag => eTag.ToJSON())))
+                           new JProperty(PropertyKeys.Profile,           IdentityProfile),
+                           new JProperty(PropertyKeys.RoamingNetworkId,  RoamingNetworkId.ToString()),
+                           new JProperty(PropertyKeys.Revision,          Revision),
+                           new JProperty(PropertyKeys.ETags,             new JArray(ETags.Select(eTag => eTag.ToJSON())))
                        );
 
             if (Epoch > 1)
-                json.Add("epoch",      Epoch);
+                json.Add(PropertyKeys.Epoch,      Epoch);
 
             if (Profiles is not null)
-                json.Add(RoamingNetworkEpochProfiles.JSONProperty, Profiles.ToJSON());
+                json.Add(PropertyKeys.Profiles,   Profiles.ToJSON(Embedded: true));
 
             if (!ParentIds.IsEmpty)
-                json.Add("parentIds",  new JArray(ParentIds.Select(parentId => parentId.ToString())));
+                json.Add(PropertyKeys.ParentIds,  new JArray(ParentIds.Select(parentId => parentId.ToString())));
 
             if (ChangeSet is not null)
-                json.Add("changeSet",  ChangeSet.ToJSON(IncludeSignatures));
+                json.Add(PropertyKeys.ChangeSet,  ChangeSet.ToJSON(Embedded: true, IncludeSignatures: IncludeSignatures));
 
             return json;
 

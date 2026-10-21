@@ -22,6 +22,8 @@ using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -34,7 +36,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class ChargingTariffDiscount : IEquatable<ChargingTariffDiscount>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingTariffDiscount";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context      = "@context";
+
+            /// <summary>
+            /// The property of its percentage.
+            /// </summary>
+            public const String  Percent      = "percent";
+
+            /// <summary>
+            /// The property of the dimensions it reduces.
+            /// </summary>
+            public const String  Dimensions   = "dimensions";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The percentage a price is reduced by: above 0, at most 100.
@@ -88,22 +127,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomChargingTariffDiscountSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this discount.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingTariffDiscountSerializer">A delegate to serialize custom discounts.</param>
+        public JObject ToJSON(Boolean                                                   Embedded                                 = false,
+                              CustomJObjectSerializerDelegate<ChargingTariffDiscount>?  CustomChargingTariffDiscountSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("percent", POIJSON.Number(Percent))
-                       );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,     JSONLDContext);
+
+            json.Add(PropertyKeys.Percent,         POIJSON.Number(Percent));
 
             if (Dimensions.Length > 0)
-                json.Add("dimensions", new JArray(Dimensions.Select(dimension => dimension.ToString())));
+                json.Add(PropertyKeys.Dimensions,  new JArray(Dimensions.Select(dimension => dimension.ToString())));
 
-            return json;
+            return CustomChargingTariffDiscountSerializer is not null
+                       ? CustomChargingTariffDiscountSerializer(this, json)
+                       : json;
 
         }
 
@@ -121,7 +168,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Discount = null;
 
-            if (JSON["percent"] is not JValue { Type: JTokenType.Integer or JTokenType.Float } percentJSON)
+            if (JSON[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the discount must be '{JSONLDContext}'!";
+                return false;
+            }
+
+            if (JSON[PropertyKeys.Percent] is not JValue { Type: JTokenType.Integer or JTokenType.Float } percentJSON)
             {
                 ErrorResponse = "The percentage of a discount must be a number!";
                 return false;
@@ -140,7 +194,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             if (!POIJSON.TryParseIds(JSON,
-                                     "dimensions",
+                                     PropertyKeys.Dimensions,
                                      "dimension of a discount",
                                      (String text, out ChargingDimensionTypes dimension) => POIJSON.TryParseName(text, out dimension),
                                      out ImmutableArray<ChargingDimensionTypes> dimensions,
@@ -149,7 +203,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (JSON["dimensions"] is JArray { Count: 0 })
+            if (JSON[PropertyKeys.Dimensions] is JArray { Count: 0 })
             {
                 ErrorResponse = "The dimensions of a discount must not be empty: without them, it reduces all of them!";
                 return false;

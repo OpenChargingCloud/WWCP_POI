@@ -100,7 +100,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var json      = qa.ToJSON();
 
             var withKeys  = (JObject) json.DeepClone();
-            withKeys[POIPartyKeys.SigningKeysProperty] = json[RoamingNetworkOperator.JSONProperty]![POIPartyKeys.SigningKeysProperty]!.DeepClone();
+            withKeys[POIPartyKeys.SigningKeysProperty] = json[RoamingNetwork.PropertyKeys.Operator]![POIPartyKeys.SigningKeysProperty]!.DeepClone();
 
             Assert.That(RoamingNetwork.TryParse(JObject.Parse(json.ToString()),  out var fromJSON, out var errorJSON),  Is.True, errorJSON);
             Assert.That(RoamingNetwork.TryParse(qa.ToCBOR(),                     out var fromCBOR, out var errorCBOR),  Is.True, errorCBOR);
@@ -108,7 +108,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(json[RoamingNetworkOperator.JSONProperty]!["@id"]!.Value<String>(),       Is.EqualTo("GraphDefined"));
+                Assert.That(json[RoamingNetwork.PropertyKeys.Operator]!["@id"]!.Value<String>(),       Is.EqualTo("GraphDefined"));
                 Assert.That(json[POIPartyKeys.SigningKeysProperty],                                   Is.Null);
                 Assert.That(json[POIPartyKeys.IdentityKeysProperty],                                  Is.Null);
 
@@ -215,7 +215,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(unoperated.ToJSON()[RoamingNetworkOperator.JSONProperty],                 Is.Null);
+                Assert.That(unoperated.ToJSON()[RoamingNetwork.PropertyKeys.Operator],                 Is.Null);
                 Assert.That(unoperated.Parties.Select(party => party.Id.EntityType),                  Is.EqualTo(new[] { nameof(ChargingStationOperator) }));
                 Assert.That(network.Error,                                                            Does.Contain("the roaming network operator, of which this roaming network has none"));
                 Assert.That(own.Error,                                                                Is.Null);

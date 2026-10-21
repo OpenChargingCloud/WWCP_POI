@@ -38,6 +38,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public static class POIDataLicenses
     {
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization of a data license within POI data.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id            = "@id";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description   = "description";
+
+            /// <summary>
+            /// The property of its URLs.
+            /// </summary>
+            public const String  URLs          = "URLs";
+
+        }
+
+        #endregion
+
         #region Known
 
         /// <summary>
@@ -83,14 +110,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => JSONObject.Create(
 
-                         new JProperty("@id",           DataLicense.Id.ToString()),
+                         new JProperty(PropertyKeys.Id,            DataLicense.Id.ToString()),
 
                    DataLicense.Description.IsNotNullOrEmpty()
-                       ? new JProperty("description",   DataLicense.Description.ToJSON())
+                       ? new JProperty(PropertyKeys.Description,   DataLicense.Description.ToJSON())
                        : null,
 
                    DataLicense.URLs.Any()
-                       ? new JProperty("URLs",          new JArray(DataLicense.URLs.
+                       ? new JProperty(PropertyKeys.URLs,          new JArray(DataLicense.URLs.
                                                                        Select (url => url.ToString()).
                                                                        Order  (StringComparer.Ordinal)))
                        : null
@@ -107,6 +134,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static JArray ToPOIJSON(this IEnumerable<DataLicense> DataLicenses)
 
             => new (DataLicenses.Ordered().Select(dataLicense => dataLicense.ToPOIJSON()));
+
+        #endregion
+
+        #region ToPOICBOR  (this DataLicense)
+
+        /// <summary>
+        /// The complete CBOR representation of the given data license within POI data: the keys and values of its JSON
+        /// representation, built directly.
+        /// </summary>
+        public static CBORValue ToPOICBOR(this DataLicense DataLicense)
+        {
+
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(PropertyKeys.Id),            CBORValue.FromText(DataLicense.Id.ToString()) }
+                       };
+
+            if (DataLicense.Description.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(PropertyKeys.Description),   DataLicense.Description.ToCBOR());
+
+            if (DataLicense.URLs.Any())
+                cbor.Add(CBORValue.FromText(PropertyKeys.URLs),          CBORValue.FromArray(DataLicense.URLs.
+                                                                                     Select (url => url.ToString()).
+                                                                                     Order  (StringComparer.Ordinal).
+                                                                                     Select (CBORValue.FromText)));
+
+            return cbor;
+
+        }
+
+        #endregion
+
+        #region ToPOICBOR  (this DataLicenses)
+
+        /// <summary>
+        /// The complete CBOR representations of the given data licenses, ordered by their identification.
+        /// </summary>
+        public static CBORValue ToPOICBOR(this IEnumerable<DataLicense> DataLicenses)
+
+            => CBORValue.FromArray(DataLicenses.Ordered().Select(dataLicense => dataLicense.ToPOICBOR()));
 
         #endregion
 

@@ -247,7 +247,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public void Append(RoamingNetworkHistoryLogEntry Entry)
         {
 
-            var bytes = utf8.GetBytes(POIJSON.ToText(Entry.ToJSON()) + "\n");
+            var bytes = utf8.GetBytes(POIJSON.ToText(Entry.ToJSON(Embedded: true)) + "\n");
 
             lock (storeLock)
             {
@@ -426,7 +426,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 foreach (var entry in Entries)
-                    logStream.Write(utf8.GetBytes(POIJSON.ToText(entry.ToJSON()) + "\n"));
+                    logStream.Write(utf8.GetBytes(POIJSON.ToText(entry.ToJSON(Embedded: true)) + "\n"));
 
                 logStream.Flush(true);
 

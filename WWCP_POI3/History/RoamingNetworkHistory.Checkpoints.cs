@@ -639,8 +639,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 Snapshot = SnapshotJSON(commits[commitPosition], version, Head.RoamingNetwork);
-                Snapshot.Remove("runtimeStatus");
-                Snapshot.Add("checkpoint", checkpoint.ToJSON());
+                Snapshot.Remove(PropertyKeys.RuntimeStatus);
+                Snapshot.Add(PropertyKeys.Checkpoint, checkpoint.ToJSON(Embedded: true));
 
                 ErrorResponse = null;
                 return true;
@@ -679,7 +679,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             History = null;
 
-            if (Snapshot?["checkpoint"] is not JObject checkpointJSON)
+            if (Snapshot?[PropertyKeys.Checkpoint] is not JObject checkpointJSON)
             {
                 ErrorResponse = "The snapshot of a checkpoint needs its checkpoint!";
                 return false;
@@ -693,12 +693,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // The version and its commit only: a runtime status would be the one of another version.
             var version = new JObject(
-                              new JProperty("commit",          Snapshot["commit"]),
-                              new JProperty("roamingNetwork",  Snapshot["roamingNetwork"])
+                              new JProperty(PropertyKeys.Commit,          Snapshot[PropertyKeys.Commit]),
+                              new JProperty(PropertyKeys.RoamingNetwork,  Snapshot[PropertyKeys.RoamingNetwork])
                           );
 
-            if (Snapshot["effectiveLastChanges"] is JToken effectiveLastChanges)
-                version.Add("effectiveLastChanges", effectiveLastChanges);
+            if (Snapshot[PropertyKeys.EffectiveLastChanges] is JToken effectiveLastChanges)
+                version.Add(PropertyKeys.EffectiveLastChanges, effectiveLastChanges);
 
             if (Snapshot[EpochJSONProperty] is JToken epochOfSnapshot)
                 version.Add(EpochJSONProperty, epochOfSnapshot);

@@ -63,7 +63,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             IComparable<ParkingSpaceGroup>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/parkingSpaceGroup";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its parking spaces.
+            /// </summary>
+            public const String  ParkingSpaceIds   = "parkingSpaceIds";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// Its parking spaces, of the same parking operator, in the order of their identifications.
@@ -171,33 +198,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomParkingSpaceGroupSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this parking space group, as its owner embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomParkingSpaceGroupSerializer">A delegate to serialize custom parking space group JSON objects.</param>
+        public JObject ToJSON(Boolean                                              Embedded                            = false,
+                              CustomJObjectSerializerDelegate<ParkingSpaceGroup>?  CustomParkingSpaceGroupSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,      JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",         Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,         Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,  Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",   DataSource);
+                json.Add(BasePropertyKeys.DataSource,   DataSource);
 
             if (ParkingSpaceIds.Length > 0)
-                json.Add("parkingSpaceIds",  POIJSON.IdsToJSON(ParkingSpaceIds));
+                json.Add(PropertyKeys.ParkingSpaceIds,  POIJSON.IdsToJSON(ParkingSpaceIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomParkingSpaceGroupSerializer is not null
+                       ? CustomParkingSpaceGroupSerializer(this, json)
+                       : json;
 
         }
 
@@ -221,7 +256,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "parking space group identification",
                                          ParkingSpaceGroup_Id.TryParse,
                                          out ParkingSpaceGroup_Id id,
@@ -230,10 +265,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N  (JSON, "name",         "parking space group name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N  (JSON, "description",  "parking space group description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "dataSource",   "data source",              out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseIds   (JSON, "parkingSpaceIds", "member identification", ParkingSpace_Id.TryParse, out ImmutableArray<ParkingSpace_Id> members, out ErrorResponse))
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the parking space group '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Name,         "parking space group name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Description,  "parking space group description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, BasePropertyKeys.DataSource,   "data source",              out var dataSource,   out ErrorResponse) ||
+                    !POIJSON.TryParseIds   (JSON, PropertyKeys.ParkingSpaceIds,  "member identification", ParkingSpace_Id.TryParse, out ImmutableArray<ParkingSpace_Id> members, out ErrorResponse))
                 {
                     return false;
                 }

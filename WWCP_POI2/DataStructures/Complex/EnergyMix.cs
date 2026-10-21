@@ -46,6 +46,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                = "@context";
+
+            /// <summary>
+            /// The property of its energy sources.
+            /// </summary>
+            public const String  EnergySources          = "energySources";
+
+            /// <summary>
+            /// The property of its environmental impacts.
+            /// </summary>
+            public const String  EnvironmentalImpacts   = "environmentalImpacts";
+
+            /// <summary>
+            /// The property of its supplier name.
+            /// </summary>
+            public const String  SupplierName           = "supplierName";
+
+            /// <summary>
+            /// The property of its product name.
+            /// </summary>
+            public const String  ProductName            = "productName";
+
+            /// <summary>
+            /// The property of its additional remarks.
+            /// </summary>
+            public const String  AdditionalRemarks      = "additionalRemarks";
+
+        }
+
+        #endregion
+
         /// <summary>
         /// The energy sources.
         /// </summary>
@@ -168,19 +210,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 //StrictJSON.OnlyProperties(JSON,
-                //                          "@context",
-                //                          "energySources",
-                //                          "environmentalImpacts",
-                //                          "supplierName",
-                //                          "productName",
-                //                          "additionalRemarks");
+                //                          PropertyKeys.Context,
+                //                          PropertyKeys.EnergySources,
+                //                          PropertyKeys.EnvironmentalImpacts,
+                //                          PropertyKeys.SupplierName,
+                //                          PropertyKeys.ProductName,
+                //                          PropertyKeys.AdditionalRemarks);
 
                 //StrictJSON.Context(JSON, JSONLDContext);
 
                 #region Parse EnergySources           [mandatory]
 
                 if (!PercentageOfExtensions.TryParse<EnergySourceCategory>(JSON,
-                                                                           "energySources",
+                                                                           PropertyKeys.EnergySources,
                                                                            "energy source",
                                                                            EnergySourceCategory.TryParse,
                                                                            out var energySources,
@@ -194,7 +236,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse EnvironmentalImpacts    [mandatory]
 
                 if (!EnvironmentalImpactAmountExtensions.TryParse(JSON,
-                                                                  "environmentalImpacts",
+                                                                  PropertyKeys.EnvironmentalImpacts,
                                                                   out var environmentalImpacts,
                                                                   out ErrorResponse))
                 {
@@ -205,7 +247,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse SupplierName            [mandatory]
 
-                if (!JSON.ParseMandatory("supplierName",
+                if (!JSON.ParseMandatory(PropertyKeys.SupplierName,
                                          "supplier name",
                                          out I18NString supplierName,
                                          out ErrorResponse))
@@ -217,7 +259,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse ProductName             [mandatory]
 
-                if (!JSON.ParseMandatory("productName",
+                if (!JSON.ParseMandatory(PropertyKeys.ProductName,
                                          "product name",
                                          out I18NString productName,
                                          out ErrorResponse))
@@ -229,7 +271,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse AdditionalRemarks       [optional]
 
-                if (JSON.ParseOptional("additionalRemarks",
+                if (JSON.ParseOptional(PropertyKeys.AdditionalRemarks,
                                        "additional remarks",
                                        I18NString.TryParse,
                                        out I18NString? additionalRemarks,
@@ -275,24 +317,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return a JSON representation of this object.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        public JObject ToJSON(Boolean Embedded = false)
+        /// <param name="CustomEnergyMixSerializer">A delegate to serialize custom energy mix JSON objects.</param>
+        public JObject ToJSON(Boolean                                      Embedded                    = false,
+                              CustomJObjectSerializerDelegate<EnergyMix>?  CustomEnergyMixSerializer   = null)
         {
 
             var json = new JObject();
 
             if (!Embedded)
-                json.Add("@context",              JSONLDContext);
+                json.Add(PropertyKeys.Context,                 JSONLDContext);
 
             // Mandatory, even when empty: [] stands for an unknown composition.
-            json.Add("energySources",             EnergySources.       ToJSON());
-            json.Add("environmentalImpacts",      EnvironmentalImpacts.ToJSON());
-            json.Add("supplierName",              SupplierName.        ToJSON());
-            json.Add("productName",               ProductName.         ToJSON());
+            json.Add(PropertyKeys.EnergySources,               EnergySources.       ToJSON());
+            json.Add(PropertyKeys.EnvironmentalImpacts,        EnvironmentalImpacts.ToJSON());
+            json.Add(PropertyKeys.SupplierName,                SupplierName.        ToJSON());
+            json.Add(PropertyKeys.ProductName,                 ProductName.         ToJSON());
 
             if (AdditionalRemarks is not null && AdditionalRemarks.IsNotNullOrEmpty())
-                json.Add("additionalRemarks",     AdditionalRemarks.ToJSON());
+                json.Add(PropertyKeys.AdditionalRemarks,       AdditionalRemarks.ToJSON());
 
-            return json;
+            return CustomEnergyMixSerializer is not null
+                       ? CustomEnergyMixSerializer(this, json)
+                       : json;
 
         }
 

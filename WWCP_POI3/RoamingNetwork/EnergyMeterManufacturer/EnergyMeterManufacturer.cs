@@ -39,7 +39,84 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   IComparable
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/energyMeterManufacturer";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                   = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context              = "@context";
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name                 = "name";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description          = "description";
+
+            /// <summary>
+            /// The property of its data source.
+            /// </summary>
+            public const String  DataSource           = "dataSource";
+
+            /// <summary>
+            /// The property of its address.
+            /// </summary>
+            public const String  Address              = "address";
+
+            /// <summary>
+            /// The property of its homepage.
+            /// </summary>
+            public const String  Homepage             = "homepage";
+
+            /// <summary>
+            /// The property of its hotline phone number.
+            /// </summary>
+            public const String  HotlinePhoneNumber   = "hotline";
+
+            /// <summary>
+            /// The property of its creation timestamp, as of every entity.
+            /// </summary>
+            public const String  Created              = "created";
+
+            /// <summary>
+            /// The property of its last change timestamp, as of every entity.
+            /// </summary>
+            public const String  LastChange           = "lastChange";
+
+            /// <summary>
+            /// The property of its custom data, as of every entity.
+            /// </summary>
+            public const String  CustomData           = "customData";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The identification of this manufacturer.
@@ -126,52 +203,101 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomEnergyMeterManufacturerSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this energy meter manufacturer, as its roaming network embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEnergyMeterManufacturerSerializer">A delegate to serialize custom energy meter manufacturer JSON objects.</param>
+        public JObject ToJSON(Boolean                                                    Embedded                                  = false,
+                              CustomJObjectSerializerDelegate<EnergyMeterManufacturer>?  CustomEnergyMeterManufacturerSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(PropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,             JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",         Name.ToJSON());
+                json.Add(PropertyKeys.Name,                Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(PropertyKeys.Description,         Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",   DataSource);
+                json.Add(PropertyKeys.DataSource,          DataSource);
 
             if (Address is not null)
-                json.Add("address",      Address.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.Address,             Address.ToJSON(Embedded: true));
 
             if (Homepage.HasValue)
-                json.Add("homepage",     Homepage.Value.ToString());
+                json.Add(PropertyKeys.Homepage,            Homepage.Value.ToString());
 
             if (HotlinePhoneNumber.HasValue)
-                json.Add("hotline",      HotlinePhoneNumber.Value.ToString());
+                json.Add(PropertyKeys.HotlinePhoneNumber,  HotlinePhoneNumber.Value.ToString());
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomEnergyMeterManufacturerSerializer is not null
+                       ? CustomEnergyMeterManufacturerSerializer(this, json)
+                       : json;
 
         }
 
         #endregion
 
-        #region ToCBOR()
+        #region ToCBOR(Embedded = false, CustomEnergyMeterManufacturerSerializer = null)
 
         /// <summary>
         /// Return the CBOR representation of this energy meter manufacturer: the keys and values of its JSON representation.
         /// </summary>
-        public CBORValue ToCBOR()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEnergyMeterManufacturerSerializer">A delegate to serialize custom energy meter manufacturer CBOR values.</param>
+        public CBORValue ToCBOR(Boolean                                                  Embedded                                  = false,
+                                CustomCBORSerializerDelegate<EnergyMeterManufacturer>?   CustomEnergyMeterManufacturerSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON());
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(PropertyKeys.Id),                  CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Context),             CBORValue.FromText(JSONLDContext));
+
+            if (Name.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(PropertyKeys.Name),                Name.       ToCBOR());
+
+            if (Description.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(PropertyKeys.Description),         Description.ToCBOR());
+
+            if (DataSource is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.DataSource),          CBORValue.FromText(DataSource));
+
+            // The address has no CBOR representation of its own: it is the keys and values of its JSON representation.
+            if (Address is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Address),             CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
+
+            if (Homepage.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),            CBORValue.FromText(Homepage.Value.ToString()));
+
+            if (HotlinePhoneNumber.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),  CBORValue.FromText(HotlinePhoneNumber.Value.ToString()));
+
+            // Always part of the content, as in the JSON representation; custom data is JSON.
+            cbor.Add(CBORValue.FromText(PropertyKeys.Created),                 CBORValue.FromText(Created.       ToISO8601()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.LastChange),              CBORValue.FromText(LastChangeDate.ToISO8601()));
+
+            if (CustomData.HasValues)
+                cbor.Add(CBORValue.FromText(PropertyKeys.CustomData),          CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            return CustomEnergyMeterManufacturerSerializer is not null
+                       ? CustomEnergyMeterManufacturerSerializer(this, cbor)
+                       : cbor;
+
+        }
 
         #endregion
 
@@ -193,7 +319,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(PropertyKeys.Id,
                                          "energy meter manufacturer identification",
                                          EnergyMeterManufacturer_Id.TryParse,
                                          out EnergyMeterManufacturer_Id id,
@@ -202,12 +328,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N   (JSON, "name",         "manufacturer name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N   (JSON, "description",  "manufacturer description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString (JSON, "dataSource",   "data source",               out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseAddress(JSON,                                              out var address,      out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, "homepage",     "homepage",                  URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, "hotline",      "hotline phone number",      PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the energy meter manufacturer '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N   (JSON, PropertyKeys.Name,                "manufacturer name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N   (JSON, PropertyKeys.Description,         "manufacturer description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString (JSON, PropertyKeys.DataSource,          "data source",               out var dataSource,   out ErrorResponse) ||
+                    !POIJSON.TryParseAddress(JSON, PropertyKeys.Address,             "address",                   out var address,      out ErrorResponse) ||
+                    !POIJSON.TryParseText   (JSON, PropertyKeys.Homepage,            "homepage",                  URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
+                    !POIJSON.TryParseText   (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
                 {
                     return false;
                 }
@@ -240,6 +373,114 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 EnergyMeterManufacturer  = null;
                 ErrorResponse            = "The given JSON representation of an energy meter manufacturer is invalid: " + e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region (static) TryParse(CBOR, out EnergyMeterManufacturer, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given CBOR representation of an energy meter manufacturer: the keys and values of its JSON
+        /// representation, see ToCBOR().
+        /// </summary>
+        /// <param name="CBOR">The CBOR to parse.</param>
+        /// <param name="EnergyMeterManufacturer">The parsed energy meter manufacturer.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public static Boolean TryParse(CBORValue                                          CBOR,
+                                       [NotNullWhen(true)]  out EnergyMeterManufacturer?  EnergyMeterManufacturer,
+                                       [NotNullWhen(false)] out String?                   ErrorResponse)
+        {
+
+            EnergyMeterManufacturer = null;
+
+            try
+            {
+
+                if (CBOR.Kind != CBORValueKind.Map)
+                {
+                    ErrorResponse = "The CBOR representation of an energy meter manufacturer must be a map!";
+                    return false;
+                }
+
+                if (!CBOR.ParseMandatory(PropertyKeys.Id,
+                                         "energy meter manufacturer identification",
+                                         EnergyMeterManufacturer_Id.TryParse,
+                                         out EnergyMeterManufacturer_Id id,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (CBOR.TryGetValue(CBORValue.FromText(PropertyKeys.Context), out var context) &&
+                    !(context.TryGetText(out var contextText) && contextText == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the energy meter manufacturer '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                CBOR.ParseOptionalText(PropertyKeys.DataSource, "data source", out var dataSource, out ErrorResponse);
+                if (ErrorResponse is not null)
+                    return false;
+
+                // What has no CBOR parser of its own is read as its JSON, with the parsers of the JSON representation:
+                // the multilingual texts, the address, the homepage, the hotline and the metadata.
+                var json = new JObject(
+                               new JProperty(PropertyKeys.Id, id.ToString())
+                           );
+
+                foreach (var key in new[] { PropertyKeys.Name,
+                                            PropertyKeys.Description,
+                                            PropertyKeys.Address,
+                                            PropertyKeys.Homepage,
+                                            PropertyKeys.HotlinePhoneNumber,
+                                            PropertyKeys.Created,
+                                            PropertyKeys.LastChange,
+                                            PropertyKeys.CustomData })
+                {
+                    if (CBOR.TryGetValue(CBORValue.FromText(key), out var value))
+                        json.Add(key, CBORJSON.ToJSON(value));
+                }
+
+                if (!POIJSON.TryParseI18N   (json, PropertyKeys.Name,                "manufacturer name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N   (json, PropertyKeys.Description,         "manufacturer description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseAddress(json, PropertyKeys.Address,             "address",                   out var address,      out ErrorResponse) ||
+                    !POIJSON.TryParseText   (json, PropertyKeys.Homepage,            "homepage",                  URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
+                    !POIJSON.TryParseText   (json, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIEntityMetadata.TryParse(json,
+                                                out var created,
+                                                out var lastChange,
+                                                out var customData,
+                                                out ErrorResponse))
+                {
+                    return false;
+                }
+
+                EnergyMeterManufacturer = new EnergyMeterManufacturer(id,
+                                                                      name,
+                                                                      description,
+                                                                      address,
+                                                                      homepage,
+                                                                      hotline,
+                                                                      dataSource,
+                                                                      created,
+                                                                      lastChange,
+                                                                      customData);
+
+                ErrorResponse = null;
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                EnergyMeterManufacturer  = null;
+                ErrorResponse            = "The given CBOR representation of an energy meter manufacturer is invalid: " + e.Message;
                 return false;
             }
 

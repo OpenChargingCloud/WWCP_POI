@@ -49,31 +49,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The properties of a grid connection point a change set can update or remove.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableGridConnectionPointProperties = [
-            "name",
-            "description",
-            "address",
-            "geoLocation",
-            "voltageLevel",
-            "connectionType",
-            "nominalVoltage",
-            "nominalFrequency",
-            "contractedImportPower",
-            "contractedExportPower",
-            "contractedImportApparentPower",
-            "contractedExportApparentPower",
-            "connectionAgreementId",
-            "networkLocationId",
-            "marketLocationIds",
-            "meteringLocationIds",
-            "energyMeter",
+            GridConnectionPoint.PropertyKeys.Name,
+            GridConnectionPoint.PropertyKeys.Description,
+            GridConnectionPoint.PropertyKeys.Address,
+            GridConnectionPoint.PropertyKeys.GeoLocation,
+            GridConnectionPoint.PropertyKeys.VoltageLevel,
+            GridConnectionPoint.PropertyKeys.ConnectionType,
+            GridConnectionPoint.PropertyKeys.NominalVoltage,
+            GridConnectionPoint.PropertyKeys.NominalFrequency,
+            GridConnectionPoint.PropertyKeys.ContractedImportPower,
+            GridConnectionPoint.PropertyKeys.ContractedExportPower,
+            GridConnectionPoint.PropertyKeys.ContractedImportApparentPower,
+            GridConnectionPoint.PropertyKeys.ContractedExportApparentPower,
+            GridConnectionPoint.PropertyKeys.ConnectionAgreementId,
+            GridConnectionPoint.PropertyKeys.NetworkLocationId,
+            GridConnectionPoint.PropertyKeys.MarketLocationIds,
+            GridConnectionPoint.PropertyKeys.MeteringLocationIds,
+            GridConnectionPoint.PropertyKeys.EnergyMeter,
             MaintainedByProperty,
-            "customData"
+            GridConnectionPoint.PropertyKeys.CustomData
         ];
 
         /// <summary>
         /// The property naming the maintainer of a grid connection point.
         /// </summary>
-        public const String MaintainedByProperty = "maintainedBy";
+        public const String MaintainedByProperty = GridConnectionPoint.PropertyKeys.MaintainedBy;
 
         #endregion
 
@@ -154,13 +154,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            var operatorJSON  = gridOperator.ToJSON();
-            var children      = operatorJSON["gridConnectionPoints"] as JArray;
+            var operatorJSON  = gridOperator.ToJSON(Embedded: true);
+            var children      = operatorJSON[GridOperator.PropertyKeys.GridConnectionPoints] as JArray;
             // Found under the identification it is kept with: the change may name it in another spelling.
             var storedId      = gridOperator.TryGetGridConnectionPoint(gridConnectionPointId, out var stored) ? stored.Id.ToString() : null;
             var pointJSON     = Change.Kind == RoamingNetworkChangeKind.Add
                                     ? null
-                                    : children?.OfType<JObject>().FirstOrDefault(child => child["@id"]?.Value<String>() == storedId);
+                                    : children?.OfType<JObject>().FirstOrDefault(child => child[GridConnectionPoint.PropertyKeys.Id]?.Value<String>() == storedId);
 
             #endregion
 
@@ -229,8 +229,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 case RoamingNetworkChangeKind.Add:
 
                     if (Change.NewValue is not JObject newPoint ||
-                        newPoint["@id"]?.Type != JTokenType.String ||
-                        !GridConnectionPoint_Id.TryParse(newPoint["@id"]!.Value<String>()!, out var newId) ||
+                        newPoint[GridConnectionPoint.PropertyKeys.Id]?.Type != JTokenType.String ||
+                        !GridConnectionPoint_Id.TryParse(newPoint[GridConnectionPoint.PropertyKeys.Id]!.Value<String>()!, out var newId) ||
                         newId != gridConnectionPointId)
                     {
                         ErrorResponse = $"Change {Index}: the grid connection point to add must be a JSON object with the identification '{gridConnectionPointId}'!";
@@ -240,7 +240,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (children is null)
                     {
                         children = [];
-                        operatorJSON["gridConnectionPoints"] = children;
+                        operatorJSON[GridOperator.PropertyKeys.GridConnectionPoints] = children;
                     }
 
                     children.Add(newPoint.DeepClone());
@@ -255,7 +255,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     children!.Remove(pointJSON!);
 
                     if (children.Count == 0)
-                        operatorJSON.Remove("gridConnectionPoints");
+                        operatorJSON.Remove(GridOperator.PropertyKeys.GridConnectionPoints);
 
                     break;
 
@@ -268,7 +268,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // The grid operator embedding it changed with it, at the time of the change set.
-            operatorJSON["lastChange"] = CreatedAt.ToISO8601();
+            operatorJSON[GridOperator.BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
 
             #region The changed grid operator must still be a valid one
 

@@ -301,7 +301,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             AddEmbeddedListHandlers<ChargingTariff_Id, ChargingTariff>(
                 chargingStationOperatorPath + "/CTs",
                 RequestedChargingTariffsOfOperator,
-                chargingTariff => chargingTariff.ToJSON(),
+                chargingTariff => chargingTariff.ToJSON(Embedded: true),
                 Viewed: true);
 
             AddEmbeddedEntityHandlers<ChargingTariff_Id, ChargingTariff>(
@@ -309,7 +309,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 RequestedChargingTariffsOfOperator,
                 ChargingTariff_Id.TryParse,
                 "charging tariff",
-                chargingTariff => chargingTariff.ToJSON(),
+                chargingTariff => chargingTariff.ToJSON(Embedded: true),
                 (request, chargingTariff) => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out _) &&
                                              chargingStationOperator.TryGetChargingTariff(chargingTariff.Id, out var stored)
                                                  ? stored
@@ -320,7 +320,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.EVSETemplates, null)
                                : (null, errorResponse),
-                evseTemplate => evseTemplate.ToJSON());
+                evseTemplate => evseTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<EVSETemplate_Id, EVSETemplate>(
                 chargingStationOperatorPath + "/EVSETs/{EVSETemplateId}",
@@ -329,14 +329,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 EVSETemplate_Id.TryParse,
                 "EVSE template",
-                evseTemplate => evseTemplate.ToJSON());
+                evseTemplate => evseTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ChargingStationTemplate_Id, ChargingStationTemplate>(
                 chargingStationOperatorPath + "/CSTs",
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.ChargingStationTemplates, null)
                                : (null, errorResponse),
-                chargingStationTemplate => chargingStationTemplate.ToJSON());
+                chargingStationTemplate => chargingStationTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ChargingStationTemplate_Id, ChargingStationTemplate>(
                 chargingStationOperatorPath + "/CSTs/{chargingStationTemplateId}",
@@ -345,14 +345,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ChargingStationTemplate_Id.TryParse,
                 "charging station template",
-                chargingStationTemplate => chargingStationTemplate.ToJSON());
+                chargingStationTemplate => chargingStationTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ChargingPoolTemplate_Id, ChargingPoolTemplate>(
                 chargingStationOperatorPath + "/CPTs",
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.ChargingPoolTemplates, null)
                                : (null, errorResponse),
-                chargingPoolTemplate => chargingPoolTemplate.ToJSON());
+                chargingPoolTemplate => chargingPoolTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ChargingPoolTemplate_Id, ChargingPoolTemplate>(
                 chargingStationOperatorPath + "/CPTs/{chargingPoolTemplateId}",
@@ -361,14 +361,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ChargingPoolTemplate_Id.TryParse,
                 "charging pool template",
-                chargingPoolTemplate => chargingPoolTemplate.ToJSON());
+                chargingPoolTemplate => chargingPoolTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ChargingTariffTemplate_Id, ChargingTariffTemplate>(
                 chargingStationOperatorPath + "/CTTs",
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.ChargingTariffTemplates, null)
                                : (null, errorResponse),
-                chargingTariffTemplate => chargingTariffTemplate.ToJSON());
+                chargingTariffTemplate => chargingTariffTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ChargingTariffTemplate_Id, ChargingTariffTemplate>(
                 chargingStationOperatorPath + "/CTTs/{chargingTariffTemplateId}",
@@ -377,14 +377,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ChargingTariffTemplate_Id.TryParse,
                 "charging tariff template",
-                chargingTariffTemplate => chargingTariffTemplate.ToJSON());
+                chargingTariffTemplate => chargingTariffTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<EnergyMeterTemplate_Id, EnergyMeterTemplate>(
                 chargingStationOperatorPath + "/EMTs",
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.EnergyMeterTemplates, null)
                                : (null, errorResponse),
-                energyMeterTemplate => energyMeterTemplate.ToJSON());
+                energyMeterTemplate => energyMeterTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<EnergyMeterTemplate_Id, EnergyMeterTemplate>(
                 chargingStationOperatorPath + "/EMTs/{energyMeterTemplateId}",
@@ -393,7 +393,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 EnergyMeterTemplate_Id.TryParse,
                 "energy meter template",
-                energyMeterTemplate => energyMeterTemplate.ToJSON());
+                energyMeterTemplate => energyMeterTemplate.ToJSON(Embedded: true));
 
 
             AddEmbeddedListHandlers<ChargingTariffOffer_Id, ChargingTariffOffer>(
@@ -401,7 +401,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.ChargingTariffOffers, null)
                                : (null, errorResponse),
-                chargingTariffOffer => chargingTariffOffer.ToJSON());
+                chargingTariffOffer => chargingTariffOffer.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ChargingTariffOffer_Id, ChargingTariffOffer>(
                 chargingStationOperatorPath + "/CTOs/{chargingTariffOfferId}",
@@ -410,14 +410,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ChargingTariffOffer_Id.TryParse,
                 "charging tariff offer",
-                chargingTariffOffer => chargingTariffOffer.ToJSON());
+                chargingTariffOffer => chargingTariffOffer.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ChargingTariffGroup_Id, ChargingTariffGroup>(
                 chargingStationOperatorPath + "/CTGs",
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.ChargingTariffGroups, null)
                                : (null, errorResponse),
-                chargingTariffGroup => chargingTariffGroup.ToJSON());
+                chargingTariffGroup => chargingTariffGroup.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ChargingTariffGroup_Id, ChargingTariffGroup>(
                 chargingStationOperatorPath + "/CTGs/{chargingTariffGroupId}",
@@ -426,14 +426,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ChargingTariffGroup_Id.TryParse,
                 "charging tariff group",
-                chargingTariffGroup => chargingTariffGroup.ToJSON());
+                chargingTariffGroup => chargingTariffGroup.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ChargingPoolGroup_Id, ChargingPoolGroup>(
                 chargingStationOperatorPath + "/CPGs",
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.ChargingPoolGroups, null)
                                : (null, errorResponse),
-                chargingPoolGroup => chargingPoolGroup.ToJSON());
+                chargingPoolGroup => chargingPoolGroup.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ChargingPoolGroup_Id, ChargingPoolGroup>(
                 chargingStationOperatorPath + "/CPGs/{chargingPoolGroupId}",
@@ -442,14 +442,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ChargingPoolGroup_Id.TryParse,
                 "charging pool group",
-                chargingPoolGroup => chargingPoolGroup.ToJSON());
+                chargingPoolGroup => chargingPoolGroup.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
                 chargingStationOperatorPath + "/CSGs",
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.ChargingStationGroups, null)
                                : (null, errorResponse),
-                chargingStationGroup => chargingStationGroup.ToJSON());
+                chargingStationGroup => chargingStationGroup.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
                 chargingStationOperatorPath + "/CSGs/{chargingStationGroupId}",
@@ -458,14 +458,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ChargingStationGroup_Id.TryParse,
                 "charging station group",
-                chargingStationGroup => chargingStationGroup.ToJSON());
+                chargingStationGroup => chargingStationGroup.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<EVSEGroup_Id, EVSEGroup>(
                 chargingStationOperatorPath + "/EVSEGs",
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.EVSEGroups, null)
                                : (null, errorResponse),
-                eVSEGroup => eVSEGroup.ToJSON());
+                eVSEGroup => eVSEGroup.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<EVSEGroup_Id, EVSEGroup>(
                 chargingStationOperatorPath + "/EVSEGs/{EVSEGroupId}",
@@ -474,14 +474,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 EVSEGroup_Id.TryParse,
                 "EVSE group",
-                eVSEGroup => eVSEGroup.ToJSON());
+                eVSEGroup => eVSEGroup.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<EnergyMeterGroup_Id, EnergyMeterGroup>(
                 chargingStationOperatorPath + "/EMGs",
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.EnergyMeterGroups, null)
                                : (null, errorResponse),
-                energyMeterGroup => energyMeterGroup.ToJSON());
+                energyMeterGroup => energyMeterGroup.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<EnergyMeterGroup_Id, EnergyMeterGroup>(
                 chargingStationOperatorPath + "/EMGs/{energyMeterGroupId}",
@@ -490,7 +490,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 EnergyMeterGroup_Id.TryParse,
                 "energy meter group",
-                energyMeterGroup => energyMeterGroup.ToJSON());
+                energyMeterGroup => energyMeterGroup.ToJSON(Embedded: true));
 
             #endregion
 
@@ -513,14 +513,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   // The ETag a precondition names: the one of the charging pool as its operator embeds it.
                                   var storedETag = roamingNetwork.TryGetChargingStationOperatorById(chargingPool.Id.OperatorId, out var chargingStationOperator) &&
                                                    chargingStationOperator.TryGetChargingPool(chargingPool.Id, out var storedChargingPool)
-                                                       ? StoredETagOf(request, storedChargingPool, storedChargingPool.ToJSON)
+                                                       ? StoredETagOf(request, storedChargingPool, () => storedChargingPool.ToJSON(Embedded: true))
                                                        : null;
 
                                   if (expansions.Length == 0)
-                                      return CachedEntityResponse(request, chargingPool, chargingPool.ToJSON, StoredETag: storedETag);
+                                      return CachedEntityResponse(request, chargingPool, () => chargingPool.ToJSON(Embedded: true), StoredETag: storedETag);
 
                                   // An expanded view depends on the version of the pool and on the one of its grid connection point.
-                                  var json = chargingPool.ToJSON();
+                                  var json = chargingPool.ToJSON(Embedded: true);
 
                                   foreach (var expansion in expansions)
                                       if (expansion != "gridConnectionPoint")
@@ -530,7 +530,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   // as the charging pool is, unless the view is the stored one.
                                   if (chargingPool.GridConnectionPointId is GridConnectionPoint_Id gridConnectionPointId &&
                                       roamingNetwork.TryGetGridConnectionPoint(gridConnectionPointId, out var gridOperator, out var gridConnectionPoint) &&
-                                      json.Property("gridConnectionPointId") is JProperty idProperty)
+                                      json.Property(ChargingPool.PropertyKeys.GridConnectionPointId) is JProperty idProperty)
                                   {
 
                                       if (!TryGetStoredView(request, out var stored, out errorResponse))
@@ -541,14 +541,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                          : gridOperator.EffectiveGridConnectionPoint(gridConnectionPoint);
 
                                       var embedded = new JObject(
-                                                         new JProperty("@id",             gridConnectionPoint.Id.ToString()),
-                                                         new JProperty("gridOperatorId",  gridOperator.Id.ToString())
+                                                         new JProperty(POI.RoamingNetwork.BasePropertyKeys.Id,             gridConnectionPoint.Id.ToString()),
+                                                         new JProperty(PropertyKeys.GridOperatorId,  gridOperator.Id.ToString())
                                                      );
 
-                                      foreach (var property in shown.ToJSON().Properties().Where(property => property.Name != "@id"))
+                                      foreach (var property in shown.ToJSON(Embedded: true).Properties().Where(property => property.Name != POI.RoamingNetwork.BasePropertyKeys.Id))
                                           embedded.Add(new JProperty(property.Name, property.Value.DeepClone()));
 
-                                      idProperty.Replace(new JProperty("gridConnectionPoint", embedded));
+                                      idProperty.Replace(new JProperty(PropertyKeys.GridConnectionPoint, embedded));
 
                                   }
 
@@ -565,9 +565,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          TryGetRequestedChargingStationOperator (request, out var chargingStationOperator, out errorResponse)
                                              ? CachedEntityResponse(request,
                                                                     chargingStation,
-                                                                    chargingStation.ToJSON,
+                                                                    () => chargingStation.ToJSON(Embedded: true),
                                                                     StoredETag: chargingStationOperator.TryGetChargingStation(chargingStation.Id, out var stored)
-                                                                                    ? StoredETagOf(request, stored, stored.ToJSON)
+                                                                                    ? StoredETagOf(request, stored, () => stored.ToJSON(Embedded: true))
                                                                                     : null)
                                              : errorResponse);
 
@@ -580,7 +580,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             AddEmbeddedListHandlers<ParkingSpace_Id, ParkingSpace>(
                 chargingStationPath + "/PSs",
                 RequestedParkingSpacesOfChargingStation,
-                parkingSpace => parkingSpace.ToJSON(),
+                parkingSpace => parkingSpace.ToJSON(Embedded: true),
                 Viewed: true);
 
             AddEmbeddedEntityHandlers<ParkingSpace_Id, ParkingSpace>(
@@ -588,7 +588,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 RequestedParkingSpacesOfChargingStation,
                 ParkingSpace_Id.TryParse,
                 "parking space",
-                parkingSpace => parkingSpace.ToJSON(),
+                parkingSpace => parkingSpace.ToJSON(Embedded: true),
                 (request, parkingSpace) => TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out _) &&
                                            roamingNetwork.TryGetParkingSpaceById(parkingSpace.Id, out var stored)
                                                ? stored
@@ -603,9 +603,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          TryGetRequestedChargingStationOperator (request, out var chargingStationOperator, out errorResponse)
                                              ? CachedEntityResponse(request,
                                                                     evse,
-                                                                    evse.ToJSON,
+                                                                    () => evse.ToJSON(Embedded: true),
                                                                     StoredETag: chargingStationOperator.TryGetEVSE(evse.Id, out var stored)
-                                                                                    ? StoredETagOf(request, stored, stored.ToJSON)
+                                                                                    ? StoredETagOf(request, stored, () => stored.ToJSON(Embedded: true))
                                                                                     : null)
                                              : errorResponse);
 
@@ -619,7 +619,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 request => TryGetRequestedChargingStationOperator(request, out var chargingStationOperator, out var errorResponse)
                                ? (chargingStationOperator.Brands, null)
                                : (null, errorResponse),
-                brand => brand.ToJSON());
+                brand => brand.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<Brand_Id, Brand>(
                 chargingStationOperatorPath + "/Brands/{brandId}",
@@ -628,14 +628,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 Brand_Id.TryParse,
                 "brand of the charging station operator",
-                brand => brand.ToJSON());
+                brand => brand.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<Brand_Id, Brand>(
                 chargingPoolPath + "/Brands",
                 request => TryGetRequestedChargingPool(request, out var chargingPool, out var errorResponse)
                                ? (chargingPool.Brands, null)
                                : (null, errorResponse),
-                brand => brand.ToJSON(),
+                brand => brand.ToJSON(Embedded: true),
                 Viewed: true);
 
             AddEmbeddedEntityHandlers<Brand_Id, Brand>(
@@ -645,14 +645,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 Brand_Id.TryParse,
                 "brand of the charging pool",
-                brand => brand.ToJSON());
+                brand => brand.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<Brand_Id, Brand>(
                 chargingStationPath + "/Brands",
                 request => TryGetRequestedChargingStation(request, out var chargingStation, out var errorResponse)
                                ? (chargingStation.Brands, null)
                                : (null, errorResponse),
-                brand => brand.ToJSON(),
+                brand => brand.ToJSON(Embedded: true),
                 Viewed: true);
 
             AddEmbeddedEntityHandlers<Brand_Id, Brand>(
@@ -662,14 +662,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 Brand_Id.TryParse,
                 "brand of the charging station",
-                brand => brand.ToJSON());
+                brand => brand.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<Brand_Id, Brand>(
                 chargingStationPath + "/EVSEs/{evseId}" + "/Brands",
                 request => TryGetRequestedEVSE(request, out var evse, out var errorResponse)
                                ? (evse.Brands, null)
                                : (null, errorResponse),
-                brand => brand.ToJSON(),
+                brand => brand.ToJSON(Embedded: true),
                 Viewed: true);
 
             AddEmbeddedEntityHandlers<Brand_Id, Brand>(
@@ -679,7 +679,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 Brand_Id.TryParse,
                 "brand of the EVSE",
-                brand => brand.ToJSON());
+                brand => brand.ToJSON(Embedded: true));
 
             #endregion
 
@@ -693,7 +693,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            TryGetRequestedChargingPool           (request, out var chargingPool,            out errorResponse)
                                ? ([ .. chargingStationOperator.TemplatesOf(chargingPool) ], null)
                                : (null, errorResponse),
-                chargingPoolTemplate => chargingPoolTemplate.ToJSON());
+                chargingPoolTemplate => chargingPoolTemplate.ToJSON(Embedded: true));
 
             AddOrderedListHandlers<ChargingStationTemplate>(
                 chargingStationPath + "/CSTs",
@@ -701,7 +701,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            TryGetRequestedChargingStation        (request, out var chargingStation,         out errorResponse)
                                ? ([ .. chargingStationOperator.TemplatesOf(chargingStation) ], null)
                                : (null, errorResponse),
-                chargingStationTemplate => chargingStationTemplate.ToJSON());
+                chargingStationTemplate => chargingStationTemplate.ToJSON(Embedded: true));
 
             AddOrderedListHandlers<EVSETemplate>(
                 chargingStationPath + "/EVSEs/{evseId}" + "/EVSETs",
@@ -709,7 +709,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            TryGetRequestedEVSE                   (request, out var evse,                    out errorResponse)
                                ? ([ .. chargingStationOperator.TemplatesOf(evse) ], null)
                                : (null, errorResponse),
-                evseTemplate => evseTemplate.ToJSON());
+                evseTemplate => evseTemplate.ToJSON(Embedded: true));
 
             AddOrderedListHandlers<ChargingTariffTemplate>(
                 chargingStationOperatorPath + "/CTs/{chargingTariffId}" + "/CTTs",
@@ -729,7 +729,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return ([ .. chargingStationOperator.TemplatesOf(chargingTariff) ], null);
 
                 },
-                chargingTariffTemplate => chargingTariffTemplate.ToJSON());
+                chargingTariffTemplate => chargingTariffTemplate.ToJSON(Embedded: true));
 
             AddOrderedListHandlers<ParkingSpaceTemplate>(
                 parkingOperatorPath + "/PSs/{parkingSpaceId}" + "/PSTs",
@@ -749,7 +749,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return ([ .. parkingOperator.TemplatesOf(parkingSpace) ], null);
 
                 },
-                parkingSpaceTemplate => parkingSpaceTemplate.ToJSON());
+                parkingSpaceTemplate => parkingSpaceTemplate.ToJSON(Embedded: true));
 
             #endregion
 
@@ -794,7 +794,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                              $"the charging pool '{chargingPool.Id}'"),
                                   null)
                                : (null, errorResponse),
-                chargingPoolGroup => chargingPoolGroup.ToJSON());
+                chargingPoolGroup => chargingPoolGroup.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
                 chargingStationPath + "/CSGs",
@@ -806,7 +806,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                                    $"the charging station '{chargingStation.Id}'"),
                                   null)
                                : (null, errorResponse),
-                chargingStationGroup => chargingStationGroup.ToJSON());
+                chargingStationGroup => chargingStationGroup.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<EVSEGroup_Id, EVSEGroup>(
                 chargingStationPath + "/EVSEs/{evseId}" + "/EVSEGs",
@@ -818,7 +818,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                              $"the EVSE '{evse.Id}'"),
                                   null)
                                : (null, errorResponse),
-                evseGroup => evseGroup.ToJSON());
+                evseGroup => evseGroup.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ParkingSpaceGroup_Id, ParkingSpaceGroup>(
                 parkingOperatorPath + "/PSs/{parkingSpaceId}" + "/PSGs",
@@ -842,7 +842,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             null);
 
                 },
-                parkingSpaceGroup => parkingSpaceGroup.ToJSON());
+                parkingSpaceGroup => parkingSpaceGroup.ToJSON(Embedded: true));
 
             #endregion
 
@@ -852,7 +852,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               request => TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse)
                                              ? CachedEntityResponseWithout(request,
                                                                            gridOperator,
-                                                                           gridOperator.ToJSON,
+                                                                           () => gridOperator.ToJSON(Embedded: true),
                                                                            [ "gridConnectionPoints", "energyMeterTemplates", "energyMeterGroups" ],
                                                                            "a grid operator")
                                              : errorResponse);
@@ -865,7 +865,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             AddEmbeddedListHandlers<GridConnectionPoint_Id, GridConnectionPoint>(
                 gridOperatorPath + "/GCPs",
                 RequestedGridConnectionPointsOfGridOperator,
-                gridConnectionPoint => gridConnectionPoint.ToJSON(),
+                gridConnectionPoint => gridConnectionPoint.ToJSON(Embedded: true),
                 Viewed: true);
 
             AddEmbeddedListHandlers<EnergyMeterTemplate_Id, EnergyMeterTemplate>(
@@ -873,7 +873,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 request => TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse)
                                ? (gridOperator.EnergyMeterTemplates, null)
                                : (null, errorResponse),
-                energyMeterTemplate => energyMeterTemplate.ToJSON());
+                energyMeterTemplate => energyMeterTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<EnergyMeterTemplate_Id, EnergyMeterTemplate>(
                 gridOperatorPath + "/EMTs/{energyMeterTemplateId}",
@@ -882,14 +882,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 EnergyMeterTemplate_Id.TryParse,
                 "energy meter template",
-                energyMeterTemplate => energyMeterTemplate.ToJSON());
+                energyMeterTemplate => energyMeterTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<EnergyMeterGroup_Id, EnergyMeterGroup>(
                 gridOperatorPath + "/EMGs",
                 request => TryGetRequestedGridOperator(request, out _, out var gridOperator, out var errorResponse)
                                ? (gridOperator.EnergyMeterGroups, null)
                                : (null, errorResponse),
-                energyMeterGroup => energyMeterGroup.ToJSON());
+                energyMeterGroup => energyMeterGroup.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<EnergyMeterGroup_Id, EnergyMeterGroup>(
                 gridOperatorPath + "/EMGs/{energyMeterGroupId}",
@@ -898,7 +898,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 EnergyMeterGroup_Id.TryParse,
                 "energy meter group",
-                energyMeterGroup => energyMeterGroup.ToJSON());
+                energyMeterGroup => energyMeterGroup.ToJSON(Embedded: true));
 
             #endregion
 
@@ -926,8 +926,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                   return CachedEntityResponse(request,
                                                               shown,
-                                                              shown.ToJSON,
-                                                              StoredETag: StoredETagOf(request, gridConnectionPoint, gridConnectionPoint.ToJSON));
+                                                              () => shown.ToJSON(Embedded: true),
+                                                              StoredETag: StoredETagOf(request, gridConnectionPoint, () => gridConnectionPoint.ToJSON(Embedded: true)));
 
                               });
 
@@ -939,7 +939,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
                                              ? CachedEntityResponseWithout(request,
                                                                            eMobilityProvider,
-                                                                           eMobilityProvider.ToJSON,
+                                                                           () => eMobilityProvider.ToJSON(Embedded: true),
                                                                            [ "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffOffers" ],
                                                                            "an e-mobility provider")
                                              : errorResponse);
@@ -954,7 +954,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
                                ? (eMobilityProvider.ChargingTariffOffers, null)
                                : (null, errorResponse),
-                chargingTariffOffer => chargingTariffOffer.ToJSON());
+                chargingTariffOffer => chargingTariffOffer.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ChargingTariffOffer_Id, ChargingTariffOffer>(
                 eMobilityProviderPath + "/CTOs/{chargingTariffOfferId}",
@@ -963,14 +963,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ChargingTariffOffer_Id.TryParse,
                 "charging tariff offer",
-                chargingTariffOffer => chargingTariffOffer.ToJSON());
+                chargingTariffOffer => chargingTariffOffer.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<EVSEGroup_Id, EVSEGroup>(
                 eMobilityProviderPath + "/EVSEGs",
                 request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
                                ? (eMobilityProvider.EVSEGroups, null)
                                : (null, errorResponse),
-                evseGroup => evseGroup.ToJSON());
+                evseGroup => evseGroup.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<EVSEGroup_Id, EVSEGroup>(
                 eMobilityProviderPath + "/EVSEGs/{EVSEGroupId}",
@@ -979,14 +979,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 EVSEGroup_Id.TryParse,
                 "EVSE group",
-                evseGroup => evseGroup.ToJSON());
+                evseGroup => evseGroup.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
                 eMobilityProviderPath + "/CSGs",
                 request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
                                ? (eMobilityProvider.ChargingStationGroups, null)
                                : (null, errorResponse),
-                chargingStationGroup => chargingStationGroup.ToJSON());
+                chargingStationGroup => chargingStationGroup.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ChargingStationGroup_Id, ChargingStationGroup>(
                 eMobilityProviderPath + "/CSGs/{chargingStationGroupId}",
@@ -995,14 +995,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ChargingStationGroup_Id.TryParse,
                 "charging station group",
-                chargingStationGroup => chargingStationGroup.ToJSON());
+                chargingStationGroup => chargingStationGroup.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ChargingPoolGroup_Id, ChargingPoolGroup>(
                 eMobilityProviderPath + "/CPGs",
                 request => TryGetRequestedEMobilityProvider(request, out var eMobilityProvider, out var errorResponse)
                                ? (eMobilityProvider.ChargingPoolGroups, null)
                                : (null, errorResponse),
-                chargingPoolGroup => chargingPoolGroup.ToJSON());
+                chargingPoolGroup => chargingPoolGroup.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ChargingPoolGroup_Id, ChargingPoolGroup>(
                 eMobilityProviderPath + "/CPGs/{chargingPoolGroupId}",
@@ -1011,7 +1011,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ChargingPoolGroup_Id.TryParse,
                 "charging pool group",
-                chargingPoolGroup => chargingPoolGroup.ToJSON());
+                chargingPoolGroup => chargingPoolGroup.ToJSON(Embedded: true));
 
             #endregion
 
@@ -1027,7 +1027,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid charging station manufacturer identification!");
 
                                   return roamingNetwork.TryGetChargingStationManufacturerById(chargingStationManufacturerId, out var chargingStationManufacturer)
-                                             ? CachedEntityResponse(request, chargingStationManufacturer, chargingStationManufacturer.ToJSON)
+                                             ? CachedEntityResponse(request, chargingStationManufacturer, () => chargingStationManufacturer.ToJSON(Embedded: true))
                                              : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The charging station manufacturer '{chargingStationManufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
 
                               });
@@ -1042,7 +1042,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
                                              ? CachedEntityResponseWithout(request,
                                                                            parkingOperator,
-                                                                           parkingOperator.ToJSON,
+                                                                           () => parkingOperator.ToJSON(Embedded: true),
                                                                            [ "parkingGarages", "parkingSpaces", "parkingSpaceTemplates", "parkingSpaceGroups", "parkingSensors", "parkingProducts" ],
                                                                            "a parking operator")
                                              : errorResponse);
@@ -1056,13 +1056,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
                                ? (parkingOperator.ParkingGarages, null)
                                : (null, errorResponse),
-                parkingGarage => parkingGarage.ToJSON());
+                parkingGarage => parkingGarage.ToJSON(Embedded: true));
 
             // As they are at runtime, with the properties their groups give them; with ?view=stored as they are given.
             AddEmbeddedListHandlers<ParkingSpace_Id, ParkingSpace>(
                 parkingOperatorPath + "/PSs",
                 RequestedParkingSpacesOfParkingOperator,
-                parkingSpace => parkingSpace.ToJSON(),
+                parkingSpace => parkingSpace.ToJSON(Embedded: true),
                 Viewed: true);
 
             AddEmbeddedListHandlers<ParkingSpaceTemplate_Id, ParkingSpaceTemplate>(
@@ -1070,7 +1070,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
                                ? (parkingOperator.ParkingSpaceTemplates, null)
                                : (null, errorResponse),
-                parkingSpaceTemplate => parkingSpaceTemplate.ToJSON());
+                parkingSpaceTemplate => parkingSpaceTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ParkingSpaceTemplate_Id, ParkingSpaceTemplate>(
                 parkingOperatorPath + "/PSTs/{parkingSpaceTemplateId}",
@@ -1079,28 +1079,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ParkingSpaceTemplate_Id.TryParse,
                 "parking space template",
-                parkingSpaceTemplate => parkingSpaceTemplate.ToJSON());
+                parkingSpaceTemplate => parkingSpaceTemplate.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ParkingSpaceGroup_Id, ParkingSpaceGroup>(
                 parkingOperatorPath + "/PSGs",
                 request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
                                ? (parkingOperator.ParkingSpaceGroups, null)
                                : (null, errorResponse),
-                parkingSpaceGroup => parkingSpaceGroup.ToJSON());
+                parkingSpaceGroup => parkingSpaceGroup.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ParkingSensor_Id, ParkingSensor>(
                 parkingOperatorPath + "/PSNs",
                 request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
                                ? (parkingOperator.ParkingSensors, null)
                                : (null, errorResponse),
-                parkingSensor => parkingSensor.ToJSON());
+                parkingSensor => parkingSensor.ToJSON(Embedded: true));
 
             AddEmbeddedListHandlers<ParkingProduct_Id, ParkingProduct>(
                 parkingOperatorPath + "/PPs",
                 request => TryGetRequestedParkingOperator(request, out var parkingOperator, out var errorResponse)
                                ? (parkingOperator.ParkingProducts, null)
                                : (null, errorResponse),
-                parkingProduct => parkingProduct.ToJSON());
+                parkingProduct => parkingProduct.ToJSON(Embedded: true));
 
             #endregion
 
@@ -1113,14 +1113,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ParkingGarage_Id.TryParse,
                 "parking garage",
-                parkingGarage => parkingGarage.ToJSON());
+                parkingGarage => parkingGarage.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ParkingSpace_Id, ParkingSpace>(
                 parkingOperatorPath + "/PSs/{parkingSpaceId}",
                 RequestedParkingSpacesOfParkingOperator,
                 ParkingSpace_Id.TryParse,
                 "parking space",
-                parkingSpace => parkingSpace.ToJSON(),
+                parkingSpace => parkingSpace.ToJSON(Embedded: true),
                 (request, parkingSpace) => TryGetRequestedParkingOperator(request, out var parkingOperator, out _) &&
                                            parkingOperator.TryGetParkingSpace(parkingSpace.Id, out var stored)
                                                ? stored
@@ -1133,7 +1133,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ParkingSpaceGroup_Id.TryParse,
                 "parking space group",
-                parkingSpaceGroup => parkingSpaceGroup.ToJSON());
+                parkingSpaceGroup => parkingSpaceGroup.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ParkingSensor_Id, ParkingSensor>(
                 parkingOperatorPath + "/PSNs/{parkingSensorId}",
@@ -1142,7 +1142,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ParkingSensor_Id.TryParse,
                 "parking sensor",
-                parkingSensor => parkingSensor.ToJSON());
+                parkingSensor => parkingSensor.ToJSON(Embedded: true));
 
             AddEmbeddedEntityHandlers<ParkingProduct_Id, ParkingProduct>(
                 parkingOperatorPath + "/PPs/{parkingProductId}",
@@ -1151,7 +1151,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : (null, errorResponse),
                 ParkingProduct_Id.TryParse,
                 "parking product",
-                parkingProduct => parkingProduct.ToJSON());
+                parkingProduct => parkingProduct.ToJSON(Embedded: true));
 
             #endregion
 
@@ -1396,9 +1396,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      return QueryResponse<ChargingTariffOffer>(request,
                                                                                query,
                                                                                () => offers,
-                                                                               offer   => SearchTextOf(offer, offer.ToJSON),
-                                                                               entries => new JArray(entries.Select(offer => offer.ToJSON())),
-                                                                               format  => POIRepresentation.Of(new JArray(offers.Select(offer => offer.ToJSON())), format),
+                                                                               offer   => SearchTextOf(offer, () => offer.ToJSON(Embedded: true)),
+                                                                               entries => new JArray(entries.Select(offer => offer.ToJSON(Embedded: true))),
+                                                                               format  => POIRepresentation.Of(new JArray(offers.Select(offer => offer.ToJSON(Embedded: true))), format),
                                                                                offers.Length);
 
                                  });
@@ -2021,14 +2021,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         Select (entity => {
 
                             var json = new JObject(
-                                           new JProperty("@id", entity.Id.ToString())
+                                           new JProperty(POI.RoamingNetwork.BasePropertyKeys.Id, entity.Id.ToString())
                                        );
 
                             if (entity.Name.IsNotNullOrEmpty())
-                                json.Add("name",         entity.Name.ToJSON());
+                                json.Add(POI.RoamingNetwork.BasePropertyKeys.Name,         entity.Name.ToJSON());
 
                             if (entity.Description.IsNotNullOrEmpty())
-                                json.Add("description",  entity.Description.ToJSON());
+                                json.Add(POI.RoamingNetwork.BasePropertyKeys.Description,  entity.Description.ToJSON());
 
                             return json;
 
@@ -2265,7 +2265,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         String          Description)
         {
 
-            var json  = new JObject(new JProperty("description", Description));
+            var json  = new JObject(new JProperty(PropertyKeys.Description, Description));
             var cbor  = WantsCBOR(Request);
 
             return new HTTPResponse.Builder(Request) {

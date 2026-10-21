@@ -67,11 +67,119 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String Role            = RoamingNetworkCommitSignatureRoles.ChargingStationOperator;
 
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkPriceStatement";
+
         private String? digest;
 
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context           = "@context";
+
+            /// <summary>
+            /// The property of the identification of its roaming network.
+            /// </summary>
+            public const String  RoamingNetworkId  = "roamingNetworkId";
+
+            /// <summary>
+            /// The property of the type of its entity.
+            /// </summary>
+            public const String  EntityType        = "entityType";
+
+            /// <summary>
+            /// The property of the identification of its entity.
+            /// </summary>
+            public const String  EntityId          = "entityId";
+
+            /// <summary>
+            /// The property of the price status it states.
+            /// </summary>
+            public const String  PriceStatus       = "priceStatus";
+
+            /// <summary>
+            /// The property of the beginning of its validity.
+            /// </summary>
+            public const String  ValidFrom         = "validFrom";
+
+            /// <summary>
+            /// The property of the end of its validity.
+            /// </summary>
+            public const String  ValidUntil        = "validUntil";
+
+            /// <summary>
+            /// The property of its position in the chain of the statements of its entity.
+            /// </summary>
+            public const String  Sequence          = "sequence";
+
+            /// <summary>
+            /// The property of the digest of the statement before.
+            /// </summary>
+            public const String  Previous          = "previous";
+
+            /// <summary>
+            /// The property of the latest checkpoint known when it was signed.
+            /// </summary>
+            public const String  After             = "after";
+
+            /// <summary>
+            /// The property of the role it is signed in.
+            /// </summary>
+            public const String  Role              = "role";
+
+            /// <summary>
+            /// The property of the charging station operator signing it.
+            /// </summary>
+            public const String  Signer            = "signer";
+
+            /// <summary>
+            /// The property of its signing timestamp.
+            /// </summary>
+            public const String  SignedAt          = "signedAt";
+
+            /// <summary>
+            /// The property of its signature algorithm.
+            /// </summary>
+            public const String  Algorithm         = "algorithm";
+
+            /// <summary>
+            /// The property of the identification of its key.
+            /// </summary>
+            public const String  KeyId             = "keyId";
+
+            /// <summary>
+            /// The property of its signature value.
+            /// </summary>
+            public const String  Value             = "value";
+
+            /// <summary>
+            /// The property of the profile of its signature.
+            /// </summary>
+            public const String  Profile           = "profile";
+
+            /// <summary>
+            /// The property of the encoding of its signature value.
+            /// </summary>
+            public const String  Encoding          = "encoding";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The roaming network.
@@ -163,7 +271,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// digits. The next statement of the entity names it as its previous one, and a checkpoint takes it as a leaf.
         /// </summary>
         public String                        Digest
-            => digest ??= Convert.ToHexStringLower(SHA256.HashData(CanonicalJSON.ToUTF8Bytes(ToJSON())));
+            => digest ??= Convert.ToHexStringLower(SHA256.HashData(CanonicalJSON.ToUTF8Bytes(ToJSON(Embedded: true))));
 
         #endregion
 
@@ -292,7 +400,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var unsigned   = new RoamingNetworkPriceStatement(RoamingNetworkId,
                                                               EntityType,
                                                               EntityId,
-                                                              PriceStatus.ToJSON(),
+                                                              PriceStatus.ToJSON(Embedded: true),
                                                               ValidFrom.HasValue ? Truncated(ValidFrom.Value) : signedAt,
                                                               ValidUntil.HasValue ? Truncated(ValidUntil.Value) : null,
                                                               Sequence,
@@ -457,7 +565,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var at = At ?? Timestamp.Now;
 
-            if (RoamingNetworkId.ToString() != Proof.RoamingNetwork["@id"]?.Value<String>())
+            if (RoamingNetworkId.ToString() != Proof.RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
             {
                 ErrorResponse = $"The price statement is one of the roaming network '{RoamingNetworkId}'!";
                 return false;
@@ -469,16 +577,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (Proof.Given("chargingStationOperators").FirstOrDefault(chargingStationOperator => Id(chargingStationOperator) == Signer.ToString()) is not JObject operatorJSON)
+            if (Proof.Given(POI.RoamingNetwork.PropertyKeys.ChargingStationOperators).FirstOrDefault(chargingStationOperator => Id(chargingStationOperator) == Signer.ToString()) is not JObject operatorJSON)
             {
                 ErrorResponse = $"The proof gives no charging station operator '{Signer}'!";
                 return false;
             }
 
             var given = EntityType switch {
-                            nameof(ChargingPool)     => Proof.GivenBelow(operatorJSON, "chargingPools"),
-                            nameof(ChargingStation)  => Proof.GivenBelow(operatorJSON, "chargingPools", "chargingStations"),
-                            _                        => Proof.GivenBelow(operatorJSON, "chargingPools", "chargingStations", "EVSEs")
+                            nameof(ChargingPool)     => Proof.GivenBelow(operatorJSON, ChargingStationOperator.PropertyKeys.ChargingPools),
+                            nameof(ChargingStation)  => Proof.GivenBelow(operatorJSON, ChargingStationOperator.PropertyKeys.ChargingPools, ChargingPool.PropertyKeys.ChargingStations),
+                            _                        => Proof.GivenBelow(operatorJSON, ChargingStationOperator.PropertyKeys.ChargingPools, ChargingPool.PropertyKeys.ChargingStations, ChargingStation.PropertyKeys.EVSEs)
                         };
 
             if (!given.Any(entity => Id(entity) == EntityId))
@@ -563,10 +671,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = Content();
 
-            json.AddFirst(new JProperty("encoding",  "base64"));
-            json.AddFirst(new JProperty("keyId",     KeyId));
-            json.AddFirst(new JProperty("algorithm", Algorithm));
-            json.AddFirst(new JProperty("profile",   SigningProfile));
+            json.AddFirst(new JProperty(PropertyKeys.Encoding,   "base64"));
+            json.AddFirst(new JProperty(PropertyKeys.KeyId,      KeyId));
+            json.AddFirst(new JProperty(PropertyKeys.Algorithm,  Algorithm));
+            json.AddFirst(new JProperty(PropertyKeys.Profile,    SigningProfile));
 
             return CanonicalJSON.ToUTF8Bytes(json);
 
@@ -697,15 +805,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 foreach (var property in JSON.Properties())
-                    if (property.Name is not ("roamingNetworkId" or "entityType" or "entityId" or "priceStatus" or "validFrom" or "validUntil" or
-                                              "sequence" or "previous" or "after" or "role" or "signer" or "signedAt" or
-                                              "algorithm" or "keyId" or "value" or "profile" or "encoding"))
+                    if (property.Name is not (PropertyKeys.Context or
+                                              PropertyKeys.RoamingNetworkId or PropertyKeys.EntityType or PropertyKeys.EntityId or PropertyKeys.PriceStatus or
+                                              PropertyKeys.ValidFrom or PropertyKeys.ValidUntil or PropertyKeys.Sequence or PropertyKeys.Previous or
+                                              PropertyKeys.After or PropertyKeys.Role or PropertyKeys.Signer or PropertyKeys.SignedAt or
+                                              PropertyKeys.Algorithm or PropertyKeys.KeyId or PropertyKeys.Value or PropertyKeys.Profile or PropertyKeys.Encoding))
                     {
                         ErrorResponse = $"Unknown property '{property.Name}' of a price statement!";
                         return false;
                     }
 
-                if (!JSON.ParseMandatory("roamingNetworkId",
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the price statement must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!JSON.ParseMandatory(PropertyKeys.RoamingNetworkId,
                                          "roaming network identification",
                                          RoamingNetwork_Id.TryParse,
                                          out RoamingNetwork_Id roamingNetworkId,
@@ -714,19 +831,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (Text(JSON, "entityType") is not String entityType || !IsEntityType(entityType))
+                if (Text(JSON, PropertyKeys.EntityType) is not String entityType || !IsEntityType(entityType))
                 {
                     ErrorResponse = "The entity type of a price statement must be ChargingPool, ChargingStation or EVSE!";
                     return false;
                 }
 
-                if (Text(JSON, "entityId") is not String entityId || OperatorOf(entityType, entityId) is not ChargingStationOperator_Id operatorId)
+                if (Text(JSON, PropertyKeys.EntityId) is not String entityId || OperatorOf(entityType, entityId) is not ChargingStationOperator_Id operatorId)
                 {
                     ErrorResponse = $"Missing or invalid identification of the {entityType} of the price statement!";
                     return false;
                 }
 
-                if (JSON["priceStatus"] is not JObject priceStatusJSON)
+                if (JSON[PropertyKeys.PriceStatus] is not JObject priceStatusJSON)
                 {
                     ErrorResponse = "A price statement needs its price status!";
                     return false;
@@ -738,19 +855,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!TryParseTimestamp(JSON, "validFrom", out var validFrom) || !validFrom.HasValue)
+                if (!TryParseTimestamp(JSON, PropertyKeys.ValidFrom, out var validFrom) || !validFrom.HasValue)
                 {
                     ErrorResponse = "The beginning of the validity must be written as yyyy-MM-ddTHH:mm:ss.fffZ!";
                     return false;
                 }
 
-                if (!TryParseTimestamp(JSON, "validUntil", out var validUntil))
+                if (!TryParseTimestamp(JSON, PropertyKeys.ValidUntil, out var validUntil))
                 {
                     ErrorResponse = "The end of the validity must be written as yyyy-MM-ddTHH:mm:ss.fffZ!";
                     return false;
                 }
 
-                if (JSON["sequence"] is not JValue { Type: JTokenType.Integer } sequenceJSON ||
+                if (JSON[PropertyKeys.Sequence] is not JValue { Type: JTokenType.Integer } sequenceJSON ||
                     sequenceJSON.Value<Decimal>() < 0 || sequenceJSON.Value<Decimal>() > UInt64.MaxValue)
                 {
                     ErrorResponse = "Missing or invalid sequence!";
@@ -761,7 +878,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 String? previous = null;
 
-                if (JSON["previous"] is JToken previousJSON)
+                if (JSON[PropertyKeys.Previous] is JToken previousJSON)
                 {
 
                     if (previousJSON.Type != JTokenType.String || !IsDigest(previousJSON.Value<String>()))
@@ -782,7 +899,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 RoamingNetworkCheckpoint_Id? after = null;
 
-                if (JSON["after"] is JToken afterJSON)
+                if (JSON[PropertyKeys.After] is JToken afterJSON)
                 {
 
                     if (afterJSON.Type != JTokenType.String || !RoamingNetworkCheckpoint_Id.TryParse(afterJSON.Value<String>(), out var afterId))
@@ -795,29 +912,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                if (Text(JSON, "role") != Role)
+                if (Text(JSON, PropertyKeys.Role) != Role)
                 {
                     ErrorResponse = $"A price statement is signed in the role '{Role}'!";
                     return false;
                 }
 
-                if (Text(JSON, "signer") != operatorId.ToString())
+                if (Text(JSON, PropertyKeys.Signer) != operatorId.ToString())
                 {
                     ErrorResponse = $"A price statement of the {entityType} '{entityId}' is signed by its operator '{operatorId}'!";
                     return false;
                 }
 
-                if (!TryParseTimestamp(JSON, "signedAt", out var signedAt) || !signedAt.HasValue)
+                if (!TryParseTimestamp(JSON, PropertyKeys.SignedAt, out var signedAt) || !signedAt.HasValue)
                 {
                     ErrorResponse = "The signing timestamp must be written as yyyy-MM-ddTHH:mm:ss.fffZ!";
                     return false;
                 }
 
-                if (Text(JSON, "algorithm") is not String algorithm || algorithm.Length == 0 ||
-                    Text(JSON, "keyId")     is not String keyId     || keyId.    Length == 0 ||
-                    Text(JSON, "value")     is not String value     || value.    Length == 0 ||
-                    Text(JSON, "profile")   is not String profile   ||
-                    Text(JSON, "encoding")  is not String encoding)
+                if (Text(JSON, PropertyKeys.Algorithm) is not String algorithm || algorithm.Length == 0 ||
+                    Text(JSON, PropertyKeys.KeyId)     is not String keyId     || keyId.    Length == 0 ||
+                    Text(JSON, PropertyKeys.Value)     is not String value     || value.    Length == 0 ||
+                    Text(JSON, PropertyKeys.Profile)   is not String profile   ||
+                    Text(JSON, PropertyKeys.Encoding)  is not String encoding)
                 {
                     ErrorResponse = "A price statement requires an algorithm, a key identification, a value, a profile and an encoding!";
                     return false;
@@ -901,36 +1018,85 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomPriceStatementSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this price statement.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomPriceStatementSerializer">An optional custom serializer of price statements.</param>
+        public JObject ToJSON(Boolean                                                         Embedded                         = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkPriceStatement>?  CustomPriceStatementSerializer   = null)
         {
 
             var json = Content();
 
-            json.Add("algorithm",  Algorithm);
-            json.Add("keyId",      KeyId);
-            json.Add("value",      Value);
-            json.Add("profile",    Profile);
-            json.Add("encoding",   Encoding);
+            if (!Embedded)
+                json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
 
-            return json;
+            json.Add(PropertyKeys.Algorithm,  Algorithm);
+            json.Add(PropertyKeys.KeyId,      KeyId);
+            json.Add(PropertyKeys.Value,      Value);
+            json.Add(PropertyKeys.Profile,    Profile);
+            json.Add(PropertyKeys.Encoding,   Encoding);
+
+            return CustomPriceStatementSerializer is not null
+                       ? CustomPriceStatementSerializer(this, json)
+                       : json;
 
         }
 
         #endregion
 
-        #region ToCBOR()
+        #region ToCBOR(Embedded = false, CustomPriceStatementSerializer = null)
 
         /// <summary>
         /// Return the CBOR representation of this price statement: the keys and values of its JSON representation.
         /// </summary>
-        public CBORValue ToCBOR()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomPriceStatementSerializer">An optional custom serializer of price statements.</param>
+        public CBORValue ToCBOR(Boolean                                                      Embedded                         = false,
+                                CustomCBORSerializerDelegate<RoamingNetworkPriceStatement>?  CustomPriceStatementSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON());
+            var cbor = new CBORMap();
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Context),           CBORValue.FromText(JSONLDContext));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.RoamingNetworkId),      CBORValue.FromText(RoamingNetworkId.ToString()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.EntityType),            CBORValue.FromText(EntityType));
+            cbor.Add(CBORValue.FromText(PropertyKeys.EntityId),              CBORValue.FromText(EntityId));
+
+            // The price status as it was given and signed: the keys and values of its JSON representation.
+            cbor.Add(CBORValue.FromText(PropertyKeys.PriceStatus),           CBORJSON.ToCBOR(PriceStatusJSON));
+            cbor.Add(CBORValue.FromText(PropertyKeys.ValidFrom),             CBORValue.FromText(ValidFrom.ToISO8601()));
+
+            if (ValidUntil.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ValidUntil),        CBORValue.FromText(ValidUntil.Value.ToISO8601()));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.Sequence),              CBORValue.FromUInt64(Sequence));
+
+            if (Previous is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Previous),          CBORValue.FromText(Previous));
+
+            if (After.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.After),             CBORValue.FromText(After.Value.ToString()));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.Role),                  CBORValue.FromText(Role));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Signer),                CBORValue.FromText(Signer.ToString()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.SignedAt),              CBORValue.FromText(SignedAt.ToISO8601()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Algorithm),             CBORValue.FromText(Algorithm));
+            cbor.Add(CBORValue.FromText(PropertyKeys.KeyId),                 CBORValue.FromText(KeyId));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Value),                 CBORValue.FromText(Value));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Profile),               CBORValue.FromText(Profile));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Encoding),              CBORValue.FromText(Encoding));
+
+            return CustomPriceStatementSerializer is not null
+                       ? CustomPriceStatementSerializer(this, cbor)
+                       : cbor;
+
+        }
 
         #endregion
 
@@ -944,27 +1110,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("roamingNetworkId",  RoamingNetworkId.ToString()),
-                           new JProperty("entityType",        EntityType),
-                           new JProperty("entityId",          EntityId),
-                           new JProperty("priceStatus",       PriceStatusJSON.DeepClone()),
-                           new JProperty("validFrom",         ValidFrom.ToISO8601())
+                           new JProperty(PropertyKeys.RoamingNetworkId,  RoamingNetworkId.ToString()),
+                           new JProperty(PropertyKeys.EntityType,        EntityType),
+                           new JProperty(PropertyKeys.EntityId,          EntityId),
+                           new JProperty(PropertyKeys.PriceStatus,       PriceStatusJSON.DeepClone()),
+                           new JProperty(PropertyKeys.ValidFrom,         ValidFrom.ToISO8601())
                        );
 
             if (ValidUntil.HasValue)
-                json.Add("validUntil",  ValidUntil.Value.ToISO8601());
+                json.Add(PropertyKeys.ValidUntil,  ValidUntil.Value.ToISO8601());
 
-            json.Add("sequence",        Sequence);
+            json.Add(PropertyKeys.Sequence,        Sequence);
 
             if (Previous is not null)
-                json.Add("previous",    Previous);
+                json.Add(PropertyKeys.Previous,    Previous);
 
             if (After.HasValue)
-                json.Add("after",       After.Value.ToString());
+                json.Add(PropertyKeys.After,       After.Value.ToString());
 
-            json.Add("role",            Role);
-            json.Add("signer",          Signer.ToString());
-            json.Add("signedAt",        SignedAt.ToISO8601());
+            json.Add(PropertyKeys.Role,            Role);
+            json.Add(PropertyKeys.Signer,          Signer.ToString());
+            json.Add(PropertyKeys.SignedAt,        SignedAt.ToISO8601());
 
             return json;
 
@@ -986,8 +1152,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         private static String? Id(JObject Entity)
 
-            => Entity["@id"]?.Type == JTokenType.String
-                   ? Entity["@id"]!.Value<String>()
+            => Entity[POI.RoamingNetwork.BasePropertyKeys.Id]?.Type == JTokenType.String
+                   ? Entity[POI.RoamingNetwork.BasePropertyKeys.Id]!.Value<String>()
                    : null;
 
         #endregion

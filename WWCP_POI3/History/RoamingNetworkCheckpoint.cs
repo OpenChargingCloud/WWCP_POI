@@ -73,9 +73,127 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const UInt32  DefaultEpoch     = 1;
 
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String  JSONLDContext    = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkCheckpoint";
+
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context           = "@context";
+
+            /// <summary>
+            /// The property of the profile of its content, which only the content its identification is calculated over names.
+            /// </summary>
+            public const String  Profile           = "profile";
+
+            /// <summary>
+            /// The property of the identification of its roaming network.
+            /// </summary>
+            public const String  RoamingNetworkId  = "roamingNetworkId";
+
+            /// <summary>
+            /// The property of its epoch.
+            /// </summary>
+            public const String  Epoch             = "epoch";
+
+            /// <summary>
+            /// The property of its position in the line of its epoch.
+            /// </summary>
+            public const String  Sequence          = "sequence";
+
+            /// <summary>
+            /// The property of the identification of the checkpoint before.
+            /// </summary>
+            public const String  PreviousId        = "previousId";
+
+            /// <summary>
+            /// The property of the identification of its commit, as of the leaf of a commit as well.
+            /// </summary>
+            public const String  CommitId          = "commitId";
+
+            /// <summary>
+            /// The property of the revision of its commit, as of the leaf of a commit as well.
+            /// </summary>
+            public const String  Revision          = "revision";
+
+            /// <summary>
+            /// The property of the ETags of the version of its commit, as of the leaf of a commit as well.
+            /// </summary>
+            public const String  ETags             = "eTags";
+
+            /// <summary>
+            /// The property of the tree of its commits: { @merkleRoot, @size }.
+            /// </summary>
+            public const String  Commits           = "commits";
+
+            /// <summary>
+            /// The property of the tree of the price statements it names: { @merkleRoot, @size }.
+            /// </summary>
+            public const String  PriceStatements   = "priceStatements";
+
+            /// <summary>
+            /// The property of the Merkle tree hash of a tree.
+            /// </summary>
+            public const String  MerkleRoot        = "@merkleRoot";
+
+            /// <summary>
+            /// The property of the number of leaves of a tree.
+            /// </summary>
+            public const String  Size              = "@size";
+
+            /// <summary>
+            /// The property of its creation timestamp.
+            /// </summary>
+            public const String  CreatedAt         = "createdAt";
+
+            /// <summary>
+            /// The property telling that it is the final checkpoint of its epoch.
+            /// </summary>
+            public const String  Final             = "final";
+
+            /// <summary>
+            /// The property of the next epoch, named by a final checkpoint.
+            /// </summary>
+            public const String  Next              = "next";
+
+            /// <summary>
+            /// The property of the final checkpoint of the epoch before.
+            /// </summary>
+            public const String  PreviousEpoch     = RoamingNetworkEpochLink.JSONProperty;
+
+            /// <summary>
+            /// The property of its signatures.
+            /// </summary>
+            public const String  Signatures        = "signatures";
+
+            /// <summary>
+            /// The property of the checkpoint in the signature input of a checkpoint signature.
+            /// </summary>
+            public const String  Checkpoint        = "checkpoint";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The identification of this checkpoint, calculated from its content.
@@ -355,9 +473,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        UInt64                   Revision)
 
             => new (
-                   new JProperty("commitId",  CommitId.ToString()),
-                   new JProperty("eTags",     new JArray(ETags.Select(eTag => eTag.ToJSON()))),
-                   new JProperty("revision",  Revision)
+                   new JProperty(PropertyKeys.CommitId,  CommitId.ToString()),
+                   new JProperty(PropertyKeys.ETags,     new JArray(ETags.Select(eTag => eTag.ToJSON()))),
+                   new JProperty(PropertyKeys.Revision,  Revision)
                );
 
         #endregion
@@ -538,18 +656,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("The algorithm is not supported for asymmetric signing.", nameof(Signature));
 
             var json = new JObject(
-                           new JProperty("profile",     SigningProfile),
-                           new JProperty("algorithm",   Signature.Algorithm),
-                           new JProperty("keyId",       Signature.KeyId),
-                           new JProperty("encoding",    "base64"),
-                           new JProperty("role",        Signature.Role),
-                           new JProperty("signedAt",    Signature.SignedAt.ToISO8601())
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Profile,     SigningProfile),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Algorithm,   Signature.Algorithm),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.KeyId,       Signature.KeyId),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Encoding,    "base64"),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Role,        Signature.Role),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.SignedAt,    Signature.SignedAt.ToISO8601())
                        );
 
             if (Signature.Signer is not null)
-                json.Add("signer", Signature.Signer);
+                json.Add(RoamingNetworkCommitSignature.PropertyKeys.Signer, Signature.Signer);
 
-            json.Add("checkpoint", ToJSON(IncludeSignatures: false));
+            json.Add(PropertyKeys.Checkpoint, ToJSON(Embedded: true, IncludeSignatures: false));
 
             return CanonicalJSON.ToUTF8Bytes(json);
 
@@ -617,13 +735,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!RoamingNetworkCheckpoint_Id.TryParse(Text(JSON, "@id"), out var id))
+                if (!RoamingNetworkCheckpoint_Id.TryParse(Text(JSON, PropertyKeys.Id), out var id))
                 {
                     ErrorResponse = "Missing or invalid checkpoint identification!";
                     return false;
                 }
 
-                if (!JSON.ParseMandatory("roamingNetworkId",
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the checkpoint '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!JSON.ParseMandatory(PropertyKeys.RoamingNetworkId,
                                          "roaming network identification",
                                          RoamingNetwork_Id.TryParse,
                                          out RoamingNetwork_Id roamingNetworkId,
@@ -632,9 +757,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!TryParseUInt(JSON, "epoch",     out var epoch,     out ErrorResponse) ||
-                    !TryParseUInt(JSON, "sequence",  out var sequence,  out ErrorResponse) ||
-                    !TryParseUInt(JSON, "revision",  out var revision,  out ErrorResponse))
+                if (!TryParseUInt(JSON, PropertyKeys.Epoch,     out var epoch,     out ErrorResponse) ||
+                    !TryParseUInt(JSON, PropertyKeys.Sequence,  out var sequence,  out ErrorResponse) ||
+                    !TryParseUInt(JSON, PropertyKeys.Revision,  out var revision,  out ErrorResponse))
                 {
                     return false;
                 }
@@ -647,10 +772,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 RoamingNetworkCheckpoint_Id? previousId = null;
 
-                if (JSON["previousId"] is JToken)
+                if (JSON[PropertyKeys.PreviousId] is JToken)
                 {
 
-                    if (!RoamingNetworkCheckpoint_Id.TryParse(Text(JSON, "previousId"), out var parsedPreviousId))
+                    if (!RoamingNetworkCheckpoint_Id.TryParse(Text(JSON, PropertyKeys.PreviousId), out var parsedPreviousId))
                     {
                         ErrorResponse = "Invalid identification of the checkpoint before!";
                         return false;
@@ -660,13 +785,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                if (!RoamingNetworkCommit_Id.TryParse(Text(JSON, "commitId"), out var commitId))
+                if (!RoamingNetworkCommit_Id.TryParse(Text(JSON, PropertyKeys.CommitId), out var commitId))
                 {
                     ErrorResponse = "Missing or invalid commit identification!";
                     return false;
                 }
 
-                if (JSON["eTags"] is not JArray eTagsJSON)
+                if (JSON[PropertyKeys.ETags] is not JArray eTagsJSON)
                 {
                     ErrorResponse = "The ETags must be a JSON array!";
                     return false;
@@ -677,9 +802,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var eTagJSON in eTagsJSON)
                     eTags.Add(ETag.ParseHex(eTagJSON));
 
-                if (JSON["commits"] is not JObject commitsJSON ||
-                    Text(commitsJSON, "@merkleRoot") is not String commitsRoot ||
-                    !TryParseUInt(commitsJSON, "@size", out var commitsSize, out _))
+                if (JSON[PropertyKeys.Commits] is not JObject commitsJSON ||
+                    Text(commitsJSON, PropertyKeys.MerkleRoot) is not String commitsRoot ||
+                    !TryParseUInt(commitsJSON, PropertyKeys.Size, out var commitsSize, out _))
                 {
                     ErrorResponse = "The commits must be { @merkleRoot, @size }!";
                     return false;
@@ -688,12 +813,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 String? priceStatementsRoot = null;
                 UInt64  priceStatementsSize = 0;
 
-                if (JSON["priceStatements"] is JToken priceStatementsJSON)
+                if (JSON[PropertyKeys.PriceStatements] is JToken priceStatementsJSON)
                 {
 
                     if (priceStatementsJSON is not JObject priceStatementsObject ||
-                        Text(priceStatementsObject, "@merkleRoot") is not String root ||
-                        !TryParseUInt(priceStatementsObject, "@size", out priceStatementsSize, out _) ||
+                        Text(priceStatementsObject, PropertyKeys.MerkleRoot) is not String root ||
+                        !TryParseUInt(priceStatementsObject, PropertyKeys.Size, out priceStatementsSize, out _) ||
                         priceStatementsSize == 0)
                     {
                         ErrorResponse = "The price statements must be { @merkleRoot, @size }, at least one!";
@@ -706,16 +831,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 RoamingNetworkEpoch? next = null;
 
-                if (JSON["final"] is JToken finalJSON)
+                if (JSON[PropertyKeys.Final] is JToken finalJSON)
                 {
 
                     if (finalJSON.Type != JTokenType.Boolean || !finalJSON.Value<Boolean>())
                     {
-                        ErrorResponse = "A final checkpoint is \"final\": true, with the next epoch as \"next\"!";
+                        ErrorResponse = $"A final checkpoint is \"{PropertyKeys.Final}\": true, with the next epoch as \"{PropertyKeys.Next}\"!";
                         return false;
                     }
 
-                    if (!RoamingNetworkEpoch.TryParse(JSON["next"], out next, out var nextError))
+                    if (!RoamingNetworkEpoch.TryParse(JSON[PropertyKeys.Next], out next, out var nextError))
                     {
                         ErrorResponse = "Invalid next epoch of the final checkpoint: " + nextError;
                         return false;
@@ -723,7 +848,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                else if (JSON["next"] is not null)
+                else if (JSON[PropertyKeys.Next] is not null)
                 {
                     ErrorResponse = "Only a final checkpoint names the next epoch!";
                     return false;
@@ -731,14 +856,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 RoamingNetworkEpochLink? previousEpoch = null;
 
-                if (JSON[RoamingNetworkEpochLink.JSONProperty] is JToken previousEpochJSON &&
+                if (JSON[PropertyKeys.PreviousEpoch] is JToken previousEpochJSON &&
                     !RoamingNetworkEpochLink.TryParse(previousEpochJSON, out previousEpoch, out var previousEpochError))
                 {
                     ErrorResponse = previousEpochError;
                     return false;
                 }
 
-                if (Text(JSON, "createdAt") is not String createdAtText ||
+                if (Text(JSON, PropertyKeys.CreatedAt) is not String createdAtText ||
                     !DateTimeOffset.TryParse(createdAtText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var createdAt) ||
                     createdAt.ToISO8601() != createdAtText)
                 {
@@ -748,7 +873,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var signatures = ImmutableArray.CreateBuilder<RoamingNetworkCommitSignature>();
 
-                if (JSON["signatures"] is JToken signaturesJSON)
+                if (JSON[PropertyKeys.Signatures] is JToken signaturesJSON)
                 {
 
                     if (signaturesJSON is not JArray signaturesArray)
@@ -851,37 +976,102 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON(IncludeSignatures = true)
+        #region ToJSON(Embedded = false, IncludeSignatures = true, CustomCheckpointSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this checkpoint, and, unless excluded, its signatures.
         /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="IncludeSignatures">Whether to include the signatures.</param>
-        public JObject ToJSON(Boolean IncludeSignatures = true)
+        /// <param name="CustomCheckpointSerializer">An optional custom serializer of checkpoints.</param>
+        public JObject ToJSON(Boolean                                                     Embedded                     = false,
+                              Boolean                                                     IncludeSignatures            = true,
+                              CustomJObjectSerializerDelegate<RoamingNetworkCheckpoint>?  CustomCheckpointSerializer   = null)
         {
 
             var json = Content();
 
-            json.Remove("profile");
-            json.AddFirst(new JProperty("@id", Id.ToString()));
+            json.Remove(PropertyKeys.Profile);
+
+            if (!Embedded)
+                json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
+
+            json.AddFirst(new JProperty(PropertyKeys.Id, Id.ToString()));
 
             if (IncludeSignatures && !Signatures.IsEmpty)
-                json.Add("signatures", new JArray(Signatures.Select(signature => signature.ToJSON())));
+                json.Add(PropertyKeys.Signatures, new JArray(Signatures.Select(signature => signature.ToJSON(Embedded: true))));
 
-            return json;
+            return CustomCheckpointSerializer is not null
+                       ? CustomCheckpointSerializer(this, json)
+                       : json;
 
         }
 
         #endregion
 
-        #region ToCBOR()
+        #region ToCBOR(Embedded = false, CustomCheckpointSerializer = null)
 
         /// <summary>
         /// Return the CBOR representation of this checkpoint: the keys and values of its JSON representation.
         /// </summary>
-        public CBORValue ToCBOR()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomCheckpointSerializer">An optional custom serializer of checkpoints.</param>
+        public CBORValue ToCBOR(Boolean                                                  Embedded                     = false,
+                                CustomCBORSerializerDelegate<RoamingNetworkCheckpoint>?  CustomCheckpointSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON());
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(PropertyKeys.Id),                CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Context),           CBORValue.FromText(JSONLDContext));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.RoamingNetworkId),      CBORValue.FromText(RoamingNetworkId.ToString()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Epoch),                 CBORValue.FromUInt64(Epoch));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Sequence),              CBORValue.FromUInt64(Sequence));
+
+            if (PreviousId.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.PreviousId),        CBORValue.FromText(PreviousId.Value.ToString()));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.CommitId),              CBORValue.FromText(CommitId.ToString()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Revision),              CBORValue.FromUInt64(Revision));
+
+            // ETags as in the JSON representation: arrays of texts, their digests in hex.
+            cbor.Add(CBORValue.FromText(PropertyKeys.ETags),                 CBORValue.FromArray(ETags.Select(eTag => CBORJSON.ToCBOR(eTag.ToJSON()))));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.Commits),               new CBORMap {
+                                                                                 { CBORValue.FromText(PropertyKeys.MerkleRoot),  CBORValue.FromText(CommitsRoot) },
+                                                                                 { CBORValue.FromText(PropertyKeys.Size),        CBORValue.FromUInt64(CommitsSize) }
+                                                                             });
+
+            if (PriceStatementsRoot is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.PriceStatements),   new CBORMap {
+                                                                                 { CBORValue.FromText(PropertyKeys.MerkleRoot),  CBORValue.FromText(PriceStatementsRoot) },
+                                                                                 { CBORValue.FromText(PropertyKeys.Size),        CBORValue.FromUInt64(PriceStatementsSize) }
+                                                                             });
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.CreatedAt),             CBORValue.FromText(CreatedAt.ToISO8601()));
+
+            // The next epoch, the epoch before and the signatures have no CBOR representation of their own: theirs are the
+            // keys and values of their JSON representation.
+            if (Next is not null)
+            {
+                cbor.Add(CBORValue.FromText(PropertyKeys.Final),             CBORValue.True);
+                cbor.Add(CBORValue.FromText(PropertyKeys.Next),              CBORJSON.ToCBOR(Next.ToJSON(Embedded: true)));
+            }
+
+            if (PreviousEpoch is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.PreviousEpoch),     CBORJSON.ToCBOR(PreviousEpoch.ToJSON(Embedded: true)));
+
+            if (!Signatures.IsEmpty)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Signatures),        CBORValue.FromArray(Signatures.Select(signature => CBORJSON.ToCBOR(signature.ToJSON(Embedded: true)))));
+
+            return CustomCheckpointSerializer is not null
+                       ? CustomCheckpointSerializer(this, cbor)
+                       : cbor;
+
+        }
 
         #endregion
 
@@ -895,39 +1085,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("profile",           IdentityProfile),
-                           new JProperty("roamingNetworkId",  RoamingNetworkId.ToString()),
-                           new JProperty("epoch",             Epoch),
-                           new JProperty("sequence",          Sequence)
+                           new JProperty(PropertyKeys.Profile,           IdentityProfile),
+                           new JProperty(PropertyKeys.RoamingNetworkId,  RoamingNetworkId.ToString()),
+                           new JProperty(PropertyKeys.Epoch,             Epoch),
+                           new JProperty(PropertyKeys.Sequence,          Sequence)
                        );
 
             if (PreviousId.HasValue)
-                json.Add("previousId",  PreviousId.Value.ToString());
+                json.Add(PropertyKeys.PreviousId,  PreviousId.Value.ToString());
 
-            json.Add("commitId",        CommitId.ToString());
-            json.Add("revision",        Revision);
-            json.Add("eTags",           new JArray(ETags.Select(eTag => eTag.ToJSON())));
-            json.Add("commits",         new JObject(
-                                            new JProperty("@merkleRoot",  CommitsRoot),
-                                            new JProperty("@size",        CommitsSize)
-                                        ));
+            json.Add(PropertyKeys.CommitId,        CommitId.ToString());
+            json.Add(PropertyKeys.Revision,        Revision);
+            json.Add(PropertyKeys.ETags,           new JArray(ETags.Select(eTag => eTag.ToJSON())));
+            json.Add(PropertyKeys.Commits,         new JObject(
+                                                       new JProperty(PropertyKeys.MerkleRoot,  CommitsRoot),
+                                                       new JProperty(PropertyKeys.Size,        CommitsSize)
+                                                   ));
 
             if (PriceStatementsRoot is not null)
-                json.Add("priceStatements", new JObject(
-                                                new JProperty("@merkleRoot",  PriceStatementsRoot),
-                                                new JProperty("@size",        PriceStatementsSize)
-                                            ));
+                json.Add(PropertyKeys.PriceStatements, new JObject(
+                                                           new JProperty(PropertyKeys.MerkleRoot,  PriceStatementsRoot),
+                                                           new JProperty(PropertyKeys.Size,        PriceStatementsSize)
+                                                       ));
 
-            json.Add("createdAt",       CreatedAt.ToISO8601());
+            json.Add(PropertyKeys.CreatedAt,       CreatedAt.ToISO8601());
 
             if (Next is not null)
             {
-                json.Add("final",       true);
-                json.Add("next",        Next.ToJSON());
+                json.Add(PropertyKeys.Final,       true);
+                json.Add(PropertyKeys.Next,        Next.ToJSON(Embedded: true));
             }
 
             if (PreviousEpoch is not null)
-                json.Add(RoamingNetworkEpochLink.JSONProperty, PreviousEpoch.ToJSON());
+                json.Add(PropertyKeys.PreviousEpoch, PreviousEpoch.ToJSON(Embedded: true));
 
             return json;
 

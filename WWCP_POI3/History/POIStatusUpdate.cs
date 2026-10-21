@@ -50,32 +50,109 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          String?               DataSource     = null)
     {
 
-        #region ToJSON()
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/poiStatusUpdate";
+
+        #endregion
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context       = "@context";
+
+            /// <summary>
+            /// The property of its kind.
+            /// </summary>
+            public const String  Kind          = "kind";
+
+            /// <summary>
+            /// The property of the type of its entity.
+            /// </summary>
+            public const String  EntityType    = "entityType";
+
+            /// <summary>
+            /// The property of the identification of its entity.
+            /// </summary>
+            public const String  EntityId      = "entityId";
+
+            /// <summary>
+            /// The property of since when the entity has the status.
+            /// </summary>
+            public const String  Timestamp     = "timestamp";
+
+            /// <summary>
+            /// The property of its status.
+            /// </summary>
+            public const String  Value         = "value";
+
+            /// <summary>
+            /// The property of since when the entity had its previous status.
+            /// </summary>
+            public const String  OldTimestamp  = "oldTimestamp";
+
+            /// <summary>
+            /// The property of the previous status.
+            /// </summary>
+            public const String  OldValue      = "oldValue";
+
+            /// <summary>
+            /// The property of its data source.
+            /// </summary>
+            public const String  DataSource    = "dataSource";
+
+        }
+
+        #endregion
+
+        #region ToJSON(Embedded = false, CustomStatusUpdateSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this status update.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomStatusUpdateSerializer">An optional custom serializer of status updates.</param>
+        public JObject ToJSON(Boolean                                            Embedded                       = false,
+                              CustomJObjectSerializerDelegate<POIStatusUpdate>?  CustomStatusUpdateSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("kind",        KindText(Kind)),
-                           new JProperty("entityType",  EntityType),
-                           new JProperty("entityId",    EntityId),
-                           new JProperty("timestamp",   Timestamp.ToISO8601()),
-                           new JProperty("value",       ValueToJSON(Kind, Value))
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,     JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Kind,        KindText(Kind)),
+                                 new JProperty(PropertyKeys.EntityType,  EntityType),
+                                 new JProperty(PropertyKeys.EntityId,    EntityId),
+                                 new JProperty(PropertyKeys.Timestamp,   Timestamp.ToISO8601()),
+                                 new JProperty(PropertyKeys.Value,       ValueToJSON(Kind, Value))
+
                        );
 
             if (OldTimestamp.HasValue)
-                json.Add("oldTimestamp",  OldTimestamp.Value.ToISO8601());
+                json.Add(PropertyKeys.OldTimestamp,  OldTimestamp.Value.ToISO8601());
 
             if (OldValue is not null)
-                json.Add("oldValue",      ValueToJSON(Kind, OldValue));
+                json.Add(PropertyKeys.OldValue,      ValueToJSON(Kind, OldValue));
 
             if (DataSource is not null)
-                json.Add("dataSource",    DataSource);
+                json.Add(PropertyKeys.DataSource,    DataSource);
 
-            return json;
+            return CustomStatusUpdateSerializer is not null
+                       ? CustomStatusUpdateSerializer(this, json)
+                       : json;
 
         }
 
@@ -96,23 +173,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             StatusUpdate = null;
 
-            if (!TryParseKind(JSON["kind"]?.Type == JTokenType.String ? JSON["kind"]!.Value<String>() : null, out var kind))
+            if (JSON[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the status update must be '{JSONLDContext}'!";
+                return false;
+            }
+
+            if (!TryParseKind(JSON[PropertyKeys.Kind]?.Type == JTokenType.String ? JSON[PropertyKeys.Kind]!.Value<String>() : null, out var kind))
             {
                 ErrorResponse = "Missing or invalid status kind!";
                 return false;
             }
 
-            if (!JSON.ParseMandatoryText("entityType", "entity type",           out String? entityType, out ErrorResponse) ||
-                !JSON.ParseMandatoryText("entityId",   "entity identification", out String? entityId,   out ErrorResponse) ||
-                !TryParseValue(kind, JSON["value"], "status", out String? value, out ErrorResponse))
+            if (!JSON.ParseMandatoryText(PropertyKeys.EntityType, "entity type",           out String? entityType, out ErrorResponse) ||
+                !JSON.ParseMandatoryText(PropertyKeys.EntityId,   "entity identification", out String? entityId,   out ErrorResponse) ||
+                !TryParseValue(kind, JSON[PropertyKeys.Value], "status", out String? value, out ErrorResponse))
             {
                 return false;
             }
 
-            if (!JSON.ParseMandatory("timestamp", "timestamp", out DateTimeOffset timestamp, out ErrorResponse))
+            if (!JSON.ParseMandatory(PropertyKeys.Timestamp, "timestamp", out DateTimeOffset timestamp, out ErrorResponse))
                 return false;
 
-            if (JSON.ParseOptional("oldTimestamp", "old timestamp", out DateTimeOffset? oldTimestamp, out ErrorResponse))
+            if (JSON.ParseOptional(PropertyKeys.OldTimestamp, "old timestamp", out DateTimeOffset? oldTimestamp, out ErrorResponse))
             {
                 if (ErrorResponse is not null)
                     return false;
@@ -120,13 +204,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             String? oldValue = null;
 
-            if (JSON["oldValue"] is JToken oldValueJSON &&
+            if (JSON[PropertyKeys.OldValue] is JToken oldValueJSON &&
                 !TryParseValue(kind, oldValueJSON, "old status", out oldValue, out ErrorResponse))
             {
                 return false;
             }
 
-            if (JSON.ParseOptional("dataSource", "data source", out String? dataSource, out ErrorResponse))
+            if (JSON.ParseOptional(PropertyKeys.DataSource, "data source", out String? dataSource, out ErrorResponse))
             {
                 if (ErrorResponse is not null)
                     return false;
@@ -160,7 +244,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return POIEnergyStatus.ToJSON(energyStatus);
 
             if (Kind == POIRuntimeStatusKind.PriceStatus && ChargingPrices.TryParseText(Value, out var priceStatus))
-                return priceStatus.ToJSON();
+                return priceStatus.ToJSON(Embedded: true);
 
             return Value;
 

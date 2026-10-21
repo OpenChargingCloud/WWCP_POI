@@ -133,7 +133,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                      : JSONResponse(request,
                                                     HTTPStatusCode.OK,
-                                                    new JArray(roamingNetworkHistory.GetCheckpointsSince(since, max).Select(checkpoint => checkpoint.ToJSON())))
+                                                    new JArray(roamingNetworkHistory.GetCheckpointsSince(since, max).Select(checkpoint => checkpoint.ToJSON(Embedded: true))))
 
                        ));
 
@@ -249,13 +249,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!TryGetHistory(Request, out var history, out var errorResponse))
                 return errorResponse;
 
-            if (!TryReadBody(Request, out var json) || json["checkpoints"] is not JArray checkpointsJSON)
+            if (!TryReadBody(Request, out var json) || json[PropertyKeys.Checkpoints] is not JArray checkpointsJSON)
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, "The request must contain { checkpoints: [ … ] }!");
 
             if (!TryParseCheckpoints(checkpointsJSON, out var checkpoints, out var parseError))
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, parseError);
 
-            if (!TryParseCheckpointPriceStatements(json["priceStatements"], out var priceStatements, out var priceStatementsError))
+            if (!TryParseCheckpointPriceStatements(json[PropertyKeys.PriceStatements], out var priceStatements, out var priceStatementsError))
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, priceStatementsError);
 
             var result = PushCheckpoints(Request, history, checkpoints, priceStatements);
@@ -283,7 +283,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!TryReadBody(Request, out var json))
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, "The request must contain { signatures: [ … ] }!");
 
-            if (!TryParseSignatures(checkpoint.Id, json["signatures"], out var signatures, out var signaturesError))
+            if (!TryParseSignatures(checkpoint.Id, json[RoamingNetworkCommitSignature.PropertyKeys.Signatures], out var signatures, out var signaturesError))
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, signaturesError);
 
             var result = AddCheckpointSignatures(Request, history, checkpoint.Id, signatures);
@@ -335,9 +335,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             return (newSignatures.Count > 0 ? CommitSignaturesStatus.Added : CommitSignaturesStatus.Known,
                     new JObject(
-                        new JProperty("checkpointId",  CheckpointId.ToString()),
-                        new JProperty("signatures",    new JArray(signed.Signatures.Select(signature => signature.ToJSON()))),
-                        new JProperty("added",         newSignatures.Count)
+                        new JProperty(PropertyKeys.CheckpointId,  CheckpointId.ToString()),
+                        new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Signatures,    new JArray(signed.Signatures.Select(signature => signature.ToJSON(Embedded: true)))),
+                        new JProperty(PropertyKeys.Added,         newSignatures.Count)
                     ),
                     null);
 
@@ -381,7 +381,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            return (new JObject(new JProperty("checkpoints", taken)), false, null);
+            return (new JObject(new JProperty(PropertyKeys.Checkpoints, taken)), false, null);
 
         }
 
@@ -407,15 +407,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Task.FromResult(
 
                     // { latest: true }: only the latest one, e.g. to know what a peer misses.
-                    request.Payload["latest"]?.Type == JTokenType.Boolean && request.Payload["latest"]!.Value<Boolean>()
-                        ? request.Respond(new JObject(new JProperty("checkpoints", new JArray(History.LatestCheckpoint is RoamingNetworkCheckpoint latest
-                                                                                                    ? [ latest.ToJSON() ]
+                    request.Payload[PropertyKeys.Latest]?.Type == JTokenType.Boolean && request.Payload[PropertyKeys.Latest]!.Value<Boolean>()
+                        ? request.Respond(new JObject(new JProperty(PropertyKeys.Checkpoints, new JArray(History.LatestCheckpoint is RoamingNetworkCheckpoint latest
+                                                                                                    ? [ latest.ToJSON(Embedded: true) ]
                                                                                                     : Array.Empty<JObject>()))))
 
-                        : !TryGetSequence(request.Payload["since"]?.ToString(), out var since) ||
-                    !TryGetMax     (request.Payload["max"]?.  ToString(), out var max)
+                        : !TryGetSequence(request.Payload[PropertyKeys.Since]?.ToString(), out var since) ||
+                    !TryGetMax     (request.Payload[PropertyKeys.Max]?.  ToString(), out var max)
                         ? request.Error(POIWebSocketErrorCodes.FormatViolation, "Invalid since or max!")
-                        : request.Respond(new JObject(new JProperty("checkpoints", new JArray(History.GetCheckpointsSince(since, max).Select(checkpoint => checkpoint.ToJSON())))))
+                        : request.Respond(new JObject(new JProperty(PropertyKeys.Checkpoints, new JArray(History.GetCheckpointsSince(since, max).Select(checkpoint => checkpoint.ToJSON(Embedded: true))))))
 
                 )
 
@@ -425,7 +425,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Task.FromResult(
 
-                    !RoamingNetworkCheckpoint_Id.TryParse(request.Payload["checkpointId"]?.Value<String>() ?? "", out var checkpointId)
+                    !RoamingNetworkCheckpoint_Id.TryParse(request.Payload[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var checkpointId)
                         ? request.Error(POIWebSocketErrorCodes.FormatViolation, "Missing or invalid checkpoint identification!")
 
                         : History.TryGetCheckpoint(checkpointId, out var checkpoint)
@@ -440,7 +440,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Task.FromResult(
 
-                    !RoamingNetworkCheckpoint_Id.TryParse(request.Payload["checkpointId"]?.Value<String>() ?? "", out var checkpointId)
+                    !RoamingNetworkCheckpoint_Id.TryParse(request.Payload[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var checkpointId)
                         ? request.Error(POIWebSocketErrorCodes.FormatViolation, "Missing or invalid checkpoint identification!")
 
                         : History.TryGetCheckpointSnapshotJSON(checkpointId, out var snapshot, out var snapshotError)
@@ -453,15 +453,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             WebSocketServer.AddCommand("commitProof", request => {
 
-                if (!RoamingNetworkCommit_Id.TryParse(request.Payload["commitId"]?.Value<String>() ?? "", out var commitId))
+                if (!RoamingNetworkCommit_Id.TryParse(request.Payload[RoamingNetworkCommitSignature.PropertyKeys.CommitId]?.Value<String>() ?? "", out var commitId))
                     return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, "Missing or invalid commit identification!"));
 
                 RoamingNetworkCheckpoint_Id? checkpointId = null;
 
-                if (request.Payload["checkpointId"] is JToken)
+                if (request.Payload[PropertyKeys.CheckpointId] is JToken)
                 {
 
-                    if (!RoamingNetworkCheckpoint_Id.TryParse(request.Payload["checkpointId"]?.Value<String>() ?? "", out var parsedCheckpointId))
+                    if (!RoamingNetworkCheckpoint_Id.TryParse(request.Payload[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var parsedCheckpointId))
                         return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, "Invalid checkpoint identification!"));
 
                     checkpointId = parsedCheckpointId;
@@ -481,10 +481,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (request.Session.UpgradeRequest is not HTTPRequest upgradeRequest)
                     return Task.FromResult(request.Error(POIWebSocketErrorCodes.SecurityError, "The signer is unknown!"));
 
-                if (!RoamingNetworkCheckpoint_Id.TryParse(request.Payload["checkpointId"]?.Value<String>() ?? "", out var checkpointId))
+                if (!RoamingNetworkCheckpoint_Id.TryParse(request.Payload[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var checkpointId))
                     return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, "Missing or invalid checkpoint identification!"));
 
-                if (!TryParseSignatures(checkpointId, request.Payload["signatures"], out var signatures, out var signaturesError))
+                if (!TryParseSignatures(checkpointId, request.Payload[RoamingNetworkCommitSignature.PropertyKeys.Signatures], out var signatures, out var signaturesError))
                     return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, signaturesError));
 
                 var result = AddCheckpointSignatures(upgradeRequest, History, checkpointId, signatures);
@@ -503,13 +503,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (request.Session.UpgradeRequest is not HTTPRequest upgradeRequest)
                     return Task.FromResult(request.Error(POIWebSocketErrorCodes.SecurityError, "The sender of the checkpoints is unknown!"));
 
-                if (request.Payload["checkpoints"] is not JArray checkpointsJSON ||
+                if (request.Payload[PropertyKeys.Checkpoints] is not JArray checkpointsJSON ||
                     !TryParseCheckpoints(checkpointsJSON, out var checkpoints, out var parseError))
                 {
                     return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, "The request must contain { checkpoints: [ … ] }!"));
                 }
 
-                if (!TryParseCheckpointPriceStatements(request.Payload["priceStatements"], out var priceStatements, out var priceStatementsError))
+                if (!TryParseCheckpointPriceStatements(request.Payload[PropertyKeys.PriceStatements], out var priceStatements, out var priceStatementsError))
                     return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, priceStatementsError));
 
                 var result = PushCheckpoints(upgradeRequest, History, checkpoints, priceStatements);
@@ -547,8 +547,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             OnRoamingNetworkCheckpointSignaturesDelegate onCheckpointSignatures = (checkpoint, newSignatures) =>
                 WebSocketServer.Push(CheckpointSignaturesTopic,
                                      new JObject(
-                                         new JProperty("checkpointId",  checkpoint.Id.ToString()),
-                                         new JProperty("signatures",    new JArray(newSignatures.Select(signature => signature.ToJSON())))
+                                         new JProperty(PropertyKeys.CheckpointId,  checkpoint.Id.ToString()),
+                                         new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Signatures,    new JArray(newSignatures.Select(signature => signature.ToJSON(Embedded: true))))
                                      ));
 
             History.OnCheckpoint            += onCheckpoint;
@@ -686,8 +686,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // The same form as the signatures of a commit.
             if (!RoamingNetworkCommitSignature.TryParseCommitSignatures(new JObject(
-                                                                            new JProperty("commitId",    CheckpointId.ToString()),
-                                                                            new JProperty("signatures",  JSON)
+                                                                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.CommitId,    CheckpointId.ToString()),
+                                                                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Signatures,  JSON)
                                                                         ),
                                                                         out _,
                                                                         out var signatures,

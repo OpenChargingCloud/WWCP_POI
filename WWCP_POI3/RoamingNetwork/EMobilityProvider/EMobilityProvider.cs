@@ -66,7 +66,94 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             IPOIParty
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/eMobilityProvider";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its address.
+            /// </summary>
+            public const String  Address                   = "address";
+
+            /// <summary>
+            /// The property of its homepage.
+            /// </summary>
+            public const String  Homepage                  = "homepage";
+
+            /// <summary>
+            /// The property of its hotline phone number.
+            /// </summary>
+            public const String  HotlinePhoneNumber        = "hotline";
+
+            /// <summary>
+            /// The property of its signing keys, as of every party.
+            /// </summary>
+            public const String  SigningKeys               = POIPartyKeys.SigningKeysProperty;
+
+            /// <summary>
+            /// The property of its identity keys, as of every party.
+            /// </summary>
+            public const String  IdentityKeys              = POIPartyKeys.IdentityKeysProperty;
+
+            /// <summary>
+            /// The property of its EVSE groups.
+            /// </summary>
+            public const String  EVSEGroups                = "EVSEGroups";
+
+            /// <summary>
+            /// The property of the identifications of its EVSE groups, refused: they are given completely.
+            /// </summary>
+            public const String  EVSEGroupIds              = "EVSEGroupIds";
+
+            /// <summary>
+            /// The property of its charging station groups.
+            /// </summary>
+            public const String  ChargingStationGroups     = "chargingStationGroups";
+
+            /// <summary>
+            /// The property of the identifications of its charging station groups, refused: they are given completely.
+            /// </summary>
+            public const String  ChargingStationGroupIds   = "chargingStationGroupIds";
+
+            /// <summary>
+            /// The property of its charging pool groups.
+            /// </summary>
+            public const String  ChargingPoolGroups        = "chargingPoolGroups";
+
+            /// <summary>
+            /// The property of the identifications of its charging pool groups, refused: they are given completely.
+            /// </summary>
+            public const String  ChargingPoolGroupIds      = "chargingPoolGroupIds";
+
+            /// <summary>
+            /// The property of its charging tariff offers.
+            /// </summary>
+            public const String  ChargingTariffOffers      = "chargingTariffOffers";
+
+            /// <summary>
+            /// The property of the identifications of its charging tariff offers, refused: they are given completely.
+            /// </summary>
+            public const String  ChargingTariffOfferIds    = "chargingTariffOfferIds";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The address of the headquarters.
@@ -330,75 +417,155 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, ...)
 
         /// <summary>
-        /// Return the JSON representation of this e-mobility provider, as its roaming network embeds it.
+        /// Return the JSON representation of this e-mobility provider; embedded, as its roaming network embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEMobilityProviderSerializer">A delegate to serialize custom e-mobility provider JSON objects.</param>
+        public JObject ToJSON(Boolean                                              Embedded                            = false,
+                              CustomJObjectSerializerDelegate<EMobilityProvider>?  CustomEMobilityProviderSerializer   = null)
 
-            => ToJSON(IncludeChildArrays: true);
+            => ToJSON(Embedded,
+                      CustomEMobilityProviderSerializer,
+                      IncludeChildArrays: true);
 
         /// <summary>
         /// The JSON representation of this e-mobility provider, with or without its child arrays: without them for the skeleton of its
         /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
         /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEMobilityProviderSerializer">A delegate to serialize custom e-mobility provider JSON objects.</param>
         /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
-        internal JObject ToJSON(Boolean IncludeChildArrays)
+        internal JObject ToJSON(Boolean                                              Embedded,
+                                CustomJObjectSerializerDelegate<EMobilityProvider>?  CustomEMobilityProviderSerializer,
+                                Boolean                                              IncludeChildArrays)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id,  Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,          JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",         Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,             Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,      Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",   DataSource);
+                json.Add(BasePropertyKeys.DataSource,       DataSource);
 
             if (Address is not null)
-                json.Add("address",      Address.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.Address,              Address.ToJSON(Embedded: true));
 
             if (Homepage.HasValue)
-                json.Add("homepage",     Homepage.Value.ToString());
+                json.Add(PropertyKeys.Homepage,             Homepage.Value.ToString());
 
             if (HotlinePhoneNumber.HasValue)
-                json.Add("hotline",      HotlinePhoneNumber.Value.ToString());
+                json.Add(PropertyKeys.HotlinePhoneNumber,   HotlinePhoneNumber.Value.ToString());
 
             if (IncludeChildArrays && EVSEGroups.Count > 0)
-                json.Add("EVSEGroups",             new JArray(EVSEGroups.           Select(group => group.ToJSON())));
+                json.Add(PropertyKeys.EVSEGroups,             new JArray(EVSEGroups.           Select(group => group.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && ChargingStationGroups.Count > 0)
-                json.Add("chargingStationGroups",  new JArray(ChargingStationGroups.Select(group => group.ToJSON())));
+                json.Add(PropertyKeys.ChargingStationGroups,  new JArray(ChargingStationGroups.Select(group => group.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && ChargingPoolGroups.Count > 0)
-                json.Add("chargingPoolGroups",     new JArray(ChargingPoolGroups.   Select(group => group.ToJSON())));
+                json.Add(PropertyKeys.ChargingPoolGroups,     new JArray(ChargingPoolGroups.   Select(group => group.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && ChargingTariffOffers.Count > 0)
-                json.Add("chargingTariffOffers",   new JArray(ChargingTariffOffers. Select(offer => offer.ToJSON())));
+                json.Add(PropertyKeys.ChargingTariffOffers,   new JArray(ChargingTariffOffers. Select(offer => offer.ToJSON(Embedded: true))));
 
             POIPartyKeys.AddTo(json, this);
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomEMobilityProviderSerializer is not null
+                       ? CustomEMobilityProviderSerializer(this, json)
+                       : json;
 
         }
 
         #endregion
 
-        #region ToCBOR()
+        #region ToCBOR(Embedded = false, ...)
 
         /// <summary>
         /// Return the CBOR representation of this e-mobility provider: the keys and values of its JSON representation.
         /// </summary>
-        public CBORValue ToCBOR()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEMobilityProviderSerializer">A delegate to serialize custom e-mobility provider CBOR maps.</param>
+        public CBORValue ToCBOR(Boolean                                            Embedded                            = false,
+                                CustomCBORSerializerDelegate<EMobilityProvider>?   CustomEMobilityProviderSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON());
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(BasePropertyKeys.Id),           CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Context),          CBORValue.FromText(JSONLDContext));
+
+            if (Name.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Name),             Name.       ToCBOR());
+
+            if (Description.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Description),      Description.ToCBOR());
+
+            if (DataSource is not null)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),       CBORValue.FromText(DataSource));
+
+            // The address, the charging pool groups, the charging tariff offers and the keys have no CBOR representation
+            // of their own: theirs are the keys and values of their JSON representation.
+            if (Address is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Address),              CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
+
+            if (Homepage.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),             CBORValue.FromText(Homepage.Value.ToString()));
+
+            if (HotlinePhoneNumber.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),   CBORValue.FromText(HotlinePhoneNumber.Value.ToString()));
+
+            if (EVSEGroups.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.EVSEGroups),
+                         CBORValue.FromArray(EVSEGroups.           Select(group => group.ToCBOR(Embedded: true))));
+
+            if (ChargingStationGroups.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingStationGroups),
+                         CBORValue.FromArray(ChargingStationGroups.Select(group => group.ToCBOR(Embedded: true))));
+
+            if (ChargingPoolGroups.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingPoolGroups),
+                         CBORValue.FromArray(ChargingPoolGroups.   Select(group => CBORJSON.ToCBOR(group.ToJSON(Embedded: true)))));
+
+            if (ChargingTariffOffers.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingTariffOffers),
+                         CBORValue.FromArray(ChargingTariffOffers. Select(offer => CBORJSON.ToCBOR(offer.ToJSON(Embedded: true)))));
+
+            if (SigningKeys.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.SigningKeys),
+                         CBORValue.FromArray(SigningKeys. Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
+
+            if (IdentityKeys.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.IdentityKeys),
+                         CBORValue.FromArray(IdentityKeys.Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
+
+            // Always part of the content, as in the JSON representation; custom data is JSON.
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),              CBORValue.FromText(Created.       ToISO8601()));
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.LastChange),           CBORValue.FromText(LastChangeDate.ToISO8601()));
+
+            if (CustomData.HasValues)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),       CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            return CustomEMobilityProviderSerializer is not null
+                       ? CustomEMobilityProviderSerializer(this, cbor)
+                       : cbor;
+
+        }
 
         #endregion
 
@@ -420,7 +587,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "e-mobility provider identification",
                                          EMobilityProvider_Id.TryParse,
                                          out EMobilityProvider_Id id,
@@ -429,12 +596,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N   (JSON, "name",         "e-mobility provider name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N   (JSON, "description",  "e-mobility provider description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString (JSON, "dataSource",   "data source",                      out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseAddress(JSON,                                                     out var address,      out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, "homepage",     "homepage",                         URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, "hotline",      "hotline phone number",             PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the e-mobility provider '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Name,            "e-mobility provider name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Description,     "e-mobility provider description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString (JSON, BasePropertyKeys.DataSource,      "data source",                      out var dataSource,   out ErrorResponse) ||
+                    !POIJSON.TryParseAddress(JSON, PropertyKeys.Address,             "address",                          out var address,      out ErrorResponse) ||
+                    !POIJSON.TryParseText   (JSON, PropertyKeys.Homepage,            "homepage",                         URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
+                    !POIJSON.TryParseText   (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",             PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
                 {
                     return false;
                 }
@@ -442,10 +616,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseChildren<EVSEGroup>           (JSON, "EVSEGroups",            "EVSEGroupIds",            "EVSEGroups",            EVSEGroup.           TryParse, out var evseGroups,            out ErrorResponse) ||
-                    !POIJSON.TryParseChildren<ChargingStationGroup>(JSON, "chargingStationGroups", "chargingStationGroupIds", "ChargingStationGroups", ChargingStationGroup.TryParse, out var chargingStationGroups, out ErrorResponse) ||
-                    !POIJSON.TryParseChildren<ChargingPoolGroup>   (JSON, "chargingPoolGroups",    "chargingPoolGroupIds",    "ChargingPoolGroups",    ChargingPoolGroup.   TryParse, out var chargingPoolGroups,    out ErrorResponse) ||
-                    !POIJSON.TryParseChildren<ChargingTariffOffer> (JSON, "chargingTariffOffers",  "chargingTariffOfferIds",  "charging tariff offers", ChargingTariffOffer. TryParse, out var chargingTariffOffers,  out ErrorResponse))
+                if (!POIJSON.TryParseChildren<EVSEGroup>           (JSON, PropertyKeys.EVSEGroups,            PropertyKeys.EVSEGroupIds,            "EVSEGroups",            EVSEGroup.           TryParse, out var evseGroups,            out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingStationGroup>(JSON, PropertyKeys.ChargingStationGroups, PropertyKeys.ChargingStationGroupIds, "ChargingStationGroups", ChargingStationGroup.TryParse, out var chargingStationGroups, out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingPoolGroup>   (JSON, PropertyKeys.ChargingPoolGroups,    PropertyKeys.ChargingPoolGroupIds,    "ChargingPoolGroups",    ChargingPoolGroup.   TryParse, out var chargingPoolGroups,    out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingTariffOffer> (JSON, PropertyKeys.ChargingTariffOffers,  PropertyKeys.ChargingTariffOfferIds,  "charging tariff offers", ChargingTariffOffer. TryParse, out var chargingTariffOffers,  out ErrorResponse))
                 {
                     return false;
                 }
@@ -488,6 +662,214 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
         }
+
+        #endregion
+
+        #region (static) TryParse(CBOR, out EMobilityProvider, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given CBOR representation of an e-mobility provider: the keys and values of its JSON
+        /// representation, see ToCBOR().
+        /// </summary>
+        /// <param name="CBOR">The CBOR to parse.</param>
+        /// <param name="EMobilityProvider">The parsed e-mobility provider.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public static Boolean TryParse(CBORValue                                    CBOR,
+                                       [NotNullWhen(true)]  out EMobilityProvider?  EMobilityProvider,
+                                       [NotNullWhen(false)] out String?             ErrorResponse)
+        {
+
+            EMobilityProvider = null;
+
+            try
+            {
+
+                if (CBOR.Kind != CBORValueKind.Map)
+                {
+                    ErrorResponse = "The CBOR representation of an e-mobility provider must be a map!";
+                    return false;
+                }
+
+                if (!CBOR.ParseMandatory(BasePropertyKeys.Id,
+                                         "e-mobility provider identification",
+                                         EMobilityProvider_Id.TryParse,
+                                         out EMobilityProvider_Id id,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.Context), out var contextCBOR) &&
+                    !(contextCBOR.TryGetText(out var context) && context == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the e-mobility provider '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                CBOR.ParseOptional    (BasePropertyKeys.Name,         "e-mobility provider name",         I18NString.TryParse, out I18NString? name,         out ErrorResponse);
+                if (ErrorResponse is not null)
+                    return false;
+
+                CBOR.ParseOptional    (BasePropertyKeys.Description,  "e-mobility provider description",  I18NString.TryParse, out I18NString? description,  out ErrorResponse);
+                if (ErrorResponse is not null)
+                    return false;
+
+                CBOR.ParseOptionalText(BasePropertyKeys.DataSource,   "data source",                                           out var         dataSource,   out ErrorResponse);
+                if (ErrorResponse is not null)
+                    return false;
+
+                if (!TryParseCBORChildren<EVSEGroup>           (CBOR, PropertyKeys.EVSEGroups,            PropertyKeys.EVSEGroupIds,            "EVSEGroups",            EVSEGroup.           TryParse, out var evseGroups,            out ErrorResponse) ||
+                    !TryParseCBORChildren<ChargingStationGroup>(CBOR, PropertyKeys.ChargingStationGroups, PropertyKeys.ChargingStationGroupIds, "ChargingStationGroups", ChargingStationGroup.TryParse, out var chargingStationGroups, out ErrorResponse))
+                {
+                    return false;
+                }
+
+                // What has no CBOR representation of its own is read as its JSON, with the parsers of the JSON
+                // representation: the address, the homepage, the hotline, the keys, the charging pool groups,
+                // the charging tariff offers and the metadata.
+                var json = new JObject();
+
+                foreach (var key in new[] { PropertyKeys.Address,
+                                            PropertyKeys.Homepage,
+                                            PropertyKeys.HotlinePhoneNumber,
+                                            PropertyKeys.SigningKeys,
+                                            PropertyKeys.IdentityKeys,
+                                            PropertyKeys.ChargingPoolGroups,
+                                            PropertyKeys.ChargingPoolGroupIds,
+                                            PropertyKeys.ChargingTariffOffers,
+                                            PropertyKeys.ChargingTariffOfferIds,
+                                            BasePropertyKeys.Created,
+                                            BasePropertyKeys.LastChange,
+                                            BasePropertyKeys.CustomData })
+                {
+                    if (CBOR.TryGetValue(CBORValue.FromText(key), out var value))
+                        json.Add(key, CBORJSON.ToJSON(value));
+                }
+
+                if (!POIJSON.TryParseAddress(json, PropertyKeys.Address,             "address",               out var address,  out ErrorResponse) ||
+                    !POIJSON.TryParseText   (json, PropertyKeys.Homepage,            "homepage",              URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
+                    !POIJSON.TryParseText   (json, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",  PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIPartyKeys.TryParse(json, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
+
+                if (!POIJSON.TryParseChildren<ChargingPoolGroup>   (json, PropertyKeys.ChargingPoolGroups,    PropertyKeys.ChargingPoolGroupIds,    "ChargingPoolGroups",    ChargingPoolGroup.   TryParse, out var chargingPoolGroups,    out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingTariffOffer> (json, PropertyKeys.ChargingTariffOffers,  PropertyKeys.ChargingTariffOfferIds,  "charging tariff offers", ChargingTariffOffer. TryParse, out var chargingTariffOffers,  out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIEntityMetadata.TryParse(json,
+                                                out var created,
+                                                out var lastChange,
+                                                out var customData,
+                                                out ErrorResponse))
+                {
+                    return false;
+                }
+
+                EMobilityProvider = new EMobilityProvider(id,
+                                                          name,
+                                                          description,
+                                                          address,
+                                                          homepage,
+                                                          hotline,
+                                                          SigningKeys:            signingKeys,
+                                                          IdentityKeys:           identityKeys,
+                                                          EVSEGroups:             evseGroups,
+                                                          ChargingStationGroups:  chargingStationGroups,
+                                                          ChargingPoolGroups:     chargingPoolGroups,
+                                                          ChargingTariffOffers:   chargingTariffOffers,
+                                                          DataSource:  dataSource,
+                                                          Created:     created,
+                                                          LastChange:  lastChange,
+                                                          CustomData:  customData);
+
+                ErrorResponse = null;
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                EMobilityProvider  = null;
+                ErrorResponse      = "The given CBOR representation of an e-mobility provider is invalid: " + e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region (private static) TryParseCBORChildren<T>(CBOR, PropertyName, IdsPropertyName, Description, Parser, out Children, out ErrorResponse)
+
+        /// <summary>
+        /// The optional embedded children of the given CBOR map, given completely - as POIJSON.TryParseChildren does in JSON.
+        /// </summary>
+        private static Boolean TryParseCBORChildren<T>(CBORValue                         CBOR,
+                                                       String                            PropertyName,
+                                                       String                            IdsPropertyName,
+                                                       String                            Description,
+                                                       TryCBORParser<T>                  Parser,
+                                                       out ImmutableArray<T>             Children,
+                                                       [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Children = [];
+
+            if (CBOR.TryGetValue(CBORValue.FromText(IdsPropertyName), out _))
+            {
+                ErrorResponse = $"The {Description} must be given completely in '{PropertyName}', not by '{IdsPropertyName}'!";
+                return false;
+            }
+
+            if (!CBOR.TryGetValue(CBORValue.FromText(PropertyName), out var array))
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            if (array.Kind != CBORValueKind.Array)
+            {
+                ErrorResponse = $"The {Description} must be a CBOR array!";
+                return false;
+            }
+
+            var children = ImmutableArray.CreateBuilder<T>(array.Count);
+
+            foreach (var item in array.AsArray())
+            {
+
+                if (item.Kind != CBORValueKind.Map)
+                {
+                    ErrorResponse = $"The {Description} must be CBOR maps!";
+                    return false;
+                }
+
+                if (!Parser(item, out var child, out var childError))
+                {
+                    ErrorResponse = childError;
+                    return false;
+                }
+
+                children.Add(child);
+
+            }
+
+            Children       = children.MoveToImmutable();
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        /// <summary>
+        /// A parser of the CBOR representation of a child.
+        /// </summary>
+        private delegate Boolean TryCBORParser<T>(CBORValue                         CBOR,
+                                                  [NotNullWhen(true)]  out T?       Child,
+                                                  [NotNullWhen(false)] out String?  ErrorResponse);
 
         #endregion
 

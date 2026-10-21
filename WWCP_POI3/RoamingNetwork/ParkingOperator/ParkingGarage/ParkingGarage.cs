@@ -64,7 +64,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         IComparable<ParkingGarage>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/parkingGarage";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its address.
+            /// </summary>
+            public const String  Address              = "address";
+
+            /// <summary>
+            /// The property of its geographical location.
+            /// </summary>
+            public const String  GeoLocation          = "geoLocation";
+
+            /// <summary>
+            /// The property of its charging stations.
+            /// </summary>
+            public const String  ChargingStationIds   = "chargingStationIds";
+
+            /// <summary>
+            /// The property of its opening times.
+            /// </summary>
+            public const String  OpeningTimes         = "openingTimes";
+
+            /// <summary>
+            /// The property of its images.
+            /// </summary>
+            public const String  Images               = "images";
+
+            /// <summary>
+            /// The property of its parking products.
+            /// </summary>
+            public const String  ParkingProductIds    = "parkingProductIds";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The address.
@@ -209,47 +261,56 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomParkingGarageSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this parking garage, as its parking operator embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomParkingGarageSerializer">A delegate to serialize custom parking garage JSON objects.</param>
+        public JObject ToJSON(Boolean                                          Embedded                        = false,
+                              CustomJObjectSerializerDelegate<ParkingGarage>?  CustomParkingGarageSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,         JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",                Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,            Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",         Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,     Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",          DataSource);
+                json.Add(BasePropertyKeys.DataSource,      DataSource);
 
             if (Address is not null)
-                json.Add("address",             Address.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.Address,             Address.ToJSON(Embedded: true));
 
             if (GeoLocation.HasValue)
-                json.Add("geoLocation",         GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,         GeoLocation.Value.ToJSON(Embedded: true));
 
             if (ChargingStationIds.Length > 0)
-                json.Add("chargingStationIds",  POIJSON.IdsToJSON(ChargingStationIds));
+                json.Add(PropertyKeys.ChargingStationIds,  POIJSON.IdsToJSON(ChargingStationIds));
 
             if (OpeningTimes is not null)
-                json.Add("openingTimes",  OpeningTimes.ToJSON());
+                json.Add(PropertyKeys.OpeningTimes,        OpeningTimes.ToJSON());
 
             if (Images.Length > 0)
-                json.Add("images",  new JArray(Images.Select(image => image.ToJSON())));
+                json.Add(PropertyKeys.Images,              new JArray(Images.Select(image => image.ToJSON(Embedded: true))));
+
             if (ParkingProductIds.Length > 0)
-                json.Add("parkingProductIds",  POIJSON.IdsToJSON(ParkingProductIds));
+                json.Add(PropertyKeys.ParkingProductIds,   POIJSON.IdsToJSON(ParkingProductIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomParkingGarageSerializer is not null
+                       ? CustomParkingGarageSerializer(this, json)
+                       : json;
 
         }
 
@@ -273,7 +334,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "parking garage identification",
                                          ParkingGarage_Id.TryParse,
                                          out ParkingGarage_Id id,
@@ -282,23 +343,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N       (JSON, "name",                "parking garage name",               out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N       (JSON, "description",         "parking garage description",        out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString     (JSON, "dataSource",          "data source",                       out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseAddress    (JSON,                                                             out var address,      out ErrorResponse) ||
-                    !POIJSON.TryParseGeoLocation(JSON,                                                             out var geoLocation,  out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "chargingStationIds",  "charging station identification",   ChargingStation_Id.TryParse, out ImmutableArray<ChargingStation_Id> chargingStationIds, out ErrorResponse))
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the parking garage '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N       (JSON, BasePropertyKeys.Name,            "parking garage name",               out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N       (JSON, BasePropertyKeys.Description,     "parking garage description",        out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, BasePropertyKeys.DataSource,      "data source",                       out var dataSource,   out ErrorResponse) ||
+                    !POIJSON.TryParseAddress    (JSON, PropertyKeys.Address,             "address",                           out var address,      out ErrorResponse) ||
+                    !POIJSON.TryParseGeoLocation(JSON, PropertyKeys.GeoLocation,         "geo location",                      out var geoLocation,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.ChargingStationIds,  "charging station identification",   ChargingStation_Id.TryParse, out ImmutableArray<ChargingStation_Id> chargingStationIds, out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, "openingTimes", "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
+                if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, PropertyKeys.OpeningTimes, "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
+                if (!POIJSON.TryParseObjects<Image>(JSON, PropertyKeys.Images, "images", Image.TryParse, out var images, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseIds(JSON, "parkingProductIds", "parking product identification", ParkingProduct_Id.TryParse, out ImmutableArray<ParkingProduct_Id> parkingProductIds, out ErrorResponse))
+                if (!POIJSON.TryParseIds(JSON, PropertyKeys.ParkingProductIds, "parking product identification", ParkingProduct_Id.TryParse, out ImmutableArray<ParkingProduct_Id> parkingProductIds, out ErrorResponse))
                     return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,

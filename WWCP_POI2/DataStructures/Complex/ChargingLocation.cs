@@ -53,7 +53,53 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     IComparable<ChargingLocation>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingLocation";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                     = "@context";
+
+            /// <summary>
+            /// The property of its EVSE identification.
+            /// </summary>
+            public const String  EVSEId                      = "evseId";
+
+            /// <summary>
+            /// The property of its charging station identification.
+            /// </summary>
+            public const String  ChargingStationId           = "chargingStationId";
+
+            /// <summary>
+            /// The property of its charging pool identification.
+            /// </summary>
+            public const String  ChargingPoolId              = "chargingPoolId";
+
+            /// <summary>
+            /// The property of its charging station operator identification.
+            /// </summary>
+            public const String  ChargingStationOperatorId   = "chargingStationOperatorId";
+
+        }
+
+        #endregion
 
         public EVSE_Id?                     EVSEId                       { get; }
 
@@ -231,27 +277,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
 
-        public JObject ToJSON()
+        #region ToJSON(Embedded = false, CustomChargingLocationSerializer = null)
 
-            => JSONObject.Create(
+        /// <summary>
+        /// Return a JSON representation of this object.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingLocationSerializer">A delegate to serialize custom charging location JSON objects.</param>
+        public JObject ToJSON(Boolean                                             Embedded                           = false,
+                              CustomJObjectSerializerDelegate<ChargingLocation>?  CustomChargingLocationSerializer   = null)
+        {
 
-                   EVSEId.HasValue
-                       ? new JProperty("evseId",                      EVSEId.                   Value.ToString())
-                       : null,
+            var json = JSONObject.Create(
 
-                   ChargingStationId.HasValue
-                       ? new JProperty("chargingStationId",           ChargingStationId.        Value.ToString())
-                       : null,
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,                     JSONLDContext)
+                               : null,
 
-                   ChargingPoolId.HasValue
-                       ? new JProperty("chargingPoolId",              ChargingPoolId.           Value.ToString())
-                       : null,
+                           EVSEId.HasValue
+                               ? new JProperty(PropertyKeys.EVSEId,                      EVSEId.                   Value.ToString())
+                               : null,
 
-                   ChargingStationOperatorId.HasValue
-                       ? new JProperty("chargingStationOperatorId",   ChargingStationOperatorId.Value.ToString())
-                       : null
+                           ChargingStationId.HasValue
+                               ? new JProperty(PropertyKeys.ChargingStationId,           ChargingStationId.        Value.ToString())
+                               : null,
 
-               );
+                           ChargingPoolId.HasValue
+                               ? new JProperty(PropertyKeys.ChargingPoolId,              ChargingPoolId.           Value.ToString())
+                               : null,
+
+                           ChargingStationOperatorId.HasValue
+                               ? new JProperty(PropertyKeys.ChargingStationOperatorId,   ChargingStationOperatorId.Value.ToString())
+                               : null
+
+                       );
+
+            return CustomChargingLocationSerializer is not null
+                       ? CustomChargingLocationSerializer(this, json)
+                       : json;
+
+        }
+
+        #endregion
 
 
         public static Boolean TryParse(JObject                JSON,

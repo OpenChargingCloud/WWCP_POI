@@ -42,7 +42,169 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        IComparable<EVSETemplate>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/evseTemplate";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization: those of the properties of an EVSE as an EVSE writes them.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                             = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                        = "@context";
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name                           = "name";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description                    = "description";
+
+            /// <summary>
+            /// The property of its data source.
+            /// </summary>
+            public const String  DataSource                     = "dataSource";
+
+            /// <summary>
+            /// The property of the identification of its charging tariff.
+            /// </summary>
+            public const String  ChargingTariffId               = "chargingTariffId";
+
+            /// <summary>
+            /// The property of the reference printed on its members.
+            /// </summary>
+            public const String  PhysicalReference              = EVSE.PropertyKeys.PhysicalReference;
+
+            /// <summary>
+            /// The property of the current types of its members.
+            /// </summary>
+            public const String  CurrentTypes                   = EVSE.PropertyKeys.CurrentTypes;
+
+            /// <summary>
+            /// The property of the charging modes of its members.
+            /// </summary>
+            public const String  ChargingModes                  = EVSE.PropertyKeys.ChargingModes;
+
+            /// <summary>
+            /// The property of the maximum voltage of its members.
+            /// </summary>
+            public const String  MaxVoltage                     = EVSE.PropertyKeys.MaxVoltage;
+
+            /// <summary>
+            /// The property of the maximum current of its members.
+            /// </summary>
+            public const String  MaxCurrent                     = EVSE.PropertyKeys.MaxCurrent;
+
+            /// <summary>
+            /// The property of the maximum power of its members.
+            /// </summary>
+            public const String  MaxPower                       = EVSE.PropertyKeys.MaxPower;
+
+            /// <summary>
+            /// The property of the charging connectors of its members.
+            /// </summary>
+            public const String  ChargingConnectors             = EVSE.PropertyKeys.ChargingConnectors;
+
+            /// <summary>
+            /// The property of the identifications of the charging connectors of its members, refused: they are given completely.
+            /// </summary>
+            public const String  ChargingConnectorIds           = EVSE.PropertyKeys.ChargingConnectorIds;
+
+            /// <summary>
+            /// The property of the brands of its members.
+            /// </summary>
+            public const String  Brands                         = EVSE.PropertyKeys.Brands;
+
+            /// <summary>
+            /// The property of the identifications of the brands of its members, refused: they are given completely.
+            /// </summary>
+            public const String  BrandIds                       = EVSE.PropertyKeys.BrandIds;
+
+            /// <summary>
+            /// The property of the images of its members.
+            /// </summary>
+            public const String  Images                         = EVSE.PropertyKeys.Images;
+
+            /// <summary>
+            /// The property of the geographical location of its members.
+            /// </summary>
+            public const String  GeoLocation                    = EVSE.PropertyKeys.GeoLocation;
+
+            /// <summary>
+            /// The property of the maximum reservation duration of its members.
+            /// </summary>
+            public const String  MaxReservationDuration         = EVSE.PropertyKeys.MaxReservationDuration;
+
+            /// <summary>
+            /// The property of the reach distance of its members.
+            /// </summary>
+            public const String  ReachDistance                  = EVSE.PropertyKeys.ReachDistance;
+
+            /// <summary>
+            /// The property of the operation timeout of its members.
+            /// </summary>
+            public const String  OperationTimeout               = EVSE.PropertyKeys.OperationTimeout;
+
+            /// <summary>
+            /// The property of whether its members have an extended operation timeout.
+            /// </summary>
+            public const String  ExtendedOperationTimeout       = EVSE.PropertyKeys.ExtendedOperationTimeout;
+
+            /// <summary>
+            /// The property of the standards of its members.
+            /// </summary>
+            public const String  Standards                      = EVSE.PropertyKeys.Standards;
+
+            /// <summary>
+            /// The property of the floor level of its members.
+            /// </summary>
+            public const String  FloorLevel                     = EVSE.PropertyKeys.FloorLevel;
+
+            /// <summary>
+            /// The property of the e-mobility providers whose contracts its members accept.
+            /// </summary>
+            public const String  AcceptedEMobilityProviderIds   = EVSE.PropertyKeys.AcceptedEMobilityProviderIds;
+
+            /// <summary>
+            /// The property of its creation timestamp.
+            /// </summary>
+            public const String  Created                        = "created";
+
+            /// <summary>
+            /// The property of its last change timestamp.
+            /// </summary>
+            public const String  LastChange                     = "lastChange";
+
+            /// <summary>
+            /// The property of its custom data.
+            /// </summary>
+            public const String  CustomData                     = "customData";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The charging tariff of its operator for the EVSEs of its members without tariffs of their own, unless more
@@ -238,79 +400,98 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return the JSON representation of this EVSE template, as its charging station operator embeds it.
         /// </summary>
         public override JObject ToJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
+        #region ToJSON(Embedded = false, ...)
+
+        /// <summary>
+        /// Return the JSON representation of this EVSE template; embedded, as its charging station operator embeds it.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEVSETemplateSerializer">A delegate to serialize custom EVSE template JSON objects.</param>
+        public JObject ToJSON(Boolean                                         Embedded                       = false,
+                              CustomJObjectSerializerDelegate<EVSETemplate>?  CustomEVSETemplateSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(PropertyKeys.Id,  Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,           JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",         Name.ToJSON());
+                json.Add(PropertyKeys.Name,              Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(PropertyKeys.Description,       Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",   DataSource);
+                json.Add(PropertyKeys.DataSource,        DataSource);
 
             if (ChargingTariffId.HasValue)
-                json.Add("chargingTariffId",  ChargingTariffId.Value.ToString());
+                json.Add(PropertyKeys.ChargingTariffId,  ChargingTariffId.Value.ToString());
 
             // The properties of an EVSE, as an EVSE writes them.
             if (PhysicalReference is not null)
-                json.Add("physicalReference",         PhysicalReference);
+                json.Add(PropertyKeys.PhysicalReference,             PhysicalReference);
 
             if (CurrentTypes  != POI.CurrentTypes. Unspecified)
-                json.Add("currentTypes",              POIJSON.FlagsToJSON(CurrentTypes));
+                json.Add(PropertyKeys.CurrentTypes,                  POIJSON.FlagsToJSON(CurrentTypes));
 
             if (ChargingModes != POI.ChargingModes.Unspecified)
-                json.Add("chargingModes",             POIJSON.FlagsToJSON(ChargingModes));
+                json.Add(PropertyKeys.ChargingModes,                 POIJSON.FlagsToJSON(ChargingModes));
 
             if (MaxVoltage.HasValue)
-                json.Add("maxVoltage",                POIJSON.Number(MaxVoltage.Value.Value));
+                json.Add(PropertyKeys.MaxVoltage,                    POIJSON.Number(MaxVoltage.Value.Value));
 
             if (MaxCurrent.HasValue)
-                json.Add("maxCurrent",                POIJSON.Number(MaxCurrent.Value.Value));
+                json.Add(PropertyKeys.MaxCurrent,                    POIJSON.Number(MaxCurrent.Value.Value));
 
             if (MaxPower.HasValue)
-                json.Add("maxPower",                  POIJSON.Number(MaxPower.Value.Value));
+                json.Add(PropertyKeys.MaxPower,                      POIJSON.Number(MaxPower.Value.Value));
 
             if (ChargingConnectors.Length > 0)
-                json.Add("chargingConnectors",        new JArray(ChargingConnectors.Select(chargingConnector => chargingConnector.ToJSON())));
+                json.Add(PropertyKeys.ChargingConnectors,            new JArray(ChargingConnectors.Select(chargingConnector => chargingConnector.ToJSON(Embedded: true))));
 
             if (Brands.Count > 0)
-                json.Add("brands",                    new JArray(Brands.Select(brand => brand.ToJSON())));
+                json.Add(PropertyKeys.Brands,                        new JArray(Brands.Select(brand => brand.ToJSON(Embedded: true))));
 
             if (Images.Length > 0)
-                json.Add("images",                    new JArray(Images.Select(image => image.ToJSON())));
+                json.Add(PropertyKeys.Images,                        new JArray(Images.Select(image => image.ToJSON(Embedded: true))));
 
             if (GeoLocation.HasValue)
-                json.Add("geoLocation",               GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,                   GeoLocation.Value.ToJSON(Embedded: true));
 
             if (MaxReservationDuration.HasValue)
-                json.Add("maxReservationDuration",    POIJSON.Seconds(MaxReservationDuration.Value));
+                json.Add(PropertyKeys.MaxReservationDuration,        POIJSON.Seconds(MaxReservationDuration.Value));
 
             if (ReachDistance.HasValue)
-                json.Add("reachDistance",             POIJSON.Number(ReachDistance.Value.m));
+                json.Add(PropertyKeys.ReachDistance,                 POIJSON.Number(ReachDistance.Value.m));
 
             if (OperationTimeout.HasValue)
-                json.Add("operationTimeout",          POIJSON.Seconds(OperationTimeout.Value));
+                json.Add(PropertyKeys.OperationTimeout,              POIJSON.Seconds(OperationTimeout.Value));
 
             if (ExtendedOperationTimeout.HasValue)
-                json.Add("extendedOperationTimeout",  ExtendedOperationTimeout.Value);
+                json.Add(PropertyKeys.ExtendedOperationTimeout,      ExtendedOperationTimeout.Value);
 
             if (Standards.Length > 0)
-                json.Add("standards",                 POIJSON.IdsToJSON(Standards));
+                json.Add(PropertyKeys.Standards,                     POIJSON.IdsToJSON(Standards));
 
             if (FloorLevel is not null)
-                json.Add("floorLevel",                FloorLevel);
+                json.Add(PropertyKeys.FloorLevel,                    FloorLevel);
 
             if (AcceptedEMobilityProviderIds.Length > 0)
-                json.Add("acceptedEMobilityProviderIds",  POIJSON.IdsToJSON(AcceptedEMobilityProviderIds));
+                json.Add(PropertyKeys.AcceptedEMobilityProviderIds,  POIJSON.IdsToJSON(AcceptedEMobilityProviderIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomEVSETemplateSerializer is not null
+                       ? CustomEVSETemplateSerializer(this, json)
+                       : json;
 
         }
 
@@ -334,7 +515,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(PropertyKeys.Id,
                                          "EVSE template identification",
                                          EVSETemplate_Id.TryParse,
                                          out EVSETemplate_Id id,
@@ -343,34 +524,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N  (JSON, "name",         "EVSE template name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N  (JSON, "description",  "EVSE template description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "dataSource",   "data source",           out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseText  (JSON, "chargingTariffId",  "charging tariff identification",  ChargingTariff_Id.TryParse, out ChargingTariff_Id? chargingTariffId, out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the EVSE template '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N  (JSON, PropertyKeys.Name,         "EVSE template name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N  (JSON, PropertyKeys.Description,  "EVSE template description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.DataSource,   "data source",           out var dataSource,   out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.ChargingTariffId,  "charging tariff identification",  ChargingTariff_Id.TryParse, out ChargingTariff_Id? chargingTariffId, out ErrorResponse))
                 {
                     return false;
                 }
 
                 // The properties of an EVSE, as an EVSE reads them.
-                if (!POIJSON.TryParseString(JSON, "physicalReference",  "physical reference",  out var physicalReference,  out ErrorResponse) ||
-                    !POIJSON.TryParseFlags (JSON, "currentTypes",       "current type",        out CurrentTypes  currentTypes,  out ErrorResponse) ||
-                    !POIJSON.TryParseFlags (JSON, "chargingModes",      "charging mode",       out ChargingModes chargingModes, out ErrorResponse))
+                if (!POIJSON.TryParseString(JSON, PropertyKeys.PhysicalReference,  "physical reference",  out var physicalReference,  out ErrorResponse) ||
+                    !POIJSON.TryParseFlags (JSON, PropertyKeys.CurrentTypes,       "current type",        out CurrentTypes  currentTypes,  out ErrorResponse) ||
+                    !POIJSON.TryParseFlags (JSON, PropertyKeys.ChargingModes,      "charging mode",       out ChargingModes chargingModes, out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (JSON.ParseOptional("maxVoltage", "maximum voltage", out Volt?   maxVoltage, out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.MaxVoltage, "maximum voltage", out Volt?   maxVoltage, out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("maxCurrent", "maximum current", out Ampere? maxCurrent, out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.MaxCurrent, "maximum current", out Ampere? maxCurrent, out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("maxPower",   "maximum power",   out Watt?   maxPower,   out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.MaxPower,   "maximum power",   out Watt?   maxPower,   out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
                 if (!POIJSON.TryParseChildren<ChargingConnector>(JSON,
-                                                                 "chargingConnectors",
-                                                                 "chargingConnectorIds",
+                                                                 PropertyKeys.ChargingConnectors,
+                                                                 PropertyKeys.ChargingConnectorIds,
                                                                  "charging connectors",
                                                                  ChargingConnector.TryParse,
                                                                  out var chargingConnectors,
@@ -379,28 +567,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseChildren<Brand>(JSON, "brands", "brandIds", "brands", Brand.TryParse, out var brands, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<Brand>(JSON, PropertyKeys.Brands, PropertyKeys.BrandIds, "brands", Brand.TryParse, out var brands, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
+                if (!POIJSON.TryParseObjects<Image>(JSON, PropertyKeys.Images, "images", Image.TryParse, out var images, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseGeoLocation(JSON,                            out var geoLocation,             out ErrorResponse) ||
-                    !POIJSON.TryParseSeconds    (JSON, "maxReservationDuration",
+                if (!POIJSON.TryParseGeoLocation(JSON, PropertyKeys.GeoLocation,
+                                                       "geo location",                 out var geoLocation,             out ErrorResponse) ||
+                    !POIJSON.TryParseSeconds    (JSON, PropertyKeys.MaxReservationDuration,
                                                        "maximum reservation duration", out var maxReservationDuration,  out ErrorResponse) ||
-                    !POIJSON.TryParseSeconds    (JSON, "operationTimeout",
+                    !POIJSON.TryParseSeconds    (JSON, PropertyKeys.OperationTimeout,
                                                        "operation timeout",            out var operationTimeout,        out ErrorResponse) ||
-                    !POIJSON.TryParseNonNegative(JSON, "reachDistance",
+                    !POIJSON.TryParseNonNegative(JSON, PropertyKeys.ReachDistance,
                                                        "reach distance",               out var reachDistance,           out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "standards", "standard", Standard.TryParse, out ImmutableArray<Standard> standards, out ErrorResponse) ||
-                    !POIJSON.TryParseString     (JSON, "floorLevel",           "floor level",                  out var floorLevel,              out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "acceptedEMobilityProviderIds", "accepted e-mobility provider identification",
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.Standards, "standard", Standard.TryParse, out ImmutableArray<Standard> standards, out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, PropertyKeys.FloorLevel,           "floor level",                  out var floorLevel,              out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.AcceptedEMobilityProviderIds, "accepted e-mobility provider identification",
                                                  EMobilityProvider_Id.TryParse, out ImmutableArray<EMobilityProvider_Id> acceptedEMobilityProviderIds, out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (JSON.ParseOptional("extendedOperationTimeout", "extended operation timeout", out Boolean? extendedOperationTimeout, out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.ExtendedOperationTimeout, "extended operation timeout", out Boolean? extendedOperationTimeout, out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,

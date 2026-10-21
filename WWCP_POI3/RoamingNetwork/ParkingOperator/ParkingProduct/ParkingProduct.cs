@@ -41,7 +41,64 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          IComparable<ParkingProduct>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/parkingProduct";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                     = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                = "@context";
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name                   = "name";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description            = "description";
+
+            /// <summary>
+            /// The property of its minimum parking duration, in seconds.
+            /// </summary>
+            public const String  MinDuration            = "minDuration";
+
+            /// <summary>
+            /// The property of its parking duration after which parking must stop, in seconds.
+            /// </summary>
+            public const String  StopParkingAfterTime   = "stopParkingAfterTime";
+
+            /// <summary>
+            /// The property of its custom data.
+            /// </summary>
+            public const String  CustomData             = "customData";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The identification of the parking product.
@@ -106,34 +163,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomParkingProductSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this parking product, as its parking operator embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomParkingProductSerializer">A delegate to serialize custom parking product JSON objects.</param>
+        public JObject ToJSON(Boolean                                           Embedded                         = false,
+                              CustomJObjectSerializerDelegate<ParkingProduct>?  CustomParkingProductSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(PropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,               JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",                  Name.ToJSON());
+                json.Add(PropertyKeys.Name,                  Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",           Description.ToJSON());
+                json.Add(PropertyKeys.Description,           Description.ToJSON());
 
             if (MinDuration.HasValue)
-                json.Add("minDuration",           POIJSON.Seconds(MinDuration.Value));
+                json.Add(PropertyKeys.MinDuration,           POIJSON.Seconds(MinDuration.Value));
 
             if (StopParkingAfterTime.HasValue)
-                json.Add("stopParkingAfterTime",  POIJSON.Seconds(StopParkingAfterTime.Value));
+                json.Add(PropertyKeys.StopParkingAfterTime,  POIJSON.Seconds(StopParkingAfterTime.Value));
 
             if (CustomData is not null && CustomData.HasValues)
-                json.Add("customData",            CustomData.ToJObject());
+                json.Add(PropertyKeys.CustomData,            CustomData.ToJObject());
 
-            return json;
+            return CustomParkingProductSerializer is not null
+                       ? CustomParkingProductSerializer(this, json)
+                       : json;
 
         }
 
@@ -157,7 +222,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(PropertyKeys.Id,
                                          "parking product identification",
                                          ParkingProduct_Id.TryParse,
                                          out ParkingProduct_Id id,
@@ -166,16 +231,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N(JSON, "name",         "parking product name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N(JSON, "description",  "parking product description",  out var description,  out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the parking product '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N(JSON, PropertyKeys.Name,         "parking product name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N(JSON, PropertyKeys.Description,  "parking product description",  out var description,  out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (JSON.ParseOptional("minDuration",           "minimum duration",          out Decimal? minDuration,           out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.MinDuration,           "minimum duration",          out Decimal? minDuration,           out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("stopParkingAfterTime",  "stop parking after time",   out Decimal? stopParkingAfterTime,  out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.StopParkingAfterTime,  "stop parking after time",   out Decimal? stopParkingAfterTime,  out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,

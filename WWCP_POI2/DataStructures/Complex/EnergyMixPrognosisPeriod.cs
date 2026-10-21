@@ -36,7 +36,53 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class EnergyMixPrognosisPeriod : IEquatable<EnergyMixPrognosisPeriod>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/energyMixPrognosisPeriod";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                = "@context";
+
+            /// <summary>
+            /// The property of its start.
+            /// </summary>
+            public const String  Start                  = "start";
+
+            /// <summary>
+            /// The property of its optional end.
+            /// </summary>
+            public const String  End                    = "end";
+
+            /// <summary>
+            /// The property of its expected energy sources.
+            /// </summary>
+            public const String  EnergySources          = "energySources";
+
+            /// <summary>
+            /// The property of its expected environmental impacts.
+            /// </summary>
+            public const String  EnvironmentalImpacts   = "environmentalImpacts";
+
+        }
+
+        #endregion
 
         /// <summary>
         /// The start of this period.
@@ -156,9 +202,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                #region Check JSON-LD context         [optional]
+
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the energy mix prognosis period must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Start                   [mandatory]
 
-                if (!JSON.ParseMandatory("start",
+                if (!JSON.ParseMandatory(PropertyKeys.Start,
                                          "start",
                                          out DateTimeOffset start,
                                          out ErrorResponse))
@@ -170,7 +227,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse End                     [optional]
 
-                if (JSON.ParseOptional("end",
+                if (JSON.ParseOptional(PropertyKeys.End,
                                        "end",
                                        out DateTimeOffset? end,
                                        out ErrorResponse))
@@ -184,7 +241,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse EnergySources           [mandatory]
 
                 if (!PercentageOfExtensions.TryParse<EnergySourceCategory>(JSON,
-                                                                           "energySources",
+                                                                           PropertyKeys.EnergySources,
                                                                            "energy source",
                                                                            EnergySourceCategory.TryParse,
                                                                            out var energySources,
@@ -198,7 +255,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse EnvironmentalImpacts    [mandatory]
 
                 if (!EnvironmentalImpactAmountExtensions.TryParse(JSON,
-                                                                  "environmentalImpacts",
+                                                                  PropertyKeys.EnvironmentalImpacts,
                                                                   out var environmentalImpacts,
                                                                   out ErrorResponse))
                 {
@@ -209,7 +266,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (end.HasValue && end.Value <= start)
                 {
-                    ErrorResponse = "end: must be after the start!";
+                    ErrorResponse = $"{PropertyKeys.End}: must be after the {PropertyKeys.Start}!";
                     return false;
                 }
 
@@ -234,26 +291,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomEnergyMixPrognosisPeriodSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this object.
         /// Timestamps are written in UTC with millisecond precision.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEnergyMixPrognosisPeriodSerializer">A delegate to serialize custom energy mix prognosis period JSON objects.</param>
+        public JObject ToJSON(Boolean                                                     Embedded                                   = false,
+                              CustomJObjectSerializerDelegate<EnergyMixPrognosisPeriod>?  CustomEnergyMixPrognosisPeriodSerializer   = null)
+        {
 
-            => JSONObject.Create(
+            var json = JSONObject.Create(
 
-                         new JProperty("start",                  Start.    ToISO8601()),
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,                JSONLDContext)
+                               : null,
 
-                   End.HasValue
-                       ? new JProperty("end",                    End.Value.ToISO8601())
-                       : null,
+                                 new JProperty(PropertyKeys.Start,                  Start.    ToISO8601()),
 
-                         new JProperty("energySources",          EnergySources.       ToJSON()),
-                         new JProperty("environmentalImpacts",   EnvironmentalImpacts.ToJSON())
+                           End.HasValue
+                               ? new JProperty(PropertyKeys.End,                    End.Value.ToISO8601())
+                               : null,
 
-               );
+                                 new JProperty(PropertyKeys.EnergySources,          EnergySources.       ToJSON()),
+                                 new JProperty(PropertyKeys.EnvironmentalImpacts,   EnvironmentalImpacts.ToJSON())
+
+                       );
+
+            return CustomEnergyMixPrognosisPeriodSerializer is not null
+                       ? CustomEnergyMixPrognosisPeriodSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 

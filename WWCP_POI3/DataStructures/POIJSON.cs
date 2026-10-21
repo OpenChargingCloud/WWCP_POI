@@ -51,6 +51,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
     internal static class POIJSON
     {
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization the helpers read by default.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its address.
+            /// </summary>
+            public const String  Address       = "address";
+
+            /// <summary>
+            /// The property of its geographical location.
+            /// </summary>
+            public const String  GeoLocation   = "geoLocation";
+
+        }
+
+        #endregion
+
         #region ToText              (JSON)
 
         /// <summary>
@@ -527,7 +549,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               out Address?                      Address,
                                               [NotNullWhen(false)] out String?  ErrorResponse)
 
-            => TryParseAddress(JSON, "address", "address", out Address, out ErrorResponse);
+            => TryParseAddress(JSON, PropertyKeys.Address, "address", out Address, out ErrorResponse);
 
 
         /// <summary>
@@ -576,7 +598,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   out GeoCoordinate?                GeoLocation,
                                                   [NotNullWhen(false)] out String?  ErrorResponse)
 
-            => TryParseGeoLocation(JSON, "geoLocation", "geo location", out GeoLocation, out ErrorResponse);
+            => TryParseGeoLocation(JSON, PropertyKeys.GeoLocation, "geo location", out GeoLocation, out ErrorResponse);
 
 
         /// <summary>

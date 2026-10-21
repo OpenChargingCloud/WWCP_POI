@@ -72,10 +72,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               request => TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse)
                                              ? EntityResponse(request,
                                                               new JObject(
-                                                                  new JProperty("attestations",
+                                                                  new JProperty(PropertyKeys.Attestations,
                                                                                 new JArray((roamingNetworkHistories.TryGetValue(roamingNetwork.Id, out var history)
                                                                                                 ? history.CurrentAttestations(TimeProvider.GetUtcNow())
-                                                                                                : []).Select(attestation => attestation.ToJSON())))
+                                                                                                : []).Select(attestation => attestation.ToJSON(Embedded: true))))
                                                               ))
                                              : errorResponse);
 
@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               request => !TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse)
                                              ? errorResponse
                                              : roamingNetwork.Operator?.KeyStatement is RoamingNetworkKeyStatement keyStatement
-                                                   ? EntityResponse(request, keyStatement.ToJSON())
+                                                   ? EntityResponse(request, keyStatement.ToJSON(Embedded: true))
                                                    : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The operator of the roaming network '{roamingNetwork.Id}' states no keys!"));
 
             #endregion
@@ -113,9 +113,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                   return EntityResponse(request,
                                                         new JObject(
-                                                            new JProperty("roamingNetworkId",  roamingNetwork.Id.ToString()),
-                                                            new JProperty("identityKeyIds",    new JArray(trustAnchor.IdentityKeyIds)),
-                                                            new JProperty("uri",               trustAnchor.ToURI())
+                                                            new JProperty(PropertyKeys.RoamingNetworkId,  roamingNetwork.Id.ToString()),
+                                                            new JProperty(PropertyKeys.IdentityKeyIds,    new JArray(trustAnchor.IdentityKeyIds)),
+                                                            new JProperty(PropertyKeys.URI,               trustAnchor.ToURI())
                                                         ));
 
                               });
@@ -241,7 +241,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Task.FromResult(
                     request.Respond(new JObject(
-                                        new JProperty("attestations", new JArray(History.CurrentAttestations(TimeProvider.GetUtcNow()).Select(attestation => attestation.ToJSON())))
+                                        new JProperty(PropertyKeys.Attestations, new JArray(History.CurrentAttestations(TimeProvider.GetUtcNow()).Select(attestation => attestation.ToJSON(Embedded: true))))
                                     ))
                 )
 
@@ -251,7 +251,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 ETagHashAlgorithm? hashAlgorithm = null;
 
-                if (request.Payload["hashAlgorithm"] is JToken hashAlgorithmJSON)
+                if (request.Payload[PropertyKeys.HashAlgorithm] is JToken hashAlgorithmJSON)
                 {
 
                     if (hashAlgorithmJSON.Type != JTokenType.String || !ETagHashAlgorithmExtensions.TryParse(hashAlgorithmJSON.Value<String>(), out var parsed))
@@ -261,7 +261,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                if (request.Payload["chargingStationId"] is JToken chargingStationIdJSON)
+                if (request.Payload[PropertyKeys.ChargingStationId] is JToken chargingStationIdJSON)
                     return Task.FromResult(
                                chargingStationIdJSON.Type != JTokenType.String || !ChargingStation_Id.TryParse(chargingStationIdJSON.Value<String>() ?? "", out var chargingStationId)
                                    ? request.Error(POIWebSocketErrorCodes.FormatViolation, "Invalid charging station identification!")
@@ -270,7 +270,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          : request.Error(POIWebSocketErrorCodes.NotFound, proofError)
                            );
 
-                if (request.Payload["EVSEId"] is JToken evseIdJSON)
+                if (request.Payload[PropertyKeys.EVSEId] is JToken evseIdJSON)
                     return Task.FromResult(
                                evseIdJSON.Type != JTokenType.String || !EVSE_Id.TryParse(evseIdJSON.Value<String>() ?? "", out var evseId)
                                    ? request.Error(POIWebSocketErrorCodes.FormatViolation, "Invalid EVSE identification!")

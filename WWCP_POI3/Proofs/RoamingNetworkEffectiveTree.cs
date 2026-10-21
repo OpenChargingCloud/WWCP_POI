@@ -166,25 +166,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var stationIndex     = effectivePool.ChargingStations.Ids.IndexOf(ChargingStationId);
             var chargingStation  = effectivePool.ChargingStations[stationIndex];
 
-            var operatorNode     = Root.Arrays["chargingStationOperators"].Children![operatorIndex];
+            var operatorNode     = Root.Arrays[POI.RoamingNetwork.PropertyKeys.ChargingStationOperators].Children![operatorIndex];
 
             #endregion
 
             #region The charging pool: its skeleton, with the charging station complete
 
-            var poolJSON = effectivePool.ToJSON();
+            var poolJSON = effectivePool.ToJSON(Embedded: true);
 
-            if (!POIEffectiveTree.TryDigest(poolJSON, "chargingPools", HashAlgorithm, 1, "chargingPools", out var poolDigest, out var poolNode, out ErrorResponse))
+            if (!POIEffectiveTree.TryDigest(poolJSON, ChargingStationOperator.PropertyKeys.ChargingPools, HashAlgorithm, 1, ChargingStationOperator.PropertyKeys.ChargingPools, out var poolDigest, out var poolNode, out ErrorResponse))
                 return false;
 
-            if (!poolDigest.AsSpan().SequenceEqual(operatorNode.Arrays["chargingPools"].LeafHashes[poolIndex]))
+            if (!poolDigest.AsSpan().SequenceEqual(operatorNode.Arrays[ChargingStationOperator.PropertyKeys.ChargingPools].LeafHashes[poolIndex]))
             {
                 ErrorResponse = $"The charging pool '{chargingPool.Id}' is not the one of the tree!";
                 return false;
             }
 
-            poolJSON["chargingStations"] = Partial(poolNode!.Arrays["chargingStations"],
-                                                   [ (stationIndex, chargingStation.ToJSON()) ]);
+            poolJSON[ChargingPool.PropertyKeys.ChargingStations] = Partial(poolNode!.Arrays[ChargingPool.PropertyKeys.ChargingStations],
+                                                                           [ (stationIndex, chargingStation.ToJSON(Embedded: true)) ]);
 
             #endregion
 
@@ -192,28 +192,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var operatorJSON = (JObject) operatorNode.Skeleton.DeepClone();
 
-            operatorJSON["chargingPools"] = Partial(operatorNode.Arrays["chargingPools"],
-                                                    [ (poolIndex, poolJSON) ]);
+            operatorJSON[ChargingStationOperator.PropertyKeys.ChargingPools] = Partial(operatorNode.Arrays[ChargingStationOperator.PropertyKeys.ChargingPools],
+                                                                                       [ (poolIndex, poolJSON) ]);
 
             var effectiveTariffs = members.ChargingTariffs.TryGetValue(chargingStationOperator.Id, out var tariffs) ? tariffs : null;
 
             SetPartial(operatorJSON,
                        operatorNode,
-                       "chargingTariffs",
+                       ChargingStationOperator.PropertyKeys.ChargingTariffs,
                        chargingStation.EVSEs.SelectMany(evse => evse.ChargingTariffIds).Distinct().
                            Select(tariffId => chargingStationOperator.ChargingTariffs.Ids.IndexOf(tariffId)).
                            Where (index    => index >= 0).
                            Select(index    => (index, (effectiveTariffs is not null && effectiveTariffs.TryGetValue(chargingStationOperator.ChargingTariffs[index].Id, out var effectiveTariff)
                                                             ? effectiveTariff
-                                                            : chargingStationOperator.ChargingTariffs[index]).ToJSON())));
+                                                            : chargingStationOperator.ChargingTariffs[index]).ToJSON(Embedded: true))));
 
             SetPartial(operatorJSON,
                        operatorNode,
-                       "parkingSpaces",
+                       ChargingStationOperator.PropertyKeys.ParkingSpaces,
                        chargingStation.ParkingSpaceIds.
                            Select(parkingSpaceId => chargingStationOperator.ParkingSpaces.Ids.IndexOf(parkingSpaceId)).
                            Where (index          => index >= 0).
-                           Select(index          => (index, chargingStationOperator.ParkingSpaces[index].ToJSON())));
+                           Select(index          => (index, chargingStationOperator.ParkingSpaces[index].ToJSON(Embedded: true))));
 
             #endregion
 
@@ -221,28 +221,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var networkJSON = (JObject) Root.Skeleton.DeepClone();
 
-            networkJSON["chargingStationOperators"] = Partial(Root.Arrays["chargingStationOperators"],
+            networkJSON[POI.RoamingNetwork.PropertyKeys.ChargingStationOperators] = Partial(Root.Arrays[POI.RoamingNetwork.PropertyKeys.ChargingStationOperators],
                                                               [ (operatorIndex, operatorJSON) ]);
 
             var energyMeters = chargingStation.AllEnergyMeters.ToArray();
 
             SetPartialOfNetwork(networkJSON,
-                                "chargingStationManufacturers",
+                                POI.RoamingNetwork.PropertyKeys.ChargingStationManufacturers,
                                 RoamingNetwork.ChargingStationManufacturers.Ids,
                                 chargingStation.ManufacturerId.HasValue ? [ chargingStation.ManufacturerId.Value ] : []);
 
             SetPartialOfNetwork(networkJSON,
-                                "energyMeterManufacturers",
+                                POI.RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,
                                 RoamingNetwork.EnergyMeterManufacturers.Ids,
                                 energyMeters.Select(energyMeter => energyMeter.ManufacturerId).OfType<EnergyMeterManufacturer_Id>());
 
             SetPartialOfNetwork(networkJSON,
-                                "transparencySoftware",
+                                POI.RoamingNetwork.PropertyKeys.TransparencySoftware,
                                 RoamingNetwork.TransparencySoftware.Ids,
                                 energyMeters.SelectMany(energyMeter => energyMeter.TransparencySoftwareStatus).Select(assignment => assignment.TransparencySoftwareId));
 
             SetPartialOfNetwork(networkJSON,
-                                "transparencySoftwareCertificates",
+                                POI.RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates,
                                 RoamingNetwork.TransparencySoftwareCertificates.Ids,
                                 energyMeters.SelectMany(energyMeter => energyMeter.TransparencySoftwareStatus).Select(assignment => assignment.CertificateId).OfType<TransparencySoftwareCertificate_Id>());
 
@@ -253,15 +253,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 var gridOperatorIndex  = RoamingNetwork.GridOperators.Ids.IndexOf(gridOperator.Id);
-                var gridOperatorNode   = Root.Arrays["gridOperators"].Children![gridOperatorIndex];
+                var gridOperatorNode   = Root.Arrays[POI.RoamingNetwork.PropertyKeys.GridOperators].Children![gridOperatorIndex];
                 var gridOperatorJSON   = (JObject) gridOperatorNode.Skeleton.DeepClone();
 
                 SetPartial(gridOperatorJSON,
                            gridOperatorNode,
-                           "gridConnectionPoints",
-                           [ (gridOperator.GridConnectionPoints.Ids.IndexOf(gridConnectionPoint.Id), gridOperator.EffectiveGridConnectionPoint(gridConnectionPoint).ToJSON()) ]);
+                           GridOperator.PropertyKeys.GridConnectionPoints,
+                           [ (gridOperator.GridConnectionPoints.Ids.IndexOf(gridConnectionPoint.Id), gridOperator.EffectiveGridConnectionPoint(gridConnectionPoint).ToJSON(Embedded: true)) ]);
 
-                networkJSON["gridOperators"] = Partial(Root.Arrays["gridOperators"],
+                networkJSON[POI.RoamingNetwork.PropertyKeys.GridOperators] = Partial(Root.Arrays[POI.RoamingNetwork.PropertyKeys.GridOperators],
                                                        [ (gridOperatorIndex, gridOperatorJSON) ]);
 
             }
@@ -285,22 +285,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     continue;
 
                 var effectiveSpaces       = members.ParkingSpaces.TryGetValue(parkingOperator.Id, out var spaces) ? spaces : null;
-                var parkingOperatorNode   = Root.Arrays["parkingOperators"].Children![parkingOperatorIndex];
+                var parkingOperatorNode   = Root.Arrays[POI.RoamingNetwork.PropertyKeys.ParkingOperators].Children![parkingOperatorIndex];
                 var parkingOperatorJSON   = (JObject) parkingOperatorNode.Skeleton.DeepClone();
 
                 SetPartial(parkingOperatorJSON,
                            parkingOperatorNode,
-                           "parkingSpaces",
+                           ParkingOperator.PropertyKeys.ParkingSpaces,
                            spaceIndices.Select(index => (index, (effectiveSpaces is not null && effectiveSpaces.TryGetValue(parkingOperator.ParkingSpaces[index].Id, out var effectiveSpace)
                                                                      ? effectiveSpace
-                                                                     : parkingOperator.ParkingSpaces[index]).ToJSON())));
+                                                                     : parkingOperator.ParkingSpaces[index]).ToJSON(Embedded: true))));
 
                 parkingOperators.Add((parkingOperatorIndex, parkingOperatorJSON));
 
             }
 
             if (parkingOperators.Count > 0)
-                networkJSON["parkingOperators"] = Partial(Root.Arrays["parkingOperators"], parkingOperators);
+                networkJSON[POI.RoamingNetwork.PropertyKeys.ParkingOperators] = Partial(Root.Arrays[POI.RoamingNetwork.PropertyKeys.ParkingOperators], parkingOperators);
 
             #endregion
 

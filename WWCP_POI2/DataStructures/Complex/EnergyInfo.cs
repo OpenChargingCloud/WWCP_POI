@@ -60,6 +60,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                 = "@context";
+
+            /// <summary>
+            /// The property of its power currently delivered.
+            /// </summary>
+            public const String  Used                    = "used";
+
+            /// <summary>
+            /// The property of its power a newly arriving vehicle would still get.
+            /// </summary>
+            public const String  Available               = "available";
+
+            /// <summary>
+            /// The property of its energy stored in a battery buffer.
+            /// </summary>
+            public const String  StoredEnergy            = "storedEnergy";
+
+            /// <summary>
+            /// The property of its current voltage.
+            /// </summary>
+            public const String  CurrentVoltage          = "currentVoltage";
+
+            /// <summary>
+            /// The property of its remaining charging time.
+            /// </summary>
+            public const String  RemainingChargingTime   = "remainingChargingTime";
+
+        }
+
+        #endregion
+
         /// <summary>
         /// The power currently delivered.
         /// </summary>
@@ -145,7 +187,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Used            [mandatory]
 
-                if (!JSON.ParseMandatory("used",
+                if (!JSON.ParseMandatory(PropertyKeys.Used,
                                          "used",
                                          Watt.TryParse,
                                          out Watt used,
@@ -158,7 +200,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Available       [mandatory]
 
-                if (!JSON.ParseMandatory("available",
+                if (!JSON.ParseMandatory(PropertyKeys.Available,
                                          "available",
                                          Watt.TryParse,
                                          out Watt available,
@@ -173,7 +215,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 WattHour? storedEnergy = null;
 
-                if (JSON.ParseOptionalStruct("storedEnergy",
+                if (JSON.ParseOptionalStruct(PropertyKeys.StoredEnergy,
                                              "stored energy",
                                              WattHour.TryParse,
                                              out WattHour storedEnergyValue,
@@ -193,7 +235,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Volt? currentVoltage = null;
 
-                if (JSON.ParseOptionalStruct("currentVoltage",
+                if (JSON.ParseOptionalStruct(PropertyKeys.CurrentVoltage,
                                              "current voltage",
                                              Volt.TryParse,
                                              out Volt currentVoltageValue,
@@ -219,7 +261,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 TimeSpan? remainingChargingTime = null;
 
-                if (JSON["remainingChargingTime"] is JToken remainingChargingTimeToken)
+                if (JSON[PropertyKeys.RemainingChargingTime] is JToken remainingChargingTimeToken)
                 {
 
                     if (remainingChargingTimeToken.Type is not (JTokenType.Integer or JTokenType.Float) ||
@@ -271,30 +313,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// the remaining charging time as a number of seconds.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        public JObject ToJSON(Boolean Embedded = false)
+        /// <param name="CustomEnergyInfoSerializer">A delegate to serialize custom energy information JSON objects.</param>
+        public JObject ToJSON(Boolean                                       Embedded                     = false,
+                              CustomJObjectSerializerDelegate<EnergyInfo>?  CustomEnergyInfoSerializer   = null)
+        {
 
-            => JSONObject.Create(
+            var json = JSONObject.Create(
 
-                   !Embedded
-                       ? new JProperty("@context",    JSONLDContext)
-                       : null,
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,                 JSONLDContext)
+                               : null,
 
-                         new JProperty("used",                    Used.     ToString()),
-                         new JProperty("available",               Available.ToString()),
+                                 new JProperty(PropertyKeys.Used,                    Used.     ToString()),
+                                 new JProperty(PropertyKeys.Available,               Available.ToString()),
 
-                   StoredEnergy.HasValue
-                       ? new JProperty("storedEnergy",            StoredEnergy.Value.ToString())
-                       : null,
+                           StoredEnergy.HasValue
+                               ? new JProperty(PropertyKeys.StoredEnergy,            StoredEnergy.Value.ToString())
+                               : null,
 
-                   CurrentVoltage.HasValue
-                       ? new JProperty("currentVoltage",          CurrentVoltage.Value.ToString())
-                       : null,
+                           CurrentVoltage.HasValue
+                               ? new JProperty(PropertyKeys.CurrentVoltage,          CurrentVoltage.Value.ToString())
+                               : null,
 
-                   RemainingChargingTime.HasValue
-                       ? new JProperty("remainingChargingTime",   Seconds(RemainingChargingTime.Value))
-                       : null
+                           RemainingChargingTime.HasValue
+                               ? new JProperty(PropertyKeys.RemainingChargingTime,   Seconds(RemainingChargingTime.Value))
+                               : null
 
-               );
+                       );
+
+            return CustomEnergyInfoSerializer is not null
+                       ? CustomEnergyInfoSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 

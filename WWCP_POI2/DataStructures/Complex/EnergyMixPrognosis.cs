@@ -47,6 +47,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context             = "@context";
+
+            /// <summary>
+            /// The property of its issue timestamp.
+            /// </summary>
+            public const String  Timestamp           = "timestamp";
+
+            /// <summary>
+            /// The property of its supplier name.
+            /// </summary>
+            public const String  SupplierName        = "supplierName";
+
+            /// <summary>
+            /// The property of its product name.
+            /// </summary>
+            public const String  ProductName         = "productName";
+
+            /// <summary>
+            /// The property of its periods.
+            /// </summary>
+            public const String  Periods             = "periods";
+
+            /// <summary>
+            /// The property of its additional remarks.
+            /// </summary>
+            public const String  AdditionalRemarks   = "additionalRemarks";
+
+        }
+
+        #endregion
+
         /// <summary>
         /// When this prognosis was issued.
         /// </summary>
@@ -186,7 +228,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Timestamp               [mandatory]
 
-                if (!JSON.ParseMandatory("timestamp",
+                if (!JSON.ParseMandatory(PropertyKeys.Timestamp,
                                          "timestamp",
                                          out DateTimeOffset timestamp,
                                          out ErrorResponse))
@@ -198,7 +240,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse SupplierName            [mandatory]
 
-                if (!JSON.ParseMandatory("supplierName",
+                if (!JSON.ParseMandatory(PropertyKeys.SupplierName,
                                          "supplier name",
                                          out I18NString supplierName,
                                          out ErrorResponse))
@@ -210,7 +252,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse ProductName             [mandatory]
 
-                if (!JSON.ParseMandatory("productName",
+                if (!JSON.ParseMandatory(PropertyKeys.ProductName,
                                          "product name",
                                          out I18NString productName,
                                          out ErrorResponse))
@@ -222,9 +264,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Periods                 [mandatory]
 
-                if (JSON["periods"] is not JArray periodsJSON)
+                if (JSON[PropertyKeys.Periods] is not JArray periodsJSON)
                 {
-                    ErrorResponse = "The 'periods' property must be an array!";
+                    ErrorResponse = $"The '{PropertyKeys.Periods}' property must be an array!";
                     return false;
                 }
 
@@ -235,7 +277,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (periodsJSON[index] is not JObject periodJSON)
                     {
-                        ErrorResponse = $"periods[{index}]: expected an object!";
+                        ErrorResponse = $"{PropertyKeys.Periods}[{index}]: expected an object!";
                         return false;
                     }
 
@@ -243,7 +285,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                            out var period,
                                                            out var periodError))
                     {
-                        ErrorResponse = $"periods[{index}]: {periodError}";
+                        ErrorResponse = $"{PropertyKeys.Periods}[{index}]: {periodError}";
                         return false;
                     }
 
@@ -254,13 +296,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         if (period.Start <= previous.Start)
                         {
-                            ErrorResponse = $"periods[{index}].start: the periods must be ordered by their start!";
+                            ErrorResponse = $"{PropertyKeys.Periods}[{index}].{EnergyMixPrognosisPeriod.PropertyKeys.Start}: the periods must be ordered by their start!";
                             return false;
                         }
 
                         if (previous.End.HasValue && previous.End.Value > period.Start)
                         {
-                            ErrorResponse = $"periods[{index - 1}].end: the period must end before the next one starts!";
+                            ErrorResponse = $"{PropertyKeys.Periods}[{index - 1}].{EnergyMixPrognosisPeriod.PropertyKeys.End}: the period must end before the next one starts!";
                             return false;
                         }
 
@@ -274,7 +316,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse AdditionalRemarks       [optional]
 
-                if (JSON.ParseOptional("additionalRemarks",
+                if (JSON.ParseOptional(PropertyKeys.AdditionalRemarks,
                                        "additional remarks",
                                        I18NString.TryParse,
                                        out I18NString? additionalRemarks,
@@ -328,16 +370,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var json = JSONObject.Create(
 
                            !Embedded
-                               ? new JProperty("@context",            JSONLDContext)
+                               ? new JProperty(PropertyKeys.Context,             JSONLDContext)
                                : null,
 
-                                 new JProperty("timestamp",           Timestamp.   ToISO8601()),
-                                 new JProperty("supplierName",        SupplierName.ToJSON()),
-                                 new JProperty("productName",         ProductName. ToJSON()),
-                                 new JProperty("periods",             new JArray(Periods.Select(period => period.ToJSON()))),
+                                 new JProperty(PropertyKeys.Timestamp,           Timestamp.   ToISO8601()),
+                                 new JProperty(PropertyKeys.SupplierName,        SupplierName.ToJSON()),
+                                 new JProperty(PropertyKeys.ProductName,         ProductName. ToJSON()),
+                                 new JProperty(PropertyKeys.Periods,             new JArray(Periods.Select(period => period.ToJSON(Embedded: true)))),
 
                            AdditionalRemarks is not null
-                               ? new JProperty("additionalRemarks",   AdditionalRemarks.ToJSON())
+                               ? new JProperty(PropertyKeys.AdditionalRemarks,   AdditionalRemarks.ToJSON())
                                : null
 
                        );

@@ -276,7 +276,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   CancellationToken        CancellationToken   = default)
 
             => RequestAsync("commitChangeSet",
-                            new JObject(new JProperty("changeSet", ChangeSet.ToJSON())),
+                            new JObject(new JProperty(POI_API.PropertyKeys.ChangeSet, ChangeSet.ToJSON(Embedded: true))),
                             CancellationToken);
 
         #endregion
@@ -297,8 +297,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => RequestAsync("signCommit",
                             new JObject(
-                                new JProperty("commitId",    CommitId.ToString()),
-                                new JProperty("signatures",  new JArray(Signatures.Select(signature => signature.ToJSON())))
+                                new JProperty(RoamingNetworkCommitSignature.PropertyKeys.CommitId,    CommitId.ToString()),
+                                new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Signatures,  new JArray(Signatures.Select(signature => signature.ToJSON(Embedded: true))))
                             ),
                             CancellationToken);
 
@@ -320,17 +320,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var payload = new JObject(
-                              new JProperty("kind",        POIStatusUpdate.KindText(Kind)),
-                              new JProperty("entityType",  EntityType),
-                              new JProperty("entityId",    EntityId),
-                              new JProperty("value",       POIStatusUpdate.ValueToJSON(Kind, Value))
+                              new JProperty(POIStatusUpdate.PropertyKeys.Kind,        POIStatusUpdate.KindText(Kind)),
+                              new JProperty(POIStatusUpdate.PropertyKeys.EntityType,  EntityType),
+                              new JProperty(POIStatusUpdate.PropertyKeys.EntityId,    EntityId),
+                              new JProperty(POIStatusUpdate.PropertyKeys.Value,       POIStatusUpdate.ValueToJSON(Kind, Value))
                           );
 
             if (Timestamp.HasValue)
-                payload.Add("timestamp",   Timestamp.Value.ToISO8601());
+                payload.Add(POIStatusUpdate.PropertyKeys.Timestamp,   Timestamp.Value.ToISO8601());
 
             if (DataSource is not null)
-                payload.Add("dataSource",  DataSource);
+                payload.Add(POIStatusUpdate.PropertyKeys.DataSource,  DataSource);
 
             return RequestAsync("setStatus", payload, CancellationToken);
 
@@ -539,7 +539,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (options.FollowPriceStatements)
                 topics.Add(POI_API.PriceStatementsTopic);
 
-            await Expect(Connection, "subscribe", new JObject(new JProperty("topics", topics)), CancellationToken);
+            await Expect(Connection, "subscribe", new JObject(new JProperty(POIWebSocketServer.PropertyKeys.Topics, topics)), CancellationToken);
 
             statusFromSnapshot = false;
 
@@ -574,7 +574,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var runtimeStatus = await Expect(Connection, "runtimeStatus", [], CancellationToken);
 
-                foreach (var statusJSON in runtimeStatus["runtimeStatus"]?.OfType<JObject>() ?? [])
+                foreach (var statusJSON in runtimeStatus[POI_API.PropertyKeys.RuntimeStatus]?.OfType<JObject>() ?? [])
                 {
                     if (options.FollowStatus)
                         TakeStatusUpdate(statusJSON);
@@ -601,7 +601,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             await foreach (var push in Connection.Pushes.Reader.ReadAllAsync(CancellationToken))
             {
 
-                var payloads = push.GetPayloadJSON()?["batch"] is JArray batch
+                var payloads = push.GetPayloadJSON()?[POIWebSocketServer.PropertyKeys.Batch] is JArray batch
                                    ? batch.OfType<JObject>().ToArray()
                                    : [ push.GetPayloadJSON() ?? [] ];
 
@@ -635,7 +635,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             break;
 
                         case "commitAnnouncement":
-                            if (payload["commitId"]?.Value<String>() is not String commitIdText ||
+                            if (payload[RoamingNetworkCommitSignature.PropertyKeys.CommitId]?.Value<String>() is not String commitIdText ||
                                 !RoamingNetworkCommit_Id.TryParse(commitIdText, out var commitId) ||
                                 !History!.Contains(commitId))
                             {
@@ -867,8 +867,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var currentHistory  = History!;
                 var answer          = await Connection.RequestAsync("commits",
                                                                     new JObject(
-                                                                        new JProperty("have",  new JArray(currentHistory.HaveIds().Select(commitId => commitId.ToString()))),
-                                                                        new JProperty("max",   options.MaxCommitsPerRequest)
+                                                                        new JProperty(POI_API.PropertyKeys.Have,  new JArray(currentHistory.HaveIds().Select(commitId => commitId.ToString()))),
+                                                                        new JProperty(POI_API.PropertyKeys.Max,   options.MaxCommitsPerRequest)
                                                                     ),
                                                                     CancellationToken);
 
@@ -887,7 +887,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var commits = new List<RoamingNetworkCommit>();
 
-                foreach (var commitJSON in answer.GetPayloadJSON()?["commits"]?.OfType<JObject>() ?? [])
+                foreach (var commitJSON in answer.GetPayloadJSON()?[POI_API.PropertyKeys.Commits]?.OfType<JObject>() ?? [])
                 {
 
                     if (!RoamingNetworkCommit.TryParse(commitJSON, out var commit, out var commitError, options.ChangeSetLimits))
@@ -930,7 +930,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var snapshot = await Expect(Connection,
                                             "snapshot",
-                                            new JObject(new JProperty("runtimeStatus", options.FollowStatus)),
+                                            new JObject(new JProperty(POI_API.PropertyKeys.RuntimeStatus, options.FollowStatus)),
                                             CancellationToken);
 
                 if (!RoamingNetworkHistory.TryFromSnapshot(snapshot, out newHistory, out var errorResponse, options.ChangeSetLimits))
@@ -1000,7 +1000,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var currentHistory  = History!;
             var haveIds         = await Expect(Connection, "haveIds", [], CancellationToken);
 
-            var have            = (haveIds["haveIds"] as JArray ?? []).
+            var have            = (haveIds[POI_API.PropertyKeys.HaveIds] as JArray ?? []).
                                       Select (item     => RoamingNetworkCommit_Id.TryParse(item.Value<String>() ?? "", out var commitId) ? commitId : (RoamingNetworkCommit_Id?) null).
                                       Where  (commitId => commitId.HasValue).
                                       Select (commitId => commitId!.Value).
@@ -1140,7 +1140,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var answer = await Connection.RequestAsync("pushStatusUpdates",
-                                                       new JObject(new JProperty("statusUpdates", new JArray(StatusUpdates.Select(statusUpdate => statusUpdate.ToJSON())))),
+                                                       new JObject(new JProperty(POI_API.PropertyKeys.StatusUpdates, new JArray(StatusUpdates.Select(statusUpdate => statusUpdate.ToJSON(Embedded: true))))),
                                                        CancellationToken);
 
             if (answer.IsError)
@@ -1149,13 +1149,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            var refused = (answer.GetPayloadJSON()?["results"] as JArray ?? []).
+            var refused = (answer.GetPayloadJSON()?[POI_API.PropertyKeys.Results] as JArray ?? []).
                               OfType<JObject>().
-                              Where (result => result["result"]?.Value<String>() == nameof(POIStatusUpdateResult.Refused)).
+                              Where (result => result[POI_API.PropertyKeys.Result]?.Value<String>() == nameof(POIStatusUpdateResult.Refused)).
                               ToArray();
 
             if (refused.Length > 0)
-                RaiseError($"The other server refused {refused.Length} of {StatusUpdates.Count} status updates: {refused[0]["description"]?.Value<String>()}", null);
+                RaiseError($"The other server refused {refused.Length} of {StatusUpdates.Count} status updates: {refused[0][POI_API.PropertyKeys.Description]?.Value<String>()}", null);
 
             return true;
 
@@ -1177,7 +1177,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return true;
 
             var answer = await Connection.RequestAsync("pushCommits",
-                                                       new JObject(new JProperty("commits", new JArray(Commits.Select(commit => commit.ToJSON())))),
+                                                       new JObject(new JProperty(POI_API.PropertyKeys.Commits, new JArray(Commits.Select(commit => commit.ToJSON(Embedded: true))))),
                                                        CancellationToken);
 
             if (answer.IsError)
@@ -1186,7 +1186,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (answer.GetPayloadJSON()?["description"]?.Value<String>() is String description)
+            if (answer.GetPayloadJSON()?[POI_API.PropertyKeys.Description]?.Value<String>() is String description)
                 RaiseError("The other server did not take all commits: " + description, null);
 
             return true;

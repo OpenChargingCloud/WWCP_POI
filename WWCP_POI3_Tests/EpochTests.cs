@@ -125,7 +125,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         public void Profiles_name_what_an_epoch_calculates()
         {
 
-            var json = Restricted.ToJSON();
+            var json = Restricted.ToJSON(Embedded: true);
 
             using (Assert.EnterMultipleScope())
             {

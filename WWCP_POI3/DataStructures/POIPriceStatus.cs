@@ -40,7 +40,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              IEnumerable<ChargingTariffElement>  Elements)
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingTariffPrices";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context            = "@context";
+
+            /// <summary>
+            /// The property of its charging tariff identification.
+            /// </summary>
+            public const String  ChargingTariffId   = "chargingTariffId";
+
+            /// <summary>
+            /// The property of its charging tariff elements.
+            /// </summary>
+            public const String  Elements           = ChargingTariff.PropertyKeys.Elements;
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The charging tariff whose prices these are.
@@ -57,15 +94,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomChargingTariffPricesSerializer = null)
 
         /// <summary>
         /// The JSON representation: { chargingTariffId, elements }.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingTariffPricesSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                                 Embedded                               = false,
+                              CustomJObjectSerializerDelegate<ChargingTariffPrices>?  CustomChargingTariffPricesSerializer   = null)
+        {
 
-            => new (new JProperty("chargingTariffId",  ChargingTariffId.ToString()),
-                    new JProperty("elements",          new JArray(Elements.Select(element => element.ToJSON()))));
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,           JSONLDContext);
+
+            json.Add(PropertyKeys.ChargingTariffId,      ChargingTariffId.ToString());
+            json.Add(PropertyKeys.Elements,              new JArray(Elements.Select(element => element.ToJSON(Embedded: true))));
+
+            return CustomChargingTariffPricesSerializer is not null
+                       ? CustomChargingTariffPricesSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 
@@ -83,25 +135,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (JSON is not JObject json)
             {
-                ErrorResponse = "The prices of a charging tariff must be a JSON object { chargingTariffId, elements }!";
+                ErrorResponse = $"The prices of a charging tariff must be a JSON object {{ {PropertyKeys.ChargingTariffId}, {PropertyKeys.Elements} }}!";
                 return false;
             }
 
             foreach (var property in json.Properties())
-                if (property.Name is not ("chargingTariffId" or "elements"))
+                if (property.Name is not (PropertyKeys.Context or PropertyKeys.ChargingTariffId or PropertyKeys.Elements))
                 {
                     ErrorResponse = $"Unknown property '{property.Name}' of the prices of a charging tariff!";
                     return false;
                 }
 
-            if (json["chargingTariffId"]?.Type != JTokenType.String ||
-                !ChargingTariff_Id.TryParse(json["chargingTariffId"]!.Value<String>() ?? "", out var chargingTariffId))
+            if (json[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
             {
-                ErrorResponse = "The prices of a charging tariff need a valid 'chargingTariffId'!";
+                ErrorResponse = $"The JSON-LD context of the prices of a charging tariff must be '{JSONLDContext}'!";
                 return false;
             }
 
-            if (json["elements"] is not JArray elementsJSON || elementsJSON.Count == 0)
+            if (json[PropertyKeys.ChargingTariffId]?.Type != JTokenType.String ||
+                !ChargingTariff_Id.TryParse(json[PropertyKeys.ChargingTariffId]!.Value<String>() ?? "", out var chargingTariffId))
+            {
+                ErrorResponse = $"The prices of a charging tariff need a valid '{PropertyKeys.ChargingTariffId}'!";
+                return false;
+            }
+
+            if (json[PropertyKeys.Elements] is not JArray elementsJSON || elementsJSON.Count == 0)
             {
                 ErrorResponse = $"The prices of the charging tariff '{chargingTariffId}' need their elements as a JSON array, at least one!";
                 return false;
@@ -144,7 +203,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class ChargingPrices : IEquatable<ChargingPrices>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingPrices";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context   = "@context";
+
+            /// <summary>
+            /// The property of its prices.
+            /// </summary>
+            public const String  Prices    = "prices";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The new prices, in the order of their charging tariffs.
@@ -175,21 +266,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("A price status must name a charging tariff only once!", nameof(Prices));
 
             this.Prices  = [.. prices.OrderBy(price => price.ChargingTariffId.ToString(), StringComparer.Ordinal)];
-            this.Text    = ToJSON().ToString(Formatting.None);
+            this.Text    = ToJSON(Embedded: true).ToString(Formatting.None);
 
         }
 
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomChargingPricesSerializer = null)
 
         /// <summary>
         /// The JSON representation: { prices: [ { chargingTariffId, elements }, … ] }.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingPricesSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                           Embedded                         = false,
+                              CustomJObjectSerializerDelegate<ChargingPrices>?  CustomChargingPricesSerializer   = null)
+        {
 
-            => new (new JProperty("prices", new JArray(Prices.Select(price => price.ToJSON()))));
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,  JSONLDContext);
+
+            json.Add(PropertyKeys.Prices,       new JArray(Prices.Select(price => price.ToJSON(Embedded: true))));
+
+            return CustomChargingPricesSerializer is not null
+                       ? CustomChargingPricesSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 
@@ -205,18 +311,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ChargingPrices = null;
 
-            if (JSON is not JObject json || json["prices"] is not JArray pricesJSON)
+            if (JSON is not JObject json || json[PropertyKeys.Prices] is not JArray pricesJSON)
             {
-                ErrorResponse = "A price status must be a JSON object { prices: [ { chargingTariffId, elements }, … ] }!";
+                ErrorResponse = $"A price status must be a JSON object {{ {PropertyKeys.Prices}: [ {{ {ChargingTariffPrices.PropertyKeys.ChargingTariffId}, {ChargingTariffPrices.PropertyKeys.Elements} }}, … ] }}!";
                 return false;
             }
 
             foreach (var property in json.Properties())
-                if (property.Name != "prices")
+                if (property.Name is not (PropertyKeys.Context or PropertyKeys.Prices))
                 {
                     ErrorResponse = $"Unknown property '{property.Name}' of a price status!";
                     return false;
                 }
+
+            if (json[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of a price status must be '{JSONLDContext}'!";
+                return false;
+            }
 
             var prices = new List<ChargingTariffPrices>();
 

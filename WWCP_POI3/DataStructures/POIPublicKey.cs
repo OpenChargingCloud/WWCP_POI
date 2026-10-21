@@ -41,7 +41,54 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class POIPublicKey : IEquatable<POIPublicKey>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/poiPublicKey";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id          = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context     = "@context";
+
+            /// <summary>
+            /// The property of its COSE key.
+            /// </summary>
+            public const String  Key         = "key";
+
+            /// <summary>
+            /// The property of since when it may be used.
+            /// </summary>
+            public const String  NotBefore   = "notBefore";
+
+            /// <summary>
+            /// The property of until when it may be used.
+            /// </summary>
+            public const String  NotAfter    = "notAfter";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The identification: the SHA-256 COSE key thumbprint, as 64 lowercase hexadecimal digits.
@@ -119,27 +166,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomPOIPublicKeySerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this public key: its identification,
         /// its COSE key as Base64 of its deterministic CBOR, and its validity.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomPOIPublicKeySerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                         Embedded                       = false,
+                              CustomJObjectSerializerDelegate<POIPublicKey>?  CustomPOIPublicKeySerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id",  Id),
-                           new JProperty("key",  Convert.ToBase64String(Key.ToByteArray(CBORWriterOptions.Canonical)))
+                           new JProperty(PropertyKeys.Id,  Id)
                        );
 
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,    JSONLDContext);
+
+            json.Add(PropertyKeys.Key,            Convert.ToBase64String(Key.ToByteArray(CBORWriterOptions.Canonical)));
+
             if (NotBefore.HasValue)
-                json.Add("notBefore",  NotBefore.Value.ToISO8601());
+                json.Add(PropertyKeys.NotBefore,  NotBefore.Value.ToISO8601());
 
             if (NotAfter.HasValue)
-                json.Add("notAfter",   NotAfter. Value.ToISO8601());
+                json.Add(PropertyKeys.NotAfter,   NotAfter. Value.ToISO8601());
 
-            return json;
+            return CustomPOIPublicKeySerializer is not null
+                       ? CustomPOIPublicKeySerializer(this, json)
+                       : json;
 
         }
 
@@ -161,9 +217,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!POIJSON.TryParseString(JSON, "@id", "public key identification", out var id,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "key", "public key",                out var key, out ErrorResponse))
+                if (!POIJSON.TryParseString(JSON, PropertyKeys.Id,  "public key identification", out var id,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.Key, "public key",                out var key, out ErrorResponse))
                 {
+                    return false;
+                }
+
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the public key '{id}' must be '{JSONLDContext}'!";
                     return false;
                 }
 
@@ -193,10 +256,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (JSON.ParseOptional("notBefore", "not before", out DateTimeOffset? notBefore, out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.NotBefore, "not before", out DateTimeOffset? notBefore, out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("notAfter",  "not after",  out DateTimeOffset? notAfter,  out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.NotAfter,  "not after",  out DateTimeOffset? notAfter,  out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
                 var publicKey = new POIPublicKey(coseKey, notBefore, notAfter);
@@ -252,7 +315,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean Equals(POIPublicKey? PublicKey)
 
             => PublicKey is not null &&
-               POIJSON.SameValue(ToJSON(), PublicKey.ToJSON());
+               POIJSON.SameValue(ToJSON(Embedded: true), PublicKey.ToJSON(Embedded: true));
 
         /// <inheritdoc/>
         public override Int32 GetHashCode()

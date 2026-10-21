@@ -42,7 +42,219 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                IComparable<ParkingSpaceTemplate>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/parkingSpaceTemplate";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                         = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                    = "@context";
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name                       = "name";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description                = "description";
+
+            /// <summary>
+            /// The property of its data source.
+            /// </summary>
+            public const String  DataSource                 = "dataSource";
+
+            /// <summary>
+            /// The property of its geographical location, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  GeoLocation                = ParkingSpace.PropertyKeys.GeoLocation;
+
+            /// <summary>
+            /// The property of its parking garage, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  ParkingGarageId            = ParkingSpace.PropertyKeys.ParkingGarageId;
+
+            /// <summary>
+            /// The property of the parking sensors watching it, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  ParkingSensorIds           = ParkingSpace.PropertyKeys.ParkingSensorIds;
+
+            /// <summary>
+            /// The property of its charging stations, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  ChargingStationIds         = ParkingSpace.PropertyKeys.ChargingStationIds;
+
+            /// <summary>
+            /// The property of its parking products, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  ParkingProductIds          = ParkingSpace.PropertyKeys.ParkingProductIds;
+
+            /// <summary>
+            /// The property of its parking restrictions, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  ParkingRestrictions        = ParkingSpace.PropertyKeys.ParkingRestrictions;
+
+            /// <summary>
+            /// The property of its EU vehicle categories, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  EUVehicleCategories        = ParkingSpace.PropertyKeys.EUVehicleCategories;
+
+            /// <summary>
+            /// The property of its physical reference, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  PhysicalReference          = ParkingSpace.PropertyKeys.PhysicalReference;
+
+            /// <summary>
+            /// The property of its vehicle types, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  VehicleTypes               = ParkingSpace.PropertyKeys.VehicleTypes;
+
+            /// <summary>
+            /// The property of its maximum vehicle weight, in kg, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  MaxVehicleWeight           = ParkingSpace.PropertyKeys.MaxVehicleWeight;
+
+            /// <summary>
+            /// The property of its maximum vehicle height, in m, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  MaxVehicleHeight           = ParkingSpace.PropertyKeys.MaxVehicleHeight;
+
+            /// <summary>
+            /// The property of its maximum vehicle length, in m, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  MaxVehicleLength           = ParkingSpace.PropertyKeys.MaxVehicleLength;
+
+            /// <summary>
+            /// The property of its maximum vehicle width, in m, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  MaxVehicleWidth            = ParkingSpace.PropertyKeys.MaxVehicleWidth;
+
+            /// <summary>
+            /// The property of its length, in m, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  Length                     = ParkingSpace.PropertyKeys.Length;
+
+            /// <summary>
+            /// The property of its width, in m, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  Width                      = ParkingSpace.PropertyKeys.Width;
+
+            /// <summary>
+            /// The property of the position of its charging station, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  EVSEPosition               = ParkingSpace.PropertyKeys.EVSEPosition;
+
+            /// <summary>
+            /// The property of its direction, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  Direction                  = ParkingSpace.PropertyKeys.Direction;
+
+            /// <summary>
+            /// The property of its surface, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  Surface                    = ParkingSpace.PropertyKeys.Surface;
+
+            /// <summary>
+            /// The property of its slope, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  Slope                      = ParkingSpace.PropertyKeys.Slope;
+
+            /// <summary>
+            /// The property of its time limit, in seconds, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  TimeLimit                  = ParkingSpace.PropertyKeys.TimeLimit;
+
+            /// <summary>
+            /// The property of whether it is restricted to its vehicle types, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  RestrictedToVehicleTypes   = ParkingSpace.PropertyKeys.RestrictedToVehicleTypes;
+
+            /// <summary>
+            /// The property of whether it is a drive-through, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  DriveThrough               = ParkingSpace.PropertyKeys.DriveThrough;
+
+            /// <summary>
+            /// The property of whether it requires a reservation, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  ReservationRequired        = ParkingSpace.PropertyKeys.ReservationRequired;
+
+            /// <summary>
+            /// The property of whether it is roofed, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  Roofed                     = ParkingSpace.PropertyKeys.Roofed;
+
+            /// <summary>
+            /// The property of whether it is illuminated, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  Illuminated                = ParkingSpace.PropertyKeys.Illuminated;
+
+            /// <summary>
+            /// The property of whether it has a refrigeration outlet, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  RefrigerationOutlet        = ParkingSpace.PropertyKeys.RefrigerationOutlet;
+
+            /// <summary>
+            /// The property of whether dangerous goods are allowed, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  DangerousGoodsAllowed      = ParkingSpace.PropertyKeys.DangerousGoodsAllowed;
+
+            /// <summary>
+            /// The property of whether it is in a protected area, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  ProtectedArea              = ParkingSpace.PropertyKeys.ProtectedArea;
+
+            /// <summary>
+            /// The property of its standards, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  Standards                  = ParkingSpace.PropertyKeys.Standards;
+
+            /// <summary>
+            /// The property of its images, for its members, as a parking space writes it.
+            /// </summary>
+            public const String  Images                     = ParkingSpace.PropertyKeys.Images;
+
+            /// <summary>
+            /// The property of its creation timestamp, as of every entity.
+            /// </summary>
+            public const String  Created                    = "created";
+
+            /// <summary>
+            /// The property of its last change timestamp, as of every entity.
+            /// </summary>
+            public const String  LastChange                 = "lastChange";
+
+            /// <summary>
+            /// The property of its custom data, as of every entity.
+            /// </summary>
+            public const String  CustomData                 = "customData";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The parking products of its parking operator offered at its members, besides their own, in the order of their identifications.
@@ -301,115 +513,134 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return the JSON representation of this parking space template, as its parking operator embeds it.
         /// </summary>
         public override JObject ToJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
+        #region ToJSON(Embedded = false, CustomParkingSpaceTemplateSerializer = null)
+
+        /// <summary>
+        /// Return the JSON representation of this parking space template.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomParkingSpaceTemplateSerializer">A delegate to serialize custom parking space template JSON objects.</param>
+        public JObject ToJSON(Boolean                                                 Embedded                               = false,
+                              CustomJObjectSerializerDelegate<ParkingSpaceTemplate>?  CustomParkingSpaceTemplateSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(PropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,                  JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",         Name.ToJSON());
+                json.Add(PropertyKeys.Name,                     Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(PropertyKeys.Description,              Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",   DataSource);
+                json.Add(PropertyKeys.DataSource,               DataSource);
 
             if (ParkingProductIds.Length > 0)
-                json.Add("parkingProductIds",  POIJSON.IdsToJSON(ParkingProductIds));
+                json.Add(PropertyKeys.ParkingProductIds,        POIJSON.IdsToJSON(ParkingProductIds));
 
             // The properties of a parking space, as a parking space writes them.
             if (GeoLocation.HasValue)
-                json.Add("geoLocation",               GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,              GeoLocation.Value.ToJSON(Embedded: true));
 
             if (ParkingGarageId.HasValue)
-                json.Add("parkingGarageId",           ParkingGarageId.Value.ToString());
+                json.Add(PropertyKeys.ParkingGarageId,          ParkingGarageId.Value.ToString());
 
             if (ParkingSensorIds.Length > 0)
-                json.Add("parkingSensorIds",          POIJSON.IdsToJSON(ParkingSensorIds));
+                json.Add(PropertyKeys.ParkingSensorIds,         POIJSON.IdsToJSON(ParkingSensorIds));
 
             if (ChargingStationIds.Length > 0)
-                json.Add("chargingStationIds",        POIJSON.IdsToJSON(ChargingStationIds));
+                json.Add(PropertyKeys.ChargingStationIds,       POIJSON.IdsToJSON(ChargingStationIds));
 
             if (ParkingRestrictions.Length > 0)
-                json.Add("parkingRestrictions",       POIJSON.IdsToJSON(ParkingRestrictions));
+                json.Add(PropertyKeys.ParkingRestrictions,      POIJSON.IdsToJSON(ParkingRestrictions));
 
             if (EUVehicleCategories.Length > 0)
-                json.Add("euVehicleCategories",       POIJSON.IdsToJSON(EUVehicleCategories));
+                json.Add(PropertyKeys.EUVehicleCategories,      POIJSON.IdsToJSON(EUVehicleCategories));
 
             if (PhysicalReference is not null)
-                json.Add("physicalReference",         PhysicalReference);
+                json.Add(PropertyKeys.PhysicalReference,        PhysicalReference);
 
             if (VehicleTypes.Length > 0)
-                json.Add("vehicleTypes",              POIJSON.IdsToJSON(VehicleTypes));
+                json.Add(PropertyKeys.VehicleTypes,             POIJSON.IdsToJSON(VehicleTypes));
 
             if (MaxVehicleWeight.HasValue)
-                json.Add("maxVehicleWeight",          POIJSON.Number(MaxVehicleWeight.Value.Value));
+                json.Add(PropertyKeys.MaxVehicleWeight,         POIJSON.Number(MaxVehicleWeight.Value.Value));
 
             if (MaxVehicleHeight.HasValue)
-                json.Add("maxVehicleHeight",          POIJSON.Number(MaxVehicleHeight.Value.m));
+                json.Add(PropertyKeys.MaxVehicleHeight,         POIJSON.Number(MaxVehicleHeight.Value.m));
 
             if (MaxVehicleLength.HasValue)
-                json.Add("maxVehicleLength",          POIJSON.Number(MaxVehicleLength.Value.m));
+                json.Add(PropertyKeys.MaxVehicleLength,         POIJSON.Number(MaxVehicleLength.Value.m));
 
             if (MaxVehicleWidth.HasValue)
-                json.Add("maxVehicleWidth",           POIJSON.Number(MaxVehicleWidth.Value.m));
+                json.Add(PropertyKeys.MaxVehicleWidth,          POIJSON.Number(MaxVehicleWidth.Value.m));
 
             if (Length.HasValue)
-                json.Add("length",                    POIJSON.Number(Length.Value.m));
+                json.Add(PropertyKeys.Length,                   POIJSON.Number(Length.Value.m));
 
             if (Width.HasValue)
-                json.Add("width",                     POIJSON.Number(Width.Value.m));
+                json.Add(PropertyKeys.Width,                    POIJSON.Number(Width.Value.m));
 
             if (EVSEPosition.HasValue)
-                json.Add("evsePosition",              EVSEPosition.Value.ToString());
+                json.Add(PropertyKeys.EVSEPosition,             EVSEPosition.Value.ToString());
 
             if (Direction.HasValue)
-                json.Add("direction",                 Direction.Value.ToString());
+                json.Add(PropertyKeys.Direction,                Direction.Value.ToString());
 
             if (Surface.HasValue)
-                json.Add("surface",                   Surface.Value.ToString());
+                json.Add(PropertyKeys.Surface,                  Surface.Value.ToString());
 
             if (Slope.HasValue)
-                json.Add("slope",                     Slope.Value.ToString());
+                json.Add(PropertyKeys.Slope,                    Slope.Value.ToString());
 
             if (TimeLimit.HasValue)
-                json.Add("timeLimit",                 POIJSON.Seconds(TimeLimit.Value));
+                json.Add(PropertyKeys.TimeLimit,                POIJSON.Seconds(TimeLimit.Value));
 
             if (RestrictedToVehicleTypes.HasValue)
-                json.Add("restrictedToVehicleTypes",  RestrictedToVehicleTypes.Value);
+                json.Add(PropertyKeys.RestrictedToVehicleTypes, RestrictedToVehicleTypes.Value);
 
             if (DriveThrough.HasValue)
-                json.Add("driveThrough",              DriveThrough.Value);
+                json.Add(PropertyKeys.DriveThrough,             DriveThrough.Value);
 
             if (ReservationRequired.HasValue)
-                json.Add("reservationRequired",       ReservationRequired.Value);
+                json.Add(PropertyKeys.ReservationRequired,      ReservationRequired.Value);
 
             if (Roofed.HasValue)
-                json.Add("roofed",                    Roofed.Value);
+                json.Add(PropertyKeys.Roofed,                   Roofed.Value);
 
             if (Illuminated.HasValue)
-                json.Add("illuminated",               Illuminated.Value);
+                json.Add(PropertyKeys.Illuminated,              Illuminated.Value);
 
             if (RefrigerationOutlet.HasValue)
-                json.Add("refrigerationOutlet",       RefrigerationOutlet.Value);
+                json.Add(PropertyKeys.RefrigerationOutlet,      RefrigerationOutlet.Value);
 
             if (DangerousGoodsAllowed.HasValue)
-                json.Add("dangerousGoodsAllowed",     DangerousGoodsAllowed.Value);
+                json.Add(PropertyKeys.DangerousGoodsAllowed,    DangerousGoodsAllowed.Value);
 
             if (ProtectedArea.HasValue)
-                json.Add("protectedArea",             ProtectedArea.Value);
+                json.Add(PropertyKeys.ProtectedArea,            ProtectedArea.Value);
 
             if (Standards.Length > 0)
-                json.Add("standards",                 POIJSON.IdsToJSON(Standards));
+                json.Add(PropertyKeys.Standards,                POIJSON.IdsToJSON(Standards));
 
             if (Images.Length > 0)
-                json.Add("images",                    new JArray(Images.Select(image => image.ToJSON())));
+                json.Add(PropertyKeys.Images,                   new JArray(Images.Select(image => image.ToJSON(Embedded: true))));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomParkingSpaceTemplateSerializer is not null
+                       ? CustomParkingSpaceTemplateSerializer(this, json)
+                       : json;
 
         }
 
@@ -433,7 +664,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(PropertyKeys.Id,
                                          "parking space template identification",
                                          ParkingSpaceTemplate_Id.TryParse,
                                          out ParkingSpaceTemplate_Id id,
@@ -442,53 +673,60 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N  (JSON, "name",         "parking space template name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N  (JSON, "description",  "parking space template description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "dataSource",   "data source",                    out var dataSource,   out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the parking space template '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N  (JSON, PropertyKeys.Name,         "parking space template name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N  (JSON, PropertyKeys.Description,  "parking space template description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.DataSource,   "data source",                    out var dataSource,   out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (!POIJSON.TryParseIds(JSON, "parkingProductIds", "parking product identification", ParkingProduct_Id.TryParse, out ImmutableArray<ParkingProduct_Id> parkingProductIds, out ErrorResponse))
+                if (!POIJSON.TryParseIds(JSON, PropertyKeys.ParkingProductIds, "parking product identification", ParkingProduct_Id.TryParse, out ImmutableArray<ParkingProduct_Id> parkingProductIds, out ErrorResponse))
                     return false;
 
                 // The properties of a parking space, as a parking space reads them.
-                if (!POIJSON.TryParseGeoLocation(JSON,                                                             out var geoLocation,  out ErrorResponse) ||
-                    !POIJSON.TryParseText       (JSON, "parkingGarageId",     "parking garage identification",     ParkingGarage_Id.  TryParse, out ParkingGarage_Id? parkingGarageId,   out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "parkingSensorIds",    "parking sensor identification",     ParkingSensor_Id.  TryParse, out ImmutableArray<ParkingSensor_Id>   parkingSensorIds,   out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "chargingStationIds",  "charging station identification",   ChargingStation_Id.TryParse, out ImmutableArray<ChargingStation_Id> chargingStationIds, out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "parkingRestrictions", "parking restriction",               ParkingRestrictionGroup.TryParse, out ImmutableArray<ParkingRestrictionGroup> parkingRestrictions,  out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "euVehicleCategories", "EU vehicle category",               EUVehicleCategory.      TryParse, out ImmutableArray<EUVehicleCategory>       euVehicleCategories,  out ErrorResponse) ||
-                    !POIJSON.TryParseString     (JSON, "physicalReference",   "physical reference",                out var physicalReference,  out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "vehicleTypes",        "vehicle type",  VehicleType.TryParse, out ImmutableArray<VehicleType> vehicleTypes, out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "standards",           "standard",      Standard.   TryParse, out ImmutableArray<Standard>    standards,    out ErrorResponse) ||
-                    !POIJSON.TryParseObjects<Image>(JSON, "images",           "images",        Image.      TryParse, out var images,                               out ErrorResponse) ||
-                    !POIJSON.TryParseSeconds    (JSON, "timeLimit",           "time limit",                        out var timeLimit,          out ErrorResponse) ||
-                    !POIJSON.TryParseNonNegative(JSON, "maxVehicleWeight",    "maximum vehicle weight",            out var maxVehicleWeight,   out ErrorResponse))
+                if (!POIJSON.TryParseGeoLocation(JSON, PropertyKeys.GeoLocation,  "geo location",                      out var geoLocation,  out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.ParkingGarageId,     "parking garage identification",     ParkingGarage_Id.  TryParse, out ParkingGarage_Id? parkingGarageId,   out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.ParkingSensorIds,    "parking sensor identification",     ParkingSensor_Id.  TryParse, out ImmutableArray<ParkingSensor_Id>   parkingSensorIds,   out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.ChargingStationIds,  "charging station identification",   ChargingStation_Id.TryParse, out ImmutableArray<ChargingStation_Id> chargingStationIds, out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.ParkingRestrictions, "parking restriction",               ParkingRestrictionGroup.TryParse, out ImmutableArray<ParkingRestrictionGroup> parkingRestrictions,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.EUVehicleCategories, "EU vehicle category",               EUVehicleCategory.      TryParse, out ImmutableArray<EUVehicleCategory>       euVehicleCategories,  out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, PropertyKeys.PhysicalReference,   "physical reference",                out var physicalReference,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.VehicleTypes,        "vehicle type",  VehicleType.TryParse, out ImmutableArray<VehicleType> vehicleTypes, out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.Standards,           "standard",      Standard.   TryParse, out ImmutableArray<Standard>    standards,    out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<Image>(JSON, PropertyKeys.Images,           PropertyKeys.Images,        Image.      TryParse, out var images,                               out ErrorResponse) ||
+                    !POIJSON.TryParseSeconds    (JSON, PropertyKeys.TimeLimit,           "time limit",                        out var timeLimit,          out ErrorResponse) ||
+                    !POIJSON.TryParseNonNegative(JSON, PropertyKeys.MaxVehicleWeight,    "maximum vehicle weight",            out var maxVehicleWeight,   out ErrorResponse))
                 {
                     return false;
                 }
 
                 var meters = new Dictionary<String, Decimal?>();
 
-                foreach (var key in new[] { "maxVehicleHeight", "maxVehicleLength", "maxVehicleWidth", "length", "width" })
+                foreach (var key in new[] { PropertyKeys.MaxVehicleHeight, PropertyKeys.MaxVehicleLength, PropertyKeys.MaxVehicleWidth, PropertyKeys.Length, PropertyKeys.Width })
                 {
                     if (!POIJSON.TryParseNonNegative(JSON, key, key, out var meter, out ErrorResponse))
                         return false;
                     meters[key] = meter;
                 }
 
-                if (!POIJSON.TryParseEnum(JSON, "evsePosition", "evsePosition", out EVSEPosition?     eVSEPosition, out ErrorResponse) ||
-                    !POIJSON.TryParseEnum(JSON, "direction",    "direction",    out ParkingDirection? direction,    out ErrorResponse) ||
-                    !POIJSON.TryParseEnum(JSON, "surface",      "surface",      out ParkingSurface?   surface,      out ErrorResponse) ||
-                    !POIJSON.TryParseEnum(JSON, "slope",        "slope",        out ParkingSlope?     slope,        out ErrorResponse))
+                if (!POIJSON.TryParseEnum(JSON, PropertyKeys.EVSEPosition, PropertyKeys.EVSEPosition, out EVSEPosition?     eVSEPosition, out ErrorResponse) ||
+                    !POIJSON.TryParseEnum(JSON, PropertyKeys.Direction,    PropertyKeys.Direction,    out ParkingDirection? direction,    out ErrorResponse) ||
+                    !POIJSON.TryParseEnum(JSON, PropertyKeys.Surface,      PropertyKeys.Surface,      out ParkingSurface?   surface,      out ErrorResponse) ||
+                    !POIJSON.TryParseEnum(JSON, PropertyKeys.Slope,        PropertyKeys.Slope,        out ParkingSlope?     slope,        out ErrorResponse))
                 {
                     return false;
                 }
 
                 var flags = new Dictionary<String, Boolean?>();
 
-                foreach (var key in new[] { "restrictedToVehicleTypes", "driveThrough", "reservationRequired", "roofed", "illuminated", "refrigerationOutlet", "dangerousGoodsAllowed", "protectedArea" })
+                foreach (var key in new[] { PropertyKeys.RestrictedToVehicleTypes, PropertyKeys.DriveThrough, PropertyKeys.ReservationRequired, PropertyKeys.Roofed, PropertyKeys.Illuminated, PropertyKeys.RefrigerationOutlet, PropertyKeys.DangerousGoodsAllowed, PropertyKeys.ProtectedArea })
                 {
                     flags[key] = null;
                     if (JSON.ParseOptional(key, key, out Boolean? flag, out ErrorResponse))
@@ -521,24 +759,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           physicalReference,
                                                           vehicleTypes,
                                                           maxVehicleWeight.HasValue ? Kilogram.FromKG(maxVehicleWeight.Value) : null,
-                                                          meters["maxVehicleHeight"].HasValue ? Meter.From_m(meters["maxVehicleHeight"]!.Value) : null,
-                                                          meters["maxVehicleLength"].HasValue ? Meter.From_m(meters["maxVehicleLength"]!.Value) : null,
-                                                          meters["maxVehicleWidth"]. HasValue ? Meter.From_m(meters["maxVehicleWidth"]!. Value) : null,
-                                                          meters["length"].          HasValue ? Meter.From_m(meters["length"]!.          Value) : null,
-                                                          meters["width"].           HasValue ? Meter.From_m(meters["width"]!.           Value) : null,
+                                                          meters[PropertyKeys.MaxVehicleHeight].HasValue ? Meter.From_m(meters[PropertyKeys.MaxVehicleHeight]!.Value) : null,
+                                                          meters[PropertyKeys.MaxVehicleLength].HasValue ? Meter.From_m(meters[PropertyKeys.MaxVehicleLength]!.Value) : null,
+                                                          meters[PropertyKeys.MaxVehicleWidth]. HasValue ? Meter.From_m(meters[PropertyKeys.MaxVehicleWidth]!. Value) : null,
+                                                          meters[PropertyKeys.Length].          HasValue ? Meter.From_m(meters[PropertyKeys.Length]!.          Value) : null,
+                                                          meters[PropertyKeys.Width].           HasValue ? Meter.From_m(meters[PropertyKeys.Width]!.           Value) : null,
                                                           eVSEPosition,
                                                           direction,
                                                           surface,
                                                           slope,
                                                           timeLimit,
-                                                          flags["restrictedToVehicleTypes"],
-                                                          flags["driveThrough"],
-                                                          flags["reservationRequired"],
-                                                          flags["roofed"],
-                                                          flags["illuminated"],
-                                                          flags["refrigerationOutlet"],
-                                                          flags["dangerousGoodsAllowed"],
-                                                          flags["protectedArea"],
+                                                          flags[PropertyKeys.RestrictedToVehicleTypes],
+                                                          flags[PropertyKeys.DriveThrough],
+                                                          flags[PropertyKeys.ReservationRequired],
+                                                          flags[PropertyKeys.Roofed],
+                                                          flags[PropertyKeys.Illuminated],
+                                                          flags[PropertyKeys.RefrigerationOutlet],
+                                                          flags[PropertyKeys.DangerousGoodsAllowed],
+                                                          flags[PropertyKeys.ProtectedArea],
                                                           standards,
                                                           images,
                                                           DataSource:  dataSource,

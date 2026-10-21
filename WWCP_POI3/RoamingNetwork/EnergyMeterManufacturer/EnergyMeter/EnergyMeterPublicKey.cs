@@ -31,6 +31,8 @@ using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Security;
 using Org.BouncyCastle.X509;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -48,7 +50,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class EnergyMeterPublicKey : IEquatable<EnergyMeterPublicKey>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/energyMeterPublicKey";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                 = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context            = "@context";
+
+            /// <summary>
+            /// The property of its key.
+            /// </summary>
+            public const String  Key                = "key";
+
+            /// <summary>
+            /// The property of its certificate chain.
+            /// </summary>
+            public const String  CertificateChain   = "certificateChain";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The identification: the SHA-256 of the DER encoded SubjectPublicKeyInfo, as 64 lowercase hexadecimal digits.
@@ -228,24 +272,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomEnergyMeterPublicKeySerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this public key: its identification, its key as Base64 of its
         /// DER encoded SubjectPublicKeyInfo, and its certificate chain as Base64 of each DER encoded certificate.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEnergyMeterPublicKeySerializer">A delegate to serialize custom public key JSON objects.</param>
+        public JObject ToJSON(Boolean                                                 Embedded                               = false,
+                              CustomJObjectSerializerDelegate<EnergyMeterPublicKey>?  CustomEnergyMeterPublicKeySerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id",  Id),
-                           new JProperty("key",  Convert.ToBase64String(Key.AsSpan()))
+                           new JProperty(PropertyKeys.Id,  Id)
                        );
 
-            if (CertificateChain.Length > 0)
-                json.Add("certificateChain", new JArray(CertificateChain.Select(certificate => Convert.ToBase64String(certificate.AsSpan()))));
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,           JSONLDContext);
 
-            return json;
+            json.Add(PropertyKeys.Key,                   Convert.ToBase64String(Key.AsSpan()));
+
+            if (CertificateChain.Length > 0)
+                json.Add(PropertyKeys.CertificateChain,  new JArray(CertificateChain.Select(certificate => Convert.ToBase64String(certificate.AsSpan()))));
+
+            return CustomEnergyMeterPublicKeySerializer is not null
+                       ? CustomEnergyMeterPublicKeySerializer(this, json)
+                       : json;
 
         }
 
@@ -267,9 +320,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!POIJSON.TryParseString (JSON, "@id",              "public key identification",  out var id,                out ErrorResponse) ||
-                    !POIJSON.TryParseString (JSON, "key",              "public key",                 out var key,               out ErrorResponse) ||
-                    !POIJSON.TryParseStrings(JSON, "certificateChain", "certificate chain",          out var certificateChain,  out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the public key of an energy meter must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseString (JSON, PropertyKeys.Id,                "public key identification",  out var id,                out ErrorResponse) ||
+                    !POIJSON.TryParseString (JSON, PropertyKeys.Key,               "public key",                 out var key,               out ErrorResponse) ||
+                    !POIJSON.TryParseStrings(JSON, PropertyKeys.CertificateChain,  "certificate chain",          out var certificateChain,  out ErrorResponse))
                 {
                     return false;
                 }
@@ -390,7 +450,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean Equals(EnergyMeterPublicKey? PublicKey)
 
             => PublicKey is not null &&
-               POIJSON.SameValue(ToJSON(), PublicKey.ToJSON());
+               POIJSON.SameValue(ToJSON(Embedded: true), PublicKey.ToJSON(Embedded: true));
 
         /// <inheritdoc/>
         public override Int32 GetHashCode()

@@ -295,18 +295,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("The algorithm is not supported for asymmetric signing.", nameof(Signature));
 
             var json = new JObject(
-                           new JProperty("profile",    SigningProfile),
-                           new JProperty("algorithm",  Signature.Algorithm),
-                           new JProperty("keyId",      Signature.KeyId),
-                           new JProperty("encoding",   "base64"),
-                           new JProperty("role",       Signature.Role),
-                           new JProperty("signedAt",   Signature.SignedAt.ToISO8601())
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Profile,    SigningProfile),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Algorithm,  Signature.Algorithm),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.KeyId,      Signature.KeyId),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Encoding,   "base64"),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Role,       Signature.Role),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.SignedAt,   Signature.SignedAt.ToISO8601())
                        );
 
             if (Signature.Signer is not null)
-                json.Add("signer", Signature.Signer);
+                json.Add(RoamingNetworkCommitSignature.PropertyKeys.Signer, Signature.Signer);
 
-            json.Add("commit", ToJSON(IncludeSignatures: false));
+            json.Add(PropertyKeys.Commit, ToJSON(Embedded: true, IncludeSignatures: false));
 
             return CanonicalJSON.ToUTF8Bytes(json);
 

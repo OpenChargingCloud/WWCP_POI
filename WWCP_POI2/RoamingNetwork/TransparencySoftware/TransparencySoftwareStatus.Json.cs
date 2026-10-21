@@ -91,28 +91,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ArgumentNullException.ThrowIfNull(TransparencySoftwareLookup);
                 ArgumentNullException.ThrowIfNull(CertificateLookup);
 
-                StrictJSON.OnlyProperties(JSON, "transparencySoftwareId", "legalStatus", "certificateId");
+                StrictJSON.OnlyProperties(JSON, PropertyKeys.Context, PropertyKeys.TransparencySoftwareId, PropertyKeys.LegalStatus, PropertyKeys.CertificateId);
+
+                #region Check JSON-LD context           [optional]
+
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    throw new ArgumentException($"The JSON-LD context of the transparency software status must be '{JSONLDContext}'!");
+                }
+
+                #endregion
 
                 #region Parse TransparencySoftwareId    [mandatory]
 
-                var transparencySoftwareId  = TransparencySoftware_Id.Parse(StrictJSON.RequiredText(JSON, "transparencySoftwareId"));
+                var transparencySoftwareId  = TransparencySoftware_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.TransparencySoftwareId));
                 var transparencySoftware    = TransparencySoftwareLookup(transparencySoftwareId) ??
-                                                  throw new ArgumentException($"transparencySoftwareId: unresolved software '{transparencySoftwareId}'.");
+                                                  throw new ArgumentException($"{PropertyKeys.TransparencySoftwareId}: unresolved software '{transparencySoftwareId}'.");
 
                 #endregion
 
                 #region Parse LegalStatus               [mandatory]
 
-                if (!LegalStatus.TryParse(StrictJSON.RequiredText(JSON, "legalStatus"), out var legalStatus))
-                    throw new ArgumentException("legalStatus: invalid legal status.");
+                if (!LegalStatus.TryParse(StrictJSON.RequiredText(JSON, PropertyKeys.LegalStatus), out var legalStatus))
+                    throw new ArgumentException($"{PropertyKeys.LegalStatus}: invalid legal status.");
 
                 #endregion
 
                 #region Parse CertificateId             [optional]
 
-                var certificate = StrictJSON.Text(JSON, "certificateId") is { } certificateId
+                var certificate = StrictJSON.Text(JSON, PropertyKeys.CertificateId) is { } certificateId
                                       ? CertificateLookup(TransparencySoftwareCertificate_Id.Parse(certificateId)) ??
-                                            throw new ArgumentException($"certificateId: unresolved document '{certificateId}'.")
+                                            throw new ArgumentException($"{PropertyKeys.CertificateId}: unresolved document '{certificateId}'.")
                                       : null;
 
                 #endregion

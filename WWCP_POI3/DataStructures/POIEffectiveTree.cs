@@ -80,28 +80,109 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String RoamingNetworkKind  = "";
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization of pruned and partial child arrays.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of the identification of an entity.
+            /// </summary>
+            public const String  Id           = "@id";
+
+            /// <summary>
+            /// The property of the root of the tree of a pruned child array.
+            /// </summary>
+            public const String  MerkleRoot   = MerkleRootProperty;
+
+            /// <summary>
+            /// The property of the number of children of a pruned or partial child array.
+            /// </summary>
+            public const String  Size         = SizeProperty;
+
+            /// <summary>
+            /// The property of the children a partial child array gives.
+            /// </summary>
+            public const String  Leaves       = LeavesProperty;
+
+            /// <summary>
+            /// The property of the index of a child of a partial child array.
+            /// </summary>
+            public const String  Index        = IndexProperty;
+
+            /// <summary>
+            /// The property of the audit path of a child of a partial child array.
+            /// </summary>
+            public const String  AuditPath    = AuditPathProperty;
+
+            /// <summary>
+            /// The property of the child itself of a partial child array.
+            /// </summary>
+            public const String  Entity       = EntityProperty;
+
+        }
+
+        #endregion
+
         /// <summary>
         /// The child arrays of the kinds of entities having some, by their kind: the arrays of entities change sets add
         /// and remove. Everything else is part of the entity embedding it.
         /// </summary>
         public static readonly ImmutableDictionary<String, ImmutableArray<String>> ChildArrays = new Dictionary<String, ImmutableArray<String>> {
 
-            { RoamingNetworkKind,          [ "chargingStationOperators", "chargingStationManufacturers", "eMobilityProviders", "gridOperators", "parkingOperators",
-                                             "energyMeterManufacturers", "transparencySoftware", "transparencySoftwareCertificates" ] },
+            { RoamingNetworkKind,
+              [ RoamingNetwork.PropertyKeys.ChargingStationOperators,
+                RoamingNetwork.PropertyKeys.ChargingStationManufacturers,
+                RoamingNetwork.PropertyKeys.EMobilityProviders,
+                RoamingNetwork.PropertyKeys.GridOperators,
+                RoamingNetwork.PropertyKeys.ParkingOperators,
+                RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,
+                RoamingNetwork.PropertyKeys.TransparencySoftware,
+                RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates ] },
 
-            { "chargingStationOperators",  [ "chargingPools", "chargingTariffs", "EVSETemplates", "chargingStationTemplates", "chargingPoolTemplates", "chargingTariffTemplates",
-                                             "energyMeterTemplates", "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups", "energyMeterGroups",
-                                             "chargingTariffOffers", "parkingSpaces" ] },
+            { RoamingNetwork.PropertyKeys.ChargingStationOperators,
+              [ ChargingStationOperator.PropertyKeys.ChargingPools,
+                ChargingStationOperator.PropertyKeys.ChargingTariffs,
+                ChargingStationOperator.PropertyKeys.EVSETemplates,
+                ChargingStationOperator.PropertyKeys.ChargingStationTemplates,
+                ChargingStationOperator.PropertyKeys.ChargingPoolTemplates,
+                ChargingStationOperator.PropertyKeys.ChargingTariffTemplates,
+                ChargingStationOperator.PropertyKeys.EnergyMeterTemplates,
+                ChargingStationOperator.PropertyKeys.EVSEGroups,
+                ChargingStationOperator.PropertyKeys.ChargingStationGroups,
+                ChargingStationOperator.PropertyKeys.ChargingPoolGroups,
+                ChargingStationOperator.PropertyKeys.ChargingTariffGroups,
+                ChargingStationOperator.PropertyKeys.EnergyMeterGroups,
+                ChargingStationOperator.PropertyKeys.ChargingTariffOffers,
+                ChargingStationOperator.PropertyKeys.ParkingSpaces ] },
 
-            { "chargingPools",             [ "chargingStations" ] },
+            { ChargingStationOperator.PropertyKeys.ChargingPools,
+              [ ChargingPool.PropertyKeys.ChargingStations ] },
 
-            { "chargingStations",          [ "EVSEs" ] },
+            { ChargingPool.PropertyKeys.ChargingStations,
+              [ ChargingStation.PropertyKeys.EVSEs ] },
 
-            { "eMobilityProviders",        [ "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffOffers" ] },
+            { RoamingNetwork.PropertyKeys.EMobilityProviders,
+              [ EMobilityProvider.PropertyKeys.EVSEGroups,
+                EMobilityProvider.PropertyKeys.ChargingStationGroups,
+                EMobilityProvider.PropertyKeys.ChargingPoolGroups,
+                EMobilityProvider.PropertyKeys.ChargingTariffOffers ] },
 
-            { "gridOperators",             [ "gridConnectionPoints", "energyMeterTemplates", "energyMeterGroups" ] },
+            { RoamingNetwork.PropertyKeys.GridOperators,
+              [ GridOperator.PropertyKeys.GridConnectionPoints,
+                GridOperator.PropertyKeys.EnergyMeterTemplates,
+                GridOperator.PropertyKeys.EnergyMeterGroups ] },
 
-            { "parkingOperators",          [ "parkingGarages", "parkingSpaces", "parkingSensors", "parkingSpaceTemplates", "parkingSpaceGroups", "parkingProducts" ] }
+            { RoamingNetwork.PropertyKeys.ParkingOperators,
+              [ ParkingOperator.PropertyKeys.ParkingGarages,
+                ParkingOperator.PropertyKeys.ParkingSpaces,
+                ParkingOperator.PropertyKeys.ParkingSensors,
+                ParkingOperator.PropertyKeys.ParkingSpaceTemplates,
+                ParkingOperator.PropertyKeys.ParkingSpaceGroups,
+                ParkingOperator.PropertyKeys.ParkingProducts ] },
 
         }.ToImmutableDictionary();
 
@@ -352,7 +433,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (arrays is not null)
                 Node = new POITreeNode(Kind,
-                                       Entity["@id"]?.Type == JTokenType.String ? Entity["@id"]!.Value<String>() : null,
+                                       Entity[PropertyKeys.Id]?.Type == JTokenType.String ? Entity[PropertyKeys.Id]!.Value<String>() : null,
                                        Digest,
                                        Entity,
                                        arrays);

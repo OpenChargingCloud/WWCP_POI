@@ -50,9 +50,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static (String Property, String Description)? ProviderGroupKind(String EntityType)
 
             => EntityType switch {
-                   nameof(EVSEGroup)             => ("EVSEGroups",             "EVSE group"),
-                   nameof(ChargingStationGroup)  => ("chargingStationGroups",  "charging station group"),
-                   nameof(ChargingPoolGroup)     => ("chargingPoolGroups",     "charging pool group"),
+                   nameof(EVSEGroup)             => (EMobilityProvider.PropertyKeys.EVSEGroups,            "EVSE group"),
+                   nameof(ChargingStationGroup)  => (EMobilityProvider.PropertyKeys.ChargingStationGroups, "charging station group"),
+                   nameof(ChargingPoolGroup)     => (EMobilityProvider.PropertyKeys.ChargingPoolGroups,    "charging pool group"),
                    _                             => null
                };
 
@@ -163,12 +163,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            var ownerJSON   = eMobilityProvider!.ToJSON();
+            var ownerJSON   = eMobilityProvider!.ToJSON(Embedded: true);
             var children    = ownerJSON[property] as JArray;
             // Found under the identification it is kept with: the change may name it in another spelling.
             var entityJSON  = Change.Kind == RoamingNetworkChangeKind.Add
                                   ? null
-                                  : children?.OfType<JObject>().FirstOrDefault(child => child["@id"]?.Value<String>() == storedId);
+                                  : children?.OfType<JObject>().FirstOrDefault(child => child[BasePropertyKeys.Id]?.Value<String>() == storedId);
 
             #endregion
 
@@ -229,7 +229,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         entityJSON![propertyName] = Change.NewValue;
 
                     // The change set's timestamp is the last change, so that its after ETags are deterministic.
-                    entityJSON["lastChange"] = CreatedAt.ToISO8601();
+                    entityJSON[BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
                     break;
 
                 #endregion
@@ -239,8 +239,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 case RoamingNetworkChangeKind.Add:
 
                     if (Change.NewValue is not JObject newEntity ||
-                        newEntity["@id"]?.Type != JTokenType.String ||
-                        newEntity["@id"]!.Value<String>() != entityId)
+                        newEntity[BasePropertyKeys.Id]?.Type != JTokenType.String ||
+                        newEntity[BasePropertyKeys.Id]!.Value<String>() != entityId)
                     {
                         ErrorResponse = $"Change {Index}: the {description} to add must be a JSON object with the identification '{entityId}'!";
                         return false;
@@ -255,8 +255,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     // The change set's timestamp is the last change and, unless given, the creation,
                     // so that its after ETags are deterministic.
                     var added = (JObject) newEntity.DeepClone();
-                    added["created"]    ??= CreatedAt.ToISO8601();
-                    added["lastChange"]   = CreatedAt.ToISO8601();
+                    added[BasePropertyKeys.Created]    ??= CreatedAt.ToISO8601();
+                    added[BasePropertyKeys.LastChange]   = CreatedAt.ToISO8601();
 
                     children.Add(added);
                     break;
@@ -283,7 +283,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // The provider embedding it changed with it, at the time of the change set.
-            ownerJSON["lastChange"] = CreatedAt.ToISO8601();
+            ownerJSON[EMobilityProvider.BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
 
             #region The changed provider must still be a valid one
 

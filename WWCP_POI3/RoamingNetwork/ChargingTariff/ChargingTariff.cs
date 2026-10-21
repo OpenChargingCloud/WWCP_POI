@@ -63,7 +63,89 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          IComparable<ChargingTariff>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingTariff";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its currency.
+            /// </summary>
+            public const String  Currency        = "currency";
+
+            /// <summary>
+            /// The property of its tariff type.
+            /// </summary>
+            public const String  TariffType      = "tariffType";
+
+            /// <summary>
+            /// The property of its tariff URL.
+            /// </summary>
+            public const String  TariffURL       = "tariffURL";
+
+            /// <summary>
+            /// The property of its elements.
+            /// </summary>
+            public const String  Elements        = "elements";
+
+            /// <summary>
+            /// The property of its minimum price.
+            /// </summary>
+            public const String  MinPrice        = "minPrice";
+
+            /// <summary>
+            /// The property of its maximum price.
+            /// </summary>
+            public const String  MaxPrice        = "maxPrice";
+
+            /// <summary>
+            /// The property of its payment means.
+            /// </summary>
+            public const String  PaymentMeans    = "paymentMeans";
+
+            /// <summary>
+            /// The property of its payment brands.
+            /// </summary>
+            public const String  PaymentBrands   = "paymentBrands";
+
+            /// <summary>
+            /// The property of the start of its validity.
+            /// </summary>
+            public const String  ValidFrom       = "validFrom";
+
+            /// <summary>
+            /// The property of the end of its validity.
+            /// </summary>
+            public const String  ValidUntil      = "validUntil";
+
+            /// <summary>
+            /// The property of its energy mix.
+            /// </summary>
+            public const String  EnergyMix       = "energyMix";
+
+            /// <summary>
+            /// The property of the identifications of its templates.
+            /// </summary>
+            public const String  TemplateIds     = "templateIds";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The currency of all its prices, by its ISO 4217 code: its own, if any; the effective tariff, with what its
@@ -242,7 +324,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Elements = [];
 
-            if (JSON["elements"] is not JToken elementsToken)
+            if (JSON[PropertyKeys.Elements] is not JToken elementsToken)
             {
                 ErrorResponse = null;
                 return true;
@@ -358,66 +440,74 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomChargingTariffSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this charging tariff, as its operator embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingTariffSerializer">A delegate to serialize custom charging tariffs.</param>
+        public JObject ToJSON(Boolean                                           Embedded                         = false,
+                              CustomJObjectSerializerDelegate<ChargingTariff>?  CustomChargingTariffSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,      JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",         Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,         Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,  Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",   DataSource);
+                json.Add(BasePropertyKeys.DataSource,   DataSource);
 
             if (Currency is not null)
-                json.Add("currency",     Currency.ISOCode);
+                json.Add(PropertyKeys.Currency,         Currency.ISOCode);
 
             if (TariffType.HasValue)
-                json.Add("tariffType",   TariffType.Value.ToString());
+                json.Add(PropertyKeys.TariffType,       TariffType.Value.ToString());
 
             if (TariffURL.HasValue)
-                json.Add("tariffURL",    TariffURL.Value.ToString());
+                json.Add(PropertyKeys.TariffURL,        TariffURL.Value.ToString());
 
             if (Elements.Length > 0)
-                json.Add("elements",     new JArray(Elements.Select(element => element.ToJSON())));
+                json.Add(PropertyKeys.Elements,         new JArray(Elements.Select(element => element.ToJSON(Embedded: true))));
 
             if (MinPrice is not null)
-                json.Add("minPrice",     MinPrice.ToJSON());
+                json.Add(PropertyKeys.MinPrice,         MinPrice.ToJSON(Embedded: true));
 
             if (MaxPrice is not null)
-                json.Add("maxPrice",     MaxPrice.ToJSON());
+                json.Add(PropertyKeys.MaxPrice,         MaxPrice.ToJSON(Embedded: true));
 
             if (PaymentMeans.Length > 0)
-                json.Add("paymentMeans",   POIJSON.IdsToJSON(PaymentMeans));
+                json.Add(PropertyKeys.PaymentMeans,     POIJSON.IdsToJSON(PaymentMeans));
 
             if (PaymentBrands.Length > 0)
-                json.Add("paymentBrands",  POIJSON.IdsToJSON(PaymentBrands));
+                json.Add(PropertyKeys.PaymentBrands,    POIJSON.IdsToJSON(PaymentBrands));
 
             if (ValidFrom.HasValue)
-                json.Add("validFrom",      ValidFrom. Value.ToISO8601());
+                json.Add(PropertyKeys.ValidFrom,        ValidFrom. Value.ToISO8601());
 
             if (ValidUntil.HasValue)
-                json.Add("validUntil",     ValidUntil.Value.ToISO8601());
+                json.Add(PropertyKeys.ValidUntil,       ValidUntil.Value.ToISO8601());
 
             if (EnergyMix is not null)
-                json.Add("energyMix",    EnergyMix.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.EnergyMix,        EnergyMix.ToJSON(Embedded: true));
 
             if (TemplateIds.Length > 0)
-                json.Add("templateIds", POIJSON.IdsToJSON(TemplateIds));
+                json.Add(PropertyKeys.TemplateIds,      POIJSON.IdsToJSON(TemplateIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomChargingTariffSerializer is not null
+                       ? CustomChargingTariffSerializer(this, json)
+                       : json;
 
         }
 
@@ -441,7 +531,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "charging tariff identification",
                                          ChargingTariff_Id.TryParse,
                                          out ChargingTariff_Id id,
@@ -450,10 +540,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the charging tariff '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
                 // Its currency and elements, unless its templates give them.
                 Currency? currency = null;
 
-                if (JSON["currency"] is JToken currencyJSON &&
+                if (JSON[PropertyKeys.Currency] is JToken currencyJSON &&
                    (currencyJSON.Type != JTokenType.String ||
                     !Currency.TryParseISO(currencyJSON.Value<String>()!, out currency)))
                 {
@@ -461,10 +558,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N  (JSON, "name",         "charging tariff name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N  (JSON, "description",  "charging tariff description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "dataSource",   "data source",                  out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseText  (JSON, "tariffURL",    "tariff URL",                   URL.TryParse, out URL? tariffURL, out ErrorResponse))
+                if (!POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Name,         "charging tariff name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Description,  "charging tariff description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, BasePropertyKeys.DataSource,   "data source",                  out var dataSource,   out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.    TariffURL,    "tariff URL",                   URL.TryParse, out URL? tariffURL, out ErrorResponse))
                 {
                     return false;
                 }
@@ -472,20 +569,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!TryParseElements(JSON, $"the charging tariff '{id}'", out var elements, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseObject<EnergyMix>(JSON, "energyMix", "energy mix", (JObject json, out EnergyMix? energyMix, out String? error) => POI.EnergyMix.TryParse(json, out energyMix, out error), out var energyMix, out ErrorResponse))
+                if (!POIJSON.TryParseObject<EnergyMix>(JSON, PropertyKeys.EnergyMix, "energy mix", (JObject json, out EnergyMix? energyMix, out String? error) => POI.EnergyMix.TryParse(json, out energyMix, out error), out var energyMix, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseEnum(JSON, "tariffType", "charging tariff type", out ChargingTariffType? tariffType, out ErrorResponse))
+                if (!POIJSON.TryParseEnum(JSON, PropertyKeys.TariffType, "charging tariff type", out ChargingTariffType? tariffType, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseObject<ChargingPriceLimit>(JSON, "minPrice", "minimum price", ChargingPriceLimit.TryParse, out var minPrice, out ErrorResponse) ||
-                    !POIJSON.TryParseObject<ChargingPriceLimit>(JSON, "maxPrice", "maximum price", ChargingPriceLimit.TryParse, out var maxPrice, out ErrorResponse))
+                if (!POIJSON.TryParseObject<ChargingPriceLimit>(JSON, PropertyKeys.MinPrice, "minimum price", ChargingPriceLimit.TryParse, out var minPrice, out ErrorResponse) ||
+                    !POIJSON.TryParseObject<ChargingPriceLimit>(JSON, PropertyKeys.MaxPrice, "maximum price", ChargingPriceLimit.TryParse, out var maxPrice, out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (!POIJSON.TryParseIds(JSON, "paymentMeans",  "payment means", POI.PaymentMeans.TryParse, out ImmutableArray<PaymentMeans> paymentMeans,  out ErrorResponse) ||
-                    !POIJSON.TryParseIds(JSON, "paymentBrands", "payment brand", POI.PaymentBrand.TryParse, out ImmutableArray<PaymentBrand> paymentBrands, out ErrorResponse))
+                if (!POIJSON.TryParseIds(JSON, PropertyKeys.PaymentMeans,  "payment means", POI.PaymentMeans.TryParse, out ImmutableArray<PaymentMeans> paymentMeans,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds(JSON, PropertyKeys.PaymentBrands, "payment brand", POI.PaymentBrand.TryParse, out ImmutableArray<PaymentBrand> paymentBrands, out ErrorResponse))
                 {
                     return false;
                 }
@@ -496,8 +593,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIEntityMetadata.TryParseTimestamp(JSON["validFrom"],   "start of the validity", out var validFrom,  out ErrorResponse) ||
-                    !POIEntityMetadata.TryParseTimestamp(JSON["validUntil"],  "end of the validity",   out var validUntil, out ErrorResponse))
+                if (!POIEntityMetadata.TryParseTimestamp(JSON[PropertyKeys.ValidFrom],   "start of the validity", out var validFrom,  out ErrorResponse) ||
+                    !POIEntityMetadata.TryParseTimestamp(JSON[PropertyKeys.ValidUntil],  "end of the validity",   out var validUntil, out ErrorResponse))
                 {
                     return false;
                 }
@@ -508,7 +605,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseIds(JSON, "templateIds", "template identification", ChargingTariffTemplate_Id.TryParse, out ImmutableArray<ChargingTariffTemplate_Id> templateIds, out ErrorResponse))
+                if (!POIJSON.TryParseIds(JSON, PropertyKeys.TemplateIds, "template identification", ChargingTariffTemplate_Id.TryParse, out ImmutableArray<ChargingTariffTemplate_Id> templateIds, out ErrorResponse))
                     return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,

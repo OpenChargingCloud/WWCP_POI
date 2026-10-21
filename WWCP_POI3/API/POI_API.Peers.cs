@@ -176,10 +176,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = TipsJSON(History);
 
-            json.AddFirst(new JProperty("appended", appended));
+            json.AddFirst(new JProperty(PropertyKeys.Appended, appended));
 
             if (appendError is not null)
-                json.Add("description", appendError);
+                json.Add(PropertyKeys.Description, appendError);
 
             return (false, json, appendError);
 
@@ -199,7 +199,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Commits = null;
 
-            if (JSON["commits"] is not JArray commitsJSON)
+            if (JSON[PropertyKeys.Commits] is not JArray commitsJSON)
             {
                 ErrorResponse = "Missing commits!";
                 return false;
@@ -239,14 +239,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var tips  = History.Tips;
             var json  = new JObject(
-                            new JProperty("head",  new RoamingNetworkCommitInfo(tips[0].Commit).ToJSON()),
-                            new JProperty("tips",  new JArray(tips.Select(tip => new RoamingNetworkCommitInfo(tip.Commit).ToJSON())))
+                            new JProperty(PropertyKeys.Head,  new RoamingNetworkCommitInfo(tips[0].Commit).ToJSON(Embedded: true)),
+                            new JProperty(PropertyKeys.Tips,  new JArray(tips.Select(tip => new RoamingNetworkCommitInfo(tip.Commit).ToJSON(Embedded: true))))
                         );
 
             var conflicts = History.Conflicts;
 
             if (!conflicts.IsEmpty)
-                json.Add("conflicts", new JArray(conflicts.Select(conflict => conflict.ToJSON())));
+                json.Add(PropertyKeys.Conflicts, new JArray(conflicts.Select(conflict => conflict.ToJSON(Embedded: true))));
 
             return json;
 
@@ -261,7 +261,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         internal static JObject HaveIdsJSON(RoamingNetworkHistory History)
 
-            => new (new JProperty("haveIds", new JArray(History.HaveIds().Select(commitId => commitId.ToString()))));
+            => new (new JProperty(PropertyKeys.HaveIds, new JArray(History.HaveIds().Select(commitId => commitId.ToString()))));
 
         #endregion
 

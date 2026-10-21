@@ -80,6 +80,53 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 Decimal?                StepSize   = null)
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingPriceComponent";
+
+        #endregion
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context    = "@context";
+
+            /// <summary>
+            /// The property of its type.
+            /// </summary>
+            public const String  Type       = "type";
+
+            /// <summary>
+            /// The property of its price.
+            /// </summary>
+            public const String  Price      = "price";
+
+            /// <summary>
+            /// The property of its VAT.
+            /// </summary>
+            public const String  VAT        = "vat";
+
+            /// <summary>
+            /// The property of its step size.
+            /// </summary>
+            public const String  StepSize   = "stepSize";
+
+        }
+
+        #endregion
+
+
         #region Validate()
 
         /// <summary>
@@ -108,26 +155,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomChargingPriceComponentSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this price component.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingPriceComponentSerializer">A delegate to serialize custom price components.</param>
+        public JObject ToJSON(Boolean                                                   Embedded                                 = false,
+                              CustomJObjectSerializerDelegate<ChargingPriceComponent>?  CustomChargingPriceComponentSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("type",   Type.ToString()),
-                           new JProperty("price",  POIJSON.Number(Price))
-                       );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,   JSONLDContext);
+
+            json.Add(PropertyKeys.Type,          Type.ToString());
+            json.Add(PropertyKeys.Price,         POIJSON.Number(Price));
 
             if (VAT.HasValue)
-                json.Add("vat",       POIJSON.Number(VAT.Value));
+                json.Add(PropertyKeys.VAT,       POIJSON.Number(VAT.Value));
 
             if (StepSize.HasValue)
-                json.Add("stepSize",  POIJSON.Number(StepSize.Value));
+                json.Add(PropertyKeys.StepSize,  POIJSON.Number(StepSize.Value));
 
-            return json;
+            return CustomChargingPriceComponentSerializer is not null
+                       ? CustomChargingPriceComponentSerializer(this, json)
+                       : json;
 
         }
 
@@ -145,7 +200,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ChargingPriceComponent = null;
 
-            if (!POIJSON.TryParseEnum(JSON, "type", "price component type", out ChargingDimensionTypes? type, out ErrorResponse))
+            if (JSON[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the price component must be '{JSONLDContext}'!";
+                return false;
+            }
+
+            if (!POIJSON.TryParseEnum(JSON, PropertyKeys.Type, "price component type", out ChargingDimensionTypes? type, out ErrorResponse))
                 return false;
 
             if (!type.HasValue)
@@ -154,7 +216,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!JSON.ParseMandatory("price",
+            if (!JSON.ParseMandatory(PropertyKeys.Price,
                                      "price",
                                      out Decimal price,
                                      out ErrorResponse))
@@ -162,10 +224,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (JSON.ParseOptional("vat",      "VAT",        out Decimal? vat,      out ErrorResponse))
+            if (JSON.ParseOptional(PropertyKeys.VAT,       "VAT",        out Decimal? vat,      out ErrorResponse))
                 if (ErrorResponse is not null) return false;
 
-            if (JSON.ParseOptional("stepSize", "step size",  out Decimal? stepSize, out ErrorResponse))
+            if (JSON.ParseOptional(PropertyKeys.StepSize,  "step size",  out Decimal? stepSize, out ErrorResponse))
                 if (ErrorResponse is not null) return false;
 
             var priceComponent = new ChargingPriceComponent(type.Value, price, vat, stepSize);

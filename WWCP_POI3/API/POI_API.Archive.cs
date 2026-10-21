@@ -102,7 +102,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Task.FromResult(
 
-                    request.Payload["number"] is not JValue { Type: JTokenType.Integer } number || number.Value<Int64>() is < 1 or > UInt32.MaxValue
+                    request.Payload[PropertyKeys.Number] is not JValue { Type: JTokenType.Integer } number || number.Value<Int64>() is < 1 or > UInt32.MaxValue
                         ? request.Error(POIWebSocketErrorCodes.FormatViolation, "Missing or invalid segment number!")
 
                         : History.TryGetArchiveSegment(number.Value<UInt32>(), out var segment)
@@ -125,7 +125,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static JObject ArchiveJSON(RoamingNetworkHistory History)
 
             => new (
-                   new JProperty("segments", new JArray(History.ArchiveSegments.Select(info => info.ToJSON(IncludeCommitIds: false))))
+                   new JProperty(PropertyKeys.Segments, new JArray(History.ArchiveSegments.Select(info => info.ToJSON(Embedded: true, IncludeCommitIds: false))))
                );
 
         #endregion

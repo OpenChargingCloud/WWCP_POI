@@ -240,11 +240,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             return CanonicalJSON.ToUTF8Bytes(
                        new JObject(
-                           new JProperty("profile",    SigningProfile),
-                           new JProperty("algorithm",  Algorithm.Name),
-                           new JProperty("keyId",      KeyId),
-                           new JProperty("encoding",   "base64"),
-                           new JProperty("changeSet",  ToJSON(IncludeSignatures: false))
+                           new JProperty(RoamingNetworkChangeSetSignature.PropertyKeys.Profile,    SigningProfile),
+                           new JProperty(RoamingNetworkChangeSetSignature.PropertyKeys.Algorithm,  Algorithm.Name),
+                           new JProperty(RoamingNetworkChangeSetSignature.PropertyKeys.KeyId,      KeyId),
+                           new JProperty(RoamingNetworkChangeSetSignature.PropertyKeys.Encoding,   "base64"),
+                           new JProperty(PropertyKeys.ChangeSet,                                   ToJSON(Embedded:           true,
+                                                                                                          IncludeSignatures:  false))
                        )
                    );
 

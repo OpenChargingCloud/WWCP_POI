@@ -78,28 +78,107 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           DateTimeOffset                          ArchivedAt)
     {
 
-        #region ToJSON(IncludeCommitIds = true)
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkArchiveSegmentInfo";
+
+        #endregion
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context       = "@context";
+
+            /// <summary>
+            /// The property of the number of the segment.
+            /// </summary>
+            public const String  Number        = "number";
+
+            /// <summary>
+            /// The property of the root of the segment.
+            /// </summary>
+            public const String  RootId        = "rootId";
+
+            /// <summary>
+            /// The property of the end of the segment.
+            /// </summary>
+            public const String  EndId         = "endId";
+
+            /// <summary>
+            /// The property of the revision of the root.
+            /// </summary>
+            public const String  FromRevision  = "fromRevision";
+
+            /// <summary>
+            /// The property of the revision of the end.
+            /// </summary>
+            public const String  ToRevision    = "toRevision";
+
+            /// <summary>
+            /// The property of the number of commits of the segment after its root.
+            /// </summary>
+            public const String  Size          = "size";
+
+            /// <summary>
+            /// The property of when the segment was archived.
+            /// </summary>
+            public const String  ArchivedAt    = "archivedAt";
+
+            /// <summary>
+            /// The property of the commits of the segment after its root.
+            /// </summary>
+            public const String  CommitIds     = "commitIds";
+
+        }
+
+        #endregion
+
+        #region ToJSON(Embedded = false, IncludeCommitIds = true, CustomArchiveSegmentInfoSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this information, with or without the commit identifications.
         /// </summary>
-        public JObject ToJSON(Boolean IncludeCommitIds = true)
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure, or stored.</param>
+        /// <param name="IncludeCommitIds">Whether to include the commit identifications.</param>
+        /// <param name="CustomArchiveSegmentInfoSerializer">An optional custom serializer of the information of archive segments.</param>
+        public JObject ToJSON(Boolean                                                             Embedded                             = false,
+                              Boolean                                                             IncludeCommitIds                     = true,
+                              CustomJObjectSerializerDelegate<RoamingNetworkArchiveSegmentInfo>?  CustomArchiveSegmentInfoSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("number",        Number),
-                           new JProperty("rootId",        RootId.ToString()),
-                           new JProperty("endId",         EndId. ToString()),
-                           new JProperty("fromRevision",  FromRevision),
-                           new JProperty("toRevision",    ToRevision),
-                           new JProperty("size",          CommitIds.Length),
-                           new JProperty("archivedAt",    ArchivedAt.ToISO8601())
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,       JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Number,        Number),
+                                 new JProperty(PropertyKeys.RootId,        RootId.ToString()),
+                                 new JProperty(PropertyKeys.EndId,         EndId. ToString()),
+                                 new JProperty(PropertyKeys.FromRevision,  FromRevision),
+                                 new JProperty(PropertyKeys.ToRevision,    ToRevision),
+                                 new JProperty(PropertyKeys.Size,          CommitIds.Length),
+                                 new JProperty(PropertyKeys.ArchivedAt,    ArchivedAt.ToISO8601())
+
                        );
 
             if (IncludeCommitIds)
-                json.Add("commitIds", new JArray(CommitIds.Select(commitId => commitId.ToString())));
+                json.Add(PropertyKeys.CommitIds, new JArray(CommitIds.Select(commitId => commitId.ToString())));
 
-            return json;
+            return CustomArchiveSegmentInfoSerializer is not null
+                       ? CustomArchiveSegmentInfoSerializer(this, json)
+                       : json;
 
         }
 
@@ -120,15 +199,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (JSON["number"] is not JValue { Type: JTokenType.Integer } number ||
-                    !RoamingNetworkCommit_Id.TryParse(JSON["rootId"]?.Value<String>() ?? "", out var rootId) ||
-                    !RoamingNetworkCommit_Id.TryParse(JSON["endId"]?. Value<String>() ?? "", out var endId)  ||
-                    JSON["fromRevision"] is not JValue { Type: JTokenType.Integer } fromRevision ||
-                    JSON["toRevision"]   is not JValue { Type: JTokenType.Integer } toRevision   ||
-                    JSON["commitIds"]    is not JArray commitIdsJSON ||
-                    !DateTimeOffset.TryParse(JSON["archivedAt"]?.Value<String>(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var archivedAt))
+                if (JSON[PropertyKeys.Number] is not JValue { Type: JTokenType.Integer } number ||
+                    !RoamingNetworkCommit_Id.TryParse(JSON[PropertyKeys.RootId]?.Value<String>() ?? "", out var rootId) ||
+                    !RoamingNetworkCommit_Id.TryParse(JSON[PropertyKeys.EndId]?. Value<String>() ?? "", out var endId)  ||
+                    JSON[PropertyKeys.FromRevision] is not JValue { Type: JTokenType.Integer } fromRevision ||
+                    JSON[PropertyKeys.ToRevision]   is not JValue { Type: JTokenType.Integer } toRevision   ||
+                    JSON[PropertyKeys.CommitIds]    is not JArray commitIdsJSON ||
+                    !DateTimeOffset.TryParse(JSON[PropertyKeys.ArchivedAt]?.Value<String>(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var archivedAt))
                 {
                     ErrorResponse = "Invalid information of an archive segment!";
+                    return false;
+                }
+
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the information of an archive segment must be '{JSONLDContext}'!";
                     return false;
                 }
 
@@ -185,18 +271,75 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       IReadOnlyList<RoamingNetworkCommit>  Commits)
     {
 
-        #region ToJSON()
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkArchiveSegment";
+
+        #endregion
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context  = "@context";
+
+            /// <summary>
+            /// The property of what it holds.
+            /// </summary>
+            public const String  Info     = "info";
+
+            /// <summary>
+            /// The property of the snapshot of its root.
+            /// </summary>
+            public const String  Base     = "base";
+
+            /// <summary>
+            /// The property of its commits after the root.
+            /// </summary>
+            public const String  Commits  = "commits";
+
+        }
+
+        #endregion
+
+        #region ToJSON(Embedded = false, CustomArchiveSegmentSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this segment: { info, base, commits }.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure, or stored.</param>
+        /// <param name="CustomArchiveSegmentSerializer">An optional custom serializer of archive segments.</param>
+        public JObject ToJSON(Boolean                                                         Embedded                         = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkArchiveSegment>?  CustomArchiveSegmentSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("info",     Info.ToJSON()),
-                   new JProperty("base",     Base.DeepClone()),
-                   new JProperty("commits",  new JArray(Commits.Select(commit => commit.ToJSON())))
-               );
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,  JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Info,     Info.ToJSON(Embedded: true)),
+                                 new JProperty(PropertyKeys.Base,     Base.DeepClone()),
+                                 new JProperty(PropertyKeys.Commits,  new JArray(Commits.Select(commit => commit.ToJSON(Embedded: true))))
+
+                       );
+
+            return CustomArchiveSegmentSerializer is not null
+                       ? CustomArchiveSegmentSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 
@@ -209,7 +352,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean Check([NotNullWhen(false)] out String? ErrorResponse)
         {
 
-            if (Base["commit"]?["@id"]?.Value<String>() != Info.RootId.ToString())
+            if (Base[RoamingNetworkHistory.PropertyKeys.Commit]?[RoamingNetworkCommit.PropertyKeys.Id]?.Value<String>() != Info.RootId.ToString())
             {
                 ErrorResponse = $"The base of the archive segment {Info.Number} is not of its root '{Info.RootId}'!";
                 return false;

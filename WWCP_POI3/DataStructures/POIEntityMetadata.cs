@@ -36,6 +36,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public static class POIEntityMetadata
     {
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization of the metadata of a POI entity.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification, named in error messages.
+            /// </summary>
+            public const String  Id           = "@id";
+
+            /// <summary>
+            /// The property of its creation timestamp.
+            /// </summary>
+            public const String  Created      = "created";
+
+            /// <summary>
+            /// The property of its last change timestamp.
+            /// </summary>
+            public const String  LastChange   = "lastChange";
+
+            /// <summary>
+            /// The property of its custom data.
+            /// </summary>
+            public const String  CustomData   = "customData";
+
+        }
+
+        #endregion
+
         #region Timestamp       (Timestamp)
 
         /// <summary>
@@ -59,11 +91,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     CustomDataNew   CustomData)
         {
 
-            JSON.Add("created",     Created.   ToISO8601());
-            JSON.Add("lastChange",  LastChange.ToISO8601());
+            JSON.Add(PropertyKeys.Created,     Created.   ToISO8601());
+            JSON.Add(PropertyKeys.LastChange,  LastChange.ToISO8601());
 
             if (CustomData.HasValues)
-                JSON.Add("customData", CustomData.ToJObject());
+                JSON.Add(PropertyKeys.CustomData, CustomData.ToJObject());
 
             return JSON;
 
@@ -91,14 +123,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             LastChange  = null;
             CustomData  = null;
 
-            if (JSON["created"] is null)
+            if (JSON[PropertyKeys.Created] is null)
             {
-                ErrorResponse = $"The creation timestamp 'created'{(JSON["@id"] is JValue id ? $" of '{id}'" : "")} is missing!";
+                ErrorResponse = $"The creation timestamp '{PropertyKeys.Created}'{(JSON[PropertyKeys.Id] is JValue id ? $" of '{id}'" : "")} is missing!";
                 return false;
             }
 
-            if (!TryParseTimestamp(JSON["created"],     "creation timestamp",     out Created,     out ErrorResponse) ||
-                !TryParseTimestamp(JSON["lastChange"],  "last change timestamp",  out LastChange,  out ErrorResponse))
+            if (!TryParseTimestamp(JSON[PropertyKeys.Created],     "creation timestamp",     out Created,     out ErrorResponse) ||
+                !TryParseTimestamp(JSON[PropertyKeys.LastChange],  "last change timestamp",  out LastChange,  out ErrorResponse))
             {
                 return false;
             }
@@ -123,10 +155,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             CustomData = null;
 
-            foreach (var timestamp in new[] { "created", "lastChange" })
+            foreach (var timestamp in new[] { PropertyKeys.Created, PropertyKeys.LastChange })
                 if (JSON[timestamp] is not null)
                 {
-                    ErrorResponse = $"'{JSON["@id"]}' has no timestamps: '{timestamp}' is not allowed!";
+                    ErrorResponse = $"'{JSON[PropertyKeys.Id]}' has no timestamps: '{timestamp}' is not allowed!";
                     return false;
                 }
 
@@ -145,7 +177,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             CustomData = null;
 
-            if (JSON["customData"] is JToken customDataJSON)
+            if (JSON[PropertyKeys.CustomData] is JToken customDataJSON)
             {
 
                 if (customDataJSON is not JObject customDataObject)

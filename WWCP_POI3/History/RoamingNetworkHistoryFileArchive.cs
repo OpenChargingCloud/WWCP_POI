@@ -125,11 +125,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     throw new ArgumentException($"The next segment of the archive is {segments.Count + 1}, not {number}!", nameof(Segment));
 
                 WriteSynced(BaseFile(number),     utf8.GetBytes(POIJSON.ToText(Segment.Base)));
-                WriteSynced(CommitsFile(number),  utf8.GetBytes(String.Concat(Segment.Commits.Select(commit => POIJSON.ToText(commit.ToJSON()) + "\n"))));
+                WriteSynced(CommitsFile(number),  utf8.GetBytes(String.Concat(Segment.Commits.Select(commit => POIJSON.ToText(commit.ToJSON(Embedded: true)) + "\n"))));
 
                 using (var segmentsFile = new FileStream(Path.Combine(Directory, SegmentsFileName), FileMode.Append, FileAccess.Write, FileShare.Read))
                 {
-                    segmentsFile.Write(utf8.GetBytes(POIJSON.ToText(Segment.Info.ToJSON()) + "\n"));
+                    segmentsFile.Write(utf8.GetBytes(POIJSON.ToText(Segment.Info.ToJSON(Embedded: true)) + "\n"));
                     segmentsFile.Flush(true);
                 }
 

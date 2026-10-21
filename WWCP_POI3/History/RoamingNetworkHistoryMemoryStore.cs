@@ -115,7 +115,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             lock (storeLock)
             {
                 BeforeWrite?.Invoke(Entry.Type.ToString());
-                lines.Add(POIJSON.ToText(Entry.ToJSON()));
+                lines.Add(POIJSON.ToText(Entry.ToJSON(Embedded: true)));
             }
 
         }
@@ -125,7 +125,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             IEnumerable<RoamingNetworkHistoryLogEntry>  Entries)
         {
 
-            var newLines = Entries.Select(entry => POIJSON.ToText(entry.ToJSON())).ToList();
+            var newLines = Entries.Select(entry => POIJSON.ToText(entry.ToJSON(Embedded: true))).ToList();
 
             lock (storeLock)
             {

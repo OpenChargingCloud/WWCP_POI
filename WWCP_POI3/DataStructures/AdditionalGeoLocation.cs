@@ -39,22 +39,71 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                ImmutableI18NString?  Name   = null)
     {
 
-        #region ToJSON()
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/additionalGeoLocation";
+
+        #endregion
+
+        #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context       = "@context";
+
+            /// <summary>
+            /// The property of its geographical location.
+            /// </summary>
+            public const String  GeoLocation   = "geoLocation";
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name          = "name";
+
+        }
+
+        #endregion
+
+        #endregion
+
+
+        #region ToJSON(Embedded = false, CustomAdditionalGeoLocationSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this related location.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomAdditionalGeoLocationSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                                  Embedded                                = false,
+                              CustomJObjectSerializerDelegate<AdditionalGeoLocation>?  CustomAdditionalGeoLocationSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("geoLocation",  GeoLocation.ToJSON(Embedded: true))
-                       );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,  JSONLDContext);
+
+            json.Add(PropertyKeys.GeoLocation,  GeoLocation.ToJSON(Embedded: true));
 
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",  Name.ToJSON());
+                json.Add(PropertyKeys.Name,     Name.ToJSON());
 
-            return json;
+            return CustomAdditionalGeoLocationSerializer is not null
+                       ? CustomAdditionalGeoLocationSerializer(this, json)
+                       : json;
 
         }
 
@@ -72,8 +121,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AdditionalGeoLocation = null;
 
-            if (!POIJSON.TryParseGeoLocation(JSON, out var geoLocation, out ErrorResponse) ||
-                !POIJSON.TryParseI18N       (JSON, "name", "name of a related location", out var name, out ErrorResponse))
+            if (JSON[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the related location must be '{JSONLDContext}'!";
+                return false;
+            }
+
+            if (!POIJSON.TryParseGeoLocation(JSON, PropertyKeys.GeoLocation, "geo location",               out var geoLocation, out ErrorResponse) ||
+                !POIJSON.TryParseI18N       (JSON, PropertyKeys.Name,        "name of a related location", out var name,        out ErrorResponse))
             {
                 return false;
             }

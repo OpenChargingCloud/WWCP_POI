@@ -27,6 +27,25 @@ strings as strings, never as points in time. A number with a fraction or an expo
 cannot hold as written - more than 28 decimal places, as `1e-30`, or a mantissa above 96 bits -
 MUST be refused, not rounded; so MUST an object that names a property twice.
 
+### 1.1 JSON-LD contexts
+
+Every object of POI - an entity, a template, a group, a change set and its changes, a commit, a
+checkpoint, an epoch, an attestation, a key or price statement, a proof, a WebSocket message - has a
+JSON-LD context, `https://open.charging.cloud/contexts/wwcp+json/<type>`, its type in lowerCamelCase,
+e.g. `chargingPool`, `roamingNetworkChangeSet`, `roamingNetworkCommit`; a proof's is `poiProof`.
+
+- **Written on its own**, e.g. as the body of an HTTP response or a WebSocket message, an object names
+  its context in `@context`, after its `@id`, in JSON as in CBOR.
+- **Embedded** in another object, e.g. an entity in its parent, a change set in its commit or an item of
+  a list, it does not.
+- **Hashed, signed or identified**, an object is written embedded: a change set, commit, checkpoint,
+  attestation or statement is hashed and signed without its `@context`, and the content of a version
+  (section 2) names the context of the roaming network only. The contexts change no ETag,
+  identification or signature, and a history written before them stays valid.
+- A reader MUST accept an object without `@context` and MUST refuse one with another.
+
+A JSON text that is `null` is `null` in CBOR as well, never the empty text.
+
 
 ## 2. The content of a version
 
@@ -35,7 +54,7 @@ A version of a roaming network is identified by its **content**: its JSON repres
 
 - **Included:** `@context`
   (`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork`), `@id`, `name`, `description`,
-  `dataSource`, `dataLicenses`, its operator `roamingNetworkOperator`, every embedded entity completely (operators with their pools,
+  `dataSource`, `dataLicenses`, its operator `operator`, every embedded entity completely (operators with their pools,
   stations, EVSEs, connectors, energy meters, tariffs, templates, groups and offers; manufacturers;
   e-mobility providers with their groups and offers; grid operators with their grid connection points,
   energy meter templates and groups; parking operators; energy meter manufacturers, transparency
@@ -180,7 +199,7 @@ A reader MUST calculate the thumbprint and refuse a key whose `@id` differs, and
 private parts. The roaming network operator (RNO), charging station operators,
 e-mobility providers, grid operators and parking operators each name 1..n `signingKeys`, e.g.
 secp256r1, and 1..n `identityKeys`, e.g. secp521r1; a key is not both. A grid operator not taking
-part names neither. The RNO is the `roamingNetworkOperator` the roaming network embeds, the party
+part names neither. The RNO is the `operator` the roaming network embeds, the party
 `{"entityType": "RoamingNetworkOperator", "entityId": its @id}`; the roaming network names no keys
 of its own, and a reader MUST refuse one that does. The `keyId` of a
 signature is the `@id` of the key.

@@ -57,7 +57,104 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class ChargingTariffRestrictions
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingTariffRestrictions";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context       = "@context";
+
+            /// <summary>
+            /// The property of its start time.
+            /// </summary>
+            public const String  StartTime     = "startTime";
+
+            /// <summary>
+            /// The property of its end time.
+            /// </summary>
+            public const String  EndTime       = "endTime";
+
+            /// <summary>
+            /// The property of its start date.
+            /// </summary>
+            public const String  StartDate     = "startDate";
+
+            /// <summary>
+            /// The property of its end date.
+            /// </summary>
+            public const String  EndDate       = "endDate";
+
+            /// <summary>
+            /// The property of its minimum energy.
+            /// </summary>
+            public const String  MinEnergy     = "minEnergy";
+
+            /// <summary>
+            /// The property of its maximum energy.
+            /// </summary>
+            public const String  MaxEnergy     = "maxEnergy";
+
+            /// <summary>
+            /// The property of its minimum current.
+            /// </summary>
+            public const String  MinCurrent    = "minCurrent";
+
+            /// <summary>
+            /// The property of its maximum current.
+            /// </summary>
+            public const String  MaxCurrent    = "maxCurrent";
+
+            /// <summary>
+            /// The property of its minimum power.
+            /// </summary>
+            public const String  MinPower      = "minPower";
+
+            /// <summary>
+            /// The property of its maximum power.
+            /// </summary>
+            public const String  MaxPower      = "maxPower";
+
+            /// <summary>
+            /// The property of its minimum duration.
+            /// </summary>
+            public const String  MinDuration   = "minDuration";
+
+            /// <summary>
+            /// The property of its maximum duration.
+            /// </summary>
+            public const String  MaxDuration   = "maxDuration";
+
+            /// <summary>
+            /// The property of its days of the week.
+            /// </summary>
+            public const String  DaysOfWeek    = "daysOfWeek";
+
+            /// <summary>
+            /// The property of its reservation restriction.
+            /// </summary>
+            public const String  Reservation   = "reservation";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// From this time of day on, inclusive.
@@ -197,59 +294,67 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomChargingTariffRestrictionsSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of these restrictions.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingTariffRestrictionsSerializer">A delegate to serialize custom charging tariff restrictions.</param>
+        public JObject ToJSON(Boolean                                                       Embedded                                     = false,
+                              CustomJObjectSerializerDelegate<ChargingTariffRestrictions>?  CustomChargingTariffRestrictionsSerializer   = null)
         {
 
             var json = new JObject();
 
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,      JSONLDContext);
+
             if (StartTime.HasValue)
-                json.Add("startTime",    StartTime.Value.ToString("HH:mm", CultureInfo.InvariantCulture));
+                json.Add(PropertyKeys.StartTime,    StartTime.Value.ToString("HH:mm", CultureInfo.InvariantCulture));
 
             if (EndTime.HasValue)
-                json.Add("endTime",      EndTime.  Value.ToString("HH:mm", CultureInfo.InvariantCulture));
+                json.Add(PropertyKeys.EndTime,      EndTime.  Value.ToString("HH:mm", CultureInfo.InvariantCulture));
 
             if (StartDate.HasValue)
-                json.Add("startDate",    StartDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                json.Add(PropertyKeys.StartDate,    StartDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
 
             if (EndDate.HasValue)
-                json.Add("endDate",      EndDate.  Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                json.Add(PropertyKeys.EndDate,      EndDate.  Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
 
             if (MinEnergy.HasValue)
-                json.Add("minEnergy",    POIJSON.Number(MinEnergy.Value));
+                json.Add(PropertyKeys.MinEnergy,    POIJSON.Number(MinEnergy.Value));
 
             if (MaxEnergy.HasValue)
-                json.Add("maxEnergy",    POIJSON.Number(MaxEnergy.Value));
+                json.Add(PropertyKeys.MaxEnergy,    POIJSON.Number(MaxEnergy.Value));
 
             if (MinCurrent.HasValue)
-                json.Add("minCurrent",   POIJSON.Number(MinCurrent.Value));
+                json.Add(PropertyKeys.MinCurrent,   POIJSON.Number(MinCurrent.Value));
 
             if (MaxCurrent.HasValue)
-                json.Add("maxCurrent",   POIJSON.Number(MaxCurrent.Value));
+                json.Add(PropertyKeys.MaxCurrent,   POIJSON.Number(MaxCurrent.Value));
 
             if (MinPower.HasValue)
-                json.Add("minPower",     POIJSON.Number(MinPower.Value));
+                json.Add(PropertyKeys.MinPower,     POIJSON.Number(MinPower.Value));
 
             if (MaxPower.HasValue)
-                json.Add("maxPower",     POIJSON.Number(MaxPower.Value));
+                json.Add(PropertyKeys.MaxPower,     POIJSON.Number(MaxPower.Value));
 
             if (MinDuration.HasValue)
-                json.Add("minDuration",  POIJSON.Number(MinDuration.Value));
+                json.Add(PropertyKeys.MinDuration,  POIJSON.Number(MinDuration.Value));
 
             if (MaxDuration.HasValue)
-                json.Add("maxDuration",  POIJSON.Number(MaxDuration.Value));
+                json.Add(PropertyKeys.MaxDuration,  POIJSON.Number(MaxDuration.Value));
 
             if (DaysOfWeek.Length > 0)
-                json.Add("daysOfWeek",   new JArray(DaysOfWeek.Select(day => day.ToString().ToUpperInvariant())));
+                json.Add(PropertyKeys.DaysOfWeek,   new JArray(DaysOfWeek.Select(day => day.ToString().ToUpperInvariant())));
 
             if (Reservation.HasValue)
-                json.Add("reservation",  Reservation.Value.ToString());
+                json.Add(PropertyKeys.Reservation,  Reservation.Value.ToString());
 
-            return json;
+            return CustomChargingTariffRestrictionsSerializer is not null
+                       ? CustomChargingTariffRestrictionsSerializer(this, json)
+                       : json;
 
         }
 
@@ -270,17 +375,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!TryParseText(JSON, "startTime", "HH:mm",      TimeOnly.TryParseExact, out TimeOnly? startTime, out ErrorResponse) ||
-                    !TryParseText(JSON, "endTime",   "HH:mm",      TimeOnly.TryParseExact, out TimeOnly? endTime,   out ErrorResponse) ||
-                    !TryParseText(JSON, "startDate", "yyyy-MM-dd", DateOnly.TryParseExact, out DateOnly? startDate, out ErrorResponse) ||
-                    !TryParseText(JSON, "endDate",   "yyyy-MM-dd", DateOnly.TryParseExact, out DateOnly? endDate,   out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the charging tariff restrictions must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!TryParseText(JSON, PropertyKeys.StartTime, "HH:mm",      TimeOnly.TryParseExact, out TimeOnly? startTime, out ErrorResponse) ||
+                    !TryParseText(JSON, PropertyKeys.EndTime,   "HH:mm",      TimeOnly.TryParseExact, out TimeOnly? endTime,   out ErrorResponse) ||
+                    !TryParseText(JSON, PropertyKeys.StartDate, "yyyy-MM-dd", DateOnly.TryParseExact, out DateOnly? startDate, out ErrorResponse) ||
+                    !TryParseText(JSON, PropertyKeys.EndDate,   "yyyy-MM-dd", DateOnly.TryParseExact, out DateOnly? endDate,   out ErrorResponse))
                 {
                     return false;
                 }
 
                 var values = new Dictionary<String, Decimal?>();
 
-                foreach (var name in new[] { "minEnergy", "maxEnergy", "minCurrent", "maxCurrent", "minPower", "maxPower", "minDuration", "maxDuration" })
+                foreach (var name in new[] { PropertyKeys.MinEnergy,    PropertyKeys.MaxEnergy,
+                                             PropertyKeys.MinCurrent,   PropertyKeys.MaxCurrent,
+                                             PropertyKeys.MinPower,     PropertyKeys.MaxPower,
+                                             PropertyKeys.MinDuration,  PropertyKeys.MaxDuration })
                 {
 
                     values[name] = null;
@@ -296,7 +411,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var daysOfWeek = new List<DayOfWeek>();
 
-                if (JSON["daysOfWeek"] is JToken daysOfWeekJSON)
+                if (JSON[PropertyKeys.DaysOfWeek] is JToken daysOfWeekJSON)
                 {
 
                     if (daysOfWeekJSON is not JArray daysOfWeekArray)
@@ -324,21 +439,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                if (!POIJSON.TryParseEnum(JSON, "reservation", "reservation restriction", out ChargingReservationRestriction? reservation, out ErrorResponse))
+                if (!POIJSON.TryParseEnum(JSON, PropertyKeys.Reservation, "reservation restriction", out ChargingReservationRestriction? reservation, out ErrorResponse))
                     return false;
 
                 ChargingTariffRestrictions = new ChargingTariffRestrictions(startTime,
                                                                             endTime,
                                                                             startDate,
                                                                             endDate,
-                                                                            values["minEnergy"],
-                                                                            values["maxEnergy"],
-                                                                            values["minCurrent"],
-                                                                            values["maxCurrent"],
-                                                                            values["minPower"],
-                                                                            values["maxPower"],
-                                                                            values["minDuration"],
-                                                                            values["maxDuration"],
+                                                                            values[PropertyKeys.MinEnergy],
+                                                                            values[PropertyKeys.MaxEnergy],
+                                                                            values[PropertyKeys.MinCurrent],
+                                                                            values[PropertyKeys.MaxCurrent],
+                                                                            values[PropertyKeys.MinPower],
+                                                                            values[PropertyKeys.MaxPower],
+                                                                            values[PropertyKeys.MinDuration],
+                                                                            values[PropertyKeys.MaxDuration],
                                                                             daysOfWeek,
                                                                             reservation);
 

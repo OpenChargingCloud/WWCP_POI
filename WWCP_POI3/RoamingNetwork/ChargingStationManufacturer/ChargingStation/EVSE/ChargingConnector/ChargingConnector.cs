@@ -56,7 +56,104 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed record ChargingConnector
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingConnector";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                      = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                 = "@context";
+
+            /// <summary>
+            /// The property of its type.
+            /// </summary>
+            public const String  Type                    = "type";
+
+            /// <summary>
+            /// The property of whether it can be locked.
+            /// </summary>
+            public const String  Lockable                = "lockable";
+
+            /// <summary>
+            /// The property of its format: a socket or an attached cable.
+            /// </summary>
+            public const String  Format                  = "format";
+
+            /// <summary>
+            /// The property of the length of its attached cable.
+            /// </summary>
+            public const String  CableLength             = "cableLength";
+
+            /// <summary>
+            /// The property of the weight of its attached cable.
+            /// </summary>
+            public const String  CableWeight             = "cableWeight";
+
+            /// <summary>
+            /// The property of whether a system helps to handle its cable.
+            /// </summary>
+            public const String  CableManagementSystem   = "cableManagementSystem";
+
+            /// <summary>
+            /// The property of its standards.
+            /// </summary>
+            public const String  Standards               = "standards";
+
+            /// <summary>
+            /// The property of its images.
+            /// </summary>
+            public const String  Images                  = "images";
+
+            /// <summary>
+            /// The property of its current types.
+            /// </summary>
+            public const String  CurrentTypes            = "currentTypes";
+
+            /// <summary>
+            /// The property of its maximum voltage.
+            /// </summary>
+            public const String  MaxVoltage              = "maxVoltage";
+
+            /// <summary>
+            /// The property of its maximum current.
+            /// </summary>
+            public const String  MaxCurrent              = "maxCurrent";
+
+            /// <summary>
+            /// The property of its maximum power.
+            /// </summary>
+            public const String  MaxPower                = "maxPower";
+
+            /// <summary>
+            /// The property of the identifications of its charging tariffs.
+            /// </summary>
+            public const String  ChargingTariffIds       = "chargingTariffIds";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The identification of the connector, unique within its EVSE.
@@ -247,56 +344,65 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, ...)
 
         /// <summary>
-        /// Return a JSON representation of this charging connector.
+        /// Return a JSON representation of this charging connector; embedded, as its EVSE embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingConnectorSerializer">A delegate to serialize custom charging connector JSON objects.</param>
+        public JObject ToJSON(Boolean                                              Embedded                            = false,
+                              CustomJObjectSerializerDelegate<ChargingConnector>?  CustomChargingConnectorSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id",   Id.  ToString()),
-                           new JProperty("type",  Type.ToString())
+                           new JProperty(PropertyKeys.Id,  Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,                JSONLDContext);
+
+            json.Add(PropertyKeys.Type,                       Type.ToString());
+
             if (Lockable.HasValue)
-                json.Add("lockable",               Lockable.Value);
+                json.Add(PropertyKeys.Lockable,               Lockable.Value);
 
             if (Format.HasValue)
-                json.Add("format",                 Format.Value.ToString());
+                json.Add(PropertyKeys.Format,                 Format.Value.ToString());
 
             if (CableLength.HasValue)
-                json.Add("cableLength",            POIJSON.Number(CableLength.Value.m));
+                json.Add(PropertyKeys.CableLength,            POIJSON.Number(CableLength.Value.m));
 
             if (CableWeight.HasValue)
-                json.Add("cableWeight",            POIJSON.Number(CableWeight.Value.Value));
+                json.Add(PropertyKeys.CableWeight,            POIJSON.Number(CableWeight.Value.Value));
 
             if (CableManagementSystem.HasValue)
-                json.Add("cableManagementSystem",  CableManagementSystem.Value);
+                json.Add(PropertyKeys.CableManagementSystem,  CableManagementSystem.Value);
 
             if (Standards.Length > 0)
-                json.Add("standards",              POIJSON.IdsToJSON(Standards));
+                json.Add(PropertyKeys.Standards,              POIJSON.IdsToJSON(Standards));
 
             if (Images.Length > 0)
-                json.Add("images",                 new JArray(Images.Select(image => image.ToJSON())));
+                json.Add(PropertyKeys.Images,                 new JArray(Images.Select(image => image.ToJSON(Embedded: true))));
 
             if (CurrentTypes.HasValue)
-                json.Add("currentTypes",           POIJSON.FlagsToJSON(CurrentTypes.Value));
+                json.Add(PropertyKeys.CurrentTypes,           POIJSON.FlagsToJSON(CurrentTypes.Value));
 
             if (MaxVoltage.HasValue)
-                json.Add("maxVoltage",             POIJSON.Number(MaxVoltage.Value.Value));
+                json.Add(PropertyKeys.MaxVoltage,             POIJSON.Number(MaxVoltage.Value.Value));
 
             if (MaxCurrent.HasValue)
-                json.Add("maxCurrent",             POIJSON.Number(MaxCurrent.Value.Value));
+                json.Add(PropertyKeys.MaxCurrent,             POIJSON.Number(MaxCurrent.Value.Value));
 
             if (MaxPower.HasValue)
-                json.Add("maxPower",               POIJSON.Number(MaxPower.Value.Value));
+                json.Add(PropertyKeys.MaxPower,               POIJSON.Number(MaxPower.Value.Value));
 
             if (ChargingTariffIds.Length > 0)
-                json.Add("chargingTariffIds",      POIJSON.IdsToJSON(ChargingTariffIds));
+                json.Add(PropertyKeys.ChargingTariffIds,      POIJSON.IdsToJSON(ChargingTariffIds));
 
-            return json;
+            return CustomChargingConnectorSerializer is not null
+                       ? CustomChargingConnectorSerializer(this, json)
+                       : json;
 
         }
 
@@ -320,7 +426,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(PropertyKeys.Id,
                                          "charging connector identification",
                                          ChargingConnector_Id.TryParse,
                                          out ChargingConnector_Id id,
@@ -329,7 +435,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!JSON.ParseMandatory("type",
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the charging connector '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!JSON.ParseMandatory(PropertyKeys.Type,
                                          "charging connector type",
                                          ChargingConnectorType.TryParse,
                                          out ChargingConnectorType type,
@@ -338,7 +451,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (JSON.ParseOptional("lockable",
+                if (JSON.ParseOptional(PropertyKeys.Lockable,
                                        "lockable",
                                        out Boolean? lockable,
                                        out ErrorResponse))
@@ -347,7 +460,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                 }
 
-                if (JSON.ParseOptional("cableManagementSystem",
+                if (JSON.ParseOptional(PropertyKeys.CableManagementSystem,
                                        "cable management system",
                                        out Boolean? cableManagementSystem,
                                        out ErrorResponse))
@@ -356,24 +469,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                 }
 
-                if (!POIJSON.TryParseEnum       (JSON, "format",       "charging connector format",  out ChargingConnectorFormat? format,  out ErrorResponse) ||
-                    !POIJSON.TryParseNonNegative(JSON, "cableLength",  "cable length",               out var cableLength,                out ErrorResponse) ||
-                    !POIJSON.TryParseNonNegative(JSON, "cableWeight",  "cable weight",               out var cableWeight,                out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "standards",    "standard", Standard.TryParse, out ImmutableArray<Standard> standards, out ErrorResponse) ||
-                    !POIJSON.TryParseObjects<Image>(JSON, "images",    "images",   Image.TryParse,    out var images,                    out ErrorResponse) ||
-                    !POIJSON.TryParseFlags      (JSON, "currentTypes", "current type",               out CurrentTypes currentTypes,      out ErrorResponse) ||
-                    !POIJSON.TryParseIds        (JSON, "chargingTariffIds", "charging tariff identification", ChargingTariff_Id.TryParse, out ImmutableArray<ChargingTariff_Id> chargingTariffIds, out ErrorResponse))
+                if (!POIJSON.TryParseEnum       (JSON, PropertyKeys.Format,       "charging connector format",  out ChargingConnectorFormat? format,  out ErrorResponse) ||
+                    !POIJSON.TryParseNonNegative(JSON, PropertyKeys.CableLength,  "cable length",               out var cableLength,                out ErrorResponse) ||
+                    !POIJSON.TryParseNonNegative(JSON, PropertyKeys.CableWeight,  "cable weight",               out var cableWeight,                out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.Standards,    "standard", Standard.TryParse, out ImmutableArray<Standard> standards, out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<Image>(JSON, PropertyKeys.Images,    "images",   Image.TryParse,    out var images,                    out ErrorResponse) ||
+                    !POIJSON.TryParseFlags      (JSON, PropertyKeys.CurrentTypes, "current type",               out CurrentTypes currentTypes,      out ErrorResponse) ||
+                    !POIJSON.TryParseIds        (JSON, PropertyKeys.ChargingTariffIds, "charging tariff identification", ChargingTariff_Id.TryParse, out ImmutableArray<ChargingTariff_Id> chargingTariffIds, out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (JSON.ParseOptional("maxVoltage", "maximum voltage", out Volt?   maxVoltage, out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.MaxVoltage, "maximum voltage", out Volt?   maxVoltage, out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("maxCurrent", "maximum current", out Ampere? maxCurrent, out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.MaxCurrent, "maximum current", out Ampere? maxCurrent, out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("maxPower",   "maximum power",   out Watt?   maxPower,   out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.MaxPower,   "maximum power",   out Watt?   maxPower,   out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
                 var chargingConnector = new ChargingConnector(id,
@@ -422,12 +535,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean Equals(ChargingConnector? ChargingConnector)
 
             => ChargingConnector is not null &&
-               POIJSON.SameValue(ToJSON(), ChargingConnector.ToJSON());
+               POIJSON.SameValue(ToJSON(Embedded: true), ChargingConnector.ToJSON(Embedded: true));
 
         /// <inheritdoc/>
         public override Int32 GetHashCode()
 
-            => ToJSON().ToString(Newtonsoft.Json.Formatting.None).GetHashCode();
+            => ToJSON(Embedded: true).ToString(Newtonsoft.Json.Formatting.None).GetHashCode();
 
         #endregion
 

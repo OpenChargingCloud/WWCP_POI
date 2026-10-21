@@ -101,16 +101,73 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 String?                   ErrorResponse   = null)
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/commitSignaturesResult";
+
+        #endregion
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context     = "@context";
+
+            /// <summary>
+            /// The property of the identification of the commit.
+            /// </summary>
+            public const String  CommitId    = RoamingNetworkCommitSignature.PropertyKeys.CommitId;
+
+            /// <summary>
+            /// The property of all signatures of the commit.
+            /// </summary>
+            public const String  Signatures  = RoamingNetworkCommitSignature.PropertyKeys.Signatures;
+
+            /// <summary>
+            /// The property of the number of signatures added.
+            /// </summary>
+            public const String  Added       = "added";
+
+        }
+
+        #endregion
+
         /// <summary>
         /// { commitId, signatures, added }: all signatures of the commit, and how many were added.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomCommitSignaturesResultSerializer">An optional custom serializer of results of adding signatures.</param>
+        public JObject ToJSON(Boolean                                                   Embedded                                 = false,
+                              CustomJObjectSerializerDelegate<CommitSignaturesResult>?  CustomCommitSignaturesResultSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("commitId",    CommitId.ToString()),
-                   new JProperty("signatures",  new JArray(Commit?.Signatures.Select(signature => signature.ToJSON()) ?? [])),
-                   new JProperty("added",       Added)
-               );
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,     JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.CommitId,    CommitId.ToString()),
+                                 new JProperty(PropertyKeys.Signatures,  new JArray(Commit?.Signatures.Select(signature => signature.ToJSON(Embedded: true)) ?? [])),
+                                 new JProperty(PropertyKeys.Added,       Added)
+
+                       );
+
+            return CustomCommitSignaturesResultSerializer is not null
+                       ? CustomCommitSignaturesResultSerializer(this, json)
+                       : json;
+
+        }
 
     }
 
@@ -284,7 +341,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ? errorResponse
 
                                      : roamingNetworkHistory.TryGetCommitInfosSince(since, out var commitInfos, out var error, max)
-                                           ? JSONResponse(request, HTTPStatusCode.OK, new JArray(commitInfos.Select(commitInfo => commitInfo.ToJSON())))
+                                           ? JSONResponse(request, HTTPStatusCode.OK, new JArray(commitInfos.Select(commitInfo => commitInfo.ToJSON(Embedded: true))))
                                            : ErrorResponse(request, HTTPStatusCode.NotFound, error)
 
                        ));
@@ -321,7 +378,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                            return Task.FromResult(
                                       commits is not null
-                                          ? JSONResponse(request, HTTPStatusCode.OK, new JArray(commits.Select(commit => commit.ToJSON())))
+                                          ? JSONResponse(request, HTTPStatusCode.OK, new JArray(commits.Select(commit => commit.ToJSON(Embedded: true))))
                                           : ErrorResponse(request, HTTPStatusCode.NotFound, error)
                                   );
 
@@ -414,7 +471,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (json is null)
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, "The request must contain { signatures: [ … ] }!");
 
-            json["commitId"] = commitId.ToString();
+            json[RoamingNetworkCommitSignature.PropertyKeys.CommitId] = commitId.ToString();
 
             if (!RoamingNetworkCommitSignature.TryParseCommitSignatures(json, out _, out var signatures, out var signaturesError))
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, signaturesError);
@@ -569,13 +626,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = new RoamingNetworkCommitInfo(Result.Commit!).ToJSON();
 
-            json.Add("status",  Result.Status.ToString());
-            json.Add("head",    new RoamingNetworkCommitInfo(Result.Head.Commit).ToJSON());
+            json.Add(PropertyKeys.Status,  Result.Status.ToString());
+            json.Add(PropertyKeys.Head,    new RoamingNetworkCommitInfo(Result.Head.Commit).ToJSON(Embedded: true));
 
             var conflicts = History.Conflicts;
 
             if (!conflicts.IsEmpty)
-                json.Add("conflicts", new JArray(conflicts.Select(conflict => conflict.ToJSON())));
+                json.Add(PropertyKeys.Conflicts, new JArray(conflicts.Select(conflict => conflict.ToJSON(Embedded: true))));
 
             return json;
 
@@ -717,7 +774,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => JSONResponse(Request,
                             StatusCode,
-                            new JObject(new JProperty("description", Description ?? StatusCode.ToString())));
+                            new JObject(new JProperty(PropertyKeys.Description, Description ?? StatusCode.ToString())));
 
         #endregion
 

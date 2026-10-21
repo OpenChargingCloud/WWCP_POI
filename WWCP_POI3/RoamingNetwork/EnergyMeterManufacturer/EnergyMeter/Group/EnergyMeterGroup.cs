@@ -64,7 +64,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            IComparable<EnergyMeterGroup>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/energyMeterGroup";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its energy meters.
+            /// </summary>
+            public const String  EnergyMeterIds   = "energyMeterIds";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// Its energy meters, of the same owner, in the order of their identifications.
@@ -172,33 +199,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomEnergyMeterGroupSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this energy meter group, as its owner embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEnergyMeterGroupSerializer">A delegate to serialize custom energy meter group JSON objects.</param>
+        public JObject ToJSON(Boolean                                             Embedded                           = false,
+                              CustomJObjectSerializerDelegate<EnergyMeterGroup>?  CustomEnergyMeterGroupSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,      JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",         Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,         Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,  Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",   DataSource);
+                json.Add(BasePropertyKeys.DataSource,   DataSource);
 
             if (EnergyMeterIds.Length > 0)
-                json.Add("energyMeterIds",  POIJSON.IdsToJSON(EnergyMeterIds));
+                json.Add(PropertyKeys.EnergyMeterIds,   POIJSON.IdsToJSON(EnergyMeterIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomEnergyMeterGroupSerializer is not null
+                       ? CustomEnergyMeterGroupSerializer(this, json)
+                       : json;
 
         }
 
@@ -222,7 +257,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "energy meter group identification",
                                          EnergyMeterGroup_Id.TryParse,
                                          out EnergyMeterGroup_Id id,
@@ -231,10 +266,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N  (JSON, "name",         "energy meter group name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N  (JSON, "description",  "energy meter group description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "dataSource",   "data source",             out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseIds   (JSON, "energyMeterIds", "member identification", EnergyMeter_Id.TryParse, out ImmutableArray<EnergyMeter_Id> members, out ErrorResponse))
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the energy meter group '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Name,         "energy meter group name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Description,  "energy meter group description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, BasePropertyKeys.DataSource,   "data source",             out var dataSource,   out ErrorResponse) ||
+                    !POIJSON.TryParseIds   (JSON, PropertyKeys.EnergyMeterIds,   "member identification", EnergyMeter_Id.TryParse, out ImmutableArray<EnergyMeter_Id> members, out ErrorResponse))
                 {
                     return false;
                 }

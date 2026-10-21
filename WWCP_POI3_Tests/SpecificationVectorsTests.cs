@@ -189,7 +189,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var genesis = RoamingNetworkCommit.Genesis(Network(),
                                                        new RoamingNetworkEpoch(2, new RoamingNetworkEpochProfiles(ETagHashAlgorithm.SHA512, [ "Ed25519", "ML-DSA-65" ])));
 
-            var content = genesis.ToJSON();
+            var content = genesis.ToJSON(Embedded: true);
             content.Remove("@id");
             content.AddFirst(new Newtonsoft.Json.Linq.JProperty("profile", RoamingNetworkCommit.IdentityProfile));
 
@@ -331,7 +331,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(publicKey.Id,                                                                       Is.EqualTo(KeyId));
                 Assert.That(Encoding.UTF8.GetString(statement.GetSigningBytes()),                               Is.EqualTo(Input));
                 Assert.That(statement.Value,                                                                    Is.EqualTo(Value));
-                Assert.That(CanonicalJSON.Serialize(statement.ToJSON()),                                        Is.EqualTo(withValue));
+                Assert.That(CanonicalJSON.Serialize(statement.ToJSON(Embedded: true)),                                        Is.EqualTo(withValue));
                 Assert.That(statement.Digest,                                                                   Is.EqualTo(Digest));
                 Assert.That(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(withValue))),       Is.EqualTo(Digest));
                 Assert.That(statement.TryVerify([ publicKey ], out var error),                                  Is.True, error);

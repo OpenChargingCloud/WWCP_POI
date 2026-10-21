@@ -49,116 +49,116 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The properties of a charging pool a change set can update or remove.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableChargingPoolProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "dataLicenses",
-            "address",
-            "geoLocation",
-            "parkingType",
-            "accessibility",
-            "hotline",
-            "gridConnectionPointId",
-            "energyMeters",
-            "brands",
-            "openingTimes",
-            "energyMix",
-            "images",
-            "timeZone",
-            "facilities",
-            "paymentOptions",
-            "authenticationModes",
-            "uiFeatures",
-            "features",
-            "locationLanguages",
-            "entranceAddress",
-            "entranceLocation",
-            "exitAddress",
-            "exitLocation",
-            "arrivalInstructions",
-            "chargingWhenClosed",
-            "parkingRestrictions",
-            "relatedLocations",
-            "services",
-            "assistanceServiceDetails",
-            "standards",
-            "nutsCodes",
-            "templateIds",
-            "customData"
+            ChargingPool.BasePropertyKeys.Name,
+            ChargingPool.BasePropertyKeys.Description,
+            ChargingPool.BasePropertyKeys.DataSource,
+            ChargingPool.BasePropertyKeys.DataLicenses,
+            ChargingPool.PropertyKeys.Address,
+            ChargingPool.PropertyKeys.GeoLocation,
+            ChargingPool.PropertyKeys.ParkingType,
+            ChargingPool.PropertyKeys.Accessibility,
+            ChargingPool.PropertyKeys.HotlinePhoneNumber,
+            ChargingPool.PropertyKeys.GridConnectionPointId,
+            ChargingPool.PropertyKeys.EnergyMeters,
+            ChargingPool.PropertyKeys.Brands,
+            ChargingPool.PropertyKeys.OpeningTimes,
+            ChargingPool.PropertyKeys.EnergyMix,
+            ChargingPool.PropertyKeys.Images,
+            ChargingPool.PropertyKeys.TimeZone,
+            ChargingPool.PropertyKeys.Facilities,
+            ChargingPool.PropertyKeys.PaymentOptions,
+            ChargingPool.PropertyKeys.AuthenticationModes,
+            ChargingPool.PropertyKeys.UIFeatures,
+            ChargingPool.PropertyKeys.Features,
+            ChargingPool.PropertyKeys.LocationLanguages,
+            ChargingPool.PropertyKeys.EntranceAddress,
+            ChargingPool.PropertyKeys.EntranceLocation,
+            ChargingPool.PropertyKeys.ExitAddress,
+            ChargingPool.PropertyKeys.ExitLocation,
+            ChargingPool.PropertyKeys.ArrivalInstructions,
+            ChargingPool.PropertyKeys.ChargingWhenClosed,
+            ChargingPool.PropertyKeys.ParkingRestrictions,
+            ChargingPool.PropertyKeys.RelatedLocations,
+            ChargingPool.PropertyKeys.Services,
+            ChargingPool.PropertyKeys.AssistanceServiceDetails,
+            ChargingPool.PropertyKeys.Standards,
+            ChargingPool.PropertyKeys.NUTSCodes,
+            ChargingPool.PropertyKeys.TemplateIds,
+            ChargingPool.BasePropertyKeys.CustomData
         ];
 
         /// <summary>
         /// The properties of a charging station a change set can update or remove.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableChargingStationProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "physicalReference",
-            "address",
-            "geoLocation",
-            "hotline",
-            "manufacturerId",
-            "modelId",
-            "energyMeters",
-            "brands",
-            "openingTimes",
-            "images",
-            "vehicleTypes",
-            "euVehicleCategories",
-            "accessibility",
-            "features",
-            "calibrationInfo",
-            "certificationInfo",
-            "maxPower",
-            "parkingSpaceIds",
-            "templateIds",
-            "customData"
+            ChargingStation.BasePropertyKeys.Name,
+            ChargingStation.BasePropertyKeys.Description,
+            ChargingStation.BasePropertyKeys.DataSource,
+            ChargingStation.PropertyKeys.PhysicalReference,
+            ChargingStation.PropertyKeys.Address,
+            ChargingStation.PropertyKeys.GeoLocation,
+            ChargingStation.PropertyKeys.HotlinePhoneNumber,
+            ChargingStation.PropertyKeys.ManufacturerId,
+            ChargingStation.PropertyKeys.ModelId,
+            ChargingStation.PropertyKeys.EnergyMeters,
+            ChargingStation.PropertyKeys.Brands,
+            ChargingStation.PropertyKeys.OpeningTimes,
+            ChargingStation.PropertyKeys.Images,
+            ChargingStation.PropertyKeys.VehicleTypes,
+            ChargingStation.PropertyKeys.EUVehicleCategories,
+            ChargingStation.PropertyKeys.Accessibility,
+            ChargingStation.PropertyKeys.Features,
+            ChargingStation.PropertyKeys.CalibrationInfo,
+            ChargingStation.PropertyKeys.CertificationInfo,
+            ChargingStation.PropertyKeys.MaxPower,
+            ChargingStation.PropertyKeys.ParkingSpaceIds,
+            ChargingStation.PropertyKeys.TemplateIds,
+            ChargingStation.BasePropertyKeys.CustomData
         ];
 
         /// <summary>
         /// The properties of an EVSE a change set can update or remove.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableEVSEProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "physicalReference",
-            "currentTypes",
-            "chargingModes",
-            "maxVoltage",
-            "maxCurrent",
-            "maxPower",
-            "chargingConnectors",
-            "energyMeter",
-            "chargingTariffIds",
-            "brands",
-            "images",
-            "geoLocation",
-            "maxReservationDuration",
-            "reachDistance",
-            "operationTimeout",
-            "extendedOperationTimeout",
-            "standards",
-            "floorLevel",
-            "acceptedEMobilityProviderIds",
-            "templateIds",
-            "customData"
+            EVSE.BasePropertyKeys.Name,
+            EVSE.BasePropertyKeys.Description,
+            EVSE.BasePropertyKeys.DataSource,
+            EVSE.PropertyKeys.PhysicalReference,
+            EVSE.PropertyKeys.CurrentTypes,
+            EVSE.PropertyKeys.ChargingModes,
+            EVSE.PropertyKeys.MaxVoltage,
+            EVSE.PropertyKeys.MaxCurrent,
+            EVSE.PropertyKeys.MaxPower,
+            EVSE.PropertyKeys.ChargingConnectors,
+            EVSE.PropertyKeys.EnergyMeter,
+            EVSE.PropertyKeys.ChargingTariffIds,
+            EVSE.PropertyKeys.Brands,
+            EVSE.PropertyKeys.Images,
+            EVSE.PropertyKeys.GeoLocation,
+            EVSE.PropertyKeys.MaxReservationDuration,
+            EVSE.PropertyKeys.ReachDistance,
+            EVSE.PropertyKeys.OperationTimeout,
+            EVSE.PropertyKeys.ExtendedOperationTimeout,
+            EVSE.PropertyKeys.Standards,
+            EVSE.PropertyKeys.FloorLevel,
+            EVSE.PropertyKeys.AcceptedEMobilityProviderIds,
+            EVSE.PropertyKeys.TemplateIds,
+            EVSE.BasePropertyKeys.CustomData
         ];
 
         /// <summary>
         /// The direct children of an operator besides its charging pools, by their JSON keys.
         /// </summary>
         private static readonly ImmutableDictionary<String, String> OperatorChildArrays = new Dictionary<String, String> {
-            { nameof(ChargingTariff),           "chargingTariffs"           },
-            { nameof(EVSETemplate),             "EVSETemplates"             },
-            { nameof(ChargingStationTemplate),  "chargingStationTemplates"  },
-            { nameof(ChargingPoolTemplate),     "chargingPoolTemplates"     },
-            { nameof(ChargingTariffTemplate),   "chargingTariffTemplates"   },
-            { nameof(EVSEGroup),            "EVSEGroups"            },
-            { nameof(ChargingStationGroup), "chargingStationGroups" },
-            { nameof(ChargingPoolGroup),    "chargingPoolGroups"    },
-            { nameof(ChargingTariffGroup),  "chargingTariffGroups"  }
+            { nameof(ChargingTariff),           ChargingStationOperator.PropertyKeys.ChargingTariffs          },
+            { nameof(EVSETemplate),             ChargingStationOperator.PropertyKeys.EVSETemplates            },
+            { nameof(ChargingStationTemplate),  ChargingStationOperator.PropertyKeys.ChargingStationTemplates },
+            { nameof(ChargingPoolTemplate),     ChargingStationOperator.PropertyKeys.ChargingPoolTemplates    },
+            { nameof(ChargingTariffTemplate),   ChargingStationOperator.PropertyKeys.ChargingTariffTemplates  },
+            { nameof(EVSEGroup),            ChargingStationOperator.PropertyKeys.EVSEGroups            },
+            { nameof(ChargingStationGroup), ChargingStationOperator.PropertyKeys.ChargingStationGroups },
+            { nameof(ChargingPoolGroup),    ChargingStationOperator.PropertyKeys.ChargingPoolGroups    },
+            { nameof(ChargingTariffGroup),  ChargingStationOperator.PropertyKeys.ChargingTariffGroups  }
         }.ToImmutableDictionary();
 
         /// <summary>
@@ -166,23 +166,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// all but its identification, name, description, data source, custom data, templates, EVSEs and energy meters.
         /// </summary>
         internal static readonly ImmutableArray<String> ChargingStationTemplateStationProperties = [
-            "physicalReference",
-            "address",
-            "geoLocation",
-            "hotline",
-            "manufacturerId",
-            "modelId",
-            "brands",
-            "openingTimes",
-            "images",
-            "vehicleTypes",
-            "euVehicleCategories",
-            "accessibility",
-            "features",
-            "calibrationInfo",
-            "certificationInfo",
-            "maxPower",
-            "parkingSpaceIds"
+            ChargingStation.PropertyKeys.PhysicalReference,
+            ChargingStation.PropertyKeys.Address,
+            ChargingStation.PropertyKeys.GeoLocation,
+            ChargingStation.PropertyKeys.HotlinePhoneNumber,
+            ChargingStation.PropertyKeys.ManufacturerId,
+            ChargingStation.PropertyKeys.ModelId,
+            ChargingStation.PropertyKeys.Brands,
+            ChargingStation.PropertyKeys.OpeningTimes,
+            ChargingStation.PropertyKeys.Images,
+            ChargingStation.PropertyKeys.VehicleTypes,
+            ChargingStation.PropertyKeys.EUVehicleCategories,
+            ChargingStation.PropertyKeys.Accessibility,
+            ChargingStation.PropertyKeys.Features,
+            ChargingStation.PropertyKeys.CalibrationInfo,
+            ChargingStation.PropertyKeys.CertificationInfo,
+            ChargingStation.PropertyKeys.MaxPower,
+            ChargingStation.PropertyKeys.ParkingSpaceIds
         ];
 
         /// <summary>
@@ -190,23 +190,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// all but its identification, name, description, data source, custom data, templates, energy meter and charging tariffs.
         /// </summary>
         internal static readonly ImmutableArray<String> EVSETemplateEVSEProperties = [
-            "physicalReference",
-            "currentTypes",
-            "chargingModes",
-            "maxVoltage",
-            "maxCurrent",
-            "maxPower",
-            "chargingConnectors",
-            "brands",
-            "images",
-            "geoLocation",
-            "maxReservationDuration",
-            "reachDistance",
-            "operationTimeout",
-            "extendedOperationTimeout",
-            "standards",
-            "floorLevel",
-            "acceptedEMobilityProviderIds"
+            EVSE.PropertyKeys.PhysicalReference,
+            EVSE.PropertyKeys.CurrentTypes,
+            EVSE.PropertyKeys.ChargingModes,
+            EVSE.PropertyKeys.MaxVoltage,
+            EVSE.PropertyKeys.MaxCurrent,
+            EVSE.PropertyKeys.MaxPower,
+            EVSE.PropertyKeys.ChargingConnectors,
+            EVSE.PropertyKeys.Brands,
+            EVSE.PropertyKeys.Images,
+            EVSE.PropertyKeys.GeoLocation,
+            EVSE.PropertyKeys.MaxReservationDuration,
+            EVSE.PropertyKeys.ReachDistance,
+            EVSE.PropertyKeys.OperationTimeout,
+            EVSE.PropertyKeys.ExtendedOperationTimeout,
+            EVSE.PropertyKeys.Standards,
+            EVSE.PropertyKeys.FloorLevel,
+            EVSE.PropertyKeys.AcceptedEMobilityProviderIds
         ];
 
         /// <summary>
@@ -214,36 +214,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// all but its identification, name, description, data source, custom data, templates, charging stations and energy meters.
         /// </summary>
         internal static readonly ImmutableArray<String> ChargingPoolTemplatePoolProperties = [
-            "dataLicenses",
-            "address",
-            "geoLocation",
-            "parkingType",
-            "accessibility",
-            "hotline",
-            "gridConnectionPointId",
-            "brands",
-            "openingTimes",
-            "energyMix",
-            "images",
-            "timeZone",
-            "facilities",
-            "paymentOptions",
-            "authenticationModes",
-            "uiFeatures",
-            "features",
-            "locationLanguages",
-            "entranceAddress",
-            "entranceLocation",
-            "exitAddress",
-            "exitLocation",
-            "arrivalInstructions",
-            "chargingWhenClosed",
-            "parkingRestrictions",
-            "relatedLocations",
-            "services",
-            "assistanceServiceDetails",
-            "standards",
-            "nutsCodes"
+            ChargingPool.BasePropertyKeys.DataLicenses,
+            ChargingPool.PropertyKeys.Address,
+            ChargingPool.PropertyKeys.GeoLocation,
+            ChargingPool.PropertyKeys.ParkingType,
+            ChargingPool.PropertyKeys.Accessibility,
+            ChargingPool.PropertyKeys.HotlinePhoneNumber,
+            ChargingPool.PropertyKeys.GridConnectionPointId,
+            ChargingPool.PropertyKeys.Brands,
+            ChargingPool.PropertyKeys.OpeningTimes,
+            ChargingPool.PropertyKeys.EnergyMix,
+            ChargingPool.PropertyKeys.Images,
+            ChargingPool.PropertyKeys.TimeZone,
+            ChargingPool.PropertyKeys.Facilities,
+            ChargingPool.PropertyKeys.PaymentOptions,
+            ChargingPool.PropertyKeys.AuthenticationModes,
+            ChargingPool.PropertyKeys.UIFeatures,
+            ChargingPool.PropertyKeys.Features,
+            ChargingPool.PropertyKeys.LocationLanguages,
+            ChargingPool.PropertyKeys.EntranceAddress,
+            ChargingPool.PropertyKeys.EntranceLocation,
+            ChargingPool.PropertyKeys.ExitAddress,
+            ChargingPool.PropertyKeys.ExitLocation,
+            ChargingPool.PropertyKeys.ArrivalInstructions,
+            ChargingPool.PropertyKeys.ChargingWhenClosed,
+            ChargingPool.PropertyKeys.ParkingRestrictions,
+            ChargingPool.PropertyKeys.RelatedLocations,
+            ChargingPool.PropertyKeys.Services,
+            ChargingPool.PropertyKeys.AssistanceServiceDetails,
+            ChargingPool.PropertyKeys.Standards,
+            ChargingPool.PropertyKeys.NUTSCodes
         ];
 
         /// <summary>
@@ -251,17 +251,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// all but its identification, name, description, data source, custom data and templates.
         /// </summary>
         internal static readonly ImmutableArray<String> ChargingTariffTemplateTariffProperties = [
-            "currency",
-            "tariffType",
-            "tariffURL",
-            "elements",
-            "minPrice",
-            "maxPrice",
-            "paymentMeans",
-            "paymentBrands",
-            "validFrom",
-            "validUntil",
-            "energyMix"
+            ChargingTariff.PropertyKeys.Currency,
+            ChargingTariff.PropertyKeys.TariffType,
+            ChargingTariff.PropertyKeys.TariffURL,
+            ChargingTariff.PropertyKeys.Elements,
+            ChargingTariff.PropertyKeys.MinPrice,
+            ChargingTariff.PropertyKeys.MaxPrice,
+            ChargingTariff.PropertyKeys.PaymentMeans,
+            ChargingTariff.PropertyKeys.PaymentBrands,
+            ChargingTariff.PropertyKeys.ValidFrom,
+            ChargingTariff.PropertyKeys.ValidUntil,
+            ChargingTariff.PropertyKeys.EnergyMix
         ];
 
         /// <summary>
@@ -269,10 +269,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// nothing.
         /// </summary>
         private static readonly ImmutableDictionary<String, ImmutableHashSet<String>> ChangeableGroupProperties = new Dictionary<String, ImmutableHashSet<String>> {
-            { nameof(EVSEGroup),            [ "name", "description", "dataSource", "EVSEIds",            "customData" ] },
-            { nameof(ChargingStationGroup), [ "name", "description", "dataSource", "chargingStationIds", "customData" ] },
-            { nameof(ChargingPoolGroup),    [ "name", "description", "dataSource", "chargingPoolIds",    "customData" ] },
-            { nameof(ChargingTariffGroup),  [ "name", "description", "dataSource", "chargingTariffIds",  "customData" ] }
+            { nameof(EVSEGroup),            [ EVSEGroup.           BasePropertyKeys.Name, EVSEGroup.           BasePropertyKeys.Description, EVSEGroup.           BasePropertyKeys.DataSource,
+                                              EVSEGroup.           PropertyKeys.EVSEIds,            EVSEGroup.           BasePropertyKeys.CustomData ] },
+            { nameof(ChargingStationGroup), [ ChargingStationGroup.BasePropertyKeys.Name, ChargingStationGroup.BasePropertyKeys.Description, ChargingStationGroup.BasePropertyKeys.DataSource,
+                                              ChargingStationGroup.PropertyKeys.ChargingStationIds, ChargingStationGroup.BasePropertyKeys.CustomData ] },
+            { nameof(ChargingPoolGroup),    [ ChargingPoolGroup.   BasePropertyKeys.Name, ChargingPoolGroup.   BasePropertyKeys.Description, ChargingPoolGroup.   BasePropertyKeys.DataSource,
+                                              ChargingPoolGroup.   PropertyKeys.ChargingPoolIds,    ChargingPoolGroup.   BasePropertyKeys.CustomData ] },
+            { nameof(ChargingTariffGroup),  [ ChargingTariffGroup. BasePropertyKeys.Name, ChargingTariffGroup. BasePropertyKeys.Description, ChargingTariffGroup. BasePropertyKeys.DataSource,
+                                              ChargingTariffGroup. PropertyKeys.ChargingTariffIds,  ChargingTariffGroup. BasePropertyKeys.CustomData ] }
         }.ToImmutableDictionary();
 
         /// <summary>
@@ -280,13 +284,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// gives them, and of an EVSE, charging station or charging pool template the charging tariff of their EVSEs.
         /// </summary>
         private static readonly ImmutableDictionary<String, ImmutableHashSet<String>> ChangeableTemplateProperties = new Dictionary<String, ImmutableHashSet<String>> {
-            { nameof(EVSETemplate),             [ "name", "description", "dataSource", "chargingTariffId", "customData",
+            { nameof(EVSETemplate),             [ EVSETemplate.           PropertyKeys.Name, EVSETemplate.           PropertyKeys.Description, EVSETemplate.           PropertyKeys.DataSource,
+                                                  EVSETemplate.           PropertyKeys.ChargingTariffId, EVSETemplate.           PropertyKeys.CustomData,
                                                   .. EVSETemplateEVSEProperties ] },
-            { nameof(ChargingStationTemplate),  [ "name", "description", "dataSource", "chargingTariffId", "customData",
+            { nameof(ChargingStationTemplate),  [ ChargingStationTemplate.PropertyKeys.Name, ChargingStationTemplate.PropertyKeys.Description, ChargingStationTemplate.PropertyKeys.DataSource,
+                                                  ChargingStationTemplate.PropertyKeys.ChargingTariffId, ChargingStationTemplate.PropertyKeys.CustomData,
                                                   .. ChargingStationTemplateStationProperties ] },
-            { nameof(ChargingPoolTemplate),     [ "name", "description", "dataSource", "chargingTariffId", "customData",
+            { nameof(ChargingPoolTemplate),     [ ChargingPoolTemplate.   PropertyKeys.Name, ChargingPoolTemplate.   PropertyKeys.Description, ChargingPoolTemplate.   PropertyKeys.DataSource,
+                                                  ChargingPoolTemplate.   PropertyKeys.ChargingTariffId, ChargingPoolTemplate.   PropertyKeys.CustomData,
                                                   .. ChargingPoolTemplatePoolProperties ] },
-            { nameof(ChargingTariffTemplate),   [ "name", "description", "dataSource", "customData",
+            { nameof(ChargingTariffTemplate),   [ ChargingTariffTemplate. PropertyKeys.Name, ChargingTariffTemplate. PropertyKeys.Description, ChargingTariffTemplate. PropertyKeys.DataSource,
+                                                  ChargingTariffTemplate. PropertyKeys.CustomData,
                                                   .. ChargingTariffTemplateTariffProperties ] }
         }.ToImmutableDictionary();
 
@@ -294,22 +302,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The properties of a charging tariff a change set can update, and remove unless they are required.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableChargingTariffProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "currency",
-            "tariffType",
-            "tariffURL",
-            "elements",
-            "minPrice",
-            "maxPrice",
-            "paymentMeans",
-            "paymentBrands",
-            "validFrom",
-            "validUntil",
-            "energyMix",
-            "templateIds",
-            "customData"
+            ChargingTariff.BasePropertyKeys.Name,
+            ChargingTariff.BasePropertyKeys.Description,
+            ChargingTariff.BasePropertyKeys.DataSource,
+            ChargingTariff.PropertyKeys.Currency,
+            ChargingTariff.PropertyKeys.TariffType,
+            ChargingTariff.PropertyKeys.TariffURL,
+            ChargingTariff.PropertyKeys.Elements,
+            ChargingTariff.PropertyKeys.MinPrice,
+            ChargingTariff.PropertyKeys.MaxPrice,
+            ChargingTariff.PropertyKeys.PaymentMeans,
+            ChargingTariff.PropertyKeys.PaymentBrands,
+            ChargingTariff.PropertyKeys.ValidFrom,
+            ChargingTariff.PropertyKeys.ValidUntil,
+            ChargingTariff.PropertyKeys.EnergyMix,
+            ChargingTariff.PropertyKeys.TemplateIds,
+            ChargingTariff.BasePropertyKeys.CustomData
         ];
 
         #endregion
@@ -483,7 +491,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         entityJSON![propertyName] = Change.NewValue;
 
                     // The change set's timestamp is the last change, so that its after ETags are deterministic.
-                    entityJSON["lastChange"] = CreatedAt.ToISO8601();
+                    entityJSON[BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
                     break;
 
                 #endregion
@@ -499,8 +507,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     if (Change.NewValue is not JObject newEntity ||
-                        newEntity["@id"]?.Type != JTokenType.String ||
-                        newEntity["@id"]!.Value<String>() != entityId)
+                        newEntity[BasePropertyKeys.Id]?.Type != JTokenType.String ||
+                        newEntity[BasePropertyKeys.Id]!.Value<String>() != entityId)
                     {
                         ErrorResponse = $"Change {Index}: the {description} to add must be a JSON object with the identification '{entityId}'!";
                         return false;
@@ -519,8 +527,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     // The change set's timestamp is the last change and, unless given, the creation,
                     // so that its after ETags are deterministic.
                     var added = (JObject) newEntity.DeepClone();
-                    added["created"]    ??= CreatedAt.ToISO8601();
-                    added["lastChange"]   = CreatedAt.ToISO8601();
+                    added[BasePropertyKeys.Created]    ??= CreatedAt.ToISO8601();
+                    added[BasePropertyKeys.LastChange]   = CreatedAt.ToISO8601();
 
                     children.Add(added);
                     break;
@@ -598,13 +606,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (parent is null)
                     break;
 
-                parent["lastChange"]  = lastChange;
+                parent[BasePropertyKeys.LastChange]  = lastChange;
                 ParentType            = grandParentType;
                 ParentId              = grandParentId;
 
             }
 
-            OperatorJSON["lastChange"] = lastChange;
+            OperatorJSON[ChargingStationOperator.BasePropertyKeys.LastChange] = lastChange;
 
         }
 
@@ -620,7 +628,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                                     String   EntityId)
         {
 
-            var operatorId = OperatorJSON["@id"]?.Value<String>();
+            var operatorId = OperatorJSON[ChargingStationOperator.BasePropertyKeys.Id]?.Value<String>();
 
             // Charging tariffs, templates and groups are children of the operator itself.
             if (OperatorChildArrays.TryGetValue(EntityType, out var childArray))
@@ -628,20 +636,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (OperatorJSON[childArray] is JArray operatorChildren)
                     foreach (var operatorChild in operatorChildren.OfType<JObject>())
-                        if (operatorChild["@id"]?.Value<String>() == EntityId)
+                        if (operatorChild[BasePropertyKeys.Id]?.Value<String>() == EntityId)
                             return (operatorChild, operatorChildren, nameof(ChargingStationOperator), operatorId);
 
                 return (null, null, null, null);
 
             }
 
-            if (OperatorJSON["chargingPools"] is not JArray chargingPools)
+            if (OperatorJSON[ChargingStationOperator.PropertyKeys.ChargingPools] is not JArray chargingPools)
                 return (null, null, null, null);
 
             foreach (var chargingPool in chargingPools.OfType<JObject>())
             {
 
-                var chargingPoolId = chargingPool["@id"]?.Value<String>();
+                var chargingPoolId = chargingPool[ChargingPool.BasePropertyKeys.Id]?.Value<String>();
 
                 if (EntityType == nameof(ChargingPool))
                 {
@@ -650,13 +658,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     continue;
                 }
 
-                if (chargingPool["chargingStations"] is not JArray chargingStations)
+                if (chargingPool[ChargingPool.PropertyKeys.ChargingStations] is not JArray chargingStations)
                     continue;
 
                 foreach (var chargingStation in chargingStations.OfType<JObject>())
                 {
 
-                    var chargingStationId = chargingStation["@id"]?.Value<String>();
+                    var chargingStationId = chargingStation[ChargingStation.BasePropertyKeys.Id]?.Value<String>();
 
                     if (EntityType == nameof(ChargingStation))
                     {
@@ -665,11 +673,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         continue;
                     }
 
-                    if (chargingStation["EVSEs"] is not JArray evses)
+                    if (chargingStation[ChargingStation.PropertyKeys.EVSEs] is not JArray evses)
                         continue;
 
                     foreach (var evse in evses.OfType<JObject>())
-                        if (evse["@id"]?.Value<String>() == EntityId)
+                        if (evse[EVSE.BasePropertyKeys.Id]?.Value<String>() == EntityId)
                             return (evse, evses, nameof(ChargingStation), chargingStationId);
 
                 }
@@ -723,7 +731,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     parent        = OperatorJSON;
-                    childrenName  = Change.EntityType == nameof(ChargingPool) ? "chargingPools" : OperatorChildArrays[Change.EntityType];
+                    childrenName  = Change.EntityType == nameof(ChargingPool) ? ChargingStationOperator.PropertyKeys.ChargingPools : OperatorChildArrays[Change.EntityType];
                     break;
 
                 case nameof(ChargingStation):
@@ -741,7 +749,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     parent        = chargingPool;
-                    childrenName  = "chargingStations";
+                    childrenName  = ChargingPool.PropertyKeys.ChargingStations;
                     break;
 
                 default:
@@ -759,7 +767,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     parent        = chargingStation;
-                    childrenName  = "EVSEs";
+                    childrenName  = ChargingStation.PropertyKeys.EVSEs;
                     break;
 
             }

@@ -40,6 +40,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
     internal static partial class StrictJSON
     {
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys every strictly read data structure shares.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context.
+            /// </summary>
+            public const String  Context   = "@context";
+
+        }
+
+        #endregion
+
         #region Properties
 
         /// <summary>
@@ -237,9 +254,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      String   Expected)
         {
 
-            if (JSON["@context"] is { } context &&
+            if (JSON[PropertyKeys.Context] is { } context &&
                 (context.Type != JTokenType.String || context.Value<String>() != Expected))
-                throw new ArgumentException("Invalid '@context'.");
+                throw new ArgumentException($"Invalid '{PropertyKeys.Context}'.");
 
         }
 

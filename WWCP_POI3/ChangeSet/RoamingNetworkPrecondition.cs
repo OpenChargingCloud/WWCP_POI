@@ -30,6 +30,52 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     ETag    ETag)
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkPrecondition";
+
+        #endregion
+
+        #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context      = "@context";
+
+            /// <summary>
+            /// The property of its entity type.
+            /// </summary>
+            public const String  EntityType   = "entityType";
+
+            /// <summary>
+            /// The property of its entity identification.
+            /// </summary>
+            public const String  EntityId     = "entityId";
+
+            /// <summary>
+            /// The property of its ETag.
+            /// </summary>
+            public const String  ETag         = "eTag";
+
+        }
+
+        #endregion
+
+        #endregion
+
+
         #region TryParse (JSON, out Precondition, out ErrorResponse)
 
         /// <summary>
@@ -48,13 +94,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatoryText("entityType", "entity type", out var entityType, out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("entityId",   "entity identification", out var entityId, out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the precondition must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!JSON.ParseMandatoryText(PropertyKeys.EntityType, "entity type", out var entityType, out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.EntityId,   "entity identification", out var entityId, out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (JSON["eTag"] is not JToken eTagJSON)
+                if (JSON[PropertyKeys.ETag] is not JToken eTagJSON)
                 {
                     ErrorResponse = "The ETag of a precondition is missing!";
                     return false;
@@ -76,18 +129,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomRoamingNetworkPreconditionSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this precondition: { "entityType", "entityId", "eTag" }.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomRoamingNetworkPreconditionSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                                       Embedded                                     = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkPrecondition>?  CustomRoamingNetworkPreconditionSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("entityType",  EntityType),
-                   new JProperty("entityId",    EntityId),
-                   new JProperty("eTag",        ETag.ToJSON())
-               );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,     JSONLDContext);
+
+            json.Add(PropertyKeys.EntityType,      EntityType);
+            json.Add(PropertyKeys.EntityId,        EntityId);
+            json.Add(PropertyKeys.ETag,            ETag.ToJSON());
+
+            return CustomRoamingNetworkPreconditionSerializer is not null
+                       ? CustomRoamingNetworkPreconditionSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 

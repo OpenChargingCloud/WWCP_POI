@@ -46,7 +46,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var answer          = await Connection.RequestAsync("epoch", [], CancellationToken);
 
             // A server without epochs is in the first one.
-            var theirs          = answer.IsError ? 1 : answer.GetPayloadJSON()?["epoch"]?.Value<UInt32>() ?? 1;
+            var theirs          = answer.IsError ? 1 : answer.GetPayloadJSON()?[RoamingNetworkEpoch.PropertyKeys.Epoch]?.Value<UInt32>() ?? 1;
             var ours            = currentHistory.Epoch.Number;
 
             if (theirs == ours)

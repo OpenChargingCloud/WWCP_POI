@@ -449,8 +449,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var rebasedFrom  = metadata["rebasedFrom"] as JArray ?? [];
 
                 rebasedFrom.Add(new JObject(
-                                    new JProperty("@id",          ChangeSet.Id.ToString()),
-                                    new JProperty("beforeETags",  new JArray(ChangeSet.BeforeETags.Select(eTag => eTag.ToJSON())))
+                                    new JProperty(RoamingNetworkChangeSet.PropertyKeys.Id,           ChangeSet.Id.ToString()),
+                                    new JProperty(RoamingNetworkChangeSet.PropertyKeys.BeforeETags,  new JArray(ChangeSet.BeforeETags.Select(eTag => eTag.ToJSON())))
                                 ));
 
                 metadata["rebasedFrom"] = rebasedFrom;
@@ -624,7 +624,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             if (applied.Kind == RoamingNetworkChangeKind.RemoveProperty)
                             {
 
-                                if (propertyName == "name")
+                                if (propertyName == ChargingStationOperator.BasePropertyKeys.Name)
                                 {
                                     ErrorResponse = $"Change {index}: the name of a charging station operator can not be removed, only changed!";
                                     return false;
@@ -643,7 +643,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 currentOperatorJSON![propertyName] = applied.NewValue;
 
                             // The change set's timestamp is the last change, so that its after ETags are deterministic.
-                            currentOperatorJSON!["lastChange"] = ChangeSet.CreatedAt.ToISO8601();
+                            currentOperatorJSON![ChargingStationOperator.BasePropertyKeys.LastChange] = ChangeSet.CreatedAt.ToISO8601();
 
                             // The changed operator must still be a valid one.
                             if (!ChargingStationOperator.TryParseWithinChangeSet(currentOperatorJSON, out var changedOperator, out var changedOperatorError))
@@ -673,8 +673,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             // The change set's timestamp is the last change and, unless given, the creation,
                             // so that its after ETags are deterministic.
                             var newOperatorJSON = (JObject) applied.NewValue!;
-                            newOperatorJSON["created"]    ??= ChangeSet.CreatedAt.ToISO8601();
-                            newOperatorJSON["lastChange"]   = ChangeSet.CreatedAt.ToISO8601();
+                            newOperatorJSON[ChargingStationOperator.BasePropertyKeys.Created]    ??= ChangeSet.CreatedAt.ToISO8601();
+                            newOperatorJSON[ChargingStationOperator.BasePropertyKeys.LastChange]   = ChangeSet.CreatedAt.ToISO8601();
 
                             if (!ChargingStationOperator.TryParseWithinChangeSet(newOperatorJSON, out var newOperator, out var newOperatorError))
                             {
@@ -765,7 +765,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             switch (propertyName)
                             {
 
-                                case "name":
+                                case BasePropertyKeys.Name:
                                     if (!TryParseI18N(newValue, out var newName, out var nameError))
                                     {
                                         ErrorResponse = $"Change {index}: invalid name: {nameError}";
@@ -774,7 +774,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     name = newName;
                                     break;
 
-                                case "description":
+                                case BasePropertyKeys.Description:
                                     if (!TryParseI18N(newValue, out var newDescription, out var descriptionError))
                                     {
                                         ErrorResponse = $"Change {index}: invalid description: {descriptionError}";
@@ -783,7 +783,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     description = newDescription;
                                     break;
 
-                                case "dataSource":
+                                case BasePropertyKeys.DataSource:
                                     if (newValue.Type != JTokenType.String || String.IsNullOrWhiteSpace(newValue.Value<String>()))
                                     {
                                         ErrorResponse = $"Change {index}: the data source must be a nonempty text!";
@@ -792,7 +792,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     dataSource = newValue.Value<String>();
                                     break;
 
-                                case "dataLicenses":
+                                case BasePropertyKeys.DataLicenses:
                                     if (!POIDataLicenses.TryParse(newValue, null, out var newLicenses, out var licensesError))
                                     {
                                         ErrorResponse = $"Change {index}: {licensesError}";
@@ -801,7 +801,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     licenses = newLicenses;
                                     break;
 
-                                case POITreeHashAlgorithms.JSONProperty:
+                                case PropertyKeys.TreeHashAlgorithms:
                                     if (!POITreeHashAlgorithms.TryParse(newValue, out var newTreeHashAlgorithms, out var treeHashAlgorithmsError) || newTreeHashAlgorithms is null)
                                     {
                                         ErrorResponse = $"Change {index}: {treeHashAlgorithmsError ?? "the tree hash algorithms must be an array of hash algorithms!"}";
@@ -810,7 +810,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     treeHashAlgorithms = newTreeHashAlgorithms;
                                     break;
 
-                                case "customData":
+                                case BasePropertyKeys.CustomData:
                                     if (newValue is not JObject newCustomData)
                                     {
                                         ErrorResponse = $"Change {index}: the custom data must be a JSON object!";
@@ -819,8 +819,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     customData = CustomDataNew.ParseJObject(newCustomData);
                                     break;
 
-                                case POIPartyKeys.SigningKeysProperty:
-                                case POIPartyKeys.IdentityKeysProperty:
+                                case RoamingNetworkOperator.PropertyKeys.SigningKeys:
+                                case RoamingNetworkOperator.PropertyKeys.IdentityKeys:
                                     ErrorResponse = $"Change {index}: a roaming network has no keys of its own: they are the keys of its {nameof(POI.RoamingNetworkOperator)}!";
                                     return false;
 
@@ -847,27 +847,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             switch (propertyName)
                             {
 
-                                case "name":
+                                case BasePropertyKeys.Name:
                                     name         = ImmutableI18NString.Empty;
                                     break;
 
-                                case "description":
+                                case BasePropertyKeys.Description:
                                     description  = ImmutableI18NString.Empty;
                                     break;
 
-                                case "dataSource":
+                                case BasePropertyKeys.DataSource:
                                     dataSource   = null;
                                     break;
 
-                                case "dataLicenses":
+                                case BasePropertyKeys.DataLicenses:
                                     licenses     = [];
                                     break;
 
-                                case POITreeHashAlgorithms.JSONProperty:
+                                case PropertyKeys.TreeHashAlgorithms:
                                     treeHashAlgorithms = null;
                                     break;
 
-                                case "customData":
+                                case BasePropertyKeys.CustomData:
                                     customData   = CustomDataNew.Empty;
                                     break;
 
@@ -1157,22 +1157,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// as named in its embedded JSON representation. Its identification can not be changed.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableOperatorProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "dataLicenses",
-            "address",
-            "geoLocation",
-            "logos",
-            "telephone",
-            "eMailAddress",
-            "homepage",
-            "hotline",
-            "termsAndConditions",
-            "brands",
-            "signingKeys",
-            "identityKeys",
-            "customData"
+            ChargingStationOperator.BasePropertyKeys.Name,
+            ChargingStationOperator.BasePropertyKeys.Description,
+            ChargingStationOperator.BasePropertyKeys.DataSource,
+            ChargingStationOperator.BasePropertyKeys.DataLicenses,
+            ChargingStationOperator.PropertyKeys.Address,
+            ChargingStationOperator.PropertyKeys.GeoLocation,
+            ChargingStationOperator.PropertyKeys.Logos,
+            ChargingStationOperator.PropertyKeys.Telephone,
+            ChargingStationOperator.PropertyKeys.EMailAddress,
+            ChargingStationOperator.PropertyKeys.Homepage,
+            ChargingStationOperator.PropertyKeys.HotlinePhoneNumber,
+            ChargingStationOperator.PropertyKeys.TermsAndConditions,
+            ChargingStationOperator.PropertyKeys.Brands,
+            ChargingStationOperator.PropertyKeys.SigningKeys,
+            ChargingStationOperator.PropertyKeys.IdentityKeys,
+            ChargingStationOperator.BasePropertyKeys.CustomData
         ];
 
         #endregion
@@ -1182,22 +1182,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON value of the given property, as ToJSON() writes it, or null when it is absent.
         /// </summary>
-        private static JToken? CurrentValue(String                     PropertyName,
-                                            ImmutableI18NString        Name,
-                                            ImmutableI18NString        Description,
-                                            String?                    DataSource,
-                                            ImmutableArray<DataLicense>  DataLicenses,
-                                            CustomDataNew              CustomData,
+        private static JToken? CurrentValue(String                              PropertyName,
+                                            ImmutableI18NString                 Name,
+                                            ImmutableI18NString                 Description,
+                                            String?                             DataSource,
+                                            ImmutableArray<DataLicense>         DataLicenses,
+                                            CustomDataNew                       CustomData,
                                             ImmutableArray<ETagHashAlgorithm>?  TreeHashAlgorithms)
 
             => PropertyName switch {
-                   POITreeHashAlgorithms.JSONProperty  => TreeHashAlgorithms.HasValue ? POITreeHashAlgorithms.ToJSON(TreeHashAlgorithms.Value) : null,
-                   "name"          => Name.       IsNotNullOrEmpty()       ? Name.       ToJSON()      : null,
-                   "description"   => Description.IsNotNullOrEmpty()       ? Description.ToJSON()      : null,
-                   "dataSource"    => DataSource.IsNeitherNullNorEmpty()   ? DataSource                : null,
-                   "dataLicenses"  => DataLicenses.Length > 0              ? DataLicenses.ToPOIJSON()  : null,
-                   "customData"    => CustomData.HasValues                 ? CustomData.ToJObject()    : null,
-                   _               => null
+                   PropertyKeys.    TreeHashAlgorithms  => TreeHashAlgorithms.HasValue          ? POITreeHashAlgorithms.ToJSON(TreeHashAlgorithms.Value) : null,
+                   BasePropertyKeys.Name                => Name.       IsNotNullOrEmpty()       ? Name.       ToJSON()      : null,
+                   BasePropertyKeys.Description         => Description.IsNotNullOrEmpty()       ? Description.ToJSON()      : null,
+                   BasePropertyKeys.DataSource          => DataSource.IsNeitherNullNorEmpty()   ? DataSource                : null,
+                   BasePropertyKeys.DataLicenses        => DataLicenses.Length > 0              ? DataLicenses.ToPOIJSON()  : null,
+                   BasePropertyKeys.CustomData          => CustomData.HasValues                 ? CustomData.ToJObject()    : null,
+                   _                                    => null
                };
 
         #endregion

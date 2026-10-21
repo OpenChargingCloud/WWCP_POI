@@ -24,7 +24,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed record POIElementPathSegment
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/poiElementPathSegment";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context        = "@context";
+
+            /// <summary>
+            /// The property of its schema property name.
+            /// </summary>
+            public const String  PropertyName   = "propertyName";
+
+            /// <summary>
+            /// The property of its element identification.
+            /// </summary>
+            public const String  ElementId      = "elementId";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The exact schema property name on the current owner.
@@ -82,9 +119,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the element path segment must be '{JSONLDContext}'!";
+                    return false;
+                }
+
                 #region Parse PropertyName    [mandatory]
 
-                if (!JSON.ParseMandatoryText("propertyName",
+                if (!JSON.ParseMandatoryText(PropertyKeys.PropertyName,
                                              "property name",
                                              out var propertyName,
                                              out ErrorResponse))
@@ -96,7 +140,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse ElementId       [optional]
 
-                if (JSON.ParseOptional("elementId",
+                if (JSON.ParseOptional(PropertyKeys.ElementId,
                                        "element identification",
                                        out String? elementId,
                                        out ErrorResponse))
@@ -128,22 +172,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomPOIElementPathSegmentSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this element path segment.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomPOIElementPathSegmentSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                                  Embedded                                = false,
+                              CustomJObjectSerializerDelegate<POIElementPathSegment>?  CustomPOIElementPathSegmentSerializer   = null)
+        {
 
-            => JSONObject.Create(
+            var json = JSONObject.Create(
 
-                         new JProperty("propertyName",  PropertyName),
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,       JSONLDContext)
+                               : null,
 
-                   ElementId is not null
-                       ? new JProperty("elementId",     ElementId)
-                       : null
+                                 new JProperty(PropertyKeys.PropertyName,  PropertyName),
 
-               );
+                           ElementId is not null
+                               ? new JProperty(PropertyKeys.ElementId,     ElementId)
+                               : null
+
+                       );
+
+            return CustomPOIElementPathSegmentSerializer is not null
+                       ? CustomPOIElementPathSegmentSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 

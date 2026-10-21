@@ -66,6 +66,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class BasePropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization every template shares.
+        /// </summary>
+        public static class BasePropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name          = "name";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description   = "description";
+
+            /// <summary>
+            /// The property of its data source.
+            /// </summary>
+            public const String  DataSource    = "dataSource";
+
+        }
+
+        #endregion
+
+
         /// <summary>
         /// The identification of the template.
         /// </summary>
@@ -142,13 +170,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (Name.IsNotNullOrEmpty())
-                JSON.Add("name",         Name.ToJSON());
+                JSON.Add(BasePropertyKeys.Name,         Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                JSON.Add("description",  Description.ToJSON());
+                JSON.Add(BasePropertyKeys.Description,  Description.ToJSON());
 
             if (DataSource is not null)
-                JSON.Add("dataSource",   DataSource);
+                JSON.Add(BasePropertyKeys.DataSource,   DataSource);
 
         }
 

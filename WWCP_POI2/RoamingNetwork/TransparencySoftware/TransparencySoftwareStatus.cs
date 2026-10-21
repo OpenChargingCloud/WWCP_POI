@@ -46,7 +46,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                              IComparable
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/transparencySoftwareStatus";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                  = "@context";
+
+            /// <summary>
+            /// The property of its transparency software identification.
+            /// </summary>
+            public const String  TransparencySoftwareId   = "transparencySoftwareId";
+
+            /// <summary>
+            /// The property of its legal status.
+            /// </summary>
+            public const String  LegalStatus              = "legalStatus";
+
+            /// <summary>
+            /// The property of its certificate identification.
+            /// </summary>
+            public const String  CertificateId            = "certificateId";
+
+        }
+
+        #endregion
 
         /// <summary>
         /// The transparency software release.
@@ -110,23 +151,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON(CustomTransparencySoftwareStatusSerializer = null)
+        #region ToJSON(Embedded = false, CustomTransparencySoftwareStatusSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this object. The software release and
         /// its document are referenced by their identifications.
         /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="CustomTransparencySoftwareStatusSerializer">A delegate to serialize custom transparency software status JSON objects.</param>
-        public JObject ToJSON(CustomJObjectSerializerDelegate<TransparencySoftwareStatus>? CustomTransparencySoftwareStatusSerializer = null)
+        public JObject ToJSON(Boolean                                                       Embedded                                     = false,
+                              CustomJObjectSerializerDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusSerializer   = null)
         {
 
             var json = JSONObject.Create(
 
-                                 new JProperty("transparencySoftwareId",  TransparencySoftwareId.ToString()),
-                                 new JProperty("legalStatus",             LegalStatus.           ToString()),
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,                  JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.TransparencySoftwareId,   TransparencySoftwareId.ToString()),
+                                 new JProperty(PropertyKeys.LegalStatus,              LegalStatus.           ToString()),
 
                            CertificateId.HasValue
-                               ? new JProperty("certificateId",           CertificateId.Value.   ToString())
+                               ? new JProperty(PropertyKeys.CertificateId,            CertificateId.Value.   ToString())
                                : null
 
                        );

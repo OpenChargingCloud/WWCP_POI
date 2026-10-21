@@ -40,11 +40,53 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data
 
+        /// <summary>
+        /// The JSON-LD context of the object, unless another one is given.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/statusReport";
+
         private readonly Dictionary<TStatus, Tuple<UInt64, Single>> overview;
 
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context      = "@context";
+
+            /// <summary>
+            /// The property of its generation timestamp.
+            /// </summary>
+            public const String  Timestamp    = "timestamp";
+
+            /// <summary>
+            /// The property of its number of aggregated entities, and of the number of entities having a status.
+            /// </summary>
+            public const String  Count        = "count";
+
+            /// <summary>
+            /// The property of the percentage of entities having a status.
+            /// </summary>
+            public const String  Percentage   = "percentage";
+
+            /// <summary>
+            /// The property of its report per status.
+            /// </summary>
+            public const String  Report       = "report";
+
+        }
+
+        #endregion
 
         /// <summary>
         /// The timestamp of the status report generation.
@@ -92,7 +134,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.Entities        = Entities;
             this.Timestamp       = Timestamp   ?? org.GraphDefined.Vanaheimr.Illias.Timestamp.Now;
-            this.JSONContext     = JSONContext ?? "https://open.charging.cloud/contexts/wwcp+json/statusReport";
+            this.JSONContext     = JSONContext ?? JSONLDContext;
 
             this.Count           = (UInt32) Entities.Count();
             var sum              = (Single) this.Count;
@@ -144,7 +186,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return a JSON representation of the given status report.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        public JObject ToJSON(Boolean Embedded = false)
+        /// <param name="CustomStatusReportSerializer">A delegate to serialize custom status report JSON objects.</param>
+        public JObject ToJSON(Boolean                                                         Embedded                       = false,
+                              CustomJObjectSerializerDelegate<StatusReport<TEntity, TStatus>>?  CustomStatusReportSerializer   = null)
         {
 
             var reportJSON = new JObject();
@@ -156,8 +200,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (key is not null)
                     reportJSON.Add(new JProperty(key, new JObject(
-                                                          new JProperty("count",      item.Value.Item1),
-                                                          new JProperty("percentage", item.Value.Item2)
+                                                          new JProperty(PropertyKeys.Count,       item.Value.Item1),
+                                                          new JProperty(PropertyKeys.Percentage,  item.Value.Item2)
                                                       )));
 
             }
@@ -165,16 +209,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var json = JSONObject.Create(
 
                            !Embedded
-                               ? new JProperty("@context",   JSONContext)
+                               ? new JProperty(PropertyKeys.Context,    JSONContext)
                                : null,
 
-                           new JProperty("timestamp",  Timestamp.ToISO8601()),
-                           new JProperty("count",      Count),
-                           new JProperty("report",     reportJSON)
+                           new JProperty(PropertyKeys.Timestamp,  Timestamp.ToISO8601()),
+                           new JProperty(PropertyKeys.Count,      Count),
+                           new JProperty(PropertyKeys.Report,     reportJSON)
 
                        );
 
-            return json;
+            return CustomStatusReportSerializer is not null
+                       ? CustomStatusReportSerializer(this, json)
+                       : json;
 
         }
 

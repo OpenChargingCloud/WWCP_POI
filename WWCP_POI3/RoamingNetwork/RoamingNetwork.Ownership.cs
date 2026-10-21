@@ -56,15 +56,75 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              String  EntityId)
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/poiPartyId";
+
+        #endregion
+
+        #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context      = "@context";
+
+            /// <summary>
+            /// The property of its entity type.
+            /// </summary>
+            public const String  EntityType   = "entityType";
+
+            /// <summary>
+            /// The property of its entity identification.
+            /// </summary>
+            public const String  EntityId     = "entityId";
+
+        }
+
+        #endregion
+
+        #endregion
+
+
+        #region ToJSON(Embedded = false, CustomPOIPartyIdSerializer = null)
+
         /// <summary>
         /// { "entityType", "entityId" }.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomPOIPartyIdSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                       Embedded                     = false,
+                              CustomJObjectSerializerDelegate<POIPartyId>?  CustomPOIPartyIdSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("entityType",  EntityType),
-                   new JProperty("entityId",    EntityId)
-               );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,     JSONLDContext);
+
+            json.Add(PropertyKeys.EntityType,      EntityType);
+            json.Add(PropertyKeys.EntityId,        EntityId);
+
+            return CustomPOIPartyIdSerializer is not null
+                       ? CustomPOIPartyIdSerializer(this, json)
+                       : json;
+
+        }
+
+        #endregion
+
+        #region TryParse(JSON, out PartyId, out ErrorResponse)
 
         /// <summary>
         /// Try to parse { "entityType", "entityId" }.
@@ -79,14 +139,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             PartyId = default;
 
+            if (JSON is JObject withContext &&
+                withContext[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the party must be '{JSONLDContext}'!";
+                return false;
+            }
+
             if (JSON is not JObject json                                                                         ||
-                json["entityType"] is not JValue { Type: JTokenType.String } entityType                         ||
-                json["entityId"]   is not JValue { Type: JTokenType.String } entityId                           ||
-                json.Count != 2                                                                                  ||
+                json[PropertyKeys.EntityType] is not JValue { Type: JTokenType.String } entityType              ||
+                json[PropertyKeys.EntityId]   is not JValue { Type: JTokenType.String } entityId                ||
+                json.Count != (json.ContainsKey(PropertyKeys.Context) ? 3 : 2)                                   ||
                 String.IsNullOrWhiteSpace(entityType.Value<String>())                                            ||
                 String.IsNullOrWhiteSpace(entityId.  Value<String>()))
             {
-                ErrorResponse = "A party must be { \"entityType\", \"entityId\" }!";
+                ErrorResponse = $"A party must be {{ \"{PropertyKeys.EntityType}\", \"{PropertyKeys.EntityId}\" }}!";
                 return false;
             }
 
@@ -95,6 +163,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return true;
 
         }
+
+        #endregion
 
         /// <inheritdoc/>
         public override String ToString()
@@ -154,11 +224,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The embedded children a party must not be added with, by its entity type.
         /// </summary>
         internal static readonly Dictionary<String, String[]> PartyChildren = new () {
-            { nameof(ChargingStationOperator), [ "chargingPools", "chargingTariffs", "EVSETemplates", "chargingStationTemplates", "chargingPoolTemplates", "chargingTariffTemplates", "energyMeterTemplates",
-                                                 "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffGroups", "energyMeterGroups", "chargingTariffOffers", "parkingSpaces" ] },
-            { nameof(EMobilityProvider),       [ "EVSEGroups", "chargingStationGroups", "chargingPoolGroups", "chargingTariffOffers" ] },
-            { nameof(GridOperator),            [ "gridConnectionPoints", "energyMeterTemplates", "energyMeterGroups" ] },
-            { nameof(ParkingOperator),         [ "parkingGarages", "parkingSpaces", "parkingSensors", "parkingSpaceTemplates", "parkingSpaceGroups", "parkingProducts" ] }
+            { nameof(ChargingStationOperator), [ ChargingStationOperator.PropertyKeys.ChargingPools,
+                                                 ChargingStationOperator.PropertyKeys.ChargingTariffs,
+                                                 ChargingStationOperator.PropertyKeys.EVSETemplates,
+                                                 ChargingStationOperator.PropertyKeys.ChargingStationTemplates,
+                                                 ChargingStationOperator.PropertyKeys.ChargingPoolTemplates,
+                                                 ChargingStationOperator.PropertyKeys.ChargingTariffTemplates,
+                                                 ChargingStationOperator.PropertyKeys.EnergyMeterTemplates,
+                                                 ChargingStationOperator.PropertyKeys.EVSEGroups,
+                                                 ChargingStationOperator.PropertyKeys.ChargingStationGroups,
+                                                 ChargingStationOperator.PropertyKeys.ChargingPoolGroups,
+                                                 ChargingStationOperator.PropertyKeys.ChargingTariffGroups,
+                                                 ChargingStationOperator.PropertyKeys.EnergyMeterGroups,
+                                                 ChargingStationOperator.PropertyKeys.ChargingTariffOffers,
+                                                 ChargingStationOperator.PropertyKeys.ParkingSpaces ] },
+            { nameof(EMobilityProvider),       [ EMobilityProvider.PropertyKeys.EVSEGroups,
+                                                 EMobilityProvider.PropertyKeys.ChargingStationGroups,
+                                                 EMobilityProvider.PropertyKeys.ChargingPoolGroups,
+                                                 EMobilityProvider.PropertyKeys.ChargingTariffOffers ] },
+            { nameof(GridOperator),            [ GridOperator.PropertyKeys.GridConnectionPoints,
+                                                 GridOperator.PropertyKeys.EnergyMeterTemplates,
+                                                 GridOperator.PropertyKeys.EnergyMeterGroups ] },
+            { nameof(ParkingOperator),         [ ParkingOperator.PropertyKeys.ParkingGarages,
+                                                 ParkingOperator.PropertyKeys.ParkingSpaces,
+                                                 ParkingOperator.PropertyKeys.ParkingSensors,
+                                                 ParkingOperator.PropertyKeys.ParkingSpaceTemplates,
+                                                 ParkingOperator.PropertyKeys.ParkingSpaceGroups,
+                                                 ParkingOperator.PropertyKeys.ParkingProducts ] }
         };
 
         #endregion

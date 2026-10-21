@@ -48,80 +48,80 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The properties of a parking garage a change set can update or remove.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableParkingGarageProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "address",
-            "geoLocation",
-            "chargingStationIds",
-            "openingTimes",
-            "images",
-            "parkingProductIds",
-            "customData"
+            ParkingGarage.BasePropertyKeys.Name,
+            ParkingGarage.BasePropertyKeys.Description,
+            ParkingGarage.BasePropertyKeys.DataSource,
+            ParkingGarage.PropertyKeys.Address,
+            ParkingGarage.PropertyKeys.GeoLocation,
+            ParkingGarage.PropertyKeys.ChargingStationIds,
+            ParkingGarage.PropertyKeys.OpeningTimes,
+            ParkingGarage.PropertyKeys.Images,
+            ParkingGarage.PropertyKeys.ParkingProductIds,
+            ParkingGarage.BasePropertyKeys.CustomData
         ];
 
         /// <summary>
         /// The properties of a parking space a change set can update or remove.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableParkingSpaceProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "geoLocation",
-            "parkingGarageId",
-            "parkingSensorIds",
-            "chargingStationIds",
-            "parkingProductIds",
-            "parkingRestrictions",
-            "euVehicleCategories",
-            "physicalReference",
-            "vehicleTypes",
-            "restrictedToVehicleTypes",
-            "maxVehicleWeight",
-            "maxVehicleHeight",
-            "maxVehicleLength",
-            "maxVehicleWidth",
-            "length",
-            "width",
-            "evsePosition",
-            "direction",
-            "surface",
-            "slope",
-            "driveThrough",
-            "reservationRequired",
-            "timeLimit",
-            "roofed",
-            "illuminated",
-            "refrigerationOutlet",
-            "dangerousGoodsAllowed",
-            "protectedArea",
-            "apdsReference",
-            "standards",
-            "images",
-            "templateIds",
-            "customData"
+            ParkingSpace.BasePropertyKeys.Name,
+            ParkingSpace.BasePropertyKeys.Description,
+            ParkingSpace.BasePropertyKeys.DataSource,
+            ParkingSpace.PropertyKeys.GeoLocation,
+            ParkingSpace.PropertyKeys.ParkingGarageId,
+            ParkingSpace.PropertyKeys.ParkingSensorIds,
+            ParkingSpace.PropertyKeys.ChargingStationIds,
+            ParkingSpace.PropertyKeys.ParkingProductIds,
+            ParkingSpace.PropertyKeys.ParkingRestrictions,
+            ParkingSpace.PropertyKeys.EUVehicleCategories,
+            ParkingSpace.PropertyKeys.PhysicalReference,
+            ParkingSpace.PropertyKeys.VehicleTypes,
+            ParkingSpace.PropertyKeys.RestrictedToVehicleTypes,
+            ParkingSpace.PropertyKeys.MaxVehicleWeight,
+            ParkingSpace.PropertyKeys.MaxVehicleHeight,
+            ParkingSpace.PropertyKeys.MaxVehicleLength,
+            ParkingSpace.PropertyKeys.MaxVehicleWidth,
+            ParkingSpace.PropertyKeys.Length,
+            ParkingSpace.PropertyKeys.Width,
+            ParkingSpace.PropertyKeys.EVSEPosition,
+            ParkingSpace.PropertyKeys.Direction,
+            ParkingSpace.PropertyKeys.Surface,
+            ParkingSpace.PropertyKeys.Slope,
+            ParkingSpace.PropertyKeys.DriveThrough,
+            ParkingSpace.PropertyKeys.ReservationRequired,
+            ParkingSpace.PropertyKeys.TimeLimit,
+            ParkingSpace.PropertyKeys.Roofed,
+            ParkingSpace.PropertyKeys.Illuminated,
+            ParkingSpace.PropertyKeys.RefrigerationOutlet,
+            ParkingSpace.PropertyKeys.DangerousGoodsAllowed,
+            ParkingSpace.PropertyKeys.ProtectedArea,
+            ParkingSpace.PropertyKeys.APDSReference,
+            ParkingSpace.PropertyKeys.Standards,
+            ParkingSpace.PropertyKeys.Images,
+            ParkingSpace.PropertyKeys.TemplateIds,
+            ParkingSpace.BasePropertyKeys.CustomData
         ];
 
         /// <summary>
         /// The properties of a parking product a change set can update or remove.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableParkingProductProperties = [
-            "name",
-            "description",
-            "minDuration",
-            "stopParkingAfterTime",
-            "customData"
+            ParkingProduct.PropertyKeys.Name,
+            ParkingProduct.PropertyKeys.Description,
+            ParkingProduct.PropertyKeys.MinDuration,
+            ParkingProduct.PropertyKeys.StopParkingAfterTime,
+            ParkingProduct.PropertyKeys.CustomData
         ];
 
         /// <summary>
         /// The properties of a parking space group a change set can update or remove: its members, as it gives them nothing.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableParkingSpaceGroupProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "parkingSpaceIds",
-            "customData"
+            ParkingSpaceGroup.BasePropertyKeys.Name,
+            ParkingSpaceGroup.BasePropertyKeys.Description,
+            ParkingSpaceGroup.BasePropertyKeys.DataSource,
+            ParkingSpaceGroup.PropertyKeys.ParkingSpaceIds,
+            ParkingSpaceGroup.BasePropertyKeys.CustomData
         ];
 
         /// <summary>
@@ -129,52 +129,52 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// its members, all but its identification, name, description, data source, custom data, templates and APDS reference.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableParkingSpaceTemplateProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "parkingProductIds",
-            "customData",
-            "geoLocation",
-            "parkingGarageId",
-            "parkingSensorIds",
-            "chargingStationIds",
-            "parkingRestrictions",
-            "euVehicleCategories",
-            "physicalReference",
-            "vehicleTypes",
-            "maxVehicleWeight",
-            "maxVehicleHeight",
-            "maxVehicleLength",
-            "maxVehicleWidth",
-            "length",
-            "width",
-            "evsePosition",
-            "direction",
-            "surface",
-            "slope",
-            "timeLimit",
-            "restrictedToVehicleTypes",
-            "driveThrough",
-            "reservationRequired",
-            "roofed",
-            "illuminated",
-            "refrigerationOutlet",
-            "dangerousGoodsAllowed",
-            "protectedArea",
-            "standards",
-            "images"
+            ParkingSpaceTemplate.PropertyKeys.Name,
+            ParkingSpaceTemplate.PropertyKeys.Description,
+            ParkingSpaceTemplate.PropertyKeys.DataSource,
+            ParkingSpaceTemplate.PropertyKeys.ParkingProductIds,
+            ParkingSpaceTemplate.PropertyKeys.CustomData,
+            ParkingSpaceTemplate.PropertyKeys.GeoLocation,
+            ParkingSpaceTemplate.PropertyKeys.ParkingGarageId,
+            ParkingSpaceTemplate.PropertyKeys.ParkingSensorIds,
+            ParkingSpaceTemplate.PropertyKeys.ChargingStationIds,
+            ParkingSpaceTemplate.PropertyKeys.ParkingRestrictions,
+            ParkingSpaceTemplate.PropertyKeys.EUVehicleCategories,
+            ParkingSpaceTemplate.PropertyKeys.PhysicalReference,
+            ParkingSpaceTemplate.PropertyKeys.VehicleTypes,
+            ParkingSpaceTemplate.PropertyKeys.MaxVehicleWeight,
+            ParkingSpaceTemplate.PropertyKeys.MaxVehicleHeight,
+            ParkingSpaceTemplate.PropertyKeys.MaxVehicleLength,
+            ParkingSpaceTemplate.PropertyKeys.MaxVehicleWidth,
+            ParkingSpaceTemplate.PropertyKeys.Length,
+            ParkingSpaceTemplate.PropertyKeys.Width,
+            ParkingSpaceTemplate.PropertyKeys.EVSEPosition,
+            ParkingSpaceTemplate.PropertyKeys.Direction,
+            ParkingSpaceTemplate.PropertyKeys.Surface,
+            ParkingSpaceTemplate.PropertyKeys.Slope,
+            ParkingSpaceTemplate.PropertyKeys.TimeLimit,
+            ParkingSpaceTemplate.PropertyKeys.RestrictedToVehicleTypes,
+            ParkingSpaceTemplate.PropertyKeys.DriveThrough,
+            ParkingSpaceTemplate.PropertyKeys.ReservationRequired,
+            ParkingSpaceTemplate.PropertyKeys.Roofed,
+            ParkingSpaceTemplate.PropertyKeys.Illuminated,
+            ParkingSpaceTemplate.PropertyKeys.RefrigerationOutlet,
+            ParkingSpaceTemplate.PropertyKeys.DangerousGoodsAllowed,
+            ParkingSpaceTemplate.PropertyKeys.ProtectedArea,
+            ParkingSpaceTemplate.PropertyKeys.Standards,
+            ParkingSpaceTemplate.PropertyKeys.Images
         ];
 
         /// <summary>
         /// The properties of a parking sensor a change set can update or remove.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableParkingSensorProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "geoLocation",
-            "chargingStationIds",
-            "customData"
+            ParkingSensor.BasePropertyKeys.Name,
+            ParkingSensor.BasePropertyKeys.Description,
+            ParkingSensor.BasePropertyKeys.DataSource,
+            ParkingSensor.PropertyKeys.GeoLocation,
+            ParkingSensor.PropertyKeys.ChargingStationIds,
+            ParkingSensor.BasePropertyKeys.CustomData
         ];
 
         #endregion
@@ -275,12 +275,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             CurrentValue = null;
 
             var (description, arrayName, changeable) = Change.EntityType switch {
-                nameof(ParkingGarage)  => ("parking garage", "parkingGarages", ChangeableParkingGarageProperties),
-                nameof(ParkingSpace)   => ("parking space",  "parkingSpaces",  ChangeableParkingSpaceProperties),
-                nameof(ParkingSpaceTemplate) => ("parking space template", "parkingSpaceTemplates", ChangeableParkingSpaceTemplateProperties),
-                nameof(ParkingSpaceGroup) => ("parking space group", "parkingSpaceGroups", ChangeableParkingSpaceGroupProperties),
-                nameof(ParkingProduct)    => ("parking product",     "parkingProducts",    ChangeableParkingProductProperties),
-                _                      => ("parking sensor", "parkingSensors", ChangeableParkingSensorProperties)
+                nameof(ParkingGarage)  => ("parking garage", ParkingOperator.PropertyKeys.ParkingGarages, ChangeableParkingGarageProperties),
+                nameof(ParkingSpace)   => ("parking space",  ParkingOperator.PropertyKeys.ParkingSpaces,  ChangeableParkingSpaceProperties),
+                nameof(ParkingSpaceTemplate) => ("parking space template", ParkingOperator.PropertyKeys.ParkingSpaceTemplates, ChangeableParkingSpaceTemplateProperties),
+                nameof(ParkingSpaceGroup) => ("parking space group", ParkingOperator.PropertyKeys.ParkingSpaceGroups, ChangeableParkingSpaceGroupProperties),
+                nameof(ParkingProduct)    => ("parking product",     ParkingOperator.PropertyKeys.ParkingProducts,    ChangeableParkingProductProperties),
+                _                      => ("parking sensor", ParkingOperator.PropertyKeys.ParkingSensors, ChangeableParkingSensorProperties)
             };
 
             var entityId    = Change.EntityId;
@@ -364,7 +364,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             var operatorJSON  = owner is not null
-                                    ? owner.        ToJSON()
+                                    ? owner.        ToJSON(Embedded: true)
                                     : operatorOwner!.ToEmbeddedJSON();
             var children      = operatorJSON[arrayName] as JArray;
             // Found under the identification it is kept with: the change may name it in every spelling
@@ -376,7 +376,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           : null;
             var entityJSON    = Change.Kind == RoamingNetworkChangeKind.Add
                                     ? null
-                                    : children?.OfType<JObject>().FirstOrDefault(child => child["@id"]?.Value<String>() == storedId);
+                                    : children?.OfType<JObject>().FirstOrDefault(child => child[BasePropertyKeys.Id]?.Value<String>() == storedId);
 
             #endregion
 
@@ -438,7 +438,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     // The change set's timestamp is the last change, so that its after ETags are deterministic.
                     if (timestamps)
-                        entityJSON["lastChange"] = CreatedAt.ToISO8601();
+                        entityJSON[BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
 
                     break;
 
@@ -449,8 +449,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 case RoamingNetworkChangeKind.Add:
 
                     if (Change.NewValue is not JObject newEntity ||
-                        newEntity["@id"]?.Type != JTokenType.String ||
-                        newEntity["@id"]!.Value<String>() != entityId)
+                        newEntity[BasePropertyKeys.Id]?.Type != JTokenType.String ||
+                        newEntity[BasePropertyKeys.Id]!.Value<String>() != entityId)
                     {
                         ErrorResponse = $"Change {Index}: the {description} to add must be a JSON object with the identification '{entityId}'!";
                         return false;
@@ -468,8 +468,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (timestamps)
                     {
-                        added["created"]    ??= CreatedAt.ToISO8601();
-                        added["lastChange"]   = CreatedAt.ToISO8601();
+                        added[BasePropertyKeys.Created]    ??= CreatedAt.ToISO8601();
+                        added[BasePropertyKeys.LastChange]   = CreatedAt.ToISO8601();
                     }
 
                     children.Add(added);
@@ -497,7 +497,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // The operator embedding it changed with it, at the time of the change set.
-            operatorJSON["lastChange"] = CreatedAt.ToISO8601();
+            operatorJSON[BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
 
             #region The changed operator must still be a valid one
 

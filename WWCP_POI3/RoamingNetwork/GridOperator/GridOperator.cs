@@ -68,6 +68,74 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its address.
+            /// </summary>
+            public const String  Address                  = "address";
+
+            /// <summary>
+            /// The property of its homepage.
+            /// </summary>
+            public const String  Homepage                 = "homepage";
+
+            /// <summary>
+            /// The property of its hotline phone number.
+            /// </summary>
+            public const String  HotlinePhoneNumber       = "hotline";
+
+            /// <summary>
+            /// The property of its grid connection points.
+            /// </summary>
+            public const String  GridConnectionPoints     = "gridConnectionPoints";
+
+            /// <summary>
+            /// The property of the roots of its grid connection points, in the skeleton of its tree.
+            /// </summary>
+            public const String  GridConnectionPointIds   = "gridConnectionPointIds";
+
+            /// <summary>
+            /// The property of its energy meter templates.
+            /// </summary>
+            public const String  EnergyMeterTemplates     = "energyMeterTemplates";
+
+            /// <summary>
+            /// The property of the roots of its energy meter templates, in the skeleton of its tree.
+            /// </summary>
+            public const String  EnergyMeterTemplateIds   = "energyMeterTemplateIds";
+
+            /// <summary>
+            /// The property of its energy meter groups.
+            /// </summary>
+            public const String  EnergyMeterGroups        = "energyMeterGroups";
+
+            /// <summary>
+            /// The property of the roots of its energy meter groups, in the skeleton of its tree.
+            /// </summary>
+            public const String  EnergyMeterGroupIds      = "energyMeterGroupIds";
+
+            /// <summary>
+            /// The property of its signing keys, as of every party.
+            /// </summary>
+            public const String  SigningKeys              = POIPartyKeys.SigningKeysProperty;
+
+            /// <summary>
+            /// The property of its identity keys, as of every party.
+            /// </summary>
+            public const String  IdentityKeys             = POIPartyKeys.IdentityKeysProperty;
+
+        }
+
+        #endregion
+
+
         /// <summary>
         /// The address of the headquarters.
         /// </summary>
@@ -123,6 +191,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
         #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/gridOperator";
 
         /// <summary>
         /// The effective grid connection points differing from the grid connection points, by their identifications.
@@ -441,72 +514,153 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomGridOperatorSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this grid operator, as its roaming network embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomGridOperatorSerializer">A delegate to serialize custom grid operator JSON objects.</param>
+        public JObject ToJSON(Boolean                                         Embedded                       = false,
+                              CustomJObjectSerializerDelegate<GridOperator>?  CustomGridOperatorSerializer   = null)
 
-            => ToJSON(IncludeChildArrays: true);
+            => ToJSON(Embedded,
+                      CustomGridOperatorSerializer,
+                      IncludeChildArrays: true);
 
         /// <summary>
-        /// The JSON representation of this grid operator, with or without its child arrays: without them for the skeleton of its
-        /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
+        /// The JSON representation of this grid operator, as its roaming network embeds it, with or without its child arrays:
+        /// without them for the skeleton of its tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
         /// </summary>
         /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
         internal JObject ToJSON(Boolean IncludeChildArrays)
+
+            => ToJSON(Embedded:                      true,
+                      CustomGridOperatorSerializer:  null,
+                      IncludeChildArrays:            IncludeChildArrays);
+
+        /// <summary>
+        /// The JSON representation of this grid operator, with or without its child arrays.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomGridOperatorSerializer">A delegate to serialize custom grid operator JSON objects.</param>
+        /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
+        private JObject ToJSON(Boolean                                         Embedded,
+                               CustomJObjectSerializerDelegate<GridOperator>?  CustomGridOperatorSerializer,
+                               Boolean                                         IncludeChildArrays)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,             JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",         Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,                Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,         Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",   DataSource);
+                json.Add(BasePropertyKeys.DataSource,          DataSource);
 
             if (Address is not null)
-                json.Add("address",      Address.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.Address,                 Address.ToJSON(Embedded: true));
 
             if (Homepage.HasValue)
-                json.Add("homepage",     Homepage.Value.ToString());
+                json.Add(PropertyKeys.Homepage,                Homepage.Value.ToString());
 
             if (HotlinePhoneNumber.HasValue)
-                json.Add("hotline",      HotlinePhoneNumber.Value.ToString());
+                json.Add(PropertyKeys.HotlinePhoneNumber,      HotlinePhoneNumber.Value.ToString());
 
             if (IncludeChildArrays && GridConnectionPoints.Count > 0)
-                json.Add("gridConnectionPoints", new JArray(GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.ToJSON())));
+                json.Add(PropertyKeys.GridConnectionPoints,    new JArray(GridConnectionPoints.Select(gridConnectionPoint => gridConnectionPoint.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && EnergyMeterTemplates.Count > 0)
-                json.Add("energyMeterTemplates", new JArray(EnergyMeterTemplates.Select(energyMeterTemplate => energyMeterTemplate.ToJSON())));
+                json.Add(PropertyKeys.EnergyMeterTemplates,    new JArray(EnergyMeterTemplates.Select(energyMeterTemplate => energyMeterTemplate.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && EnergyMeterGroups.Count > 0)
-                json.Add("energyMeterGroups",    new JArray(EnergyMeterGroups.   Select(energyMeterGroup    => energyMeterGroup.   ToJSON())));
+                json.Add(PropertyKeys.EnergyMeterGroups,       new JArray(EnergyMeterGroups.   Select(energyMeterGroup    => energyMeterGroup.   ToJSON(Embedded: true))));
 
             POIPartyKeys.AddTo(json, this);
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomGridOperatorSerializer is not null
+                       ? CustomGridOperatorSerializer(this, json)
+                       : json;
 
         }
 
         #endregion
 
-        #region ToCBOR()
+        #region ToCBOR(Embedded = false, CustomGridOperatorSerializer = null)
 
         /// <summary>
         /// Return the CBOR representation of this grid operator: the keys and values of its JSON representation.
         /// </summary>
-        public CBORValue ToCBOR()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomGridOperatorSerializer">A delegate to serialize custom grid operator CBOR values.</param>
+        public CBORValue ToCBOR(Boolean                                       Embedded                       = false,
+                                CustomCBORSerializerDelegate<GridOperator>?   CustomGridOperatorSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON());
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(BasePropertyKeys.Id),                CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Context),           CBORValue.FromText(JSONLDContext));
+
+            if (Name.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Name),              Name.       ToCBOR());
+
+            if (Description.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Description),       Description.ToCBOR());
+
+            if (DataSource is not null)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),        CBORValue.FromText(DataSource));
+
+            // The address, the grid connection points, the energy meter templates and groups and the keys have no CBOR
+            // representation of their own: theirs are the keys and values of their JSON representation.
+            if (Address is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Address),               CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
+
+            if (Homepage.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),              CBORValue.FromText(Homepage.Value.ToString()));
+
+            if (HotlinePhoneNumber.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),    CBORValue.FromText(HotlinePhoneNumber.Value.ToString()));
+
+            if (GridConnectionPoints.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.GridConnectionPoints),
+                         CBORValue.FromArray(GridConnectionPoints.Select(gridConnectionPoint => CBORJSON.ToCBOR(gridConnectionPoint.ToJSON(Embedded: true)))));
+
+            if (EnergyMeterTemplates.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.EnergyMeterTemplates),
+                         CBORValue.FromArray(EnergyMeterTemplates.Select(energyMeterTemplate => CBORJSON.ToCBOR(energyMeterTemplate.ToJSON(Embedded: true)))));
+
+            if (EnergyMeterGroups.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.EnergyMeterGroups),
+                         CBORValue.FromArray(EnergyMeterGroups.   Select(energyMeterGroup    => CBORJSON.ToCBOR(energyMeterGroup.   ToJSON(Embedded: true)))));
+
+            foreach (var keys in POIPartyKeys.AddTo(new JObject(), this).Properties())
+                cbor.Add(CBORValue.FromText(keys.Name),                          CBORJSON.ToCBOR(keys.Value));
+
+            // Always part of the content, as in the JSON representation; custom data is JSON.
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),               CBORValue.FromText(Created.       ToISO8601()));
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.LastChange),            CBORValue.FromText(LastChangeDate.ToISO8601()));
+
+            if (CustomData.HasValues)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),        CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            return CustomGridOperatorSerializer is not null
+                       ? CustomGridOperatorSerializer(this, cbor)
+                       : cbor;
+
+        }
 
         #endregion
 
@@ -528,7 +682,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "grid operator identification",
                                          GridOperator_Id.TryParse,
                                          out GridOperator_Id id,
@@ -537,55 +691,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N   (JSON, "name",         "grid operator name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N   (JSON, "description",  "grid operator description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString (JSON, "dataSource",   "data source",                out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseAddress(JSON,                                               out var address,      out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, "homepage",     "homepage",                   URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, "hotline",      "hotline phone number",       PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
                 {
+                    ErrorResponse = $"The JSON-LD context of the grid operator '{id}' must be '{JSONLDContext}'!";
                     return false;
                 }
 
-                if (!POIJSON.TryParseChildren<GridConnectionPoint>(JSON, "gridConnectionPoints", "gridConnectionPointIds", "grid connection points", GridConnectionPoint.TryParse, out var gridConnectionPoints, out ErrorResponse))
+                if (!POIJSON.TryParseString(JSON, BasePropertyKeys.DataSource, "data source", out var dataSource, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseChildren<EnergyMeterTemplate>(JSON, "energyMeterTemplates", "energyMeterTemplateIds", "energy meter templates", EnergyMeterTemplate.TryParse, out var energyMeterTemplates, out ErrorResponse))
-                    return false;
-
-                if (!POIJSON.TryParseChildren<EnergyMeterGroup>   (JSON, "energyMeterGroups",    "energyMeterGroupIds",    "energy meter groups",    EnergyMeterGroup.   TryParse, out var energyMeterGroups,    out ErrorResponse))
-                    return false;
-
-                if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
-                    return false;
-
-                if (!POIEntityMetadata.TryParse(JSON,
-                                                out var created,
-                                                out var lastChange,
-                                                out var customData,
-                                                out ErrorResponse))
-                {
-                    return false;
-                }
-
-                GridOperator = new GridOperator(id,
-                                                name,
-                                                description,
-                                                address,
-                                                homepage,
-                                                hotline,
-                                                gridConnectionPoints,
-                                                SigningKeys:        signingKeys,
-                                                IdentityKeys:       identityKeys,
-                                                EnergyMeterGroups:     energyMeterGroups,
-                                                EnergyMeterTemplates:  energyMeterTemplates,
-                                                DataSource:  dataSource,
-                                                Created:     created,
-                                                LastChange:  lastChange,
-                                                CustomData:  customData);
-
-                ErrorResponse = null;
-                return true;
+                return TryParse(id,
+                                dataSource,
+                                JSON,
+                                out GridOperator,
+                                out ErrorResponse);
 
             }
             catch (Exception e)
@@ -594,6 +714,164 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ErrorResponse  = "The given JSON representation of a grid operator is invalid: " + e.Message;
                 return false;
             }
+
+        }
+
+        #endregion
+
+        #region (static) TryParse(CBOR, out GridOperator, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given CBOR representation of a grid operator: the keys and values of its JSON representation,
+        /// see ToCBOR().
+        /// </summary>
+        /// <param name="CBOR">The CBOR to parse.</param>
+        /// <param name="GridOperator">The parsed grid operator.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public static Boolean TryParse(CBORValue                               CBOR,
+                                       [NotNullWhen(true)]  out GridOperator?  GridOperator,
+                                       [NotNullWhen(false)] out String?        ErrorResponse)
+        {
+
+            GridOperator = null;
+
+            try
+            {
+
+                if (CBOR.Kind != CBORValueKind.Map)
+                {
+                    ErrorResponse = "The CBOR representation of a grid operator must be a map!";
+                    return false;
+                }
+
+                if (!CBOR.ParseMandatory(BasePropertyKeys.Id,
+                                         "grid operator identification",
+                                         GridOperator_Id.TryParse,
+                                         out GridOperator_Id id,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.Context), out var context) &&
+                    !(context.TryGetText(out var contextText) && contextText == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the grid operator '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                CBOR.ParseOptionalText(BasePropertyKeys.DataSource, "data source", out var dataSource, out ErrorResponse);
+                if (ErrorResponse is not null)
+                    return false;
+
+                // What has no CBOR parser of its own is read as its JSON, with the parsers of the JSON representation:
+                // the multilingual texts, the address, the homepage, the hotline, the children, the keys and the metadata.
+                var json = new JObject(
+                               new JProperty(BasePropertyKeys.Id, id.ToString())
+                           );
+
+                foreach (var key in new[] { BasePropertyKeys.Name,
+                                            BasePropertyKeys.Description,
+                                            PropertyKeys.    Address,
+                                            PropertyKeys.    Homepage,
+                                            PropertyKeys.    HotlinePhoneNumber,
+                                            PropertyKeys.    GridConnectionPoints,
+                                            PropertyKeys.    GridConnectionPointIds,
+                                            PropertyKeys.    EnergyMeterTemplates,
+                                            PropertyKeys.    EnergyMeterTemplateIds,
+                                            PropertyKeys.    EnergyMeterGroups,
+                                            PropertyKeys.    EnergyMeterGroupIds,
+                                            PropertyKeys.    SigningKeys,
+                                            PropertyKeys.    IdentityKeys,
+                                            BasePropertyKeys.Created,
+                                            BasePropertyKeys.LastChange,
+                                            BasePropertyKeys.CustomData })
+                {
+                    if (CBOR.TryGetValue(CBORValue.FromText(key), out var value))
+                        json.Add(key, CBORJSON.ToJSON(value));
+                }
+
+                return TryParse(id,
+                                dataSource,
+                                json,
+                                out GridOperator,
+                                out ErrorResponse);
+
+            }
+            catch (Exception e)
+            {
+                GridOperator   = null;
+                ErrorResponse  = "The given CBOR representation of a grid operator is invalid: " + e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region (private static) TryParse(Id, DataSource, JSON, out GridOperator, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the rest of the given JSON representation of a grid operator, or of the JSON of the parts of its CBOR
+        /// representation without a CBOR parser of their own.
+        /// </summary>
+        private static Boolean TryParse(GridOperator_Id                         Id,
+                                        String?                                 DataSource,
+                                        JObject                                 JSON,
+                                        [NotNullWhen(true)]  out GridOperator?  GridOperator,
+                                        [NotNullWhen(false)] out String?        ErrorResponse)
+        {
+
+            GridOperator = null;
+
+            if (!POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Name,               "grid operator name",         out var name,         out ErrorResponse) ||
+                !POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Description,        "grid operator description",  out var description,  out ErrorResponse) ||
+                !POIJSON.TryParseAddress(JSON, PropertyKeys.    Address,            "address",                    out var address,      out ErrorResponse) ||
+                !POIJSON.TryParseText   (JSON, PropertyKeys.    Homepage,           "homepage",                   URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
+                !POIJSON.TryParseText   (JSON, PropertyKeys.    HotlinePhoneNumber, "hotline phone number",       PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+            {
+                return false;
+            }
+
+            if (!POIJSON.TryParseChildren<GridConnectionPoint>(JSON, PropertyKeys.GridConnectionPoints, PropertyKeys.GridConnectionPointIds, "grid connection points", GridConnectionPoint.TryParse, out var gridConnectionPoints, out ErrorResponse))
+                return false;
+
+            if (!POIJSON.TryParseChildren<EnergyMeterTemplate>(JSON, PropertyKeys.EnergyMeterTemplates, PropertyKeys.EnergyMeterTemplateIds, "energy meter templates", EnergyMeterTemplate.TryParse, out var energyMeterTemplates, out ErrorResponse))
+                return false;
+
+            if (!POIJSON.TryParseChildren<EnergyMeterGroup>   (JSON, PropertyKeys.EnergyMeterGroups,    PropertyKeys.EnergyMeterGroupIds,    "energy meter groups",    EnergyMeterGroup.   TryParse, out var energyMeterGroups,    out ErrorResponse))
+                return false;
+
+            if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
+                return false;
+
+            if (!POIEntityMetadata.TryParse(JSON,
+                                            out var created,
+                                            out var lastChange,
+                                            out var customData,
+                                            out ErrorResponse))
+            {
+                return false;
+            }
+
+            GridOperator = new GridOperator(Id,
+                                            name,
+                                            description,
+                                            address,
+                                            homepage,
+                                            hotline,
+                                            gridConnectionPoints,
+                                            SigningKeys:        signingKeys,
+                                            IdentityKeys:       identityKeys,
+                                            EnergyMeterGroups:     energyMeterGroups,
+                                            EnergyMeterTemplates:  energyMeterTemplates,
+                                            DataSource:  DataSource,
+                                            Created:     created,
+                                            LastChange:  lastChange,
+                                            CustomData:  customData);
+
+            ErrorResponse = null;
+            return true;
 
         }
 

@@ -54,9 +54,87 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String JSONProperty    = "keyStatement";
 
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkKeyStatement";
+
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                   = "@context";
+
+            /// <summary>
+            /// The property of the identification of its roaming network.
+            /// </summary>
+            public const String  RoamingNetworkId          = "roamingNetworkId";
+
+            /// <summary>
+            /// The property of the identification of the roaming network operator stating it.
+            /// </summary>
+            public const String  RoamingNetworkOperatorId  = "roamingNetworkOperatorId";
+
+            /// <summary>
+            /// The property of the signing keys it states.
+            /// </summary>
+            public const String  SigningKeys               = POIPartyKeys.SigningKeysProperty;
+
+            /// <summary>
+            /// The property of the identity keys of the roaming network operator.
+            /// </summary>
+            public const String  IdentityKeys              = POIPartyKeys.IdentityKeysProperty;
+
+            /// <summary>
+            /// The property of its signing timestamp.
+            /// </summary>
+            public const String  SignedAt                  = "signedAt";
+
+            /// <summary>
+            /// The property of the end of its validity.
+            /// </summary>
+            public const String  ValidUntil                = "validUntil";
+
+            /// <summary>
+            /// The property of its signature algorithm.
+            /// </summary>
+            public const String  Algorithm                 = "algorithm";
+
+            /// <summary>
+            /// The property of the identification of the identity key that signed it.
+            /// </summary>
+            public const String  KeyId                     = "keyId";
+
+            /// <summary>
+            /// The property of its signature value.
+            /// </summary>
+            public const String  Value                     = "value";
+
+            /// <summary>
+            /// The property of the profile of its signature.
+            /// </summary>
+            public const String  Profile                   = "profile";
+
+            /// <summary>
+            /// The property of the encoding of its signature value.
+            /// </summary>
+            public const String  Encoding                  = "encoding";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The roaming network.
@@ -340,10 +418,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = Content();
 
-            json.Add("profile",    SigningProfile);
-            json.Add("algorithm",  Algorithm);
-            json.Add("keyId",      KeyId);
-            json.Add("encoding",   "base64");
+            json.Add(PropertyKeys.Profile,    SigningProfile);
+            json.Add(PropertyKeys.Algorithm,  Algorithm);
+            json.Add(PropertyKeys.KeyId,      KeyId);
+            json.Add(PropertyKeys.Encoding,   "base64");
 
             return CanonicalJSON.ToUTF8Bytes(json);
 
@@ -368,12 +446,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("roamingNetworkId",
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the key statement must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!JSON.ParseMandatory(PropertyKeys.RoamingNetworkId,
                                          "roaming network identification",
                                          RoamingNetwork_Id.TryParse,
                                          out RoamingNetwork_Id roamingNetworkId,
                                          out ErrorResponse) ||
-                    !JSON.ParseMandatory("roamingNetworkOperatorId",
+                    !JSON.ParseMandatory(PropertyKeys.RoamingNetworkOperatorId,
                                          "roaming network operator identification",
                                          RoamingNetworkOperator_Id.TryParse,
                                          out RoamingNetworkOperator_Id roamingNetworkOperatorId,
@@ -382,24 +467,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!TryParseKeys(JSON, "signingKeys",  out var signingKeys,  out ErrorResponse) ||
-                    !TryParseKeys(JSON, "identityKeys", out var identityKeys, out ErrorResponse))
+                if (!TryParseKeys(JSON, PropertyKeys.SigningKeys,   out var signingKeys,  out ErrorResponse) ||
+                    !TryParseKeys(JSON, PropertyKeys.IdentityKeys,  out var identityKeys, out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (!TryParseTimestamp(JSON, "signedAt",   out var signedAt) ||
-                    !TryParseTimestamp(JSON, "validUntil", out var validUntil))
+                if (!TryParseTimestamp(JSON, PropertyKeys.SignedAt,   out var signedAt) ||
+                    !TryParseTimestamp(JSON, PropertyKeys.ValidUntil, out var validUntil))
                 {
-                    ErrorResponse = "The signedAt and validUntil of a key statement must be written as yyyy-MM-ddTHH:mm:ss.fffZ!";
+                    ErrorResponse = $"The {PropertyKeys.SignedAt} and {PropertyKeys.ValidUntil} of a key statement must be written as yyyy-MM-ddTHH:mm:ss.fffZ!";
                     return false;
                 }
 
-                if (Text(JSON, "algorithm") is not String algorithm || algorithm.Length == 0 ||
-                    Text(JSON, "keyId")     is not String keyId     || keyId.    Length == 0 ||
-                    Text(JSON, "value")     is not String value     || value.    Length == 0 ||
-                    Text(JSON, "profile")   is not String profile   ||
-                    Text(JSON, "encoding")  is not String encoding)
+                if (Text(JSON, PropertyKeys.Algorithm) is not String algorithm || algorithm.Length == 0 ||
+                    Text(JSON, PropertyKeys.KeyId)     is not String keyId     || keyId.    Length == 0 ||
+                    Text(JSON, PropertyKeys.Value)     is not String value     || value.    Length == 0 ||
+                    Text(JSON, PropertyKeys.Profile)   is not String profile   ||
+                    Text(JSON, PropertyKeys.Encoding)  is not String encoding)
                 {
                     ErrorResponse = "A key statement requires an algorithm, a key identification, a value, a profile and an encoding!";
                     return false;
@@ -432,23 +517,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomKeyStatementSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this key statement.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomKeyStatementSerializer">An optional custom serializer of key statements.</param>
+        public JObject ToJSON(Boolean                                                       Embedded                       = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkKeyStatement>?  CustomKeyStatementSerializer   = null)
         {
 
             var json = Content();
 
-            json.Add("algorithm",  Algorithm);
-            json.Add("keyId",      KeyId);
-            json.Add("value",      Value);
-            json.Add("profile",    Profile);
-            json.Add("encoding",   Encoding);
+            if (!Embedded)
+                json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
 
-            return json;
+            json.Add(PropertyKeys.Algorithm,  Algorithm);
+            json.Add(PropertyKeys.KeyId,      KeyId);
+            json.Add(PropertyKeys.Value,      Value);
+            json.Add(PropertyKeys.Profile,    Profile);
+            json.Add(PropertyKeys.Encoding,   Encoding);
+
+            return CustomKeyStatementSerializer is not null
+                       ? CustomKeyStatementSerializer(this, json)
+                       : json;
 
         }
 
@@ -464,16 +557,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("roamingNetworkId",          RoamingNetworkId.        ToString()),
-                           new JProperty("roamingNetworkOperatorId",  RoamingNetworkOperatorId.ToString()),
-                           new JProperty("signingKeys",               new JArray(SigningKeys.Select(signingKey => signingKey.ToJSON())))
+                           new JProperty(PropertyKeys.RoamingNetworkId,          RoamingNetworkId.        ToString()),
+                           new JProperty(PropertyKeys.RoamingNetworkOperatorId,  RoamingNetworkOperatorId.ToString()),
+                           new JProperty(PropertyKeys.SigningKeys,               new JArray(SigningKeys.Select(signingKey => signingKey.ToJSON(Embedded: true))))
                        );
 
             if (!IdentityKeys.IsEmpty)
-                json.Add("identityKeys",  new JArray(IdentityKeys.Select(identityKey => identityKey.ToJSON())));
+                json.Add(PropertyKeys.IdentityKeys,  new JArray(IdentityKeys.Select(identityKey => identityKey.ToJSON(Embedded: true))));
 
-            json.Add("signedAt",          SignedAt.  ToISO8601());
-            json.Add("validUntil",        ValidUntil.ToISO8601());
+            json.Add(PropertyKeys.SignedAt,          SignedAt.  ToISO8601());
+            json.Add(PropertyKeys.ValidUntil,        ValidUntil.ToISO8601());
 
             return json;
 

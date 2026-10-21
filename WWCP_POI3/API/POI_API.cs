@@ -41,6 +41,234 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys of the requests and responses of this API, over HTTP and WebSocket, in JSON and CBOR.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of a list of checkpoints.
+            /// </summary>
+            public const String  Checkpoints              = "checkpoints";
+
+            /// <summary>
+            /// The property of the identification of a checkpoint.
+            /// </summary>
+            public const String  CheckpointId             = "checkpointId";
+
+            /// <summary>
+            /// The property of the identification of the final checkpoint of an epoch.
+            /// </summary>
+            public const String  FinalCheckpointId        = "finalCheckpointId";
+
+            /// <summary>
+            /// The property of a list of price statements.
+            /// </summary>
+            public const String  PriceStatements          = "priceStatements";
+
+            /// <summary>
+            /// The property of a list of commits.
+            /// </summary>
+            public const String  Commits                  = "commits";
+
+            /// <summary>
+            /// The property of a list of commit metadata.
+            /// </summary>
+            public const String  CommitInfos              = "commitInfos";
+
+            /// <summary>
+            /// The property of a change set.
+            /// </summary>
+            public const String  ChangeSet                = "changeSet";
+
+            /// <summary>
+            /// The property of a list of attestations.
+            /// </summary>
+            public const String  Attestations             = "attestations";
+
+            /// <summary>
+            /// The property of a list of status updates.
+            /// </summary>
+            public const String  StatusUpdates            = "statusUpdates";
+
+            /// <summary>
+            /// The property of the runtime status, or whether it is wanted.
+            /// </summary>
+            public const String  RuntimeStatus            = "runtimeStatus";
+
+            /// <summary>
+            /// The property of the current status of an entity.
+            /// </summary>
+            public const String  Current                  = "current";
+
+            /// <summary>
+            /// The property of the position or the commit to start after.
+            /// </summary>
+            public const String  Since                    = "since";
+
+            /// <summary>
+            /// The property of the maximum number of entries wanted.
+            /// </summary>
+            public const String  Max                      = "max";
+
+            /// <summary>
+            /// The property asking for the latest entry only.
+            /// </summary>
+            public const String  Latest                   = "latest";
+
+            /// <summary>
+            /// The property of the commits a peer has.
+            /// </summary>
+            public const String  Have                     = "have";
+
+            /// <summary>
+            /// The property of the identifications of the commits a history has.
+            /// </summary>
+            public const String  HaveIds                  = "haveIds";
+
+            /// <summary>
+            /// The property of the head commit.
+            /// </summary>
+            public const String  Head                     = "head";
+
+            /// <summary>
+            /// The property of the tips of a history.
+            /// </summary>
+            public const String  Tips                     = "tips";
+
+            /// <summary>
+            /// The property of the conflicts between the tips of a history.
+            /// </summary>
+            public const String  Conflicts                = "conflicts";
+
+            /// <summary>
+            /// The property of the status of an outcome or of an epoch.
+            /// </summary>
+            public const String  Status                   = "status";
+
+            /// <summary>
+            /// The property of the result of one entry of a batch.
+            /// </summary>
+            public const String  Result                   = "result";
+
+            /// <summary>
+            /// The property of the results of a batch.
+            /// </summary>
+            public const String  Results                  = "results";
+
+            /// <summary>
+            /// The property of a description, e.g. of an error.
+            /// </summary>
+            public const String  Description              = "description";
+
+            /// <summary>
+            /// The property of the number of entries taken.
+            /// </summary>
+            public const String  Taken                    = "taken";
+
+            /// <summary>
+            /// The property of the number of entries already known.
+            /// </summary>
+            public const String  Known                    = "known";
+
+            /// <summary>
+            /// The property of the number of outdated entries.
+            /// </summary>
+            public const String  Outdated                 = "outdated";
+
+            /// <summary>
+            /// The property of the number of entries refused.
+            /// </summary>
+            public const String  Refused                  = "refused";
+
+            /// <summary>
+            /// The property of why entries were refused.
+            /// </summary>
+            public const String  Refusals                 = "refusals";
+
+            /// <summary>
+            /// The property of the index of an entry.
+            /// </summary>
+            public const String  Index                    = "index";
+
+            /// <summary>
+            /// The property of the number of signatures added.
+            /// </summary>
+            public const String  Added                    = "added";
+
+            /// <summary>
+            /// The property of the number of commits appended.
+            /// </summary>
+            public const String  Appended                 = "appended";
+
+            /// <summary>
+            /// The property of the segments of an archive.
+            /// </summary>
+            public const String  Segments                 = "segments";
+
+            /// <summary>
+            /// The property of the number of a segment of an archive.
+            /// </summary>
+            public const String  Number                   = "number";
+
+            /// <summary>
+            /// The property of the identification of a charging station.
+            /// </summary>
+            public const String  ChargingStationId        = "chargingStationId";
+
+            /// <summary>
+            /// The property of the identification of an EVSE.
+            /// </summary>
+            public const String  EVSEId                   = "EVSEId";
+
+            /// <summary>
+            /// The property of the digest of a price statement.
+            /// </summary>
+            public const String  Digest                   = "digest";
+
+            /// <summary>
+            /// The property of a hash algorithm.
+            /// </summary>
+            public const String  HashAlgorithm            = "hashAlgorithm";
+
+            /// <summary>
+            /// The property of the identification of a roaming network.
+            /// </summary>
+            public const String  RoamingNetworkId         = "roamingNetworkId";
+
+            /// <summary>
+            /// The property of the identifications of the identity keys of a trust anchor.
+            /// </summary>
+            public const String  IdentityKeyIds           = "identityKeyIds";
+
+            /// <summary>
+            /// The property of the URI of a trust anchor.
+            /// </summary>
+            public const String  URI                      = "uri";
+
+            /// <summary>
+            /// The property of the charging station operator of a charging pool found by a query.
+            /// </summary>
+            public const String  ChargingStationOperator  = "chargingStationOperator";
+
+            /// <summary>
+            /// The property of the grid connection point of a charging pool, when expanded.
+            /// </summary>
+            public const String  GridConnectionPoint      = "gridConnectionPoint";
+
+            /// <summary>
+            /// The property of the identification of the grid operator of an expanded grid connection point.
+            /// </summary>
+            public const String  GridOperatorId           = "gridOperatorId";
+
+        }
+
+        #endregion
+
+
         public TimeProvider       TimeProvider    { get; }
 
         /// <summary>

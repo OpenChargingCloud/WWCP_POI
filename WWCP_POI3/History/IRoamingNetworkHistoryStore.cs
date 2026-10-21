@@ -21,6 +21,8 @@ using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -130,7 +132,79 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class RoamingNetworkHistoryLogEntry
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkHistoryLogEntry";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context          = "@context";
+
+            /// <summary>
+            /// The property of its kind.
+            /// </summary>
+            public const String  Type             = "type";
+
+            /// <summary>
+            /// The property of the commit of a commit entry.
+            /// </summary>
+            public const String  Commit           = "commit";
+
+            /// <summary>
+            /// The property of the commit of a signatures entry.
+            /// </summary>
+            public const String  CommitId         = RoamingNetworkCommitSignature.PropertyKeys.CommitId;
+
+            /// <summary>
+            /// The property of the signatures of a signatures entry or of a checkpoint signatures entry.
+            /// </summary>
+            public const String  Signatures       = RoamingNetworkCommitSignature.PropertyKeys.Signatures;
+
+            /// <summary>
+            /// The property of the status update of a status entry.
+            /// </summary>
+            public const String  StatusUpdate     = "statusUpdate";
+
+            /// <summary>
+            /// The property of the checkpoint of a checkpoint entry.
+            /// </summary>
+            public const String  Checkpoint       = "checkpoint";
+
+            /// <summary>
+            /// The property of the checkpoint of a checkpoint signatures or a checkpoint price statements entry.
+            /// </summary>
+            public const String  CheckpointId     = "checkpointId";
+
+            /// <summary>
+            /// The property of the price statement of a price statement entry.
+            /// </summary>
+            public const String  PriceStatement   = "priceStatement";
+
+            /// <summary>
+            /// The property of the price statements of a checkpoint price statements entry.
+            /// </summary>
+            public const String  PriceStatements  = "priceStatements";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The kind of the entry.
@@ -250,57 +324,70 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomLogEntrySerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this entry.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure, or stored.</param>
+        /// <param name="CustomLogEntrySerializer">An optional custom serializer of log entries.</param>
+        public JObject ToJSON(Boolean                                                          Embedded                   = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkHistoryLogEntry>?  CustomLogEntrySerializer   = null)
+        {
 
-            => Type switch {
+            var json = Type switch {
 
-                   RoamingNetworkHistoryLogEntryType.Commit      => new JObject(
-                                                                        new JProperty("type",          "commit"),
-                                                                        new JProperty("commit",        Commit!.ToJSON())
-                                                                    ),
+                           RoamingNetworkHistoryLogEntryType.Commit      => new JObject(
+                                                                                new JProperty(PropertyKeys.Type,          "commit"),
+                                                                                new JProperty(PropertyKeys.Commit,        Commit!.ToJSON(Embedded: true))
+                                                                            ),
 
-                   RoamingNetworkHistoryLogEntryType.Signatures  => new JObject(
-                                                                        new JProperty("type",          "signatures"),
-                                                                        new JProperty("commitId",      CommitId!.Value.ToString()),
-                                                                        new JProperty("signatures",    new JArray(Signatures.Select(signature => signature.ToJSON())))
-                                                                    ),
+                           RoamingNetworkHistoryLogEntryType.Signatures  => new JObject(
+                                                                                new JProperty(PropertyKeys.Type,          "signatures"),
+                                                                                new JProperty(PropertyKeys.CommitId,      CommitId!.Value.ToString()),
+                                                                                new JProperty(PropertyKeys.Signatures,    new JArray(Signatures.Select(signature => signature.ToJSON(Embedded: true))))
+                                                                            ),
 
-                   RoamingNetworkHistoryLogEntryType.Checkpoint  => new JObject(
-                                                                        new JProperty("type",          "checkpoint"),
-                                                                        new JProperty("checkpoint",    Checkpoint!.ToJSON())
-                                                                    ),
+                           RoamingNetworkHistoryLogEntryType.Checkpoint  => new JObject(
+                                                                                new JProperty(PropertyKeys.Type,          "checkpoint"),
+                                                                                new JProperty(PropertyKeys.Checkpoint,    Checkpoint!.ToJSON(Embedded: true))
+                                                                            ),
 
-                   RoamingNetworkHistoryLogEntryType.CheckpointSignatures
-                                                                 => new JObject(
-                                                                        new JProperty("type",          "checkpointSignatures"),
-                                                                        new JProperty("checkpointId",  CheckpointId!.Value.ToString()),
-                                                                        new JProperty("signatures",    new JArray(Signatures.Select(signature => signature.ToJSON())))
-                                                                    ),
+                           RoamingNetworkHistoryLogEntryType.CheckpointSignatures
+                                                                         => new JObject(
+                                                                                new JProperty(PropertyKeys.Type,          "checkpointSignatures"),
+                                                                                new JProperty(PropertyKeys.CheckpointId,  CheckpointId!.Value.ToString()),
+                                                                                new JProperty(PropertyKeys.Signatures,    new JArray(Signatures.Select(signature => signature.ToJSON(Embedded: true))))
+                                                                            ),
 
-                   RoamingNetworkHistoryLogEntryType.PriceStatement
-                                                                 => new JObject(
-                                                                        new JProperty("type",             "priceStatement"),
-                                                                        new JProperty("priceStatement",   PriceStatement!.ToJSON())
-                                                                    ),
+                           RoamingNetworkHistoryLogEntryType.PriceStatement
+                                                                         => new JObject(
+                                                                                new JProperty(PropertyKeys.Type,             "priceStatement"),
+                                                                                new JProperty(PropertyKeys.PriceStatement,   PriceStatement!.ToJSON(Embedded: true))
+                                                                            ),
 
-                   RoamingNetworkHistoryLogEntryType.CheckpointPriceStatements
-                                                                 => new JObject(
-                                                                        new JProperty("type",             "checkpointPriceStatements"),
-                                                                        new JProperty("checkpointId",     CheckpointId!.Value.ToString()),
-                                                                        new JProperty("priceStatements",  new JArray(PriceStatements.Select(priceStatement => priceStatement.ToJSON())))
-                                                                    ),
+                           RoamingNetworkHistoryLogEntryType.CheckpointPriceStatements
+                                                                         => new JObject(
+                                                                                new JProperty(PropertyKeys.Type,             "checkpointPriceStatements"),
+                                                                                new JProperty(PropertyKeys.CheckpointId,     CheckpointId!.Value.ToString()),
+                                                                                new JProperty(PropertyKeys.PriceStatements,  new JArray(PriceStatements.Select(priceStatement => priceStatement.ToJSON(Embedded: true))))
+                                                                            ),
 
-                   _                                             => new JObject(
-                                                                        new JProperty("type",          "status"),
-                                                                        new JProperty("statusUpdate",  StatusUpdate!.ToJSON())
-                                                                    )
+                           _                                             => new JObject(
+                                                                                new JProperty(PropertyKeys.Type,          "status"),
+                                                                                new JProperty(PropertyKeys.StatusUpdate,  StatusUpdate!.ToJSON(Embedded: true))
+                                                                            )
 
-               };
+                       };
+
+            if (!Embedded)
+                json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
+
+            return CustomLogEntrySerializer is not null
+                       ? CustomLogEntrySerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 
@@ -317,12 +404,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Entry = null;
 
-            switch (JSON["type"]?.Value<String>())
+            if (JSON[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the log entry must be '{JSONLDContext}'!";
+                return false;
+            }
+
+            switch (JSON[PropertyKeys.Type]?.Value<String>())
             {
 
                 case "commit":
 
-                    if (JSON["commit"] is not JObject commitJSON ||
+                    if (JSON[PropertyKeys.Commit] is not JObject commitJSON ||
                         !RoamingNetworkCommit.TryParse(commitJSON, out var commit, out ErrorResponse, Limits))
                     {
                         ErrorResponse = "Invalid commit entry!";
@@ -342,7 +436,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 case "status":
 
-                    if (JSON["statusUpdate"] is not JObject statusJSON ||
+                    if (JSON[PropertyKeys.StatusUpdate] is not JObject statusJSON ||
                         !POIStatusUpdate.TryParse(statusJSON, out var statusUpdate, out ErrorResponse))
                     {
                         ErrorResponse = "Invalid status entry!";
@@ -354,7 +448,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 case "checkpoint":
 
-                    if (JSON["checkpoint"] is not JObject checkpointJSON ||
+                    if (JSON[PropertyKeys.Checkpoint] is not JObject checkpointJSON ||
                         !RoamingNetworkCheckpoint.TryParse(checkpointJSON, out var checkpoint, out ErrorResponse))
                     {
                         ErrorResponse = "Invalid checkpoint entry!";
@@ -366,7 +460,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 case "checkpointSignatures":
 
-                    if (!RoamingNetworkCheckpoint_Id.TryParse(JSON["checkpointId"]?.Value<String>() ?? "", out var checkpointId))
+                    if (!RoamingNetworkCheckpoint_Id.TryParse(JSON[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var checkpointId))
                     {
                         ErrorResponse = "Invalid checkpoint signatures entry!";
                         return false;
@@ -374,8 +468,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     // The same signatures as of a commit, of another checkpoint than one named by its commit.
                     if (!RoamingNetworkCommitSignature.TryParseCommitSignatures(new JObject(
-                                                                                    new JProperty("commitId",    checkpointId.ToString()),
-                                                                                    new JProperty("signatures",  JSON["signatures"])
+                                                                                    new JProperty(RoamingNetworkCommitSignature.PropertyKeys.CommitId,    checkpointId.ToString()),
+                                                                                    new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Signatures,  JSON[PropertyKeys.Signatures])
                                                                                 ),
                                                                                 out _,
                                                                                 out var checkpointSignatures,
@@ -389,7 +483,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 case "priceStatement":
 
-                    if (JSON["priceStatement"] is not JObject priceStatementJSON ||
+                    if (JSON[PropertyKeys.PriceStatement] is not JObject priceStatementJSON ||
                         !RoamingNetworkPriceStatement.TryParse(priceStatementJSON, out var priceStatement, out ErrorResponse))
                     {
                         ErrorResponse = "Invalid price statement entry!";
@@ -401,8 +495,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 case "checkpointPriceStatements":
 
-                    if (!RoamingNetworkCheckpoint_Id.TryParse(JSON["checkpointId"]?.Value<String>() ?? "", out var priceStatementsCheckpointId) ||
-                        JSON["priceStatements"] is not JArray priceStatementsJSON)
+                    if (!RoamingNetworkCheckpoint_Id.TryParse(JSON[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var priceStatementsCheckpointId) ||
+                        JSON[PropertyKeys.PriceStatements] is not JArray priceStatementsJSON)
                     {
                         ErrorResponse = "Invalid checkpoint price statements entry!";
                         return false;
@@ -429,7 +523,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return true;
 
                 default:
-                    ErrorResponse = $"Unknown type of log entry '{JSON["type"]}'!";
+                    ErrorResponse = $"Unknown type of log entry '{JSON[PropertyKeys.Type]}'!";
                     return false;
 
             }

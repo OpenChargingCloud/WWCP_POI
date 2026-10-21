@@ -195,8 +195,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // The runtime status of the base is the one of the head when it was written, also of entities added after the
             // root: taken as it is where the root has them, and once more after the log, for those added since.
-            var baseStatus = content.Base["runtimeStatus"] as JArray;
-            content.Base.Remove("runtimeStatus");
+            var baseStatus = content.Base[PropertyKeys.RuntimeStatus] as JArray;
+            content.Base.Remove(PropertyKeys.RuntimeStatus);
 
             if (!TryFromSnapshot(content.Base, out var history, out ErrorResponse, Limits))
             {
@@ -734,15 +734,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("timestamp",       Timestamp.Now.ToISO8601()),
-                           new JProperty("commit",          Commit.ToJSON()),
-                           new JProperty("roamingNetwork",  RoamingNetwork.ToJSON())
+                           new JProperty(PropertyKeys.Timestamp,       Timestamp.Now.ToISO8601()),
+                           new JProperty(PropertyKeys.Commit,          Commit.ToJSON(Embedded: true)),
+                           new JProperty(PropertyKeys.RoamingNetwork,  RoamingNetwork.ToJSON())
                        );
 
             if (RoamingNetwork.EffectiveFloorsJSON() is JArray effectiveLastChanges)
-                json.Add("effectiveLastChanges", effectiveLastChanges);
+                json.Add(PropertyKeys.EffectiveLastChanges, effectiveLastChanges);
 
-            json.Add("runtimeStatus", new JArray(RoamingNetworkRuntimeStatus.Of(StatusOf).Select(status => status.ToJSON())));
+            json.Add(PropertyKeys.RuntimeStatus, new JArray(RoamingNetworkRuntimeStatus.Of(StatusOf).Select(status => status.ToJSON(Embedded: true))));
 
             if (epoch.Number > 1)
                 json.Add(EpochJSONProperty, EpochJSON(epoch, previousEpoch));

@@ -35,7 +35,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed record RoamingNetworkChangeSetSignature
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkChangeSetSignature";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context     = "@context";
+
+            /// <summary>
+            /// The property of its signature algorithm.
+            /// </summary>
+            public const String  Algorithm   = "algorithm";
+
+            /// <summary>
+            /// The property of its key identification.
+            /// </summary>
+            public const String  KeyId       = "keyId";
+
+            /// <summary>
+            /// The property of its signature value.
+            /// </summary>
+            public const String  Value       = "value";
+
+            /// <summary>
+            /// The property of its signature profile.
+            /// </summary>
+            public const String  Profile     = "profile";
+
+            /// <summary>
+            /// The property of its signature encoding.
+            /// </summary>
+            public const String  Encoding    = "encoding";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The canonical Styx COSE algorithm name for the built-in signing profile.
@@ -110,11 +162,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatoryText("algorithm", "signature algorithm", out var algorithm, out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("keyId",     "key identification",  out var keyId,     out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("value",     "signature value",     out var value,     out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("profile",   "signature profile",   out var profile,   out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("encoding",  "signature encoding",  out var encoding,  out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the change set signature must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!JSON.ParseMandatoryText(PropertyKeys.Algorithm, "signature algorithm", out var algorithm, out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.KeyId,     "key identification",  out var keyId,     out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.Value,     "signature value",     out var value,     out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.Profile,   "signature profile",   out var profile,   out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.Encoding,  "signature encoding",  out var encoding,  out ErrorResponse))
                 {
                     return false;
                 }
@@ -142,20 +201,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomRoamingNetworkChangeSetSignatureSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this change set signature.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomRoamingNetworkChangeSetSignatureSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                                             Embedded                                           = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkChangeSetSignature>?  CustomRoamingNetworkChangeSetSignatureSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("algorithm",  Algorithm),
-                   new JProperty("keyId",      KeyId),
-                   new JProperty("value",      Value),
-                   new JProperty("profile",    Profile),
-                   new JProperty("encoding",   Encoding)
-               );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,    JSONLDContext);
+
+            json.Add(PropertyKeys.Algorithm,      Algorithm);
+            json.Add(PropertyKeys.KeyId,          KeyId);
+            json.Add(PropertyKeys.Value,          Value);
+            json.Add(PropertyKeys.Profile,        Profile);
+            json.Add(PropertyKeys.Encoding,       Encoding);
+
+            return CustomRoamingNetworkChangeSetSignatureSerializer is not null
+                       ? CustomRoamingNetworkChangeSetSignatureSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 

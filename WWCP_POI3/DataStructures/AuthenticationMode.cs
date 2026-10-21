@@ -22,6 +22,8 @@ using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -71,7 +73,64 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/authenticationMode";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context       = "@context";
+
+            /// <summary>
+            /// The property of its type.
+            /// </summary>
+            public const String  Type          = "type";
+
+            /// <summary>
+            /// The property of its RFID card types.
+            /// </summary>
+            public const String  CardTypes     = "cardTypes";
+
+            /// <summary>
+            /// The property of its brands, embedded completely.
+            /// </summary>
+            public const String  Brands        = "brands";
+
+            /// <summary>
+            /// The property of the identifications of its brands, which it does not take.
+            /// </summary>
+            public const String  BrandIds      = "brandIds";
+
+            /// <summary>
+            /// The property of its number to send an SMS to or to call.
+            /// </summary>
+            public const String  Number        = "number";
+
+            /// <summary>
+            /// The property of its station code.
+            /// </summary>
+            public const String  StationCode   = "stationCode";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The type, e.g. RFID.
@@ -192,31 +251,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomAuthenticationModeSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this authentication mode.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomAuthenticationModeSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                               Embedded                             = false,
+                              CustomJObjectSerializerDelegate<AuthenticationMode>?  CustomAuthenticationModeSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("type",  Type)
-                       );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,      JSONLDContext);
+
+            json.Add(PropertyKeys.Type,             Type);
 
             if (CardTypes.Length > 0)
-                json.Add("cardTypes",    new JArray(CardTypes.Select(cardType => cardType.ToString())));
+                json.Add(PropertyKeys.CardTypes,    new JArray(CardTypes.Select(cardType => cardType.ToString())));
 
             if (Brands.Count > 0)
-                json.Add("brands",       new JArray(Brands.Select(brand => brand.ToJSON())));
+                json.Add(PropertyKeys.Brands,       new JArray(Brands.Select(brand => brand.ToJSON(Embedded: true))));
 
             if (Number is not null)
-                json.Add("number",       Number);
+                json.Add(PropertyKeys.Number,       Number);
 
             if (StationCode is not null)
-                json.Add("stationCode",  StationCode);
+                json.Add(PropertyKeys.StationCode,  StationCode);
 
-            return json;
+            return CustomAuthenticationModeSerializer is not null
+                       ? CustomAuthenticationModeSerializer(this, json)
+                       : json;
 
         }
 
@@ -237,11 +304,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!POIJSON.TryParseString(JSON, "type",         "authentication mode type",  out var type,         out ErrorResponse) ||
-                    !POIJSON.TryParseIds   (JSON, "cardTypes",    "RFID card type",            POIJSON.TryParseName, out ImmutableArray<RFIDCardTypes> cardTypes, out ErrorResponse) ||
-                    !POIJSON.TryParseChildren<Brand>(JSON, "brands", "brandIds", "brands", Brand.TryParse, out var brands, out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "number",       "number",                    out var number,       out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "stationCode",  "station code",              out var stationCode,  out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the authentication mode must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseString(JSON, PropertyKeys.Type,         "authentication mode type",  out var type,         out ErrorResponse) ||
+                    !POIJSON.TryParseIds   (JSON, PropertyKeys.CardTypes,    "RFID card type",            POIJSON.TryParseName, out ImmutableArray<RFIDCardTypes> cardTypes, out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<Brand>(JSON, PropertyKeys.Brands, PropertyKeys.BrandIds, "brands", Brand.TryParse, out var brands, out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.Number,       "number",                    out var number,       out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.StationCode,  "station code",              out var stationCode,  out ErrorResponse))
                 {
                     return false;
                 }
@@ -283,7 +357,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean Equals(AuthenticationMode? AuthenticationMode)
 
             => AuthenticationMode is not null &&
-               POIJSON.SameValue(ToJSON(), AuthenticationMode.ToJSON());
+               POIJSON.SameValue(ToJSON(Embedded: true), AuthenticationMode.ToJSON(Embedded: true));
 
         /// <inheritdoc/>
         public override Int32 GetHashCode()

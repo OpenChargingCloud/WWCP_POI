@@ -63,7 +63,84 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       IComparable<EnergyMeter>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/energyMeter";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its role.
+            /// </summary>
+            public const String  Role                         = "role";
+
+            /// <summary>
+            /// The property of its manufacturer.
+            /// </summary>
+            public const String  ManufacturerId               = "manufacturerId";
+
+            /// <summary>
+            /// The property of its model.
+            /// </summary>
+            public const String  ModelId                      = "modelId";
+
+            /// <summary>
+            /// The property of the homepage of its model.
+            /// </summary>
+            public const String  ModelURL                     = "modelURL";
+
+            /// <summary>
+            /// The property of its serial number.
+            /// </summary>
+            public const String  SerialNumber                 = "serialNumber";
+
+            /// <summary>
+            /// The property of its hardware version.
+            /// </summary>
+            public const String  HardwareVersion              = "hardwareVersion";
+
+            /// <summary>
+            /// The property of its firmware version.
+            /// </summary>
+            public const String  FirmwareVersion              = "firmwareVersion";
+
+            /// <summary>
+            /// The property of its transparency software releases with their legal status.
+            /// </summary>
+            public const String  TransparencySoftwareStatus   = "transparencySoftwareStatus";
+
+            /// <summary>
+            /// The property of its signature methods.
+            /// </summary>
+            public const String  SignatureMethods             = "signatureMethods";
+
+            /// <summary>
+            /// The property of its public keys.
+            /// </summary>
+            public const String  PublicKeys                   = "publicKeys";
+
+            /// <summary>
+            /// The property of its templates.
+            /// </summary>
+            public const String  TemplateIds                  = "templateIds";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// What it measures, e.g. the grid, a PV system or a battery.
@@ -244,63 +321,71 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomEnergyMeterSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this energy meter, as what it measures embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEnergyMeterSerializer">A delegate to serialize custom energy meter JSON objects.</param>
+        public JObject ToJSON(Boolean                                        Embedded                      = false,
+                              CustomJObjectSerializerDelegate<EnergyMeter>?  CustomEnergyMeterSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,                 JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",             Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,                    Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",      Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,             Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",       DataSource);
+                json.Add(BasePropertyKeys.DataSource,              DataSource);
 
             if (Role.HasValue)
-                json.Add("role",             Role.Value.ToString());
+                json.Add(PropertyKeys.Role,                        Role.Value.ToString());
 
             if (ManufacturerId.HasValue)
-                json.Add("manufacturerId",   ManufacturerId.Value.ToString());
+                json.Add(PropertyKeys.ManufacturerId,              ManufacturerId.Value.ToString());
 
             if (ModelId.HasValue)
-                json.Add("modelId",          ModelId.Value.ToString());
+                json.Add(PropertyKeys.ModelId,                     ModelId.Value.ToString());
 
             if (ModelURL.HasValue)
-                json.Add("modelURL",         ModelURL.Value.ToString());
+                json.Add(PropertyKeys.ModelURL,                    ModelURL.Value.ToString());
 
             if (SerialNumber is not null)
-                json.Add("serialNumber",     SerialNumber);
+                json.Add(PropertyKeys.SerialNumber,                SerialNumber);
 
             if (HardwareVersion is not null)
-                json.Add("hardwareVersion",  HardwareVersion);
+                json.Add(PropertyKeys.HardwareVersion,             HardwareVersion);
 
             if (FirmwareVersion is not null)
-                json.Add("firmwareVersion",  FirmwareVersion);
+                json.Add(PropertyKeys.FirmwareVersion,             FirmwareVersion);
 
             if (TransparencySoftwareStatus.Length > 0)
-                json.Add("transparencySoftwareStatus", new JArray(TransparencySoftwareStatus.Select(assignment => assignment.ToJSON())));
+                json.Add(PropertyKeys.TransparencySoftwareStatus,  new JArray(TransparencySoftwareStatus.Select(assignment => assignment.ToJSON(Embedded: true))));
 
             if (SignatureMethods.Length > 0)
-                json.Add("signatureMethods", POIJSON.IdsToJSON(SignatureMethods));
+                json.Add(PropertyKeys.SignatureMethods,            POIJSON.IdsToJSON(SignatureMethods));
 
             if (PublicKeys.Length > 0)
-                json.Add("publicKeys",       new JArray(PublicKeys.Select(publicKey => publicKey.ToJSON())));
+                json.Add(PropertyKeys.PublicKeys,                  new JArray(PublicKeys.Select(publicKey => publicKey.ToJSON(Embedded: true))));
 
             if (TemplateIds.Length > 0)
-                json.Add("templateIds", POIJSON.IdsToJSON(TemplateIds));
+                json.Add(PropertyKeys.TemplateIds,                 POIJSON.IdsToJSON(TemplateIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomEnergyMeterSerializer is not null
+                       ? CustomEnergyMeterSerializer(this, json)
+                       : json;
 
         }
 
@@ -324,7 +409,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "energy meter identification",
                                          EnergyMeter_Id.TryParse,
                                          out EnergyMeter_Id id,
@@ -333,25 +418,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N  (JSON, "name",             "energy meter name",         out var name,             out ErrorResponse) ||
-                    !POIJSON.TryParseI18N  (JSON, "description",      "energy meter description",  out var description,      out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "dataSource",       "data source",               out var dataSource,       out ErrorResponse) ||
-                    !POIJSON.TryParseText  (JSON, "role",             "energy meter role",           EnergyMeterRole.           TryParse, out EnergyMeterRole?            role,           out ErrorResponse) ||
-                    !POIJSON.TryParseText  (JSON, "manufacturerId",   "manufacturer identification", EnergyMeterManufacturer_Id.TryParse, out EnergyMeterManufacturer_Id? manufacturerId, out ErrorResponse) ||
-                    !POIJSON.TryParseText  (JSON, "modelId",          "model identification",        EnergyMeterModel_Id.       TryParse, out EnergyMeterModel_Id?        modelId,        out ErrorResponse) ||
-                    !POIJSON.TryParseText  (JSON, "modelURL",         "model URL",                 URL.TryParse, out URL? modelURL,        out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "serialNumber",     "serial number",             out var serialNumber,     out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "hardwareVersion",  "hardware version",          out var hardwareVersion,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "firmwareVersion",  "firmware version",          out var firmwareVersion,  out ErrorResponse) ||
-                    !POIJSON.TryParseIds<SignatureMethod>(JSON, "signatureMethods", "signature method",          SignatureMethod.TryParse,      out var signatureMethods, out ErrorResponse) ||
-                    !POIJSON.TryParseObjects<EnergyMeterPublicKey>(JSON, "publicKeys",      "public key",                EnergyMeterPublicKey.TryParse, out var publicKeys,       out ErrorResponse))
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the energy meter '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Name,             "energy meter name",         out var name,             out ErrorResponse) ||
+                    !POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Description,      "energy meter description",  out var description,      out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, BasePropertyKeys.DataSource,       "data source",               out var dataSource,       out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.Role,                 "energy meter role",           EnergyMeterRole.           TryParse, out EnergyMeterRole?            role,           out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.ManufacturerId,       "manufacturer identification", EnergyMeterManufacturer_Id.TryParse, out EnergyMeterManufacturer_Id? manufacturerId, out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.ModelId,              "model identification",        EnergyMeterModel_Id.       TryParse, out EnergyMeterModel_Id?        modelId,        out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.ModelURL,             "model URL",                 URL.TryParse, out URL? modelURL,        out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.SerialNumber,         "serial number",             out var serialNumber,     out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.HardwareVersion,      "hardware version",          out var hardwareVersion,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.FirmwareVersion,      "firmware version",          out var firmwareVersion,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds<SignatureMethod>(JSON, PropertyKeys.SignatureMethods, "signature method",          SignatureMethod.TryParse,      out var signatureMethods, out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<EnergyMeterPublicKey>(JSON, PropertyKeys.PublicKeys,      "public key",                EnergyMeterPublicKey.TryParse, out var publicKeys,       out ErrorResponse))
                 {
                     return false;
                 }
 
                 var transparencySoftwareStatus = new List<TransparencySoftwareAssignment>();
 
-                if (JSON["transparencySoftwareStatus"] is JToken transparencySoftwareStatusJSON)
+                if (JSON[PropertyKeys.TransparencySoftwareStatus] is JToken transparencySoftwareStatusJSON)
                 {
 
                     if (transparencySoftwareStatusJSON is not JArray transparencySoftwareStatusArray)
@@ -378,7 +470,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                if (!POIJSON.TryParseIds(JSON, "templateIds", "template identification", EnergyMeterTemplate_Id.TryParse, out ImmutableArray<EnergyMeterTemplate_Id> templateIds, out ErrorResponse))
+                if (!POIJSON.TryParseIds(JSON, PropertyKeys.TemplateIds, "template identification", EnergyMeterTemplate_Id.TryParse, out ImmutableArray<EnergyMeterTemplate_Id> templateIds, out ErrorResponse))
                     return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,

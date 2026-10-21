@@ -59,7 +59,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var floors = EffectiveFloors().ToArray();
 
             return floors.Length > 0
-                       ? new JArray(floors.Select(floor => floor.ToJSON()))
+                       ? new JArray(floors.Select(floor => floor.ToJSON(Embedded: true)))
                        : null;
 
         }

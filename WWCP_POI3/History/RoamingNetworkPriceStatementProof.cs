@@ -22,6 +22,8 @@ using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -35,7 +37,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class RoamingNetworkPriceStatementProof
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkPriceStatementProof";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context         = "@context";
+
+            /// <summary>
+            /// The property of the identification of its checkpoint.
+            /// </summary>
+            public const String  CheckpointId    = "checkpointId";
+
+            /// <summary>
+            /// The property of its price statement.
+            /// </summary>
+            public const String  PriceStatement  = "priceStatement";
+
+            /// <summary>
+            /// The property of the index of the leaf.
+            /// </summary>
+            public const String  Index           = "@index";
+
+            /// <summary>
+            /// The property of the number of price statements of the checkpoint.
+            /// </summary>
+            public const String  Size            = "@size";
+
+            /// <summary>
+            /// The property of the audit path of the leaf.
+            /// </summary>
+            public const String  AuditPath       = "@auditPath";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The checkpoint the price statement is proved to be named by.
@@ -159,13 +213,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!RoamingNetworkCheckpoint_Id.TryParse(JSON["checkpointId"]?.Value<String>() ?? "", out var checkpointId))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the proof of a price statement must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!RoamingNetworkCheckpoint_Id.TryParse(JSON[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var checkpointId))
                 {
                     ErrorResponse = "Missing or invalid checkpoint identification!";
                     return false;
                 }
 
-                if (JSON["priceStatement"] is not JObject priceStatementJSON)
+                if (JSON[PropertyKeys.PriceStatement] is not JObject priceStatementJSON)
                 {
                     ErrorResponse = "A proof of a price statement needs its price statement!";
                     return false;
@@ -177,9 +238,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (JSON["@index"]     is not JValue { Type: JTokenType.Integer } index ||
-                    JSON["@size"]      is not JValue { Type: JTokenType.Integer } size  ||
-                    JSON["@auditPath"] is not JArray auditPath)
+                if (JSON[PropertyKeys.Index]     is not JValue { Type: JTokenType.Integer } index ||
+                    JSON[PropertyKeys.Size]      is not JValue { Type: JTokenType.Integer } size  ||
+                    JSON[PropertyKeys.AuditPath] is not JArray auditPath)
                 {
                     ErrorResponse = "A proof needs @index, @size and @auditPath!";
                     return false;
@@ -206,20 +267,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomPriceStatementProofSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this proof.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomPriceStatementProofSerializer">An optional custom serializer of proofs of price statements.</param>
+        public JObject ToJSON(Boolean                                                              Embedded                              = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkPriceStatementProof>?  CustomPriceStatementProofSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("checkpointId",    CheckpointId.ToString()),
-                   new JProperty("priceStatement",  PriceStatement.ToJSON()),
-                   new JProperty("@index",          Index),
-                   new JProperty("@size",           Size),
-                   new JProperty("@auditPath",      new JArray(AuditPath.Select(hash => Convert.ToHexStringLower(hash))))
-               );
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,         JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.CheckpointId,    CheckpointId.ToString()),
+                                 new JProperty(PropertyKeys.PriceStatement,  PriceStatement.ToJSON(Embedded: true)),
+                                 new JProperty(PropertyKeys.Index,           Index),
+                                 new JProperty(PropertyKeys.Size,            Size),
+                                 new JProperty(PropertyKeys.AuditPath,       new JArray(AuditPath.Select(hash => Convert.ToHexStringLower(hash))))
+
+                       );
+
+            return CustomPriceStatementProofSerializer is not null
+                       ? CustomPriceStatementProofSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 

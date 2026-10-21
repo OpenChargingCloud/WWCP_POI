@@ -244,7 +244,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             {
 
                 Assert.That(EnergyMeterPublicKey.TryParse(KeyJSON(keyId, key, certificate, ca), out var valid, out var error), Is.True, error);
-                Assert.That(valid!.ToJSON().ToString(),                                                Is.EqualTo(KeyJSON(keyId, key, certificate, ca).ToString()));
+                Assert.That(valid!.ToJSON(Embedded: true).ToString(),                                                Is.EqualTo(KeyJSON(keyId, key, certificate, ca).ToString()));
 
                 Assert.That(Refused(KeyJSON(new String('0', 64), key)),                               Does.Contain("is not the SHA-256"));
                 Assert.That(Refused(new JObject(new JProperty("@id", keyId),

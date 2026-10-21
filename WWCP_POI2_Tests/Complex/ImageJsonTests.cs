@@ -48,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
             var parsed = Image.Parse(JObject.Parse(source.ToJSON().ToString()));
 
             Assert.That(parsed, Is.EqualTo(source));
-            Assert.That(JToken.DeepEquals(parsed.ToJSON(), json), Is.True);
+            Assert.That(JToken.DeepEquals(parsed.ToJSON(Embedded: true), json), Is.True);
 
         }
 

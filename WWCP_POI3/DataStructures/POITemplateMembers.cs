@@ -41,7 +41,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// values, e.g. the flags of the current types of an EVSE, or its charging tariffs.
         /// </summary>
         public static readonly IReadOnlySet<String> TakenWhole = new HashSet<String> {
-            "currentTypes", "chargingModes", "chargingTariffIds"
+            EVSE.PropertyKeys.CurrentTypes, EVSE.PropertyKeys.ChargingModes, EVSE.PropertyKeys.ChargingTariffIds
         };
 
         /// <summary>
@@ -49,11 +49,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// e.g. an authentication mode by its type. The elements of the other arrays are keyed by what they are.
         /// </summary>
         public static readonly IReadOnlyDictionary<String, String> ElementKeys = new Dictionary<String, String> {
-            ["authenticationModes"]  = "type",
-            ["brands"]               = "@id",
-            ["chargingConnectors"]   = "@id",
-            ["dataLicenses"]         = "@id",
-            ["images"]               = "url"
+            [ChargingPool.PropertyKeys.AuthenticationModes]  = AuthenticationMode.PropertyKeys.Type,
+            [ChargingPool.PropertyKeys.Brands]               = "@id",
+            [EVSE.PropertyKeys.ChargingConnectors]           = "@id",
+            [ChargingPoolTemplate.PropertyKeys.DataLicenses] = POIDataLicenses.PropertyKeys.Id,
+            [ChargingPool.PropertyKeys.Images]               = "url"
         };
 
         #endregion

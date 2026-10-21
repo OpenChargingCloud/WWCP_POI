@@ -243,6 +243,233 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its address.
+            /// </summary>
+            public const String  Address                     = "address";
+
+            /// <summary>
+            /// The property of its logos.
+            /// </summary>
+            public const String  Logos                       = "logos";
+
+            /// <summary>
+            /// The property of the URI of one of its logos.
+            /// </summary>
+            public const String  LogoURI                     = "uri";
+
+            /// <summary>
+            /// The property of its geographical location.
+            /// </summary>
+            public const String  GeoLocation                 = "geoLocation";
+
+            /// <summary>
+            /// The property of its telephone number.
+            /// </summary>
+            public const String  Telephone                   = "telephone";
+
+            /// <summary>
+            /// The property of its e-mail address.
+            /// </summary>
+            public const String  EMailAddress                = "eMailAddress";
+
+            /// <summary>
+            /// The property of its homepage.
+            /// </summary>
+            public const String  Homepage                    = "homepage";
+
+            /// <summary>
+            /// The property of its hotline phone number.
+            /// </summary>
+            public const String  HotlinePhoneNumber          = "hotline";
+
+            /// <summary>
+            /// The property of the URL of its terms and conditions.
+            /// </summary>
+            public const String  TermsAndConditions          = "termsAndConditions";
+
+            /// <summary>
+            /// The property of its brands.
+            /// </summary>
+            public const String  Brands                      = "brands";
+
+            /// <summary>
+            /// The property of the identifications of its brands.
+            /// </summary>
+            public const String  BrandIds                    = "brandIds";
+
+            /// <summary>
+            /// The property of its charging tariffs.
+            /// </summary>
+            public const String  ChargingTariffs             = "chargingTariffs";
+
+            /// <summary>
+            /// The property of the identifications of its charging tariffs.
+            /// </summary>
+            public const String  ChargingTariffIds           = "chargingTariffIds";
+
+            /// <summary>
+            /// The property of its charging pools.
+            /// </summary>
+            public const String  ChargingPools               = "chargingPools";
+
+            /// <summary>
+            /// The property of the identifications of its charging pools.
+            /// </summary>
+            public const String  ChargingPoolIds             = "chargingPoolIds";
+
+            /// <summary>
+            /// The property of its EVSE templates.
+            /// </summary>
+            public const String  EVSETemplates               = "EVSETemplates";
+
+            /// <summary>
+            /// The property of the identifications of its EVSE templates.
+            /// </summary>
+            public const String  EVSETemplateIds             = "EVSETemplateIds";
+
+            /// <summary>
+            /// The property of its charging station templates.
+            /// </summary>
+            public const String  ChargingStationTemplates    = "chargingStationTemplates";
+
+            /// <summary>
+            /// The property of the identifications of its charging station templates.
+            /// </summary>
+            public const String  ChargingStationTemplateIds  = "chargingStationTemplateIds";
+
+            /// <summary>
+            /// The property of its charging pool templates.
+            /// </summary>
+            public const String  ChargingPoolTemplates       = "chargingPoolTemplates";
+
+            /// <summary>
+            /// The property of the identifications of its charging pool templates.
+            /// </summary>
+            public const String  ChargingPoolTemplateIds     = "chargingPoolTemplateIds";
+
+            /// <summary>
+            /// The property of its charging tariff templates.
+            /// </summary>
+            public const String  ChargingTariffTemplates     = "chargingTariffTemplates";
+
+            /// <summary>
+            /// The property of the identifications of its charging tariff templates.
+            /// </summary>
+            public const String  ChargingTariffTemplateIds   = "chargingTariffTemplateIds";
+
+            /// <summary>
+            /// The property of its energy meter templates.
+            /// </summary>
+            public const String  EnergyMeterTemplates        = "energyMeterTemplates";
+
+            /// <summary>
+            /// The property of the identifications of its energy meter templates.
+            /// </summary>
+            public const String  EnergyMeterTemplateIds      = "energyMeterTemplateIds";
+
+            /// <summary>
+            /// The property of its EVSE groups.
+            /// </summary>
+            public const String  EVSEGroups                  = "EVSEGroups";
+
+            /// <summary>
+            /// The property of the identifications of its EVSE groups.
+            /// </summary>
+            public const String  EVSEGroupIds                = "EVSEGroupIds";
+
+            /// <summary>
+            /// The property of its charging station groups.
+            /// </summary>
+            public const String  ChargingStationGroups       = "chargingStationGroups";
+
+            /// <summary>
+            /// The property of the identifications of its charging station groups.
+            /// </summary>
+            public const String  ChargingStationGroupIds     = "chargingStationGroupIds";
+
+            /// <summary>
+            /// The property of its charging pool groups.
+            /// </summary>
+            public const String  ChargingPoolGroups          = "chargingPoolGroups";
+
+            /// <summary>
+            /// The property of the identifications of its charging pool groups.
+            /// </summary>
+            public const String  ChargingPoolGroupIds        = "chargingPoolGroupIds";
+
+            /// <summary>
+            /// The property of its charging tariff groups.
+            /// </summary>
+            public const String  ChargingTariffGroups        = "chargingTariffGroups";
+
+            /// <summary>
+            /// The property of the identifications of its charging tariff groups.
+            /// </summary>
+            public const String  ChargingTariffGroupIds      = "chargingTariffGroupIds";
+
+            /// <summary>
+            /// The property of its energy meter groups.
+            /// </summary>
+            public const String  EnergyMeterGroups           = "energyMeterGroups";
+
+            /// <summary>
+            /// The property of the identifications of its energy meter groups.
+            /// </summary>
+            public const String  EnergyMeterGroupIds         = "energyMeterGroupIds";
+
+            /// <summary>
+            /// The property of its charging tariff offers.
+            /// </summary>
+            public const String  ChargingTariffOffers        = "chargingTariffOffers";
+
+            /// <summary>
+            /// The property of the identifications of its charging tariff offers.
+            /// </summary>
+            public const String  ChargingTariffOfferIds      = "chargingTariffOfferIds";
+
+            /// <summary>
+            /// The property of its parking spaces.
+            /// </summary>
+            public const String  ParkingSpaces               = "parkingSpaces";
+
+            /// <summary>
+            /// The property of the identifications of its parking spaces.
+            /// </summary>
+            public const String  ParkingSpaceIds             = "parkingSpaceIds";
+
+            /// <summary>
+            /// The property of its signing keys, as of every party.
+            /// </summary>
+            public const String  SigningKeys                 = POIPartyKeys.SigningKeysProperty;
+
+            /// <summary>
+            /// The property of its identity keys, as of every party.
+            /// </summary>
+            public const String  IdentityKeys                = POIPartyKeys.IdentityKeysProperty;
+
+            /// <summary>
+            /// The property of the message of an exception its JSON representation ran into.
+            /// </summary>
+            public const String  Exception                   = "exception";
+
+            /// <summary>
+            /// The property of the stack trace of an exception its JSON representation ran into.
+            /// </summary>
+            public const String  StackTrace                  = "stackTrace";
+
+        }
+
+        #endregion
+
 
         #region Logo
 
@@ -1457,32 +1684,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var json = JSONObject.Create(
 
-                                     new JProperty("@id",                 Id.ToString()),
+                                     new JProperty(BasePropertyKeys.Id,                   Id.ToString()),
 
 
                                !Embedded
-                                   ? new JProperty("@context",            JSONLDContext)
+                                   ? new JProperty(BasePropertyKeys.Context,              JSONLDContext)
                                    : null,
 
-                                     new JProperty("name",                Name.       ToJSON()),
+                                     new JProperty(BasePropertyKeys.Name,                 Name.       ToJSON()),
 
                                Description.IsNotNullOrEmpty()
-                                   ? new JProperty("description",         Description.ToJSON())
+                                   ? new JProperty(BasePropertyKeys.Description,          Description.ToJSON())
                                    : null,
 
                                DataSource.IsNotNullOrEmpty()
-                                   ? new JProperty("dataSource",          DataSource)
+                                   ? new JProperty(BasePropertyKeys.DataSource,           DataSource)
                                    : null,
 
                                // No data licenses, no property: as the roaming network and its charging pools write them.
                                ExpandDataLicenses != InfoStatus.Hidden && DataLicenses.Any()
                                    ? ExpandDataLicenses.Switch(
-                                         () => new JProperty("dataLicenseIds",  DataLicenses.ToPOIIdsJSON()),
-                                         () => new JProperty("dataLicenses",    DataLicenses.ToPOIJSON()))
+                                         () => new JProperty(BasePropertyKeys.DataLicenseIds,  DataLicenses.ToPOIIdsJSON()),
+                                         () => new JProperty(BasePropertyKeys.DataLicenses,    DataLicenses.ToPOIJSON()))
                                    : null,
 
                                Address is not null
-                                   ? new JProperty("address",             Address.ToJSON(Embedded: true))
+                                   ? new JProperty(PropertyKeys.Address,                  Address.ToJSON(Embedded: true))
                                    : null,
 
                                // API
@@ -1492,36 +1719,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                // DNS SRV
 
                                Logo.IsNotNullOrEmpty()
-                                   ? new JProperty("logos",               JSONArray.Create(
+                                   ? new JProperty(PropertyKeys.Logos,                    JSONArray.Create(
                                                                               JSONObject.Create(
-                                                                                  new JProperty("uri",          Logo.            ToString())
+                                                                                  new JProperty(PropertyKeys.LogoURI,  Logo.     ToString())
                                                                                   //new JProperty("description",  I18NString.Empty.ToJSON())
                                                                               )
                                                                           ))
                                    : null,
 
                                GeoLocation.HasValue
-                                   ? new JProperty("geoLocation",         GeoLocation.Value.ToJSON(Embedded: true))
+                                   ? new JProperty(PropertyKeys.GeoLocation,              GeoLocation.Value.ToJSON(Embedded: true))
                                    : null,
 
                                Telephone.HasValue
-                                   ? new JProperty("telephone",           Telephone.ToString())
+                                   ? new JProperty(PropertyKeys.Telephone,                Telephone.ToString())
                                    : null,
 
                                EMailAddress.HasValue
-                                   ? new JProperty("eMailAddress",        EMailAddress.ToString())
+                                   ? new JProperty(PropertyKeys.EMailAddress,             EMailAddress.ToString())
                                    : null,
 
                                Homepage.HasValue
-                                   ? new JProperty("homepage",            Homepage.ToString())
+                                   ? new JProperty(PropertyKeys.Homepage,                 Homepage.ToString())
                                    : null,
 
                                HotlinePhoneNumber.HasValue
-                                   ? new JProperty("hotline",             HotlinePhoneNumber.ToString())
+                                   ? new JProperty(PropertyKeys.HotlinePhoneNumber,       HotlinePhoneNumber.ToString())
                                    : null,
 
                                TermsAndConditionsURL.HasValue
-                                   ? new JProperty("termsAndConditions",  TermsAndConditionsURL.ToString())
+                                   ? new JProperty(PropertyKeys.TermsAndConditions,       TermsAndConditionsURL.ToString())
                                    : null,
 
 
@@ -1602,49 +1829,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 // Embedded completely, as content.
                 if (Brands.Count > 0)
-                    json.Add("brands", new JArray(Brands.Select(brand => brand.ToJSON())));
+                    json.Add(PropertyKeys.Brands, new JArray(Brands.Select(brand => brand.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && ChargingTariffs.Count > 0)
-                    json.Add("chargingTariffs", new JArray(ChargingTariffs.Select(chargingTariff => chargingTariff.ToJSON())));
+                    json.Add(PropertyKeys.ChargingTariffs, new JArray(ChargingTariffs.Select(chargingTariff => chargingTariff.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && ChargingPools.Count > 0)
-                    json.Add("chargingPools", new JArray(ChargingPools.Select(chargingPool => chargingPool.ToJSON())));
+                    json.Add(PropertyKeys.ChargingPools, new JArray(ChargingPools.Select(chargingPool => chargingPool.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && EVSETemplates.Count > 0)
-                    json.Add("EVSETemplates", new JArray(EVSETemplates.Select(template => template.ToJSON())));
+                    json.Add(PropertyKeys.EVSETemplates, new JArray(EVSETemplates.Select(template => template.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && ChargingStationTemplates.Count > 0)
-                    json.Add("chargingStationTemplates", new JArray(ChargingStationTemplates.Select(template => template.ToJSON())));
+                    json.Add(PropertyKeys.ChargingStationTemplates, new JArray(ChargingStationTemplates.Select(template => template.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && ChargingPoolTemplates.Count > 0)
-                    json.Add("chargingPoolTemplates", new JArray(ChargingPoolTemplates.Select(template => template.ToJSON())));
+                    json.Add(PropertyKeys.ChargingPoolTemplates, new JArray(ChargingPoolTemplates.Select(template => template.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && ChargingTariffTemplates.Count > 0)
-                    json.Add("chargingTariffTemplates", new JArray(ChargingTariffTemplates.Select(template => template.ToJSON())));
+                    json.Add(PropertyKeys.ChargingTariffTemplates, new JArray(ChargingTariffTemplates.Select(template => template.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && EnergyMeterTemplates.Count > 0)
-                    json.Add("energyMeterTemplates", new JArray(EnergyMeterTemplates.Select(template => template.ToJSON())));
+                    json.Add(PropertyKeys.EnergyMeterTemplates, new JArray(EnergyMeterTemplates.Select(template => template.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && EVSEGroups.Count > 0)
-                    json.Add("EVSEGroups", new JArray(EVSEGroups.Select(group => group.ToJSON())));
+                    json.Add(PropertyKeys.EVSEGroups, new JArray(EVSEGroups.Select(group => group.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && ChargingStationGroups.Count > 0)
-                    json.Add("chargingStationGroups", new JArray(ChargingStationGroups.Select(group => group.ToJSON())));
+                    json.Add(PropertyKeys.ChargingStationGroups, new JArray(ChargingStationGroups.Select(group => group.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && ChargingPoolGroups.Count > 0)
-                    json.Add("chargingPoolGroups", new JArray(ChargingPoolGroups.Select(group => group.ToJSON())));
+                    json.Add(PropertyKeys.ChargingPoolGroups, new JArray(ChargingPoolGroups.Select(group => group.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && ChargingTariffGroups.Count > 0)
-                    json.Add("chargingTariffGroups", new JArray(ChargingTariffGroups.Select(group => group.ToJSON())));
+                    json.Add(PropertyKeys.ChargingTariffGroups, new JArray(ChargingTariffGroups.Select(group => group.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && EnergyMeterGroups.Count > 0)
-                    json.Add("energyMeterGroups", new JArray(EnergyMeterGroups.Select(group => group.ToJSON())));
+                    json.Add(PropertyKeys.EnergyMeterGroups, new JArray(EnergyMeterGroups.Select(group => group.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && ChargingTariffOffers.Count > 0)
-                    json.Add("chargingTariffOffers", new JArray(ChargingTariffOffers.Select(offer => offer.ToJSON())));
+                    json.Add(PropertyKeys.ChargingTariffOffers, new JArray(ChargingTariffOffers.Select(offer => offer.ToJSON(Embedded: true))));
 
                 if (IncludeChildArrays && ParkingSpaces.Count > 0)
-                    json.Add("parkingSpaces", new JArray(ParkingSpaces.Select(parkingSpace => parkingSpace.ToJSON())));
+                    json.Add(PropertyKeys.ParkingSpaces, new JArray(ParkingSpaces.Select(parkingSpace => parkingSpace.ToJSON(Embedded: true))));
 
                 POIPartyKeys.AddTo(json, this);
 
@@ -1669,10 +1896,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             catch (Exception e)
             {
                 return new JObject(
-                           new JProperty("@id",         Id.ToString()),
-                           new JProperty("@context",    JSONLDContext),
-                           new JProperty("exception",   e.Message),
-                           new JProperty("stackTrace",  e.StackTrace)
+                           new JProperty(BasePropertyKeys.Id,       Id.ToString()),
+                           new JProperty(BasePropertyKeys.Context,  JSONLDContext),
+                           new JProperty(PropertyKeys.Exception,    e.Message),
+                           new JProperty(PropertyKeys.StackTrace,   e.StackTrace)
                        );
             }
 

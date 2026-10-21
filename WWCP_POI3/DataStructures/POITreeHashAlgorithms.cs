@@ -22,6 +22,8 @@ using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -58,6 +60,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static JArray ToJSON(IEnumerable<ETagHashAlgorithm> HashAlgorithms)
 
             => new (HashAlgorithms.Select(hashAlgorithm => hashAlgorithm.ToText()));
+
+        #endregion
+
+        #region ToCBOR(HashAlgorithms)
+
+        /// <summary>
+        /// The given hash algorithms as a CBOR array of their names, in their order.
+        /// </summary>
+        public static CBORValue ToCBOR(IEnumerable<ETagHashAlgorithm> HashAlgorithms)
+
+            => CBORValue.FromArray(HashAlgorithms.Select(hashAlgorithm => CBORValue.FromText(hashAlgorithm.ToText())));
 
         #endregion
 

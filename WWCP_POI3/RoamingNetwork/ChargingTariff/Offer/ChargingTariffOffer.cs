@@ -100,9 +100,87 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private const Int32 MinutesPerWeek = 7 * 24 * 60;
 
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingTariffOffer";
+
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its price of its own.
+            /// </summary>
+            public const String  ChargingTariff               = "chargingTariff";
+
+            /// <summary>
+            /// The property of its discount.
+            /// </summary>
+            public const String  Discount                     = "discount";
+
+            /// <summary>
+            /// The property of the identifications of the EVSE groups it covers.
+            /// </summary>
+            public const String  EVSEGroupIds                 = "EVSEGroupIds";
+
+            /// <summary>
+            /// The property of the identifications of the charging station groups it covers.
+            /// </summary>
+            public const String  ChargingStationGroupIds      = "chargingStationGroupIds";
+
+            /// <summary>
+            /// The property of the identifications of the charging pool groups it covers.
+            /// </summary>
+            public const String  ChargingPoolGroupIds         = "chargingPoolGroupIds";
+
+            /// <summary>
+            /// The property of the identifications of the charging station operators it covers.
+            /// </summary>
+            public const String  ChargingStationOperatorIds   = "chargingStationOperatorIds";
+
+            /// <summary>
+            /// The property of its notBefore.
+            /// </summary>
+            public const String  NotBefore                    = "notBefore";
+
+            /// <summary>
+            /// The property of its notAfter.
+            /// </summary>
+            public const String  NotAfter                     = "notAfter";
+
+            /// <summary>
+            /// The property of its opening times.
+            /// </summary>
+            public const String  OpeningTimes                 = "openingTimes";
+
+            /// <summary>
+            /// The property of the sessions it is for.
+            /// </summary>
+            public const String  Sessions                     = "sessions";
+
+            /// <summary>
+            /// The property of the identifications of the e-mobility providers with whose contracts it is for.
+            /// </summary>
+            public const String  EMobilityProviderIds         = "eMobilityProviderIds";
+
+            /// <summary>
+            /// The property of its maximum of sessions per contract.
+            /// </summary>
+            public const String  MaxSessionsPerContract       = "maxSessionsPerContract";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// Its price of its own, unless it gives a discount.
@@ -241,7 +319,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException($"The charging tariff offer '{Id}' must name at least one EVSE group, charging station group, charging pool group or charging station operator!", nameof(EVSEGroupIds));
 
             if (NotBefore.HasValue && NotAfter.HasValue && NotAfter.Value < NotBefore.Value)
-                throw new ArgumentException($"The notAfter of the charging tariff offer '{Id}' must not be before its notBefore!", nameof(NotAfter));
+                throw new ArgumentException($"The {PropertyKeys.NotAfter} of the charging tariff offer '{Id}' must not be before its {PropertyKeys.NotBefore}!", nameof(NotAfter));
 
             if (MaxSessionsPerContract == 0)
                 throw new ArgumentException($"The maximum of sessions per contract of the charging tariff offer '{Id}' must be at least 1!", nameof(MaxSessionsPerContract));
@@ -769,66 +847,74 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomChargingTariffOfferSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this charging tariff offer, as its owner embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingTariffOfferSerializer">A delegate to serialize custom charging tariff offers.</param>
+        public JObject ToJSON(Boolean                                                Embedded                              = false,
+                              CustomJObjectSerializerDelegate<ChargingTariffOffer>?  CustomChargingTariffOfferSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,                  JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",                        Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,                     Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",                 Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,              Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",                  DataSource);
+                json.Add(BasePropertyKeys.DataSource,               DataSource);
 
             if (ChargingTariff is not null)
-                json.Add("chargingTariff",              ChargingTariff.ToJSON());
+                json.Add(PropertyKeys.ChargingTariff,               ChargingTariff.ToJSON(Embedded: true));
 
             if (Discount is not null)
-                json.Add("discount",                    Discount.ToJSON());
+                json.Add(PropertyKeys.Discount,                     Discount.ToJSON(Embedded: true));
 
             if (EVSEGroupIds.Length > 0)
-                json.Add("EVSEGroupIds",                POIJSON.IdsToJSON(EVSEGroupIds));
+                json.Add(PropertyKeys.EVSEGroupIds,                 POIJSON.IdsToJSON(EVSEGroupIds));
 
             if (ChargingStationGroupIds.Length > 0)
-                json.Add("chargingStationGroupIds",     POIJSON.IdsToJSON(ChargingStationGroupIds));
+                json.Add(PropertyKeys.ChargingStationGroupIds,      POIJSON.IdsToJSON(ChargingStationGroupIds));
 
             if (ChargingPoolGroupIds.Length > 0)
-                json.Add("chargingPoolGroupIds",        POIJSON.IdsToJSON(ChargingPoolGroupIds));
+                json.Add(PropertyKeys.ChargingPoolGroupIds,         POIJSON.IdsToJSON(ChargingPoolGroupIds));
 
             if (ChargingStationOperatorIds.Length > 0)
-                json.Add("chargingStationOperatorIds",  POIJSON.IdsToJSON(ChargingStationOperatorIds));
+                json.Add(PropertyKeys.ChargingStationOperatorIds,   POIJSON.IdsToJSON(ChargingStationOperatorIds));
 
             if (NotBefore.HasValue)
-                json.Add("notBefore",                   NotBefore.Value.ToISO8601());
+                json.Add(PropertyKeys.NotBefore,                    NotBefore.Value.ToISO8601());
 
             if (NotAfter.HasValue)
-                json.Add("notAfter",                    NotAfter. Value.ToISO8601());
+                json.Add(PropertyKeys.NotAfter,                     NotAfter. Value.ToISO8601());
 
             if (OpeningTimes is not null)
-                json.Add("openingTimes",                OpeningTimes.ToJSON());
+                json.Add(PropertyKeys.OpeningTimes,                 OpeningTimes.ToJSON());
 
             if (Sessions.HasValue)
-                json.Add("sessions",                    Sessions.Value.ToString());
+                json.Add(PropertyKeys.Sessions,                     Sessions.Value.ToString());
 
             if (EMobilityProviderIds.Length > 0)
-                json.Add("eMobilityProviderIds",        POIJSON.IdsToJSON(EMobilityProviderIds));
+                json.Add(PropertyKeys.EMobilityProviderIds,         POIJSON.IdsToJSON(EMobilityProviderIds));
 
             if (MaxSessionsPerContract.HasValue)
-                json.Add("maxSessionsPerContract",      MaxSessionsPerContract.Value);
+                json.Add(PropertyKeys.MaxSessionsPerContract,       MaxSessionsPerContract.Value);
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomChargingTariffOfferSerializer is not null
+                       ? CustomChargingTariffOfferSerializer(this, json)
+                       : json;
 
         }
 
@@ -852,7 +938,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "charging tariff offer identification",
                                          ChargingTariffOffer_Id.TryParse,
                                          out ChargingTariffOffer_Id id,
@@ -863,9 +949,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var owner = $"the charging tariff offer '{id}'";
 
-                if (!POIJSON.TryParseI18N  (JSON, "name",         "charging tariff offer name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N  (JSON, "description",  "charging tariff offer description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "dataSource",   "data source",                        out var dataSource,   out ErrorResponse))
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of {owner} must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Name,         "charging tariff offer name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Description,  "charging tariff offer description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, BasePropertyKeys.DataSource,   "data source",                        out var dataSource,   out ErrorResponse))
                 {
                     return false;
                 }
@@ -875,7 +968,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ChargingTariffOfferPrice?  chargingTariff  = null;
                 ChargingTariffDiscount?    discount        = null;
 
-                if (JSON["chargingTariff"] is JToken chargingTariffJSON &&
+                if (JSON[PropertyKeys.ChargingTariff] is JToken chargingTariffJSON &&
                     (chargingTariffJSON is not JObject chargingTariffObject ||
                      !ChargingTariffOfferPrice.TryParse(chargingTariffObject, owner, out chargingTariff, out ErrorResponse)))
                 {
@@ -883,7 +976,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (JSON["discount"] is JToken discountJSON &&
+                if (JSON[PropertyKeys.Discount] is JToken discountJSON &&
                     (discountJSON is not JObject discountObject ||
                      !ChargingTariffDiscount.TryParse(discountObject, out discount, out ErrorResponse)))
                 {
@@ -895,28 +988,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Where, when, for which sessions
 
-                if (!POIJSON.TryParseIds(JSON, "EVSEGroupIds",                "EVSE group identification",                EVSEGroup_Id.              TryParse, out ImmutableArray<EVSEGroup_Id>               evseGroupIds,                out ErrorResponse) ||
-                    !POIJSON.TryParseIds(JSON, "chargingStationGroupIds",     "charging station group identification",    ChargingStationGroup_Id.   TryParse, out ImmutableArray<ChargingStationGroup_Id>    chargingStationGroupIds,     out ErrorResponse) ||
-                    !POIJSON.TryParseIds(JSON, "chargingPoolGroupIds",        "charging pool group identification",       ChargingPoolGroup_Id.      TryParse, out ImmutableArray<ChargingPoolGroup_Id>       chargingPoolGroupIds,        out ErrorResponse) ||
-                    !POIJSON.TryParseIds(JSON, "chargingStationOperatorIds",  "charging station operator identification", ChargingStationOperator_Id.TryParse, out ImmutableArray<ChargingStationOperator_Id> chargingStationOperatorIds,  out ErrorResponse) ||
-                    !POIJSON.TryParseIds(JSON, "eMobilityProviderIds",        "e-mobility provider identification",       EMobilityProvider_Id.      TryParse, out ImmutableArray<EMobilityProvider_Id>       eMobilityProviderIds,        out ErrorResponse))
+                if (!POIJSON.TryParseIds(JSON, PropertyKeys.EVSEGroupIds,                "EVSE group identification",                EVSEGroup_Id.              TryParse, out ImmutableArray<EVSEGroup_Id>               evseGroupIds,                out ErrorResponse) ||
+                    !POIJSON.TryParseIds(JSON, PropertyKeys.ChargingStationGroupIds,     "charging station group identification",    ChargingStationGroup_Id.   TryParse, out ImmutableArray<ChargingStationGroup_Id>    chargingStationGroupIds,     out ErrorResponse) ||
+                    !POIJSON.TryParseIds(JSON, PropertyKeys.ChargingPoolGroupIds,        "charging pool group identification",       ChargingPoolGroup_Id.      TryParse, out ImmutableArray<ChargingPoolGroup_Id>       chargingPoolGroupIds,        out ErrorResponse) ||
+                    !POIJSON.TryParseIds(JSON, PropertyKeys.ChargingStationOperatorIds,  "charging station operator identification", ChargingStationOperator_Id.TryParse, out ImmutableArray<ChargingStationOperator_Id> chargingStationOperatorIds,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds(JSON, PropertyKeys.EMobilityProviderIds,        "e-mobility provider identification",       EMobilityProvider_Id.      TryParse, out ImmutableArray<EMobilityProvider_Id>       eMobilityProviderIds,        out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (!POIEntityMetadata.TryParseTimestamp(JSON["notBefore"], "notBefore of the charging tariff offer", out var notBefore, out ErrorResponse) ||
-                    !POIEntityMetadata.TryParseTimestamp(JSON["notAfter"],  "notAfter of the charging tariff offer",  out var notAfter,  out ErrorResponse))
+                if (!POIEntityMetadata.TryParseTimestamp(JSON[PropertyKeys.NotBefore], $"{PropertyKeys.NotBefore} of the charging tariff offer", out var notBefore, out ErrorResponse) ||
+                    !POIEntityMetadata.TryParseTimestamp(JSON[PropertyKeys.NotAfter],  $"{PropertyKeys.NotAfter} of the charging tariff offer",  out var notAfter,  out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, "openingTimes", "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
+                if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, PropertyKeys.OpeningTimes, "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseEnum(JSON, "sessions", "sessions of the charging tariff offer", out ChargingTariffOfferSessions? sessions, out ErrorResponse))
+                if (!POIJSON.TryParseEnum(JSON, PropertyKeys.Sessions, "sessions of the charging tariff offer", out ChargingTariffOfferSessions? sessions, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseInteger(JSON, "maxSessionsPerContract", "maximum of sessions per contract", out var maxSessionsPerContract, out ErrorResponse))
+                if (!POIJSON.TryParseInteger(JSON, PropertyKeys.MaxSessionsPerContract, "maximum of sessions per contract", out var maxSessionsPerContract, out ErrorResponse))
                     return false;
 
                 if (maxSessionsPerContract < 1)

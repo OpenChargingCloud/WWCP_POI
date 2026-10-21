@@ -56,9 +56,142 @@ namespace cloud.charging.open.protocols.WWCP.POI
             nameof(ParkingOperator)
         };
 
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/gridConnectionPoint";
+
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                              = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                         = "@context";
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name                            = "name";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description                     = "description";
+
+            /// <summary>
+            /// The property of its address.
+            /// </summary>
+            public const String  Address                         = "address";
+
+            /// <summary>
+            /// The property of its geographical location.
+            /// </summary>
+            public const String  GeoLocation                     = "geoLocation";
+
+            /// <summary>
+            /// The property of its voltage level.
+            /// </summary>
+            public const String  VoltageLevel                    = "voltageLevel";
+
+            /// <summary>
+            /// The property of its connection type.
+            /// </summary>
+            public const String  ConnectionType                  = "connectionType";
+
+            /// <summary>
+            /// The property of its nominal voltage.
+            /// </summary>
+            public const String  NominalVoltage                  = "nominalVoltage";
+
+            /// <summary>
+            /// The property of its nominal frequency.
+            /// </summary>
+            public const String  NominalFrequency                = "nominalFrequency";
+
+            /// <summary>
+            /// The property of its contracted import power.
+            /// </summary>
+            public const String  ContractedImportPower           = "contractedImportPower";
+
+            /// <summary>
+            /// The property of its contracted export power.
+            /// </summary>
+            public const String  ContractedExportPower           = "contractedExportPower";
+
+            /// <summary>
+            /// The property of its contracted import apparent power.
+            /// </summary>
+            public const String  ContractedImportApparentPower   = "contractedImportApparentPower";
+
+            /// <summary>
+            /// The property of its contracted export apparent power.
+            /// </summary>
+            public const String  ContractedExportApparentPower   = "contractedExportApparentPower";
+
+            /// <summary>
+            /// The property of its connection agreement identification.
+            /// </summary>
+            public const String  ConnectionAgreementId           = "connectionAgreementId";
+
+            /// <summary>
+            /// The property of its network location identification.
+            /// </summary>
+            public const String  NetworkLocationId               = "networkLocationId";
+
+            /// <summary>
+            /// The property of its market location identifications.
+            /// </summary>
+            public const String  MarketLocationIds               = "marketLocationIds";
+
+            /// <summary>
+            /// The property of its metering location identifications.
+            /// </summary>
+            public const String  MeteringLocationIds             = "meteringLocationIds";
+
+            /// <summary>
+            /// The property of its energy meter.
+            /// </summary>
+            public const String  EnergyMeter                     = "energyMeter";
+
+            /// <summary>
+            /// The property of its maintainer.
+            /// </summary>
+            public const String  MaintainedBy                    = "maintainedBy";
+
+            /// <summary>
+            /// The property of its custom data.
+            /// </summary>
+            public const String  CustomData                      = "customData";
+
+            /// <summary>
+            /// The property of its grid operator, refused: it is embedded in its grid operator.
+            /// </summary>
+            public const String  GridOperator                    = "gridOperator";
+
+            /// <summary>
+            /// The property of the identification of its grid operator, refused: it is embedded in its grid operator.
+            /// </summary>
+            public const String  GridOperatorId                  = "gridOperatorId";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The identification of the connection point, assigned by the grid operator.
@@ -264,76 +397,84 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomGridConnectionPointSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this grid connection point, as its grid operator embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomGridConnectionPointSerializer">A delegate to serialize custom grid connection point JSON objects.</param>
+        public JObject ToJSON(Boolean                                                Embedded                              = false,
+                              CustomJObjectSerializerDelegate<GridConnectionPoint>?  CustomGridConnectionPointSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(PropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,                        JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",                           Name.ToJSON());
+                json.Add(PropertyKeys.Name,                           Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",                    Description.ToJSON());
+                json.Add(PropertyKeys.Description,                    Description.ToJSON());
 
             if (Address is not null)
-                json.Add("address",                        Address.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.Address,                        Address.ToJSON(Embedded: true));
 
             if (GeoLocation.HasValue)
-                json.Add("geoLocation",                    GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,                    GeoLocation.Value.ToJSON(Embedded: true));
 
             if (VoltageLevel.HasValue)
-                json.Add("voltageLevel",                   VoltageLevel.Value.ToString());
+                json.Add(PropertyKeys.VoltageLevel,                   VoltageLevel.Value.ToString());
 
             if (ConnectionType.HasValue)
-                json.Add("connectionType",                 ConnectionType.Value.ToString());
+                json.Add(PropertyKeys.ConnectionType,                 ConnectionType.Value.ToString());
 
             if (NominalVoltage.HasValue)
-                json.Add("nominalVoltage",                 POIJSON.Number(NominalVoltage.Value.Value));
+                json.Add(PropertyKeys.NominalVoltage,                 POIJSON.Number(NominalVoltage.Value.Value));
 
             if (NominalFrequency.HasValue)
-                json.Add("nominalFrequency",               POIJSON.Number(NominalFrequency.Value.Value));
+                json.Add(PropertyKeys.NominalFrequency,               POIJSON.Number(NominalFrequency.Value.Value));
 
             if (ContractedImportPower.HasValue)
-                json.Add("contractedImportPower",          POIJSON.Number(ContractedImportPower.Value.Value));
+                json.Add(PropertyKeys.ContractedImportPower,          POIJSON.Number(ContractedImportPower.Value.Value));
 
             if (ContractedExportPower.HasValue)
-                json.Add("contractedExportPower",          POIJSON.Number(ContractedExportPower.Value.Value));
+                json.Add(PropertyKeys.ContractedExportPower,          POIJSON.Number(ContractedExportPower.Value.Value));
 
             if (ContractedImportApparentPower.HasValue)
-                json.Add("contractedImportApparentPower",  POIJSON.Number(ContractedImportApparentPower.Value.Value));
+                json.Add(PropertyKeys.ContractedImportApparentPower,  POIJSON.Number(ContractedImportApparentPower.Value.Value));
 
             if (ContractedExportApparentPower.HasValue)
-                json.Add("contractedExportApparentPower",  POIJSON.Number(ContractedExportApparentPower.Value.Value));
+                json.Add(PropertyKeys.ContractedExportApparentPower,  POIJSON.Number(ContractedExportApparentPower.Value.Value));
 
             if (ConnectionAgreementId is not null)
-                json.Add("connectionAgreementId",          ConnectionAgreementId);
+                json.Add(PropertyKeys.ConnectionAgreementId,          ConnectionAgreementId);
 
             if (NetworkLocationId is not null)
-                json.Add("networkLocationId",              NetworkLocationId);
+                json.Add(PropertyKeys.NetworkLocationId,              NetworkLocationId);
 
             if (MarketLocationIds.Length > 0)
-                json.Add("marketLocationIds",              new JArray(MarketLocationIds));
+                json.Add(PropertyKeys.MarketLocationIds,              new JArray(MarketLocationIds));
 
             if (MeteringLocationIds.Length > 0)
-                json.Add("meteringLocationIds",            new JArray(MeteringLocationIds));
+                json.Add(PropertyKeys.MeteringLocationIds,            new JArray(MeteringLocationIds));
 
             if (EnergyMeter is not null)
-                json.Add("energyMeter",                    EnergyMeter.ToJSON());
+                json.Add(PropertyKeys.EnergyMeter,                    EnergyMeter.ToJSON(Embedded: true));
 
             if (MaintainedBy.HasValue)
-                json.Add("maintainedBy",                   MaintainedBy.Value.ToJSON());
+                json.Add(PropertyKeys.MaintainedBy,                   MaintainedBy.Value.ToJSON(Embedded: true));
 
             if (CustomData is not null && CustomData.HasValues)
-                json.Add("customData",                     CustomData.ToJObject());
+                json.Add(PropertyKeys.CustomData,                     CustomData.ToJObject());
 
-            return json;
+            return CustomGridConnectionPointSerializer is not null
+                       ? CustomGridConnectionPointSerializer(this, json)
+                       : json;
 
         }
 
@@ -357,7 +498,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(PropertyKeys.Id,
                                          "grid connection point identification",
                                          GridConnectionPoint_Id.TryParse,
                                          out GridConnectionPoint_Id id,
@@ -366,7 +507,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (JSON["gridOperator"] is not null || JSON["gridOperatorId"] is not null)
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the grid connection point '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (JSON[PropertyKeys.GridOperator] is not null || JSON[PropertyKeys.GridOperatorId] is not null)
                 {
                     ErrorResponse = $"The grid connection point '{id}' is embedded in its grid operator: it names none!";
                     return false;
@@ -374,7 +522,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 POIPartyId? maintainedBy = null;
 
-                if (JSON["maintainedBy"] is JToken maintainedByJSON)
+                if (JSON[PropertyKeys.MaintainedBy] is JToken maintainedByJSON)
                 {
 
                     if (!POIPartyId.TryParse(maintainedByJSON, out var maintainer, out ErrorResponse))
@@ -387,37 +535,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                if (!POIJSON.TryParseI18N       (JSON, "name",                   "grid connection point name",           out var name,                   out ErrorResponse) ||
-                    !POIJSON.TryParseI18N       (JSON, "description",            "grid connection point description",    out var description,            out ErrorResponse) ||
-                    !POIJSON.TryParseAddress    (JSON,                                                                   out var address,                out ErrorResponse) ||
-                    !POIJSON.TryParseGeoLocation(JSON,                                                                   out var geoLocation,            out ErrorResponse) ||
-                    !POIJSON.TryParseEnum       (JSON, "voltageLevel",           "voltage level",                        out GridVoltageLevel?    voltageLevel,    out ErrorResponse) ||
-                    !POIJSON.TryParseEnum       (JSON, "connectionType",         "grid connection type",                 out GridConnectionTypes? connectionType,  out ErrorResponse) ||
-                    !POIJSON.TryParseString     (JSON, "connectionAgreementId",  "connection agreement identification",  out var connectionAgreementId,  out ErrorResponse) ||
-                    !POIJSON.TryParseString     (JSON, "networkLocationId",      "network location identification",      out var networkLocationId,      out ErrorResponse) ||
-                    !POIJSON.TryParseStrings    (JSON, "marketLocationIds",      "market location identifications",      out var marketLocationIds,      out ErrorResponse) ||
-                    !POIJSON.TryParseStrings    (JSON, "meteringLocationIds",    "metering location identifications",    out var meteringLocationIds,    out ErrorResponse) ||
-                    !EnergyMeter.TryParseOne    (JSON, "energyMeter",                                                    out var energyMeter,            out ErrorResponse))
+                if (!POIJSON.TryParseI18N       (JSON, PropertyKeys.Name,                   "grid connection point name",           out var name,                   out ErrorResponse) ||
+                    !POIJSON.TryParseI18N       (JSON, PropertyKeys.Description,            "grid connection point description",    out var description,            out ErrorResponse) ||
+                    !POIJSON.TryParseAddress    (JSON, PropertyKeys.Address,                "address",                              out var address,                out ErrorResponse) ||
+                    !POIJSON.TryParseGeoLocation(JSON, PropertyKeys.GeoLocation,            "geo location",                         out var geoLocation,            out ErrorResponse) ||
+                    !POIJSON.TryParseEnum       (JSON, PropertyKeys.VoltageLevel,           "voltage level",                        out GridVoltageLevel?    voltageLevel,    out ErrorResponse) ||
+                    !POIJSON.TryParseEnum       (JSON, PropertyKeys.ConnectionType,         "grid connection type",                 out GridConnectionTypes? connectionType,  out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, PropertyKeys.ConnectionAgreementId,  "connection agreement identification",  out var connectionAgreementId,  out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, PropertyKeys.NetworkLocationId,      "network location identification",      out var networkLocationId,      out ErrorResponse) ||
+                    !POIJSON.TryParseStrings    (JSON, PropertyKeys.MarketLocationIds,      "market location identifications",      out var marketLocationIds,      out ErrorResponse) ||
+                    !POIJSON.TryParseStrings    (JSON, PropertyKeys.MeteringLocationIds,    "metering location identifications",    out var meteringLocationIds,    out ErrorResponse) ||
+                    !EnergyMeter.TryParseOne    (JSON, PropertyKeys.EnergyMeter,                                                    out var energyMeter,            out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (JSON.ParseOptional("nominalVoltage",                 "nominal voltage",                   out Volt?        nominalVoltage,                 out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.NominalVoltage,                 "nominal voltage",                   out Volt?        nominalVoltage,                 out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("nominalFrequency",               "nominal frequency",                 out Hertz?       nominalFrequency,               out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.NominalFrequency,               "nominal frequency",                 out Hertz?       nominalFrequency,               out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("contractedImportPower",          "contracted import power",           out Watt?        contractedImportPower,          out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.ContractedImportPower,          "contracted import power",           out Watt?        contractedImportPower,          out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("contractedExportPower",          "contracted export power",           out Watt?        contractedExportPower,          out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.ContractedExportPower,          "contracted export power",           out Watt?        contractedExportPower,          out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("contractedImportApparentPower",  "contracted import apparent power",  out VoltAmpere?  contractedImportApparentPower,  out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.ContractedImportApparentPower,  "contracted import apparent power",  out VoltAmpere?  contractedImportApparentPower,  out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (JSON.ParseOptional("contractedExportApparentPower",  "contracted export apparent power",  out VoltAmpere?  contractedExportApparentPower,  out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.ContractedExportApparentPower,  "contracted export apparent power",  out VoltAmpere?  contractedExportApparentPower,  out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,

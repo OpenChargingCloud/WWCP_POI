@@ -555,7 +555,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 foreach (var json in new[] { Current, Before })
                 {
-                    json.Remove("lastChange");
+                    json.Remove(BasePropertyKeys.LastChange);
                     if (Embedded is not null)
                         json.Remove(Embedded);
                 }
@@ -636,14 +636,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var chargingStationId in chargingStationCandidates)
                 if (TryGetChargingStation(chargingStationId, out var chargingStation) && Previous.TryGetChargingStation(chargingStationId, out var previousChargingStation) &&
-                    FloorOf(new (EffectiveChargingStation(chargingStation)), new (Previous.EffectiveChargingStation(previousChargingStation)), "EVSEs") is DateTimeOffset floor)
+                    FloorOf(new (EffectiveChargingStation(chargingStation)), new (Previous.EffectiveChargingStation(previousChargingStation)), ChargingStation.PropertyKeys.EVSEs) is DateTimeOffset floor)
                 {
                     found = Raise(chargingStations, chargingStation.Id, floor) | found;
                 }
 
             foreach (var chargingPoolId in chargingPoolCandidates)
                 if (TryGetChargingPool(chargingPoolId, out var chargingPool) && Previous.TryGetChargingPool(chargingPoolId, out var previousChargingPool) &&
-                    FloorOf(new (EffectiveChargingPool(chargingPool)), new (Previous.EffectiveChargingPool(previousChargingPool)), "chargingStations") is DateTimeOffset floor)
+                    FloorOf(new (EffectiveChargingPool(chargingPool)), new (Previous.EffectiveChargingPool(previousChargingPool)), ChargingPool.PropertyKeys.ChargingStations) is DateTimeOffset floor)
                 {
                     found = Raise(chargingPools, chargingPool.Id, floor) | found;
                 }
@@ -799,9 +799,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private readonly record struct AEntity(Func<JObject> ToJSONOf, DateTimeOffset LastChangeDate)
         {
-            public AEntity(EVSE            EVSE)            : this(EVSE.           ToJSON, EVSE.           LastChangeDate) { }
-            public AEntity(ChargingStation ChargingStation) : this(ChargingStation.ToJSON, ChargingStation.LastChangeDate) { }
-            public AEntity(ChargingPool    ChargingPool)    : this(ChargingPool.   ToJSON, ChargingPool.   LastChangeDate) { }
+            public AEntity(EVSE            EVSE)            : this(() => EVSE.           ToJSON(Embedded: true), EVSE.           LastChangeDate) { }
+            public AEntity(ChargingStation ChargingStation) : this(() => ChargingStation.ToJSON(Embedded: true), ChargingStation.LastChangeDate) { }
+            public AEntity(ChargingPool    ChargingPool)    : this(() => ChargingPool.   ToJSON(Embedded: true), ChargingPool.   LastChangeDate) { }
         }
 
         #endregion
@@ -1049,7 +1049,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     Brands:                    Templates.Union (ChargingPool.Brands,               template => template.Brands,               brand               => brand.Id),
                                     Images:                    Templates.Union (ChargingPool.Images,               template => template.Images,               image               => image.URL.ToString()),
                                     AuthenticationModes:       Templates.Union (ChargingPool.AuthenticationModes,  template => template.AuthenticationModes,  authenticationMode  => authenticationMode.Type),
-                                    RelatedLocations:          Templates.Union (ChargingPool.RelatedLocations,     template => template.RelatedLocations,     relatedLocation     => relatedLocation.ToJSON().ToString(Newtonsoft.Json.Formatting.None)),
+                                    RelatedLocations:          Templates.Union (ChargingPool.RelatedLocations,     template => template.RelatedLocations,     relatedLocation     => relatedLocation.ToJSON(Embedded: true).ToString(Newtonsoft.Json.Formatting.None)),
 
                                     Facilities:                Templates.Union (ChargingPool.Facilities,           template => template.Facilities),
                                     PaymentOptions:            Templates.Union (ChargingPool.PaymentOptions,       template => template.PaymentOptions),

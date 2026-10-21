@@ -65,7 +65,84 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed record RoamingNetworkCommitSignature
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkCommitSignature";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context     = "@context";
+
+            /// <summary>
+            /// The property of the role of its signer.
+            /// </summary>
+            public const String  Role        = "role";
+
+            /// <summary>
+            /// The property of the optional name of its signer.
+            /// </summary>
+            public const String  Signer      = "signer";
+
+            /// <summary>
+            /// The property of its signing timestamp.
+            /// </summary>
+            public const String  SignedAt    = "signedAt";
+
+            /// <summary>
+            /// The property of its signature algorithm.
+            /// </summary>
+            public const String  Algorithm   = "algorithm";
+
+            /// <summary>
+            /// The property of the identification of its key.
+            /// </summary>
+            public const String  KeyId       = "keyId";
+
+            /// <summary>
+            /// The property of its signature value.
+            /// </summary>
+            public const String  Value       = "value";
+
+            /// <summary>
+            /// The property of the profile of its signature input.
+            /// </summary>
+            public const String  Profile     = "profile";
+
+            /// <summary>
+            /// The property of the encoding of its signature value.
+            /// </summary>
+            public const String  Encoding    = "encoding";
+
+            /// <summary>
+            /// The property of the identification of the commit of the signatures of a commit, { commitId, signatures }.
+            /// </summary>
+            public const String  CommitId    = "commitId";
+
+            /// <summary>
+            /// The property of the signatures of the signatures of a commit, { commitId, signatures }.
+            /// </summary>
+            public const String  Signatures  = "signatures";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The role of the signer, e.g. leader or roamingNetworkOperator.
@@ -166,13 +243,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatoryText("role",       "signer role",          out var role,       out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("signedAt",   "signing timestamp",    out var signedAt,   out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("algorithm",  "signature algorithm",  out var algorithm,  out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("keyId",      "key identification",   out var keyId,      out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("value",      "signature value",      out var value,      out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("profile",    "signature profile",    out var profile,    out ErrorResponse) ||
-                    !JSON.ParseMandatoryText("encoding",   "signature encoding",   out var encoding,   out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the commit signature must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!JSON.ParseMandatoryText(PropertyKeys.Role,       "signer role",          out var role,       out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.SignedAt,   "signing timestamp",    out var signedAt,   out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.Algorithm,  "signature algorithm",  out var algorithm,  out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.KeyId,      "key identification",   out var keyId,      out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.Value,      "signature value",      out var value,      out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.Profile,    "signature profile",    out var profile,    out ErrorResponse) ||
+                    !JSON.ParseMandatoryText(PropertyKeys.Encoding,   "signature encoding",   out var encoding,   out ErrorResponse))
                 {
                     return false;
                 }
@@ -186,7 +270,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 String? signer = null;
 
-                if (JSON.ParseOptional("signer", "signer", out String? parsedSigner, out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.Signer, "signer", out String? parsedSigner, out ErrorResponse))
                 {
 
                     if (ErrorResponse is not null)
@@ -240,7 +324,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Signatures = null;
 
-            if (!JSON.ParseMandatory("commitId",
+            if (!JSON.ParseMandatory(PropertyKeys.CommitId,
                                      "commit identification",
                                      RoamingNetworkCommit_Id.TryParse,
                                      out CommitId,
@@ -249,7 +333,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (JSON["signatures"] is not JArray signaturesJSON || signaturesJSON.Count == 0)
+            if (JSON[PropertyKeys.Signatures] is not JArray signaturesJSON || signaturesJSON.Count == 0)
             {
                 ErrorResponse = "The signatures must be a JSON array of at least one signature!";
                 return false;
@@ -284,29 +368,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomCommitSignatureSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this commit signature.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomCommitSignatureSerializer">An optional custom serializer of commit signatures.</param>
+        public JObject ToJSON(Boolean                                                          Embedded                          = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkCommitSignature>?  CustomCommitSignatureSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("role",       Role)
-                       );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,    JSONLDContext);
+
+            json.Add(PropertyKeys.Role,           Role);
 
             if (Signer is not null)
-                json.Add("signer",     Signer);
+                json.Add(PropertyKeys.Signer,     Signer);
 
-            json.Add("signedAt",       SignedAt.ToISO8601());
-            json.Add("algorithm",      Algorithm);
-            json.Add("keyId",          KeyId);
-            json.Add("value",          Value);
-            json.Add("profile",        Profile);
-            json.Add("encoding",       Encoding);
+            json.Add(PropertyKeys.SignedAt,       SignedAt.ToISO8601());
+            json.Add(PropertyKeys.Algorithm,      Algorithm);
+            json.Add(PropertyKeys.KeyId,          KeyId);
+            json.Add(PropertyKeys.Value,          Value);
+            json.Add(PropertyKeys.Profile,        Profile);
+            json.Add(PropertyKeys.Encoding,       Encoding);
 
-            return json;
+            return CustomCommitSignatureSerializer is not null
+                       ? CustomCommitSignatureSerializer(this, json)
+                       : json;
 
         }
 

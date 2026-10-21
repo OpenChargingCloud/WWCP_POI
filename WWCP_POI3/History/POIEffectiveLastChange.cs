@@ -42,18 +42,75 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 DateTimeOffset  LastChange)
     {
 
-        #region ToJSON()
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/poiEffectiveLastChange";
+
+        #endregion
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context     = "@context";
+
+            /// <summary>
+            /// The property of the type of its member.
+            /// </summary>
+            public const String  EntityType  = "entityType";
+
+            /// <summary>
+            /// The property of the identification of its member.
+            /// </summary>
+            public const String  EntityId    = "entityId";
+
+            /// <summary>
+            /// The property of the last change its member has at least.
+            /// </summary>
+            public const String  LastChange  = "lastChange";
+
+        }
+
+        #endregion
+
+        #region ToJSON(Embedded = false, CustomEffectiveLastChangeSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this floor.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEffectiveLastChangeSerializer">An optional custom serializer of effective last changes.</param>
+        public JObject ToJSON(Boolean                                                   Embedded                              = false,
+                              CustomJObjectSerializerDelegate<POIEffectiveLastChange>?  CustomEffectiveLastChangeSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("entityType",  EntityType),
-                   new JProperty("entityId",    EntityId),
-                   new JProperty("lastChange",  LastChange.ToISO8601())
-               );
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,     JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.EntityType,  EntityType),
+                                 new JProperty(PropertyKeys.EntityId,    EntityId),
+                                 new JProperty(PropertyKeys.LastChange,  LastChange.ToISO8601())
+
+                       );
+
+            return CustomEffectiveLastChangeSerializer is not null
+                       ? CustomEffectiveLastChangeSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 
@@ -69,8 +126,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             EffectiveLastChange = null;
 
-            if (!POIJSON.TryParseString(JSON, "entityType", "entity type",        out var entityType, out ErrorResponse) ||
-                !POIJSON.TryParseString(JSON, "entityId",   "entity identification", out var entityId,  out ErrorResponse))
+            if (JSON[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the effective last change must be '{JSONLDContext}'!";
+                return false;
+            }
+
+            if (!POIJSON.TryParseString(JSON, PropertyKeys.EntityType, "entity type",        out var entityType, out ErrorResponse) ||
+                !POIJSON.TryParseString(JSON, PropertyKeys.EntityId,   "entity identification", out var entityId,  out ErrorResponse))
             {
                 return false;
             }
@@ -81,7 +145,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!JSON.ParseMandatory("lastChange", "last change", out DateTimeOffset lastChange, out ErrorResponse))
+            if (!JSON.ParseMandatory(PropertyKeys.LastChange, "last change", out DateTimeOffset lastChange, out ErrorResponse))
                 return false;
 
             EffectiveLastChange  = new POIEffectiveLastChange(entityType, entityId, lastChange);

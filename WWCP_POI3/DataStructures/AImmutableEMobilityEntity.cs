@@ -48,187 +48,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     {
 
-        /// <summary>
-        /// Restore persisted timestamps on a newly parsed entity without recording a change.
-        /// </summary>
-        internal void RestoreSnapshotTimestamps(DateTimeOffset? created, DateTimeOffset? lastChange)
-            => RestoreTimestamps(created ?? Created, lastChange ?? LastChangeDate);
-
-        internal (UInt16 Admin, UInt16 Status) RuntimeHistorySizes
-            => (adminStatusSchedule.MaxStatusHistorySize, statusSchedule.MaxStatusHistorySize);
-
-        internal void RestoreRuntimeHistorySizes((UInt16 Admin, UInt16 Status) sizes)
-        {
-            adminStatusSchedule.MaxStatusHistorySize = sizes.Admin;
-            statusSchedule.MaxStatusHistorySize = sizes.Status;
-        }
-
-        #region Runtime status shared by all versions
-
-        // The admin status and the status belong to the entity, not to one of its versions:
-        // a new version takes the schedules of the one before (ShareRuntimeOf), so all versions
-        // of an entity show the same, current status. A version raises its status events only while
-        // somebody listens to them, so that the versions nobody looks at any more are not kept alive
-        // by the schedules they share.
-
-        private readonly Lock  runtimeLock           = new ();
-        private          Boolean  listensToAdminStatus;
-        private          Boolean  listensToStatus;
-
-        /// <summary>
-        /// Take the admin status schedule, the status schedule and the internal data of the given
-        /// previous version of this entity. Only for a new version nobody listens to yet.
-        /// </summary>
-        /// <param name="Previous">The previous version of this entity.</param>
-        internal void ShareRuntimeOf(AImmutableEMobilityEntity<TId, TAdminStatus, TStatus> Previous)
-        {
-
-            if (ReferenceEquals(Previous, this))
-                return;
-
-            lock (runtimeLock)
-            {
-
-                if (listensToAdminStatus || listensToStatus)
-                    throw new InvalidOperationException("Only a new version nobody listens to yet can take the runtime status of the one before!");
-
-                adminStatusSchedule  = Previous.adminStatusSchedule;
-                statusSchedule       = Previous.statusSchedule;
-
-            }
-
-            ShareFurtherRuntimeOf(Previous);
-            ShareInternalDataOf(Previous);
-
-        }
-
-        /// <summary>
-        /// Take further runtime data of the given previous version of this entity, e.g. its energy status.
-        /// </summary>
-        /// <param name="Previous">The previous version of this entity.</param>
-        protected virtual void ShareFurtherRuntimeOf(AImmutableEMobilityEntity<TId, TAdminStatus, TStatus> Previous)
-        { }
-
-        /// <summary>
-        /// Raise the admin status events of this version while Listen is true.
-        /// Called by the events of a subclass when they get their first handler, or lose their last one.
-        /// </summary>
-        protected void ListenToAdminStatus(Boolean Listen)
-        {
-            lock (runtimeLock)
-            {
-
-                if (Listen == listensToAdminStatus)
-                    return;
-
-                if (Listen)
-                    adminStatusSchedule.OnStatusChanged += AdminStatusScheduleChanged;
-                else
-                    adminStatusSchedule.OnStatusChanged -= AdminStatusScheduleChanged;
-
-                listensToAdminStatus = Listen;
-
-            }
-        }
-
-        /// <summary>
-        /// Raise the status events of this version while Listen is true.
-        /// Called by the events of a subclass when they get their first handler, or lose their last one.
-        /// </summary>
-        protected void ListenToStatus(Boolean Listen)
-        {
-            lock (runtimeLock)
-            {
-
-                if (Listen == listensToStatus)
-                    return;
-
-                if (Listen)
-                    statusSchedule.OnStatusChanged += StatusScheduleChanged;
-                else
-                    statusSchedule.OnStatusChanged -= StatusScheduleChanged;
-
-                listensToStatus = Listen;
-
-            }
-        }
-
-        private Task AdminStatusScheduleChanged(DateTimeOffset                          Timestamp,
-                                                EventTracking_Id                        EventTrackingId,
-                                                RuntimeStatusSchedule<TAdminStatus>     Schedule,
-                                                Timestamped<TAdminStatus>               NewStatus,
-                                                Timestamped<TAdminStatus>               OldStatus,
-                                                Context?                                DataSource)
-
-            => OnAdminStatusScheduleChanged(Timestamp, EventTrackingId, NewStatus, OldStatus, DataSource);
-
-        private Task StatusScheduleChanged(DateTimeOffset                Timestamp,
-                                           EventTracking_Id              EventTrackingId,
-                                           RuntimeStatusSchedule<TStatus>  Schedule,
-                                           Timestamped<TStatus>          NewStatus,
-                                           Timestamped<TStatus>          OldStatus,
-                                           Context?                      DataSource)
-
-            => OnStatusScheduleChanged(Timestamp, EventTrackingId, NewStatus, OldStatus, DataSource);
-
-        /// <summary>
-        /// The current admin status changed: raise the admin status events of the subclass.
-        /// </summary>
-        protected virtual Task OnAdminStatusScheduleChanged(DateTimeOffset             Timestamp,
-                                                            EventTracking_Id           EventTrackingId,
-                                                            Timestamped<TAdminStatus>  NewStatus,
-                                                            Timestamped<TAdminStatus>  OldStatus,
-                                                            Context?                   DataSource)
-
-            => Task.CompletedTask;
-
-        /// <summary>
-        /// The current status changed: raise the status events of the subclass.
-        /// </summary>
-        protected virtual Task OnStatusScheduleChanged(DateTimeOffset        Timestamp,
-                                                       EventTracking_Id      EventTrackingId,
-                                                       Timestamped<TStatus>  NewStatus,
-                                                       Timestamped<TStatus>  OldStatus,
-                                                       Context?              DataSource)
-
-            => Task.CompletedTask;
-
-        /// <summary>
-        /// The current admin status, if there is one already.
-        /// </summary>
-        internal Timestamped<TAdminStatus>? CurrentAdminStatus
-            => adminStatusSchedule.Any(status => status.Timestamp <= Timestamp.Now)
-                   ? adminStatusSchedule.CurrentStatus
-                   : null;
-
-        /// <summary>
-        /// The current status, if there is one already.
-        /// </summary>
-        internal Timestamped<TStatus>? CurrentStatus
-            => statusSchedule.Any(status => status.Timestamp <= Timestamp.Now)
-                   ? statusSchedule.CurrentStatus
-                   : null;
-
-        /// <summary>
-        /// The next planned admin status, if any.
-        /// </summary>
-        internal Timestamped<TAdminStatus>? NextAdminStatus
-            => adminStatusSchedule.NextStatus;
-
-        /// <summary>
-        /// The next planned status, if any.
-        /// </summary>
-        internal Timestamped<TStatus>? NextStatus
-            => statusSchedule.NextStatus;
-
-        #endregion
-
-        //internal void ApplyRuntimeStatus(Timestamped<TStatus> value, Timestamped<TStatus>? expected, POIRuntimeUpdateMode mode)
-        //    => statusSchedule.ApplyRuntimeUpdate(value, expected, mode);
-
-        //internal void ApplyRuntimeAdminStatus(Timestamped<TAdminStatus> value, Timestamped<TAdminStatus>? expected, POIRuntimeUpdateMode mode)
-        //    => adminStatusSchedule.ApplyRuntimeUpdate(value, expected, mode);
-
         #region Data
 
         /// <summary>
@@ -245,155 +64,104 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class BasePropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                    = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context               = "@context";
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name                  = "name";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description           = "description";
+
+            /// <summary>
+            /// The property of its data source.
+            /// </summary>
+            public const String  DataSource            = "dataSource";
+
+
+            /// <summary>
+            /// The property of its data licenses.
+            /// </summary>
+            public const String  DataLicenses          = "dataLicenses";
+
+            /// <summary>
+            /// The property of the identifications of its data licenses, written instead of them when they are not expanded.
+            /// </summary>
+            public const String  DataLicenseIds        = "dataLicenseIds";
+
+
+            /// <summary>
+            /// The property of its creation timestamp, as of every entity.
+            /// </summary>
+            public const String  Created               = "created";
+
+            /// <summary>
+            /// The property of its last change timestamp, as of every entity.
+            /// </summary>
+            public const String  LastChange            = "lastChange";
+
+            /// <summary>
+            /// The property of its custom data, as of every entity.
+            /// </summary>
+            public const String  CustomData            = "customData";
+
+            /// <summary>
+            /// The property of its ETags, which describe its content without them.
+            /// </summary>
+            public const String  ETags                 = "eTags";
+
+        }
+
+        #endregion
+
+
         /// <summary>
         /// The global unique identification of this entity.
         /// </summary>
         [Mandatory]
-        public TId                     Id                       { get; }
+        public TId                   Id             { get; }
 
         /// <summary>
         /// The multi-language name of this entity.
         /// </summary>
         [Optional]
-        public ImmutableI18NString     Name                     { get; private set; }
+        public ImmutableI18NString   Name           { get; private set; }
 
         /// <summary>
         /// The multi-language description of this entity.
         /// </summary>
         [Optional]
-        public ImmutableI18NString     Description              { get; private set; }
+        public ImmutableI18NString   Description    { get; private set; }
 
         /// <summary>
         /// The source of this information, e.g. the WWCP importer used.
         /// </summary>
         [Optional]
-        public String?                 DataSource               { get; private set; }
+        public String?               DataSource     { get; private set; }
 
         /// <summary>
         /// Identifiers of the canonical JSON and deterministic CBOR representations.
         /// </summary>
-        public ImmutableArray<ETag>    ETags                    { get; protected set; } = [];
-
-
-        #region AdminStatus
-
-        /// <summary>
-        /// The current charging station admin status.
-        /// </summary>
-        [InternalUseOnly]
-        public Timestamped<TAdminStatus> AdminStatus
-        {
-
-            get
-            {
-                return adminStatusSchedule.CurrentStatus;
-            }
-
-            set
-            {
-                adminStatusSchedule.Insert(value);
-            }
-
-        }
-
-        #endregion
-
-        #region AdminStatusSchedule
-
-        protected RuntimeStatusSchedule<TAdminStatus> adminStatusSchedule;
-
-        /// <summary>
-        /// The charging station admin status schedule.
-        /// </summary>
-        /// <param name="TimestampFilter">An optional admin status timestamp filter.</param>
-        /// <param name="AdminStatusFilter">An optional admin status value filter.</param>
-        /// <param name="Skip">The number of admin status entries to skip.</param>
-        /// <param name="Take">The number of admin status entries to return.</param>
-        public IEnumerable<Timestamped<TAdminStatus>> AdminStatusSchedule(Func<DateTimeOffset, Boolean>?  TimestampFilter     = null,
-                                                                          Func<TAdminStatus,   Boolean>?  AdminStatusFilter   = null,
-                                                                          UInt64?                         Skip                = null,
-                                                                          UInt64?                         Take                = null)
-        {
-
-            TimestampFilter   ??= timestamp => true;
-            AdminStatusFilter ??= status    => true;
-
-            var filteredAdminStatusSchedule = adminStatusSchedule.
-                                                  Where(adminStatus => TimestampFilter  (adminStatus.Timestamp)).
-                                                  Where(adminStatus => AdminStatusFilter(adminStatus.Value)).
-                                                  Skip (Skip ?? 0);
-
-            return Take.HasValue
-                       ? filteredAdminStatusSchedule.Take(Take)
-                       : filteredAdminStatusSchedule;
-
-        }
-
-        #endregion
-
-
-        #region Status
-
-        /// <summary>
-        /// The current charging station status.
-        /// </summary>
-        [InternalUseOnly]
-        public Timestamped<TStatus> Status
-        {
-
-            get
-            {
-                return statusSchedule.CurrentStatus;
-            }
-
-            set
-            {
-                statusSchedule.Insert(value);
-            }
-
-        }
-
-        #endregion
-
-        #region StatusSchedule
-
-        protected RuntimeStatusSchedule<TStatus> statusSchedule;
-
-        /// <summary>
-        /// The charging station status schedule.
-        /// </summary>
-        /// <param name="TimestampFilter">An optional status timestamp filter.</param>
-        /// <param name="StatusFilter">An optional status value filter.</param>
-        /// <param name="Skip">The number of status entries to skip.</param>
-        /// <param name="Take">The number of status entries to return.</param>
-        public IEnumerable<Timestamped<TStatus>> StatusSchedule(Func<DateTimeOffset, Boolean>?  TimestampFilter   = null,
-                                                                Func<TStatus,        Boolean>?  StatusFilter      = null,
-                                                                UInt64?                         Skip              = null,
-                                                                UInt64?                         Take              = null)
-        {
-
-             TimestampFilter ??= timestamp => true;
-             StatusFilter    ??= status    => true;
-
-             var filteredStatusSchedule = statusSchedule.
-                                              Where(status => TimestampFilter(status.Timestamp)).
-                                              Where(status => StatusFilter   (status.Value)).
-                                              Skip (Skip ?? 0);
-
-             return Take.HasValue
-                        ? filteredStatusSchedule.Take(Take)
-                        : filteredStatusSchedule;
-
-        }
-
-        #endregion
-
-
-        //public UInt64   Length
-        //    => 0;
-
-        //public Boolean  IsNullOrEmpty
-        //    => false;
+        public ImmutableArray<ETag>  ETags          { get; protected set; } = [];
 
         #endregion
 
@@ -464,7 +232,150 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (Admin-)Status management
+        #region (Admin)Status
+
+        internal (UInt16 Admin, UInt16 Status) RuntimeHistorySizes
+
+            => (adminStatusSchedule.MaxStatusHistorySize,
+                     statusSchedule.MaxStatusHistorySize);
+
+        internal void RestoreRuntimeHistorySizes((UInt16 Admin, UInt16 Status) sizes)
+        {
+            adminStatusSchedule.MaxStatusHistorySize = sizes.Admin;
+            statusSchedule.     MaxStatusHistorySize = sizes.Status;
+        }
+
+        // The admin status and the status belong to the entity, not to one of its versions:
+        // a new version takes the schedules of the one before (ShareRuntimeOf), so all versions
+        // of an entity show the same, current status. A version raises its status events only while
+        // somebody listens to them, so that the versions nobody looks at any more are not kept alive
+        // by the schedules they share.
+
+        private readonly Lock runtimeLock = new ();
+
+
+        /// <summary>
+        /// Take the admin status schedule, the status schedule and the internal data of the given
+        /// previous version of this entity. Only for a new version nobody listens to yet.
+        /// </summary>
+        /// <param name="Previous">The previous version of this entity.</param>
+        internal void ShareRuntimeOf(AImmutableEMobilityEntity<TId, TAdminStatus, TStatus> Previous)
+        {
+
+            if (ReferenceEquals(Previous, this))
+                return;
+
+            lock (runtimeLock)
+            {
+
+                if (listensToAdminStatus || listensToStatus)
+                    throw new InvalidOperationException("Only a new version nobody listens to yet can take the runtime status of the one before!");
+
+                adminStatusSchedule  = Previous.adminStatusSchedule;
+                statusSchedule       = Previous.statusSchedule;
+
+            }
+
+            ShareFurtherRuntimeOf(Previous);
+            ShareInternalDataOf(Previous);
+
+        }
+
+        /// <summary>
+        /// Take further runtime data of the given previous version of this entity, e.g. its energy status.
+        /// </summary>
+        /// <param name="Previous">The previous version of this entity.</param>
+        protected virtual void ShareFurtherRuntimeOf(AImmutableEMobilityEntity<TId, TAdminStatus, TStatus> Previous)
+        { }
+
+
+        #region AdminStatus
+
+        private Boolean listensToAdminStatus;
+
+        #region AdminStatus
+
+        /// <summary>
+        /// The current charging station admin status.
+        /// </summary>
+        [InternalUseOnly]
+        public Timestamped<TAdminStatus> AdminStatus
+        {
+
+            get
+            {
+                return adminStatusSchedule.CurrentStatus;
+            }
+
+            set
+            {
+                adminStatusSchedule.Insert(value);
+            }
+
+        }
+
+        #endregion
+
+        #region AdminStatusSchedule
+
+        protected RuntimeStatusSchedule<TAdminStatus> adminStatusSchedule;
+
+        /// <summary>
+        /// The charging station admin status schedule.
+        /// </summary>
+        /// <param name="TimestampFilter">An optional admin status timestamp filter.</param>
+        /// <param name="AdminStatusFilter">An optional admin status value filter.</param>
+        /// <param name="Skip">The number of admin status entries to skip.</param>
+        /// <param name="Take">The number of admin status entries to return.</param>
+        public IEnumerable<Timestamped<TAdminStatus>> AdminStatusSchedule(Func<DateTimeOffset, Boolean>?  TimestampFilter     = null,
+                                                                          Func<TAdminStatus,   Boolean>?  AdminStatusFilter   = null,
+                                                                          UInt64?                         Skip                = null,
+                                                                          UInt64?                         Take                = null)
+        {
+
+            TimestampFilter   ??= timestamp => true;
+            AdminStatusFilter ??= status    => true;
+
+            var filteredAdminStatusSchedule = adminStatusSchedule.
+                                                  Where(adminStatus => TimestampFilter  (adminStatus.Timestamp)).
+                                                  Where(adminStatus => AdminStatusFilter(adminStatus.Value)).
+                                                  Skip (Skip ?? 0);
+
+            return Take.HasValue
+                       ? filteredAdminStatusSchedule.Take(Take)
+                       : filteredAdminStatusSchedule;
+
+        }
+
+        #endregion
+
+
+        private Task AdminStatusScheduleChanged(DateTimeOffset                       Timestamp,
+                                                EventTracking_Id                     EventTrackingId,
+                                                RuntimeStatusSchedule<TAdminStatus>  Schedule,
+                                                Timestamped<TAdminStatus>            NewStatus,
+                                                Timestamped<TAdminStatus>            OldStatus,
+                                                Context?                             DataSource)
+
+            => OnAdminStatusScheduleChanged(
+                   Timestamp,
+                   EventTrackingId,
+                   NewStatus,
+                   OldStatus,
+                   DataSource
+               );
+
+        /// <summary>
+        /// The current admin status changed: raise the admin status events of the subclass.
+        /// </summary>
+        protected virtual Task OnAdminStatusScheduleChanged(DateTimeOffset             Timestamp,
+                                                            EventTracking_Id           EventTrackingId,
+                                                            Timestamped<TAdminStatus>  NewStatus,
+                                                            Timestamped<TAdminStatus>  OldStatus,
+                                                            Context?                   DataSource)
+
+            => Task.CompletedTask;
+
 
         #region SetAdminStatus(NewAdminStatus, DataSource = null)
 
@@ -545,6 +456,132 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        /// <summary>
+        /// The current admin status, if there is one already.
+        /// </summary>
+        internal Timestamped<TAdminStatus>? CurrentAdminStatus
+            => adminStatusSchedule.Any(status => status.Timestamp <= Timestamp.Now)
+                   ? adminStatusSchedule.CurrentStatus
+                   : null;
+
+        /// <summary>
+        /// The next planned admin status, if any.
+        /// </summary>
+        internal Timestamped<TAdminStatus>? NextAdminStatus
+            => adminStatusSchedule.NextStatus;
+
+
+        /// <summary>
+        /// Raise the admin status events of this version while Listen is true.
+        /// Called by the events of a subclass when they get their first handler, or lose their last one.
+        /// </summary>
+        protected void ListenToAdminStatus(Boolean Listen)
+        {
+            lock (runtimeLock)
+            {
+
+                if (Listen == listensToAdminStatus)
+                    return;
+
+                if (Listen)
+                    adminStatusSchedule.OnStatusChanged += AdminStatusScheduleChanged;
+                else
+                    adminStatusSchedule.OnStatusChanged -= AdminStatusScheduleChanged;
+
+                listensToAdminStatus = Listen;
+
+            }
+        }
+
+        #endregion
+
+        #region Status
+
+        private Boolean listensToStatus;
+
+        #region Status
+
+        /// <summary>
+        /// The current charging station status.
+        /// </summary>
+        [InternalUseOnly]
+        public Timestamped<TStatus> Status
+        {
+
+            get
+            {
+                return statusSchedule.CurrentStatus;
+            }
+
+            set
+            {
+                statusSchedule.Insert(value);
+            }
+
+        }
+
+        #endregion
+
+        #region StatusSchedule
+
+        protected RuntimeStatusSchedule<TStatus> statusSchedule;
+
+        /// <summary>
+        /// The charging station status schedule.
+        /// </summary>
+        /// <param name="TimestampFilter">An optional status timestamp filter.</param>
+        /// <param name="StatusFilter">An optional status value filter.</param>
+        /// <param name="Skip">The number of status entries to skip.</param>
+        /// <param name="Take">The number of status entries to return.</param>
+        public IEnumerable<Timestamped<TStatus>> StatusSchedule(Func<DateTimeOffset, Boolean>?  TimestampFilter   = null,
+                                                                Func<TStatus,        Boolean>?  StatusFilter      = null,
+                                                                UInt64?                         Skip              = null,
+                                                                UInt64?                         Take              = null)
+        {
+
+             TimestampFilter ??= timestamp => true;
+             StatusFilter    ??= status    => true;
+
+             var filteredStatusSchedule = statusSchedule.
+                                              Where(status => TimestampFilter(status.Timestamp)).
+                                              Where(status => StatusFilter   (status.Value)).
+                                              Skip (Skip ?? 0);
+
+             return Take.HasValue
+                        ? filteredStatusSchedule.Take(Take)
+                        : filteredStatusSchedule;
+
+        }
+
+        #endregion
+
+        private Task StatusScheduleChanged(DateTimeOffset                  Timestamp,
+                                           EventTracking_Id                EventTrackingId,
+                                           RuntimeStatusSchedule<TStatus>  Schedule,
+                                           Timestamped<TStatus>            NewStatus,
+                                           Timestamped<TStatus>            OldStatus,
+                                           Context?                        DataSource)
+
+            => OnStatusScheduleChanged(
+                   Timestamp,
+                   EventTrackingId,
+                   NewStatus,
+                   OldStatus,
+                   DataSource
+               );
+
+        /// <summary>
+        /// The current status changed: raise the status events of the subclass.
+        /// </summary>
+        protected virtual Task OnStatusScheduleChanged(DateTimeOffset        Timestamp,
+                                                       EventTracking_Id      EventTrackingId,
+                                                       Timestamped<TStatus>  NewStatus,
+                                                       Timestamped<TStatus>  OldStatus,
+                                                       Context?              DataSource)
+
+            => Task.CompletedTask;
+
+
         #region SetStatus(NewStatus, DataSource = null)
 
         /// <summary>
@@ -619,6 +656,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                ChangeMethod,
                                DataSource);
 
+        }
+
+        #endregion
+
+
+        /// <summary>
+        /// The current status, if there is one already.
+        /// </summary>
+        internal Timestamped<TStatus>? CurrentStatus
+            => statusSchedule.Any(status => status.Timestamp <= Timestamp.Now)
+                   ? statusSchedule.CurrentStatus
+                   : null;
+
+        /// <summary>
+        /// The next planned status, if any.
+        /// </summary>
+        internal Timestamped<TStatus>? NextStatus
+            => statusSchedule.NextStatus;
+
+
+        /// <summary>
+        /// Raise the status events of this version while Listen is true.
+        /// Called by the events of a subclass when they get their first handler, or lose their last one.
+        /// </summary>
+        protected void ListenToStatus(Boolean Listen)
+        {
+            lock (runtimeLock)
+            {
+
+                if (Listen == listensToStatus)
+                    return;
+
+                if (Listen)
+                    statusSchedule.OnStatusChanged += StatusScheduleChanged;
+                else
+                    statusSchedule.OnStatusChanged -= StatusScheduleChanged;
+
+                listensToStatus = Listen;
+
+            }
         }
 
         #endregion
@@ -751,7 +828,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
-            if (JSON?["eTags"] is not JArray eTagsJSON)
+            if (JSON?[BasePropertyKeys.ETags] is not JArray eTagsJSON)
             {
                 ErrorResponse = "The JSON representation has no ETags!";
                 return false;
@@ -773,7 +850,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             var content = (JObject) JSON.DeepClone();
-            content.Remove("eTags");
+            content.Remove(BasePropertyKeys.ETags);
 
             return ValidateETags(
                        declaredETags,
@@ -803,7 +880,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (CBOR.Kind != CBORValueKind.Map ||
-               !CBOR.TryGetValue(CBORValue.FromText("eTags"), out var eTagsCBOR) ||
+               !CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.ETags), out var eTagsCBOR) ||
                 eTagsCBOR.Kind != CBORValueKind.Array)
             {
                 ErrorResponse = "The CBOR representation has no ETags!";
@@ -825,7 +902,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
             }
 
-            var content = CBORValue.FromMap(CBOR.AsMap().Where(entry => !(entry.Key.TryGetText(out var key) && key == "eTags")));
+            var content = CBORValue.FromMap(CBOR.AsMap().Where(entry => !(entry.Key.TryGetText(out var key) && key == BasePropertyKeys.ETags)));
 
             return ValidateETags(
                        declaredETags,
@@ -898,6 +975,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Timestamps
+
+        /// <summary>
+        /// Restore persisted timestamps on a newly parsed entity without recording a change.
+        /// </summary>
+        internal void RestoreSnapshotTimestamps(DateTimeOffset?  Created,
+                                                DateTimeOffset?  LastChange)
+
+            => RestoreTimestamps(
+                   Created    ?? base.Created,
+                   LastChange ?? base.LastChangeDate
+               );
+
+        #endregion
 
 
         #region (protected) LogEvent(Logger, LogHandler, ...)

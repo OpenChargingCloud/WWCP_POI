@@ -267,7 +267,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var includeRuntimeStatus = true;
 
-                if (request.Payload.ParseOptional("runtimeStatus",
+                if (request.Payload.ParseOptional(PropertyKeys.RuntimeStatus,
                                                   "include runtime status",
                                                   out Boolean? runtimeStatus,
                                                   out var errorResponse))
@@ -299,7 +299,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         ? errorMessage
 
                         : History.TryGetCommitInfosSince(since, out var commitInfos, out var error, max)
-                              ? request.Respond(new JObject(new JProperty("commitInfos", new JArray(commitInfos.Select(commitInfo => commitInfo.ToJSON())))))
+                              ? request.Respond(new JObject(new JProperty(PropertyKeys.CommitInfos, new JArray(commitInfos.Select(commitInfo => commitInfo.ToJSON(Embedded: true))))))
                               : request.Error(POIWebSocketErrorCodes.NotFound, error)
 
                 )
@@ -319,7 +319,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 String?                              error;
 
                 // The commits missing at a server holding the given ones, e.g. its tips and a sample of older commits.
-                if (request.Payload["have"] is JToken have)
+                if (request.Payload[PropertyKeys.Have] is JToken have)
                 {
 
                     if (!TryParseHave(have, out var haveIds, out var haveError))
@@ -333,7 +333,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 return Task.FromResult(
                            commits is not null
-                               ? request.Respond(new JObject(new JProperty("commits", new JArray(commits.Select(commit => commit.ToJSON())))))
+                               ? request.Respond(new JObject(new JProperty(PropertyKeys.Commits, new JArray(commits.Select(commit => commit.ToJSON(Embedded: true))))))
                                : request.Error(POIWebSocketErrorCodes.NotFound, error)
                        );
 
@@ -391,7 +391,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             webSocketServer.AddCommand("commit", request => {
 
-                if (!request.Payload.ParseMandatory("commitId",
+                if (!request.Payload.ParseMandatory(RoamingNetworkCommitSignature.PropertyKeys.CommitId,
                                                     "commit identification",
                                                     RoamingNetworkCommit_Id.TryParse,
                                                     out RoamingNetworkCommit_Id commitId,
@@ -439,7 +439,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             webSocketServer.AddCommand("runtimeStatus", request =>
 
                 Task.FromResult(
-                    request.Respond(new JObject(new JProperty("runtimeStatus", new JArray(History.RuntimeStatus.All.Select(status => status.ToJSON())))))
+                    request.Respond(new JObject(new JProperty(PropertyKeys.RuntimeStatus, new JArray(History.RuntimeStatus.All.Select(status => status.ToJSON(Embedded: true))))))
                 )
 
             );
@@ -544,8 +544,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             OnRoamingNetworkCommitSignaturesDelegate onCommitSignatures = (commit, newSignatures) =>
                 WebSocketServer.Push(CommitSignaturesTopic,
                                      new JObject(
-                                         new JProperty("commitId",    commit.Id.ToString()),
-                                         new JProperty("signatures",  new JArray(newSignatures.Select(signature => signature.ToJSON())))
+                                         new JProperty(RoamingNetworkCommitSignature.PropertyKeys.CommitId,    commit.Id.ToString()),
+                                         new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Signatures,  new JArray(newSignatures.Select(signature => signature.ToJSON(Embedded: true))))
                                      ));
 
             OnPOIStatusUpdateDelegate onStatusUpdate = statusUpdate =>
@@ -629,7 +629,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    ? Request.Message.PayloadCBOR?.TryGetValue(CBORValue.FromText("changeSet"), out var changeSetCBOR) == true &&
                                      RoamingNetworkChangeSet.TryParse(changeSetCBOR, out changeSet, out changeSetError, ChangeSetLimits)
 
-                                   : Request.Payload["changeSet"] is JObject changeSetJSON &&
+                                   : Request.Payload[PropertyKeys.ChangeSet] is JObject changeSetJSON &&
                                      RoamingNetworkChangeSet.TryParse(changeSetJSON, out changeSet, out changeSetError, ChangeSetLimits);
 
             if (!hasChangeSet || changeSet is null)
@@ -651,8 +651,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        ? Request.Respond(CommittedJSON(result, History))
 
                        : Request.Respond(new JObject(
-                             new JProperty("status",       result.Status.ToString()),
-                             new JProperty("description",  result.ErrorResponse)
+                             new JProperty(PropertyKeys.Status,       result.Status.ToString()),
+                             new JProperty(PropertyKeys.Description,  result.ErrorResponse)
                          ));
 
         }
@@ -676,21 +676,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Parse the status update
 
-            if (!POIStatusUpdate.TryParseKind(Request.Payload["kind"]?.Type == JTokenType.String ? Request.Payload["kind"]!.Value<String>() : null, out var kind))
+            if (!POIStatusUpdate.TryParseKind(Request.Payload[POIStatusUpdate.PropertyKeys.Kind]?.Type == JTokenType.String ? Request.Payload[POIStatusUpdate.PropertyKeys.Kind]!.Value<String>() : null, out var kind))
                 return Request.Error(POIWebSocketErrorCodes.FormatViolation, "The kind must be adminStatus, status, energyStatus or priceStatus!");
 
             // The value of an energy status is an object { used, available, storedEnergy?, currentVoltage?, remainingChargingTime? },
             // that of a price status { prices: [ { chargingTariffId, elements }, … ] }.
-            if (!Request.Payload.ParseMandatoryText("entityType", "entity type",           out String? entityType, out var errorResponse) ||
-                !Request.Payload.ParseMandatoryText("entityId",   "entity identification", out String? entityId,   out errorResponse) ||
-                !POIStatusUpdate.TryParseValue(kind, Request.Payload["value"], "status",  out String? value,      out errorResponse))
+            if (!Request.Payload.ParseMandatoryText(POIStatusUpdate.PropertyKeys.EntityType, "entity type",           out String? entityType, out var errorResponse) ||
+                !Request.Payload.ParseMandatoryText(POIStatusUpdate.PropertyKeys.EntityId,   "entity identification", out String? entityId,   out errorResponse) ||
+                !POIStatusUpdate.TryParseValue(kind, Request.Payload[POIStatusUpdate.PropertyKeys.Value], "status",  out String? value,      out errorResponse))
             {
                 return Request.Error(POIWebSocketErrorCodes.FormatViolation, errorResponse);
             }
 
             var timestamp = TimeProvider.GetUtcNow();
 
-            if (Request.Payload.ParseOptional("timestamp", "timestamp", out DateTimeOffset? givenTimestamp, out errorResponse))
+            if (Request.Payload.ParseOptional(POIStatusUpdate.PropertyKeys.Timestamp, "timestamp", out DateTimeOffset? givenTimestamp, out errorResponse))
             {
 
                 if (errorResponse is not null)
@@ -700,7 +700,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            if (Request.Payload.ParseOptional("dataSource", "data source", out String? dataSource, out errorResponse))
+            if (Request.Payload.ParseOptional(POIStatusUpdate.PropertyKeys.DataSource, "data source", out String? dataSource, out errorResponse))
             {
                 if (errorResponse is not null)
                     return Request.Error(POIWebSocketErrorCodes.FormatViolation, errorResponse);
@@ -724,13 +724,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                             out var description,
                                                             dataSource);
 
-            var response  = new JObject(new JProperty("result", result.ToString()));
+            var response  = new JObject(new JProperty(PropertyKeys.Result, result.ToString()));
 
             if (description is not null)
-                response.Add("description", description);
+                response.Add(PropertyKeys.Description, description);
 
             if (History.RuntimeStatus.TryGet(kind, entityType, entityId, out var current))
-                response.Add("current", current.ToJSON());
+                response.Add(PropertyKeys.Current, current.ToJSON(Embedded: true));
 
             return Request.Respond(response);
 
@@ -757,7 +757,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Parse the status updates
 
-            if (Request.Payload["statusUpdates"] is not JArray statusUpdatesJSON)
+            if (Request.Payload[PropertyKeys.StatusUpdates] is not JArray statusUpdatesJSON)
                 return Request.Error(POIWebSocketErrorCodes.FormatViolation, "Missing status updates!");
 
             if (statusUpdatesJSON.Count > MaxStatusUpdates)
@@ -791,16 +791,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (AuthorizeStatusPush(upgradeRequest, Request.Session.Login, statusUpdate))
                     result = History.RuntimeStatus.TryUpdate(statusUpdate, out description);
 
-                var resultJSON = new JObject(new JProperty("result", result.ToString()));
+                var resultJSON = new JObject(new JProperty(PropertyKeys.Result, result.ToString()));
 
                 if (description is not null)
-                    resultJSON.Add("description", description);
+                    resultJSON.Add(PropertyKeys.Description, description);
 
                 results.Add(resultJSON);
 
             }
 
-            return Request.Respond(new JObject(new JProperty("results", results)));
+            return Request.Respond(new JObject(new JProperty(PropertyKeys.Results, results)));
 
         }
 
@@ -822,7 +822,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Max           = MaxCommitsPerRequest;
             ErrorMessage  = null;
 
-            if (Request.Payload.ParseOptionalStruct("since",
+            if (Request.Payload.ParseOptionalStruct(PropertyKeys.Since,
                                                     "commit identification",
                                                     RoamingNetworkCommit_Id.TryParse,
                                                     out RoamingNetworkCommit_Id since,
@@ -839,7 +839,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            if (Request.Payload.ParseOptional("max",
+            if (Request.Payload.ParseOptional(PropertyKeys.Max,
                                               "maximum number of commits",
                                               out Int32? max,
                                               out errorResponse))

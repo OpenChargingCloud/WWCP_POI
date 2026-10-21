@@ -222,7 +222,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!TryGetHistory(Request, out var history, out var errorResponse))
                 return errorResponse;
 
-            if (!TryReadBody(Request, out var json) || json["priceStatements"] is not JArray priceStatementsJSON)
+            if (!TryReadBody(Request, out var json) || json[PropertyKeys.PriceStatements] is not JArray priceStatementsJSON)
                 return ErrorResponse(Request, HTTPStatusCode.BadRequest, "The request must contain { priceStatements: [ … ] }!");
 
             if (!TryParsePriceStatements(priceStatementsJSON, out var priceStatements, out var parseError))
@@ -231,7 +231,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var answer = AddPriceStatements(history, priceStatements);
 
             return JSONResponse(Request,
-                                answer["refused"]?.Value<UInt32>() > 0 ? HTTPStatusCode.UnprocessableEntity : HTTPStatusCode.OK,
+                                answer[PropertyKeys.Refused]?.Value<UInt32>() > 0 ? HTTPStatusCode.UnprocessableEntity : HTTPStatusCode.OK,
                                 answer);
 
         }
@@ -267,8 +267,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     default:
                         refusals.Add(new JObject(
-                                         new JProperty("index",        index),
-                                         new JProperty("description",  errorResponse)
+                                         new JProperty(PropertyKeys.Index,        index),
+                                         new JProperty(PropertyKeys.Description,  errorResponse)
                                      ));
                         break;
 
@@ -279,11 +279,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             return new JObject(
-                       new JProperty("taken",     taken),
-                       new JProperty("known",     known),
-                       new JProperty("outdated",  outdated),
-                       new JProperty("refused",   refusals.Count),
-                       new JProperty("refusals",  refusals)
+                       new JProperty(PropertyKeys.Taken,     taken),
+                       new JProperty(PropertyKeys.Known,     known),
+                       new JProperty(PropertyKeys.Outdated,  outdated),
+                       new JProperty(PropertyKeys.Refused,   refusals.Count),
+                       new JProperty(PropertyKeys.Refusals,  refusals)
                    );
 
         }
@@ -302,14 +302,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             WebSocketServer.AddCommand("priceStatements", request => {
 
-                if (request.Payload["chargingStationId"] is JToken chargingStationIdJSON)
+                if (request.Payload[PropertyKeys.ChargingStationId] is JToken chargingStationIdJSON)
                     return Task.FromResult(
                                chargingStationIdJSON.Type != JTokenType.String || !ChargingStation_Id.TryParse(chargingStationIdJSON.Value<String>() ?? "", out var chargingStationId)
                                    ? request.Error(POIWebSocketErrorCodes.FormatViolation, "Invalid charging station identification!")
                                    : request.Respond(PriceStatementsJSON(History.PriceStatementsOf(chargingStationId)))
                            );
 
-                if (request.Payload["EVSEId"] is JToken evseIdJSON)
+                if (request.Payload[PropertyKeys.EVSEId] is JToken evseIdJSON)
                     return Task.FromResult(
                                evseIdJSON.Type != JTokenType.String || !EVSE_Id.TryParse(evseIdJSON.Value<String>() ?? "", out var evseId)
                                    ? request.Error(POIWebSocketErrorCodes.FormatViolation, "Invalid EVSE identification!")
@@ -322,7 +322,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             WebSocketServer.AddCommand("addPriceStatements", request => {
 
-                if (request.Payload["priceStatements"] is not JArray priceStatementsJSON ||
+                if (request.Payload[PropertyKeys.PriceStatements] is not JArray priceStatementsJSON ||
                     !TryParsePriceStatements(priceStatementsJSON, out var priceStatements, out var parseError))
                 {
                     return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, "The request must contain { priceStatements: [ … ] }!"));
@@ -336,7 +336,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Task.FromResult(
 
-                    !RoamingNetworkCheckpoint_Id.TryParse(request.Payload["checkpointId"]?.Value<String>() ?? "", out var checkpointId)
+                    !RoamingNetworkCheckpoint_Id.TryParse(request.Payload[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var checkpointId)
                         ? request.Error(POIWebSocketErrorCodes.FormatViolation, "Missing or invalid checkpoint identification!")
 
                         : History.PriceStatementsOf(checkpointId) is IReadOnlyList<RoamingNetworkPriceStatement> priceStatements
@@ -351,11 +351,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Task.FromResult(
 
-                    !RoamingNetworkCheckpoint_Id.TryParse(request.Payload["checkpointId"]?.Value<String>() ?? "", out var checkpointId) ||
-                    request.Payload["digest"]?.Type != JTokenType.String
+                    !RoamingNetworkCheckpoint_Id.TryParse(request.Payload[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var checkpointId) ||
+                    request.Payload[PropertyKeys.Digest]?.Type != JTokenType.String
                         ? request.Error(POIWebSocketErrorCodes.FormatViolation, "The request must name a checkpointId and the digest of a price statement!")
 
-                        : History.TryGetPriceStatementProof(checkpointId, request.Payload["digest"]!.Value<String>()!, out var proof, out var proofError)
+                        : History.TryGetPriceStatementProof(checkpointId, request.Payload[PropertyKeys.Digest]!.Value<String>()!, out var proof, out var proofError)
                               ? request.Respond(proof.ToJSON())
                               : request.Error(POIWebSocketErrorCodes.NotFound, proofError)
 
@@ -399,7 +399,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private static JObject PriceStatementsJSON(IEnumerable<RoamingNetworkPriceStatement> PriceStatements)
 
-            => new (new JProperty("priceStatements", new JArray(PriceStatements.Select(priceStatement => priceStatement.ToJSON()))));
+            => new (new JProperty(PropertyKeys.PriceStatements, new JArray(PriceStatements.Select(priceStatement => priceStatement.ToJSON(Embedded: true)))));
 
         #endregion
 
@@ -411,8 +411,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static JObject CheckpointPriceStatementsJSON(RoamingNetworkCheckpoint_Id                CheckpointId,
                                                              IEnumerable<RoamingNetworkPriceStatement>  PriceStatements)
 
-            => new (new JProperty("checkpointId",     CheckpointId.ToString()),
-                    new JProperty("priceStatements",  new JArray(PriceStatements.Select(priceStatement => priceStatement.ToJSON()))));
+            => new (new JProperty(PropertyKeys.CheckpointId,     CheckpointId.ToString()),
+                    new JProperty(PropertyKeys.PriceStatements,  new JArray(PriceStatements.Select(priceStatement => priceStatement.ToJSON(Embedded: true)))));
 
         #endregion
 
@@ -481,8 +481,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 if (entry is not JObject entryObject ||
-                    !RoamingNetworkCheckpoint_Id.TryParse(entryObject["checkpointId"]?.Value<String>() ?? "", out var checkpointId) ||
-                    entryObject["priceStatements"] is not JArray priceStatementsJSON)
+                    !RoamingNetworkCheckpoint_Id.TryParse(entryObject[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var checkpointId) ||
+                    entryObject[PropertyKeys.PriceStatements] is not JArray priceStatementsJSON)
                 {
                     ErrorResponse = "The price statements of checkpoints must be [ { checkpointId, priceStatements: [ … ] }, … ]!";
                     return false;

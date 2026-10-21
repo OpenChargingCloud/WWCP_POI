@@ -44,7 +44,109 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               IComparable<EnergyMeterTemplate>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/energyMeterTemplate";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                           = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                      = "@context";
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name                         = "name";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description                  = "description";
+
+            /// <summary>
+            /// The property of its data source.
+            /// </summary>
+            public const String  DataSource                   = "dataSource";
+
+            /// <summary>
+            /// The property of the role of its members, as an energy meter writes it.
+            /// </summary>
+            public const String  Role                         = EnergyMeter.PropertyKeys.Role;
+
+            /// <summary>
+            /// The property of the manufacturer of its members, as an energy meter writes it.
+            /// </summary>
+            public const String  ManufacturerId               = EnergyMeter.PropertyKeys.ManufacturerId;
+
+            /// <summary>
+            /// The property of the model of its members, as an energy meter writes it.
+            /// </summary>
+            public const String  ModelId                      = EnergyMeter.PropertyKeys.ModelId;
+
+            /// <summary>
+            /// The property of the homepage of the model of its members, as an energy meter writes it.
+            /// </summary>
+            public const String  ModelURL                     = EnergyMeter.PropertyKeys.ModelURL;
+
+            /// <summary>
+            /// The property of the hardware version of its members, as an energy meter writes it.
+            /// </summary>
+            public const String  HardwareVersion              = EnergyMeter.PropertyKeys.HardwareVersion;
+
+            /// <summary>
+            /// The property of the firmware version of its members, as an energy meter writes it.
+            /// </summary>
+            public const String  FirmwareVersion              = EnergyMeter.PropertyKeys.FirmwareVersion;
+
+            /// <summary>
+            /// The property of the transparency software status of its members, as an energy meter writes it.
+            /// </summary>
+            public const String  TransparencySoftwareStatus   = EnergyMeter.PropertyKeys.TransparencySoftwareStatus;
+
+            /// <summary>
+            /// The property of the signature methods of its members, as an energy meter writes it.
+            /// </summary>
+            public const String  SignatureMethods             = EnergyMeter.PropertyKeys.SignatureMethods;
+
+            /// <summary>
+            /// The property of its creation timestamp, as of every entity.
+            /// </summary>
+            public const String  Created                      = "created";
+
+            /// <summary>
+            /// The property of its last change timestamp, as of every entity.
+            /// </summary>
+            public const String  LastChange                   = "lastChange";
+
+            /// <summary>
+            /// The property of its custom data, as of every entity.
+            /// </summary>
+            public const String  CustomData                   = "customData";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// What its members measure, unless they tell it themselves.
@@ -144,49 +246,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Return the JSON representation of this energy meter template, as its owner embeds it.
         /// </summary>
         public override JObject ToJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
+        #region ToJSON(Embedded = false, CustomEnergyMeterTemplateSerializer = null)
+
+        /// <summary>
+        /// Return the JSON representation of this energy meter template.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEnergyMeterTemplateSerializer">A delegate to serialize custom energy meter template JSON objects.</param>
+        public JObject ToJSON(Boolean                                                Embedded                              = false,
+                              CustomJObjectSerializerDelegate<EnergyMeterTemplate>?  CustomEnergyMeterTemplateSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(PropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,                     JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",            Name.ToJSON());
+                json.Add(PropertyKeys.Name,                        Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",     Description.ToJSON());
+                json.Add(PropertyKeys.Description,                 Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",      DataSource);
+                json.Add(PropertyKeys.DataSource,                  DataSource);
 
             // The properties of an energy meter, as an energy meter writes them.
             if (Role.HasValue)
-                json.Add("role",             Role.Value.ToString());
+                json.Add(PropertyKeys.Role,                        Role.Value.ToString());
 
             if (ManufacturerId.HasValue)
-                json.Add("manufacturerId",   ManufacturerId.Value.ToString());
+                json.Add(PropertyKeys.ManufacturerId,              ManufacturerId.Value.ToString());
 
             if (ModelId.HasValue)
-                json.Add("modelId",          ModelId.Value.ToString());
+                json.Add(PropertyKeys.ModelId,                     ModelId.Value.ToString());
 
             if (ModelURL.HasValue)
-                json.Add("modelURL",         ModelURL.Value.ToString());
+                json.Add(PropertyKeys.ModelURL,                    ModelURL.Value.ToString());
 
             if (HardwareVersion is not null)
-                json.Add("hardwareVersion",  HardwareVersion);
+                json.Add(PropertyKeys.HardwareVersion,             HardwareVersion);
 
             if (FirmwareVersion is not null)
-                json.Add("firmwareVersion",  FirmwareVersion);
+                json.Add(PropertyKeys.FirmwareVersion,             FirmwareVersion);
 
             if (TransparencySoftwareStatus.Length > 0)
-                json.Add("transparencySoftwareStatus", new JArray(TransparencySoftwareStatus.Select(assignment => assignment.ToJSON())));
+                json.Add(PropertyKeys.TransparencySoftwareStatus,  new JArray(TransparencySoftwareStatus.Select(assignment => assignment.ToJSON(Embedded: true))));
 
             if (SignatureMethods.Length > 0)
-                json.Add("signatureMethods", POIJSON.IdsToJSON(SignatureMethods));
+                json.Add(PropertyKeys.SignatureMethods,            POIJSON.IdsToJSON(SignatureMethods));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomEnergyMeterTemplateSerializer is not null
+                       ? CustomEnergyMeterTemplateSerializer(this, json)
+                       : json;
 
         }
 
@@ -210,7 +331,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(PropertyKeys.Id,
                                          "energy meter template identification",
                                          EnergyMeterTemplate_Id.TryParse,
                                          out EnergyMeterTemplate_Id id,
@@ -219,22 +340,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N   (JSON, "name",            "energy meter template name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N   (JSON, "description",     "energy meter template description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString (JSON, "dataSource",      "data source",                     out var dataSource,   out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the energy meter template '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N   (JSON, PropertyKeys.Name,            "energy meter template name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N   (JSON, PropertyKeys.Description,     "energy meter template description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString (JSON, PropertyKeys.DataSource,      "data source",                     out var dataSource,   out ErrorResponse))
                 {
                     return false;
                 }
 
                 // The properties of an energy meter, as an energy meter reads them.
-                if (!POIJSON.TryParseText  (JSON, "role",             "energy meter role",           EnergyMeterRole.           TryParse, out EnergyMeterRole?            role,           out ErrorResponse) ||
-                    !POIJSON.TryParseText  (JSON, "manufacturerId",   "manufacturer identification", EnergyMeterManufacturer_Id.TryParse, out EnergyMeterManufacturer_Id? manufacturerId, out ErrorResponse) ||
-                    !POIJSON.TryParseText  (JSON, "modelId",          "model identification",        EnergyMeterModel_Id.       TryParse, out EnergyMeterModel_Id?        modelId,        out ErrorResponse) ||
-                    !POIJSON.TryParseText  (JSON, "modelURL",         "model URL",                   URL.                       TryParse, out URL?                        modelURL,       out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "hardwareVersion",  "hardware version",            out var hardwareVersion,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "firmwareVersion",  "firmware version",            out var firmwareVersion,  out ErrorResponse) ||
-                    !POIJSON.TryParseObjects<TransparencySoftwareAssignment>(JSON, "transparencySoftwareStatus", "transparency software status", TransparencySoftwareAssignment.TryParse, out var transparencySoftwareStatus, out ErrorResponse) ||
-                    !POIJSON.TryParseIds<SignatureMethod>                   (JSON, "signatureMethods",           "signature method",             SignatureMethod.               TryParse, out var signatureMethods,           out ErrorResponse))
+                if (!POIJSON.TryParseText  (JSON, PropertyKeys.Role,             "energy meter role",           EnergyMeterRole.           TryParse, out EnergyMeterRole?            role,           out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.ManufacturerId,   "manufacturer identification", EnergyMeterManufacturer_Id.TryParse, out EnergyMeterManufacturer_Id? manufacturerId, out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.ModelId,          "model identification",        EnergyMeterModel_Id.       TryParse, out EnergyMeterModel_Id?        modelId,        out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.ModelURL,         "model URL",                   URL.                       TryParse, out URL?                        modelURL,       out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.HardwareVersion,  "hardware version",            out var hardwareVersion,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.FirmwareVersion,  "firmware version",            out var firmwareVersion,  out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<TransparencySoftwareAssignment>(JSON, PropertyKeys.TransparencySoftwareStatus, "transparency software status", TransparencySoftwareAssignment.TryParse, out var transparencySoftwareStatus, out ErrorResponse) ||
+                    !POIJSON.TryParseIds<SignatureMethod>                   (JSON, PropertyKeys.SignatureMethods,           "signature method",             SignatureMethod.               TryParse, out var signatureMethods,           out ErrorResponse))
                 {
                     return false;
                 }

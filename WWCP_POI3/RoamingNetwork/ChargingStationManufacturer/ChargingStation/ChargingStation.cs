@@ -86,10 +86,142 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data
 
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingStation";
 
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of the reference printed on it.
+            /// </summary>
+            public const String  PhysicalReference     = "physicalReference";
+
+            /// <summary>
+            /// The property of its address.
+            /// </summary>
+            public const String  Address               = "address";
+
+            /// <summary>
+            /// The property of its geographical location.
+            /// </summary>
+            public const String  GeoLocation           = "geoLocation";
+
+            /// <summary>
+            /// The property of its hotline phone number.
+            /// </summary>
+            public const String  HotlinePhoneNumber    = "hotline";
+
+            /// <summary>
+            /// The property of the identification of its manufacturer.
+            /// </summary>
+            public const String  ManufacturerId        = "manufacturerId";
+
+            /// <summary>
+            /// The property of the identification of its model.
+            /// </summary>
+            public const String  ModelId               = "modelId";
+
+            /// <summary>
+            /// The property of its own energy meters.
+            /// </summary>
+            public const String  EnergyMeters          = "energyMeters";
+
+            /// <summary>
+            /// The property of the identifications of its own energy meters, refused: they are given completely.
+            /// </summary>
+            public const String  EnergyMeterIds        = "energyMeterIds";
+
+            /// <summary>
+            /// The property of its EVSEs.
+            /// </summary>
+            public const String  EVSEs                 = "EVSEs";
+
+            /// <summary>
+            /// The property of the identifications of its EVSEs, refused: they are given completely.
+            /// </summary>
+            public const String  EVSEIds               = "EVSEIds";
+
+            /// <summary>
+            /// The property of its brands.
+            /// </summary>
+            public const String  Brands                = "brands";
+
+            /// <summary>
+            /// The property of the identifications of its brands, refused: they are given completely.
+            /// </summary>
+            public const String  BrandIds              = "brandIds";
+
+            /// <summary>
+            /// The property of its opening times.
+            /// </summary>
+            public const String  OpeningTimes          = "openingTimes";
+
+            /// <summary>
+            /// The property of its images.
+            /// </summary>
+            public const String  Images                = "images";
+
+            /// <summary>
+            /// The property of the types of vehicles it charges.
+            /// </summary>
+            public const String  VehicleTypes          = "vehicleTypes";
+
+            /// <summary>
+            /// The property of the EU vehicle categories it charges.
+            /// </summary>
+            public const String  EUVehicleCategories   = "euVehicleCategories";
+
+            /// <summary>
+            /// The property of who may use it.
+            /// </summary>
+            public const String  Accessibility         = "accessibility";
+
+            /// <summary>
+            /// The property of its features.
+            /// </summary>
+            public const String  Features              = "features";
+
+            /// <summary>
+            /// The property of where to find information on the calibration of its energy meters.
+            /// </summary>
+            public const String  CalibrationInfo       = "calibrationInfo";
+
+            /// <summary>
+            /// The property of where to find information on its certification.
+            /// </summary>
+            public const String  CertificationInfo     = "certificationInfo";
+
+            /// <summary>
+            /// The property of its maximum power.
+            /// </summary>
+            public const String  MaxPower              = "maxPower";
+
+            /// <summary>
+            /// The property of the identifications of the parking spaces it charges at.
+            /// </summary>
+            public const String  ParkingSpaceIds       = "parkingSpaceIds";
+
+            /// <summary>
+            /// The property of the identifications of its templates.
+            /// </summary>
+            public const String  TemplateIds           = "templateIds";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The reference printed on the charging station, e.g. "Station 2".
@@ -526,99 +658,113 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, ...)
 
         /// <summary>
-        /// Return the JSON representation of this charging station, as its charging pool embeds it: with its EVSEs.
+        /// Return the JSON representation of this charging station, with its EVSEs; embedded, as its charging pool embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingStationSerializer">A delegate to serialize custom charging station JSON objects.</param>
+        public JObject ToJSON(Boolean                                            Embedded                          = false,
+                              CustomJObjectSerializerDelegate<ChargingStation>?  CustomChargingStationSerializer   = null)
 
-            => ToJSON(IncludeChildArrays: true);
+            => ToJSON(Embedded,
+                      CustomChargingStationSerializer,
+                      IncludeChildArrays: true);
 
         /// <summary>
         /// The JSON representation of this charging station, with or without its child arrays: without them for the skeleton of its
         /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
         /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingStationSerializer">A delegate to serialize custom charging station JSON objects.</param>
         /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
-        internal JObject ToJSON(Boolean IncludeChildArrays)
+        internal JObject ToJSON(Boolean                                            Embedded,
+                                CustomJObjectSerializerDelegate<ChargingStation>?  CustomChargingStationSerializer,
+                                Boolean                                            IncludeChildArrays)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id,  Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,          JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",               Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,             Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",        Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,      Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",         DataSource);
+                json.Add(BasePropertyKeys.DataSource,       DataSource);
 
             if (PhysicalReference is not null)
-                json.Add("physicalReference",  PhysicalReference);
+                json.Add(PropertyKeys.PhysicalReference,    PhysicalReference);
 
             if (Address is not null)
-                json.Add("address",            Address.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.Address,              Address.ToJSON(Embedded: true));
 
             if (GeoLocation.HasValue)
-                json.Add("geoLocation",        GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,          GeoLocation.Value.ToJSON(Embedded: true));
 
             if (HotlinePhoneNumber.HasValue)
-                json.Add("hotline",            HotlinePhoneNumber.Value.ToString());
+                json.Add(PropertyKeys.HotlinePhoneNumber,   HotlinePhoneNumber.Value.ToString());
 
             if (ManufacturerId.HasValue)
-                json.Add("manufacturerId",     ManufacturerId.Value.ToString());
+                json.Add(PropertyKeys.ManufacturerId,       ManufacturerId.Value.ToString());
 
             if (ModelId.HasValue)
-                json.Add("modelId",            ModelId.Value.ToString());
+                json.Add(PropertyKeys.ModelId,              ModelId.Value.ToString());
 
             if (EnergyMeters.Length > 0)
-                json.Add("energyMeters",       new JArray(EnergyMeters.Select(energyMeter => energyMeter.ToJSON())));
+                json.Add(PropertyKeys.EnergyMeters,         new JArray(EnergyMeters.Select(energyMeter => energyMeter.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && EVSEs.Count > 0)
-                json.Add("EVSEs",              new JArray(EVSEs.Select(evse => evse.ToJSON())));
+                json.Add(PropertyKeys.EVSEs,                new JArray(EVSEs.Select(evse => evse.ToJSON(Embedded: true))));
 
             if (Brands.Count > 0)
-                json.Add("brands",        new JArray(Brands.Select(brand => brand.ToJSON())));
+                json.Add(PropertyKeys.Brands,               new JArray(Brands.Select(brand => brand.ToJSON(Embedded: true))));
 
             if (OpeningTimes is not null)
-                json.Add("openingTimes",  OpeningTimes.ToJSON());
+                json.Add(PropertyKeys.OpeningTimes,         OpeningTimes.ToJSON());
 
             if (Images.Length > 0)
-                json.Add("images",  new JArray(Images.Select(image => image.ToJSON())));
+                json.Add(PropertyKeys.Images,               new JArray(Images.Select(image => image.ToJSON(Embedded: true))));
 
             if (VehicleTypes.Length > 0)
-                json.Add("vehicleTypes",       POIJSON.IdsToJSON(VehicleTypes));
+                json.Add(PropertyKeys.VehicleTypes,         POIJSON.IdsToJSON(VehicleTypes));
 
             if (EUVehicleCategories.Length > 0)
-                json.Add("euVehicleCategories", POIJSON.IdsToJSON(EUVehicleCategories));
+                json.Add(PropertyKeys.EUVehicleCategories,  POIJSON.IdsToJSON(EUVehicleCategories));
 
             if (Accessibility.HasValue)
-                json.Add("accessibility",      Accessibility.Value.ToString());
+                json.Add(PropertyKeys.Accessibility,        Accessibility.Value.ToString());
 
             if (Features.Length > 0)
-                json.Add("features",           POIJSON.IdsToJSON(Features));
+                json.Add(PropertyKeys.Features,             POIJSON.IdsToJSON(Features));
 
             if (CalibrationInfo.HasValue)
-                json.Add("calibrationInfo",    CalibrationInfo.Value.ToString());
+                json.Add(PropertyKeys.CalibrationInfo,      CalibrationInfo.Value.ToString());
 
             if (CertificationInfo.HasValue)
-                json.Add("certificationInfo",  CertificationInfo.Value.ToString());
+                json.Add(PropertyKeys.CertificationInfo,    CertificationInfo.Value.ToString());
 
             if (MaxPower.HasValue)
-                json.Add("maxPower",           POIJSON.Number(MaxPower.Value.Value));
+                json.Add(PropertyKeys.MaxPower,             POIJSON.Number(MaxPower.Value.Value));
 
             if (ParkingSpaceIds.Length > 0)
-                json.Add("parkingSpaceIds",    POIJSON.IdsToJSON(ParkingSpaceIds));
+                json.Add(PropertyKeys.ParkingSpaceIds,      POIJSON.IdsToJSON(ParkingSpaceIds));
 
             if (TemplateIds.Length > 0)
-                json.Add("templateIds", POIJSON.IdsToJSON(TemplateIds));
+                json.Add(PropertyKeys.TemplateIds,          POIJSON.IdsToJSON(TemplateIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomChargingStationSerializer is not null
+                       ? CustomChargingStationSerializer(this, json)
+                       : json;
 
         }
 
@@ -642,7 +788,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "charging station identification",
                                          ChargingStation_Id.TryParse,
                                          out ChargingStation_Id id,
@@ -651,22 +797,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N       (JSON, "name",               "charging station name",         out var name,               out ErrorResponse) ||
-                    !POIJSON.TryParseI18N       (JSON, "description",        "charging station description",  out var description,        out ErrorResponse) ||
-                    !POIJSON.TryParseString     (JSON, "dataSource",         "data source",                   out var dataSource,         out ErrorResponse) ||
-                    !POIJSON.TryParseString     (JSON, "physicalReference",  "physical reference",            out var physicalReference,  out ErrorResponse) ||
-                    !POIJSON.TryParseAddress    (JSON,                                                        out var address,            out ErrorResponse) ||
-                    !POIJSON.TryParseGeoLocation(JSON,                                                        out var geoLocation,        out ErrorResponse) ||
-                    !POIJSON.TryParseText       (JSON, "hotline",            "hotline phone number",          PhoneNumber.TryParse,       out PhoneNumber? hotline,  out ErrorResponse) ||
-                    !POIJSON.TryParseText       (JSON, "manufacturerId",     "manufacturer identification",   ChargingStationManufacturer_Id.TryParse, out ChargingStationManufacturer_Id? manufacturerId, out ErrorResponse) ||
-                    !POIJSON.TryParseText       (JSON, "modelId",            "model identification",          ChargingStationModel_Id.       TryParse, out ChargingStationModel_Id?        modelId,        out ErrorResponse))
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the charging station '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N       (JSON, BasePropertyKeys.Name,           "charging station name",         out var name,               out ErrorResponse) ||
+                    !POIJSON.TryParseI18N       (JSON, BasePropertyKeys.Description,    "charging station description",  out var description,        out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, BasePropertyKeys.DataSource,     "data source",                   out var dataSource,         out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, PropertyKeys.PhysicalReference,  "physical reference",            out var physicalReference,  out ErrorResponse) ||
+                    !POIJSON.TryParseAddress    (JSON, PropertyKeys.Address,            "address",                       out var address,            out ErrorResponse) ||
+                    !POIJSON.TryParseGeoLocation(JSON, PropertyKeys.GeoLocation,        "geo location",                  out var geoLocation,        out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.HotlinePhoneNumber, "hotline phone number",          PhoneNumber.TryParse,       out PhoneNumber? hotline,  out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.ManufacturerId,     "manufacturer identification",   ChargingStationManufacturer_Id.TryParse, out ChargingStationManufacturer_Id? manufacturerId, out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.ModelId,            "model identification",          ChargingStationModel_Id.       TryParse, out ChargingStationModel_Id?        modelId,        out ErrorResponse))
                 {
                     return false;
                 }
 
                 if (!POIJSON.TryParseChildren<EVSE>(JSON,
-                                                    "EVSEs",
-                                                    "EVSEIds",
+                                                    PropertyKeys.EVSEs,
+                                                    PropertyKeys.EVSEIds,
                                                     "EVSEs",
                                                     EVSE.TryParse,
                                                     out var evses,
@@ -676,8 +829,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 if (!POIJSON.TryParseChildren<EnergyMeter>(JSON,
-                                                           "energyMeters",
-                                                           "energyMeterIds",
+                                                           PropertyKeys.EnergyMeters,
+                                                           PropertyKeys.EnergyMeterIds,
                                                            "energy meters",
                                                            EnergyMeter.TryParse,
                                                            out var energyMeters,
@@ -686,30 +839,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseChildren<Brand>(JSON, "brands", "brandIds", "brands", Brand.TryParse, out var brands, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<Brand>(JSON, PropertyKeys.Brands, PropertyKeys.BrandIds, "brands", Brand.TryParse, out var brands, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, "openingTimes", "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
+                if (!POIJSON.TryParseObject<ImmutableOpeningTimes>(JSON, PropertyKeys.OpeningTimes, "opening times", ImmutableOpeningTimes.TryParse, out var openingTimes, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseObjects<Image>(JSON, "images", "images", Image.TryParse, out var images, out ErrorResponse))
+                if (!POIJSON.TryParseObjects<Image>(JSON, PropertyKeys.Images, "images", Image.TryParse, out var images, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseIds (JSON, "vehicleTypes",       "vehicle type",               VehicleType.           TryParse, out ImmutableArray<VehicleType>             vehicleTypes,       out ErrorResponse) ||
-                    !POIJSON.TryParseIds (JSON, "euVehicleCategories", "EU vehicle category",       EUVehicleCategory.     TryParse, out ImmutableArray<EUVehicleCategory>       euVehicleCategories, out ErrorResponse) ||
-                    !POIJSON.TryParseText(JSON, "accessibility",      "accessibility",              AccessibilityType.     TryParse, out AccessibilityType?                      accessibility,      out ErrorResponse) ||
-                    !POIJSON.TryParseIds (JSON, "features",           "charging station feature",   ChargingStationFeature.TryParse, out ImmutableArray<ChargingStationFeature>  features,           out ErrorResponse) ||
-                    !POIJSON.TryParseText(JSON, "calibrationInfo",    "calibration information",    URL.                   TryParse, out URL?                                    calibrationInfo,    out ErrorResponse) ||
-                    !POIJSON.TryParseText(JSON, "certificationInfo",  "certification information",  URL.                   TryParse, out URL?                                    certificationInfo,  out ErrorResponse) ||
-                    !POIJSON.TryParseIds (JSON, "parkingSpaceIds",    "parking space identification", ParkingSpace_Id.     TryParse, out ImmutableArray<ParkingSpace_Id>         parkingSpaceIds,    out ErrorResponse))
+                if (!POIJSON.TryParseIds (JSON, PropertyKeys.VehicleTypes,        "vehicle type",                 VehicleType.           TryParse, out ImmutableArray<VehicleType>             vehicleTypes,       out ErrorResponse) ||
+                    !POIJSON.TryParseIds (JSON, PropertyKeys.EUVehicleCategories, "EU vehicle category",          EUVehicleCategory.     TryParse, out ImmutableArray<EUVehicleCategory>       euVehicleCategories, out ErrorResponse) ||
+                    !POIJSON.TryParseText(JSON, PropertyKeys.Accessibility,       "accessibility",                AccessibilityType.     TryParse, out AccessibilityType?                      accessibility,      out ErrorResponse) ||
+                    !POIJSON.TryParseIds (JSON, PropertyKeys.Features,            "charging station feature",     ChargingStationFeature.TryParse, out ImmutableArray<ChargingStationFeature>  features,           out ErrorResponse) ||
+                    !POIJSON.TryParseText(JSON, PropertyKeys.CalibrationInfo,     "calibration information",      URL.                   TryParse, out URL?                                    calibrationInfo,    out ErrorResponse) ||
+                    !POIJSON.TryParseText(JSON, PropertyKeys.CertificationInfo,   "certification information",    URL.                   TryParse, out URL?                                    certificationInfo,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds (JSON, PropertyKeys.ParkingSpaceIds,     "parking space identification", ParkingSpace_Id.       TryParse, out ImmutableArray<ParkingSpace_Id>         parkingSpaceIds,    out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (JSON.ParseOptional("maxPower", "maximum power", out Watt? maxPower, out ErrorResponse))
+                if (JSON.ParseOptional(PropertyKeys.MaxPower, "maximum power", out Watt? maxPower, out ErrorResponse))
                     if (ErrorResponse is not null) return false;
 
-                if (!POIJSON.TryParseIds(JSON, "templateIds", "template identification", ChargingStationTemplate_Id.TryParse, out ImmutableArray<ChargingStationTemplate_Id> templateIds, out ErrorResponse))
+                if (!POIJSON.TryParseIds(JSON, PropertyKeys.TemplateIds, "template identification", ChargingStationTemplate_Id.TryParse, out ImmutableArray<ChargingStationTemplate_Id> templateIds, out ErrorResponse))
                     return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,

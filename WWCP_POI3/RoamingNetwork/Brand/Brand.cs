@@ -39,7 +39,64 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 IComparable<Brand>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/brand";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id            = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context       = "@context";
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name          = "name";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description   = "description";
+
+            /// <summary>
+            /// The property of its logo.
+            /// </summary>
+            public const String  Logo          = "logo";
+
+            /// <summary>
+            /// The property of its homepage.
+            /// </summary>
+            public const String  Homepage      = "homepage";
+
+            /// <summary>
+            /// The property of its custom data.
+            /// </summary>
+            public const String  CustomData    = "customData";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The identification of the brand.
@@ -101,32 +158,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, ...)
 
         /// <summary>
-        /// Return the JSON representation of this brand, as its roaming network embeds it.
+        /// Return the JSON representation of this brand; embedded, as what it is a brand of embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomBrandSerializer">A delegate to serialize custom brand JSON objects.</param>
+        public JObject ToJSON(Boolean                                  Embedded                = false,
+                              CustomJObjectSerializerDelegate<Brand>?  CustomBrandSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id",   Id.  ToString()),
-                           new JProperty("name",  Name.ToJSON())
+                           new JProperty(PropertyKeys.Id,  Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,      JSONLDContext);
+
+            json.Add(PropertyKeys.Name,             Name.ToJSON());
+
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(PropertyKeys.Description,  Description.ToJSON());
 
             if (Logo.HasValue)
-                json.Add("logo",         Logo.Value.ToString());
+                json.Add(PropertyKeys.Logo,         Logo.Value.ToString());
 
             if (Homepage.HasValue)
-                json.Add("homepage",     Homepage.Value.ToString());
+                json.Add(PropertyKeys.Homepage,     Homepage.Value.ToString());
 
             if (CustomData is not null && CustomData.HasValues)
-                json.Add("customData",   CustomData.ToJObject());
+                json.Add(PropertyKeys.CustomData,   CustomData.ToJObject());
 
-            return json;
+            return CustomBrandSerializer is not null
+                       ? CustomBrandSerializer(this, json)
+                       : json;
 
         }
 
@@ -150,7 +216,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(PropertyKeys.Id,
                                          "brand identification",
                                          Brand_Id.TryParse,
                                          out Brand_Id id,
@@ -159,10 +225,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N(JSON, "name",         "brand name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N(JSON, "description",  "brand description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseText(JSON, "logo",         "logo",               URL.TryParse, out URL? logo,      out ErrorResponse) ||
-                    !POIJSON.TryParseText(JSON, "homepage",     "homepage",           URL.TryParse, out URL? homepage,  out ErrorResponse))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the brand '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N(JSON, PropertyKeys.Name,         "brand name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N(JSON, PropertyKeys.Description,  "brand description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseText(JSON, PropertyKeys.Logo,         "logo",               URL.TryParse, out URL? logo,      out ErrorResponse) ||
+                    !POIJSON.TryParseText(JSON, PropertyKeys.Homepage,     "homepage",           URL.TryParse, out URL? homepage,  out ErrorResponse))
                 {
                     return false;
                 }

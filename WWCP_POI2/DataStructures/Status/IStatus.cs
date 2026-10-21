@@ -32,6 +32,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public static class IStatusExtensions
     {
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for the JSON serialization of a status.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its entity identification.
+            /// </summary>
+            public const String  Id          = "id";
+
+            /// <summary>
+            /// The property of its status.
+            /// </summary>
+            public const String  Status      = "status";
+
+            /// <summary>
+            /// The property of its timestamp.
+            /// </summary>
+            public const String  Timestamp   = "timestamp";
+
+        }
+
+        #endregion
+
         #region ToJSON              (this StatusList, Skip = null, Take = null)
 
         public static JObject ToJSON<TId, TData>(this IEnumerable<IStatus<TId, TData>>  StatusList,
@@ -132,9 +159,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             where TId : notnull
 
             => JSONObject.Create(
-                   new JProperty("id",         Status.Id.       ToString()),
-                   new JProperty("status",     Status.Status?.  ToString()),
-                   new JProperty("timestamp",  Status.Timestamp.ToISO8601())
+                   new JProperty(PropertyKeys.Id,         Status.Id.       ToString()),
+                   new JProperty(PropertyKeys.Status,     Status.Status?.  ToString()),
+                   new JProperty(PropertyKeys.Timestamp,  Status.Timestamp.ToISO8601())
                );
 
         #endregion

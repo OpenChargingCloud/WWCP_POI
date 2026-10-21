@@ -60,7 +60,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               IComparable<ChargingTariffGroup>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingTariffGroup";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of the identifications of its charging tariffs.
+            /// </summary>
+            public const String  ChargingTariffIds   = "chargingTariffIds";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// Its charging tariffs, of the same charging station operator, in the order of their identifications.
@@ -166,33 +193,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomChargingTariffGroupSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this charging tariff group, as its charging station operator embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingTariffGroupSerializer">A delegate to serialize custom charging tariff groups.</param>
+        public JObject ToJSON(Boolean                                                Embedded                              = false,
+                              CustomJObjectSerializerDelegate<ChargingTariffGroup>?  CustomChargingTariffGroupSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id, Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,          JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",         Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,             Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,      Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",   DataSource);
+                json.Add(BasePropertyKeys.DataSource,       DataSource);
 
             if (ChargingTariffIds.Length > 0)
-                json.Add("chargingTariffIds",  POIJSON.IdsToJSON(ChargingTariffIds));
+                json.Add(PropertyKeys.ChargingTariffIds,    POIJSON.IdsToJSON(ChargingTariffIds));
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomChargingTariffGroupSerializer is not null
+                       ? CustomChargingTariffGroupSerializer(this, json)
+                       : json;
 
         }
 
@@ -216,7 +251,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "charging tariff group identification",
                                          ChargingTariffGroup_Id.TryParse,
                                          out ChargingTariffGroup_Id id,
@@ -225,10 +260,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N  (JSON, "name",         "charging tariff group name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N  (JSON, "description",  "charging tariff group description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, "dataSource",   "data source",                      out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseIds   (JSON, "chargingTariffIds", "member identification", ChargingTariff_Id.TryParse, out ImmutableArray<ChargingTariff_Id> members, out ErrorResponse))
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the charging tariff group '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Name,                "charging tariff group name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N  (JSON, BasePropertyKeys.Description,         "charging tariff group description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, BasePropertyKeys.DataSource,          "data source",                        out var dataSource,   out ErrorResponse) ||
+                    !POIJSON.TryParseIds   (JSON, PropertyKeys.    ChargingTariffIds,   "member identification", ChargingTariff_Id.TryParse, out ImmutableArray<ChargingTariff_Id> members, out ErrorResponse))
                 {
                     return false;
                 }

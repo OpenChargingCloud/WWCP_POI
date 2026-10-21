@@ -54,6 +54,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context         = "@context";
+
+            /// <summary>
+            /// The property of the hash algorithm of its tree.
+            /// </summary>
+            public const String  HashAlgorithm   = "hashAlgorithm";
+
+            /// <summary>
+            /// The property of the identification of the commit of the proven version.
+            /// </summary>
+            public const String  CommitId        = "commitId";
+
+            /// <summary>
+            /// The property of the revision of the commit.
+            /// </summary>
+            public const String  Revision        = "revision";
+
+            /// <summary>
+            /// The property of the pruned roaming network.
+            /// </summary>
+            public const String  RoamingNetwork  = "roamingNetwork";
+
+            /// <summary>
+            /// The property of the attestations of its root.
+            /// </summary>
+            public const String  Attestations    = "attestations";
+
+        }
+
+        #endregion
+
+
         /// <summary>
         /// The hash algorithm of the tree.
         /// </summary>
@@ -162,7 +205,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
 
             var at                = At ?? Timestamp.Now;
-            var roamingNetworkId  = RoamingNetwork["@id"]?.Type == JTokenType.String ? RoamingNetwork["@id"]!.Value<String>() : null;
+            var roamingNetworkId  = RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Type == JTokenType.String ? RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]!.Value<String>() : null;
 
             foreach (var attestation in Attestations)
             {
@@ -232,7 +275,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (keyStatement.RoamingNetworkId.ToString() != RoamingNetwork["@id"]?.Value<String>())
+            if (keyStatement.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
             {
                 ErrorResponse = $"The key statement is one of the roaming network '{keyStatement.RoamingNetworkId}'!";
                 return false;
@@ -261,8 +304,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             KeyStatement  = null;
             IdentityKeys  = [];
 
-            if (RoamingNetwork[POI.RoamingNetworkOperator.JSONProperty] is not JObject operatorJSON ||
-                operatorJSON[RoamingNetworkKeyStatement.JSONProperty] is not JObject keyStatementJSON)
+            if (RoamingNetwork[POI.RoamingNetwork.PropertyKeys.Operator] is not JObject operatorJSON ||
+                operatorJSON[RoamingNetworkOperator.PropertyKeys.KeyStatement] is not JObject keyStatementJSON)
             {
                 ErrorResponse = "The proof gives no key statement of the roaming network operator!";
                 return false;
@@ -405,20 +448,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (JSON["@context"]?.Type != JTokenType.String || JSON["@context"]!.Value<String>() != JSONLDContext)
+                // Embedded, a proof is written without its context.
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
                 {
-                    ErrorResponse = $"A proof must have the context '{JSONLDContext}'!";
+                    ErrorResponse = $"The JSON-LD context of a proof must be '{JSONLDContext}'!";
                     return false;
                 }
 
-                if (JSON["hashAlgorithm"]?.Type != JTokenType.String ||
-                    !ETagHashAlgorithmExtensions.TryParse(JSON["hashAlgorithm"]!.Value<String>(), out var hashAlgorithm))
+                if (JSON[PropertyKeys.HashAlgorithm]?.Type != JTokenType.String ||
+                    !ETagHashAlgorithmExtensions.TryParse(JSON[PropertyKeys.HashAlgorithm]!.Value<String>(), out var hashAlgorithm))
                 {
                     ErrorResponse = "Missing or unknown hash algorithm: sha256, sha384 or sha512!";
                     return false;
                 }
 
-                if (JSON["roamingNetwork"] is not JObject roamingNetwork)
+                if (JSON[PropertyKeys.RoamingNetwork] is not JObject roamingNetwork)
                 {
                     ErrorResponse = "The roaming network must be a JSON object!";
                     return false;
@@ -426,7 +471,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 RoamingNetworkCommit_Id? commitId = null;
 
-                if (JSON["commitId"] is JToken commitIdJSON)
+                if (JSON[PropertyKeys.CommitId] is JToken commitIdJSON)
                 {
 
                     if (commitIdJSON.Type != JTokenType.String || !RoamingNetworkCommit_Id.TryParse(commitIdJSON.Value<String>() ?? "", out var parsedCommitId))
@@ -441,7 +486,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 UInt64? revision = null;
 
-                if (JSON["revision"] is JToken revisionJSON)
+                if (JSON[PropertyKeys.Revision] is JToken revisionJSON)
                 {
 
                     if (revisionJSON is not JValue { Type: JTokenType.Integer } revisionValue ||
@@ -457,7 +502,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var attestations = new List<RoamingNetworkAttestation>();
 
-                if (JSON["attestations"] is JToken attestationsJSON)
+                if (JSON[PropertyKeys.Attestations] is JToken attestationsJSON)
                 {
 
                     if (attestationsJSON is not JArray attestationsArray)
@@ -541,42 +586,77 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomProofSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this proof.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomProofSerializer">An optional custom serializer of proofs.</param>
+        public JObject ToJSON(Boolean                                                Embedded                = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkProof>?  CustomProofSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("@context",       JSONLDContext),
-                           new JProperty("hashAlgorithm",  HashAlgorithm.ToText())
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,        JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.HashAlgorithm,  HashAlgorithm.ToText())
+
                        );
 
             if (CommitId.HasValue)
-                json.Add("commitId",    CommitId.Value.ToString());
+                json.Add(PropertyKeys.CommitId,    CommitId.Value.ToString());
 
             if (Revision.HasValue)
-                json.Add("revision",    Revision.Value);
+                json.Add(PropertyKeys.Revision,    Revision.Value);
 
-            json.Add("roamingNetwork",  RoamingNetwork.DeepClone());
-            json.Add("attestations",    new JArray(Attestations.Select(attestation => attestation.ToJSON())));
+            json.Add(PropertyKeys.RoamingNetwork,  RoamingNetwork.DeepClone());
+            json.Add(PropertyKeys.Attestations,    new JArray(Attestations.Select(attestation => attestation.ToJSON(Embedded: true))));
 
-            return json;
+            return CustomProofSerializer is not null
+                       ? CustomProofSerializer(this, json)
+                       : json;
 
         }
 
         #endregion
 
-        #region ToCBOR()
+        #region ToCBOR(Embedded = false, CustomProofSerializer = null)
 
         /// <summary>
         /// Return the CBOR representation of this proof: the keys and values of its JSON representation.
         /// </summary>
-        public CBORValue ToCBOR()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomProofSerializer">An optional custom serializer of proofs.</param>
+        public CBORValue ToCBOR(Boolean                                             Embedded                = false,
+                                CustomCBORSerializerDelegate<RoamingNetworkProof>?  CustomProofSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON());
+            var cbor = new CBORMap();
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Context),         CBORValue.FromText(JSONLDContext));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.HashAlgorithm),       CBORValue.FromText(HashAlgorithm.ToText()));
+
+            if (CommitId.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.CommitId),        CBORValue.FromText(CommitId.Value.ToString()));
+
+            if (Revision.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Revision),        CBORValue.FromUInt64(Revision.Value));
+
+            // The pruned roaming network is the proof as it is given: the keys and values of its JSON.
+            cbor.Add(CBORValue.FromText(PropertyKeys.RoamingNetwork),      CBORJSON.ToCBOR(RoamingNetwork));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Attestations),        CBORValue.FromArray(Attestations.Select(attestation => attestation.ToCBOR(Embedded: true))));
+
+            return CustomProofSerializer is not null
+                       ? CustomProofSerializer(this, cbor)
+                       : cbor;
+
+        }
 
         #endregion
 
@@ -593,10 +673,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Subject.EntityType != nameof(ChargingStationOperator))
                 return false;
 
-            foreach (var chargingStationOperator in Children(RoamingNetwork, "chargingStationOperators"))
-                if (chargingStationOperator["@id"]?.Type == JTokenType.String &&
-                    chargingStationOperator["@id"]!.Value<String>() == Subject.EntityId &&
-                    POIEffectiveTree.TryDigest((JObject) chargingStationOperator.DeepClone(), "chargingStationOperators", HashAlgorithm, out var digest, out _) &&
+            foreach (var chargingStationOperator in Children(RoamingNetwork, POI.RoamingNetwork.PropertyKeys.ChargingStationOperators))
+                if (chargingStationOperator[POI.RoamingNetwork.BasePropertyKeys.Id]?.Type == JTokenType.String &&
+                    chargingStationOperator[POI.RoamingNetwork.BasePropertyKeys.Id]!.Value<String>() == Subject.EntityId &&
+                    POIEffectiveTree.TryDigest((JObject) chargingStationOperator.DeepClone(), POI.RoamingNetwork.PropertyKeys.ChargingStationOperators, HashAlgorithm, out var digest, out _) &&
                     Convert.ToHexStringLower(digest) == Subject.Digest)
                 {
                     return true;

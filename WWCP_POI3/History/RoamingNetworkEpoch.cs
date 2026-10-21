@@ -75,9 +75,62 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String  StyxCanonicalJSON                = "styx-canonical-json-v1";
 
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String  JSONLDContext                    = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkEpochProfiles";
+
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context              = "@context";
+
+            /// <summary>
+            /// The property of its canonicalization.
+            /// </summary>
+            public const String  Canonicalization     = "canonicalization";
+
+            /// <summary>
+            /// The property of its identification hash.
+            /// </summary>
+            public const String  IdentificationHash   = "identificationHash";
+
+            /// <summary>
+            /// The property of its profile of commits.
+            /// </summary>
+            public const String  Commit               = "commit";
+
+            /// <summary>
+            /// The property of its profile of checkpoints.
+            /// </summary>
+            public const String  Checkpoint           = "checkpoint";
+
+            /// <summary>
+            /// The property of its profile of price statements.
+            /// </summary>
+            public const String  PriceStatement       = "priceStatement";
+
+            /// <summary>
+            /// The property of its signature algorithms.
+            /// </summary>
+            public const String  SignatureAlgorithms  = "signatureAlgorithms";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The canonicalization of everything hashed and signed.
@@ -200,27 +253,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             foreach (var property in json.Properties())
-                if (property.Name is not ("canonicalization" or "identificationHash" or "commit" or "checkpoint" or "priceStatement" or "signatureAlgorithms"))
+                if (property.Name is not (PropertyKeys.Context or PropertyKeys.Canonicalization or PropertyKeys.IdentificationHash or PropertyKeys.Commit or
+                                          PropertyKeys.Checkpoint or PropertyKeys.PriceStatement or PropertyKeys.SignatureAlgorithms))
                 {
                     ErrorResponse = $"Unknown profile '{property.Name}' of an epoch!";
                     return false;
                 }
 
-            if (Text(json, "canonicalization") != StyxCanonicalJSON)
+            if (json[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the profiles of an epoch must be '{JSONLDContext}'!";
+                return false;
+            }
+
+            if (Text(json, PropertyKeys.Canonicalization) != StyxCanonicalJSON)
             {
                 ErrorResponse = $"The canonicalization of an epoch must be '{StyxCanonicalJSON}', the one this implementation calculates!";
                 return false;
             }
 
-            if (!ETagHashAlgorithmExtensions.TryParse(Text(json, "identificationHash"), out var identificationHash))
+            if (!ETagHashAlgorithmExtensions.TryParse(Text(json, PropertyKeys.IdentificationHash), out var identificationHash))
             {
                 ErrorResponse = "The identification hash of an epoch must be sha256, sha384 or sha512!";
                 return false;
             }
 
-            if (Text(json, "commit")         != RoamingNetworkCommit.        IdentityProfile ||
-                Text(json, "checkpoint")     != RoamingNetworkCheckpoint.    IdentityProfile ||
-                Text(json, "priceStatement") != RoamingNetworkPriceStatement.SigningProfile)
+            if (Text(json, PropertyKeys.Commit)         != RoamingNetworkCommit.        IdentityProfile ||
+                Text(json, PropertyKeys.Checkpoint)     != RoamingNetworkCheckpoint.    IdentityProfile ||
+                Text(json, PropertyKeys.PriceStatement) != RoamingNetworkPriceStatement.SigningProfile)
             {
                 ErrorResponse = $"The profiles of commits, checkpoints and price statements of an epoch must be '{RoamingNetworkCommit.IdentityProfile}', " +
                                 $"'{RoamingNetworkCheckpoint.IdentityProfile}' and '{RoamingNetworkPriceStatement.SigningProfile}', the ones this implementation calculates!";
@@ -229,7 +290,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var signatureAlgorithms = new List<String>();
 
-            if (json["signatureAlgorithms"] is JToken signatureAlgorithmsJSON)
+            if (json[PropertyKeys.SignatureAlgorithms] is JToken signatureAlgorithmsJSON)
             {
 
                 if (signatureAlgorithmsJSON is not JArray signatureAlgorithmsArray ||
@@ -267,21 +328,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomEpochProfilesSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of these profiles.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEpochProfilesSerializer">An optional custom serializer of the profiles of an epoch.</param>
+        public JObject ToJSON(Boolean                                                        Embedded                        = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkEpochProfiles>?  CustomEpochProfilesSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("canonicalization",     Canonicalization),
-                   new JProperty("identificationHash",   IdentificationHash.ToText()),
-                   new JProperty("commit",               Commit),
-                   new JProperty("checkpoint",           Checkpoint),
-                   new JProperty("priceStatement",       PriceStatement),
-                   new JProperty("signatureAlgorithms",  new JArray(SignatureAlgorithms))
-               );
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,              JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Canonicalization,     Canonicalization),
+                                 new JProperty(PropertyKeys.IdentificationHash,   IdentificationHash.ToText()),
+                                 new JProperty(PropertyKeys.Commit,               Commit),
+                                 new JProperty(PropertyKeys.Checkpoint,           Checkpoint),
+                                 new JProperty(PropertyKeys.PriceStatement,       PriceStatement),
+                                 new JProperty(PropertyKeys.SignatureAlgorithms,  new JArray(SignatureAlgorithms))
+
+                       );
+
+            return CustomEpochProfilesSerializer is not null
+                       ? CustomEpochProfilesSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 
@@ -303,7 +380,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean Equals(RoamingNetworkEpochProfiles? Profiles)
 
             => Profiles is not null &&
-               ToJSON().ToString(Formatting.None) == Profiles.ToJSON().ToString(Formatting.None);
+               ToJSON(Embedded: true).ToString(Formatting.None) == Profiles.ToJSON(Embedded: true).ToString(Formatting.None);
 
         /// <inheritdoc/>
         public override Boolean Equals(Object? Object)
@@ -314,7 +391,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <inheritdoc/>
         public override Int32 GetHashCode()
 
-            => ToJSON().ToString(Formatting.None).GetHashCode();
+            => ToJSON(Embedded: true).ToString(Formatting.None).GetHashCode();
 
         /// <inheritdoc/>
         public override String ToString()
@@ -335,6 +412,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              RoamingNetworkEpochProfiles  Profiles)
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkEpoch";
+
+        #endregion
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context   = "@context";
+
+            /// <summary>
+            /// The property of its number.
+            /// </summary>
+            public const String  Epoch     = "epoch";
+
+            /// <summary>
+            /// The property of its profiles.
+            /// </summary>
+            public const String  Profiles  = RoamingNetworkEpochProfiles.JSONProperty;
+
+        }
+
+        #endregion
+
+
         /// <summary>
         /// The first epoch of every history: SHA-256 identifications, every signature algorithm.
         /// </summary>
@@ -351,12 +465,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Return the JSON representation of this epoch: { epoch, profiles }.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEpochSerializer">An optional custom serializer of epochs.</param>
+        public JObject ToJSON(Boolean                                                Embedded                = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkEpoch>?  CustomEpochSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("epoch",                                 Number),
-                   new JProperty(RoamingNetworkEpochProfiles.JSONProperty,  Profiles.ToJSON())
-               );
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,   JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Epoch,     Number),
+                                 new JProperty(PropertyKeys.Profiles,  Profiles.ToJSON(Embedded: true))
+
+                       );
+
+            return CustomEpochSerializer is not null
+                       ? CustomEpochSerializer(this, json)
+                       : json;
+
+        }
 
         /// <summary>
         /// Try to parse the given JSON representation of an epoch: { epoch, profiles }.
@@ -369,14 +499,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Epoch = null;
 
             if (JSON is not JObject json ||
-                json["epoch"] is not JValue { Type: JTokenType.Integer } number ||
+                json[PropertyKeys.Epoch] is not JValue { Type: JTokenType.Integer } number ||
                 number.Value<Decimal>() < 1 || number.Value<Decimal>() > UInt32.MaxValue)
             {
                 ErrorResponse = "An epoch must be { epoch, profiles }, its number from 1 on!";
                 return false;
             }
 
-            if (!RoamingNetworkEpochProfiles.TryParse(json[RoamingNetworkEpochProfiles.JSONProperty], out var profiles, out ErrorResponse))
+            if (json[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the epoch must be '{JSONLDContext}'!";
+                return false;
+            }
+
+            if (!RoamingNetworkEpochProfiles.TryParse(json[PropertyKeys.Profiles], out var profiles, out ErrorResponse))
                 return false;
 
             Epoch = new RoamingNetworkEpoch(number.Value<UInt32>(), profiles);
@@ -402,7 +539,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON key of the link in a checkpoint.
         /// </summary>
-        public const String JSONProperty = "previous";
+        public const String JSONProperty   = "previous";
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext  = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkEpochLink";
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context       = "@context";
+
+            /// <summary>
+            /// The property of the number of the epoch before.
+            /// </summary>
+            public const String  Epoch         = "epoch";
+
+            /// <summary>
+            /// The property of the final checkpoint of the epoch before.
+            /// </summary>
+            public const String  CheckpointId  = "checkpointId";
+
+            /// <summary>
+            /// The property of the ETags of the version of the commit of the final checkpoint.
+            /// </summary>
+            public const String  ETags         = "eTags";
+
+        }
+
+        #endregion
 
         /// <summary>
         /// The link to the given final checkpoint.
@@ -429,13 +603,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Return the JSON representation: { epoch, checkpointId, eTags }.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEpochLinkSerializer">An optional custom serializer of links to the epoch before.</param>
+        public JObject ToJSON(Boolean                                                    Embedded                    = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkEpochLink>?  CustomEpochLinkSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("epoch",         Epoch),
-                   new JProperty("checkpointId",  CheckpointId.ToString()),
-                   new JProperty("eTags",         new JArray(ETags.Select(eTag => eTag.ToJSON())))
-               );
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,       JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Epoch,         Epoch),
+                                 new JProperty(PropertyKeys.CheckpointId,  CheckpointId.ToString()),
+                                 new JProperty(PropertyKeys.ETags,         new JArray(ETags.Select(eTag => eTag.ToJSON())))
+
+                       );
+
+            return CustomEpochLinkSerializer is not null
+                       ? CustomEpochLinkSerializer(this, json)
+                       : json;
+
+        }
 
         /// <summary>
         /// Try to parse the given JSON representation: { epoch, checkpointId, eTags }.
@@ -451,12 +641,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 if (JSON is not JObject json ||
-                    json["epoch"] is not JValue { Type: JTokenType.Integer } epoch ||
+                    json[PropertyKeys.Epoch] is not JValue { Type: JTokenType.Integer } epoch ||
                     epoch.Value<Decimal>() < 1 || epoch.Value<Decimal>() > UInt32.MaxValue ||
-                    !RoamingNetworkCheckpoint_Id.TryParse(json["checkpointId"]?.Type == JTokenType.String ? json["checkpointId"]!.Value<String>() : null, out var checkpointId) ||
-                    json["eTags"] is not JArray { Count: > 0 } eTagsJSON)
+                    !RoamingNetworkCheckpoint_Id.TryParse(json[PropertyKeys.CheckpointId]?.Type == JTokenType.String ? json[PropertyKeys.CheckpointId]!.Value<String>() : null, out var checkpointId) ||
+                    json[PropertyKeys.ETags] is not JArray { Count: > 0 } eTagsJSON)
                 {
                     ErrorResponse = "The epoch before must be { epoch, checkpointId, eTags }!";
+                    return false;
+                }
+
+                if (json[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the epoch before must be '{JSONLDContext}'!";
                     return false;
                 }
 

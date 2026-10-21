@@ -40,9 +40,77 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly JToken? oldValue;
         private readonly JToken? newValue;
 
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkChange";
+
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context            = "@context";
+
+            /// <summary>
+            /// The property of its change kind.
+            /// </summary>
+            public const String  Kind               = "kind";
+
+            /// <summary>
+            /// The property of its entity type.
+            /// </summary>
+            public const String  EntityType         = "entityType";
+
+            /// <summary>
+            /// The property of its entity identification.
+            /// </summary>
+            public const String  EntityId           = "entityId";
+
+            /// <summary>
+            /// The property of its property name.
+            /// </summary>
+            public const String  PropertyName       = "propertyName";
+
+            /// <summary>
+            /// The property of its parent entity type.
+            /// </summary>
+            public const String  ParentEntityType   = "parentEntityType";
+
+            /// <summary>
+            /// The property of its parent entity identification.
+            /// </summary>
+            public const String  ParentEntityId     = "parentEntityId";
+
+            /// <summary>
+            /// The property of its element path.
+            /// </summary>
+            public const String  ElementPath        = "elementPath";
+
+            /// <summary>
+            /// The property of its expected previous value.
+            /// </summary>
+            public const String  OldValue           = "oldValue";
+
+            /// <summary>
+            /// The property of its new value.
+            /// </summary>
+            public const String  NewValue           = "newValue";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The operation to perform.
@@ -500,7 +568,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.ChargingStationManufacturer),
                    ChargingStationManufacturer.Id.ToString(),
-                   ChargingStationManufacturer.ToJSON());
+                   ChargingStationManufacturer.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given charging station manufacturer, optionally checking its complete previous JSON representation.
@@ -544,7 +612,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => Add(nameof(POI.EMobilityProvider),
                    EMobilityProvider.Id.ToString(),
                    WithoutChildren(nameof(POI.EMobilityProvider),
-                                   EMobilityProvider.ToJSON()));
+                                   EMobilityProvider.ToJSON(Embedded: true)));
 
         /// <summary>
         /// Add the EVSE groups, charging station groups, charging pool groups and charging tariff offers of the given
@@ -627,7 +695,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => Add(nameof(POI.GridOperator),
                    GridOperator.Id.ToString(),
                    WithoutChildren(nameof(POI.GridOperator),
-                                   GridOperator.ToJSON()));
+                                   GridOperator.ToJSON(Embedded: true)));
 
         /// <summary>
         /// Add the energy meter templates of the given grid operator, its grid connection points and then its energy meter
@@ -685,7 +753,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => Add(nameof(POI.ParkingOperator),
                    ParkingOperator.Id.ToString(),
                    WithoutChildren(nameof(POI.ParkingOperator),
-                                   ParkingOperator.ToJSON()));
+                                   ParkingOperator.ToJSON(Embedded: true)));
 
         /// <summary>
         /// Add the parking garages, space templates, spaces, sensors, space groups and products of the given parking operator,
@@ -742,7 +810,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ParkingGarage       ParkingGarage,
                                                ParkingOperator_Id  ParkingOperatorId)
 
-            => Add(nameof(POI.ParkingGarage), ParkingGarage.Id.ToString(), ParkingGarage.ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+            => Add(nameof(POI.ParkingGarage), ParkingGarage.Id.ToString(), ParkingGarage.ToJSON(Embedded: true), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
 
         /// <summary>
         /// Add the given parking space to the given parking operator.
@@ -750,7 +818,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ParkingSpace        ParkingSpace,
                                                ParkingOperator_Id  ParkingOperatorId)
 
-            => Add(nameof(POI.ParkingSpace),  ParkingSpace. Id.ToString(), ParkingSpace. ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+            => Add(nameof(POI.ParkingSpace),  ParkingSpace. Id.ToString(), ParkingSpace. ToJSON(Embedded: true), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
 
         /// <summary>
         /// Add the given parking space to the given charging station operator, which defines it where no parking operator does.
@@ -758,7 +826,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ParkingSpace                ParkingSpace,
                                                ChargingStationOperator_Id  ChargingStationOperatorId)
 
-            => Add(nameof(POI.ParkingSpace),  ParkingSpace. Id.ToString(), ParkingSpace. ToJSON(), nameof(POI.ChargingStationOperator), ChargingStationOperatorId.ToString());
+            => Add(nameof(POI.ParkingSpace),  ParkingSpace. Id.ToString(), ParkingSpace. ToJSON(Embedded: true), nameof(POI.ChargingStationOperator), ChargingStationOperatorId.ToString());
 
         /// <summary>
         /// Add the given parking sensor to the given parking operator.
@@ -766,7 +834,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ParkingSensor       ParkingSensor,
                                                ParkingOperator_Id  ParkingOperatorId)
 
-            => Add(nameof(POI.ParkingSensor), ParkingSensor.Id.ToString(), ParkingSensor.ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+            => Add(nameof(POI.ParkingSensor), ParkingSensor.Id.ToString(), ParkingSensor.ToJSON(Embedded: true), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
 
         #endregion
 
@@ -871,7 +939,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(GridConnectionPoint  GridConnectionPoint,
                                                GridOperator_Id      GridOperatorId)
 
-            => Add(nameof(POI.GridConnectionPoint), GridConnectionPoint.Id.ToString(), GridConnectionPoint.ToJSON(), nameof(POI.GridOperator), GridOperatorId.ToString());
+            => Add(nameof(POI.GridConnectionPoint), GridConnectionPoint.Id.ToString(), GridConnectionPoint.ToJSON(Embedded: true), nameof(POI.GridOperator), GridOperatorId.ToString());
 
         #endregion
 
@@ -947,7 +1015,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 String               OwnerType,
                                                 String               OwnerId)
 
-            => Add(nameof(POI.EnergyMeterTemplate), EnergyMeterTemplate.Id.ToString(), EnergyMeterTemplate.ToJSON(), OwnerType, OwnerId);
+            => Add(nameof(POI.EnergyMeterTemplate), EnergyMeterTemplate.Id.ToString(), EnergyMeterTemplate.ToJSON(Embedded: true), OwnerType, OwnerId);
 
         #endregion
 
@@ -1013,7 +1081,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 String            OwnerType,
                                                 String            OwnerId)
 
-            => Add(nameof(POI.EnergyMeterGroup), EnergyMeterGroup.Id.ToString(), EnergyMeterGroup.ToJSON(), OwnerType, OwnerId);
+            => Add(nameof(POI.EnergyMeterGroup), EnergyMeterGroup.Id.ToString(), EnergyMeterGroup.ToJSON(Embedded: true), OwnerType, OwnerId);
 
         #endregion
 
@@ -1067,7 +1135,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.ChargingTariff),
                    ChargingTariff.Id.ToString(),
-                   ChargingTariff.ToJSON());
+                   ChargingTariff.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given charging tariff, optionally checking its complete previous JSON representation.
@@ -1110,7 +1178,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.TransparencySoftware),
                    TransparencySoftware.Id.ToString(),
-                   TransparencySoftware.ToJSON());
+                   TransparencySoftware.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given transparency software release, optionally checking its complete previous JSON representation.
@@ -1153,7 +1221,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.TransparencySoftwareCertificate),
                    TransparencySoftwareCertificate.Id.ToString(),
-                   TransparencySoftwareCertificate.ToJSON());
+                   TransparencySoftwareCertificate.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given transparency software certificate, optionally checking its complete previous JSON representation.
@@ -1196,7 +1264,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.EVSETemplate),
                    EVSETemplate.Id.ToString(),
-                   EVSETemplate.ToJSON());
+                   EVSETemplate.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given EVSE template, optionally checking its complete previous JSON representation.
@@ -1237,7 +1305,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.ChargingStationTemplate),
                    ChargingStationTemplate.Id.ToString(),
-                   ChargingStationTemplate.ToJSON());
+                   ChargingStationTemplate.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given charging station template, optionally checking its complete previous JSON representation.
@@ -1278,7 +1346,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.ChargingPoolTemplate),
                    ChargingPoolTemplate.Id.ToString(),
-                   ChargingPoolTemplate.ToJSON());
+                   ChargingPoolTemplate.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given charging pool template, optionally checking its complete previous JSON representation.
@@ -1319,7 +1387,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.ChargingTariffTemplate),
                    ChargingTariffTemplate.Id.ToString(),
-                   ChargingTariffTemplate.ToJSON());
+                   ChargingTariffTemplate.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given charging tariff template, optionally checking its complete previous JSON representation.
@@ -1358,7 +1426,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ChargingTariffOffer         ChargingTariffOffer,
                                                ChargingStationOperator_Id  ChargingStationOperatorId)
 
-            => Add(nameof(POI.ChargingTariffOffer), ChargingTariffOffer.Id.ToString(), ChargingTariffOffer.ToJSON(), nameof(POI.ChargingStationOperator), ChargingStationOperatorId.ToString());
+            => Add(nameof(POI.ChargingTariffOffer), ChargingTariffOffer.Id.ToString(), ChargingTariffOffer.ToJSON(Embedded: true), nameof(POI.ChargingStationOperator), ChargingStationOperatorId.ToString());
 
         /// <summary>
         /// Add the given charging tariff offer to the given e-mobility provider, for its customers at the EVSEs of any operator.
@@ -1366,7 +1434,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ChargingTariffOffer   ChargingTariffOffer,
                                                EMobilityProvider_Id  EMobilityProviderId)
 
-            => Add(nameof(POI.ChargingTariffOffer), ChargingTariffOffer.Id.ToString(), ChargingTariffOffer.ToJSON(), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
+            => Add(nameof(POI.ChargingTariffOffer), ChargingTariffOffer.Id.ToString(), ChargingTariffOffer.ToJSON(Embedded: true), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
 
         /// <summary>
         /// Remove the given charging tariff offer from its owner, optionally checking its complete previous JSON representation.
@@ -1405,7 +1473,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(EVSEGroup             EVSEGroup,
                                                EMobilityProvider_Id  EMobilityProviderId)
 
-            => Add(nameof(POI.EVSEGroup), EVSEGroup.Id.ToString(), EVSEGroup.ToJSON(), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
+            => Add(nameof(POI.EVSEGroup), EVSEGroup.Id.ToString(), EVSEGroup.ToJSON(Embedded: true), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
 
         /// <summary>
         /// Add the given charging station group to the given e-mobility provider, naming charging stations of any operator.
@@ -1413,7 +1481,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ChargingStationGroup  ChargingStationGroup,
                                                EMobilityProvider_Id  EMobilityProviderId)
 
-            => Add(nameof(POI.ChargingStationGroup), ChargingStationGroup.Id.ToString(), ChargingStationGroup.ToJSON(), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
+            => Add(nameof(POI.ChargingStationGroup), ChargingStationGroup.Id.ToString(), ChargingStationGroup.ToJSON(Embedded: true), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
 
         /// <summary>
         /// Add the given charging pool group to the given e-mobility provider, naming charging pools of any operator.
@@ -1421,7 +1489,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ChargingPoolGroup     ChargingPoolGroup,
                                                EMobilityProvider_Id  EMobilityProviderId)
 
-            => Add(nameof(POI.ChargingPoolGroup), ChargingPoolGroup.Id.ToString(), ChargingPoolGroup.ToJSON(), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
+            => Add(nameof(POI.ChargingPoolGroup), ChargingPoolGroup.Id.ToString(), ChargingPoolGroup.ToJSON(Embedded: true), nameof(POI.EMobilityProvider), EMobilityProviderId.ToString());
 
         #endregion
 
@@ -1435,7 +1503,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.EVSEGroup),
                    EVSEGroup.Id.ToString(),
-                   EVSEGroup.ToJSON());
+                   EVSEGroup.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given EVSE group, optionally checking its complete previous JSON representation.
@@ -1478,7 +1546,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.ChargingStationGroup),
                    ChargingStationGroup.Id.ToString(),
-                   ChargingStationGroup.ToJSON());
+                   ChargingStationGroup.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given charging station group, optionally checking its complete previous JSON representation.
@@ -1521,7 +1589,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.ChargingPoolGroup),
                    ChargingPoolGroup.Id.ToString(),
-                   ChargingPoolGroup.ToJSON());
+                   ChargingPoolGroup.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given charging pool group, optionally checking its complete previous JSON representation.
@@ -1564,7 +1632,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.ChargingTariffGroup),
                    ChargingTariffGroup.Id.ToString(),
-                   ChargingTariffGroup.ToJSON());
+                   ChargingTariffGroup.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given charging tariff group, optionally checking its complete previous JSON representation.
@@ -1605,7 +1673,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ParkingSpaceTemplate  ParkingSpaceTemplate,
                                                ParkingOperator_Id    ParkingOperatorId)
 
-            => Add(nameof(POI.ParkingSpaceTemplate), ParkingSpaceTemplate.Id.ToString(), ParkingSpaceTemplate.ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+            => Add(nameof(POI.ParkingSpaceTemplate), ParkingSpaceTemplate.Id.ToString(), ParkingSpaceTemplate.ToJSON(Embedded: true), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
 
         /// <summary>
         /// Remove the given parking space template, optionally checking its complete previous JSON representation.
@@ -1644,7 +1712,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ParkingSpaceGroup   ParkingSpaceGroup,
                                                ParkingOperator_Id  ParkingOperatorId)
 
-            => Add(nameof(POI.ParkingSpaceGroup), ParkingSpaceGroup.Id.ToString(), ParkingSpaceGroup.ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+            => Add(nameof(POI.ParkingSpaceGroup), ParkingSpaceGroup.Id.ToString(), ParkingSpaceGroup.ToJSON(Embedded: true), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
 
         /// <summary>
         /// Remove the given parking space group, optionally checking its complete previous JSON representation.
@@ -1685,7 +1753,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.EnergyMeterManufacturer),
                    EnergyMeterManufacturer.Id.ToString(),
-                   EnergyMeterManufacturer.ToJSON());
+                   EnergyMeterManufacturer.ToJSON(Embedded: true));
 
         /// <summary>
         /// Remove the given energy meter manufacturer, optionally checking its complete previous JSON representation.
@@ -1726,7 +1794,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkChange Add(ParkingProduct   ParkingProduct,
                                                ParkingOperator_Id  ParkingOperatorId)
 
-            => Add(nameof(POI.ParkingProduct), ParkingProduct.Id.ToString(), ParkingProduct.ToJSON(), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
+            => Add(nameof(POI.ParkingProduct), ParkingProduct.Id.ToString(), ParkingProduct.ToJSON(Embedded: true), nameof(POI.ParkingOperator), ParkingOperatorId.ToString());
 
         /// <summary>
         /// Remove the given parking product, optionally checking its complete previous JSON representation.
@@ -1767,7 +1835,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.ChargingPool),
                    ChargingPool.Id.ToString(),
-                   ChargingPool.ToJSON(),
+                   ChargingPool.ToJSON(Embedded: true),
                    nameof(POI.ChargingStationOperator),
                    ChargingPool.Id.OperatorId.ToString());
 
@@ -1785,7 +1853,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.ChargingStation),
                    ChargingStation.Id.ToString(),
-                   ChargingStation.ToJSON(),
+                   ChargingStation.ToJSON(Embedded: true),
                    nameof(POI.ChargingPool),
                    ChargingPoolId.ToString());
 
@@ -1803,7 +1871,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Add(nameof(POI.EVSE),
                    EVSE.Id.ToString(),
-                   EVSE.ToJSON(),
+                   EVSE.ToJSON(Embedded: true),
                    nameof(POI.ChargingStation),
                    ChargingStationId.ToString());
 
@@ -2082,9 +2150,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the roaming network change must be '{JSONLDContext}'!";
+                    return false;
+                }
+
                 #region Parse Kind                [mandatory]
 
-                if (!JSON.ParseMandatoryText("kind",
+                if (!JSON.ParseMandatoryText(PropertyKeys.Kind,
                                              "change kind",
                                              out var kindText,
                                              out ErrorResponse))
@@ -2104,7 +2179,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse EntityType          [mandatory]
 
-                if (!JSON.ParseMandatoryText("entityType",
+                if (!JSON.ParseMandatoryText(PropertyKeys.EntityType,
                                              "entity type",
                                              out var entityType,
                                              out ErrorResponse))
@@ -2116,7 +2191,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse EntityId            [mandatory]
 
-                if (!JSON.ParseMandatoryText("entityId",
+                if (!JSON.ParseMandatoryText(PropertyKeys.EntityId,
                                              "entity identification",
                                              out var entityId,
                                              out ErrorResponse))
@@ -2128,7 +2203,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse PropertyName        [optional]
 
-                if (JSON.ParseOptional("propertyName",
+                if (JSON.ParseOptional(PropertyKeys.PropertyName,
                                        "property name",
                                        out String? propertyName,
                                        out ErrorResponse))
@@ -2141,7 +2216,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse ParentEntityType    [optional]
 
-                if (JSON.ParseOptional("parentEntityType",
+                if (JSON.ParseOptional(PropertyKeys.ParentEntityType,
                                        "parent entity type",
                                        out String? parentEntityType,
                                        out ErrorResponse))
@@ -2154,7 +2229,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse ParentEntityId      [optional]
 
-                if (JSON.ParseOptional("parentEntityId",
+                if (JSON.ParseOptional(PropertyKeys.ParentEntityId,
                                        "parent entity identification",
                                        out String? parentEntityId,
                                        out ErrorResponse))
@@ -2169,7 +2244,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var elementPath = ImmutableArray<POIElementPathSegment>.Empty;
 
-                if (JSON["elementPath"] is JToken elementPathJSON)
+                if (JSON[PropertyKeys.ElementPath] is JToken elementPathJSON)
                 {
 
                     if (elementPathJSON is not JArray elementPathArray)
@@ -2203,8 +2278,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse OldValue/NewValue   [optional]
 
-                var oldValue = JSON["oldValue"];
-                var newValue = JSON["newValue"];
+                var oldValue = JSON[PropertyKeys.OldValue];
+                var newValue = JSON[PropertyKeys.NewValue];
 
                 #endregion
 
@@ -2236,34 +2311,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomRoamingNetworkChangeSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this roaming network change.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomRoamingNetworkChangeSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                                 Embedded                               = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkChange>?  CustomRoamingNetworkChangeSerializer   = null)
         {
 
             var json = JSONObject.Create(
 
-                                 new JProperty("kind",               Kind.ToString()),
-                                 new JProperty("entityType",         EntityType),
-                                 new JProperty("entityId",           EntityId),
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,            JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Kind,               Kind.ToString()),
+                                 new JProperty(PropertyKeys.EntityType,         EntityType),
+                                 new JProperty(PropertyKeys.EntityId,           EntityId),
 
                            PropertyName is not null
-                               ? new JProperty("propertyName",       PropertyName)
+                               ? new JProperty(PropertyKeys.PropertyName,       PropertyName)
                                : null,
 
                            ParentEntityType is not null
-                               ? new JProperty("parentEntityType",   ParentEntityType)
+                               ? new JProperty(PropertyKeys.ParentEntityType,   ParentEntityType)
                                : null,
 
                            ParentEntityId is not null
-                               ? new JProperty("parentEntityId",     ParentEntityId)
+                               ? new JProperty(PropertyKeys.ParentEntityId,     ParentEntityId)
                                : null,
 
                            ElementPath.Length > 0
-                               ? new JProperty("elementPath",        new JArray(ElementPath.Select(segment => segment.ToJSON())))
+                               ? new JProperty(PropertyKeys.ElementPath,        new JArray(ElementPath.Select(segment => segment.ToJSON(Embedded: true))))
                                : null
 
                        );
@@ -2271,12 +2353,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // Added directly: JSONObject.Create leaves out JSON null and empty values,
             // but an expected absent old value (null) or an empty new value ([], {}, "") is a value here.
             if (oldValue is not null)
-                json.Add("oldValue", oldValue.DeepClone());
+                json.Add(PropertyKeys.OldValue, oldValue.DeepClone());
 
             if (newValue is not null)
-                json.Add("newValue", newValue.DeepClone());
+                json.Add(PropertyKeys.NewValue, newValue.DeepClone());
 
-            return json;
+            return CustomRoamingNetworkChangeSerializer is not null
+                       ? CustomRoamingNetworkChangeSerializer(this, json)
+                       : json;
 
         }
 

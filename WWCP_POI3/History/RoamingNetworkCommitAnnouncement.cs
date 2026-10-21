@@ -35,7 +35,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed record RoamingNetworkCommitAnnouncement
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkCommitAnnouncement";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context      = "@context";
+
+            /// <summary>
+            /// The property of when the history took the commit.
+            /// </summary>
+            public const String  Timestamp    = "timestamp";
+
+            /// <summary>
+            /// The property of the identification of the commit.
+            /// </summary>
+            public const String  CommitId     = "commitId";
+
+            /// <summary>
+            /// The property of the identifications of its parents.
+            /// </summary>
+            public const String  ParentIds    = "parentIds";
+
+            /// <summary>
+            /// The property of the revision the commit leads to.
+            /// </summary>
+            public const String  Revision     = "revision";
+
+            /// <summary>
+            /// The property of the description of its change set.
+            /// </summary>
+            public const String  Description  = "description";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The complete commit, for whoever wants more than the notice. Not part of its JSON.
@@ -92,25 +144,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomCommitAnnouncementSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this announcement.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomCommitAnnouncementSerializer">An optional custom serializer of commit announcements.</param>
+        public JObject ToJSON(Boolean                                                             Embedded                             = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkCommitAnnouncement>?  CustomCommitAnnouncementSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("timestamp",  Timestamp.ToISO8601()),
-                           new JProperty("commitId",   CommitId.ToString()),
-                           new JProperty("parentIds",  new JArray(ParentIds.Select(parentId => parentId.ToString()))),
-                           new JProperty("revision",   Revision)
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,    JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Timestamp,  Timestamp.ToISO8601()),
+                                 new JProperty(PropertyKeys.CommitId,   CommitId.ToString()),
+                                 new JProperty(PropertyKeys.ParentIds,  new JArray(ParentIds.Select(parentId => parentId.ToString()))),
+                                 new JProperty(PropertyKeys.Revision,   Revision)
+
                        );
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description", Description.ToJSON());
+                json.Add(PropertyKeys.Description, Description.ToJSON());
 
-            return json;
+            return CustomCommitAnnouncementSerializer is not null
+                       ? CustomCommitAnnouncementSerializer(this, json)
+                       : json;
 
         }
 

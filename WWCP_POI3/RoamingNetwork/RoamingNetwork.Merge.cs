@@ -91,34 +91,117 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                      String                           Description)
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkMergeConflict";
+
+        #endregion
+
+        #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context        = "@context";
+
+            /// <summary>
+            /// The property of why they conflict.
+            /// </summary>
+            public const String  Kind           = "kind";
+
+            /// <summary>
+            /// The property of its entity type.
+            /// </summary>
+            public const String  EntityType     = "entityType";
+
+            /// <summary>
+            /// The property of its entity identification.
+            /// </summary>
+            public const String  EntityId       = "entityId";
+
+            /// <summary>
+            /// The property of its description.
+            /// </summary>
+            public const String  Description    = "description";
+
+            /// <summary>
+            /// The property of its property name.
+            /// </summary>
+            public const String  PropertyName   = "propertyName";
+
+            /// <summary>
+            /// The property of the value of the common ancestor.
+            /// </summary>
+            public const String  Base           = "base";
+
+            /// <summary>
+            /// The property of the value of the left version.
+            /// </summary>
+            public const String  Left           = "left";
+
+            /// <summary>
+            /// The property of the value of the right version.
+            /// </summary>
+            public const String  Right          = "right";
+
+        }
+
+        #endregion
+
+        #endregion
+
+
+        #region ToJSON(Embedded = false, CustomRoamingNetworkMergeConflictSerializer = null)
+
         /// <summary>
         /// Return the JSON representation of this conflict.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomRoamingNetworkMergeConflictSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                                        Embedded                                      = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkMergeConflict>?  CustomRoamingNetworkMergeConflictSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("kind",        Kind.ToString()),
-                           new JProperty("entityType",  EntityType),
-                           new JProperty("entityId",    EntityId),
-                           new JProperty("description", Description)
-                       );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,       JSONLDContext);
+
+            json.Add(PropertyKeys.Kind,              Kind.ToString());
+            json.Add(PropertyKeys.EntityType,        EntityType);
+            json.Add(PropertyKeys.EntityId,          EntityId);
+            json.Add(PropertyKeys.Description,       Description);
 
             if (PropertyName is not null)
-                json.Add("propertyName", PropertyName);
+                json.Add(PropertyKeys.PropertyName,  PropertyName);
 
             if (Base  is not null)
-                json.Add("base",   Base. DeepClone());
+                json.Add(PropertyKeys.Base,          Base. DeepClone());
 
             if (Left  is not null)
-                json.Add("left",   Left. DeepClone());
+                json.Add(PropertyKeys.Left,          Left. DeepClone());
 
             if (Right is not null)
-                json.Add("right",  Right.DeepClone());
+                json.Add(PropertyKeys.Right,         Right.DeepClone());
 
-            return json;
+            return CustomRoamingNetworkMergeConflictSerializer is not null
+                       ? CustomRoamingNetworkMergeConflictSerializer(this, json)
+                       : json;
 
         }
+
+        #endregion
 
     }
 
@@ -246,56 +329,56 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// A key holds an array of them, or, as the roaming network operator, one.
         /// </summary>
         private static readonly Dictionary<String, (String Key, String Type)[]> MergeChildren = new () {
-            { nameof(RoamingNetwork),           [ (RoamingNetworkOperator.JSONProperty, nameof(RoamingNetworkOperator)),
-                                                  ("chargingStationOperators",          nameof(ChargingStationOperator)),
-                                                  ("chargingStationManufacturers",      nameof(ChargingStationManufacturer)),
-                                                  ("eMobilityProviders",                nameof(EMobilityProvider)),
-                                                  ("gridOperators",                     nameof(GridOperator)),
-                                                  ("parkingOperators",                  nameof(ParkingOperator)),
-                                                  ("energyMeterManufacturers",          nameof(EnergyMeterManufacturer)),
-                                                  ("transparencySoftware",              nameof(TransparencySoftware)),
-                                                  ("transparencySoftwareCertificates",  nameof(TransparencySoftwareCertificate)) ] },
-            { nameof(ChargingStationOperator),  [ ("chargingTariffTemplates",           nameof(ChargingTariffTemplate)),
-                                                  ("chargingTariffs",                   nameof(ChargingTariff)),
-                                                  ("EVSETemplates",                     nameof(EVSETemplate)),
-                                                  ("chargingStationTemplates",          nameof(ChargingStationTemplate)),
-                                                  ("chargingPoolTemplates",             nameof(ChargingPoolTemplate)),
-                                                  ("energyMeterTemplates",              nameof(EnergyMeterTemplate)),
-                                                  ("chargingPools",                     nameof(ChargingPool)),
-                                                  ("EVSEGroups",                        nameof(EVSEGroup)),
-                                                  ("chargingStationGroups",             nameof(ChargingStationGroup)),
-                                                  ("chargingPoolGroups",                nameof(ChargingPoolGroup)),
-                                                  ("chargingTariffGroups",              nameof(ChargingTariffGroup)),
-                                                  ("energyMeterGroups",                 nameof(EnergyMeterGroup)),
-                                                  ("chargingTariffOffers",              nameof(ChargingTariffOffer)),
-                                                  ("parkingSpaces",                     nameof(ParkingSpace)) ] },
-            { nameof(ChargingPool),             [ ("chargingStations",                  nameof(ChargingStation)) ] },
-            { nameof(ChargingStation),          [ ("EVSEs",                             nameof(EVSE)) ] },
-            { nameof(EMobilityProvider),        [ ("EVSEGroups",                        nameof(EVSEGroup)),
-                                                  ("chargingStationGroups",             nameof(ChargingStationGroup)),
-                                                  ("chargingPoolGroups",                nameof(ChargingPoolGroup)),
-                                                  ("chargingTariffOffers",              nameof(ChargingTariffOffer)) ] },
-            { nameof(GridOperator),             [ ("energyMeterTemplates",              nameof(EnergyMeterTemplate)),
-                                                  ("gridConnectionPoints",              nameof(GridConnectionPoint)),
-                                                  ("energyMeterGroups",                 nameof(EnergyMeterGroup)) ] },
-            { nameof(ParkingOperator),          [ ("parkingGarages",                    nameof(ParkingGarage)),
-                                                  ("parkingSpaceTemplates",             nameof(ParkingSpaceTemplate)),
-                                                  ("parkingSpaces",                     nameof(ParkingSpace)),
-                                                  ("parkingSensors",                    nameof(ParkingSensor)),
-                                                  ("parkingSpaceGroups",                nameof(ParkingSpaceGroup)),
-                                                  ("parkingProducts",                   nameof(ParkingProduct)) ] }
+            { nameof(RoamingNetwork),           [ (PropertyKeys.Operator,                                          nameof(RoamingNetworkOperator)),
+                                                  (PropertyKeys.ChargingStationOperators,                          nameof(ChargingStationOperator)),
+                                                  (PropertyKeys.ChargingStationManufacturers,                      nameof(ChargingStationManufacturer)),
+                                                  (PropertyKeys.EMobilityProviders,                                nameof(EMobilityProvider)),
+                                                  (PropertyKeys.GridOperators,                                     nameof(GridOperator)),
+                                                  (PropertyKeys.ParkingOperators,                                  nameof(ParkingOperator)),
+                                                  (PropertyKeys.EnergyMeterManufacturers,                          nameof(EnergyMeterManufacturer)),
+                                                  (PropertyKeys.TransparencySoftware,                              nameof(TransparencySoftware)),
+                                                  (PropertyKeys.TransparencySoftwareCertificates,                  nameof(TransparencySoftwareCertificate)) ] },
+            { nameof(ChargingStationOperator),  [ (ChargingStationOperator.PropertyKeys.ChargingTariffTemplates,   nameof(ChargingTariffTemplate)),
+                                                  (ChargingStationOperator.PropertyKeys.ChargingTariffs,           nameof(ChargingTariff)),
+                                                  (ChargingStationOperator.PropertyKeys.EVSETemplates,             nameof(EVSETemplate)),
+                                                  (ChargingStationOperator.PropertyKeys.ChargingStationTemplates,  nameof(ChargingStationTemplate)),
+                                                  (ChargingStationOperator.PropertyKeys.ChargingPoolTemplates,     nameof(ChargingPoolTemplate)),
+                                                  (ChargingStationOperator.PropertyKeys.EnergyMeterTemplates,      nameof(EnergyMeterTemplate)),
+                                                  (ChargingStationOperator.PropertyKeys.ChargingPools,             nameof(ChargingPool)),
+                                                  (ChargingStationOperator.PropertyKeys.EVSEGroups,                nameof(EVSEGroup)),
+                                                  (ChargingStationOperator.PropertyKeys.ChargingStationGroups,     nameof(ChargingStationGroup)),
+                                                  (ChargingStationOperator.PropertyKeys.ChargingPoolGroups,        nameof(ChargingPoolGroup)),
+                                                  (ChargingStationOperator.PropertyKeys.ChargingTariffGroups,      nameof(ChargingTariffGroup)),
+                                                  (ChargingStationOperator.PropertyKeys.EnergyMeterGroups,         nameof(EnergyMeterGroup)),
+                                                  (ChargingStationOperator.PropertyKeys.ChargingTariffOffers,      nameof(ChargingTariffOffer)),
+                                                  (ChargingStationOperator.PropertyKeys.ParkingSpaces,             nameof(ParkingSpace)) ] },
+            { nameof(ChargingPool),             [ (ChargingPool.PropertyKeys.ChargingStations,                     nameof(ChargingStation)) ] },
+            { nameof(ChargingStation),          [ (ChargingStation.PropertyKeys.EVSEs,                             nameof(EVSE)) ] },
+            { nameof(EMobilityProvider),        [ (EMobilityProvider.PropertyKeys.EVSEGroups,                      nameof(EVSEGroup)),
+                                                  (EMobilityProvider.PropertyKeys.ChargingStationGroups,           nameof(ChargingStationGroup)),
+                                                  (EMobilityProvider.PropertyKeys.ChargingPoolGroups,              nameof(ChargingPoolGroup)),
+                                                  (EMobilityProvider.PropertyKeys.ChargingTariffOffers,            nameof(ChargingTariffOffer)) ] },
+            { nameof(GridOperator),             [ (GridOperator.PropertyKeys.EnergyMeterTemplates,                 nameof(EnergyMeterTemplate)),
+                                                  (GridOperator.PropertyKeys.GridConnectionPoints,                 nameof(GridConnectionPoint)),
+                                                  (GridOperator.PropertyKeys.EnergyMeterGroups,                    nameof(EnergyMeterGroup)) ] },
+            { nameof(ParkingOperator),          [ (ParkingOperator.PropertyKeys.ParkingGarages,                    nameof(ParkingGarage)),
+                                                  (ParkingOperator.PropertyKeys.ParkingSpaceTemplates,             nameof(ParkingSpaceTemplate)),
+                                                  (ParkingOperator.PropertyKeys.ParkingSpaces,                     nameof(ParkingSpace)),
+                                                  (ParkingOperator.PropertyKeys.ParkingSensors,                    nameof(ParkingSensor)),
+                                                  (ParkingOperator.PropertyKeys.ParkingSpaceGroups,                nameof(ParkingSpaceGroup)),
+                                                  (ParkingOperator.PropertyKeys.ParkingProducts,                   nameof(ParkingProduct)) ] }
         };
 
         /// <summary>
         /// The properties of the roaming network itself a change set can update or remove.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableNetworkProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "dataLicenses",
-            POITreeHashAlgorithms.JSONProperty,
-            "customData"
+            BasePropertyKeys.Name,
+            BasePropertyKeys.Description,
+            BasePropertyKeys.DataSource,
+            BasePropertyKeys.DataLicenses,
+            PropertyKeys.    TreeHashAlgorithms,
+            BasePropertyKeys.CustomData
         ];
 
         #endregion
@@ -475,9 +558,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     own.Remove(key);
 
                 // Its identification is its key: another spelling of it is the same entity.
-                own.Remove("@id");
-                own.Remove("lastChange");
-                own.Remove("eTags");
+                own.Remove(BasePropertyKeys.Id);
+                own.Remove(BasePropertyKeys.LastChange);
+                own.Remove(BasePropertyKeys.ETags);
 
                 var entity = new MergeEntity(Type, Id, Parent, own, JSON);
 
@@ -491,7 +574,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                             : (JSON[key] as JArray ?? []).OfType<JObject>();
 
                     foreach (var child in childObjects)
-                        Walk(childType, child["@id"]!.Value<String>()!, entity.Key, child);
+                        Walk(childType, child[BasePropertyKeys.Id]!.Value<String>()!, entity.Key, child);
 
                 }
 
@@ -898,13 +981,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var conflict = new JObject();
 
             if (Base  is not null)
-                conflict.Add("base",   Base. DeepClone());
+                conflict.Add(RoamingNetworkMergeConflict.PropertyKeys.Base,   Base. DeepClone());
 
             if (Left  is not null)
-                conflict.Add("left",   Left. DeepClone());
+                conflict.Add(RoamingNetworkMergeConflict.PropertyKeys.Left,   Left. DeepClone());
 
             if (Right is not null)
-                conflict.Add("right",  Right.DeepClone());
+                conflict.Add(RoamingNetworkMergeConflict.PropertyKeys.Right,  Right.DeepClone());
 
             return new JObject(new JProperty(ConflictMarkerProperty, conflict));
 
@@ -930,7 +1013,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             return !POIPartyKeys.IsKeyProperty(PropertyName) &&
                    PropertyName != POIElements.TemplateIdsProperty &&
-                   PropertyName != POITreeHashAlgorithms.JSONProperty &&
+                   PropertyName != PropertyKeys.TreeHashAlgorithms &&
                    POIElements.TryMerge(PropertyName, Base, Left, Right, out Merged);
 
         }
@@ -952,7 +1035,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                          JToken?  NewValue)
         {
 
-            if (POIPartyKeys.IsKeyProperty(PropertyName) || PropertyName == POIElements.TemplateIdsProperty || PropertyName == POITreeHashAlgorithms.JSONProperty)
+            if (POIPartyKeys.IsKeyProperty(PropertyName) || PropertyName == POIElements.TemplateIdsProperty || PropertyName == PropertyKeys.TreeHashAlgorithms)
                 return [ NewValue is not null
                              ? RoamingNetworkChange.UpdateProperty(EntityType, EntityId, PropertyName, null, NewValue.DeepClone())
                              : RoamingNetworkChange.RemoveProperty(EntityType, EntityId, PropertyName) ];

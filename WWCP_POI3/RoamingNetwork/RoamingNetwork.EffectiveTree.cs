@@ -113,7 +113,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Charging station operators: their effective charging pools and charging tariffs
 
-            if (json["chargingStationOperators"] is JArray operatorsJSON)
+            if (json[PropertyKeys.ChargingStationOperators] is JArray operatorsJSON)
             {
                 for (var operatorIndex = 0; operatorIndex < chargingStationOperators.Count; operatorIndex++)
                 {
@@ -124,15 +124,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     var effectiveTariffs         = members.ChargingTariffs[chargingStationOperator.Id];
 
                     // Only those differing are written again; the others are as the operator embeds them.
-                    if (effectivePools.Count > 0 && operatorJSON["chargingPools"] is JArray poolsJSON)
+                    if (effectivePools.Count > 0 && operatorJSON[ChargingStationOperator.PropertyKeys.ChargingPools] is JArray poolsJSON)
                         for (var poolIndex = 0; poolIndex < chargingStationOperator.ChargingPools.Count; poolIndex++)
                             if (effectivePools.TryGetValue(chargingStationOperator.ChargingPools[poolIndex].Id, out var effectivePool))
-                                poolsJSON[poolIndex] = effectivePool.ToJSON();
+                                poolsJSON[poolIndex] = effectivePool.ToJSON(Embedded: true);
 
-                    if (effectiveTariffs.Count > 0 && operatorJSON["chargingTariffs"] is JArray tariffsJSON)
+                    if (effectiveTariffs.Count > 0 && operatorJSON[ChargingStationOperator.PropertyKeys.ChargingTariffs] is JArray tariffsJSON)
                         for (var tariffIndex = 0; tariffIndex < chargingStationOperator.ChargingTariffs.Count; tariffIndex++)
                             if (effectiveTariffs.TryGetValue(chargingStationOperator.ChargingTariffs[tariffIndex].Id, out var effectiveTariff))
-                                tariffsJSON[tariffIndex] = effectiveTariff.ToJSON();
+                                tariffsJSON[tariffIndex] = effectiveTariff.ToJSON(Embedded: true);
 
                 }
             }
@@ -141,7 +141,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Parking operators: their effective parking spaces
 
-            if (json["parkingOperators"] is JArray parkingOperatorsJSON)
+            if (json[PropertyKeys.ParkingOperators] is JArray parkingOperatorsJSON)
             {
                 for (var operatorIndex = 0; operatorIndex < parkingOperators.Count; operatorIndex++)
                 {
@@ -149,10 +149,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     var parkingOperator  = parkingOperators[operatorIndex];
                     var effectiveSpaces  = members.ParkingSpaces[parkingOperator.Id];
 
-                    if (effectiveSpaces.Count > 0 && parkingOperatorsJSON[operatorIndex]["parkingSpaces"] is JArray spacesJSON)
+                    if (effectiveSpaces.Count > 0 && parkingOperatorsJSON[operatorIndex][ParkingOperator.PropertyKeys.ParkingSpaces] is JArray spacesJSON)
                         for (var spaceIndex = 0; spaceIndex < parkingOperator.ParkingSpaces.Count; spaceIndex++)
                             if (effectiveSpaces.TryGetValue(parkingOperator.ParkingSpaces[spaceIndex].Id, out var effectiveSpace))
-                                spacesJSON[spaceIndex] = effectiveSpace.ToJSON();
+                                spacesJSON[spaceIndex] = effectiveSpace.ToJSON(Embedded: true);
 
                 }
             }
@@ -161,14 +161,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Grid operators: their effective grid connection points
 
-            if (json["gridOperators"] is JArray gridOperatorsJSON)
+            if (json[PropertyKeys.GridOperators] is JArray gridOperatorsJSON)
             {
                 for (var operatorIndex = 0; operatorIndex < gridOperators.Count; operatorIndex++)
                 {
 
                     var gridOperator = gridOperators[operatorIndex];
 
-                    if (gridOperatorsJSON[operatorIndex]["gridConnectionPoints"] is JArray pointsJSON)
+                    if (gridOperatorsJSON[operatorIndex][GridOperator.PropertyKeys.GridConnectionPoints] is JArray pointsJSON)
                         for (var pointIndex = 0; pointIndex < gridOperator.GridConnectionPoints.Count; pointIndex++)
                         {
 
@@ -176,7 +176,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             var effectivePoint       = gridOperator.EffectiveGridConnectionPoint(gridConnectionPoint);
 
                             if (!ReferenceEquals(effectivePoint, gridConnectionPoint))
-                                pointsJSON[pointIndex] = effectivePoint.ToJSON();
+                                pointsJSON[pointIndex] = effectivePoint.ToJSON(Embedded: true);
 
                         }
 

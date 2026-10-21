@@ -141,7 +141,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var json = Network.ToJSON();
 
-            json[RoamingNetworkOperator.JSONProperty] = WithKeys(json[RoamingNetworkOperator.JSONProperty] as JObject ?? new JObject(new JProperty("@id",      OperatorId(Network.Id).ToString()),
+            json[RoamingNetwork.PropertyKeys.Operator] = WithKeys(json[RoamingNetwork.PropertyKeys.Operator] as JObject ?? new JObject(new JProperty("@id",      OperatorId(Network.Id).ToString()),
                                                                                                                                       new JProperty("created",  json["created"])),
                                                                  Party(Network));
 

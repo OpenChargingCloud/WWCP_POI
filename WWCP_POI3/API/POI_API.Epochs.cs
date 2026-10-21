@@ -177,7 +177,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        HTTPDelegate:  request => Task.FromResult(
 
                            TryGetEpoch(request, out var epochHistory, out var errorResponse)
-                               ? JSONResponse(request, HTTPStatusCode.OK, new JArray(epochHistory.Checkpoints.Select(checkpoint => checkpoint.ToJSON())))
+                               ? JSONResponse(request, HTTPStatusCode.OK, new JArray(epochHistory.Checkpoints.Select(checkpoint => checkpoint.ToJSON(Embedded: true))))
                                : errorResponse
 
                        ));
@@ -276,19 +276,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static JObject EpochJSON(RoamingNetworkHistory History)
         {
 
-            var json = History.Epoch.ToJSON();
+            var json = History.Epoch.ToJSON(Embedded: true);
 
-            json.Add("status", History.EpochStatus switch {
+            json.Add(PropertyKeys.Status, History.EpochStatus switch {
                                    RoamingNetworkEpochStatus.Closing  => "closing",
                                    RoamingNetworkEpochStatus.Closed   => "closed",
                                    _                                  => "active"
                                });
 
             if (History.PreviousEpoch is RoamingNetworkEpochLink previousEpoch)
-                json.Add(RoamingNetworkEpochLink.JSONProperty, previousEpoch.ToJSON());
+                json.Add(RoamingNetworkEpochLink.JSONProperty, previousEpoch.ToJSON(Embedded: true));
 
             if (History.FinalCheckpoint is RoamingNetworkCheckpoint finalCheckpoint)
-                json.Add("finalCheckpointId", finalCheckpoint.Id.ToString());
+                json.Add(PropertyKeys.FinalCheckpointId, finalCheckpoint.Id.ToString());
 
             return json;
 

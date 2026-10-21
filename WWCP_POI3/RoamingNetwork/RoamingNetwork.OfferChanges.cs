@@ -47,29 +47,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON key of the charging tariff offers in their owner.
         /// </summary>
-        internal const String ChargingTariffOffersProperty = "chargingTariffOffers";
+        internal const String ChargingTariffOffersProperty = ChargingStationOperator.PropertyKeys.ChargingTariffOffers;
 
         /// <summary>
         /// The properties of a charging tariff offer a change set can update or remove: all but its identification.
         /// Switching between a price of its own and a discount replaces the offer, as it has exactly one of them.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableChargingTariffOfferProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "chargingTariff",
-            "discount",
-            "EVSEGroupIds",
-            "chargingStationGroupIds",
-            "chargingPoolGroupIds",
-            "chargingStationOperatorIds",
-            "notBefore",
-            "notAfter",
-            "openingTimes",
-            "sessions",
-            "eMobilityProviderIds",
-            "maxSessionsPerContract",
-            "customData"
+            ChargingTariffOffer.BasePropertyKeys.Name,
+            ChargingTariffOffer.BasePropertyKeys.Description,
+            ChargingTariffOffer.BasePropertyKeys.DataSource,
+            ChargingTariffOffer.PropertyKeys.ChargingTariff,
+            ChargingTariffOffer.PropertyKeys.Discount,
+            ChargingTariffOffer.PropertyKeys.EVSEGroupIds,
+            ChargingTariffOffer.PropertyKeys.ChargingStationGroupIds,
+            ChargingTariffOffer.PropertyKeys.ChargingPoolGroupIds,
+            ChargingTariffOffer.PropertyKeys.ChargingStationOperatorIds,
+            ChargingTariffOffer.PropertyKeys.NotBefore,
+            ChargingTariffOffer.PropertyKeys.NotAfter,
+            ChargingTariffOffer.PropertyKeys.OpeningTimes,
+            ChargingTariffOffer.PropertyKeys.Sessions,
+            ChargingTariffOffer.PropertyKeys.EMobilityProviderIds,
+            ChargingTariffOffer.PropertyKeys.MaxSessionsPerContract,
+            ChargingTariffOffer.BasePropertyKeys.CustomData
         ];
 
         #endregion
@@ -196,12 +196,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var ownerJSON   = chargingStationOperator is not null
                                   ? chargingStationOperator.ToEmbeddedJSON()
-                                  : eMobilityProvider!.     ToJSON();
+                                  : eMobilityProvider!.     ToJSON(Embedded: true);
             var children    = ownerJSON[ChargingTariffOffersProperty] as JArray;
             // Found under the identification it is kept with: the change may name it in another spelling.
             var entityJSON  = Change.Kind == RoamingNetworkChangeKind.Add
                                   ? null
-                                  : children?.OfType<JObject>().FirstOrDefault(child => child["@id"]?.Value<String>() == storedId);
+                                  : children?.OfType<JObject>().FirstOrDefault(child => child[ChargingTariffOffer.BasePropertyKeys.Id]?.Value<String>() == storedId);
 
             #endregion
 
@@ -262,7 +262,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         entityJSON![propertyName] = Change.NewValue;
 
                     // The change set's timestamp is the last change, so that its after ETags are deterministic.
-                    entityJSON["lastChange"] = CreatedAt.ToISO8601();
+                    entityJSON[ChargingTariffOffer.BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
                     break;
 
                 #endregion
@@ -272,8 +272,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 case RoamingNetworkChangeKind.Add:
 
                     if (Change.NewValue is not JObject newEntity ||
-                        newEntity["@id"]?.Type != JTokenType.String ||
-                        newEntity["@id"]!.Value<String>() != entityId)
+                        newEntity[ChargingTariffOffer.BasePropertyKeys.Id]?.Type != JTokenType.String ||
+                        newEntity[ChargingTariffOffer.BasePropertyKeys.Id]!.Value<String>() != entityId)
                     {
                         ErrorResponse = $"Change {Index}: the {description} to add must be a JSON object with the identification '{entityId}'!";
                         return false;
@@ -288,8 +288,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     // The change set's timestamp is the last change and, unless given, the creation,
                     // so that its after ETags are deterministic.
                     var added = (JObject) newEntity.DeepClone();
-                    added["created"]    ??= CreatedAt.ToISO8601();
-                    added["lastChange"]   = CreatedAt.ToISO8601();
+                    added[ChargingTariffOffer.BasePropertyKeys.Created]    ??= CreatedAt.ToISO8601();
+                    added[ChargingTariffOffer.BasePropertyKeys.LastChange]   = CreatedAt.ToISO8601();
 
                     children.Add(added);
                     break;
@@ -316,7 +316,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // The owner embedding it changed with it, at the time of the change set.
-            ownerJSON["lastChange"] = CreatedAt.ToISO8601();
+            ownerJSON[BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
 
             #region The changed owner must still be a valid one
 

@@ -49,7 +49,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return;
             }
 
-            foreach (var attestationJSON in answer.GetPayloadJSON()?["attestations"]?.OfType<JObject>() ?? [])
+            foreach (var attestationJSON in answer.GetPayloadJSON()?[POI_API.PropertyKeys.Attestations]?.OfType<JObject>() ?? [])
                 TakeAttestation(attestationJSON);
 
         }

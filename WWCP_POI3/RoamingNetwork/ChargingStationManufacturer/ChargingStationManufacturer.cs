@@ -62,7 +62,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       IComparable<ChargingStationManufacturer>
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingStationManufacturer";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its address.
+            /// </summary>
+            public const String  Address              = "address";
+
+            /// <summary>
+            /// The property of its homepage.
+            /// </summary>
+            public const String  Homepage             = "homepage";
+
+            /// <summary>
+            /// The property of its hotline phone number.
+            /// </summary>
+            public const String  HotlinePhoneNumber   = "hotline";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The address of the headquarters.
@@ -184,52 +221,101 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, ...)
 
         /// <summary>
-        /// Return the JSON representation of this charging station manufacturer, as its roaming network embeds it.
+        /// Return the JSON representation of this charging station manufacturer; embedded, as its roaming network embeds it.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingStationManufacturerSerializer">A delegate to serialize custom charging station manufacturer JSON objects.</param>
+        public JObject ToJSON(Boolean                                                        Embedded                                      = false,
+                              CustomJObjectSerializerDelegate<ChargingStationManufacturer>?  CustomChargingStationManufacturerSerializer   = null)
         {
 
             var json = new JObject(
-                           new JProperty("@id", Id.ToString())
+                           new JProperty(BasePropertyKeys.Id,  Id.ToString())
                        );
 
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,          JSONLDContext);
+
             if (Name.IsNotNullOrEmpty())
-                json.Add("name",         Name.ToJSON());
+                json.Add(BasePropertyKeys.Name,             Name.ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add("description",  Description.ToJSON());
+                json.Add(BasePropertyKeys.Description,      Description.ToJSON());
 
             if (DataSource is not null)
-                json.Add("dataSource",   DataSource);
+                json.Add(BasePropertyKeys.DataSource,       DataSource);
 
             if (Address is not null)
-                json.Add("address",      Address.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.Address,              Address.ToJSON(Embedded: true));
 
             if (Homepage.HasValue)
-                json.Add("homepage",     Homepage.Value.ToString());
+                json.Add(PropertyKeys.Homepage,             Homepage.Value.ToString());
 
             if (HotlinePhoneNumber.HasValue)
-                json.Add("hotline",      HotlinePhoneNumber.Value.ToString());
+                json.Add(PropertyKeys.HotlinePhoneNumber,   HotlinePhoneNumber.Value.ToString());
 
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
-            return json;
+            return CustomChargingStationManufacturerSerializer is not null
+                       ? CustomChargingStationManufacturerSerializer(this, json)
+                       : json;
 
         }
 
         #endregion
 
-        #region ToCBOR()
+        #region ToCBOR(Embedded = false, ...)
 
         /// <summary>
         /// Return the CBOR representation of this charging station manufacturer: the keys and values of its JSON representation.
         /// </summary>
-        public CBORValue ToCBOR()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingStationManufacturerSerializer">A delegate to serialize custom charging station manufacturer CBOR maps.</param>
+        public CBORValue ToCBOR(Boolean                                                      Embedded                                      = false,
+                                CustomCBORSerializerDelegate<ChargingStationManufacturer>?   CustomChargingStationManufacturerSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON());
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(BasePropertyKeys.Id),           CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Context),          CBORValue.FromText(JSONLDContext));
+
+            if (Name.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Name),             Name.       ToCBOR());
+
+            if (Description.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Description),      Description.ToCBOR());
+
+            if (DataSource is not null)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),       CBORValue.FromText(DataSource));
+
+            // The address has no CBOR representation of its own: it is written as the keys and values of its JSON representation.
+            if (Address is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Address),              CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
+
+            if (Homepage.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),             CBORValue.FromText(Homepage.Value.ToString()));
+
+            if (HotlinePhoneNumber.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),   CBORValue.FromText(HotlinePhoneNumber.Value.ToString()));
+
+            // Always part of the content, as in the JSON representation; custom data is JSON.
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),              CBORValue.FromText(Created.       ToISO8601()));
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.LastChange),           CBORValue.FromText(LastChangeDate.ToISO8601()));
+
+            if (CustomData.HasValues)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),       CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            return CustomChargingStationManufacturerSerializer is not null
+                       ? CustomChargingStationManufacturerSerializer(this, cbor)
+                       : cbor;
+
+        }
 
         #endregion
 
@@ -251,7 +337,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "charging station manufacturer identification",
                                          ChargingStationManufacturer_Id.TryParse,
                                          out ChargingStationManufacturer_Id id,
@@ -260,12 +346,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N   (JSON, "name",         "manufacturer name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N   (JSON, "description",  "manufacturer description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString (JSON, "dataSource",   "data source",               out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseAddress(JSON,                                              out var address,      out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, "homepage",     "homepage",                  URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, "hotline",      "hotline phone number",      PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the charging station manufacturer '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Name,            "manufacturer name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Description,     "manufacturer description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString (JSON, BasePropertyKeys.DataSource,      "data source",               out var dataSource,   out ErrorResponse) ||
+                    !POIJSON.TryParseAddress(JSON, PropertyKeys.Address,             "address",                   out var address,      out ErrorResponse) ||
+                    !POIJSON.TryParseText   (JSON, PropertyKeys.Homepage,            "homepage",                  URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
+                    !POIJSON.TryParseText   (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
                 {
                     return false;
                 }
@@ -298,6 +391,116 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 ChargingStationManufacturer  = null;
                 ErrorResponse                = "The given JSON representation of a charging station manufacturer is invalid: " + e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
+        #region (static) TryParse(CBOR, out ChargingStationManufacturer, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given CBOR representation of a charging station manufacturer: the keys and values of its JSON
+        /// representation, see ToCBOR().
+        /// </summary>
+        /// <param name="CBOR">The CBOR to parse.</param>
+        /// <param name="ChargingStationManufacturer">The parsed charging station manufacturer.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public static Boolean TryParse(CBORValue                                              CBOR,
+                                       [NotNullWhen(true)]  out ChargingStationManufacturer?  ChargingStationManufacturer,
+                                       [NotNullWhen(false)] out String?                       ErrorResponse)
+        {
+
+            ChargingStationManufacturer = null;
+
+            try
+            {
+
+                if (CBOR.Kind != CBORValueKind.Map)
+                {
+                    ErrorResponse = "The CBOR representation of a charging station manufacturer must be a map!";
+                    return false;
+                }
+
+                if (!CBOR.ParseMandatory(BasePropertyKeys.Id,
+                                         "charging station manufacturer identification",
+                                         ChargingStationManufacturer_Id.TryParse,
+                                         out ChargingStationManufacturer_Id id,
+                                         out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.Context), out var contextCBOR) &&
+                    !(contextCBOR.TryGetText(out var context) && context == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the charging station manufacturer '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                CBOR.ParseOptional    (BasePropertyKeys.Name,         "manufacturer name",         I18NString.TryParse, out I18NString? name,         out ErrorResponse);
+                if (ErrorResponse is not null)
+                    return false;
+
+                CBOR.ParseOptional    (BasePropertyKeys.Description,  "manufacturer description",  I18NString.TryParse, out I18NString? description,  out ErrorResponse);
+                if (ErrorResponse is not null)
+                    return false;
+
+                CBOR.ParseOptionalText(BasePropertyKeys.DataSource,   "data source",                                    out var         dataSource,   out ErrorResponse);
+                if (ErrorResponse is not null)
+                    return false;
+
+                // What has no CBOR representation of its own is read as its JSON, with the parsers of the JSON
+                // representation: the address, the homepage, the hotline and the metadata.
+                var json = new JObject();
+
+                foreach (var key in new[] { PropertyKeys.Address,
+                                            PropertyKeys.Homepage,
+                                            PropertyKeys.HotlinePhoneNumber,
+                                            BasePropertyKeys.Created,
+                                            BasePropertyKeys.LastChange,
+                                            BasePropertyKeys.CustomData })
+                {
+                    if (CBOR.TryGetValue(CBORValue.FromText(key), out var value))
+                        json.Add(key, CBORJSON.ToJSON(value));
+                }
+
+                if (!POIJSON.TryParseAddress(json, PropertyKeys.Address,             "address",               out var address,  out ErrorResponse) ||
+                    !POIJSON.TryParseText   (json, PropertyKeys.Homepage,            "homepage",              URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
+                    !POIJSON.TryParseText   (json, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",  PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIEntityMetadata.TryParse(json,
+                                                out var created,
+                                                out var lastChange,
+                                                out var customData,
+                                                out ErrorResponse))
+                {
+                    return false;
+                }
+
+                ChargingStationManufacturer = new ChargingStationManufacturer(id,
+                                                                              name,
+                                                                              description,
+                                                                              address,
+                                                                              homepage,
+                                                                              hotline,
+                                                                              DataSource:  dataSource,
+                                                                              Created:     created,
+                                                                              LastChange:  lastChange,
+                                                                              CustomData:  customData);
+
+                ErrorResponse = null;
+                return true;
+
+            }
+            catch (Exception e)
+            {
+                ChargingStationManufacturer  = null;
+                ErrorResponse                = "The given CBOR representation of a charging station manufacturer is invalid: " + e.Message;
                 return false;
             }
 

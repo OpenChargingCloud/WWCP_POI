@@ -140,6 +140,54 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys of its snapshots, in JSON and CBOR.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of the time a snapshot was made.
+            /// </summary>
+            public const String  Timestamp             = "timestamp";
+
+            /// <summary>
+            /// The property of the commit of a snapshot.
+            /// </summary>
+            public const String  Commit                = "commit";
+
+            /// <summary>
+            /// The property of the version of the roaming network of a snapshot.
+            /// </summary>
+            public const String  RoamingNetwork        = "roamingNetwork";
+
+            /// <summary>
+            /// The property of the effective last changes of a snapshot.
+            /// </summary>
+            public const String  EffectiveLastChanges  = "effectiveLastChanges";
+
+            /// <summary>
+            /// The property of the runtime status of a snapshot.
+            /// </summary>
+            public const String  RuntimeStatus         = "runtimeStatus";
+
+            /// <summary>
+            /// The property of the checkpoint of a snapshot started from a checkpoint.
+            /// </summary>
+            public const String  Checkpoint            = "checkpoint";
+
+            /// <summary>
+            /// The property of the epoch of a snapshot.
+            /// </summary>
+            public const String  Epoch                 = EpochJSONProperty;
+
+        }
+
+        #endregion
+
+
         /// <summary>
         /// The roaming network of this history.
         /// </summary>
@@ -314,14 +362,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (Snapshot?["commit"] is not JObject commitJSON ||
+                if (Snapshot?[PropertyKeys.Commit] is not JObject commitJSON ||
                     !RoamingNetworkCommit.TryParse(commitJSON, out var commit, out var commitError, Limits))
                 {
                     ErrorResponse = "Missing or invalid commit of the snapshot!";
                     return false;
                 }
 
-                if (Snapshot["roamingNetwork"] is not JObject roamingNetworkJSON)
+                if (Snapshot[PropertyKeys.RoamingNetwork] is not JObject roamingNetworkJSON)
                 {
                     ErrorResponse = "Missing roaming network of the snapshot!";
                     return false;
@@ -334,7 +382,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 // The last changes of its effective members as its history left them: they never go back.
-                if (!roamingNetwork.TryTakeEffectiveFloors(Snapshot["effectiveLastChanges"], out var effectiveLastChangesError))
+                if (!roamingNetwork.TryTakeEffectiveFloors(Snapshot[PropertyKeys.EffectiveLastChanges], out var effectiveLastChangesError))
                 {
                     ErrorResponse = effectiveLastChangesError;
                     return false;
@@ -370,7 +418,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        previousEpoch) &&
 
                        TryTakeRuntimeStatus(ref History,
-                                            Snapshot["runtimeStatus"],
+                                            Snapshot[PropertyKeys.RuntimeStatus],
                                             out ErrorResponse);
 
             }
@@ -500,20 +548,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var head = Head;
 
             var json = new JObject(
-                           new JProperty("timestamp",       Timestamp.Now.ToISO8601()),
-                           new JProperty("commit",          head.Commit.ToJSON()),
-                           new JProperty("roamingNetwork",  head.RoamingNetwork.ToJSON())
+                           new JProperty(PropertyKeys.Timestamp,       Timestamp.Now.ToISO8601()),
+                           new JProperty(PropertyKeys.Commit,          head.Commit.ToJSON(Embedded: true)),
+                           new JProperty(PropertyKeys.RoamingNetwork,  head.RoamingNetwork.ToJSON())
                        );
 
             // Not content, but part of the version as its history calculated it.
             if (head.RoamingNetwork.EffectiveFloorsJSON() is JArray effectiveLastChanges)
-                json.Add("effectiveLastChanges", effectiveLastChanges);
+                json.Add(PropertyKeys.EffectiveLastChanges, effectiveLastChanges);
 
             if (epoch.Number > 1)
                 json.Add(EpochJSONProperty, EpochJSON(epoch, previousEpoch));
 
             if (IncludeRuntimeStatus)
-                json.Add("runtimeStatus", new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON())));
+                json.Add(PropertyKeys.RuntimeStatus, new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON(Embedded: true))));
 
             // The roaming network and the runtime status write whole numbers as integers themselves (POIJSON.Number);
             // this holds for anything else in it, too, so that ToString() of it is read back with its ETags.
@@ -537,17 +585,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var head     = Head;
 
             var entries  = new List<KeyValuePair<CBORValue, CBORValue>> {
-                               new (CBORValue.FromText("timestamp"),       CBORValue.FromText(Timestamp.Now.ToISO8601())),
-                               new (CBORValue.FromText("commit"),          head.Commit.ToCBOR()),
-                               new (CBORValue.FromText("roamingNetwork"),  head.RoamingNetwork.ToCBOR())
+                               new (CBORValue.FromText(PropertyKeys.Timestamp),       CBORValue.FromText(Timestamp.Now.ToISO8601())),
+                               new (CBORValue.FromText(PropertyKeys.Commit),          head.Commit.ToCBOR(Embedded: true)),
+                               new (CBORValue.FromText(PropertyKeys.RoamingNetwork),  head.RoamingNetwork.ToCBOR())
                            };
 
             if (head.RoamingNetwork.EffectiveFloorsJSON() is JArray effectiveLastChanges)
-                entries.Add(new (CBORValue.FromText("effectiveLastChanges"), CBORJSON.ToCBOR(effectiveLastChanges)));
+                entries.Add(new (CBORValue.FromText(PropertyKeys.EffectiveLastChanges), CBORJSON.ToCBOR(effectiveLastChanges)));
 
             if (IncludeRuntimeStatus)
-                entries.Add(new (CBORValue.FromText("runtimeStatus"),
-                                 CBORJSON.ToCBOR(new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON())))));
+                entries.Add(new (CBORValue.FromText(PropertyKeys.RuntimeStatus),
+                                 CBORJSON.ToCBOR(new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON(Embedded: true))))));
 
             return CBORValue.FromMap(entries);
 
@@ -577,14 +625,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 if (Snapshot.Kind != CBORValueKind.Map ||
-                    !Snapshot.TryGetValue(CBORValue.FromText("commit"), out var commitCBOR) ||
+                    !Snapshot.TryGetValue(CBORValue.FromText(PropertyKeys.Commit), out var commitCBOR) ||
                     !RoamingNetworkCommit.TryParse(commitCBOR, out var commit, out var commitError, Limits))
                 {
                     ErrorResponse = "Missing or invalid commit of the snapshot!";
                     return false;
                 }
 
-                if (!Snapshot.TryGetValue(CBORValue.FromText("roamingNetwork"), out var roamingNetworkCBOR))
+                if (!Snapshot.TryGetValue(CBORValue.FromText(PropertyKeys.RoamingNetwork), out var roamingNetworkCBOR))
                 {
                     ErrorResponse = "Missing roaming network of the snapshot!";
                     return false;
@@ -597,7 +645,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 // The last changes of its effective members as its history left them: they never go back.
-                if (!roamingNetwork.TryTakeEffectiveFloors(Snapshot.TryGetValue(CBORValue.FromText("effectiveLastChanges"), out var effectiveLastChangesCBOR)
+                if (!roamingNetwork.TryTakeEffectiveFloors(Snapshot.TryGetValue(CBORValue.FromText(PropertyKeys.EffectiveLastChanges), out var effectiveLastChangesCBOR)
                                                                ? CBORJSON.ToJSON(effectiveLastChangesCBOR)
                                                                : null,
                                                            out var effectiveLastChangesError))
@@ -612,7 +660,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        out ErrorResponse) &&
 
                        TryTakeRuntimeStatus(ref History,
-                                            Snapshot.TryGetValue(CBORValue.FromText("runtimeStatus"), out var runtimeStatusCBOR)
+                                            Snapshot.TryGetValue(CBORValue.FromText(PropertyKeys.RuntimeStatus), out var runtimeStatusCBOR)
                                                 ? CBORJSON.ToJSON(runtimeStatusCBOR)
                                                 : null,
                                             out ErrorResponse);
@@ -867,7 +915,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                    if (!JToken.DeepEquals(mergeChangeSet.ToJSON(IncludeSignatures: false), Commit.ChangeSet!.ToJSON(IncludeSignatures: false)))
+                    if (!JToken.DeepEquals(mergeChangeSet.ToJSON(Embedded: true, IncludeSignatures: false), Commit.ChangeSet!.ToJSON(Embedded: true, IncludeSignatures: false)))
                     {
                         ErrorResponse = $"The merge commit '{Commit.Id}' is not the merge of its parents!";
                         return false;

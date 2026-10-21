@@ -92,14 +92,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var root      = NodeOf(RoamingNetwork, HashAlgorithm);
             var children  = new Dictionary<String, IReadOnlyList<POITreeNode>> {
-                                { "chargingStationOperators",          [ .. RoamingNetwork.ChargingStationOperators.        Select(party => NodeOf(party, HashAlgorithm)) ] },
-                                { "eMobilityProviders",                [ .. RoamingNetwork.EMobilityProviders.              Select(party => NodeOf(party, HashAlgorithm)) ] },
-                                { "gridOperators",                     [ .. RoamingNetwork.GridOperators.                   Select(party => NodeOf(party, HashAlgorithm)) ] },
-                                { "parkingOperators",                  [ .. RoamingNetwork.ParkingOperators.                Select(party => NodeOf(party, HashAlgorithm)) ] },
-                                { "chargingStationManufacturers",      [ .. RoamingNetwork.ChargingStationManufacturers.    Select(value => LeafNode("chargingStationManufacturers",     value, value.ToJSON(), HashAlgorithm)) ] },
-                                { "energyMeterManufacturers",          [ .. RoamingNetwork.EnergyMeterManufacturers.        Select(value => LeafNode("energyMeterManufacturers",         value, value.ToJSON(), HashAlgorithm)) ] },
-                                { "transparencySoftware",              [ .. RoamingNetwork.TransparencySoftware.            Select(value => LeafNode("transparencySoftware",             value, value.ToJSON(), HashAlgorithm)) ] },
-                                { "transparencySoftwareCertificates",  [ .. RoamingNetwork.TransparencySoftwareCertificates.Select(value => LeafNode("transparencySoftwareCertificates", value, value.ToJSON(), HashAlgorithm)) ] }
+                                { RoamingNetwork.PropertyKeys.ChargingStationOperators,          [ .. RoamingNetwork.ChargingStationOperators.        Select(party => NodeOf(party, HashAlgorithm)) ] },
+                                { RoamingNetwork.PropertyKeys.EMobilityProviders,                [ .. RoamingNetwork.EMobilityProviders.              Select(party => NodeOf(party, HashAlgorithm)) ] },
+                                { RoamingNetwork.PropertyKeys.GridOperators,                     [ .. RoamingNetwork.GridOperators.                   Select(party => NodeOf(party, HashAlgorithm)) ] },
+                                { RoamingNetwork.PropertyKeys.ParkingOperators,                  [ .. RoamingNetwork.ParkingOperators.                Select(party => NodeOf(party, HashAlgorithm)) ] },
+                                { RoamingNetwork.PropertyKeys.ChargingStationManufacturers,      [ .. RoamingNetwork.ChargingStationManufacturers.    Select(value => LeafNode(RoamingNetwork.PropertyKeys.ChargingStationManufacturers,     value, value.ToJSON(Embedded: true), HashAlgorithm)) ] },
+                                { RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          [ .. RoamingNetwork.EnergyMeterManufacturers.        Select(value => LeafNode(RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,         value, value.ToJSON(Embedded: true), HashAlgorithm)) ] },
+                                { RoamingNetwork.PropertyKeys.TransparencySoftware,              [ .. RoamingNetwork.TransparencySoftware.            Select(value => LeafNode(RoamingNetwork.PropertyKeys.TransparencySoftware,             value, value.ToJSON(Embedded: true), HashAlgorithm)) ] },
+                                { RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates,  [ .. RoamingNetwork.TransparencySoftwareCertificates.Select(value => LeafNode(RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates, value, value.ToJSON(Embedded: true), HashAlgorithm)) ] }
                             };
 
             return root with {
@@ -137,14 +137,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          ETagDigestEncoding:                       null,
                                          IncludeChildArrays:                       false),
 
-                   [ ("chargingStationOperators",          [ .. RoamingNetwork.ChargingStationOperators.        Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
-                     ("chargingStationManufacturers",      Leaves(RoamingNetwork.ChargingStationManufacturers,     value => value.ToJSON(), HashAlgorithm)),
-                     ("eMobilityProviders",                [ .. RoamingNetwork.EMobilityProviders.              Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
-                     ("gridOperators",                     [ .. RoamingNetwork.GridOperators.                   Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
-                     ("parkingOperators",                  [ .. RoamingNetwork.ParkingOperators.                Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
-                     ("energyMeterManufacturers",          Leaves(RoamingNetwork.EnergyMeterManufacturers,         value => value.ToJSON(), HashAlgorithm)),
-                     ("transparencySoftware",              Leaves(RoamingNetwork.TransparencySoftware,             value => value.ToJSON(), HashAlgorithm)),
-                     ("transparencySoftwareCertificates",  Leaves(RoamingNetwork.TransparencySoftwareCertificates,  value => value.ToJSON(), HashAlgorithm)) ],
+                   [ (RoamingNetwork.PropertyKeys.ChargingStationOperators,          [ .. RoamingNetwork.ChargingStationOperators.        Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
+                     (RoamingNetwork.PropertyKeys.ChargingStationManufacturers,      Leaves(RoamingNetwork.ChargingStationManufacturers,     value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                     (RoamingNetwork.PropertyKeys.EMobilityProviders,                [ .. RoamingNetwork.EMobilityProviders.              Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
+                     (RoamingNetwork.PropertyKeys.GridOperators,                     [ .. RoamingNetwork.GridOperators.                   Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
+                     (RoamingNetwork.PropertyKeys.ParkingOperators,                  [ .. RoamingNetwork.ParkingOperators.                Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
+                     (RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          Leaves(RoamingNetwork.EnergyMeterManufacturers,         value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                     (RoamingNetwork.PropertyKeys.TransparencySoftware,              Leaves(RoamingNetwork.TransparencySoftware,             value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                     (RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates,  Leaves(RoamingNetwork.TransparencySoftwareCertificates,  value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
 
                    HashAlgorithm));
 
@@ -162,7 +162,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    return Node(
 
-                       "chargingStationOperators",
+                       RoamingNetwork.PropertyKeys.ChargingStationOperators,
 
                        // As its roaming network embeds it, without its child arrays.
                        ChargingStationOperator.ToJSON(Embedded:                                 true,
@@ -174,26 +174,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       CustomChargingStationOperatorSerializer:  null,
                                                       IncludeChildArrays:                       false),
 
-                       [ ("chargingPools",             [ .. ChargingStationOperator.ChargingPools.Select(chargingPool => DigestOf(effectivePools.TryGetValue(chargingPool.Id, out var effectivePool)
+                       [ (ChargingStationOperator.PropertyKeys.ChargingPools,             [ .. ChargingStationOperator.ChargingPools.Select(chargingPool => DigestOf(effectivePools.TryGetValue(chargingPool.Id, out var effectivePool)
                                                                                                                                   ? effectivePool
                                                                                                                                   : chargingPool,
                                                                                                                               HashAlgorithm)) ]),
-                         ("chargingTariffs",           Leaves(ChargingStationOperator.ChargingTariffs.Select(chargingTariff => effectiveTariffs.TryGetValue(chargingTariff.Id, out var effectiveTariff)
+                         (ChargingStationOperator.PropertyKeys.ChargingTariffs,           Leaves(ChargingStationOperator.ChargingTariffs.Select(chargingTariff => effectiveTariffs.TryGetValue(chargingTariff.Id, out var effectiveTariff)
                                                                                                                                   ? effectiveTariff
                                                                                                                                   : chargingTariff),
-                                                              value => value.ToJSON(), HashAlgorithm)),
-                         ("EVSETemplates",             Leaves(ChargingStationOperator.EVSETemplates,             value => value.ToJSON(), HashAlgorithm)),
-                         ("chargingStationTemplates",  Leaves(ChargingStationOperator.ChargingStationTemplates,  value => value.ToJSON(), HashAlgorithm)),
-                         ("chargingPoolTemplates",     Leaves(ChargingStationOperator.ChargingPoolTemplates,     value => value.ToJSON(), HashAlgorithm)),
-                         ("chargingTariffTemplates",   Leaves(ChargingStationOperator.ChargingTariffTemplates,   value => value.ToJSON(), HashAlgorithm)),
-                         ("energyMeterTemplates",      Leaves(ChargingStationOperator.EnergyMeterTemplates,      value => value.ToJSON(), HashAlgorithm)),
-                         ("EVSEGroups",                Leaves(ChargingStationOperator.EVSEGroups,                value => value.ToJSON(), HashAlgorithm)),
-                         ("chargingStationGroups",     Leaves(ChargingStationOperator.ChargingStationGroups,     value => value.ToJSON(), HashAlgorithm)),
-                         ("chargingPoolGroups",        Leaves(ChargingStationOperator.ChargingPoolGroups,        value => value.ToJSON(), HashAlgorithm)),
-                         ("chargingTariffGroups",      Leaves(ChargingStationOperator.ChargingTariffGroups,      value => value.ToJSON(), HashAlgorithm)),
-                         ("energyMeterGroups",         Leaves(ChargingStationOperator.EnergyMeterGroups,         value => value.ToJSON(), HashAlgorithm)),
-                         ("chargingTariffOffers",      Leaves(ChargingStationOperator.ChargingTariffOffers,      value => value.ToJSON(), HashAlgorithm)),
-                         ("parkingSpaces",             Leaves(ChargingStationOperator.ParkingSpaces,             value => value.ToJSON(), HashAlgorithm)) ],
+                                                              value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.EVSETemplates,             Leaves(ChargingStationOperator.EVSETemplates,             value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.ChargingStationTemplates,  Leaves(ChargingStationOperator.ChargingStationTemplates,  value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.ChargingPoolTemplates,     Leaves(ChargingStationOperator.ChargingPoolTemplates,     value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.ChargingTariffTemplates,   Leaves(ChargingStationOperator.ChargingTariffTemplates,   value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.EnergyMeterTemplates,      Leaves(ChargingStationOperator.EnergyMeterTemplates,      value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.EVSEGroups,                Leaves(ChargingStationOperator.EVSEGroups,                value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.ChargingStationGroups,     Leaves(ChargingStationOperator.ChargingStationGroups,     value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.ChargingPoolGroups,        Leaves(ChargingStationOperator.ChargingPoolGroups,        value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.ChargingTariffGroups,      Leaves(ChargingStationOperator.ChargingTariffGroups,      value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.EnergyMeterGroups,         Leaves(ChargingStationOperator.EnergyMeterGroups,         value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.ChargingTariffOffers,      Leaves(ChargingStationOperator.ChargingTariffOffers,      value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ChargingStationOperator.PropertyKeys.ParkingSpaces,             Leaves(ChargingStationOperator.ParkingSpaces,             value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
 
                        HashAlgorithm);
 
@@ -208,14 +208,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Kept(EMobilityProvider, HashAlgorithm, () => Node(
 
-                   "eMobilityProviders",
+                   RoamingNetwork.PropertyKeys.EMobilityProviders,
 
-                   EMobilityProvider.ToJSON(IncludeChildArrays: false),
+                   EMobilityProvider.ToJSON(Embedded: true, CustomEMobilityProviderSerializer: null, IncludeChildArrays: false),
 
-                   [ ("EVSEGroups",             Leaves(EMobilityProvider.EVSEGroups,             value => value.ToJSON(), HashAlgorithm)),
-                     ("chargingStationGroups",  Leaves(EMobilityProvider.ChargingStationGroups,  value => value.ToJSON(), HashAlgorithm)),
-                     ("chargingPoolGroups",     Leaves(EMobilityProvider.ChargingPoolGroups,     value => value.ToJSON(), HashAlgorithm)),
-                     ("chargingTariffOffers",   Leaves(EMobilityProvider.ChargingTariffOffers,   value => value.ToJSON(), HashAlgorithm)) ],
+                   [ (EMobilityProvider.PropertyKeys.EVSEGroups,             Leaves(EMobilityProvider.EVSEGroups,             value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                     (EMobilityProvider.PropertyKeys.ChargingStationGroups,  Leaves(EMobilityProvider.ChargingStationGroups,  value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                     (EMobilityProvider.PropertyKeys.ChargingPoolGroups,     Leaves(EMobilityProvider.ChargingPoolGroups,     value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                     (EMobilityProvider.PropertyKeys.ChargingTariffOffers,   Leaves(EMobilityProvider.ChargingTariffOffers,   value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
 
                    HashAlgorithm));
 
@@ -228,13 +228,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Kept(GridOperator, HashAlgorithm, () => Node(
 
-                   "gridOperators",
+                   RoamingNetwork.PropertyKeys.GridOperators,
 
                    GridOperator.ToJSON(IncludeChildArrays: false),
 
-                   [ ("gridConnectionPoints",  Leaves(GridOperator.GridConnectionPoints.Select(GridOperator.EffectiveGridConnectionPoint), value => value.ToJSON(), HashAlgorithm)),
-                     ("energyMeterTemplates",  Leaves(GridOperator.EnergyMeterTemplates,  value => value.ToJSON(), HashAlgorithm)),
-                     ("energyMeterGroups",     Leaves(GridOperator.EnergyMeterGroups,     value => value.ToJSON(), HashAlgorithm)) ],
+                   [ (GridOperator.PropertyKeys.GridConnectionPoints,  Leaves(GridOperator.GridConnectionPoints.Select(GridOperator.EffectiveGridConnectionPoint), value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                     (GridOperator.PropertyKeys.EnergyMeterTemplates,  Leaves(GridOperator.EnergyMeterTemplates,  value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                     (GridOperator.PropertyKeys.EnergyMeterGroups,     Leaves(GridOperator.EnergyMeterGroups,     value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
 
                    HashAlgorithm));
 
@@ -251,19 +251,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    return Node(
 
-                       "parkingOperators",
+                       RoamingNetwork.PropertyKeys.ParkingOperators,
 
                        ParkingOperator.ToJSON(IncludeChildArrays: false),
 
-                       [ ("parkingGarages",         Leaves(ParkingOperator.ParkingGarages,         value => value.ToJSON(), HashAlgorithm)),
-                         ("parkingSpaces",          Leaves(ParkingOperator.ParkingSpaces.Select(parkingSpace => effectiveSpaces.TryGetValue(parkingSpace.Id, out var effectiveSpace)
+                       [ (ParkingOperator.PropertyKeys.ParkingGarages,         Leaves(ParkingOperator.ParkingGarages,         value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ParkingOperator.PropertyKeys.ParkingSpaces,          Leaves(ParkingOperator.ParkingSpaces.Select(parkingSpace => effectiveSpaces.TryGetValue(parkingSpace.Id, out var effectiveSpace)
                                                                                                                     ? effectiveSpace
                                                                                                                     : parkingSpace),
-                                                           value => value.ToJSON(), HashAlgorithm)),
-                         ("parkingSensors",         Leaves(ParkingOperator.ParkingSensors,         value => value.ToJSON(), HashAlgorithm)),
-                         ("parkingSpaceTemplates",  Leaves(ParkingOperator.ParkingSpaceTemplates,  value => value.ToJSON(), HashAlgorithm)),
-                         ("parkingSpaceGroups",     Leaves(ParkingOperator.ParkingSpaceGroups,     value => value.ToJSON(), HashAlgorithm)),
-                         ("parkingProducts",        Leaves(ParkingOperator.ParkingProducts,        value => value.ToJSON(), HashAlgorithm)) ],
+                                                           value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ParkingOperator.PropertyKeys.ParkingSensors,         Leaves(ParkingOperator.ParkingSensors,         value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ParkingOperator.PropertyKeys.ParkingSpaceTemplates,  Leaves(ParkingOperator.ParkingSpaceTemplates,  value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ParkingOperator.PropertyKeys.ParkingSpaceGroups,     Leaves(ParkingOperator.ParkingSpaceGroups,     value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                         (ParkingOperator.PropertyKeys.ParkingProducts,        Leaves(ParkingOperator.ParkingProducts,        value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
 
                        HashAlgorithm);
 
@@ -281,10 +281,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => KeptDigest(ChargingPool, HashAlgorithm, () => {
 
-                   var json = ChargingPool.ToJSON(IncludeChildArrays: false);
+                   var json = ChargingPool.ToJSON(Embedded: true, IncludeChildArrays: false);
 
                    if (ChargingPool.ChargingStations.Count > 0)
-                       json["chargingStations"] = Pruned([ .. ChargingPool.ChargingStations.Select(chargingStation => DigestOf(chargingStation, HashAlgorithm)) ], HashAlgorithm);
+                       json[ChargingPool.PropertyKeys.ChargingStations] = Pruned([ .. ChargingPool.ChargingStations.Select(chargingStation => DigestOf(chargingStation, HashAlgorithm)) ], HashAlgorithm);
 
                    return POIMerkleTree.LeafHash(HashAlgorithm, CanonicalJSON.ToUTF8Bytes(json));
 
@@ -302,10 +302,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => KeptDigest(ChargingStation, HashAlgorithm, () => {
 
-                   var json = ChargingStation.ToJSON(IncludeChildArrays: false);
+                   var json = ChargingStation.ToJSON(Embedded: true, CustomChargingStationSerializer: null, IncludeChildArrays: false);
 
                    if (ChargingStation.EVSEs.Count > 0)
-                       json["EVSEs"] = Pruned(Leaves(ChargingStation.EVSEs, evse => evse.ToJSON(), HashAlgorithm), HashAlgorithm);
+                       json[ChargingStation.PropertyKeys.EVSEs] = Pruned(Leaves(ChargingStation.EVSEs, evse => evse.ToJSON(Embedded: true), HashAlgorithm), HashAlgorithm);
 
                    return POIMerkleTree.LeafHash(HashAlgorithm, CanonicalJSON.ToUTF8Bytes(json));
 
@@ -343,7 +343,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             return new POITreeNode(Kind,
-                                   JSON["@id"]?.Type == JTokenType.String ? JSON["@id"]!.Value<String>() : null,
+                                   JSON[POIEffectiveTree.PropertyKeys.Id]?.Type == JTokenType.String ? JSON[POIEffectiveTree.PropertyKeys.Id]!.Value<String>() : null,
                                    POIMerkleTree.LeafHash(HashAlgorithm, CanonicalJSON.ToUTF8Bytes(JSON)),
                                    JSON,
                                    arrays);
@@ -363,7 +363,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             ETagHashAlgorithm  HashAlgorithm)
 
             => new (Kind,
-                    JSON["@id"]?.Type == JTokenType.String ? JSON["@id"]!.Value<String>() : null,
+                    JSON[POIEffectiveTree.PropertyKeys.Id]?.Type == JTokenType.String ? JSON[POIEffectiveTree.PropertyKeys.Id]!.Value<String>() : null,
                     KeptDigest(Entity, HashAlgorithm, () => POIMerkleTree.LeafHash(HashAlgorithm, CanonicalJSON.ToUTF8Bytes(JSON))),
                     JSON,
                     new Dictionary<String, POITreeArray>());

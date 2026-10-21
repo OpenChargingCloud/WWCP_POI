@@ -36,7 +36,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class RoamingNetworkCheckpointProof
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkCheckpointProof";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context       = "@context";
+
+            /// <summary>
+            /// The property of the identification of its checkpoint.
+            /// </summary>
+            public const String  CheckpointId  = "checkpointId";
+
+            /// <summary>
+            /// The property of the leaf of its commit: { commitId, eTags, revision }.
+            /// </summary>
+            public const String  Leaf          = "leaf";
+
+            /// <summary>
+            /// The property of the index of the leaf.
+            /// </summary>
+            public const String  Index         = "@index";
+
+            /// <summary>
+            /// The property of the number of commits of the checkpoint.
+            /// </summary>
+            public const String  Size          = "@size";
+
+            /// <summary>
+            /// The property of the audit path of the leaf.
+            /// </summary>
+            public const String  AuditPath     = "@auditPath";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The checkpoint the commit is proved to be part of.
@@ -166,24 +218,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!RoamingNetworkCheckpoint_Id.TryParse(JSON["checkpointId"]?.Value<String>() ?? "", out var checkpointId))
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the proof of a commit must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!RoamingNetworkCheckpoint_Id.TryParse(JSON[PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var checkpointId))
                 {
                     ErrorResponse = "Missing or invalid checkpoint identification!";
                     return false;
                 }
 
-                if (JSON["leaf"] is not JObject leaf ||
-                    !RoamingNetworkCommit_Id.TryParse(leaf["commitId"]?.Value<String>() ?? "", out var commitId) ||
-                    leaf["eTags"] is not JArray eTagsJSON ||
-                    leaf["revision"] is not JValue { Type: JTokenType.Integer } revision)
+                if (JSON[PropertyKeys.Leaf] is not JObject leaf ||
+                    !RoamingNetworkCommit_Id.TryParse(leaf[RoamingNetworkCheckpoint.PropertyKeys.CommitId]?.Value<String>() ?? "", out var commitId) ||
+                    leaf[RoamingNetworkCheckpoint.PropertyKeys.ETags] is not JArray eTagsJSON ||
+                    leaf[RoamingNetworkCheckpoint.PropertyKeys.Revision] is not JValue { Type: JTokenType.Integer } revision)
                 {
                     ErrorResponse = "The leaf must be { commitId, eTags, revision }!";
                     return false;
                 }
 
-                if (JSON["@index"]     is not JValue { Type: JTokenType.Integer } index ||
-                    JSON["@size"]      is not JValue { Type: JTokenType.Integer } size  ||
-                    JSON["@auditPath"] is not JArray auditPath)
+                if (JSON[PropertyKeys.Index]     is not JValue { Type: JTokenType.Integer } index ||
+                    JSON[PropertyKeys.Size]      is not JValue { Type: JTokenType.Integer } size  ||
+                    JSON[PropertyKeys.AuditPath] is not JArray auditPath)
                 {
                     ErrorResponse = "A proof needs @index, @size and @auditPath!";
                     return false;
@@ -212,20 +271,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomCheckpointProofSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this proof.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomCheckpointProofSerializer">An optional custom serializer of proofs of commits.</param>
+        public JObject ToJSON(Boolean                                                          Embedded                          = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkCheckpointProof>?  CustomCheckpointProofSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("checkpointId",  CheckpointId.ToString()),
-                   new JProperty("leaf",          RoamingNetworkCheckpoint.LeafJSON(CommitId, ETags, Revision)),
-                   new JProperty("@index",        Index),
-                   new JProperty("@size",         Size),
-                   new JProperty("@auditPath",    new JArray(AuditPath.Select(hash => Convert.ToHexStringLower(hash))))
-               );
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,       JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.CheckpointId,  CheckpointId.ToString()),
+                                 new JProperty(PropertyKeys.Leaf,          RoamingNetworkCheckpoint.LeafJSON(CommitId, ETags, Revision)),
+                                 new JProperty(PropertyKeys.Index,         Index),
+                                 new JProperty(PropertyKeys.Size,          Size),
+                                 new JProperty(PropertyKeys.AuditPath,     new JArray(AuditPath.Select(hash => Convert.ToHexStringLower(hash))))
+
+                       );
+
+            return CustomCheckpointProofSerializer is not null
+                       ? CustomCheckpointProofSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 

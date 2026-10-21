@@ -151,7 +151,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       : (UInt32) segments.Count + 1;
 
             var baseJSON        = SnapshotJSON(oldRoot, rootVersion, rootVersion);
-            baseJSON.Remove("runtimeStatus");
+            baseJSON.Remove(PropertyKeys.RuntimeStatus);
 
             currentArchive.Append(new RoamingNetworkArchiveSegment(
                                       new RoamingNetworkArchiveSegmentInfo(number,
@@ -230,7 +230,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var lookup = Segment.Commits.ToDictionary(commit => commit.Id);
 
-            if (Segment.Base["commit"] is Newtonsoft.Json.Linq.JObject rootJSON &&
+            if (Segment.Base[PropertyKeys.Commit] is Newtonsoft.Json.Linq.JObject rootJSON &&
                 RoamingNetworkCommit.TryParse(rootJSON, out var root, out _))
             {
                 lookup[root.Id] = root;

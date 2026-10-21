@@ -38,7 +38,88 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class TransparencySoftwareCertificate
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/transparencySoftwareCertificate";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                                  = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                             = "@context";
+
+            /// <summary>
+            /// The property of its issuer.
+            /// </summary>
+            public const String  Issuer                              = "issuer";
+
+            /// <summary>
+            /// The property of its charging station model.
+            /// </summary>
+            public const String  ChargingStationModel                = "chargingStationModel";
+
+            /// <summary>
+            /// The property of its charging station model version.
+            /// </summary>
+            public const String  ChargingStationModelVersion         = "chargingStationModelVersion";
+
+            /// <summary>
+            /// The property of its verified transparency software identifications.
+            /// </summary>
+            public const String  VerifiedTransparencySoftwareIds     = "verifiedTransparencySoftwareIds";
+
+            /// <summary>
+            /// The property of its compatible transparency software identifications.
+            /// </summary>
+            public const String  CompatibleTransparencySoftwareIds   = "compatibleTransparencySoftwareIds";
+
+            /// <summary>
+            /// The property of its charging station manufacturer identification.
+            /// </summary>
+            public const String  ChargingStationManufacturerId       = "chargingStationManufacturerId";
+
+            /// <summary>
+            /// The property of its document number.
+            /// </summary>
+            public const String  DocumentNumber                      = "documentNumber";
+
+            /// <summary>
+            /// The property of its document URL.
+            /// </summary>
+            public const String  DocumentURL                         = "documentURL";
+
+            /// <summary>
+            /// The property of its start of validity.
+            /// </summary>
+            public const String  NotBefore                           = "notBefore";
+
+            /// <summary>
+            /// The property of its end of validity.
+            /// </summary>
+            public const String  NotAfter                            = "notAfter";
+
+        }
+
+        #endregion
 
         /// <summary>
         /// The stable identity of this document.
@@ -220,27 +301,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                StrictJSON.OnlyProperties(JSON, "@id", "issuer", "chargingStationModel", "chargingStationModelVersion",
-                                                      "chargingStationManufacturerId", "documentNumber", "documentURL",
-                                                      "verifiedTransparencySoftwareIds", "compatibleTransparencySoftwareIds",
-                                                      "notBefore", "notAfter");
+                StrictJSON.OnlyProperties(JSON, PropertyKeys.Id, PropertyKeys.Context, PropertyKeys.Issuer, PropertyKeys.ChargingStationModel,
+                                                PropertyKeys.ChargingStationModelVersion, PropertyKeys.ChargingStationManufacturerId,
+                                                PropertyKeys.DocumentNumber, PropertyKeys.DocumentURL,
+                                                PropertyKeys.VerifiedTransparencySoftwareIds, PropertyKeys.CompatibleTransparencySoftwareIds,
+                                                PropertyKeys.NotBefore, PropertyKeys.NotAfter);
+
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    throw new ArgumentException($"The JSON-LD context of the transparency software certificate must be '{JSONLDContext}'!");
+                }
 
                 Certificate = new TransparencySoftwareCertificate(
-                                  Id:                                 TransparencySoftwareCertificate_Id.Parse(StrictJSON.RequiredText(JSON, "@id")),
-                                  Issuer:                             StrictJSON.RequiredText(JSON, "issuer"),
-                                  ChargingStationModel:               ChargingStationModel_Id.Parse(StrictJSON.RequiredText(JSON, "chargingStationModel")),
-                                  ChargingStationModelVersion:        StrictJSON.RequiredText(JSON, "chargingStationModelVersion"),
-                                  VerifiedTransparencySoftwareIds:    StrictJSON.Array(JSON, "verifiedTransparencySoftwareIds",
+                                  Id:                                 TransparencySoftwareCertificate_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.Id)),
+                                  Issuer:                             StrictJSON.RequiredText(JSON, PropertyKeys.Issuer),
+                                  ChargingStationModel:               ChargingStationModel_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationModel)),
+                                  ChargingStationModelVersion:        StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationModelVersion),
+                                  VerifiedTransparencySoftwareIds:    StrictJSON.Array(JSON, PropertyKeys.VerifiedTransparencySoftwareIds,
                                                                                              token => TransparencySoftware_Id.Parse(StrictJSON.Identifier(token))),
-                                  CompatibleTransparencySoftwareIds:  StrictJSON.Array(JSON, "compatibleTransparencySoftwareIds",
+                                  CompatibleTransparencySoftwareIds:  StrictJSON.Array(JSON, PropertyKeys.CompatibleTransparencySoftwareIds,
                                                                                              token => TransparencySoftware_Id.Parse(StrictJSON.Identifier(token))),
-                                  ChargingStationManufacturerId:      StrictJSON.Text(JSON, "chargingStationManufacturerId") is { } manufacturerId
+                                  ChargingStationManufacturerId:      StrictJSON.Text(JSON, PropertyKeys.ChargingStationManufacturerId) is { } manufacturerId
                                                                           ? ChargingStationManufacturer_Id.Parse(manufacturerId)
                                                                           : null,
-                                  DocumentNumber:                     StrictJSON.Text(JSON, "documentNumber"),
-                                  DocumentURL:                        StrictJSON.Link(JSON, "documentURL"),
-                                  NotBefore:                          StrictJSON.Date(JSON, "notBefore"),
-                                  NotAfter:                           StrictJSON.Date(JSON, "notAfter")
+                                  DocumentNumber:                     StrictJSON.Text(JSON, PropertyKeys.DocumentNumber),
+                                  DocumentURL:                        StrictJSON.Link(JSON, PropertyKeys.DocumentURL),
+                                  NotBefore:                          StrictJSON.Date(JSON, PropertyKeys.NotBefore),
+                                  NotAfter:                           StrictJSON.Date(JSON, PropertyKeys.NotAfter)
                               );
 
                 return true;
@@ -257,47 +345,57 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomTransparencySoftwareCertificateSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this document. Software releases are referenced
         /// by their identifications, in ordinal order.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomTransparencySoftwareCertificateSerializer">A delegate to serialize custom transparency software certificate JSON objects.</param>
+        public JObject ToJSON(Boolean                                                            Embedded                                          = false,
+                              CustomJObjectSerializerDelegate<TransparencySoftwareCertificate>?  CustomTransparencySoftwareCertificateSerializer   = null)
         {
 
             var json = JSONObject.Create(
 
-                                 new JProperty("@id",                                Id.ToString()),
-                                 new JProperty("issuer",                             Issuer),
-                                 new JProperty("chargingStationModel",               ChargingStationModel.ToString()),
-                                 new JProperty("chargingStationModelVersion",        ChargingStationModelVersion),
-                                 new JProperty("verifiedTransparencySoftwareIds",    new JArray(VerifiedTransparencySoftwareIds.  Select(id => id.ToString()).Order(StringComparer.Ordinal))),
-                                 new JProperty("compatibleTransparencySoftwareIds",  new JArray(CompatibleTransparencySoftwareIds.Select(id => id.ToString()).Order(StringComparer.Ordinal))),
+                                 new JProperty(PropertyKeys.Id,                                  Id.ToString()),
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,                             JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Issuer,                              Issuer),
+                                 new JProperty(PropertyKeys.ChargingStationModel,                ChargingStationModel.ToString()),
+                                 new JProperty(PropertyKeys.ChargingStationModelVersion,         ChargingStationModelVersion),
+                                 new JProperty(PropertyKeys.VerifiedTransparencySoftwareIds,     new JArray(VerifiedTransparencySoftwareIds.  Select(id => id.ToString()).Order(StringComparer.Ordinal))),
+                                 new JProperty(PropertyKeys.CompatibleTransparencySoftwareIds,   new JArray(CompatibleTransparencySoftwareIds.Select(id => id.ToString()).Order(StringComparer.Ordinal))),
 
                            ChargingStationManufacturerId.HasValue
-                               ? new JProperty("chargingStationManufacturerId",      ChargingStationManufacturerId.Value.ToString())
+                               ? new JProperty(PropertyKeys.ChargingStationManufacturerId,       ChargingStationManufacturerId.Value.ToString())
                                : null,
 
                            DocumentNumber is not null
-                               ? new JProperty("documentNumber",                     DocumentNumber)
+                               ? new JProperty(PropertyKeys.DocumentNumber,                      DocumentNumber)
                                : null,
 
                            DocumentURL.HasValue
-                               ? new JProperty("documentURL",                        DocumentURL.Value.ToString())
+                               ? new JProperty(PropertyKeys.DocumentURL,                         DocumentURL.Value.ToString())
                                : null,
 
                            NotBefore.HasValue
-                               ? new JProperty("notBefore",                          NotBefore.Value.ToISO8601())
+                               ? new JProperty(PropertyKeys.NotBefore,                           NotBefore.Value.ToISO8601())
                                : null,
 
                            NotAfter.HasValue
-                               ? new JProperty("notAfter",                           NotAfter. Value.ToISO8601())
+                               ? new JProperty(PropertyKeys.NotAfter,                            NotAfter. Value.ToISO8601())
                                : null
 
                        );
 
-            return json;
+            return CustomTransparencySoftwareCertificateSerializer is not null
+                       ? CustomTransparencySoftwareCertificateSerializer(this, json)
+                       : json;
 
         }
 

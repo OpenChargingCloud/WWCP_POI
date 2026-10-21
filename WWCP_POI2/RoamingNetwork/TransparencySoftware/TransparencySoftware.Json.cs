@@ -50,19 +50,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ArgumentNullException.ThrowIfNull(JSON);
 
                 if (CustomTransparencySoftwareParser is null)
-                    StrictJSON.OnlyProperties(JSON, "@id", "name", "version", "openSourceLicenses", "vendor",
-                                                          "logo", "howToUse", "moreInformation", "sourceCodeRepository");
+                    StrictJSON.OnlyProperties(JSON, PropertyKeys.Id, PropertyKeys.Context, PropertyKeys.Name, PropertyKeys.Version,
+                                                    PropertyKeys.OpenSourceLicenses, PropertyKeys.Vendor, PropertyKeys.Logo,
+                                                    PropertyKeys.HowToUse, PropertyKeys.MoreInformation, PropertyKeys.SourceCodeRepository);
+
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    throw new ArgumentException($"The JSON-LD context of the transparency software must be '{JSONLDContext}'!");
+                }
 
                 var transparencySoftware = new TransparencySoftware(
-                                               Id:                    TransparencySoftware_Id.Parse(StrictJSON.RequiredText(JSON, "@id")),
-                                               Name:                  StrictJSON.RequiredName(JSON, "name"),
-                                               Version:               TransparencySoftwareVersion.Parse(StrictJSON.RequiredText(JSON, "version")),
-                                               OpenSourceLicenses:    TransparencyJSON.Licenses(JSON, "openSourceLicenses"),
-                                               Vendor:                StrictJSON.RequiredText(JSON, "vendor"),
-                                               Logo:                  StrictJSON.Link(JSON, "logo"),
-                                               HowToUse:              StrictJSON.Link(JSON, "howToUse"),
-                                               MoreInformation:       StrictJSON.Link(JSON, "moreInformation"),
-                                               SourceCodeRepository:  StrictJSON.Link(JSON, "sourceCodeRepository")
+                                               Id:                    TransparencySoftware_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.Id)),
+                                               Name:                  StrictJSON.RequiredName(JSON, PropertyKeys.Name),
+                                               Version:               TransparencySoftwareVersion.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.Version)),
+                                               OpenSourceLicenses:    TransparencyJSON.Licenses(JSON, PropertyKeys.OpenSourceLicenses),
+                                               Vendor:                StrictJSON.RequiredText(JSON, PropertyKeys.Vendor),
+                                               Logo:                  StrictJSON.Link(JSON, PropertyKeys.Logo),
+                                               HowToUse:              StrictJSON.Link(JSON, PropertyKeys.HowToUse),
+                                               MoreInformation:       StrictJSON.Link(JSON, PropertyKeys.MoreInformation),
+                                               SourceCodeRepository:  StrictJSON.Link(JSON, PropertyKeys.SourceCodeRepository)
                                            );
 
                 TransparencySoftware = CustomTransparencySoftwareParser is null

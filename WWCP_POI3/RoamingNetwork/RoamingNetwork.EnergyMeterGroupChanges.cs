@@ -50,25 +50,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// and its public keys.
         /// </summary>
         internal static readonly ImmutableArray<String> EnergyMeterTemplateMeterProperties = [
-            "role",
-            "manufacturerId",
-            "modelId",
-            "modelURL",
-            "hardwareVersion",
-            "firmwareVersion",
-            "transparencySoftwareStatus",
-            "signatureMethods"
+            EnergyMeter.PropertyKeys.Role,
+            EnergyMeter.PropertyKeys.ManufacturerId,
+            EnergyMeter.PropertyKeys.ModelId,
+            EnergyMeter.PropertyKeys.ModelURL,
+            EnergyMeter.PropertyKeys.HardwareVersion,
+            EnergyMeter.PropertyKeys.FirmwareVersion,
+            EnergyMeter.PropertyKeys.TransparencySoftwareStatus,
+            EnergyMeter.PropertyKeys.SignatureMethods
         ];
 
         /// <summary>
         /// The properties of an energy meter group a change set can update or remove: its members, as it gives them nothing.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableEnergyMeterGroupProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "energyMeterIds",
-            "customData"
+            EnergyMeterGroup.BasePropertyKeys.Name,
+            EnergyMeterGroup.BasePropertyKeys.Description,
+            EnergyMeterGroup.BasePropertyKeys.DataSource,
+            EnergyMeterGroup.PropertyKeys.EnergyMeterIds,
+            EnergyMeterGroup.BasePropertyKeys.CustomData
         ];
 
         /// <summary>
@@ -76,22 +76,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// its members.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableEnergyMeterTemplateProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "customData",
+            EnergyMeterTemplate.PropertyKeys.Name,
+            EnergyMeterTemplate.PropertyKeys.Description,
+            EnergyMeterTemplate.PropertyKeys.DataSource,
+            EnergyMeterTemplate.PropertyKeys.CustomData,
             .. EnergyMeterTemplateMeterProperties
         ];
 
         /// <summary>
         /// The JSON key of the energy meter groups of their owners.
         /// </summary>
-        private const String EnergyMeterGroupsProperty     = "energyMeterGroups";
+        private const String EnergyMeterGroupsProperty     = ChargingStationOperator.PropertyKeys.EnergyMeterGroups;
 
         /// <summary>
         /// The JSON key of the energy meter templates of their owners.
         /// </summary>
-        private const String EnergyMeterTemplatesProperty  = "energyMeterTemplates";
+        private const String EnergyMeterTemplatesProperty  = ChargingStationOperator.PropertyKeys.EnergyMeterTemplates;
 
         /// <summary>
         /// What a change of an energy meter template or group needs to know of its kind.
@@ -294,12 +294,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var ownerJSON   = chargingStationOperator is not null
                                   ? chargingStationOperator.ToEmbeddedJSON()
-                                  : gridOperator!.          ToJSON();
+                                  : gridOperator!.          ToJSON(Embedded: true);
             var children    = ownerJSON[Kind.Property] as JArray;
             // Found under the identification it is kept with: the change may name it in another spelling.
             var entityJSON  = Change.Kind == RoamingNetworkChangeKind.Add
                                   ? null
-                                  : children?.OfType<JObject>().FirstOrDefault(child => child["@id"]?.Value<String>() == storedId);
+                                  : children?.OfType<JObject>().FirstOrDefault(child => child[BasePropertyKeys.Id]?.Value<String>() == storedId);
 
             #endregion
 
@@ -360,7 +360,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         entityJSON![propertyName] = Change.NewValue;
 
                     // The change set's timestamp is the last change, so that its after ETags are deterministic.
-                    entityJSON["lastChange"] = CreatedAt.ToISO8601();
+                    entityJSON[BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
                     break;
 
                 #endregion
@@ -370,8 +370,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 case RoamingNetworkChangeKind.Add:
 
                     if (Change.NewValue is not JObject newEntity ||
-                        newEntity["@id"]?.Type != JTokenType.String ||
-                        newEntity["@id"]!.Value<String>() != entityId)
+                        newEntity[BasePropertyKeys.Id]?.Type != JTokenType.String ||
+                        newEntity[BasePropertyKeys.Id]!.Value<String>() != entityId)
                     {
                         ErrorResponse = $"Change {Index}: the {description} to add must be a JSON object with the identification '{entityId}'!";
                         return false;
@@ -386,8 +386,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     // The change set's timestamp is the last change and, unless given, the creation,
                     // so that its after ETags are deterministic.
                     var added = (JObject) newEntity.DeepClone();
-                    added["created"]    ??= CreatedAt.ToISO8601();
-                    added["lastChange"]   = CreatedAt.ToISO8601();
+                    added[BasePropertyKeys.Created]    ??= CreatedAt.ToISO8601();
+                    added[BasePropertyKeys.LastChange]   = CreatedAt.ToISO8601();
 
                     children.Add(added);
                     break;
@@ -414,7 +414,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // The owner embedding it changed with it, at the time of the change set.
-            ownerJSON["lastChange"] = CreatedAt.ToISO8601();
+            ownerJSON[BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
 
             #region The changed owner must still be a valid one
 

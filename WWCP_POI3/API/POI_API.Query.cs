@@ -207,7 +207,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                        () => operatorId.HasValue
                                                                  ? [.. index.Entries.Where(entry => entry.Operator.Id == operatorId.Value)]
                                                                  : index.Entries,
-                                                       entry => SearchTextOf(entry.Pool, entry.Pool.ToJSON) + "\n" + SearchTextOf(entry.Operator, () => OperatorSummary(entry.Operator)),
+                                                       entry => SearchTextOf(entry.Pool, () => entry.Pool.ToJSON(Embedded: true)) + "\n" + SearchTextOf(entry.Operator, () => OperatorSummary(entry.Operator)),
                                                        entries => new JArray(entries.Select(PoolQueryJSON)),
                                                        format => index.Representations.GetOrAdd("pools", format, () => POIRepresentation.Of(new JArray(index.Entries.Select(PoolQueryJSON)), format)),
                                                        index.Entries.Count);
@@ -243,9 +243,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static JObject PoolQueryJSON(PoolEntry Entry)
         {
 
-            var json = Entry.Pool.ToJSON();
+            var json = Entry.Pool.ToJSON(Embedded: true);
 
-            json.Add("chargingStationOperator", OperatorSummary(Entry.Operator));
+            json.Add(PropertyKeys.ChargingStationOperator, OperatorSummary(Entry.Operator));
 
             return json;
 
@@ -259,11 +259,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("@id", Operator.Id.ToString())
+                           new JProperty(POI.RoamingNetwork.BasePropertyKeys.Id, Operator.Id.ToString())
                        );
 
             if (Operator.Name.IsNotNullOrEmpty())
-                json.Add("name", Operator.Name.ToJSON());
+                json.Add(POI.RoamingNetwork.BasePropertyKeys.Name, Operator.Name.ToJSON());
 
             return json;
 

@@ -89,7 +89,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               IComparable
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/evseEnergyStatus";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context      = "@context";
+
+            /// <summary>
+            /// The property of its EVSE identification.
+            /// </summary>
+            public const String  Id           = "id";
+
+            /// <summary>
+            /// The property of its energy information.
+            /// </summary>
+            public const String  EnergyInfo   = "energyInfo";
+
+            /// <summary>
+            /// The property of its timestamp.
+            /// </summary>
+            public const String  Timestamp    = "timestamp";
+
+        }
+
+        #endregion
 
         /// <summary>
         /// The unique identification of the EVSE.
@@ -224,9 +265,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                #region Check JSON-LD context [optional]
+
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the EVSE energy status must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Id            [mandatory]
 
-                if (!JSON.ParseMandatory("id",
+                if (!JSON.ParseMandatory(PropertyKeys.Id,
                                          "EVSE identification",
                                          EVSE_Id.TryParse,
                                          out EVSE_Id id,
@@ -239,7 +291,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse EnergyInfo    [mandatory]
 
-                if (!JSON.ParseMandatoryJSON("energyInfo",
+                if (!JSON.ParseMandatoryJSON(PropertyKeys.EnergyInfo,
                                              "energy information",
                                              (JObject json, out EnergyInfo value, out String? error) => POI.EnergyInfo.TryParse(json, out value, out error),
                                              out EnergyInfo energyInfo,
@@ -252,7 +304,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Timestamp     [mandatory]
 
-                if (!JSON.ParseMandatory("timestamp",
+                if (!JSON.ParseMandatory(PropertyKeys.Timestamp,
                                          "timestamp",
                                          out DateTimeOffset timestamp,
                                          out ErrorResponse))
@@ -288,19 +340,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomEVSEEnergyStatusSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this object.
         /// The timestamp is written in UTC with millisecond precision.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomEVSEEnergyStatusSerializer">A delegate to serialize custom EVSE energy status JSON objects.</param>
+        public JObject ToJSON(Boolean                                             Embedded                           = false,
+                              CustomJObjectSerializerDelegate<EVSEEnergyStatus>?  CustomEVSEEnergyStatusSerializer   = null)
+        {
 
-            => JSONObject.Create(
-                   new JProperty("id",           Id.        ToString()),
-                   new JProperty("energyInfo",   EnergyInfo.ToJSON(Embedded: true)),
-                   new JProperty("timestamp",    Timestamp. ToISO8601())
-               );
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,      JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Id,           Id.        ToString()),
+                                 new JProperty(PropertyKeys.EnergyInfo,   EnergyInfo.ToJSON(Embedded: true)),
+                                 new JProperty(PropertyKeys.Timestamp,    Timestamp. ToISO8601())
+
+                       );
+
+            return CustomEVSEEnergyStatusSerializer is not null
+                       ? CustomEVSEEnergyStatusSerializer(this, json)
+                       : json;
+
+        }
 
         #endregion
 

@@ -58,16 +58,73 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           String  Digest)
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkAttestationSubject";
+
+        #endregion
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context     = "@context";
+
+            /// <summary>
+            /// The property of the type of its entity.
+            /// </summary>
+            public const String  EntityType  = "entityType";
+
+            /// <summary>
+            /// The property of the identification of its entity.
+            /// </summary>
+            public const String  EntityId    = "entityId";
+
+            /// <summary>
+            /// The property of the digest of its entity.
+            /// </summary>
+            public const String  Digest      = "digest";
+
+        }
+
+        #endregion
+
         /// <summary>
         /// The JSON representation of this subject.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomAttestationSubjectSerializer">An optional custom serializer of subjects of attestations.</param>
+        public JObject ToJSON(Boolean                                                             Embedded                             = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkAttestationSubject>?  CustomAttestationSubjectSerializer   = null)
+        {
 
-            => new (
-                   new JProperty("entityType",  EntityType),
-                   new JProperty("entityId",    EntityId),
-                   new JProperty("digest",      Digest)
-               );
+            var json = JSONObject.Create(
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,     JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.EntityType,  EntityType),
+                                 new JProperty(PropertyKeys.EntityId,    EntityId),
+                                 new JProperty(PropertyKeys.Digest,      Digest)
+
+                       );
+
+            return CustomAttestationSubjectSerializer is not null
+                       ? CustomAttestationSubjectSerializer(this, json)
+                       : json;
+
+        }
 
     }
 
@@ -85,11 +142,104 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The profile of the signature of an attestation.
         /// </summary>
-        public const String SigningProfile = "wwcp-poi-attestation-v1";
+        public const String SigningProfile  = "wwcp-poi-attestation-v1";
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkAttestation";
 
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context           = "@context";
+
+            /// <summary>
+            /// The property of the identification of its roaming network.
+            /// </summary>
+            public const String  RoamingNetworkId  = "roamingNetworkId";
+
+            /// <summary>
+            /// The property of the identification of the commit of the attested version.
+            /// </summary>
+            public const String  CommitId          = "commitId";
+
+            /// <summary>
+            /// The property of the revision of the commit.
+            /// </summary>
+            public const String  Revision          = "revision";
+
+            /// <summary>
+            /// The property of the effectiveTree ETag of the attested version.
+            /// </summary>
+            public const String  ETag              = "eTag";
+
+            /// <summary>
+            /// The property of the role of its signer.
+            /// </summary>
+            public const String  Role              = "role";
+
+            /// <summary>
+            /// The property of the optional name of its signer.
+            /// </summary>
+            public const String  Signer            = "signer";
+
+            /// <summary>
+            /// The property of its signing timestamp.
+            /// </summary>
+            public const String  SignedAt          = "signedAt";
+
+            /// <summary>
+            /// The property of the end of its validity.
+            /// </summary>
+            public const String  ValidUntil        = "validUntil";
+
+            /// <summary>
+            /// The property of the one entity it attests instead of the root.
+            /// </summary>
+            public const String  Subject           = "subject";
+
+            /// <summary>
+            /// The property of its signature algorithm.
+            /// </summary>
+            public const String  Algorithm         = "algorithm";
+
+            /// <summary>
+            /// The property of the identification of its key.
+            /// </summary>
+            public const String  KeyId             = "keyId";
+
+            /// <summary>
+            /// The property of its signature value.
+            /// </summary>
+            public const String  Value             = "value";
+
+            /// <summary>
+            /// The property of the profile of its signature.
+            /// </summary>
+            public const String  Profile           = "profile";
+
+            /// <summary>
+            /// The property of the encoding of its signature value.
+            /// </summary>
+            public const String  Encoding          = "encoding";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The roaming network.
@@ -362,10 +512,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = Content();
 
-            json.AddFirst(new JProperty("encoding",  "base64"));
-            json.AddFirst(new JProperty("keyId",     KeyId));
-            json.AddFirst(new JProperty("algorithm", Algorithm));
-            json.AddFirst(new JProperty("profile",   SigningProfile));
+            json.AddFirst(new JProperty(PropertyKeys.Encoding,   "base64"));
+            json.AddFirst(new JProperty(PropertyKeys.KeyId,      KeyId));
+            json.AddFirst(new JProperty(PropertyKeys.Algorithm,  Algorithm));
+            json.AddFirst(new JProperty(PropertyKeys.Profile,    SigningProfile));
 
             return CanonicalJSON.ToUTF8Bytes(json);
 
@@ -423,7 +573,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory("roamingNetworkId",
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the attestation must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                if (!JSON.ParseMandatory(PropertyKeys.RoamingNetworkId,
                                          "roaming network identification",
                                          RoamingNetwork_Id.TryParse,
                                          out RoamingNetwork_Id roamingNetworkId,
@@ -432,20 +589,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!RoamingNetworkCommit_Id.TryParse(Text(JSON, "commitId") ?? "", out var commitId))
+                if (!RoamingNetworkCommit_Id.TryParse(Text(JSON, PropertyKeys.CommitId) ?? "", out var commitId))
                 {
                     ErrorResponse = "Missing or invalid commit identification!";
                     return false;
                 }
 
-                if (JSON["revision"] is not JValue { Type: JTokenType.Integer } revisionJSON ||
+                if (JSON[PropertyKeys.Revision] is not JValue { Type: JTokenType.Integer } revisionJSON ||
                     revisionJSON.Value<Decimal>() < 0 || revisionJSON.Value<Decimal>() > UInt64.MaxValue)
                 {
                     ErrorResponse = "Missing or invalid revision!";
                     return false;
                 }
 
-                if (JSON["eTag"] is not JArray eTagJSON)
+                if (JSON[PropertyKeys.ETag] is not JArray eTagJSON)
                 {
                     ErrorResponse = "The ETag must be an effectiveTree ETag in hex!";
                     return false;
@@ -459,12 +616,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (Text(JSON, "role")      is not String role      || role.     Length == 0 ||
-                    Text(JSON, "algorithm") is not String algorithm || algorithm.Length == 0 ||
-                    Text(JSON, "keyId")     is not String keyId     || keyId.    Length == 0 ||
-                    Text(JSON, "value")     is not String value     || value.    Length == 0 ||
-                    Text(JSON, "profile")   is not String profile   ||
-                    Text(JSON, "encoding")  is not String encoding)
+                if (Text(JSON, PropertyKeys.Role)      is not String role      || role.     Length == 0 ||
+                    Text(JSON, PropertyKeys.Algorithm) is not String algorithm || algorithm.Length == 0 ||
+                    Text(JSON, PropertyKeys.KeyId)     is not String keyId     || keyId.    Length == 0 ||
+                    Text(JSON, PropertyKeys.Value)     is not String value     || value.    Length == 0 ||
+                    Text(JSON, PropertyKeys.Profile)   is not String profile   ||
+                    Text(JSON, PropertyKeys.Encoding)  is not String encoding)
                 {
                     ErrorResponse = "An attestation requires a role, an algorithm, a key identification, a value, a profile and an encoding!";
                     return false;
@@ -472,7 +629,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 String? signer = null;
 
-                if (JSON["signer"] is JToken signerJSON)
+                if (JSON[PropertyKeys.Signer] is JToken signerJSON)
                 {
 
                     if (signerJSON.Type != JTokenType.String)
@@ -485,13 +642,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                if (!TryParseTimestamp(JSON, "signedAt", out var signedAt) || !signedAt.HasValue)
+                if (!TryParseTimestamp(JSON, PropertyKeys.SignedAt, out var signedAt) || !signedAt.HasValue)
                 {
                     ErrorResponse = "The signing timestamp must be written as yyyy-MM-ddTHH:mm:ss.fffZ!";
                     return false;
                 }
 
-                if (!TryParseTimestamp(JSON, "validUntil", out var validUntil))
+                if (!TryParseTimestamp(JSON, PropertyKeys.ValidUntil, out var validUntil))
                 {
                     ErrorResponse = "The end of the validity must be written as yyyy-MM-ddTHH:mm:ss.fffZ!";
                     return false;
@@ -499,14 +656,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 RoamingNetworkAttestationSubject? subject = null;
 
-                if (JSON["subject"] is JToken subjectJSON)
+                if (JSON[PropertyKeys.Subject] is JToken subjectJSON)
                 {
 
+                    // { entityType, entityId, digest }, and its JSON-LD context, if it names one.
                     if (subjectJSON is not JObject subjectObject ||
-                        subjectObject.Count != 3 ||
-                        Text(subjectObject, "entityType") is not String entityType || entityType.Length == 0 ||
-                        Text(subjectObject, "entityId")   is not String entityId   || entityId.  Length == 0 ||
-                        Text(subjectObject, "digest")     is not String digest     ||
+                        subjectObject.Count != (Text(subjectObject, RoamingNetworkAttestationSubject.PropertyKeys.Context) == RoamingNetworkAttestationSubject.JSONLDContext ? 4 : 3) ||
+                        Text(subjectObject, RoamingNetworkAttestationSubject.PropertyKeys.EntityType) is not String entityType || entityType.Length == 0 ||
+                        Text(subjectObject, RoamingNetworkAttestationSubject.PropertyKeys.EntityId)   is not String entityId   || entityId.  Length == 0 ||
+                        Text(subjectObject, RoamingNetworkAttestationSubject.PropertyKeys.Digest)     is not String digest     ||
                         digest.Length != 2 * ETag.DigestLength(eTag.HashAlgorithm) ||
                         digest.AsSpan().IndexOfAnyExcept("0123456789abcdef") >= 0)
                     {
@@ -588,36 +746,86 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomAttestationSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this attestation.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomAttestationSerializer">An optional custom serializer of attestations.</param>
+        public JObject ToJSON(Boolean                                                      Embedded                      = false,
+                              CustomJObjectSerializerDelegate<RoamingNetworkAttestation>?  CustomAttestationSerializer   = null)
         {
 
             var json = Content();
 
-            json.Add("algorithm",  Algorithm);
-            json.Add("keyId",      KeyId);
-            json.Add("value",      Value);
-            json.Add("profile",    Profile);
-            json.Add("encoding",   Encoding);
+            if (!Embedded)
+                json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
 
-            return json;
+            json.Add(PropertyKeys.Algorithm,  Algorithm);
+            json.Add(PropertyKeys.KeyId,      KeyId);
+            json.Add(PropertyKeys.Value,      Value);
+            json.Add(PropertyKeys.Profile,    Profile);
+            json.Add(PropertyKeys.Encoding,   Encoding);
+
+            return CustomAttestationSerializer is not null
+                       ? CustomAttestationSerializer(this, json)
+                       : json;
 
         }
 
         #endregion
 
-        #region ToCBOR()
+        #region ToCBOR(Embedded = false, CustomAttestationSerializer = null)
 
         /// <summary>
         /// Return the CBOR representation of this attestation: the keys and values of its JSON representation.
         /// </summary>
-        public CBORValue ToCBOR()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomAttestationSerializer">An optional custom serializer of attestations.</param>
+        public CBORValue ToCBOR(Boolean                                                   Embedded                      = false,
+                                CustomCBORSerializerDelegate<RoamingNetworkAttestation>?  CustomAttestationSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON());
+            var cbor = new CBORMap();
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Context),           CBORValue.FromText(JSONLDContext));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.RoamingNetworkId),      CBORValue.FromText(RoamingNetworkId.ToString()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.CommitId),              CBORValue.FromText(CommitId.ToString()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Revision),              CBORValue.FromUInt64(Revision));
+
+            // The ETag as in the JSON representation: an array of texts, its digest in hex.
+            cbor.Add(CBORValue.FromText(PropertyKeys.ETag),                  CBORJSON.ToCBOR(ETag.ToJSON()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Role),                  CBORValue.FromText(Role));
+
+            if (Signer is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Signer),            CBORValue.FromText(Signer));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.SignedAt),              CBORValue.FromText(SignedAt.ToISO8601()));
+
+            if (ValidUntil.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ValidUntil),        CBORValue.FromText(ValidUntil.Value.ToISO8601()));
+
+            if (Subject is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Subject),           new CBORMap {
+                                                                                 { CBORValue.FromText(RoamingNetworkAttestationSubject.PropertyKeys.EntityType),  CBORValue.FromText(Subject.EntityType) },
+                                                                                 { CBORValue.FromText(RoamingNetworkAttestationSubject.PropertyKeys.EntityId),    CBORValue.FromText(Subject.EntityId) },
+                                                                                 { CBORValue.FromText(RoamingNetworkAttestationSubject.PropertyKeys.Digest),      CBORValue.FromText(Subject.Digest) }
+                                                                             });
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.Algorithm),             CBORValue.FromText(Algorithm));
+            cbor.Add(CBORValue.FromText(PropertyKeys.KeyId),                 CBORValue.FromText(KeyId));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Value),                 CBORValue.FromText(Value));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Profile),               CBORValue.FromText(Profile));
+            cbor.Add(CBORValue.FromText(PropertyKeys.Encoding),              CBORValue.FromText(Encoding));
+
+            return CustomAttestationSerializer is not null
+                       ? CustomAttestationSerializer(this, cbor)
+                       : cbor;
+
+        }
 
         #endregion
 
@@ -631,23 +839,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("roamingNetworkId",  RoamingNetworkId.ToString()),
-                           new JProperty("commitId",          CommitId.ToString()),
-                           new JProperty("revision",          Revision),
-                           new JProperty("eTag",              ETag.ToJSON()),
-                           new JProperty("role",              Role)
+                           new JProperty(PropertyKeys.RoamingNetworkId,  RoamingNetworkId.ToString()),
+                           new JProperty(PropertyKeys.CommitId,          CommitId.ToString()),
+                           new JProperty(PropertyKeys.Revision,          Revision),
+                           new JProperty(PropertyKeys.ETag,              ETag.ToJSON()),
+                           new JProperty(PropertyKeys.Role,              Role)
                        );
 
             if (Signer is not null)
-                json.Add("signer",      Signer);
+                json.Add(PropertyKeys.Signer,      Signer);
 
-            json.Add("signedAt",        SignedAt.ToISO8601());
+            json.Add(PropertyKeys.SignedAt,        SignedAt.ToISO8601());
 
             if (ValidUntil.HasValue)
-                json.Add("validUntil",  ValidUntil.Value.ToISO8601());
+                json.Add(PropertyKeys.ValidUntil,  ValidUntil.Value.ToISO8601());
 
             if (Subject is not null)
-                json.Add("subject",     Subject.ToJSON());
+                json.Add(PropertyKeys.Subject,     Subject.ToJSON(Embedded: true));
 
             return json;
 

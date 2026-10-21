@@ -37,7 +37,63 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          IComparable
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/image";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context     = "@context";
+
+            /// <summary>
+            /// The property of its URL.
+            /// </summary>
+            public const String  URL         = "url";
+
+            /// <summary>
+            /// The property of its category.
+            /// </summary>
+            public const String  Category    = "category";
+
+            /// <summary>
+            /// The property of its image type.
+            /// </summary>
+            public const String  Type        = "type";
+
+            /// <summary>
+            /// The property of its optional width.
+            /// </summary>
+            public const String  Width       = "width";
+
+            /// <summary>
+            /// The property of its optional height.
+            /// </summary>
+            public const String  Height      = "height";
+
+            /// <summary>
+            /// The property of its optional thumbnail URL.
+            /// </summary>
+            public const String  Thumbnail   = "thumbnail";
+
+        }
+
+        #endregion
 
         /// <summary>
         /// The URL from where the image data can be fetched.
@@ -190,9 +246,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                #region Check JSON-LD context [optional]
+
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the image must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse URL         [mandatory]
 
-                if (!JSON.ParseMandatory("url",
+                if (!JSON.ParseMandatory(PropertyKeys.URL,
                                          "url",
                                          org.GraphDefined.Vanaheimr.Hermod.HTTP.URL.TryParse,
                                          out URL URL,
@@ -205,7 +272,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Category    [mandatory]
 
-                if (!JSON.ParseMandatory("category",
+                if (!JSON.ParseMandatory(PropertyKeys.Category,
                                          "image category",
                                          ImageCategory.TryParse,
                                          out ImageCategory Category,
@@ -218,7 +285,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Type        [mandatory]
 
-                if (!JSON.ParseMandatory("type",
+                if (!JSON.ParseMandatory(PropertyKeys.Type,
                                          "image type",
                                          HTTPContentType.TryParse,
                                          out HTTPContentType? Type,
@@ -231,7 +298,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Width       [optional]
 
-                if (JSON.ParseOptional("width",
+                if (JSON.ParseOptional(PropertyKeys.Width,
                                        "image width",
                                        out UInt16? Width,
                                        out ErrorResponse))
@@ -244,7 +311,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Height      [optional]
 
-                if (JSON.ParseOptional("height",
+                if (JSON.ParseOptional(PropertyKeys.Height,
                                        "image height",
                                        out UInt16? Height,
                                        out ErrorResponse))
@@ -257,7 +324,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Thumbnail   [optional]
 
-                if (JSON.ParseOptional("thumbnail",
+                if (JSON.ParseOptional(PropertyKeys.Thumbnail,
                                        "image thumbnail",
                                        URL.TryParse,
                                        out URL? Thumbnail,
@@ -297,31 +364,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON(CustomImageSerializer = null)
+        #region ToJSON(Embedded = false, CustomImageSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this object.
         /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="CustomImageSerializer">A delegate to serialize custom image JSON objects.</param>
-        public JObject ToJSON(CustomJObjectSerializerDelegate<Image>? CustomImageSerializer = null)
+        public JObject ToJSON(Boolean                                  Embedded                = false,
+                              CustomJObjectSerializerDelegate<Image>?  CustomImageSerializer   = null)
         {
 
             var json = JSONObject.Create(
 
-                                 new JProperty("url",         URL.            ToString()),
-                                 new JProperty("category",    Category.       ToString()),
-                                 new JProperty("type",        Type.           ToString()),
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,     JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.URL,         URL.            ToString()),
+                                 new JProperty(PropertyKeys.Category,    Category.       ToString()),
+                                 new JProperty(PropertyKeys.Type,        Type.           ToString()),
 
                            Thumbnail.HasValue
-                               ? new JProperty("thumbnail",   Thumbnail.Value.ToString())
+                               ? new JProperty(PropertyKeys.Thumbnail,   Thumbnail.Value.ToString())
                                : null,
 
                            Width.HasValue
-                               ? new JProperty("width",       Width. Value)
+                               ? new JProperty(PropertyKeys.Width,       Width. Value)
                                : null,
 
                            Height.HasValue
-                               ? new JProperty("height",      Height.Value)
+                               ? new JProperty(PropertyKeys.Height,      Height.Value)
                                : null
 
                        );

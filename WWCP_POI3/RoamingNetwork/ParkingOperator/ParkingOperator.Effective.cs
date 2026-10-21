@@ -193,7 +193,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             static JObject WithoutLastChange(JObject JSON)
             {
-                JSON.Remove("lastChange");
+                JSON.Remove(BasePropertyKeys.LastChange);
                 return JSON;
             }
 
@@ -221,7 +221,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var current  = EffectiveParkingSpace(parkingSpace);
                 var before   = Previous.EffectiveParkingSpace(previousParkingSpace);
 
-                if (!POIJSON.SameValue(WithoutLastChange(current.ToJSON()), WithoutLastChange(before.ToJSON())))
+                if (!POIJSON.SameValue(WithoutLastChange(current.ToJSON(Embedded: true)), WithoutLastChange(before.ToJSON(Embedded: true))))
                     found = ChargingStationOperator.Raise(floors, parkingSpaceId, LastChangeDate) | found;
 
                 else if (current.LastChangeDate < before.LastChangeDate)

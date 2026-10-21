@@ -38,6 +38,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public static class POIEnergyStatus
     {
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization of an energy status.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its used power.
+            /// </summary>
+            public const String  Used                    = "used";
+
+            /// <summary>
+            /// The property of its available power.
+            /// </summary>
+            public const String  Available               = "available";
+
+            /// <summary>
+            /// The property of its stored energy.
+            /// </summary>
+            public const String  StoredEnergy            = "storedEnergy";
+
+            /// <summary>
+            /// The property of its current voltage.
+            /// </summary>
+            public const String  CurrentVoltage          = "currentVoltage";
+
+            /// <summary>
+            /// The property of its remaining charging time.
+            /// </summary>
+            public const String  RemainingChargingTime   = "remainingChargingTime";
+
+        }
+
+        #endregion
+
         #region ToJSON(EnergyInfo)
 
         /// <summary>
@@ -47,18 +84,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty("used",       POIJSON.Number(EnergyInfo.Used.Value)),
-                           new JProperty("available",  POIJSON.Number(EnergyInfo.Available.Value))
+                           new JProperty(PropertyKeys.Used,       POIJSON.Number(EnergyInfo.Used.Value)),
+                           new JProperty(PropertyKeys.Available,  POIJSON.Number(EnergyInfo.Available.Value))
                        );
 
             if (EnergyInfo.StoredEnergy.HasValue)
-                json.Add("storedEnergy",           POIJSON.Number(EnergyInfo.StoredEnergy.Value.Value));
+                json.Add(PropertyKeys.StoredEnergy,           POIJSON.Number(EnergyInfo.StoredEnergy.Value.Value));
 
             if (EnergyInfo.CurrentVoltage.HasValue)
-                json.Add("currentVoltage",         POIJSON.Number(EnergyInfo.CurrentVoltage.Value.Value));
+                json.Add(PropertyKeys.CurrentVoltage,         POIJSON.Number(EnergyInfo.CurrentVoltage.Value.Value));
 
             if (EnergyInfo.RemainingChargingTime.HasValue)
-                json.Add("remainingChargingTime",  POIJSON.Seconds(EnergyInfo.RemainingChargingTime.Value));
+                json.Add(PropertyKeys.RemainingChargingTime,  POIJSON.Seconds(EnergyInfo.RemainingChargingTime.Value));
 
             return json;
 
@@ -91,22 +128,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (JSON is not JObject json)
             {
-                ErrorResponse = "An energy status must be a JSON object { used, available, storedEnergy?, currentVoltage?, remainingChargingTime? }!";
+                ErrorResponse = $"An energy status must be a JSON object {{ {PropertyKeys.Used}, {PropertyKeys.Available}, {PropertyKeys.StoredEnergy}?, {PropertyKeys.CurrentVoltage}?, {PropertyKeys.RemainingChargingTime}? }}!";
                 return false;
             }
 
             foreach (var property in json.Properties())
-                if (property.Name is not ("used" or "available" or "storedEnergy" or "currentVoltage" or "remainingChargingTime"))
+                if (property.Name is not (PropertyKeys.Used or PropertyKeys.Available or PropertyKeys.StoredEnergy or PropertyKeys.CurrentVoltage or PropertyKeys.RemainingChargingTime))
                 {
                     ErrorResponse = $"Unknown property '{property.Name}' of an energy status!";
                     return false;
                 }
 
-            if (!TryParseValue(json, "used",                   Mandatory: true,  out var used,                   out ErrorResponse) ||
-                !TryParseValue(json, "available",              Mandatory: true,  out var available,              out ErrorResponse) ||
-                !TryParseValue(json, "storedEnergy",           Mandatory: false, out var storedEnergy,           out ErrorResponse) ||
-                !TryParseValue(json, "currentVoltage",         Mandatory: false, out var currentVoltage,         out ErrorResponse) ||
-                !TryParseValue(json, "remainingChargingTime",  Mandatory: false, out var remainingChargingTime,  out ErrorResponse))
+            if (!TryParseValue(json, PropertyKeys.Used,                   Mandatory: true,  out var used,                   out ErrorResponse) ||
+                !TryParseValue(json, PropertyKeys.Available,              Mandatory: true,  out var available,              out ErrorResponse) ||
+                !TryParseValue(json, PropertyKeys.StoredEnergy,           Mandatory: false, out var storedEnergy,           out ErrorResponse) ||
+                !TryParseValue(json, PropertyKeys.CurrentVoltage,         Mandatory: false, out var currentVoltage,         out ErrorResponse) ||
+                !TryParseValue(json, PropertyKeys.RemainingChargingTime,  Mandatory: false, out var remainingChargingTime,  out ErrorResponse))
             {
                 return false;
             }

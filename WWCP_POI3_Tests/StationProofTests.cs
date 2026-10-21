@@ -295,7 +295,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(json["hashAlgorithm"]!.Value<String>(),                                   Is.EqualTo("sha256"));
 
                 // The roaming network with its own properties and its operator; one of two charging station operators.
-                Assert.That(proof.RoamingNetwork["roamingNetworkOperator"],                           Is.Not.Null);
+                Assert.That(proof.RoamingNetwork[RoamingNetwork.PropertyKeys.Operator],                           Is.Not.Null);
                 Assert.That(Ids(proof.Given("chargingStationOperators")),                             Is.EqualTo(new[] { "DE*GEF" }));
                 Assert.That(proof.RoamingNetwork["chargingStationOperators"]!["@size"]!.Value<Int32>(), Is.EqualTo(2));
 

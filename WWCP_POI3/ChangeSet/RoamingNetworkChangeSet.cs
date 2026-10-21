@@ -43,9 +43,87 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         private readonly JObject metadata;
 
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkChangeSet";
+
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                 = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context            = "@context";
+
+            /// <summary>
+            /// The property of its roaming network identification.
+            /// </summary>
+            public const String  RoamingNetworkId   = "roamingNetworkId";
+
+            /// <summary>
+            /// The property of its creation timestamp.
+            /// </summary>
+            public const String  CreatedAt          = "createdAt";
+
+            /// <summary>
+            /// The property of its multilingual description.
+            /// </summary>
+            public const String  Description        = "description";
+
+            /// <summary>
+            /// The property of its application metadata.
+            /// </summary>
+            public const String  Metadata           = "metadata";
+
+            /// <summary>
+            /// The property of its preconditions.
+            /// </summary>
+            public const String  Preconditions      = "preconditions";
+
+            /// <summary>
+            /// The property of its signatures.
+            /// </summary>
+            public const String  Signatures         = "signatures";
+
+            /// <summary>
+            /// The property of its changes.
+            /// </summary>
+            public const String  Changes            = "changes";
+
+            /// <summary>
+            /// The property of its before ETags.
+            /// </summary>
+            public const String  BeforeETags        = "beforeETags";
+
+            /// <summary>
+            /// The property of its after ETags.
+            /// </summary>
+            public const String  AfterETags         = "afterETags";
+
+            /// <summary>
+            /// The property of the change set in its signature input.
+            /// </summary>
+            public const String  ChangeSet          = "changeSet";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The unique change set identifier.
@@ -473,19 +551,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (JSON["changes"] is JArray changesToCount && changesToCount.Count > Limits.MaxChanges)
+                if (JSON[PropertyKeys.Changes] is JArray changesToCount && changesToCount.Count > Limits.MaxChanges)
                 {
                     ErrorResponse = $"The change set exceeds the limit of {Limits.MaxChanges} changes!";
                     return false;
                 }
 
-                if (JSON["signatures"] is JArray signaturesToCount && signaturesToCount.Count > Limits.MaxSignatures)
+                if (JSON[PropertyKeys.Signatures] is JArray signaturesToCount && signaturesToCount.Count > Limits.MaxSignatures)
                 {
                     ErrorResponse = $"The change set exceeds the limit of {Limits.MaxSignatures} signatures!";
                     return false;
                 }
 
-                if (JSON["preconditions"] is JArray preconditionsToCount && preconditionsToCount.Count > Limits.MaxPreconditions)
+                if (JSON[PropertyKeys.Preconditions] is JArray preconditionsToCount && preconditionsToCount.Count > Limits.MaxPreconditions)
                 {
                     ErrorResponse = $"The change set exceeds the limit of {Limits.MaxPreconditions} preconditions!";
                     return false;
@@ -495,7 +573,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Id                  [mandatory]
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(PropertyKeys.Id,
                                          "change set identification",
                                          ChangeSet_Id.TryParse,
                                          out ChangeSet_Id id,
@@ -506,9 +584,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse Context             [optional]
+
+                if (JSON[PropertyKeys.Context] is JToken context &&
+                    !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+                {
+                    ErrorResponse = $"The JSON-LD context of the change set '{id}' must be '{JSONLDContext}'!";
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse RoamingNetworkId    [mandatory]
 
-                if (!JSON.ParseMandatory("roamingNetworkId",
+                if (!JSON.ParseMandatory(PropertyKeys.RoamingNetworkId,
                                          "roaming network identification",
                                          RoamingNetwork_Id.TryParse,
                                          out RoamingNetwork_Id roamingNetworkId,
@@ -521,7 +610,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse CreatedAt           [mandatory]
 
-                if (!JSON.ParseMandatory("createdAt",
+                if (!JSON.ParseMandatory(PropertyKeys.CreatedAt,
                                          "creation timestamp",
                                          out DateTimeOffset createdAt,
                                          out ErrorResponse))
@@ -533,9 +622,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Changes             [mandatory]
 
-                if (JSON["changes"] is not JArray changesJSON)
+                if (JSON[PropertyKeys.Changes] is not JArray changesJSON)
                 {
-                    ErrorResponse = "The changes must be a JSON array!";
+                    ErrorResponse = $"The {PropertyKeys.Changes} must be a JSON array!";
                     return false;
                 }
 
@@ -564,21 +653,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse BeforeETags         [mandatory]
 
-                if (!TryParseETags(JSON, "beforeETags", out var beforeETags, out ErrorResponse))
+                if (!TryParseETags(JSON, PropertyKeys.BeforeETags, out var beforeETags, out ErrorResponse))
                     return false;
 
                 #endregion
 
                 #region Parse AfterETags          [mandatory]
 
-                if (!TryParseETags(JSON, "afterETags",  out var afterETags,  out ErrorResponse))
+                if (!TryParseETags(JSON, PropertyKeys.AfterETags,  out var afterETags,  out ErrorResponse))
                     return false;
 
                 #endregion
 
                 #region Parse Description         [optional]
 
-                if (JSON.ParseOptionalJSON("description",
+                if (JSON.ParseOptionalJSON(PropertyKeys.Description,
                                            "change set description",
                                            ImmutableI18NString.TryParse,
                                            out ImmutableI18NString? description,
@@ -592,11 +681,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Metadata            [optional]
 
-                var metadata = JSON["metadata"];
+                var metadata = JSON[PropertyKeys.Metadata];
 
                 if (metadata is not null && metadata is not JObject)
                 {
-                    ErrorResponse = "The metadata must be a JSON object!";
+                    ErrorResponse = $"The {PropertyKeys.Metadata} must be a JSON object!";
                     return false;
                 }
 
@@ -606,12 +695,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var preconditions = ImmutableArray.CreateBuilder<RoamingNetworkPrecondition>();
 
-                if (JSON["preconditions"] is JToken preconditionsJSON)
+                if (JSON[PropertyKeys.Preconditions] is JToken preconditionsJSON)
                 {
 
                     if (preconditionsJSON is not JArray preconditionsArray)
                     {
-                        ErrorResponse = "The preconditions must be a JSON array!";
+                        ErrorResponse = $"The {PropertyKeys.Preconditions} must be a JSON array!";
                         return false;
                     }
 
@@ -637,12 +726,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var signatures = ImmutableArray<RoamingNetworkChangeSetSignature>.Empty;
 
-                if (JSON["signatures"] is JToken signaturesJSON)
+                if (JSON[PropertyKeys.Signatures] is JToken signaturesJSON)
                 {
 
                     if (signaturesJSON is not JArray signaturesArray)
                     {
-                        ErrorResponse = "The signatures must be a JSON array!";
+                        ErrorResponse = $"The {PropertyKeys.Signatures} must be a JSON array!";
                         return false;
                     }
 
@@ -693,17 +782,54 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToCBOR   (IncludeSignatures = true)
+        #region ToCBOR   (Embedded = false, IncludeSignatures = true, CustomRoamingNetworkChangeSetSerializer = null)
 
         /// <summary>
         /// Return the CBOR representation of this change set: the keys and values of its JSON representation.
         /// Its signatures stay valid, as they sign the JSON representation, which the CBOR one reads back exactly.
         /// Write it with CBORWriterOptions.Canonical for deterministic bytes.
         /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="IncludeSignatures">Whether to include the signatures.</param>
-        public CBORValue ToCBOR(Boolean IncludeSignatures = true)
+        /// <param name="CustomRoamingNetworkChangeSetSerializer">An optional custom serializer.</param>
+        public CBORValue ToCBOR(Boolean                                                 Embedded                                  = false,
+                                Boolean                                                 IncludeSignatures                         = true,
+                                CustomCBORSerializerDelegate<RoamingNetworkChangeSet>?  CustomRoamingNetworkChangeSetSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON(IncludeSignatures));
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(PropertyKeys.Id),                CBORValue.FromText(Id.              ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Context),           CBORValue.FromText(JSONLDContext));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.RoamingNetworkId),      CBORValue.FromText(RoamingNetworkId.ToString()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.CreatedAt),             CBORValue.FromText(CreatedAt.       ToISO8601()));
+
+            if (Description.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(PropertyKeys.Description),       Description.ToCBOR());
+
+            // The metadata, the preconditions, the signatures and the changes have no CBOR representation of their own:
+            // theirs are the keys and values of their JSON representation, with whole numbers as integers as in ToJSON().
+            if (metadata.HasValues)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Metadata),          CBORJSON.ToCBOR(POIJSON.WholeNumbersAsIntegers(metadata.DeepClone())));
+
+            if (Preconditions.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Preconditions),     CBORValue.FromArray(Preconditions.Select(precondition => CBORJSON.ToCBOR(precondition.ToJSON(Embedded: true)))));
+
+            if (IncludeSignatures && Signatures.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Signatures),        CBORValue.FromArray(Signatures.   Select(signature    => CBORJSON.ToCBOR(signature.   ToJSON(Embedded: true)))));
+
+            cbor.Add(CBORValue.FromText(PropertyKeys.Changes),               CBORValue.FromArray(Changes.      Select(change       => CBORJSON.ToCBOR(POIJSON.WholeNumbersAsIntegers(change.ToJSON(Embedded: true))))));
+            cbor.Add(CBORValue.FromText(PropertyKeys.BeforeETags),           CBORValue.FromArray(BeforeETags.  Select(eTag         => eTag.ToTextCBOR())));
+            cbor.Add(CBORValue.FromText(PropertyKeys.AfterETags),            CBORValue.FromArray(AfterETags.   Select(eTag         => eTag.ToTextCBOR())));
+
+            return CustomRoamingNetworkChangeSetSerializer is not null
+                       ? CustomRoamingNetworkChangeSetSerializer(this, cbor)
+                       : cbor;
+
+        }
 
         #endregion
 
@@ -722,47 +848,60 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON   (IncludeSignatures = true)
+        #region ToJSON   (Embedded = false, IncludeSignatures = true, CustomRoamingNetworkChangeSetSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this change set.
         /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="IncludeSignatures">Whether to include the signatures; the signed content is without them.</param>
-        public JObject ToJSON(Boolean IncludeSignatures = true)
+        /// <param name="CustomRoamingNetworkChangeSetSerializer">An optional custom serializer.</param>
+        public JObject ToJSON(Boolean                                                    Embedded                                  = false,
+                              Boolean                                                    IncludeSignatures                         = true,
+                              CustomJObjectSerializerDelegate<RoamingNetworkChangeSet>?  CustomRoamingNetworkChangeSetSerializer   = null)
         {
 
             var json = JSONObject.Create(
 
-                                 new JProperty("@id",                Id.              ToString()),
-                                 new JProperty("roamingNetworkId",   RoamingNetworkId.ToString()),
-                                 new JProperty("createdAt",          CreatedAt.       ToISO8601()),
+                                 new JProperty(PropertyKeys.Id,                 Id.              ToString()),
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,            JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.RoamingNetworkId,   RoamingNetworkId.ToString()),
+                                 new JProperty(PropertyKeys.CreatedAt,          CreatedAt.       ToISO8601()),
 
                            Description.IsNotNullOrEmpty()
-                               ? new JProperty("description",        Description.ToJSON())
+                               ? new JProperty(PropertyKeys.Description,        Description.ToJSON())
                                : null,
 
                            metadata.HasValues
-                               ? new JProperty("metadata",           metadata.DeepClone())
+                               ? new JProperty(PropertyKeys.Metadata,           metadata.DeepClone())
                                : null,
 
                            Preconditions.Length > 0
-                               ? new JProperty("preconditions",      new JArray(Preconditions.Select(precondition => precondition.ToJSON())))
+                               ? new JProperty(PropertyKeys.Preconditions,      new JArray(Preconditions.Select(precondition => precondition.ToJSON(Embedded: true))))
                                : null,
 
                            IncludeSignatures && Signatures.Length > 0
-                               ? new JProperty("signatures",         new JArray(Signatures.Select(signature => signature.ToJSON())))
+                               ? new JProperty(PropertyKeys.Signatures,         new JArray(Signatures.Select(signature => signature.ToJSON(Embedded: true))))
                                : null
 
                        );
 
             // Added directly: JSONObject.Create leaves out empty arrays, but they are mandatory here.
-            json.Add("changes",      new JArray(Changes.    Select(change => change.ToJSON())));
-            json.Add("beforeETags",  new JArray(BeforeETags.Select(eTag   => eTag.  ToJSON())));
-            json.Add("afterETags",   new JArray(AfterETags. Select(eTag   => eTag.  ToJSON())));
+            json.Add(PropertyKeys.Changes,      new JArray(Changes.    Select(change => change.ToJSON(Embedded: true))));
+            json.Add(PropertyKeys.BeforeETags,  new JArray(BeforeETags.Select(eTag   => eTag.  ToJSON())));
+            json.Add(PropertyKeys.AfterETags,   new JArray(AfterETags. Select(eTag   => eTag.  ToJSON())));
 
             // Whole numbers as integers, so that ToString() of it is read back with its signatures, and a commit of it
             // with its identification; see POIJSON.
-            return POIJSON.WholeNumbersAsIntegers(json);
+            POIJSON.WholeNumbersAsIntegers(json);
+
+            return CustomRoamingNetworkChangeSetSerializer is not null
+                       ? CustomRoamingNetworkChangeSetSerializer(this, json)
+                       : json;
 
         }
 

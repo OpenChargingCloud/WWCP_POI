@@ -22,6 +22,8 @@ using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -34,7 +36,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed class ChargingTariffElement
     {
 
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/chargingTariffElement";
+
+        #endregion
+
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context           = "@context";
+
+            /// <summary>
+            /// The property of its price components.
+            /// </summary>
+            public const String  PriceComponents   = "priceComponents";
+
+            /// <summary>
+            /// The property of its restrictions.
+            /// </summary>
+            public const String  Restrictions      = "restrictions";
+
+        }
+
+        #endregion
+
 
         /// <summary>
         /// The price components, in their given order; at least one.
@@ -74,22 +113,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON()
+        #region ToJSON(Embedded = false, CustomChargingTariffElementSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this charging tariff element.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomChargingTariffElementSerializer">A delegate to serialize custom charging tariff elements.</param>
+        public JObject ToJSON(Boolean                                                  Embedded                                = false,
+                              CustomJObjectSerializerDelegate<ChargingTariffElement>?  CustomChargingTariffElementSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("priceComponents",  new JArray(PriceComponents.Select(priceComponent => priceComponent.ToJSON())))
-                       );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,          JSONLDContext);
+
+            json.Add(PropertyKeys.PriceComponents,      new JArray(PriceComponents.Select(priceComponent => priceComponent.ToJSON(Embedded: true))));
 
             if (Restrictions is not null)
-                json.Add("restrictions", Restrictions.ToJSON());
+                json.Add(PropertyKeys.Restrictions,     Restrictions.ToJSON(Embedded: true));
 
-            return json;
+            return CustomChargingTariffElementSerializer is not null
+                       ? CustomChargingTariffElementSerializer(this, json)
+                       : json;
 
         }
 
@@ -108,7 +155,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChargingTariffElement  = null;
             ErrorResponse          = null;
 
-            if (JSON["priceComponents"] is not JArray priceComponentsJSON)
+            if (JSON[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the charging tariff element must be '{JSONLDContext}'!";
+                return false;
+            }
+
+            if (JSON[PropertyKeys.PriceComponents] is not JArray priceComponentsJSON)
             {
                 ErrorResponse = "A charging tariff element needs its price components as a JSON array!";
                 return false;
@@ -138,7 +192,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ChargingTariffRestrictions? restrictions = null;
 
-            if (JSON["restrictions"] is JToken restrictionsJSON &&
+            if (JSON[PropertyKeys.Restrictions] is JToken restrictionsJSON &&
                (restrictionsJSON is not JObject restrictionsObject ||
                 !ChargingTariffRestrictions.TryParse(restrictionsObject, out restrictions, out ErrorResponse)))
             {

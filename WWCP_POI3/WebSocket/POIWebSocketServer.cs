@@ -102,6 +102,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys of the payloads of its own commands and of its batches, in JSON and CBOR.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of a list of topics.
+            /// </summary>
+            public const String  Topics         = "topics";
+
+            /// <summary>
+            /// The property of the topics a subscription named, but which are unknown.
+            /// </summary>
+            public const String  UnknownTopics  = "unknownTopics";
+
+            /// <summary>
+            /// The property of the maximum number of payloads of a batch a client takes.
+            /// </summary>
+            public const String  MaxBatchSize   = "maxBatchSize";
+
+            /// <summary>
+            /// The property of the payloads of a batch.
+            /// </summary>
+            public const String  Batch          = "batch";
+
+            /// <summary>
+            /// The property of the error of one payload of a batch.
+            /// </summary>
+            public const String  Error          = "error";
+
+            /// <summary>
+            /// The property of the code of an error.
+            /// </summary>
+            public const String  Code           = "code";
+
+            /// <summary>
+            /// The property of the description of an error.
+            /// </summary>
+            public const String  Description    = "description";
+
+            /// <summary>
+            /// The property of the details of an error.
+            /// </summary>
+            public const String  Details        = "details";
+
+        }
+
+        #endregion
+
+
         /// <summary>
         /// The maximum number of requests processed at the same time per connection,
         /// for connections opened from now on.
@@ -218,7 +271,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             AddCommand("topics", request =>
 
                 Task.FromResult(
-                    request.Respond(new JObject(new JProperty("topics", new JArray(Topics.Select(topic => topic.ToJSON())))))
+                    request.Respond(new JObject(new JProperty(PropertyKeys.Topics, new JArray(Topics.Select(topic => topic.ToJSON(Embedded: true))))))
                 )
 
             );
@@ -234,7 +287,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var maxPushBatchSize = MaxBatchSize;
 
-                if (request.Payload.ParseOptional("maxBatchSize",
+                if (request.Payload.ParseOptional(PropertyKeys.MaxBatchSize,
                                                   "maximum batch size",
                                                   out Int32? givenMaxBatchSize,
                                                   out var errorResponse))
@@ -488,7 +541,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             TopicNames    = null;
             ErrorMessage  = null;
 
-            if (Request.Payload["topics"] is not JArray topicsJSON ||
+            if (Request.Payload[PropertyKeys.Topics] is not JArray topicsJSON ||
                 topicsJSON.Count == 0 ||
                 topicsJSON.Any(topic => topic.Type != JTokenType.String))
             {
@@ -503,7 +556,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 ErrorMessage = Request.Error(POIWebSocketErrorCodes.PropertyConstraintViolation,
                                              $"Unknown topics: {String.Join(", ", unknown)}!",
-                                             new JObject(new JProperty("unknownTopics", new JArray(unknown))));
+                                             new JObject(new JProperty(PropertyKeys.UnknownTopics, new JArray(unknown))));
                 return false;
             }
 
@@ -518,7 +571,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         private static POIWebSocketMessage SubscriptionsResponse(POIWebSocketRequest Request)
 
-            => Request.Respond(new JObject(new JProperty("topics", new JArray(Request.Session.Subscriptions))));
+            => Request.Respond(new JObject(new JProperty(PropertyKeys.Topics, new JArray(Request.Session.Subscriptions))));
 
         #endregion
 
@@ -570,7 +623,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                         push.Action,
                                                                                         payloads.Count == 1
                                                                                             ? push.Payload
-                                                                                            : new JObject(new JProperty("batch", new JArray(payloads)))),
+                                                                                            : new JObject(new JProperty(PropertyKeys.Batch, new JArray(payloads)))),
                                                                Session.PushBinary,
                                                                Session.Closed);
 
@@ -632,7 +685,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         POIWebSocketRequest          Request)
         {
 
-            if (!(Request.Payload.Count == 1 && Request.Payload["batch"] is JArray batch))
+            if (!(Request.Payload.Count == 1 && Request.Payload[PropertyKeys.Batch] is JArray batch))
                 return await Handler(Request);
 
             if (batch.Count == 0 || batch.Count > MaxBatchSize)
@@ -692,7 +745,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            return Request.Respond(new JObject(new JProperty("batch", results)));
+            return Request.Respond(new JObject(new JProperty(PropertyKeys.Batch, results)));
 
         }
 
@@ -708,10 +761,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           JObject?  ErrorDetails)
 
             => new (
-                   new JProperty("error", new JObject(
-                       new JProperty("code",         ErrorCode),
-                       new JProperty("description",  ErrorDescription ?? ""),
-                       new JProperty("details",      ErrorDetails     ?? [])
+                   new JProperty(PropertyKeys.Error, new JObject(
+                       new JProperty(PropertyKeys.Code,         ErrorCode),
+                       new JProperty(PropertyKeys.Description,  ErrorDescription ?? ""),
+                       new JProperty(PropertyKeys.Details,      ErrorDetails     ?? [])
                    ))
                );
 

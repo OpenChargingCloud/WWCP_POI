@@ -47,7 +47,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The properties holding one identified object, not an array of them, e.g. the energy meter of an EVSE.
         /// </summary>
         private static readonly HashSet<String> SingleIdentifiedProperties = [
-            "energyMeter"
+            EVSE.PropertyKeys.EnergyMeter
         ];
 
         /// <summary>
@@ -55,24 +55,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// its elements are the same as their type compares them, e.g. without case.
         /// </summary>
         private static readonly Dictionary<String, Func<String, Object?>> ElementIdTypes = new () {
-            { "EVSEIds",               text => EVSE_Id.             TryParse(text, out var id) ? id : null },
-            { "chargingStationIds",    text => ChargingStation_Id.  TryParse(text, out var id) ? id : null },
-            { "chargingPoolIds",       text => ChargingPool_Id.     TryParse(text, out var id) ? id : null },
-            { "chargingTariffIds",     text => ChargingTariff_Id.   TryParse(text, out var id) ? id : null },
-            { "energyMeterIds",        text => EnergyMeter_Id.      TryParse(text, out var id) ? id : null },
-            { "chargingStationOperatorIds", text => ChargingStationOperator_Id.TryParse(text, out var id) ? id : null },
-            { "EVSEGroupIds",          text => EVSEGroup_Id.           TryParse(text, out var id) ? id : null },
-            { "chargingStationGroupIds", text => ChargingStationGroup_Id.TryParse(text, out var id) ? id : null },
-            { "chargingPoolGroupIds",  text => ChargingPoolGroup_Id.   TryParse(text, out var id) ? id : null },
-            { TemplateIdsProperty,     TemplateIdOf },
-            { "brands",                text => Brand_Id.            TryParse(text, out var id) ? id : null },
-            { "parkingSpaceIds",       text => ParkingSpace_Id.     TryParse(text, out var id) ? id : null },
-            { "parkingSensorIds",      text => ParkingSensor_Id.    TryParse(text, out var id) ? id : null },
-            { "parkingProductIds",     text => ParkingProduct_Id.   TryParse(text, out var id) ? id : null },
-            { "eMobilityProviderIds",  text => EMobilityProvider_Id.TryParse(text, out var id) ? id : null },
-            { "chargingConnectors",    text => ChargingConnector_Id.TryParse(text, out var id) ? id : null },
-            { "energyMeters",          text => EnergyMeter_Id.      TryParse(text, out var id) ? id : null },
-            { "signatureMethods",      text => SignatureMethod.     TryParse(text, out var id) ? id : null }
+            { ChargingStation.PropertyKeys.EVSEIds,                           text => EVSE_Id.             TryParse(text, out var id) ? id : null },
+            { ChargingPool.PropertyKeys.ChargingStationIds,                   text => ChargingStation_Id.  TryParse(text, out var id) ? id : null },
+            { ChargingStationOperator.PropertyKeys.ChargingPoolIds,           text => ChargingPool_Id.     TryParse(text, out var id) ? id : null },
+            { EVSE.PropertyKeys.ChargingTariffIds,                            text => ChargingTariff_Id.   TryParse(text, out var id) ? id : null },
+            { ChargingPool.PropertyKeys.EnergyMeterIds,                       text => EnergyMeter_Id.      TryParse(text, out var id) ? id : null },
+            { ChargingTariffOffer.PropertyKeys.ChargingStationOperatorIds,    text => ChargingStationOperator_Id.TryParse(text, out var id) ? id : null },
+            { ChargingTariffOffer.PropertyKeys.EVSEGroupIds,                  text => EVSEGroup_Id.           TryParse(text, out var id) ? id : null },
+            { ChargingTariffOffer.PropertyKeys.ChargingStationGroupIds,       text => ChargingStationGroup_Id.TryParse(text, out var id) ? id : null },
+            { ChargingTariffOffer.PropertyKeys.ChargingPoolGroupIds,          text => ChargingPoolGroup_Id.   TryParse(text, out var id) ? id : null },
+            { TemplateIdsProperty,                                            TemplateIdOf },
+            { ChargingPool.PropertyKeys.Brands,                               text => Brand_Id.            TryParse(text, out var id) ? id : null },
+            { ChargingStation.PropertyKeys.ParkingSpaceIds,                   text => ParkingSpace_Id.     TryParse(text, out var id) ? id : null },
+            { ParkingOperator.PropertyKeys.ParkingSensorIds,                  text => ParkingSensor_Id.    TryParse(text, out var id) ? id : null },
+            { ParkingOperator.PropertyKeys.ParkingProductIds,                 text => ParkingProduct_Id.   TryParse(text, out var id) ? id : null },
+            { ChargingTariffOffer.PropertyKeys.EMobilityProviderIds,          text => EMobilityProvider_Id.TryParse(text, out var id) ? id : null },
+            { EVSE.PropertyKeys.ChargingConnectors,                           text => ChargingConnector_Id.TryParse(text, out var id) ? id : null },
+            { ChargingPool.PropertyKeys.EnergyMeters,                         text => EnergyMeter_Id.      TryParse(text, out var id) ? id : null },
+            { "signatureMethods",                                             text => SignatureMethod.     TryParse(text, out var id) ? id : null }
         };
 
         #endregion

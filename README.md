@@ -208,7 +208,7 @@ parking product ids compare case-sensitively.
   elements}, …]}`: new prices of charging tariffs of their operator at runtime, e.g. ad hoc prices following the
   electricity market, without a commit, kept the same way. For every tariff, the most specific one applies at an EVSE:
   its own before its station's before its pool's (`ChargingPrices.Effective`).
-- **Keys:** the roaming network operator (RNO, the `roamingNetworkOperator` a roaming network embeds: the network
+- **Keys:** the roaming network operator (RNO, the `operator` a roaming network embeds: the network
   has no keys of its own), charging station operators, e-mobility providers,
   grid operators and parking operators each name 1..n `signingKeys` (a grid operator not taking part none at all), short keys signing their change sets
   (e.g. secp256r1), and 1..n `identityKeys`, long-term keys signing changes of their identity keys (e.g. secp521r1):

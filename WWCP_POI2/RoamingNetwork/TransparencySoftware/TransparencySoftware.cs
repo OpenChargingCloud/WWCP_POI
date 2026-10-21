@@ -43,6 +43,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/transparencySoftware";
+
+        /// <summary>
         /// The licenses in their canonical order; licenses are mutable, so they are copied on access.
         /// </summary>
         private readonly ImmutableArray<OpenSourceLicense> openSourceLicenses;
@@ -50,6 +55,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
         #region Properties
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its identification.
+            /// </summary>
+            public const String  Id                     = "@id";
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                = "@context";
+
+            /// <summary>
+            /// The property of its multilingual name.
+            /// </summary>
+            public const String  Name                   = "name";
+
+            /// <summary>
+            /// The property of its version.
+            /// </summary>
+            public const String  Version                = "version";
+
+            /// <summary>
+            /// The property of its Open Source licenses.
+            /// </summary>
+            public const String  OpenSourceLicenses     = "openSourceLicenses";
+
+            /// <summary>
+            /// The property of its vendor.
+            /// </summary>
+            public const String  Vendor                 = "vendor";
+
+            /// <summary>
+            /// The property of its logo URL.
+            /// </summary>
+            public const String  Logo                   = "logo";
+
+            /// <summary>
+            /// The property of its how-to-use URL.
+            /// </summary>
+            public const String  HowToUse               = "howToUse";
+
+            /// <summary>
+            /// The property of its more-information URL.
+            /// </summary>
+            public const String  MoreInformation        = "moreInformation";
+
+            /// <summary>
+            /// The property of its source code repository URL.
+            /// </summary>
+            public const String  SourceCodeRepository   = "sourceCodeRepository";
+
+        }
+
+        #endregion
 
         /// <summary>
         /// The stable identity of this software release, shared by all referring meters.
@@ -242,37 +309,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON(CustomTransparencySoftwareSerializer = null)
+        #region ToJSON(Embedded = false, CustomTransparencySoftwareSerializer = null)
 
         /// <summary>
         /// Return a JSON representation of this object.
         /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="CustomTransparencySoftwareSerializer">A delegate to serialize custom transparency software JSON objects.</param>
-        public JObject ToJSON(CustomJObjectSerializerDelegate<TransparencySoftware>? CustomTransparencySoftwareSerializer = null)
+        public JObject ToJSON(Boolean                                                 Embedded                               = false,
+                              CustomJObjectSerializerDelegate<TransparencySoftware>?  CustomTransparencySoftwareSerializer   = null)
         {
 
             var JSON = JSONObject.Create(
 
-                                 new JProperty("@id",                    Id.     ToString()),
-                                 new JProperty("name",                   Name.    ToJSON()),
-                                 new JProperty("version",                Version. ToString()),
-                                 new JProperty("openSourceLicenses",     new JArray(openSourceLicenses.Select(license => license.ToJSON(Embedded: true)))),
-                                 new JProperty("vendor",                 Vendor),
+                                 new JProperty(PropertyKeys.Id,                     Id.     ToString()),
+
+                           !Embedded
+                               ? new JProperty(PropertyKeys.Context,               JSONLDContext)
+                               : null,
+
+                                 new JProperty(PropertyKeys.Name,                   Name.    ToJSON()),
+                                 new JProperty(PropertyKeys.Version,                Version. ToString()),
+                                 new JProperty(PropertyKeys.OpenSourceLicenses,     new JArray(openSourceLicenses.Select(license => license.ToJSON(Embedded: true)))),
+                                 new JProperty(PropertyKeys.Vendor,                 Vendor),
 
                            Logo.                HasValue
-                               ? new JProperty("logo",                   Logo.                ToString())
+                               ? new JProperty(PropertyKeys.Logo,                   Logo.                ToString())
                                : null,
 
                            HowToUse.            HasValue
-                               ? new JProperty("howToUse",               HowToUse.            ToString())
+                               ? new JProperty(PropertyKeys.HowToUse,               HowToUse.            ToString())
                                : null,
 
                            MoreInformation.     HasValue
-                               ? new JProperty("moreInformation",        MoreInformation.     ToString())
+                               ? new JProperty(PropertyKeys.MoreInformation,        MoreInformation.     ToString())
                                : null,
 
                            SourceCodeRepository.HasValue
-                               ? new JProperty("sourceCodeRepository",   SourceCodeRepository.ToString())
+                               ? new JProperty(PropertyKeys.SourceCodeRepository,   SourceCodeRepository.ToString())
                                : null
 
                        );

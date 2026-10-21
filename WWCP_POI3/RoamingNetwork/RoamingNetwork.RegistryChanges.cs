@@ -71,13 +71,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The properties of an entity of a registry that has a name, a description, an address, a homepage and a hotline.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableRegistryProperties = [
-            "name",
-            "description",
-            "dataSource",
-            "address",
-            "homepage",
-            "hotline",
-            "customData"
+            RoamingNetworkOperator.BasePropertyKeys.Name,
+            RoamingNetworkOperator.BasePropertyKeys.Description,
+            RoamingNetworkOperator.BasePropertyKeys.DataSource,
+            RoamingNetworkOperator.PropertyKeys.Address,
+            RoamingNetworkOperator.PropertyKeys.Homepage,
+            RoamingNetworkOperator.PropertyKeys.HotlinePhoneNumber,
+            RoamingNetworkOperator.PropertyKeys.CustomData
         ];
 
         /// <summary>
@@ -89,10 +89,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ]);
 
         /// <summary>
-        /// The properties of the roaming network operator: those of a party, and its key statement.
+        /// The properties of the roaming network operator: those of a party, its e-mail addresses and its key statement.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableRoamingNetworkOperatorProperties = ChangeablePartyProperties.Union([
-            RoamingNetworkKeyStatement.JSONProperty
+            RoamingNetworkOperator.PropertyKeys.EMailAddress,
+            RoamingNetworkOperator.PropertyKeys.HotlineEMailAddress,
+            RoamingNetworkOperator.PropertyKeys.KeyStatement
         ]);
 
         private static readonly Registry<RoamingNetworkOperator_Id, RoamingNetworkOperator> RoamingNetworkOperatorRegistry = new (
@@ -102,7 +104,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             RoamingNetworkOperator_Id.TryParse,
             POI.RoamingNetworkOperator.TryParse,
             roamingNetworkOperator => roamingNetworkOperator.Id,
-            roamingNetworkOperator => roamingNetworkOperator.ToJSON(),
+            roamingNetworkOperator => roamingNetworkOperator.ToJSON(Embedded: true),
             (changed, previous) => changed.ShareRuntimeOf(previous)
         );
 
@@ -113,7 +115,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChargingStationManufacturer_Id.TryParse,
             ChargingStationManufacturer.TryParse,
             manufacturer => manufacturer.Id,
-            manufacturer => manufacturer.ToJSON(),
+            manufacturer => manufacturer.ToJSON(Embedded: true),
             (changed, previous) => changed.ShareRuntimeOf(previous)
         );
 
@@ -124,7 +126,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             EMobilityProvider_Id.TryParse,
             EMobilityProvider.TryParse,
             eMobilityProvider => eMobilityProvider.Id,
-            eMobilityProvider => eMobilityProvider.ToJSON(),
+            eMobilityProvider => eMobilityProvider.ToJSON(Embedded: true),
             // Its groups are embedded: theirs go along too.
             (changed, previous) => changed.ShareRuntimeOfAll(previous)
         );
@@ -136,7 +138,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             GridOperator_Id.TryParse,
             GridOperator.TryParse,
             gridOperator => gridOperator.Id,
-            gridOperator => gridOperator.ToJSON(),
+            gridOperator => gridOperator.ToJSON(Embedded: true),
             // The meters of its grid connection points are embedded: theirs go along too.
             (changed, previous) => changed.ShareRuntimeOfAll(previous)
         );
@@ -149,7 +151,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ParkingOperator_Id.TryParse,
             ParkingOperator.TryParse,
             parkingOperator => parkingOperator.Id,
-            parkingOperator => parkingOperator.ToJSON(),
+            parkingOperator => parkingOperator.ToJSON(Embedded: true),
             // Its garages, spaces and sensors are embedded: theirs go along too.
             (changed, previous) => changed.ShareRuntimeOfAll(previous)
         );
@@ -161,7 +163,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             EnergyMeterManufacturer_Id.TryParse,
             EnergyMeterManufacturer.TryParse,
             energyMeterManufacturer => energyMeterManufacturer.Id,
-            energyMeterManufacturer => energyMeterManufacturer.ToJSON(),
+            energyMeterManufacturer => energyMeterManufacturer.ToJSON(Embedded: true),
             // Energy meter manufacturers have no runtime status.
             (changed, previous) => { }
         );
@@ -169,11 +171,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly Registry<TransparencySoftware_Id, TransparencySoftware> TransparencySoftwareRegistry = new (
             "transparency software release",
             "a",
-            [ "name", "version", "openSourceLicenses", "vendor", "logo", "howToUse", "moreInformation", "sourceCodeRepository" ],
+            [ POI.TransparencySoftware.PropertyKeys.Name,
+              POI.TransparencySoftware.PropertyKeys.Version,
+              POI.TransparencySoftware.PropertyKeys.OpenSourceLicenses,
+              POI.TransparencySoftware.PropertyKeys.Vendor,
+              POI.TransparencySoftware.PropertyKeys.Logo,
+              POI.TransparencySoftware.PropertyKeys.HowToUse,
+              POI.TransparencySoftware.PropertyKeys.MoreInformation,
+              POI.TransparencySoftware.PropertyKeys.SourceCodeRepository ],
             TransparencySoftware_Id.TryParse,
             POI.TransparencySoftware.TryParse,
             transparencySoftware => transparencySoftware.Id,
-            transparencySoftware => transparencySoftware.ToJSON(),
+            transparencySoftware => transparencySoftware.ToJSON(Embedded: true),
             // Releases have no runtime status and no timestamps.
             (changed, previous) => { },
             Timestamps: false
@@ -182,12 +191,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly Registry<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate> TransparencySoftwareCertificateRegistry = new (
             "transparency software certificate",
             "a",
-            [ "issuer", "chargingStationModel", "chargingStationModelVersion", "chargingStationManufacturerId", "documentNumber", "documentURL",
-              "verifiedTransparencySoftwareIds", "compatibleTransparencySoftwareIds", "notBefore", "notAfter" ],
+            [ TransparencySoftwareCertificate.PropertyKeys.Issuer,
+              TransparencySoftwareCertificate.PropertyKeys.ChargingStationModel,
+              TransparencySoftwareCertificate.PropertyKeys.ChargingStationModelVersion,
+              TransparencySoftwareCertificate.PropertyKeys.ChargingStationManufacturerId,
+              TransparencySoftwareCertificate.PropertyKeys.DocumentNumber,
+              TransparencySoftwareCertificate.PropertyKeys.DocumentURL,
+              TransparencySoftwareCertificate.PropertyKeys.VerifiedTransparencySoftwareIds,
+              TransparencySoftwareCertificate.PropertyKeys.CompatibleTransparencySoftwareIds,
+              TransparencySoftwareCertificate.PropertyKeys.NotBefore,
+              TransparencySoftwareCertificate.PropertyKeys.NotAfter ],
             TransparencySoftwareCertificate_Id.TryParse,
             TransparencySoftwareCertificate.TryParse,
             certificate => certificate.Id,
-            certificate => certificate.ToJSON(),
+            certificate => certificate.ToJSON(Embedded: true),
             // Certificates have no runtime status and no timestamps.
             (changed, previous) => { },
             Timestamps: false
@@ -297,7 +314,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         currentJSON![propertyName] = Change.NewValue;
 
                     if (Registry.Timestamps)
-                        currentJSON["lastChange"] = CreatedAt.ToISO8601();
+                        currentJSON[BasePropertyKeys.LastChange] = CreatedAt.ToISO8601();
 
                     if (!Registry.TryParse(currentJSON, out var changedEntity, out var changedError))
                     {
@@ -329,8 +346,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (Registry.Timestamps)
                     {
-                        added["created"]    ??= CreatedAt.ToISO8601();
-                        added["lastChange"]   = CreatedAt.ToISO8601();
+                        added[BasePropertyKeys.Created]    ??= CreatedAt.ToISO8601();
+                        added[BasePropertyKeys.LastChange]   = CreatedAt.ToISO8601();
                     }
 
                     if (!Registry.TryParse(added, out var newEntity, out var newError))

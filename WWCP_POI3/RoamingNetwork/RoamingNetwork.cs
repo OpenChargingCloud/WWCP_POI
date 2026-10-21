@@ -156,6 +156,109 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of the operator.
+            /// </summary>
+            public const String  Operator                            = "operator";
+
+            /// <summary>
+            /// The property of its charging station operators.
+            /// </summary>
+            public const String  ChargingStationOperators            = "chargingStationOperators";
+
+            /// <summary>
+            /// The property of the identifications of its charging station operators, written instead of them when they are not expanded.
+            /// </summary>
+            public const String  ChargingStationOperatorIds          = "chargingStationOperatorIds";
+
+            /// <summary>
+            /// The property of its charging station manufacturers.
+            /// </summary>
+            public const String  ChargingStationManufacturers        = "chargingStationManufacturers";
+
+            /// <summary>
+            /// The property of the identifications of its charging station manufacturers.
+            /// </summary>
+            public const String  ChargingStationManufacturerIds      = "chargingStationManufacturerIds";
+
+            /// <summary>
+            /// The property of its e-mobility providers.
+            /// </summary>
+            public const String  EMobilityProviders                  = "eMobilityProviders";
+
+            /// <summary>
+            /// The property of the identifications of its e-mobility providers.
+            /// </summary>
+            public const String  EMobilityProviderIds                = "eMobilityProviderIds";
+
+            /// <summary>
+            /// The property of its grid operators.
+            /// </summary>
+            public const String  GridOperators                       = "gridOperators";
+
+            /// <summary>
+            /// The property of the identifications of its grid operators.
+            /// </summary>
+            public const String  GridOperatorIds                     = "gridOperatorIds";
+
+            /// <summary>
+            /// The property of its parking operators.
+            /// </summary>
+            public const String  ParkingOperators                    = "parkingOperators";
+
+            /// <summary>
+            /// The property of the identifications of its parking operators.
+            /// </summary>
+            public const String  ParkingOperatorIds                  = "parkingOperatorIds";
+
+            /// <summary>
+            /// The property of its energy meter manufacturers.
+            /// </summary>
+            public const String  EnergyMeterManufacturers            = "energyMeterManufacturers";
+
+            /// <summary>
+            /// The property of the identifications of its energy meter manufacturers.
+            /// </summary>
+            public const String  EnergyMeterManufacturerIds          = "energyMeterManufacturerIds";
+
+            /// <summary>
+            /// The property of its transparency software releases.
+            /// </summary>
+            public const String  TransparencySoftware                = "transparencySoftware";
+
+            /// <summary>
+            /// The property of the identifications of its transparency software releases.
+            /// </summary>
+            public const String  TransparencySoftwareIds             = "transparencySoftwareIds";
+
+            /// <summary>
+            /// The property of its transparency software certificates.
+            /// </summary>
+            public const String  TransparencySoftwareCertificates    = "transparencySoftwareCertificates";
+
+            /// <summary>
+            /// The property of the identifications of its transparency software certificates.
+            /// </summary>
+            public const String  TransparencySoftwareCertificateIds  = "transparencySoftwareCertificateIds";
+
+            /// <summary>
+            /// The property of the hash algorithms of its effective tree (SPECIFICATION.md, section 8.3).
+            /// </summary>
+            public const String  TreeHashAlgorithms                  = POITreeHashAlgorithms.JSONProperty;
+
+        }
+
+        #endregion
+
+
         #region Data licenses
 
         private readonly ConcurrentDictionary<DataLicense_Id, DataLicense> dataLicenses = [];
@@ -210,32 +313,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="InitialStatus">The initial status of the roaming network.</param>
         /// <param name="MaxAdminStatusScheduleSize">The maximum number of entries in the admin status history.</param>
         /// <param name="MaxStatusScheduleSize">The maximum number of entries in the status history.</param>
-        public RoamingNetwork(RoamingNetwork_Id               Id,
-                              ImmutableI18NString?            Name                         = null,
-                              ImmutableI18NString?            Description                  = null,
-                              RoamingNetworkAdminStatusType?  InitialAdminStatus           = null,
-                              RoamingNetworkStatusType?       InitialStatus                = null,
-                              UInt16?                         MaxAdminStatusScheduleSize   = null,
-                              UInt16?                         MaxStatusScheduleSize        = null,
+        public RoamingNetwork(RoamingNetwork_Id                              Id,
+                              ImmutableI18NString?                           Name                               = null,
+                              ImmutableI18NString?                           Description                        = null,
+                              RoamingNetworkAdminStatusType?                 InitialAdminStatus                 = null,
+                              RoamingNetworkStatusType?                      InitialStatus                      = null,
+                              UInt16?                                        MaxAdminStatusScheduleSize         = null,
+                              UInt16?                                        MaxStatusScheduleSize              = null,
 
-                              String?                         DataSource                   = null,
-                              DateTimeOffset?                 Created                      = null,
-                              DateTimeOffset?                 LastChange                   = null,
+                              String?                                        DataSource                         = null,
+                              DateTimeOffset?                                Created                            = null,
+                              DateTimeOffset?                                LastChange                         = null,
 
-                              CustomDataNew?                  CustomData                   = null,
-                              UserDefinedDictionary?          InternalData                 = null,
+                              CustomDataNew?                                 CustomData                         = null,
+                              UserDefinedDictionary?                         InternalData                       = null,
 
-                              IEnumerable<DataLicense>?              DataLicenses               = null,
-                              IEnumerable<ChargingStationOperator>?  ChargingStationOperators   = null,
-                              IEnumerable<ChargingStationManufacturer>?  ChargingStationManufacturers   = null,
-                              IEnumerable<EMobilityProvider>?            EMobilityProviders             = null,
-                              IEnumerable<GridOperator>?                 GridOperators                  = null,
-                              IEnumerable<ParkingOperator>?              ParkingOperators               = null,
-                              IEnumerable<TransparencySoftware>?         TransparencySoftware           = null,
-                              IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates  = null,
-                              IEnumerable<EnergyMeterManufacturer>?      EnergyMeterManufacturers       = null,
-                              RoamingNetworkOperator?                    Operator                       = null,
-                              IEnumerable<ETagHashAlgorithm>?            TreeHashAlgorithms             = null)
+                              IEnumerable<DataLicense>?                      DataLicenses                       = null,
+                              IEnumerable<ChargingStationOperator>?          ChargingStationOperators           = null,
+                              IEnumerable<ChargingStationManufacturer>?      ChargingStationManufacturers       = null,
+                              IEnumerable<EMobilityProvider>?                EMobilityProviders                 = null,
+                              IEnumerable<GridOperator>?                     GridOperators                      = null,
+                              IEnumerable<ParkingOperator>?                  ParkingOperators                   = null,
+                              IEnumerable<TransparencySoftware>?             TransparencySoftware               = null,
+                              IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates   = null,
+                              IEnumerable<EnergyMeterManufacturer>?          EnergyMeterManufacturers           = null,
+                              RoamingNetworkOperator?                        Operator                           = null,
+                              IEnumerable<ETagHashAlgorithm>?                TreeHashAlgorithms                 = null)
 
             : base(Id,
                    Name,
@@ -394,11 +497,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region Data/(Admin-)Status management
+        #region (Admin-)Status management
 
-        private readonly Lock                                     statusEventsLock  = new ();
-        private          OnRoamingNetworkStatusChangedDelegate?       onStatusChanged;
+        private readonly Lock                                         statusEventsLock = new ();
         private          OnRoamingNetworkAdminStatusChangedDelegate?  onAdminStatusChanged;
+        private          OnRoamingNetworkStatusChangedDelegate?       onStatusChanged;
+
+
+        /// <summary>
+        /// An event fired whenever the admin status changed.
+        /// </summary>
+        public event OnRoamingNetworkAdminStatusChangedDelegate?  OnAdminStatusChanged
+        {
+
+            add
+            {
+                lock (statusEventsLock)
+                {
+                    onAdminStatusChanged += value;
+                    ListenToAdminStatus(onAdminStatusChanged is not null);
+                }
+            }
+
+            remove
+            {
+                lock (statusEventsLock)
+                {
+                    onAdminStatusChanged -= value;
+                    ListenToAdminStatus(onAdminStatusChanged is not null);
+                }
+            }
+
+        }
 
         /// <summary>
         /// An event fired whenever the dynamic status changed.
@@ -426,31 +556,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        /// <summary>
-        /// An event fired whenever the admin status changed.
-        /// </summary>
-        public event OnRoamingNetworkAdminStatusChangedDelegate?  OnAdminStatusChanged
-        {
 
-            add
-            {
-                lock (statusEventsLock)
-                {
-                    onAdminStatusChanged += value;
-                    ListenToAdminStatus(onAdminStatusChanged is not null);
-                }
-            }
-
-            remove
-            {
-                lock (statusEventsLock)
-                {
-                    onAdminStatusChanged -= value;
-                    ListenToAdminStatus(onAdminStatusChanged is not null);
-                }
-            }
-
-        }
 
         /// <inheritdoc/>
         protected override async Task OnAdminStatusScheduleChanged(DateTimeOffset                              Timestamp,
@@ -541,7 +647,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Id             [mandatory]
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "roaming network identification",
                                          RoamingNetwork_Id.TryParse,
                                          out RoamingNetwork_Id id,
@@ -554,7 +660,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Check JSON-LD context [optional]
 
-                if (JSON["@context"] is JToken context &&
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
                 {
                     ErrorResponse = $"The JSON-LD context of the roaming network '{id}' must be '{JSONLDContext}'!";
@@ -565,7 +671,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Name           [optional]
 
-                if (JSON.ParseOptionalJSON("name",
+                if (JSON.ParseOptionalJSON(BasePropertyKeys.Name,
                                            "network name",
                                            ImmutableI18NString.TryParse,
                                            out ImmutableI18NString? name,
@@ -579,7 +685,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Description    [optional]
 
-                if (JSON.ParseOptionalJSON("description",
+                if (JSON.ParseOptionalJSON(BasePropertyKeys.Description,
                                            "network description",
                                            I18NString.TryParse,
                                            out I18NString? description,
@@ -593,7 +699,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse DataSource     [optional]
 
-                if (JSON.ParseOptional("dataSource",
+                if (JSON.ParseOptional(BasePropertyKeys.DataSource,
                                        "data source",
                                        out String? dataSource,
                                        out ErrorResponse))
@@ -619,8 +725,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse DataLicenses   [optional]
 
-                if (!POIDataLicenses.TryParse(JSON["dataLicenses"],
-                                              JSON["dataLicenseIds"],
+                if (!POIDataLicenses.TryParse(JSON[BasePropertyKeys.DataLicenses],
+                                              JSON[BasePropertyKeys.DataLicenseIds],
                                               out var dataLicenses,
                                               out ErrorResponse))
                 {
@@ -631,7 +737,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse TreeHashAlgorithms [optional]
 
-                if (!POITreeHashAlgorithms.TryParse(JSON[POITreeHashAlgorithms.JSONProperty],
+                if (!POITreeHashAlgorithms.TryParse(JSON[PropertyKeys.TreeHashAlgorithms],
                                                     out var treeHashAlgorithms,
                                                     out ErrorResponse))
                 {
@@ -643,15 +749,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse Operator       [optional]
 
                 // The keys of a roaming network are the keys of its operator.
-                if (JSON.ContainsKey(POIPartyKeys.SigningKeysProperty) || JSON.ContainsKey(POIPartyKeys.IdentityKeysProperty))
+                if (JSON.ContainsKey(RoamingNetworkOperator.PropertyKeys.SigningKeys) || JSON.ContainsKey(RoamingNetworkOperator.PropertyKeys.IdentityKeys))
                 {
-                    ErrorResponse = $"A roaming network has no keys of its own: they are the keys of its operator, '{RoamingNetworkOperator.JSONProperty}'!";
+                    ErrorResponse = $"A roaming network has no keys of its own: they are the keys of its operator, '{PropertyKeys.Operator}'!";
                     return false;
                 }
 
                 RoamingNetworkOperator? roamingNetworkOperator = null;
 
-                if (JSON[RoamingNetworkOperator.JSONProperty] is JToken operatorJSON)
+                if (JSON[PropertyKeys.Operator] is JToken operatorJSON)
                 {
 
                     if (operatorJSON is not JObject operatorObject)
@@ -670,8 +776,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse ChargingStationManufacturers [optional]
 
                 if (!POIJSON.TryParseChildren<ChargingStationManufacturer>(JSON,
-                                                                           "chargingStationManufacturers",
-                                                                           "chargingStationManufacturerIds",
+                                                                           PropertyKeys.ChargingStationManufacturers,
+                                                                           PropertyKeys.ChargingStationManufacturerIds,
                                                                            "charging station manufacturers",
                                                                            ChargingStationManufacturer.TryParse,
                                                                            out var chargingStationManufacturers,
@@ -685,48 +791,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse EMobilityProviders, GridOperators [optional]
 
                 if (!POIJSON.TryParseChildren<EMobilityProvider>(JSON,
-                                                                 "eMobilityProviders",
-                                                                 "eMobilityProviderIds",
+                                                                 PropertyKeys.EMobilityProviders,
+                                                                 PropertyKeys.EMobilityProviderIds,
                                                                  "e-mobility providers",
                                                                  EMobilityProvider.TryParse,
                                                                  out var eMobilityProviders,
                                                                  out ErrorResponse) ||
 
                     !POIJSON.TryParseChildren<GridOperator>     (JSON,
-                                                                 "gridOperators",
-                                                                 "gridOperatorIds",
+                                                                 PropertyKeys.GridOperators,
+                                                                 PropertyKeys.GridOperatorIds,
                                                                  "grid operators",
                                                                  GridOperator.TryParse,
                                                                  out var gridOperators,
                                                                  out ErrorResponse) ||
 
                     !POIJSON.TryParseChildren<ParkingOperator>  (JSON,
-                                                                 "parkingOperators",
-                                                                 "parkingOperatorIds",
+                                                                 PropertyKeys.ParkingOperators,
+                                                                 PropertyKeys.ParkingOperatorIds,
                                                                  "parking operators",
                                                                  ParkingOperator.TryParse,
                                                                  out var parkingOperators,
                                                                  out ErrorResponse) ||
 
                     !POIJSON.TryParseChildren<TransparencySoftware>(JSON,
-                                                                 "transparencySoftware",
-                                                                 "transparencySoftwareIds",
+                                                                 PropertyKeys.TransparencySoftware,
+                                                                 PropertyKeys.TransparencySoftwareIds,
                                                                  "transparency software releases",
                                                                  POI.TransparencySoftware.TryParse,
                                                                  out var transparencySoftware,
                                                                  out ErrorResponse) ||
 
                     !POIJSON.TryParseChildren<TransparencySoftwareCertificate>(JSON,
-                                                                 "transparencySoftwareCertificates",
-                                                                 "transparencySoftwareCertificateIds",
+                                                                 PropertyKeys.TransparencySoftwareCertificates,
+                                                                 PropertyKeys.TransparencySoftwareCertificateIds,
                                                                  "transparency software certificates",
                                                                  TransparencySoftwareCertificate.TryParse,
                                                                  out var transparencySoftwareCertificates,
                                                                  out ErrorResponse) ||
 
                     !POIJSON.TryParseChildren<EnergyMeterManufacturer>(JSON,
-                                                                 "energyMeterManufacturers",
-                                                                 "energyMeterManufacturerIds",
+                                                                 PropertyKeys.EnergyMeterManufacturers,
+                                                                 PropertyKeys.EnergyMeterManufacturerIds,
                                                                  "energy meter manufacturers",
                                                                  EnergyMeterManufacturer.TryParse,
                                                                  out var energyMeterManufacturers,
@@ -739,15 +845,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse ChargingStationOperators [optional]
 
-                if (JSON.ContainsKey("chargingStationOperatorIds"))
+                if (JSON.ContainsKey(PropertyKeys.ChargingStationOperatorIds))
                 {
-                    ErrorResponse = "Charging station operators given only by their identifications can not be read; they must be given completely as 'chargingStationOperators'!";
+                    ErrorResponse = $"Charging station operators given only by their identifications can not be read; they must be given completely as '{PropertyKeys.ChargingStationOperators}'!";
                     return false;
                 }
 
                 var chargingStationOperators = new List<ChargingStationOperator>();
 
-                if (JSON["chargingStationOperators"] is JToken chargingStationOperatorsJSON)
+                if (JSON[PropertyKeys.ChargingStationOperators] is JToken chargingStationOperatorsJSON)
                 {
 
                     if (chargingStationOperatorsJSON is not JArray chargingStationOperatorsArray)
@@ -783,29 +889,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
                 RoamingNetwork = new RoamingNetwork(
+
                                      id,
                                      name,
                                      description,
-                                     DataSource:                dataSource,
-                                     Created:                   created,
-                                     LastChange:                lastChange,
-                                     CustomData:                customData,
-                                     DataLicenses:              dataLicenses,
-                                     ChargingStationOperators:  chargingStationOperators,
-                                     ChargingStationManufacturers:  chargingStationManufacturers,
-                                     EMobilityProviders:        eMobilityProviders,
-                                     GridOperators:             gridOperators,
-                                     ParkingOperators:          parkingOperators,
-                                     TransparencySoftware:      transparencySoftware,
-                                     TransparencySoftwareCertificates:  transparencySoftwareCertificates,
-                                     EnergyMeterManufacturers:  energyMeterManufacturers,
-                                     Operator:                  roamingNetworkOperator,
-                                     TreeHashAlgorithms:        treeHashAlgorithms
+                                     DataSource:                         dataSource,
+                                     Created:                            created,
+                                     LastChange:                         lastChange,
+                                     CustomData:                         customData,
+                                     DataLicenses:                       dataLicenses,
+                                     ChargingStationOperators:           chargingStationOperators,
+                                     ChargingStationManufacturers:       chargingStationManufacturers,
+                                     EMobilityProviders:                 eMobilityProviders,
+                                     GridOperators:                      gridOperators,
+                                     ParkingOperators:                   parkingOperators,
+                                     TransparencySoftware:               transparencySoftware,
+                                     TransparencySoftwareCertificates:   transparencySoftwareCertificates,
+                                     EnergyMeterManufacturers:           energyMeterManufacturers,
+                                     Operator:                           roamingNetworkOperator,
+                                     TreeHashAlgorithms:                 treeHashAlgorithms
+
                                  );
 
                 #region Check ETags          [optional]
 
-                if (JSON["eTags"] is JToken eTagsJSON &&
+                if (JSON[BasePropertyKeys.ETags] is JToken eTagsJSON &&
                     !TryCheckETags(RoamingNetwork,
                                    eTagsJSON is JArray eTagsArray
                                        ? [ .. eTagsArray.Select(eTag => ETag.Parse(eTag)) ]
@@ -877,6 +985,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                       ETagDigestEncoding,
                       IncludeChildArrays: true);
 
+
         /// <summary>
         /// The JSON representation of this roaming network, with or without its child arrays: without them for the skeleton of its
         /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
@@ -898,47 +1007,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 Boolean                                                    IncludeChildArrays)
         {
 
-            var JSON = JSONObject.Create(
+            var json = JSONObject.Create(
 
-                               new JProperty("@id",             Id.         ToString()),
+                               new JProperty(BasePropertyKeys.Id,            Id.         ToString()),
 
                          !Embedded
-                             ? new JProperty("@context",        JSONLDContext)
+                             ? new JProperty(BasePropertyKeys.Context,       JSONLDContext)
                              : null,
 
                          Name.IsNotNullOrEmpty()
-                             ? new JProperty("name",            Name.       ToJSON())
+                             ? new JProperty(BasePropertyKeys.Name,          Name.       ToJSON())
                              : null,
 
                          Description.IsNotNullOrEmpty()
-                             ? new JProperty("description",     Description.ToJSON())
+                             ? new JProperty(BasePropertyKeys.Description,   Description.ToJSON())
                              : null,
 
                          DataSource is not null && DataSource.IsNeitherNullNorEmpty()
-                             ? new JProperty("dataSource",      DataSource)
+                             ? new JProperty(BasePropertyKeys.DataSource,    DataSource)
                              : null,
 
                          DataLicenses.Any() && ExpandDataLicenses != InfoStatus.Hidden
                              ? ExpandDataLicenses.Switch(
                                  () => new JProperty(
-                                           "dataLicenseIds",
+                                           BasePropertyKeys.DataLicenseIds,
                                            DataLicenses.ToPOIIdsJSON()
                                        ),
                                  () => new JProperty(
-                                           "dataLicenses",
+                                           BasePropertyKeys.DataLicenses,
                                            DataLicenses.ToPOIJSON()
                                        ))
                              : null,
 
                          Operator is not null
-                             ? new JProperty(RoamingNetworkOperator.JSONProperty, Operator.ToJSON())
+                             ? new JProperty(PropertyKeys.Operator,      Operator.ToJSON(Embedded: true))
                              : null,
 
                          IncludeChildArrays && ChargingStationOperators.Any() && ExpandChargingStationOperatorIds != InfoStatus.Hidden
                              ? ExpandChargingStationOperatorIds.Switch(
 
                                    () => new JProperty(
-                                             "chargingStationOperatorIds",
+                                             PropertyKeys.ChargingStationOperatorIds,
                                              new JArray(
                                                  chargingStationOperators.
                                                      Select(chargingStationOperator => chargingStationOperator.Id.ToString())
@@ -946,7 +1055,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          ),
 
                                    () => new JProperty(
-                                             "chargingStationOperators",
+                                             PropertyKeys.ChargingStationOperators,
                                              new JArray(
                                                  chargingStationOperators.
                                                      Select(chargingStationOperator => chargingStationOperator.ToJSON(
@@ -1050,40 +1159,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Always part of the content.
             if (IncludeChildArrays && !chargingStationManufacturers.IsEmpty)
-                JSON.Add("chargingStationManufacturers", new JArray(chargingStationManufacturers.Select(chargingStationManufacturer => chargingStationManufacturer.ToJSON())));
+                json.Add(PropertyKeys.ChargingStationManufacturers,      new JArray(chargingStationManufacturers.Select(chargingStationManufacturer => chargingStationManufacturer.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && !eMobilityProviders.IsEmpty)
-                JSON.Add("eMobilityProviders",           new JArray(eMobilityProviders.Select(eMobilityProvider => eMobilityProvider.ToJSON())));
+                json.Add(PropertyKeys.EMobilityProviders,                new JArray(eMobilityProviders.Select(eMobilityProvider => eMobilityProvider.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && !gridOperators.IsEmpty)
-                JSON.Add("gridOperators",                new JArray(gridOperators.Select(gridOperator => gridOperator.ToJSON())));
+                json.Add(PropertyKeys.GridOperators,                     new JArray(gridOperators.Select(gridOperator => gridOperator.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && !parkingOperators.IsEmpty)
-                JSON.Add("parkingOperators",             new JArray(parkingOperators.Select(parkingOperator => parkingOperator.ToJSON())));
+                json.Add(PropertyKeys.ParkingOperators,                  new JArray(parkingOperators.Select(parkingOperator => parkingOperator.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && !energyMeterManufacturers.IsEmpty)
-                JSON.Add("energyMeterManufacturers",     new JArray(energyMeterManufacturers.Select(energyMeterManufacturer => energyMeterManufacturer.ToJSON())));
+                json.Add(PropertyKeys.EnergyMeterManufacturers,          new JArray(energyMeterManufacturers.Select(energyMeterManufacturer => energyMeterManufacturer.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && !transparencySoftware.IsEmpty)
-                JSON.Add("transparencySoftware",         new JArray(transparencySoftware.Select(release => release.ToJSON())));
+                json.Add(PropertyKeys.TransparencySoftware,              new JArray(transparencySoftware.Select(release => release.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && !transparencySoftwareCertificates.IsEmpty)
-                JSON.Add("transparencySoftwareCertificates", new JArray(transparencySoftwareCertificates.Select(certificate => certificate.ToJSON())));
+                json.Add(PropertyKeys.TransparencySoftwareCertificates,  new JArray(transparencySoftwareCertificates.Select(certificate => certificate.ToJSON(Embedded: true))));
 
             if (GivenTreeHashAlgorithms.HasValue)
-                JSON.Add(POITreeHashAlgorithms.JSONProperty,    POITreeHashAlgorithms.ToJSON(GivenTreeHashAlgorithms.Value));
+                json.Add(PropertyKeys.TreeHashAlgorithms,                POITreeHashAlgorithms.ToJSON(GivenTreeHashAlgorithms.Value));
 
-            POIEntityMetadata.AddTo(JSON, Created, LastChangeDate, CustomData);
+            POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             // The ETags describe the content without them, irrespective of the view options.
             if (IncludeETags && ETags.Length > 0)
-                JSON.Add("eTags",  new JArray(ETags.Select(eTag => eTag.ToJSON(ETagDigestEncoding ?? POI.ETagDigestEncoding.HEX))));
+                json.Add(BasePropertyKeys.ETags,                             new JArray(ETags.Select(eTag => eTag.ToJSON(ETagDigestEncoding ?? POI.ETagDigestEncoding.HEX))));
 
             // Whole numbers are integers in it, as every writer of its entities writes them (POIJSON.Number): ToString()
             // of it is read back with its ETags.
             return CustomRoamingNetworkSerializer is not null
-                       ? CustomRoamingNetworkSerializer(this, JSON)
-                       : JSON;
+                       ? CustomRoamingNetworkSerializer(this, json)
+                       : json;
 
         }
 
@@ -1140,7 +1249,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Id             [mandatory]
 
-                if (!CBOR.ParseMandatory("@id",
+                if (CBOR.Kind != CBORValueKind.Map)
+                {
+                    ErrorResponse = "The CBOR representation of a roaming network must be a map!";
+                    return false;
+                }
+
+                if (!CBOR.ParseMandatory(BasePropertyKeys.Id,
                                          "roaming network identification",
                                          RoamingNetwork_Id.TryParse,
                                          out RoamingNetwork_Id id,
@@ -1151,9 +1266,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Check JSON-LD context [optional]
+                #region Check CBOR-LD context [optional]
 
-                if (CBOR.TryGetValue(CBORValue.FromText("@context"), out var contextCBOR) &&
+                if (CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.Context), out var contextCBOR) &&
                     !(contextCBOR.TryGetText(out var context) && context == JSONLDContext))
                 {
                     ErrorResponse = $"The JSON-LD context of the roaming network '{id}' must be '{JSONLDContext}'!";
@@ -1164,7 +1279,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Name           [optional]
 
-                if (CBOR.ParseOptional("name",
+                if (CBOR.ParseOptional(BasePropertyKeys.Name,
                                        "network name",
                                        I18NString.TryParse,
                                        out I18NString? name,
@@ -1178,7 +1293,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Description    [optional]
 
-                if (CBOR.ParseOptional("description",
+                if (CBOR.ParseOptional(BasePropertyKeys.Description,
                                        "network description",
                                        I18NString.TryParse,
                                        out I18NString? description,
@@ -1192,7 +1307,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse DataSource     [optional]
 
-                if (CBOR.ParseOptionalText("dataSource",
+                if (CBOR.ParseOptionalText(BasePropertyKeys.DataSource,
                                            "data source",
                                            out var dataSource,
                                            out ErrorResponse))
@@ -1207,7 +1322,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var metadataJSON = new JObject();
 
-                foreach (var key in new[] { "created", "lastChange", "customData" })
+                foreach (var key in new[] { BasePropertyKeys.Created, BasePropertyKeys.LastChange, BasePropertyKeys.CustomData })
                     if (CBOR.TryGetValue(CBORValue.FromText(key), out var metadataCBOR))
                         metadataJSON.Add(key, CBORJSON.ToJSON(metadataCBOR));
 
@@ -1227,10 +1342,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 JToken? dataLicensesJSON    = null;
                 JToken? dataLicenseIdsJSON  = null;
 
-                if (CBOR.TryGetValue(CBORValue.FromText("dataLicenses"),   out var dataLicensesCBOR))
+                if (CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.DataLicenses),   out var dataLicensesCBOR))
                     dataLicensesJSON    = CBORJSON.ToJSON(dataLicensesCBOR);
 
-                if (CBOR.TryGetValue(CBORValue.FromText("dataLicenseIds"), out var dataLicenseIdsCBOR))
+                if (CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.DataLicenseIds), out var dataLicenseIdsCBOR))
                     dataLicenseIdsJSON  = CBORJSON.ToJSON(dataLicenseIdsCBOR);
 
                 if (!POIDataLicenses.TryParse(dataLicensesJSON,
@@ -1245,7 +1360,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse TreeHashAlgorithms [optional]
 
-                if (!POITreeHashAlgorithms.TryParse(CBOR.TryGetValue(CBORValue.FromText(POITreeHashAlgorithms.JSONProperty), out var treeHashAlgorithmsCBOR)
+                if (!POITreeHashAlgorithms.TryParse(CBOR.TryGetValue(CBORValue.FromText(PropertyKeys.TreeHashAlgorithms), out var treeHashAlgorithmsCBOR)
                                                         ? CBORJSON.ToJSON(treeHashAlgorithmsCBOR)
                                                         : null,
                                                     out var treeHashAlgorithms,
@@ -1259,29 +1374,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse Operator       [optional]
 
                 // The keys of a roaming network are the keys of its operator.
-                foreach (var keysProperty in new[] { POIPartyKeys.SigningKeysProperty, POIPartyKeys.IdentityKeysProperty })
+                foreach (var keysProperty in new[] { RoamingNetworkOperator.PropertyKeys.SigningKeys, RoamingNetworkOperator.PropertyKeys.IdentityKeys })
                 {
                     if (CBOR.TryGetValue(CBORValue.FromText(keysProperty), out _))
                     {
-                        ErrorResponse = $"A roaming network has no keys of its own: they are the keys of its operator, '{RoamingNetworkOperator.JSONProperty}'!";
+                        ErrorResponse = $"A roaming network has no keys of its own: they are the keys of its operator, '{PropertyKeys.Operator}'!";
                         return false;
                     }
                 }
 
                 RoamingNetworkOperator? roamingNetworkOperator = null;
 
-                if (CBOR.TryGetValue(CBORValue.FromText(RoamingNetworkOperator.JSONProperty), out var operatorCBOR))
+                // Read from its own CBOR representation: the operator refuses what is no map.
+                if (CBOR.TryGetValue(CBORValue.FromText(PropertyKeys.Operator), out var operatorCBOR) &&
+                    !RoamingNetworkOperator.TryParse(operatorCBOR, out roamingNetworkOperator, out ErrorResponse))
                 {
-
-                    if (CBORJSON.ToJSON(operatorCBOR) is not JObject operatorJSON)
-                    {
-                        ErrorResponse = "The roaming network operator must be a map!";
-                        return false;
-                    }
-
-                    if (!RoamingNetworkOperator.TryParse(operatorJSON, out roamingNetworkOperator, out ErrorResponse))
-                        return false;
-
+                    return false;
                 }
 
                 #endregion
@@ -1289,56 +1397,56 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse ChargingStationManufacturers, EMobilityProviders, GridOperators [optional]
 
                 if (!TryParseCBORChildren<ChargingStationManufacturer>(CBOR,
-                                                                       "chargingStationManufacturers",
-                                                                       "chargingStationManufacturerIds",
+                                                                       PropertyKeys.ChargingStationManufacturers,
+                                                                       PropertyKeys.ChargingStationManufacturerIds,
                                                                        "charging station manufacturers",
                                                                        ChargingStationManufacturer.TryParse,
                                                                        out var chargingStationManufacturers,
                                                                        out ErrorResponse) ||
 
                     !TryParseCBORChildren<EMobilityProvider>          (CBOR,
-                                                                       "eMobilityProviders",
-                                                                       "eMobilityProviderIds",
+                                                                       PropertyKeys.EMobilityProviders,
+                                                                       PropertyKeys.EMobilityProviderIds,
                                                                        "e-mobility providers",
                                                                        EMobilityProvider.TryParse,
                                                                        out var eMobilityProviders,
                                                                        out ErrorResponse) ||
 
                     !TryParseCBORChildren<GridOperator>               (CBOR,
-                                                                       "gridOperators",
-                                                                       "gridOperatorIds",
+                                                                       PropertyKeys.GridOperators,
+                                                                       PropertyKeys.GridOperatorIds,
                                                                        "grid operators",
                                                                        GridOperator.TryParse,
                                                                        out var gridOperators,
                                                                        out ErrorResponse) ||
 
                     !TryParseCBORChildren<ParkingOperator>            (CBOR,
-                                                                       "parkingOperators",
-                                                                       "parkingOperatorIds",
+                                                                       PropertyKeys.ParkingOperators,
+                                                                       PropertyKeys.ParkingOperatorIds,
                                                                        "parking operators",
                                                                        ParkingOperator.TryParse,
                                                                        out var parkingOperators,
                                                                        out ErrorResponse) ||
 
                     !TryParseCBORChildren<TransparencySoftware>       (CBOR,
-                                                                       "transparencySoftware",
-                                                                       "transparencySoftwareIds",
+                                                                       PropertyKeys.TransparencySoftware,
+                                                                       PropertyKeys.TransparencySoftwareIds,
                                                                        "transparency software releases",
                                                                        POI.TransparencySoftware.TryParse,
                                                                        out var transparencySoftware,
                                                                        out ErrorResponse) ||
 
                     !TryParseCBORChildren<TransparencySoftwareCertificate>(CBOR,
-                                                                       "transparencySoftwareCertificates",
-                                                                       "transparencySoftwareCertificateIds",
+                                                                       PropertyKeys.TransparencySoftwareCertificates,
+                                                                       PropertyKeys.TransparencySoftwareCertificateIds,
                                                                        "transparency software certificates",
                                                                        TransparencySoftwareCertificate.TryParse,
                                                                        out var transparencySoftwareCertificates,
                                                                        out ErrorResponse) ||
 
                     !TryParseCBORChildren<EnergyMeterManufacturer>    (CBOR,
-                                                                       "energyMeterManufacturers",
-                                                                       "energyMeterManufacturerIds",
+                                                                       PropertyKeys.EnergyMeterManufacturers,
+                                                                       PropertyKeys.EnergyMeterManufacturerIds,
                                                                        "energy meter manufacturers",
                                                                        EnergyMeterManufacturer.TryParse,
                                                                        out var energyMeterManufacturers,
@@ -1351,15 +1459,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse ChargingStationOperators [optional]
 
-                if (CBOR.TryGetValue(CBORValue.FromText("chargingStationOperatorIds"), out _))
+                if (CBOR.TryGetValue(CBORValue.FromText(PropertyKeys.ChargingStationOperatorIds), out _))
                 {
-                    ErrorResponse = "Charging station operators given only by their identifications can not be read; they must be given completely as 'chargingStationOperators'!";
+                    ErrorResponse = $"Charging station operators given only by their identifications can not be read; they must be given completely as '{PropertyKeys.ChargingStationOperators}'!";
                     return false;
                 }
 
                 var chargingStationOperators = new List<ChargingStationOperator>();
 
-                if (CBOR.TryGetValue(CBORValue.FromText("chargingStationOperators"), out var chargingStationOperatorsCBOR))
+                if (CBOR.TryGetValue(CBORValue.FromText(PropertyKeys.ChargingStationOperators), out var chargingStationOperatorsCBOR))
                 {
 
                     if (chargingStationOperatorsCBOR.Kind != CBORValueKind.Array)
@@ -1411,7 +1519,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Check ETags          [optional]
 
-                if (CBOR.TryGetValue(CBORValue.FromText("eTags"), out var eTagsCBOR) &&
+                if (CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.ETags), out var eTagsCBOR) &&
                     !TryCheckETags(RoamingNetwork,
                                    eTagsCBOR.Kind == CBORValueKind.Array
                                        ? [ .. eTagsCBOR.AsArray().Select(eTag => ETag.Parse(eTag)) ]
@@ -1457,78 +1565,82 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var CBOR = new CBORMap {
-                           { CBORValue.FromText("@id"),               CBORValue.FromText(Id.ToString()) }
+                           { CBORValue.FromText(BasePropertyKeys.Id),                  CBORValue.FromText(Id.ToString()) }
                        };
 
             if (!Embedded)
-                CBOR.Add(CBORValue.FromText("@context"),              CBORValue.FromText(JSONLDContext));
+                CBOR.Add(CBORValue.FromText(BasePropertyKeys.Context),             CBORValue.FromText(JSONLDContext));
 
             if (Name.IsNotNullOrEmpty())
-                CBOR.Add(CBORValue.FromText("name"),                  Name.ToCBOR());
+                CBOR.Add(CBORValue.FromText(BasePropertyKeys.Name),                Name.ToCBOR());
 
             if (Description.IsNotNullOrEmpty())
-                CBOR.Add(CBORValue.FromText("description"),           Description.ToCBOR());
+                CBOR.Add(CBORValue.FromText(BasePropertyKeys.Description),         Description.ToCBOR());
 
             if (DataSource is not null && DataSource.IsNeitherNullNorEmpty())
-                CBOR.Add(CBORValue.FromText("dataSource"),            CBORValue.FromText(DataSource));
+                CBOR.Add(CBORValue.FromText(BasePropertyKeys.DataSource),          CBORValue.FromText(DataSource));
 
             if (DataLicenses.Any())
-                CBOR.Add(CBORValue.FromText("dataLicenses"),          CBORJSON.ToCBOR(DataLicenses.ToPOIJSON()));
+                CBOR.Add(CBORValue.FromText(BasePropertyKeys.DataLicenses),        DataLicenses.ToPOICBOR());
 
             if (Operator is not null)
-                CBOR.Add(CBORValue.FromText(RoamingNetworkOperator.JSONProperty), Operator.ToCBOR());
+                CBOR.Add(CBORValue.FromText(PropertyKeys.Operator),                Operator.ToCBOR(Embedded: true));
 
             if (ChargingStationOperators.Any())
-                CBOR.Add(CBORValue.FromText("chargingStationOperators"),
+                CBOR.Add(CBORValue.FromText(PropertyKeys.ChargingStationOperators),
                          CBORValue.FromArray(chargingStationOperators.
                                                  Select(chargingStationOperator => chargingStationOperator.ToCBOR(Embedded: true))));
 
             if (!chargingStationManufacturers.IsEmpty)
-                CBOR.Add(CBORValue.FromText("chargingStationManufacturers"),
+                CBOR.Add(CBORValue.FromText(PropertyKeys.ChargingStationManufacturers),
                          CBORValue.FromArray(chargingStationManufacturers.
-                                                 Select(chargingStationManufacturer => chargingStationManufacturer.ToCBOR())));
+                                                 Select(chargingStationManufacturer => chargingStationManufacturer.ToCBOR(Embedded: true))));
 
             if (!eMobilityProviders.IsEmpty)
-                CBOR.Add(CBORValue.FromText("eMobilityProviders"),
+                CBOR.Add(CBORValue.FromText(PropertyKeys.EMobilityProviders),
                          CBORValue.FromArray(eMobilityProviders.
-                                                 Select(eMobilityProvider => eMobilityProvider.ToCBOR())));
+                                                 Select(eMobilityProvider => eMobilityProvider.ToCBOR(Embedded: true))));
 
             if (!gridOperators.IsEmpty)
-                CBOR.Add(CBORValue.FromText("gridOperators"),
+                CBOR.Add(CBORValue.FromText(PropertyKeys.GridOperators),
                          CBORValue.FromArray(gridOperators.
-                                                 Select(gridOperator => gridOperator.ToCBOR())));
+                                                 Select(gridOperator => gridOperator.ToCBOR(Embedded: true))));
 
             if (!parkingOperators.IsEmpty)
-                CBOR.Add(CBORValue.FromText("parkingOperators"),
+                CBOR.Add(CBORValue.FromText(PropertyKeys.ParkingOperators),
                          CBORValue.FromArray(parkingOperators.
-                                                 Select(parkingOperator => parkingOperator.ToCBOR())));
+                                                 Select(parkingOperator => parkingOperator.ToCBOR(Embedded: true))));
 
             if (!energyMeterManufacturers.IsEmpty)
-                CBOR.Add(CBORValue.FromText("energyMeterManufacturers"),
+                CBOR.Add(CBORValue.FromText(PropertyKeys.EnergyMeterManufacturers),
                          CBORValue.FromArray(energyMeterManufacturers.
-                                                 Select(energyMeterManufacturer => energyMeterManufacturer.ToCBOR())));
+                                                 Select(energyMeterManufacturer => energyMeterManufacturer.ToCBOR(Embedded: true))));
 
+            // Transparency software releases and certificates have no CBOR representation of their own: theirs are the
+            // keys and values of their JSON representation.
             if (!transparencySoftware.IsEmpty)
-                CBOR.Add(CBORValue.FromText("transparencySoftware"),
+                CBOR.Add(CBORValue.FromText(PropertyKeys.TransparencySoftware),
                          CBORValue.FromArray(transparencySoftware.
-                                                 Select(release => CBORJSON.ToCBOR(release.ToJSON()))));
+                                                 Select(release => CBORJSON.ToCBOR(release.ToJSON(Embedded: true)))));
 
             if (!transparencySoftwareCertificates.IsEmpty)
-                CBOR.Add(CBORValue.FromText("transparencySoftwareCertificates"),
+                CBOR.Add(CBORValue.FromText(PropertyKeys.TransparencySoftwareCertificates),
                          CBORValue.FromArray(transparencySoftwareCertificates.
-                                                 Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON()))));
-
+                                                 Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON(Embedded: true)))));
 
             if (GivenTreeHashAlgorithms.HasValue)
-                CBOR.Add(CBORValue.FromText(POITreeHashAlgorithms.JSONProperty), CBORJSON.ToCBOR(POITreeHashAlgorithms.ToJSON(GivenTreeHashAlgorithms.Value)));
+                CBOR.Add(CBORValue.FromText(PropertyKeys.TreeHashAlgorithms),  POITreeHashAlgorithms.ToCBOR(GivenTreeHashAlgorithms.Value));
 
-            // Always part of the content, with the keys and values of the JSON representation.
-            foreach (var metadata in POIEntityMetadata.AddTo([], Created, LastChangeDate, CustomData).Properties())
-                CBOR.Add(CBORValue.FromText(metadata.Name),           CBORJSON.ToCBOR(metadata.Value));
+            // Always part of the content, as in the JSON representation; custom data is JSON.
+            CBOR.Add(CBORValue.FromText(BasePropertyKeys.Created),             CBORValue.FromText(Created.       ToISO8601()));
+            CBOR.Add(CBORValue.FromText(BasePropertyKeys.LastChange),          CBORValue.FromText(LastChangeDate.ToISO8601()));
+
+            if (CustomData.HasValues)
+                CBOR.Add(CBORValue.FromText(BasePropertyKeys.CustomData),      CBORJSON.ToCBOR(CustomData.ToJObject()));
 
             // The ETags describe the content without them, irrespective of the view options.
             if (IncludeETags && ETags.Length > 0)
-                CBOR.Add(CBORValue.FromText("eTags"),                 CBORValue.FromArray(ETags.Select(eTag => eTag.ToCBOR())));
+                CBOR.Add(CBORValue.FromText(BasePropertyKeys.ETags),           CBORValue.FromArray(ETags.Select(eTag => eTag.ToCBOR())));
 
             return CustomRoamingNetworkSerializer is not null
                        ? CustomRoamingNetworkSerializer(this, CBOR)

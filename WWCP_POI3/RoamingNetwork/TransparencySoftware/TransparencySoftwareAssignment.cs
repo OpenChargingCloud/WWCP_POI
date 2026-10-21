@@ -22,6 +22,8 @@ using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -40,23 +42,73 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         TransparencySoftwareCertificate_Id?  CertificateId   = null)
     {
 
-        #region ToJSON()
+        #region Data
+
+        /// <summary>
+        /// The JSON-LD context of the object.
+        /// </summary>
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/transparencySoftwareAssignment";
+
+        #endregion
+
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its JSON-LD context, written unless it is embedded.
+            /// </summary>
+            public const String  Context                  = "@context";
+
+            /// <summary>
+            /// The property of its transparency software release.
+            /// </summary>
+            public const String  TransparencySoftwareId   = "transparencySoftwareId";
+
+            /// <summary>
+            /// The property of its legal status.
+            /// </summary>
+            public const String  LegalStatus              = "legalStatus";
+
+            /// <summary>
+            /// The property of its certificate.
+            /// </summary>
+            public const String  CertificateId            = "certificateId";
+
+        }
+
+        #endregion
+
+
+        #region ToJSON(Embedded = false, CustomTransparencySoftwareAssignmentSerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this assignment.
         /// </summary>
-        public JObject ToJSON()
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="CustomTransparencySoftwareAssignmentSerializer">A delegate to serialize custom assignment JSON objects.</param>
+        public JObject ToJSON(Boolean                                                           Embedded                                         = false,
+                              CustomJObjectSerializerDelegate<TransparencySoftwareAssignment>?  CustomTransparencySoftwareAssignmentSerializer   = null)
         {
 
-            var json = new JObject(
-                           new JProperty("transparencySoftwareId",  TransparencySoftwareId.ToString()),
-                           new JProperty("legalStatus",             LegalStatus.           ToString())
-                       );
+            var json = new JObject();
+
+            if (!Embedded)
+                json.Add(PropertyKeys.Context,                 JSONLDContext);
+
+            json.Add(PropertyKeys.TransparencySoftwareId,      TransparencySoftwareId.ToString());
+            json.Add(PropertyKeys.LegalStatus,                 LegalStatus.           ToString());
 
             if (CertificateId.HasValue)
-                json.Add("certificateId", CertificateId.Value.ToString());
+                json.Add(PropertyKeys.CertificateId,           CertificateId.Value.   ToString());
 
-            return json;
+            return CustomTransparencySoftwareAssignmentSerializer is not null
+                       ? CustomTransparencySoftwareAssignmentSerializer(this, json)
+                       : json;
 
         }
 
@@ -74,16 +126,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             TransparencySoftwareAssignment = null;
 
-            if (!POIJSON.TryParseText(JSON, "transparencySoftwareId", "transparency software identification", TransparencySoftware_Id.           TryParse, out TransparencySoftware_Id?            transparencySoftwareId, out ErrorResponse) ||
-                !POIJSON.TryParseText(JSON, "legalStatus",            "legal status",                         POI.LegalStatus.                   TryParse, out LegalStatus?                        legalStatus,            out ErrorResponse) ||
-                !POIJSON.TryParseText(JSON, "certificateId",          "certificate identification",           TransparencySoftwareCertificate_Id.TryParse, out TransparencySoftwareCertificate_Id? certificateId,          out ErrorResponse))
+            if (JSON[PropertyKeys.Context] is JToken context &&
+                !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
+            {
+                ErrorResponse = $"The JSON-LD context of the transparency software status must be '{JSONLDContext}'!";
+                return false;
+            }
+
+            if (!POIJSON.TryParseText(JSON, PropertyKeys.TransparencySoftwareId, "transparency software identification", TransparencySoftware_Id.           TryParse, out TransparencySoftware_Id?            transparencySoftwareId, out ErrorResponse) ||
+                !POIJSON.TryParseText(JSON, PropertyKeys.LegalStatus,            "legal status",                         POI.LegalStatus.                   TryParse, out LegalStatus?                        legalStatus,            out ErrorResponse) ||
+                !POIJSON.TryParseText(JSON, PropertyKeys.CertificateId,          "certificate identification",           TransparencySoftwareCertificate_Id.TryParse, out TransparencySoftwareCertificate_Id? certificateId,          out ErrorResponse))
             {
                 return false;
             }
 
             if (!transparencySoftwareId.HasValue || !legalStatus.HasValue)
             {
-                ErrorResponse = "A transparency software status needs its transparencySoftwareId and its legalStatus!";
+                ErrorResponse = $"A transparency software status needs its {PropertyKeys.TransparencySoftwareId} and its {PropertyKeys.LegalStatus}!";
                 return false;
             }
 

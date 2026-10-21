@@ -139,7 +139,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Id                       [mandatory]
 
-                if (!JSON.ParseMandatory("@id",
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "charging station operator identification",
                                          ChargingStationOperator_Id.TryParse,
                                          out ChargingStationOperator_Id id,
@@ -152,7 +152,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Check JSON-LD context           [optional]
 
-                if (JSON["@context"] is JToken context &&
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
                 {
                     ErrorResponse = $"The JSON-LD context of the charging station operator '{id}' must be '{JSONLDContext}'!";
@@ -163,7 +163,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Name                     [optional]
 
-                if (JSON.ParseOptionalJSON("name",
+                if (JSON.ParseOptionalJSON(BasePropertyKeys.Name,
                                            "operator name",
                                            ImmutableI18NString.TryParse,
                                            out ImmutableI18NString? name,
@@ -177,7 +177,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Description              [optional]
 
-                if (JSON.ParseOptionalJSON("description",
+                if (JSON.ParseOptionalJSON(BasePropertyKeys.Description,
                                            "operator description",
                                            ImmutableI18NString.TryParse,
                                            out ImmutableI18NString? description,
@@ -191,7 +191,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse DataSource               [optional]
 
-                if (JSON.ParseOptional("dataSource",
+                if (JSON.ParseOptional(BasePropertyKeys.DataSource,
                                        "data source",
                                        out String? dataSource,
                                        out ErrorResponse))
@@ -204,8 +204,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse DataLicenses             [optional]
 
-                if (!POIDataLicenses.TryParse(JSON["dataLicenses"],
-                                              JSON["dataLicenseIds"],
+                if (!POIDataLicenses.TryParse(JSON[BasePropertyKeys.DataLicenses],
+                                              JSON[BasePropertyKeys.DataLicenseIds],
                                               out var dataLicenses,
                                               out ErrorResponse))
                 {
@@ -218,7 +218,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Address? address = null;
 
-                if (JSON["address"] is JToken addressJSON)
+                if (JSON[PropertyKeys.Address] is JToken addressJSON)
                 {
 
                     if (addressJSON is not JObject addressObject)
@@ -241,7 +241,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 GeoCoordinate? geoLocation = null;
 
-                if (JSON["geoLocation"] is JToken geoLocationJSON)
+                if (JSON[PropertyKeys.GeoLocation] is JToken geoLocationJSON)
                 {
 
                     if (geoLocationJSON is not JObject geoLocationObject)
@@ -266,7 +266,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 URL? logo = null;
 
-                if (JSON["logos"] is JToken logosJSON)
+                if (JSON[PropertyKeys.Logos] is JToken logosJSON)
                 {
 
                     if (logosJSON is not JArray logosArray || logosArray.Count > 1 ||
@@ -279,7 +279,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (logosArray.Count == 1)
                     {
 
-                        if (!TryParseOptionalText((JObject) logosArray[0], "uri", "logo URI", URL.TryParse, out logo, out ErrorResponse))
+                        if (!TryParseOptionalText((JObject) logosArray[0], PropertyKeys.LogoURI, "logo URI", URL.TryParse, out logo, out ErrorResponse))
                             return false;
 
                         if (logo is null)
@@ -296,11 +296,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Telephone, EMailAddress, Homepage, Hotline, TermsAndConditions [optional]
 
-                if (!TryParseOptionalText(JSON, "telephone",           "telephone number",          PhoneNumber.       TryParse, out PhoneNumber?         telephone,             out ErrorResponse) ||
-                    !TryParseOptionalText(JSON, "eMailAddress",        "e-mail address",            SimpleEMailAddress.TryParse, out SimpleEMailAddress?  eMailAddress,          out ErrorResponse) ||
-                    !TryParseOptionalText(JSON, "homepage",            "homepage",                  URL.               TryParse, out URL?                 homepage,              out ErrorResponse) ||
-                    !TryParseOptionalText(JSON, "hotline",             "hotline phone number",      PhoneNumber.       TryParse, out PhoneNumber?         hotlinePhoneNumber,    out ErrorResponse) ||
-                    !TryParseOptionalText(JSON, "termsAndConditions",  "terms and conditions URL",  URL.               TryParse, out URL?                 termsAndConditionsURL, out ErrorResponse))
+                if (!TryParseOptionalText(JSON, PropertyKeys.Telephone,           "telephone number",          PhoneNumber.       TryParse, out PhoneNumber?         telephone,             out ErrorResponse) ||
+                    !TryParseOptionalText(JSON, PropertyKeys.EMailAddress,        "e-mail address",            SimpleEMailAddress.TryParse, out SimpleEMailAddress?  eMailAddress,          out ErrorResponse) ||
+                    !TryParseOptionalText(JSON, PropertyKeys.Homepage,            "homepage",                  URL.               TryParse, out URL?                 homepage,              out ErrorResponse) ||
+                    !TryParseOptionalText(JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.       TryParse, out PhoneNumber?         hotlinePhoneNumber,    out ErrorResponse) ||
+                    !TryParseOptionalText(JSON, PropertyKeys.TermsAndConditions,  "terms and conditions URL",  URL.               TryParse, out URL?                 termsAndConditionsURL, out ErrorResponse))
                 {
                     return false;
                 }
@@ -310,8 +310,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse ChargingPools            [optional]
 
                 if (!POIJSON.TryParseChildren<ChargingPool>(JSON,
-                                                            "chargingPools",
-                                                            "chargingPoolIds",
+                                                            PropertyKeys.ChargingPools,
+                                                            PropertyKeys.ChargingPoolIds,
                                                             "charging pools",
                                                             ChargingPool.TryParse,
                                                             out var chargingPools,
@@ -324,37 +324,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse groups                   [optional]
 
-                if (!POIJSON.TryParseChildren<EVSEGroup>(JSON, "EVSEGroups", "EVSEGroupIds", "EVSEGroups", EVSEGroup.TryParse, out var evseGroups, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<EVSEGroup>(JSON, PropertyKeys.EVSEGroups, PropertyKeys.EVSEGroupIds, "EVSEGroups", EVSEGroup.TryParse, out var evseGroups, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseChildren<ChargingStationGroup>(JSON, "chargingStationGroups", "chargingStationGroupIds", "ChargingStationGroups", ChargingStationGroup.TryParse, out var chargingStationGroups, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<ChargingStationGroup>(JSON, PropertyKeys.ChargingStationGroups, PropertyKeys.ChargingStationGroupIds, "ChargingStationGroups", ChargingStationGroup.TryParse, out var chargingStationGroups, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseChildren<ChargingPoolGroup>(JSON, "chargingPoolGroups", "chargingPoolGroupIds", "ChargingPoolGroups", ChargingPoolGroup.TryParse, out var chargingPoolGroups, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<ChargingPoolGroup>(JSON, PropertyKeys.ChargingPoolGroups, PropertyKeys.ChargingPoolGroupIds, "ChargingPoolGroups", ChargingPoolGroup.TryParse, out var chargingPoolGroups, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseChildren<ChargingTariffGroup>(JSON, "chargingTariffGroups", "chargingTariffGroupIds", "ChargingTariffGroups", ChargingTariffGroup.TryParse, out var chargingTariffGroups, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<ChargingTariffGroup>(JSON, PropertyKeys.ChargingTariffGroups, PropertyKeys.ChargingTariffGroupIds, "ChargingTariffGroups", ChargingTariffGroup.TryParse, out var chargingTariffGroups, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseChildren<EnergyMeterGroup>(JSON, "energyMeterGroups", "energyMeterGroupIds", "energy meter groups", EnergyMeterGroup.TryParse, out var energyMeterGroups, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<EnergyMeterGroup>(JSON, PropertyKeys.EnergyMeterGroups, PropertyKeys.EnergyMeterGroupIds, "energy meter groups", EnergyMeterGroup.TryParse, out var energyMeterGroups, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseChildren<EVSETemplate>           (JSON, "EVSETemplates",            "EVSETemplateIds",            "EVSE templates",             EVSETemplate.           TryParse, out var evseTemplates,            out ErrorResponse) ||
-                    !POIJSON.TryParseChildren<ChargingStationTemplate>(JSON, "chargingStationTemplates", "chargingStationTemplateIds", "charging station templates", ChargingStationTemplate.TryParse, out var chargingStationTemplates, out ErrorResponse) ||
-                    !POIJSON.TryParseChildren<ChargingPoolTemplate>   (JSON, "chargingPoolTemplates",    "chargingPoolTemplateIds",    "charging pool templates",    ChargingPoolTemplate.   TryParse, out var chargingPoolTemplates,    out ErrorResponse) ||
-                    !POIJSON.TryParseChildren<ChargingTariffTemplate> (JSON, "chargingTariffTemplates",  "chargingTariffTemplateIds",  "charging tariff templates",  ChargingTariffTemplate. TryParse, out var chargingTariffTemplates,  out ErrorResponse) ||
-                    !POIJSON.TryParseChildren<EnergyMeterTemplate>    (JSON, "energyMeterTemplates",     "energyMeterTemplateIds",     "energy meter templates",     EnergyMeterTemplate.    TryParse, out var energyMeterTemplates,     out ErrorResponse))
+                if (!POIJSON.TryParseChildren<EVSETemplate>           (JSON, PropertyKeys.EVSETemplates,            PropertyKeys.EVSETemplateIds,            "EVSE templates",             EVSETemplate.           TryParse, out var evseTemplates,            out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingStationTemplate>(JSON, PropertyKeys.ChargingStationTemplates, PropertyKeys.ChargingStationTemplateIds, "charging station templates", ChargingStationTemplate.TryParse, out var chargingStationTemplates, out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingPoolTemplate>   (JSON, PropertyKeys.ChargingPoolTemplates,    PropertyKeys.ChargingPoolTemplateIds,    "charging pool templates",    ChargingPoolTemplate.   TryParse, out var chargingPoolTemplates,    out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<ChargingTariffTemplate> (JSON, PropertyKeys.ChargingTariffTemplates,  PropertyKeys.ChargingTariffTemplateIds,  "charging tariff templates",  ChargingTariffTemplate. TryParse, out var chargingTariffTemplates,  out ErrorResponse) ||
+                    !POIJSON.TryParseChildren<EnergyMeterTemplate>    (JSON, PropertyKeys.EnergyMeterTemplates,     PropertyKeys.EnergyMeterTemplateIds,     "energy meter templates",     EnergyMeterTemplate.    TryParse, out var energyMeterTemplates,     out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (!POIJSON.TryParseChildren<ParkingSpace>(JSON, "parkingSpaces", "parkingSpaceIds", "parking spaces", ParkingSpace.TryParse, out var parkingSpaces, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<ParkingSpace>(JSON, PropertyKeys.ParkingSpaces, PropertyKeys.ParkingSpaceIds, "parking spaces", ParkingSpace.TryParse, out var parkingSpaces, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseChildren<ChargingTariffOffer>(JSON, "chargingTariffOffers", "chargingTariffOfferIds", "charging tariff offers", ChargingTariffOffer.TryParse, out var chargingTariffOffers, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<ChargingTariffOffer>(JSON, PropertyKeys.ChargingTariffOffers, PropertyKeys.ChargingTariffOfferIds, "charging tariff offers", ChargingTariffOffer.TryParse, out var chargingTariffOffers, out ErrorResponse))
                     return false;
 
-                if (!POIJSON.TryParseChildren<Brand>(JSON, "brands", "brandIds", "brands", Brand.TryParse, out var brands, out ErrorResponse))
+                if (!POIJSON.TryParseChildren<Brand>(JSON, PropertyKeys.Brands, PropertyKeys.BrandIds, "brands", Brand.TryParse, out var brands, out ErrorResponse))
                     return false;
 
                 #endregion
@@ -362,8 +362,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse ChargingTariffs          [optional]
 
                 if (!POIJSON.TryParseChildren<ChargingTariff>(JSON,
-                                                              "chargingTariffs",
-                                                              "chargingTariffIds",
+                                                              PropertyKeys.ChargingTariffs,
+                                                              PropertyKeys.ChargingTariffIds,
                                                               "charging tariffs",
                                                               ChargingTariff.TryParse,
                                                               out var chargingTariffs,
@@ -522,7 +522,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToCBOR   (Embedded = false)
+        #region ToCBOR   (Embedded = false, ...)
 
         /// <summary>
         /// Return the CBOR representation of this charging station operator:
@@ -530,10 +530,115 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Write it with CBORWriterOptions.Canonical for deterministic bytes.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        public CBORValue ToCBOR(Boolean Embedded = false)
+        /// <param name="CustomChargingStationOperatorSerializer">An optional delegate to customize the CBOR representation.</param>
+        public CBORValue ToCBOR(Boolean                                                 Embedded                                  = false,
+                                CustomCBORSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null)
+        {
 
-            => CBORJSON.ToCBOR(ToJSON(Embedded:            Embedded,
-                                      ExpandDataLicenses:  InfoStatus.Expanded));
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(BasePropertyKeys.Id),                    CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Context),                   CBORValue.FromText(JSONLDContext));
+
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.Name),                          Name.ToCBOR());
+
+            if (Description.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Description),               Description.ToCBOR());
+
+            if (DataSource.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),                CBORValue.FromText(DataSource));
+
+            if (DataLicenses.Any())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataLicenses),              DataLicenses.ToPOICBOR());
+
+            // The address and the geo location have no CBOR representation of their own: theirs are the keys and values
+            // of their JSON representation.
+            if (Address is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Address),                       CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
+
+            if (Logo.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(PropertyKeys.Logos),
+                         CBORValue.FromArray(new CBORValue[] {
+                             new CBORMap {
+                                 { CBORValue.FromText(PropertyKeys.LogoURI),                     CBORValue.FromText(Logo.ToString()) }
+                             }
+                         }));
+
+            if (GeoLocation.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.GeoLocation),                   CBORJSON.ToCBOR(GeoLocation.Value.ToJSON(Embedded: true)));
+
+            if (Telephone.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Telephone),                     CBORValue.FromText(Telephone.ToString()));
+
+            if (EMailAddress.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.EMailAddress),                  CBORValue.FromText(EMailAddress.ToString()));
+
+            if (Homepage.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),                      CBORValue.FromText(Homepage.ToString()));
+
+            if (HotlinePhoneNumber.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),            CBORValue.FromText(HotlinePhoneNumber.ToString()));
+
+            if (TermsAndConditionsURL.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.TermsAndConditions),            CBORValue.FromText(TermsAndConditionsURL.ToString()));
+
+            // Its brands, charging tariffs, charging pools, templates, groups, offers and parking spaces have no CBOR
+            // representation of their own: theirs are the keys and values of their JSON representation, as embedded.
+            AddChildren(cbor, PropertyKeys.Brands,                    Brands,                    brand          => brand.         ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.ChargingTariffs,           ChargingTariffs,           chargingTariff => chargingTariff.ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.ChargingPools,             ChargingPools,             chargingPool   => chargingPool.  ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.EVSETemplates,             EVSETemplates,             template       => template.      ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.ChargingStationTemplates,  ChargingStationTemplates,  template       => template.      ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.ChargingPoolTemplates,     ChargingPoolTemplates,     template       => template.      ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.ChargingTariffTemplates,   ChargingTariffTemplates,   template       => template.      ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.EnergyMeterTemplates,      EnergyMeterTemplates,      template       => template.      ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.EVSEGroups,                EVSEGroups,                group          => group.         ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.ChargingStationGroups,     ChargingStationGroups,     group          => group.         ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.ChargingPoolGroups,        ChargingPoolGroups,        group          => group.         ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.ChargingTariffGroups,      ChargingTariffGroups,      group          => group.         ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.EnergyMeterGroups,         EnergyMeterGroups,         group          => group.         ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.ChargingTariffOffers,      ChargingTariffOffers,      offer          => offer.         ToJSON(Embedded: true));
+            AddChildren(cbor, PropertyKeys.ParkingSpaces,             ParkingSpaces,             parkingSpace   => parkingSpace.  ToJSON(Embedded: true));
+
+            // The keys have no CBOR representation of their own: theirs are the keys and values of their JSON representation.
+            foreach (var keys in POIPartyKeys.AddTo(new JObject(), this).Properties())
+                cbor.Add(CBORValue.FromText(keys.Name),                                  CBORJSON.ToCBOR(keys.Value));
+
+            // Always part of the content, as in the JSON representation; custom data is JSON.
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),                       CBORValue.FromText(Created.       ToISO8601()));
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.LastChange),                    CBORValue.FromText(LastChangeDate.ToISO8601()));
+
+            if (CustomData.HasValues)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),                CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            return CustomChargingStationOperatorSerializer is not null
+                       ? CustomChargingStationOperatorSerializer(this, cbor)
+                       : cbor;
+
+        }
+
+        #endregion
+
+        #region (private static) AddChildren(CBOR, PropertyName, Children, ToJSON)
+
+        /// <summary>
+        /// Add the given children, unless there are none, as the keys and values of their JSON representations.
+        /// </summary>
+        private static void AddChildren<T>(CBORMap           CBOR,
+                                           String            PropertyName,
+                                           IEnumerable<T>    Children,
+                                           Func<T, JObject>  ToJSON)
+        {
+
+            var children = Children.ToArray();
+
+            if (children.Length > 0)
+                CBOR.Add(CBORValue.FromText(PropertyName),
+                         CBORValue.FromArray(children.Select(child => CBORJSON.ToCBOR(ToJSON(child)))));
+
+        }
 
         #endregion
 

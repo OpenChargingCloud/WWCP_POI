@@ -565,7 +565,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : null,
 
                            TransparencySoftware.Any()
-                               ? new JProperty("transparencySoftware",        new JArray(TransparencySoftware.Select(transparencySoftwareStatus => transparencySoftwareStatus.ToJSON(CustomTransparencySoftwareStatusSerializer))))
+                               ? new JProperty("transparencySoftware",        new JArray(TransparencySoftware.Select(transparencySoftwareStatus => transparencySoftwareStatus.ToJSON(Embedded: true, CustomTransparencySoftwareStatusSerializer: CustomTransparencySoftwareStatusSerializer))))
                                : null,
 
                                  new JProperty("lastChange",                  LastChangeDate. ToISO8601())

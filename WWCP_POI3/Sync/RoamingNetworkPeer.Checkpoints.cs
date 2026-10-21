@@ -67,10 +67,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 while (true)
                 {
 
-                    var payload = new JObject(new JProperty("max", options.MaxCommitsPerRequest));
+                    var payload = new JObject(new JProperty(POI_API.PropertyKeys.Max, options.MaxCommitsPerRequest));
 
                     if (since.HasValue)
-                        payload.Add("since", since.Value);
+                        payload.Add(POI_API.PropertyKeys.Since, since.Value);
 
                     var answer = await Connection.RequestAsync("checkpoints", payload, CancellationToken);
 
@@ -80,7 +80,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return;
                     }
 
-                    var checkpoints = answer.GetPayloadJSON()?["checkpoints"]?.OfType<JObject>().ToArray() ?? [];
+                    var checkpoints = answer.GetPayloadJSON()?[POI_API.PropertyKeys.Checkpoints]?.OfType<JObject>().ToArray() ?? [];
 
                     if (checkpoints.Length == 0)
                         break;
@@ -113,7 +113,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 // Only those after its latest one: another one of a sequence it has is a split view to it.
-                var answer = await Connection.RequestAsync("checkpoints", new JObject(new JProperty("latest", true)), CancellationToken);
+                var answer = await Connection.RequestAsync("checkpoints", new JObject(new JProperty(POI_API.PropertyKeys.Latest, true)), CancellationToken);
 
                 if (answer.IsError)
                 {
@@ -121,7 +121,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return;
                 }
 
-                UInt64? theirLatest = answer.GetPayloadJSON()?["checkpoints"]?.OfType<JObject>().FirstOrDefault()?["sequence"]?.Value<UInt64>();
+                UInt64? theirLatest = answer.GetPayloadJSON()?[POI_API.PropertyKeys.Checkpoints]?.OfType<JObject>().FirstOrDefault()?[RoamingNetworkCheckpoint.PropertyKeys.Sequence]?.Value<UInt64>();
 
                 var missing = currentHistory.GetCheckpointsSince(theirLatest, Int32.MaxValue).
                                              Where(checkpoint => !receivedCheckpoints.ContainsKey(checkpoint.Id)).
@@ -150,10 +150,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!options.JoinFromCheckpoint || !options.FollowCheckpoints || options.VerifyCheckpointSignature is not VerifyCheckpointSignatureDelegate verify)
                 return null;
 
-            var latestAnswer = await Connection.RequestAsync("checkpoints", new JObject(new JProperty("latest", true)), CancellationToken);
+            var latestAnswer = await Connection.RequestAsync("checkpoints", new JObject(new JProperty(POI_API.PropertyKeys.Latest, true)), CancellationToken);
 
             if (latestAnswer.IsError ||
-                latestAnswer.GetPayloadJSON()?["checkpoints"]?.OfType<JObject>().FirstOrDefault() is not JObject latestJSON ||
+                latestAnswer.GetPayloadJSON()?[POI_API.PropertyKeys.Checkpoints]?.OfType<JObject>().FirstOrDefault() is not JObject latestJSON ||
                 !RoamingNetworkCheckpoint.TryParse(latestJSON, out var latest, out _))
             {
                 return null;
@@ -166,14 +166,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 var max      = (UInt64) Math.Max(options.MaxCommitsPerRequest, 1);
-                var payload  = new JObject(new JProperty("max", max));
+                var payload  = new JObject(new JProperty(POI_API.PropertyKeys.Max, max));
 
                 if (latest.Sequence > max)
-                    payload.Add("since", latest.Sequence - max - 1);
+                    payload.Add(POI_API.PropertyKeys.Since, latest.Sequence - max - 1);
 
                 var before   = await Connection.RequestAsync("checkpoints", payload, CancellationToken);
 
-                foreach (var checkpointJSON in before.IsError ? [] : before.GetPayloadJSON()?["checkpoints"]?.OfType<JObject>() ?? [])
+                foreach (var checkpointJSON in before.IsError ? [] : before.GetPayloadJSON()?[POI_API.PropertyKeys.Checkpoints]?.OfType<JObject>() ?? [])
                     if (RoamingNetworkCheckpoint.TryParse(checkpointJSON, out var checkpoint, out _) && checkpoint.Sequence < latest.Sequence)
                         candidates.Add(checkpoint);
 
@@ -188,7 +188,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     continue;
 
                 var snapshot = await Connection.RequestAsync("checkpointSnapshot",
-                                                             new JObject(new JProperty("checkpointId", checkpoint.Id.ToString())),
+                                                             new JObject(new JProperty(POI_API.PropertyKeys.CheckpointId, checkpoint.Id.ToString())),
                                                              CancellationToken);
 
                 if (snapshot.IsError || snapshot.GetPayloadJSON() is not JObject snapshotJSON)
@@ -289,10 +289,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private void TakeCheckpointSignatures(JObject SignaturesJSON)
         {
 
-            if (!RoamingNetworkCheckpoint_Id.TryParse(SignaturesJSON["checkpointId"]?.Value<String>() ?? "", out var checkpointId) ||
+            if (!RoamingNetworkCheckpoint_Id.TryParse(SignaturesJSON[POI_API.PropertyKeys.CheckpointId]?.Value<String>() ?? "", out var checkpointId) ||
                 !RoamingNetworkCommitSignature.TryParseCommitSignatures(new JObject(
-                                                                            new JProperty("commitId",    checkpointId.ToString()),
-                                                                            new JProperty("signatures",  SignaturesJSON["signatures"])
+                                                                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.CommitId,    checkpointId.ToString()),
+                                                                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Signatures,  SignaturesJSON[RoamingNetworkCommitSignature.PropertyKeys.Signatures])
                                                                         ),
                                                                         out _,
                                                                         out var signatures,
@@ -375,15 +375,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var priceStatements  = new JArray(Checkpoints.Select(checkpoint => (checkpoint.Id, PriceStatements: currentHistory.PriceStatementsOf(checkpoint.Id))).
                                                           Where (ofCheckpoint => ofCheckpoint.PriceStatements is not null).
                                                           Select(ofCheckpoint => new JObject(
-                                                                                     new JProperty("checkpointId",     ofCheckpoint.Id.ToString()),
-                                                                                     new JProperty("priceStatements",  new JArray(ofCheckpoint.PriceStatements!.Select(priceStatement => priceStatement.ToJSON())))
+                                                                                     new JProperty(POI_API.PropertyKeys.CheckpointId,     ofCheckpoint.Id.ToString()),
+                                                                                     new JProperty(POI_API.PropertyKeys.PriceStatements,  new JArray(ofCheckpoint.PriceStatements!.Select(priceStatement => priceStatement.ToJSON(Embedded: true))))
                                                                                  )));
 
-            var payload          = new JObject(new JProperty("checkpoints", new JArray(Checkpoints.Select(checkpoint => checkpoint.ToJSON()))));
+            var payload          = new JObject(new JProperty(POI_API.PropertyKeys.Checkpoints, new JArray(Checkpoints.Select(checkpoint => checkpoint.ToJSON(Embedded: true)))));
 
             // With the price statements they name, so that the other server checks them as well.
             if (priceStatements.Count > 0)
-                payload.Add("priceStatements", priceStatements);
+                payload.Add(POI_API.PropertyKeys.PriceStatements, priceStatements);
 
             var answer = await Connection.RequestAsync("pushCheckpoints",
                                                        payload,
@@ -413,8 +413,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var answer = await Connection.RequestAsync("signCheckpoint",
                                                        new JObject(
-                                                           new JProperty("checkpointId",  Push.CheckpointId.ToString()),
-                                                           new JProperty("signatures",    new JArray(Push.Signatures.Select(signature => signature.ToJSON())))
+                                                           new JProperty(POI_API.PropertyKeys.CheckpointId,  Push.CheckpointId.ToString()),
+                                                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Signatures,    new JArray(Push.Signatures.Select(signature => signature.ToJSON(Embedded: true))))
                                                        ),
                                                        CancellationToken);
 
@@ -442,8 +442,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => RequestAsync("signCheckpoint",
                             new JObject(
-                                new JProperty("checkpointId",  CheckpointId.ToString()),
-                                new JProperty("signatures",    new JArray(Signatures.Select(signature => signature.ToJSON())))
+                                new JProperty(POI_API.PropertyKeys.CheckpointId,  CheckpointId.ToString()),
+                                new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Signatures,    new JArray(Signatures.Select(signature => signature.ToJSON(Embedded: true))))
                             ),
                             CancellationToken);
 

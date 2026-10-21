@@ -64,6 +64,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String IdentityKeysProperty  = "identityKeys";
 
+        #region (static) class PropertyKeys
+
+        /// <summary>
+        /// Property keys for JSON and CBOR (de-)serialization of the keys of a party.
+        /// </summary>
+        public static class PropertyKeys
+        {
+
+            /// <summary>
+            /// The property of its signing keys.
+            /// </summary>
+            public const String  SigningKeys    = SigningKeysProperty;
+
+            /// <summary>
+            /// The property of its identity keys.
+            /// </summary>
+            public const String  IdentityKeys   = IdentityKeysProperty;
+
+        }
+
+        #endregion
+
 
         #region IsKeyProperty(PropertyName)
 
@@ -72,7 +94,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public static Boolean IsKeyProperty(String? PropertyName)
 
-            => PropertyName is SigningKeysProperty or IdentityKeysProperty;
+            => PropertyName is PropertyKeys.SigningKeys or PropertyKeys.IdentityKeys;
 
         #endregion
 
@@ -82,8 +104,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The given keys in the order of their identifications; a key must not be both a signing and an identity key.
         /// </summary>
         internal static (ImmutableArray<POIPublicKey> SigningKeys, ImmutableArray<POIPublicKey> IdentityKeys) Check(IEnumerable<POIPublicKey>?  SigningKeys,
-                                                                                                                   IEnumerable<POIPublicKey>?  IdentityKeys,
-                                                                                                                   String                      Party)
+                                                                                                                    IEnumerable<POIPublicKey>?  IdentityKeys,
+                                                                                                                    String                      Party)
         {
 
             var signingKeys   = POIPublicKey.Ordered(SigningKeys,  $"signing key of {Party}");
@@ -108,10 +130,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (Party.SigningKeys.Length > 0)
-                JSON.Add(SigningKeysProperty,   new JArray(Party.SigningKeys. Select(key => key.ToJSON())));
+                JSON.Add(PropertyKeys.SigningKeys,   new JArray(Party.SigningKeys. Select(key => key.ToJSON(Embedded: true))));
 
             if (Party.IdentityKeys.Length > 0)
-                JSON.Add(IdentityKeysProperty,  new JArray(Party.IdentityKeys.Select(key => key.ToJSON())));
+                JSON.Add(PropertyKeys.IdentityKeys,  new JArray(Party.IdentityKeys.Select(key => key.ToJSON(Embedded: true))));
 
             return JSON;
 
@@ -132,8 +154,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             IdentityKeys = [];
 
-            return POIJSON.TryParseObjects(JSON, SigningKeysProperty,  "signing key",   POIPublicKey.TryParse, out SigningKeys,  out ErrorResponse) &&
-                   POIJSON.TryParseObjects(JSON, IdentityKeysProperty, "identity key",  POIPublicKey.TryParse, out IdentityKeys, out ErrorResponse);
+            return POIJSON.TryParseObjects(JSON, PropertyKeys.SigningKeys,  "signing key",   POIPublicKey.TryParse, out SigningKeys,  out ErrorResponse) &&
+                   POIJSON.TryParseObjects(JSON, PropertyKeys.IdentityKeys, "identity key",  POIPublicKey.TryParse, out IdentityKeys, out ErrorResponse);
 
         }
 

@@ -61,7 +61,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return;
             }
 
-            foreach (var priceStatementJSON in answer.GetPayloadJSON()?["priceStatements"]?.OfType<JObject>() ?? [])
+            foreach (var priceStatementJSON in answer.GetPayloadJSON()?[POI_API.PropertyKeys.PriceStatements]?.OfType<JObject>() ?? [])
             {
 
                 if (options.FollowPriceStatements)
@@ -156,7 +156,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var answer = await Connection.RequestAsync("addPriceStatements",
-                                                       new JObject(new JProperty("priceStatements", new JArray(PriceStatements.Select(priceStatement => priceStatement.ToJSON())))),
+                                                       new JObject(new JProperty(POI_API.PropertyKeys.PriceStatements, new JArray(PriceStatements.Select(priceStatement => priceStatement.ToJSON(Embedded: true))))),
                                                        CancellationToken);
 
             if (answer.IsError)
@@ -168,8 +168,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var priceStatement in PriceStatements)
                 receivedPriceStatements.TryAdd(priceStatement.Digest, 0);
 
-            if (answer.GetPayloadJSON() is JObject result && result["refused"]?.Value<Int32>() is Int32 refused && refused > 0)
-                RaiseError($"The other server refused {refused} of {PriceStatements.Count} price statements: {result["refusals"]?.First?["description"]?.Value<String>()}", null);
+            if (answer.GetPayloadJSON() is JObject result && result[POI_API.PropertyKeys.Refused]?.Value<Int32>() is Int32 refused && refused > 0)
+                RaiseError($"The other server refused {refused} of {PriceStatements.Count} price statements: {result[POI_API.PropertyKeys.Refusals]?.First?[POI_API.PropertyKeys.Description]?.Value<String>()}", null);
 
             return true;
 
@@ -193,7 +193,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return null;
 
             var answer = await Connection.RequestAsync("checkpointPriceStatements",
-                                                       new JObject(new JProperty("checkpointId", Checkpoint.Id.ToString())),
+                                                       new JObject(new JProperty(POI_API.PropertyKeys.CheckpointId, Checkpoint.Id.ToString())),
                                                        CancellationToken);
 
             if (answer.IsError)
@@ -204,7 +204,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var priceStatements = new List<RoamingNetworkPriceStatement>();
 
-            foreach (var priceStatementJSON in answer.GetPayloadJSON()?["priceStatements"]?.OfType<JObject>() ?? [])
+            foreach (var priceStatementJSON in answer.GetPayloadJSON()?[POI_API.PropertyKeys.PriceStatements]?.OfType<JObject>() ?? [])
             {
 
                 if (!RoamingNetworkPriceStatement.TryParse(priceStatementJSON, out var priceStatement, out var errorResponse))
