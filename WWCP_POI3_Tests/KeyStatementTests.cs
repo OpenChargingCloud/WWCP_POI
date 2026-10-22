@@ -242,7 +242,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
         {
 
             var id      = new String('a', 64);
-            var anchor  = new RoamingNetworkTrustAnchor(new Uri("https://hub.example/poi/RNs/rn1"), [ id, new String('b', 64) ]);
+            var anchor  = new RoamingNetworkTrustAnchor(RoamingNetwork_Id.Parse("rn1"), URL.Parse("https://hub.example/poi/RNs/rn1"), [ id, new String('b', 64) ]);
             var uri     = anchor.ToURI();
 
             using (Assert.EnterMultipleScope())
@@ -252,7 +252,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(RoamingNetworkTrustAnchor.TryParse(uri, out var parsed, out var error),  Is.True, error);
                 Assert.That(parsed!.RoamingNetworkId.ToString(),                                     Is.EqualTo("rn1"));
                 Assert.That(parsed.IdentityKeyIds,                                                   Is.EqualTo(anchor.IdentityKeyIds));
-                Assert.That(parsed.RoamingNetworkURI,                                                Is.EqualTo(new Uri("https://hub.example/poi/RNs/rn1")));
+                Assert.That(parsed.RoamingNetworkURL,                                                Is.EqualTo(URL.Parse("https://hub.example/poi/RNs/rn1")));
 
                 Assert.That(RoamingNetworkTrustAnchor.TryParse("https://hub.example/poi/RNs/rn1",                                 out _, out _),  Is.False, "no identity keys");
                 Assert.That(RoamingNetworkTrustAnchor.TryParse("https://hub.example/poi/RNs/rn1?identityKeys=ABC",                out _, out _),  Is.False, "not a thumbprint");
@@ -288,7 +288,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             Assert.That(RoamingNetworkTrustAnchor.TryParse(trustAnchorJSON["uri"]!.Value<String>()!, out var anchor, out var error), Is.True, error);
 
             // Where the app finds the proofs: below the roaming network the anchor names.
-            var proofText           = await httpClient.GetStringAsync($"{anchor!.RoamingNetworkURI}/CSs/{S1}/proof");
+            var proofText           = await httpClient.GetStringAsync($"{anchor!.RoamingNetworkURL}/CSs/{S1}/proof");
 
             Assert.That(RoamingNetworkProof.TryParse(proofText, out var proof, out error), Is.True, error);
 
@@ -296,7 +296,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(anchor.RoamingNetworkURI.ToString(),                         Is.EqualTo($"http://127.0.0.1:{httpServer.TCPPort}/RNs/rn1"));
+                Assert.That(anchor.RoamingNetworkURL.ToString(),                         Is.EqualTo($"http://127.0.0.1:{httpServer.TCPPort}/RNs/rn1"));
                 Assert.That(anchor.IdentityKeyIds,                                       Is.EqualTo(new[] { identity.Public.Id }));
                 Assert.That(keyStatementJSON["keyId"]!.Value<String>(),                  Is.EqualTo(identity.Public.Id));
                 Assert.That(proof!.Verify(anchor.IdentityKeyIds, out _, out error),      Is.True, error);

@@ -493,7 +493,7 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   `keyStatement`, signed with one of its identity keys, or with a quorum by those of `minConsensus` holders
   (`RoamingNetworkKeyStatement.Create(…)`, `WithSignature(…)`, committed as a property of the operator), so that every
   proof gives it. An app scans the QR code of the trust anchor (`GET ~/RNs/{id}/trustAnchor`): `WWCPPOI1:` and the
-  Base45 of its CBOR, with the network, its name, description and where to learn more, the thumbprints of the identity
+  Base45 of its CBOR, with the network, its name and description, the thumbprints of the identity
   keys and the `minConsensus` (`RoamingNetworkTrustAnchor.TryParse(text, …)`; the URI
   `https://hub.example/poi/RNs/rn1?identityKeys=<@id>,…` is read as well), and verifies proofs with
   `proof.Verify(anchor, …)`: only the thumbprints and the `minConsensus` are pinned.

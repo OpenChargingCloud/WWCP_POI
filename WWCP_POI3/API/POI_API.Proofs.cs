@@ -95,7 +95,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region GET ~/RNs/{RN_Id}/trustAnchor
 
             // What an app pins, for a QR code: the roaming network as this request names it, the identity keys of its
-            // operator and its minConsensus, with the name and description of the network and the homepage of its operator;
+            // operator and its minConsensus, with the name and description of the network;
             // as a URI and as the Base45 of its CBOR. Over https, unless the request is one of this machine.
             AddEntityHandlers(roamingNetworkPath + "/trustAnchor",
                               request => {
@@ -109,16 +109,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   var host          = request.Host;
                                   var local         = host.Name is "localhost" or "127.0.0.1" or "[::1]" or "::1";
                                   var path          = request.Path.ToString();
-                                  var homepage      = roamingNetwork.Operator.Homepage?.ToString();
-                                  var trustAnchor   = new RoamingNetworkTrustAnchor(new Uri($"{(local ? "http" : "https")}://{host}{path[..path.LastIndexOf("/trustAnchor", StringComparison.Ordinal)]}"),
-                                                                                    roamingNetwork.Operator.IdentityKeys.Select(identityKey => identityKey.Id),
+                                  var trustAnchor   = new RoamingNetworkTrustAnchor(roamingNetwork.Id,
+                                                                                    URL.Parse($"{(local ? "http" : "https")}://{host}{path[..path.LastIndexOf("/trustAnchor", StringComparison.Ordinal)]}"),
+                                                                                    [ .. roamingNetwork.Operator.IdentityKeys.Select(identityKey => identityKey.Id) ],
                                                                                     roamingNetwork.Operator.MinConsensus,
                                                                                     roamingNetwork.Name,
-                                                                                    roamingNetwork.Description,
-                                                                                    homepage is not null && Uri.TryCreate(homepage, UriKind.Absolute, out var moreInformation) &&
-                                                                                    (moreInformation.Scheme == Uri.UriSchemeHttps || moreInformation.Scheme == Uri.UriSchemeHttp)
-                                                                                        ? moreInformation
-                                                                                        : null);
+                                                                                    roamingNetwork.Description);
 
                                   return EntityResponse(request,
                                                         new JObject(

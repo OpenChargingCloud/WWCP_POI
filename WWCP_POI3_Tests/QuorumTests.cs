@@ -24,6 +24,7 @@ using NUnit.Framework;
 using Org.BouncyCastle.Crypto.Parameters;
 
 using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 using cloud.charging.open.protocols.WWCP.POI.tests.Proofs;
 
@@ -341,8 +342,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var byOne     = AttestedBy("Alpha");
             var byTwo     = AttestedBy("Alpha", "Gamma");
             var network   = byTwo.Head.RoamingNetwork;
-            var anchor    = new RoamingNetworkTrustAnchor(new Uri($"https://hub.example/poi/RNs/{network.Id}"),
-                                                          network.Operator!.IdentityKeys.Select(key => key.Id),
+            var anchor    = new RoamingNetworkTrustAnchor(network.Id,
+                                                          URL.Parse($"https://hub.example/poi/RNs/{network.Id}"),
+                                                          [ .. network.Operator!.IdentityKeys.Select(key => key.Id) ],
                                                           network.Operator!.MinConsensus);
 
             Assert.That(byOne.TryGetChargingStationProof(S1, out var proofOfOne, out var error, At: at), Is.True, error);
@@ -378,12 +380,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         {
 
             var network  = Network(2);
-            var anchor   = new RoamingNetworkTrustAnchor(new Uri($"https://hub.example/poi/RNs/{network.Id}"),
-                                                         network.Operator!.IdentityKeys.Select(key => key.Id),
+            var anchor   = new RoamingNetworkTrustAnchor(network.Id,
+                                                         URL.Parse($"https://hub.example/poi/RNs/{network.Id}"),
+                                                         [ .. network.Operator!.IdentityKeys.Select(key => key.Id) ],
                                                          2,
                                                          new ImmutableI18NString(I18NString.Create(Languages.de, "Beispielnetz").Set(Languages.en, "Example network")),
-                                                         new ImmutableI18NString(I18NString.Create(Languages.en, "Charging stations of the example operators")),
-                                                         new Uri("https://roaming.example.org/about"));
+                                                         new ImmutableI18NString(I18NString.Create(Languages.en, "Charging stations of the example operators")));
 
             var qrCode   = anchor.ToQRCode();
 
@@ -398,12 +400,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(qrCode.Length,             Is.LessThan(1000));
 
                 Assert.That(read!.RoamingNetworkId,    Is.EqualTo(network.Id));
-                Assert.That(read.RoamingNetworkURI,    Is.EqualTo(anchor.RoamingNetworkURI));
+                Assert.That(read.RoamingNetworkURL,    Is.EqualTo(anchor.RoamingNetworkURL));
                 Assert.That(read.IdentityKeyIds,       Is.EqualTo(anchor.IdentityKeyIds));
                 Assert.That(read.MinConsensus,         Is.EqualTo((Byte) 2));
                 Assert.That(read.Name,                 Is.EqualTo(anchor.Name));
                 Assert.That(read.Description,          Is.EqualTo(anchor.Description));
-                Assert.That(read.MoreInformation,      Is.EqualTo(anchor.MoreInformation));
                 Assert.That(JToken.DeepEquals(read.ToJSON(), anchor.ToJSON()),  Is.True);
 
                 Assert.That(identityKeysCBOR.AsArray().All(id => id.TryGetBytes(out var bytes) && bytes.Length == 32),  Is.True);
@@ -412,13 +413,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(RoamingNetworkTrustAnchor.TryParse(anchor.ToURI(), out var fromURI, out error),  Is.True, error);
                 Assert.That(fromURI!.MinConsensus,     Is.EqualTo((Byte) 2));
 
-                Assert.That(() => new RoamingNetworkTrustAnchor(anchor.RoamingNetworkURI, anchor.IdentityKeyIds, 4),
+                Assert.That(() => new RoamingNetworkTrustAnchor(anchor.RoamingNetworkId, anchor.RoamingNetworkURL, anchor.IdentityKeyIds, 4),
                             Throws.ArgumentException.With.Message.Contains("needs as many identity keys"));
 
                 var otherNetwork = anchor.ToJSON();
                 otherNetwork["roamingNetworkId"] = "rn9";
                 Assert.That(RoamingNetworkTrustAnchor.TryParse(otherNetwork, out _, out var error2),  Is.False);
-                Assert.That(error2,  Does.Contain("names the URI of"));
+                Assert.That(error2,  Does.Contain("names the URL of"));
 
             }
 

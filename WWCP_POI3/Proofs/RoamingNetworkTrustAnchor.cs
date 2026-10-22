@@ -21,7 +21,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
-
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 using org.GraphDefined.Vanaheimr.Illias;
 
 #endregion
@@ -32,9 +32,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// What an app trusts of a roaming network (SPECIFICATION.md, section 8.6): where its proofs come from, the @ids of the
     /// identity keys of its operator, their SHA-256 thumbprints, and how many holders of them sign, its minConsensus; with
-    /// its name, its description and where to learn more about it, to show. For a QR code, e.g. on the website or in the
-    /// documents of the roaming network operator, as the text WWCPPOI1: and the Base45 of its deterministic CBOR [RFC 9285],
-    /// or, without name, description and further information, as one URI:
+    /// its name and its description, to show. For a QR code, e.g. on the website or in the documents of the roaming network
+    /// operator, as the text WWCPPOI1: and the Base45 of its deterministic CBOR [RFC 9285], or, without name and description,
+    /// as one URI:
     /// https://hub.example/poi/RNs/rn1?identityKeys=a1…,c3…&amp;minConsensus=2. Only the thumbprints and the minConsensus are
     /// trusted; the keys themselves come with every proof, in the key statement and the operator it gives.
     /// </summary>
@@ -101,11 +101,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  RoamingNetworkURI  = "roamingNetworkURI";
 
             /// <summary>
-            /// The property of where to learn more about the roaming network, e.g. the website of its operator.
-            /// </summary>
-            public const String  MoreInformation    = "moreInformation";
-
-            /// <summary>
             /// The property of the @ids of the identity keys of the roaming network operator: hexadecimal in JSON, the bytes
             /// in CBOR.
             /// </summary>
@@ -124,7 +119,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The URI of the roaming network, ~/RNs/{RN_Id}, below which its proofs are served.
         /// </summary>
-        public Uri                     RoamingNetworkURI    { get; }
+        public URL                     RoamingNetworkURL    { get; }
 
         /// <summary>
         /// The roaming network, the last segment of its URI.
@@ -152,37 +147,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableI18NString     Description          { get; }
 
-        /// <summary>
-        /// Where to learn more about the roaming network, e.g. the website of its operator; not trusted.
-        /// </summary>
-        public Uri?                    MoreInformation      { get; }
-
         #endregion
 
         #region Constructor(s)
 
         /// <summary>
-        /// Create a trust anchor of the given URI of a roaming network, ~/RNs/{RN_Id}, the @ids of the identity keys of its
-        /// operator and its minConsensus, with the name and description of the roaming network and where to learn more.
+        /// Create a trust anchor of the given roaming network and its URL, ~/RNs/{RN_Id}, the @ids of the identity keys of
+        /// its operator and its minConsensus, with the name and description of the roaming network.
         /// </summary>
-        public RoamingNetworkTrustAnchor(Uri                   RoamingNetworkURI,
-                                         IEnumerable<String>   IdentityKeyIds,
-                                         Byte                  MinConsensus      = 1,
-                                         ImmutableI18NString?  Name              = null,
-                                         ImmutableI18NString?  Description       = null,
-                                         Uri?                  MoreInformation   = null)
+        /// <exception cref="ArgumentException">The URL is not the http or https URL of the roaming network, ~/RNs/{RN_Id} without a query, an @id is not a thumbprint, or the minConsensus not from 1 to the number of identity keys.</exception>
+        public RoamingNetworkTrustAnchor(RoamingNetwork_Id       Id,
+                                         URL                     RoamingNetworkURL,
+                                         ImmutableArray<String>  IdentityKeyIds,
+                                         Byte                    MinConsensus   = 1,
+                                         ImmutableI18NString?    Name           = null,
+                                         ImmutableI18NString?    Description    = null)
         {
 
-            if (!TryCheck(RoamingNetworkURI, IdentityKeyIds, MinConsensus, MoreInformation, out var roamingNetworkId, out var identityKeyIds, out var error))
+            if (!TryCheck(RoamingNetworkURL, IdentityKeyIds, MinConsensus, out var roamingNetworkId, out _, out var error))
                 throw new ArgumentException(error);
 
-            this.RoamingNetworkURI  = new Uri(RoamingNetworkURI.GetLeftPart(UriPartial.Path));
-            this.RoamingNetworkId   = roamingNetworkId;
-            this.IdentityKeyIds     = identityKeyIds;
+            if (roamingNetworkId != Id)
+                throw new ArgumentException($"The URL of the trust anchor of the roaming network '{Id}' is the one of '{roamingNetworkId}'!");
+
+            this.RoamingNetworkId   = Id;
+            this.RoamingNetworkURL  = RoamingNetworkURL;
+            this.IdentityKeyIds     = IdentityKeyIds;
             this.MinConsensus       = MinConsensus;
             this.Name               = Name        ?? ImmutableI18NString.Empty;
             this.Description        = Description ?? ImmutableI18NString.Empty;
-            this.MoreInformation    = MoreInformation;
 
         }
 
@@ -197,7 +190,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public String ToURI()
 
-            => $"{RoamingNetworkURI.GetLeftPart(UriPartial.Path)}?{IdentityKeysParameter}={String.Join(",", IdentityKeyIds)}" +
+            => $"{RoamingNetworkURL}?{IdentityKeysParameter}={String.Join(",", IdentityKeyIds)}" +
                (MinConsensus > 1 ? $"&{MinConsensusParameter}={MinConsensus}" : "");
 
         #endregion
@@ -216,15 +209,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        );
 
             if (Name.IsNotNullOrEmpty())
-                json.Add(PropertyKeys.Name,               Name.ToJSON());
+                json.Add(PropertyKeys.Name,               Name.             ToJSON());
 
             if (Description.IsNotNullOrEmpty())
-                json.Add(PropertyKeys.Description,        Description.ToJSON());
+                json.Add(PropertyKeys.Description,        Description.      ToJSON());
 
-            json.Add(PropertyKeys.RoamingNetworkURI,      RoamingNetworkURI.GetLeftPart(UriPartial.Path));
-
-            if (MoreInformation is not null)
-                json.Add(PropertyKeys.MoreInformation,    MoreInformation.ToString());
+            json.Add(PropertyKeys.RoamingNetworkURI,      RoamingNetworkURL.ToString());
 
             json.Add(PropertyKeys.IdentityKeys,           new JArray(IdentityKeyIds));
 
@@ -279,7 +269,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Try to parse the given trust anchor, e.g. of a QR code: its text WWCPPOI1: and the Base45 of its CBOR, or its URI.
         /// </summary>
-        public static Boolean TryParse(String                                              URI,
+        public static Boolean TryParse(String                                               URI,
                                        [NotNullWhen(true)]  out RoamingNetworkTrustAnchor?  TrustAnchor,
                                        [NotNullWhen(false)] out String?                     ErrorResponse)
         {
@@ -291,13 +281,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (text.StartsWith(QRCodePrefix, StringComparison.Ordinal))
                 return TryParseQRCode(text, out TrustAnchor, out ErrorResponse);
 
-            if (!Uri.TryCreate(text, UriKind.Absolute, out var uri))
+            // The URL of the roaming network, below which its proofs are served, is the one without the query.
+            var queryAt = text.IndexOfAny([ '?', '#' ]);
+
+            if (!URL.TryParse(text, out var url) ||
+                !URL.TryParse(queryAt < 0 ? text : text[..queryAt], out var roamingNetworkURL))
             {
-                ErrorResponse = "A trust anchor is an absolute URI, or the text of its QR code!";
+                ErrorResponse = "A trust anchor is an URL, or the text of its QR code!";
                 return false;
             }
 
-            var parameters    = uri.Query.TrimStart('?').
+            var parameters    = (url.QueryString?.ToString() ?? "").TrimStart('?').
                                     Split('&', StringSplitOptions.RemoveEmptyEntries).
                                     Select (parameter => parameter.Split('=', 2)).
                                     ToArray();
@@ -322,10 +316,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var ids = Uri.UnescapeDataString(identityKeys[0][1]).Split(',');
 
-            if (!TryCheck(uri, ids, quorum, null, out _, out _, out ErrorResponse))
+            if (!TryCheck(roamingNetworkURL, ids, quorum, out var rnId, out _, out ErrorResponse))
                 return false;
 
-            TrustAnchor = new RoamingNetworkTrustAnchor(uri, ids, quorum);
+            TrustAnchor = new RoamingNetworkTrustAnchor(rnId, roamingNetworkURL, [.. ids], quorum);
             return true;
 
         }
@@ -441,12 +435,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Try to parse the given JSON representation of a trust anchor.
         /// </summary>
-        public static Boolean TryParse(JObject                                             JSON,
+        public static Boolean TryParse(JObject                                              JSON,
                                        [NotNullWhen(true)]  out RoamingNetworkTrustAnchor?  TrustAnchor,
                                        [NotNullWhen(false)] out String?                     ErrorResponse)
         {
 
-            TrustAnchor = null;
+            TrustAnchor    = null;
+            ErrorResponse  = null;
 
             try
             {
@@ -458,24 +453,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseString(JSON, PropertyKeys.RoamingNetworkId,   "roaming network identification",  out var roamingNetworkId, out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, PropertyKeys.RoamingNetworkURI,  "roaming network URI",             out var uriText,          out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, PropertyKeys.MoreInformation,    "further information",             out var moreText,         out ErrorResponse))
+                if (!JSON.ParseMandatory(PropertyKeys.RoamingNetworkId,
+                                         "roaming network identification",
+                                         RoamingNetwork_Id.TryParse,
+                                         out RoamingNetwork_Id roamingNetworkId,
+                                         out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.RoamingNetworkURI, "roaming network URI", out var uriText, out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (uriText is null || !Uri.TryCreate(uriText, UriKind.Absolute, out var uri))
+                if (uriText is null || !URL.TryParse(uriText, out var url))
                 {
-                    ErrorResponse = "A trust anchor names the absolute URI of its roaming network!";
-                    return false;
-                }
-
-                Uri? moreInformation = null;
-
-                if (moreText is not null && !Uri.TryCreate(moreText, UriKind.Absolute, out moreInformation))
-                {
-                    ErrorResponse = "Where to learn more about a roaming network is an absolute URI!";
+                    ErrorResponse = "A trust anchor names the absolute URL of its roaming network!";
                     return false;
                 }
 
@@ -513,17 +503,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var ids = identityKeysJSON.Select(id => id.Value<String>()!).ToArray();
 
-                if (!TryCheck(uri, ids, minConsensus, moreInformation, out var uriNetworkId, out _, out ErrorResponse))
+                if (!TryCheck(url, ids, minConsensus, out var rnId, out _, out ErrorResponse))
                     return false;
 
-                if (roamingNetworkId is not null && roamingNetworkId != uriNetworkId.ToString())
+                if (roamingNetworkId != rnId)
                 {
-                    ErrorResponse = $"The trust anchor of the roaming network '{roamingNetworkId}' names the URI of '{uriNetworkId}'!";
+                    ErrorResponse = $"The trust anchor of the roaming network '{roamingNetworkId}' names the URL of '{rnId}'!";
                     return false;
                 }
 
-                TrustAnchor    = new RoamingNetworkTrustAnchor(uri, ids, minConsensus, name, description, moreInformation);
-                ErrorResponse  = null;
+                TrustAnchor    = new RoamingNetworkTrustAnchor(
+                                     roamingNetworkId,
+                                     url,
+                                     [.. ids],
+                                     minConsensus,
+                                     name,
+                                     description
+                                 );
+
                 return true;
 
             }
@@ -539,12 +536,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) TryCheck(URI, IdentityKeyIds, MinConsensus, MoreInformation, out RoamingNetworkId, out Ids, out ErrorResponse)
+        #region (private static) TryCheck(URL, IdentityKeyIds, MinConsensus, out RoamingNetworkId, out Ids, out ErrorResponse)
 
-        private static Boolean TryCheck(Uri                               URI,
+        private static Boolean TryCheck(URL                               URL,
                                         IEnumerable<String>               IdentityKeyIds,
                                         Byte                              MinConsensus,
-                                        Uri?                              MoreInformation,
                                         out RoamingNetwork_Id             RoamingNetworkId,
                                         out ImmutableArray<String>        Ids,
                                         [NotNullWhen(false)] out String?  ErrorResponse)
@@ -553,18 +549,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             RoamingNetworkId  = default;
             Ids               = [ .. IdentityKeyIds ];
 
-            if (!URI.IsAbsoluteUri || (URI.Scheme != Uri.UriSchemeHttps && URI.Scheme != Uri.UriSchemeHttp))
+            if (!IsHTTP(URL))
             {
-                ErrorResponse = "A trust anchor is an http or https URI!";
+                ErrorResponse = "A trust anchor is an http or https URL!";
                 return false;
             }
 
-            var segments = URI.AbsolutePath.TrimEnd('/').Split('/');
+            var segments = URL.Path.ToString().TrimEnd('/').Split('/');
 
-            if (segments.Length < 2 || segments[^2] != "RNs" ||
+            if (URL.QueryString is not null || URL.Fragment is not null ||
+                segments.Length < 2 || segments[^2] != "RNs" ||
                 !RoamingNetwork_Id.TryParse(Uri.UnescapeDataString(segments[^1]), out RoamingNetworkId))
             {
-                ErrorResponse = "The URI of a trust anchor is the one of a roaming network, ~/RNs/{RN_Id}!";
+                ErrorResponse = "The URL of a trust anchor is the one of a roaming network, ~/RNs/{RN_Id}, without a query!";
                 return false;
             }
 
@@ -582,17 +579,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (MoreInformation is not null &&
-               (!MoreInformation.IsAbsoluteUri || (MoreInformation.Scheme != Uri.UriSchemeHttps && MoreInformation.Scheme != Uri.UriSchemeHttp)))
-            {
-                ErrorResponse = "Where to learn more about a roaming network is an http or https URI!";
-                return false;
-            }
-
             ErrorResponse = null;
             return true;
 
         }
+
+        #endregion
+
+        #region (private static) IsHTTP(URL)
+
+        /// <summary>
+        /// Whether the given URL is an http or an https URL.
+        /// </summary>
+        private static Boolean IsHTTP(URL URL)
+
+            => URL.Scheme == URIScheme.https || URL.Scheme == URIScheme.http;
 
         #endregion
 

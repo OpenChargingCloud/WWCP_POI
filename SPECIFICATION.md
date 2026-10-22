@@ -539,13 +539,13 @@ S9n8fy68dcR2YV08EVa1y3QllkuyqiBrAvY8iOZlGg1h7UJqUMYF6jnPmOT+tgUIFhFUAj7C8vLx3iua
 **Trust anchor** (section 8.6) of the example, with the identity key of the key statement above:
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetworkTrustAnchor","roamingNetworkId":"rn1","name":{"en":"Example"},"roamingNetworkURI":"https://hub.example/poi/RNs/rn1","moreInformation":"https://rno.example/roaming","identityKeys":["1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802"]}
+{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetworkTrustAnchor","roamingNetworkId":"rn1","name":{"en":"Example"},"roamingNetworkURI":"https://hub.example/poi/RNs/rn1","identityKeys":["1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802"]}
 ```
 
-Its QR code, 266 bytes of CBOR:
+Its QR code, 221 bytes of CBOR:
 
 ```
-WWCPPOI1:Q1L..DF$D4IK1$CM2D$9FQ$DTVD38DUPCG/DB$CQWE-69MWEW9E0G7%:5I9E -DNPCGECD3D3/D+%5*VD$$EQ:5-3E7WEBAFCPES4FVPC:L5VQE$-D0LEBECZEDV2D7$CK4F-KEIUA7%EGVE:.D59D.KEPED1$CBWERWE-N9-FF$FGW24.+U3M0-$O1JV%LLP-T2OR-7U%J0WP7ZXAW7RI33:PKFFM%D0P$DZKEXC9X.C/KEIEC EDK/D-K3MWEW9E0G7-:5B/D.%5$9FQ$DTVD-:5S3EJ$D3/DV9ES3EJ$D3/D:+9PWE04EFPD4VC:KECB60LEBECZEDV2D7$CK4F-KEHZA/C9U/3MWEW9E0G7V:5Z$E.%5$9FQ$DTVD*:5 3E9:5D-9-:5*-D
+WWCPPOI1:++K..DF$D4IK1$CM2D$9FQ$DTVD38DUPCG/DB$CQWE-69MWEW9E0G7%:5I9E -DNPCGECD3D3/D+%5*VD$$EQ:5-3E7WEBAFCPES4FVPC:L5VQE$-D0LEBECZEDV2D7$CK4F-KEIUA7%EGVE:.D59D.KEPED1$CBWERWE-N9-FF$FGW24.+U3M0-$O1JV%LLP-T2OR-7U%J0WP7ZXAW7RI33:PKFFM*D00LEBECZEDV2D7$CK4F-KENC9XPC*-DHFES3EJ$D3/D:+9PWE04ERPD5IAG8FA9DIWENPEJ/5B9DOICB$CBECP9ESZCS9EHDDAIACPE:KE41
 ```
 
 **Station proof** (section 8.4)
@@ -887,13 +887,13 @@ has an example.
   ```json
   { "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkTrustAnchor",
     "roamingNetworkId": "rn1", "name": { "en": "…" }, "description": { "en": "…" },
-    "roamingNetworkURI": "https://hub.example/poi/RNs/rn1", "moreInformation": "https://rno.example/roaming",
+    "roamingNetworkURI": "https://hub.example/poi/RNs/rn1",
     "identityKeys": [ "<@id>", "<@id>", "<@id>" ], "minConsensus": 2 }
   ```
 
   the roaming network, below whose URI its proofs are served (`…/CSs/{CS_Id}/proof`), the `@id`s of the identity
   keys of its operator, 64 lowercase hexadecimal digits each, and its `minConsensus`, unless 1; to show, its
-  `name` and `description` and where to learn more. Only the `@id`s and the `minConsensus` are trusted: not one
+  `name` and `description`. Only the `@id`s and the `minConsensus` are trusted: not one
   key, which would let its holder vouch for the network alone; the keys come with every proof. The QR code holds
   `WWCPPOI1:` and the Base45 [RFC 9285] of its deterministic CBOR, the keys and values of the JSON, the `@id`s as
   their 32 bytes, all of the alphanumeric mode of QR codes; a reader takes the URI
@@ -901,8 +901,7 @@ has an example.
   as the place it is found: one stuck on a charging station may be anybody's.
 - POI_API serves the key statement of the operator of the head as `GET ~/RNs/{RN_Id}/keyStatement` and its
   trust anchor as `GET ~/RNs/{RN_Id}/trustAnchor`, `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode,
-  trustAnchor}`, the URIs as the request names the roaming network, the name and description of the network, and
-  the homepage of its operator as where to learn more.
+  trustAnchor}`, the URIs as the request names the roaming network, with the name and description of the network.
 
 ### 8.7 Cost (informative)
 
