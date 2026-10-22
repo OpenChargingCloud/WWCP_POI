@@ -489,6 +489,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var parkingSpace in chargingStationOperator.ParkingSpaces)
                     parkingSpaces.TryAdd(parkingSpace.Id, parkingSpace);
 
+            // A key belongs to one party only: no party may name another party's public key as its own, which would
+            // otherwise let it block that party's signatures (its signatures are checked against every party naming the
+            // key, by its validity there), the roaming network operator's included (SPECIFICATION.md, section 4.1).
+            if (DuplicateKeyAcrossParties(Parties) is String duplicateKey)
+                throw new ArgumentException(duplicateKey, nameof(ChargingStationOperators));
+
             #endregion
 
         }
@@ -2589,6 +2595,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var energyMeter in EnergyMeters)
                 if (!seen.Add(energyMeter.Id))
                     return $"The energy meter '{energyMeter.Id}' must not be given twice in the roaming network!";
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when a public key (by its @id, the thumbprint of the key) belongs to more than one party: a party,
+        /// the roaming network operator included, must name only its own keys. A party naming another one's key could
+        /// otherwise keep it from signing, as a change set is refused where any party names the signing key with a
+        /// validity that does not cover its creation (SPECIFICATION.md, section 4.1).
+        /// </summary>
+        internal static String? DuplicateKeyAcrossParties(IEnumerable<(POIPartyId Id, IPOIParty Party)> Parties)
+        {
+
+            var seen = new Dictionary<String, POIPartyId>(StringComparer.Ordinal);
+
+            foreach (var (partyId, party) in Parties)
+                foreach (var key in party.SigningKeys.Concat(party.IdentityKeys))
+                {
+                    if (seen.TryGetValue(key.Id, out var owner))
+                        return $"The key '{key.Id}' of {partyId} is a key of {owner} as well: a key belongs to one party only!";
+                    seen[key.Id] = partyId;
+                }
 
             return null;
 

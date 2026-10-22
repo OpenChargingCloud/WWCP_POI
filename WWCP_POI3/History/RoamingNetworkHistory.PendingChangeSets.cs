@@ -268,6 +268,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                // The union of the signatures gathered so far must stay within what a change set may carry, and no key may
+                // sign it twice: the store and the peers read it back with the same limit (SPECIFICATION.md, section 4.2).
+                if (ChangeSetSignatureError(changeSet) is String signatureCountError)
+                    return Refused(signatureCountError);
+
                 if (FindVersionFor(changeSet) is not (_, RoamingNetwork version))
                     return Dropped(waiting, "The change set fits no version of this history: prepare it again for the head!");
 

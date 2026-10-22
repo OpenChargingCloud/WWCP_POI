@@ -761,6 +761,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (SignatureAlgorithmError(signature.Algorithm, "a signature of the change set") is String changeSetSignatureError)
                         return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: changeSetSignatureError);
 
+                if (ChangeSetSignatureError(ChangeSet) is String tooManySignatures)
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: tooManySignatures);
+
                 foreach (var signer in Signers.IsDefault ? [] : Signers.AsEnumerable())
                     if (SignatureAlgorithmError(signer.Algorithm.Name, $"the signer {signer}") is String signerError)
                         return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: signerError);
@@ -1792,6 +1795,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ForgetPendingChangeSet(Commit, changeSet);
 
             }
+
+        }
+
+        #endregion
+
+        #region (private static) ChangeSetSignatureError(ChangeSet)
+
+        /// <summary>
+        /// Why the signatures of the given change set can not be taken: more of them than a change set may have, or a key
+        /// signing it more than once. Co-signing (SPECIFICATION.md, section 4.2) gathers signatures from several holders,
+        /// and every submission is within the limit on its own; their union is checked here, so that neither a change set
+        /// waiting for signatures nor the commit carrying them grows past what the store and the peers read back with the
+        /// same limit, which would make them refuse it after a restart.
+        /// </summary>
+        private static String? ChangeSetSignatureError(RoamingNetworkChangeSet ChangeSet)
+        {
+
+            if (ChangeSet.Signatures.Length > RoamingNetworkChangeSetLimits.Default.MaxSignatures)
+                return $"A change set has at most {RoamingNetworkChangeSetLimits.Default.MaxSignatures} signatures, not {ChangeSet.Signatures.Length}!";
+
+            // A key signs a change set once: a holder renewing a key, or proving a new identity key, signs with that key,
+            // not several times with it (SPECIFICATION.md, section 4.1 counts holders, not signatures).
+            var keyIds = new HashSet<String>(StringComparer.Ordinal);
+
+            foreach (var signature in ChangeSet.Signatures)
+                if (!keyIds.Add(signature.KeyId))
+                    return $"The key '{signature.KeyId}' signs the change set '{ChangeSet.Id}' more than once!";
+
+            return null;
 
         }
 
