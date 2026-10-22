@@ -46,9 +46,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The versioned profile of the signature input of a commit signature.
+        /// The JSON-LD context of the signature input of a commit signature, which names what it signs and in which version.
         /// </summary>
-        public const String SigningProfile = "wwcp-poi-commit-signature-v1";
+        public const String SignatureContext = RoamingNetworkCommitSignature.JSONLDContext;
 
         #endregion
 
@@ -210,8 +210,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (PublicKey.IsPrivate)
                     throw new ArgumentException("Verification requires a public asymmetric key.", nameof(PublicKey));
 
-                if (Signature.Profile != SigningProfile || Signature.Encoding != "base64")
-                    throw new ArgumentException("Unsupported commit signature profile or encoding.");
 
                 if (Signature.KeyId != ExpectedKeyId)
                     throw new ArgumentException("The signature key ID does not match the trusted key ID.");
@@ -283,9 +281,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region GetSigningBytes(Signature)
 
         /// <summary>
-        /// The signature input of the given signature of this commit, as Styx canonical JSON:
-        /// the signed fields of the signature and the JSON representation of this commit
-        /// with the signatures of its change set, but without the signatures of this commit.
+        /// The signature input of the given signature of this commit, as Styx canonical JSON: the JSON-LD context of a
+        /// commit signature, the signed fields of the signature and the JSON representation of this commit with its own
+        /// context and the signatures of its change set, but without the signatures of this commit.
         /// </summary>
         /// <param name="Signature">A signature of this commit; its value is not part of the input.</param>
         public Byte[] GetSigningBytes(RoamingNetworkCommitSignature Signature)
@@ -295,10 +293,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("The algorithm is not supported for asymmetric signing.", nameof(Signature));
 
             var json = new JObject(
-                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Profile,    SigningProfile),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Context,    SignatureContext),
                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Algorithm,  Signature.Algorithm),
                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.KeyId,      Signature.KeyId),
-                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Encoding,   "base64"),
                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Role,       Signature.Role),
                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.SignedAt,   Signature.SignedAt.ToISO8601())
                        );
@@ -306,7 +303,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Signature.Signer is not null)
                 json.Add(RoamingNetworkCommitSignature.PropertyKeys.Signer, Signature.Signer);
 
-            json.Add(PropertyKeys.Commit, ToJSON(Embedded: true, IncludeSignatures: false));
+            json.Add(PropertyKeys.Commit, ToJSON(Embedded: false, IncludeSignatures: false));
 
             return CanonicalJSON.ToUTF8Bytes(json);
 

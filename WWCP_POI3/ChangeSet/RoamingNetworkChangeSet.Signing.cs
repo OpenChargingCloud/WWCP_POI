@@ -13,6 +13,8 @@ using Newtonsoft.Json.Linq;
 using Org.BouncyCastle.Crypto;
 
 using org.GraphDefined.Vanaheimr.Illias;
+using Org.BouncyCastle.Pkcs;
+using Org.BouncyCastle.X509;
 
 #endregion
 
@@ -21,11 +23,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     public sealed partial record RoamingNetworkChangeSet
     {
-
-        /// <summary>
-        /// Versioned, domain-separated Styx canonical JSON profile for complete ChangeSet signatures; v3 signs the Newtonsoft JSON representation.
-        /// </summary>
-        public const String SigningProfile = "wwcp-poi-changeset-json-v3";
 
         /// <summary>
         /// Append a peer signature using Styx's asymmetric COSE algorithm primitives and return
@@ -109,21 +106,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
         }
 
-
-
-
-
-
-
-
         /// <summary>
         /// Verify this complete batch with a trusted public key and its expected application key ID.
-        /// Unknown profiles, noncanonical Base64, mismatched keys and malformed inputs return false.
+        /// Noncanonical Base64, mismatched keys and malformed inputs return false.
         /// </summary>
-        public Boolean VerifySignature(RoamingNetworkChangeSetSignature signature,
-                                       AsymmetricKeyParameter publicKey,
-                                       String expectedKeyId,
-                                       [NotNullWhen(false)] out String? error)
+        public Boolean VerifySignature(RoamingNetworkChangeSetSignature  signature,
+                                       AsymmetricKeyParameter            publicKey,
+                                       String                            expectedKeyId,
+                                       [NotNullWhen(false)] out String?  error)
         {
             error = null;
             try
@@ -134,8 +124,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     throw new ArgumentException("Verification requires a public asymmetric key.", nameof(publicKey));
                 if (!Signatures.Contains(signature))
                     throw new ArgumentException("The signature is not part of this ChangeSet.", nameof(signature));
-                if (signature.Profile != SigningProfile || signature.Encoding != "base64")
-                    throw new ArgumentException("Unsupported ChangeSet signature profile or encoding.");
                 if (signature.KeyId != expectedKeyId)//Required(expectedKeyId, nameof(expectedKeyId)))
                     throw new ArgumentException("The signature key ID does not match the trusted key ID.");
                 if (!COSEAlgorithm.TryParse(signature.Algorithm, out var algorithm) || algorithm.Name != signature.Algorithm)
@@ -222,8 +210,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         /// <summary>
-        /// Return the fixed profile's canonical UTF-8 signature input:
-        /// the signature header and the JSON representation of this batch without its signatures,
+        /// Return the canonical UTF-8 signature input: the JSON-LD context of a change set, which names what is signed and
+        /// in which version, the algorithm, the key and the JSON representation of this change set without its signatures,
         /// written as Styx canonical JSON. ETags use HEX.
         /// </summary>
         /// <param name="Algorithm">The signature algorithm.</param>
@@ -240,10 +228,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             return CanonicalJSON.ToUTF8Bytes(
                        new JObject(
-                           new JProperty(RoamingNetworkChangeSetSignature.PropertyKeys.Profile,    SigningProfile),
+                           new JProperty(PropertyKeys.Context,                                     JSONLDContext),
                            new JProperty(RoamingNetworkChangeSetSignature.PropertyKeys.Algorithm,  Algorithm.Name),
                            new JProperty(RoamingNetworkChangeSetSignature.PropertyKeys.KeyId,      KeyId),
-                           new JProperty(RoamingNetworkChangeSetSignature.PropertyKeys.Encoding,   "base64"),
                            new JProperty(PropertyKeys.ChangeSet,                                   ToJSON(Embedded:           true,
                                                                                                           IncludeSignatures:  false))
                        )

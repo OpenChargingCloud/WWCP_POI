@@ -47,15 +47,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The versioned profile of the content a commit identification is calculated over: its ETags include the
-        /// effectiveTree ETags of its version (SPECIFICATION.md, section 8.3).
+        /// The JSON-LD context of the object, which names the version of the content a commit identification is calculated
+        /// over, and is part of it also where it is embedded: its ETags include the effectiveTree ETags of its version
+        /// (SPECIFICATION.md, section 8.3).
         /// </summary>
-        public const String IdentityProfile = "wwcp-poi-commit-v3";
-
-        /// <summary>
-        /// The JSON-LD context of the object.
-        /// </summary>
-        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkCommit";
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3";
 
         #endregion
 
@@ -78,11 +74,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of its JSON-LD context, written unless it is embedded.
             /// </summary>
             public const String  Context           = "@context";
-
-            /// <summary>
-            /// The property of the profile of its content, which only the content its identification is calculated over names.
-            /// </summary>
-            public const String  Profile           = "profile";
 
             /// <summary>
             /// The property of the identification of its roaming network.
@@ -735,10 +726,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = Content(IncludeSignatures: true);
 
-            json.Remove(PropertyKeys.Profile);
-
-            if (!Embedded)
-                json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
+            if (Embedded)
+                json.Remove(PropertyKeys.Context);
 
             json.AddFirst(new JProperty(PropertyKeys.Id, Id.ToString()));
 
@@ -813,7 +802,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty(PropertyKeys.Profile,           IdentityProfile),
+                           new JProperty(PropertyKeys.Context,           JSONLDContext),
                            new JProperty(PropertyKeys.RoamingNetworkId,  RoamingNetworkId.ToString()),
                            new JProperty(PropertyKeys.Revision,          Revision),
                            new JProperty(PropertyKeys.ETags,             new JArray(ETags.Select(eTag => eTag.ToJSON())))

@@ -59,14 +59,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The versioned profile of the content a checkpoint identification is calculated over.
+        /// The JSON-LD context of the signature input of a checkpoint signature, which names what it signs and in which
+        /// version: a checkpoint signature is written as a commit signature is, its context separates the two.
         /// </summary>
-        public const String  IdentityProfile  = "wwcp-poi-checkpoint-v1";
-
-        /// <summary>
-        /// The versioned profile of the signature input of a checkpoint signature.
-        /// </summary>
-        public const String  SigningProfile   = "wwcp-poi-checkpoint-signature-v1";
+        public const String  SignatureContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpointSignature/v1";
 
         /// <summary>
         /// The epoch every history begins in (SPECIFICATION.md, section 11).
@@ -74,9 +70,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const UInt32  DefaultEpoch     = 1;
 
         /// <summary>
-        /// The JSON-LD context of the object.
+        /// The JSON-LD context of the object, which names the version of the content a checkpoint identification is
+        /// calculated over, and is part of it also where it is embedded.
         /// </summary>
-        public const String  JSONLDContext    = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkCheckpoint";
+        public const String  JSONLDContext    = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpoint/v1";
 
         #endregion
 
@@ -99,11 +96,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of its JSON-LD context, written unless it is embedded.
             /// </summary>
             public const String  Context           = "@context";
-
-            /// <summary>
-            /// The property of the profile of its content, which only the content its identification is calculated over names.
-            /// </summary>
-            public const String  Profile           = "profile";
 
             /// <summary>
             /// The property of the identification of its roaming network.
@@ -556,7 +548,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("Signing requires a private asymmetric key.", nameof(PrivateKey));
 
             // Without a value yet, only to get the signed fields exactly as they will be written.
-            var unsigned  = new RoamingNetworkCommitSignature(Role, Signer, SignedAt ?? Timestamp.Now, Algorithm.Name, KeyId, "-", SigningProfile);
+            var unsigned  = new RoamingNetworkCommitSignature(Role, Signer, SignedAt ?? Timestamp.Now, Algorithm.Name, KeyId, "-");
             var value     = Algorithm.Sign(GetSigningBytes(unsigned), PrivateKey, Deterministic: Deterministic);
 
             return new RoamingNetworkCommitSignature(unsigned.Role,
@@ -564,8 +556,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                      unsigned.SignedAt,
                                                      unsigned.Algorithm,
                                                      unsigned.KeyId,
-                                                     Convert.ToBase64String(value),
-                                                     SigningProfile);
+                                                     Convert.ToBase64String(value));
 
         }
 
@@ -615,9 +606,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (PublicKey.IsPrivate)
                     throw new ArgumentException("Verification requires a public asymmetric key.", nameof(PublicKey));
 
-                if (Signature.Profile != SigningProfile || Signature.Encoding != "base64")
-                    throw new ArgumentException("Unsupported checkpoint signature profile or encoding.");
-
                 if (Signature.KeyId != ExpectedKeyId)
                     throw new ArgumentException("The signature key ID does not match the trusted key ID.");
 
@@ -645,8 +633,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region GetSigningBytes(Signature)
 
         /// <summary>
-        /// The signature input of the given signature of this checkpoint, as Styx canonical JSON:
-        /// the signed fields of the signature and the JSON representation of this checkpoint without its signatures.
+        /// The signature input of the given signature of this checkpoint, as Styx canonical JSON: the JSON-LD context of a
+        /// checkpoint signature, the signed fields of the signature and the JSON representation of this checkpoint with its
+        /// own context, without its signatures.
         /// </summary>
         /// <param name="Signature">A signature of this checkpoint; its value is not part of the input.</param>
         public Byte[] GetSigningBytes(RoamingNetworkCommitSignature Signature)
@@ -656,10 +645,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("The algorithm is not supported for asymmetric signing.", nameof(Signature));
 
             var json = new JObject(
-                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Profile,     SigningProfile),
+                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Context,     SignatureContext),
                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Algorithm,   Signature.Algorithm),
                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.KeyId,       Signature.KeyId),
-                           new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Encoding,    "base64"),
                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.Role,        Signature.Role),
                            new JProperty(RoamingNetworkCommitSignature.PropertyKeys.SignedAt,    Signature.SignedAt.ToISO8601())
                        );
@@ -667,7 +655,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Signature.Signer is not null)
                 json.Add(RoamingNetworkCommitSignature.PropertyKeys.Signer, Signature.Signer);
 
-            json.Add(PropertyKeys.Checkpoint, ToJSON(Embedded: true, IncludeSignatures: false));
+            json.Add(PropertyKeys.Checkpoint, ToJSON(Embedded: false, IncludeSignatures: false));
 
             return CanonicalJSON.ToUTF8Bytes(json);
 
@@ -991,10 +979,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = Content();
 
-            json.Remove(PropertyKeys.Profile);
-
-            if (!Embedded)
-                json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
+            if (Embedded)
+                json.Remove(PropertyKeys.Context);
 
             json.AddFirst(new JProperty(PropertyKeys.Id, Id.ToString()));
 
@@ -1085,7 +1071,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             var json = new JObject(
-                           new JProperty(PropertyKeys.Profile,           IdentityProfile),
+                           new JProperty(PropertyKeys.Context,           JSONLDContext),
                            new JProperty(PropertyKeys.RoamingNetworkId,  RoamingNetworkId.ToString()),
                            new JProperty(PropertyKeys.Epoch,             Epoch),
                            new JProperty(PropertyKeys.Sequence,          Sequence)

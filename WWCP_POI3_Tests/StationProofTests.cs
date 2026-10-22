@@ -211,7 +211,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(version.ETags[2],                                Is.EqualTo(new ETag(ETagFormat.EffectiveTree, ETagHashAlgorithm.SHA256, digest)));
                 Assert.That(version.ETags[2],                                Is.EqualTo(tree.ETag));
                 Assert.That(genesis.ETags,                                   Is.EqualTo(version.ETags));
-                Assert.That(RoamingNetworkCommit.IdentityProfile,             Is.EqualTo("wwcp-poi-commit-v3"));
+                Assert.That(RoamingNetworkCommit.JSONLDContext,               Is.EqualTo("https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3"));
                 Assert.That(version.ETags[2].ToString(),                     Does.StartWith("effectiveTree:sha256:hex:"));
 
                 // The effective content has the EVSE as it is at runtime, with the maximum power and tariff of its template.
@@ -431,7 +431,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(attestation.CommitId,                                                         Is.EqualTo(history.Head.Commit.Id));
                 Assert.That(attestation.SignedAt,                                                         Is.EqualTo(T0));
                 Assert.That(attestation.ValidUntil,                                                       Is.EqualTo(T0.AddMinutes(15)));
-                Assert.That(attestation.ToJSON()["profile"]!.Value<String>(),                             Is.EqualTo("wwcp-poi-attestation-v1"));
+                Assert.That(attestation.ToJSON()["@context"]!.Value<String>(),                            Is.EqualTo("https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/attestation/v1"));
 
                 Assert.That(proof!.Attestations,                                                          Has.Length.EqualTo(1));
                 Assert.That(proof.Verify(Trusted, out var verifiedBy, out error, T0.AddMinutes(1)),       Is.True, error);

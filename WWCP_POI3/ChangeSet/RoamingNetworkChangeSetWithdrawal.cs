@@ -40,14 +40,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The JSON-LD context of the object.
+        /// The JSON-LD context of the object, which names what its signature signs and in which version: it is part of its
+        /// signature input also where it is embedded.
         /// </summary>
-        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkChangeSetWithdrawal";
-
-        /// <summary>
-        /// The versioned profile of the signature input: the canonical JSON of the withdrawal without its value.
-        /// </summary>
-        public const String SigningProfile  = "wwcp-poi-change-set-withdrawal-v1";
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/changeSetWithdrawal/v1";
 
         #endregion
 
@@ -96,16 +92,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  Value             = "value";
 
-            /// <summary>
-            /// The property of the profile of its signature input.
-            /// </summary>
-            public const String  Profile           = "profile";
-
-            /// <summary>
-            /// The property of the encoding of its signature value.
-            /// </summary>
-            public const String  Encoding          = "encoding";
-
         }
 
         #endregion
@@ -141,16 +127,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public String             Value               { get; }
 
-        /// <summary>
-        /// The versioned profile of the signature input.
-        /// </summary>
-        public String             Profile             { get; }
-
-        /// <summary>
-        /// The encoding of the signature bytes: base64.
-        /// </summary>
-        public String             Encoding            { get; }
-
         #endregion
 
         #region Constructor(s)
@@ -164,16 +140,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Algorithm">The canonical Styx COSE algorithm name.</param>
         /// <param name="KeyId">The @id of the key that signed it.</param>
         /// <param name="Value">The signature bytes, as canonical standard Base64.</param>
-        /// <param name="Profile">The versioned profile of the signature input.</param>
-        /// <param name="Encoding">The encoding of the signature bytes.</param>
         public RoamingNetworkChangeSetWithdrawal(RoamingNetwork_Id  RoamingNetworkId,
                                                  ChangeSet_Id       ChangeSetId,
                                                  DateTimeOffset     WithdrawnAt,
                                                  String             Algorithm,
                                                  String             KeyId,
-                                                 String             Value,
-                                                 String             Profile    = SigningProfile,
-                                                 String             Encoding   = "base64")
+                                                 String             Value)
         {
 
             this.RoamingNetworkId  = RoamingNetworkId;
@@ -182,8 +154,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Algorithm         = Required(Algorithm, nameof(Algorithm));
             this.KeyId             = Required(KeyId,     nameof(KeyId));
             this.Value             = Required(Value,     nameof(Value));
-            this.Profile           = Required(Profile,   nameof(Profile));
-            this.Encoding          = Required(Encoding,  nameof(Encoding));
 
         }
 
@@ -214,7 +184,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("Signing requires a private asymmetric key.", nameof(PrivateKey));
 
             var withdrawnAt  = DateTimeOffset.FromUnixTimeMilliseconds((WithdrawnAt ?? Timestamp.Now).ToUnixTimeMilliseconds());
-            var value        = Algorithm.Sign(SigningBytes(ChangeSet.RoamingNetworkId, ChangeSet.Id, withdrawnAt, Algorithm.Name, KeyId, SigningProfile, "base64"),
+            var value        = Algorithm.Sign(SigningBytes(ChangeSet.RoamingNetworkId, ChangeSet.Id, withdrawnAt, Algorithm.Name, KeyId),
                                               PrivateKey,
                                               Deterministic: true);
 
@@ -233,7 +203,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Whether this withdrawal is signed with the private key of the given public key.
-        /// Unknown profiles, noncanonical Base64 and mismatched keys return false.
+        /// Noncanonical Base64 and mismatched keys return false.
         /// </summary>
         /// <param name="PublicKey">The public key of its KeyId.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
@@ -249,9 +219,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (PublicKey.IsPrivate)
                     throw new ArgumentException("Verification requires a public asymmetric key.", nameof(PublicKey));
 
-                if (Profile != SigningProfile || Encoding != "base64")
-                    throw new ArgumentException("Unsupported profile or encoding of the withdrawal of a change set.");
-
                 if (!COSEAlgorithm.TryParse(Algorithm, out var algorithm) || algorithm.Name != Algorithm)
                     throw new ArgumentException("Unknown or noncanonical signature algorithm.");
 
@@ -260,7 +227,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (value.Length == 0 || Convert.ToBase64String(value) != Value)
                     throw new ArgumentException("The signature value must be nonempty canonical standard Base64.");
 
-                return algorithm.Verify(SigningBytes(RoamingNetworkId, ChangeSetId, WithdrawnAt, Algorithm, KeyId, Profile, Encoding),
+                return algorithm.Verify(SigningBytes(RoamingNetworkId, ChangeSetId, WithdrawnAt, Algorithm, KeyId),
                                         value,
                                         PublicKey,
                                         out ErrorResponse);
@@ -308,9 +275,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !JSON.ParseMandatoryText(PropertyKeys.WithdrawnAt,       "withdrawal timestamp",            out var withdrawnAt,      out ErrorResponse) ||
                     !JSON.ParseMandatoryText(PropertyKeys.Algorithm,         "signature algorithm",             out var algorithm,        out ErrorResponse) ||
                     !JSON.ParseMandatoryText(PropertyKeys.KeyId,             "key identification",              out var keyId,            out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Value,             "signature value",                 out var value,            out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Profile,           "signature profile",               out var profile,          out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Encoding,          "signature encoding",              out var encoding,         out ErrorResponse))
+                    !JSON.ParseMandatoryText(PropertyKeys.Value,             "signature value",                 out var value,            out ErrorResponse))
                 {
                     return false;
                 }
@@ -334,9 +299,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  withdrawnAtTimestamp,
                                  algorithm,
                                  keyId,
-                                 value,
-                                 profile,
-                                 encoding
+                                 value
                              );
 
                 ErrorResponse = null;
@@ -374,8 +337,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             json.Add(PropertyKeys.Algorithm,         Algorithm);
             json.Add(PropertyKeys.KeyId,             KeyId);
             json.Add(PropertyKeys.Value,             Value);
-            json.Add(PropertyKeys.Profile,           Profile);
-            json.Add(PropertyKeys.Encoding,          Encoding);
 
             return json;
 
@@ -384,24 +345,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) SigningBytes(RoamingNetworkId, ChangeSetId, WithdrawnAt, Algorithm, KeyId, Profile, Encoding)
+        #region (private static) SigningBytes(RoamingNetworkId, ChangeSetId, WithdrawnAt, Algorithm, KeyId)
 
         /// <summary>
-        /// The canonical JSON of the withdrawal without its value: what its signature signs.
+        /// The canonical JSON of the withdrawal with its JSON-LD context, without its value: what its signature signs.
         /// </summary>
         private static Byte[] SigningBytes(RoamingNetwork_Id  RoamingNetworkId,
                                            ChangeSet_Id       ChangeSetId,
                                            DateTimeOffset     WithdrawnAt,
                                            String             Algorithm,
-                                           String             KeyId,
-                                           String             Profile,
-                                           String             Encoding)
+                                           String             KeyId)
 
             => CanonicalJSON.ToUTF8Bytes(new JObject(
-                                             new JProperty(PropertyKeys.Profile,           Profile),
+                                             new JProperty(PropertyKeys.Context,           JSONLDContext),
                                              new JProperty(PropertyKeys.Algorithm,         Algorithm),
                                              new JProperty(PropertyKeys.KeyId,             KeyId),
-                                             new JProperty(PropertyKeys.Encoding,          Encoding),
                                              new JProperty(PropertyKeys.RoamingNetworkId,  RoamingNetworkId.ToString()),
                                              new JProperty(PropertyKeys.ChangeSetId,       ChangeSetId.     ToString()),
                                              new JProperty(PropertyKeys.WithdrawnAt,       WithdrawnAt.     ToISO8601())

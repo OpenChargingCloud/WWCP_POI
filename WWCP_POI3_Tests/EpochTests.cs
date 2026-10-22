@@ -131,7 +131,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             {
 
                 Assert.That(json.ToString(Newtonsoft.Json.Formatting.None),
-                            Is.EqualTo("{\"canonicalization\":\"styx-canonical-json-v1\",\"identificationHash\":\"sha512\",\"commit\":\"wwcp-poi-commit-v3\",\"checkpoint\":\"wwcp-poi-checkpoint-v1\",\"priceStatement\":\"wwcp-poi-price-statement-v1\",\"signatureAlgorithms\":[\"Ed25519\",\"ML-DSA-65\"]}"));
+                            Is.EqualTo("{\"canonicalization\":\"styx-canonical-json-v1\",\"identificationHash\":\"sha512\",\"commit\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"checkpoint\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpoint/v1\",\"priceStatement\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1\",\"signatureAlgorithms\":[\"Ed25519\",\"ML-DSA-65\"]}"));
 
                 Assert.That(RoamingNetworkEpochProfiles.TryParse(json, out var parsed, out var parseError),   Is.True, parseError);
                 Assert.That(parsed,                                                                           Is.EqualTo(Restricted));

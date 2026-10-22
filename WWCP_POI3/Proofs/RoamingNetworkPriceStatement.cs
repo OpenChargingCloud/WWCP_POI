@@ -58,19 +58,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The profile of the signature of a price statement.
-        /// </summary>
-        public const String SigningProfile  = "wwcp-poi-price-statement-v1";
-
-        /// <summary>
         /// The role a price statement is signed in: by the charging station operator.
         /// </summary>
         public const String Role            = RoamingNetworkCommitSignatureRoles.ChargingStationOperator;
 
         /// <summary>
-        /// The JSON-LD context of the object.
+        /// The JSON-LD context of the object, which names what its signature signs and in which version: it is part of its
+        /// signature input and its digest also where it is embedded.
         /// </summary>
-        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkPriceStatement";
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1";
 
         private String? digest;
 
@@ -166,16 +162,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  Value             = "value";
 
-            /// <summary>
-            /// The property of the profile of its signature.
-            /// </summary>
-            public const String  Profile           = "profile";
-
-            /// <summary>
-            /// The property of the encoding of its signature value.
-            /// </summary>
-            public const String  Encoding          = "encoding";
-
         }
 
         #endregion
@@ -257,21 +243,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public String                        Value               { get; }
 
         /// <summary>
-        /// The profile of the signature.
-        /// </summary>
-        public String                        Profile             { get; }
-
-        /// <summary>
-        /// The encoding of the signature value: base64.
-        /// </summary>
-        public String                        Encoding            { get; }
-
-        /// <summary>
-        /// The digest of this statement: the SHA-256 of its canonical JSON, signature included, as 64 lowercase hexadecimal
-        /// digits. The next statement of the entity names it as its previous one, and a checkpoint takes it as a leaf.
+        /// The digest of this statement: the SHA-256 of its canonical JSON with its JSON-LD context, signature included, as
+        /// 64 lowercase hexadecimal digits. The next statement of the entity names it as its previous one, and a checkpoint
+        /// takes it as a leaf.
         /// </summary>
         public String                        Digest
-            => digest ??= Convert.ToHexStringLower(SHA256.HashData(CanonicalJSON.ToUTF8Bytes(ToJSON(Embedded: true))));
+            => digest ??= Convert.ToHexStringLower(SHA256.HashData(CanonicalJSON.ToUTF8Bytes(ToJSON(Embedded: false))));
 
         #endregion
 
@@ -293,9 +270,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             DateTimeOffset                SignedAt,
                                             String                        Algorithm,
                                             String                        KeyId,
-                                            String                        Value,
-                                            String                        Profile    = SigningProfile,
-                                            String                        Encoding   = "base64")
+                                            String                        Value)
         {
 
             if (!IsEntityType(EntityType))
@@ -342,8 +317,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Algorithm         = Algorithm;
             this.KeyId             = KeyId;
             this.Value             = Value;
-            this.Profile           = Profile;
-            this.Encoding          = Encoding;
 
         }
 
@@ -481,9 +454,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (PublicKey.IsPrivate)
                     throw new ArgumentException("Verification requires a public asymmetric key.", nameof(PublicKey));
-
-                if (Profile != SigningProfile || Encoding != "base64")
-                    throw new ArgumentException("Unsupported price statement profile or encoding.");
 
                 if (KeyId != ExpectedKeyId)
                     throw new ArgumentException("The key ID of the price statement does not match the expected key ID.");
@@ -663,7 +633,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region GetSigningBytes()
 
         /// <summary>
-        /// The signature input of this price statement, as Styx canonical JSON: its signed fields, without its value.
+        /// The signature input of this price statement, as Styx canonical JSON: its JSON-LD context and its signed fields,
+        /// without its value.
         /// </summary>
         public Byte[] GetSigningBytes()
         {
@@ -673,10 +644,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = Content();
 
-            json.AddFirst(new JProperty(PropertyKeys.Encoding,   "base64"));
             json.AddFirst(new JProperty(PropertyKeys.KeyId,      KeyId));
             json.AddFirst(new JProperty(PropertyKeys.Algorithm,  Algorithm));
-            json.AddFirst(new JProperty(PropertyKeys.Profile,    SigningProfile));
+            json.AddFirst(new JProperty(PropertyKeys.Context,    JSONLDContext));
 
             return CanonicalJSON.ToUTF8Bytes(json);
 
@@ -811,7 +781,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               PropertyKeys.RoamingNetworkId or PropertyKeys.EntityType or PropertyKeys.EntityId or PropertyKeys.PriceStatus or
                                               PropertyKeys.ValidFrom or PropertyKeys.ValidUntil or PropertyKeys.Sequence or PropertyKeys.Previous or
                                               PropertyKeys.After or PropertyKeys.Role or PropertyKeys.Signer or PropertyKeys.SignedAt or
-                                              PropertyKeys.Algorithm or PropertyKeys.KeyId or PropertyKeys.Value or PropertyKeys.Profile or PropertyKeys.Encoding))
+                                              PropertyKeys.Algorithm or PropertyKeys.KeyId or PropertyKeys.Value))
                     {
                         ErrorResponse = $"Unknown property '{property.Name}' of a price statement!";
                         return false;
@@ -934,11 +904,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (Text(JSON, PropertyKeys.Algorithm) is not String algorithm || algorithm.Length == 0 ||
                     Text(JSON, PropertyKeys.KeyId)     is not String keyId     || keyId.    Length == 0 ||
-                    Text(JSON, PropertyKeys.Value)     is not String value     || value.    Length == 0 ||
-                    Text(JSON, PropertyKeys.Profile)   is not String profile   ||
-                    Text(JSON, PropertyKeys.Encoding)  is not String encoding)
+                    Text(JSON, PropertyKeys.Value)     is not String value     || value.    Length == 0)
                 {
-                    ErrorResponse = "A price statement requires an algorithm, a key identification, a value, a profile and an encoding!";
+                    ErrorResponse = "A price statement requires an algorithm, a key identification and a value!";
                     return false;
                 }
 
@@ -967,9 +935,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                    signedAt.Value,
                                                                    algorithm,
                                                                    keyId,
-                                                                   value,
-                                                                   profile,
-                                                                   encoding);
+                                                                   value);
 
                 ErrorResponse   = null;
                 return true;
@@ -1039,8 +1005,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             json.Add(PropertyKeys.Algorithm,  Algorithm);
             json.Add(PropertyKeys.KeyId,      KeyId);
             json.Add(PropertyKeys.Value,      Value);
-            json.Add(PropertyKeys.Profile,    Profile);
-            json.Add(PropertyKeys.Encoding,   Encoding);
 
             return CustomPriceStatementSerializer is not null
                        ? CustomPriceStatementSerializer(this, json)
@@ -1091,8 +1055,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             cbor.Add(CBORValue.FromText(PropertyKeys.Algorithm),             CBORValue.FromText(Algorithm));
             cbor.Add(CBORValue.FromText(PropertyKeys.KeyId),                 CBORValue.FromText(KeyId));
             cbor.Add(CBORValue.FromText(PropertyKeys.Value),                 CBORValue.FromText(Value));
-            cbor.Add(CBORValue.FromText(PropertyKeys.Profile),               CBORValue.FromText(Profile));
-            cbor.Add(CBORValue.FromText(PropertyKeys.Encoding),              CBORValue.FromText(Encoding));
 
             return CustomPriceStatementSerializer is not null
                        ? CustomPriceStatementSerializer(this, cbor)

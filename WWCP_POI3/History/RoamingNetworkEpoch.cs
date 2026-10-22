@@ -57,8 +57,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// The profiles of an epoch (SPECIFICATION.md, section 11): the canonicalization, the hash of the identifications of
-    /// commits and checkpoints and of the trees of checkpoints, the profiles of commits, checkpoints and price statements,
-    /// and the signature algorithms accepted. Only what this implementation can calculate is accepted.
+    /// commits and checkpoints and of the trees of checkpoints, the JSON-LD contexts of commits, checkpoints and price
+    /// statements, which name their versions, and the signature algorithms accepted. Only what this implementation can calculate is accepted.
     /// </summary>
     public sealed class RoamingNetworkEpochProfiles : IEquatable<RoamingNetworkEpochProfiles>
     {
@@ -108,17 +108,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  IdentificationHash   = "identificationHash";
 
             /// <summary>
-            /// The property of its profile of commits.
+            /// The property of the JSON-LD context of its commits.
             /// </summary>
             public const String  Commit               = "commit";
 
             /// <summary>
-            /// The property of its profile of checkpoints.
+            /// The property of the JSON-LD context of its checkpoints.
             /// </summary>
             public const String  Checkpoint           = "checkpoint";
 
             /// <summary>
-            /// The property of its profile of price statements.
+            /// The property of the JSON-LD context of its price statements.
             /// </summary>
             public const String  PriceStatement       = "priceStatement";
 
@@ -143,17 +143,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ETagHashAlgorithm       IdentificationHash      { get; }
 
         /// <summary>
-        /// The profile of the content of commits.
+        /// The JSON-LD context of commits, which names the version of their content.
         /// </summary>
         public String                  Commit                  { get; }
 
         /// <summary>
-        /// The profile of the content of checkpoints.
+        /// The JSON-LD context of checkpoints, which names the version of their content.
         /// </summary>
         public String                  Checkpoint              { get; }
 
         /// <summary>
-        /// The profile of price statements.
+        /// The JSON-LD context of price statements, which names their version.
         /// </summary>
         public String                  PriceStatement          { get; }
 
@@ -177,9 +177,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             : this(StyxCanonicalJSON,
                    IdentificationHash,
-                   RoamingNetworkCommit.IdentityProfile,
-                   RoamingNetworkCheckpoint.IdentityProfile,
-                   RoamingNetworkPriceStatement.SigningProfile,
+                   RoamingNetworkCommit.JSONLDContext,
+                   RoamingNetworkCheckpoint.JSONLDContext,
+                   RoamingNetworkPriceStatement.JSONLDContext,
                    SignatureAlgorithms)
 
         { }
@@ -279,12 +279,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (Text(json, PropertyKeys.Commit)         != RoamingNetworkCommit.        IdentityProfile ||
-                Text(json, PropertyKeys.Checkpoint)     != RoamingNetworkCheckpoint.    IdentityProfile ||
-                Text(json, PropertyKeys.PriceStatement) != RoamingNetworkPriceStatement.SigningProfile)
+            if (Text(json, PropertyKeys.Commit)         != RoamingNetworkCommit.        JSONLDContext ||
+                Text(json, PropertyKeys.Checkpoint)     != RoamingNetworkCheckpoint.    JSONLDContext ||
+                Text(json, PropertyKeys.PriceStatement) != RoamingNetworkPriceStatement.JSONLDContext)
             {
-                ErrorResponse = $"The profiles of commits, checkpoints and price statements of an epoch must be '{RoamingNetworkCommit.IdentityProfile}', " +
-                                $"'{RoamingNetworkCheckpoint.IdentityProfile}' and '{RoamingNetworkPriceStatement.SigningProfile}', the ones this implementation calculates!";
+                ErrorResponse = $"The JSON-LD contexts of commits, checkpoints and price statements of an epoch must be '{RoamingNetworkCommit.JSONLDContext}', " +
+                                $"'{RoamingNetworkCheckpoint.JSONLDContext}' and '{RoamingNetworkPriceStatement.JSONLDContext}', the ones this implementation calculates!";
                 return false;
             }
 
@@ -317,9 +317,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Profiles       = new RoamingNetworkEpochProfiles(StyxCanonicalJSON,
                                                              identificationHash,
-                                                             RoamingNetworkCommit.IdentityProfile,
-                                                             RoamingNetworkCheckpoint.IdentityProfile,
-                                                             RoamingNetworkPriceStatement.SigningProfile,
+                                                             RoamingNetworkCommit.JSONLDContext,
+                                                             RoamingNetworkCheckpoint.JSONLDContext,
+                                                             RoamingNetworkPriceStatement.JSONLDContext,
                                                              signatureAlgorithms);
             ErrorResponse  = null;
             return true;

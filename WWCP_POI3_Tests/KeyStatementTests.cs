@@ -151,7 +151,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(stated.Signatures.Single().KeyId,                                                              Is.EqualTo(identity.Public.Id));
                 Assert.That(stated.SigningKeys,                                                        Is.EqualTo(new[] { signing.Public }));
                 Assert.That(stated.TryVerify([ identity.Public.Id ], null, out error),                 Is.True, error);
-                Assert.That(stated.ToJSON()["profile"]!.Value<String>(),                               Is.EqualTo("wwcp-poi-key-statement-v2"));
+                Assert.That(stated.ToJSON()["@context"]!.Value<String>(),                              Is.EqualTo("https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/keyStatement/v2"));
                 Assert.That(JToken.DeepEquals(parsed!.Operator!.KeyStatement!.ToJSON(), statement.ToJSON()),  Is.True);
             }
 

@@ -53,11 +53,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private const String TreeETagJSON    = "[\"effectiveTree\",\"sha256\",\"hex\",\"87923ecc05779a7440e8da51589252f95eeed4977afabd211190c7b3b6602221\"]";
         private const String ETagsJSON       = "[[\"json\",\"sha256\",\"hex\",\"8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224\"],[\"cbor\",\"sha256\",\"hex\",\"291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549\"]," + TreeETagJSON + "]";
 
-        private const String CommitContent   = "{\"eTags\":" + ETagsJSON + ",\"profile\":\"wwcp-poi-commit-v3\",\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
-        private const String CommitId        = "0471b41509fd8458152ecece3970be190d137a514d7e78f86621a63ac2d45042";
+        private const String CommitContent   = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"eTags\":" + ETagsJSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
+        private const String CommitId        = "fb45b9c960d2ece9085219b391a1d3bda793cd834d13f590cf9b7c2bd441f5d0";
 
-        private const String SigningInput    = "{\"algorithm\":\"Ed25519\",\"commit\":{\"@id\":\"" + CommitId + "\",\"eTags\":" + ETagsJSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"},\"encoding\":\"base64\",\"keyId\":\"leader\",\"profile\":\"wwcp-poi-commit-signature-v1\",\"role\":\"leader\",\"signedAt\":\"2026-10-12T12:00:00.000Z\",\"signer\":\"leader.example.org\"}";
-        private const String SignatureValue  = "JK3c2nNFxEaf4Z4IJnC8m1tfipZMlY2D3Qbvf7ua7M7am9JwDY2CmddzTVlMkyhnVizVx41BazSLsezsmMhBAg==";
+        private const String SigningInput    = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commitSignature/v1\",\"algorithm\":\"Ed25519\",\"commit\":{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"@id\":\"" + CommitId + "\",\"eTags\":" + ETagsJSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"},\"keyId\":\"leader\",\"role\":\"leader\",\"signedAt\":\"2026-10-12T12:00:00.000Z\",\"signer\":\"leader.example.org\"}";
+        private const String SignatureValue  = "ZdqzPpoX2rpxR/zyFw5YGG9fWVZ32guEZi1L/QSeCxHa+5T1iScOiYQSTX91kkBuSMiQZaeHCbq53N/pk/t+Cg==";
         private const String PublicKey       = "d3bocLkzVPKgskwj8qNsxOgOIjIYwbl5Jv3QGDlqK5s=";
 
         private const String Timestamps      = "\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"";
@@ -67,8 +67,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private const String PoolDigest      = "8d4f6ed9ca2ffabf1862488a9cff9c8a224a86a247a9bb48b33751d0df5042fe";
         private const String OperatorDigest  = "b137995cb4aacc1bc4f5c1b70f9620187d427bd150c3f9bc405ea079827de2ef";
 
-        private const String AttestationInput = "{\"algorithm\":\"Ed25519\",\"commitId\":\"" + CommitId + "\",\"eTag\":" + TreeETagJSON + ",\"encoding\":\"base64\",\"keyId\":\"rno\",\"profile\":\"wwcp-poi-attestation-v1\",\"revision\":0,\"roamingNetworkId\":\"rn1\",\"role\":\"roamingNetworkOperator\",\"signedAt\":\"2026-10-17T18:00:00.000Z\",\"signer\":\"DE*RNO\",\"validUntil\":\"2026-10-17T18:15:00.000Z\"}";
-        private const String AttestationValue = "p8lSj39s8tNH2kaoJXIMcGqLGCHlm7x2IVrZje4IxFfakk6juMlk3QG5MDOJeYN4Q7QyNFoOmLVZcGShypK1CA==";
+        private const String AttestationInput = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/attestation/v1\",\"algorithm\":\"Ed25519\",\"commitId\":\"" + CommitId + "\",\"eTag\":" + TreeETagJSON + ",\"keyId\":\"rno\",\"revision\":0,\"roamingNetworkId\":\"rn1\",\"role\":\"roamingNetworkOperator\",\"signedAt\":\"2026-10-17T18:00:00.000Z\",\"signer\":\"DE*RNO\",\"validUntil\":\"2026-10-17T18:15:00.000Z\"}";
+        private const String AttestationValue = "fPklC2Inr+ayWGWTYxcXnOXGia9fGT6NdS02iNBNwUkvjTKeB04K+UdSjYT/bt6t9qbeEjBJ+xiu4sXw2eg9AA==";
         private const String RNOPublicKey     = "Kay64UG8yvCyLhqU000LxzYeUm0L/hLIl5S8kyKWbdc=";
 
         #endregion
@@ -185,15 +185,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void The_genesis_of_a_second_epoch()
         {
 
-            const String Input  = "{\"eTags\":[[\"json\",\"sha256\",\"hex\",\"8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224\"],[\"cbor\",\"sha256\",\"hex\",\"291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549\"],[\"effectiveTree\",\"sha256\",\"hex\",\"87923ecc05779a7440e8da51589252f95eeed4977afabd211190c7b3b6602221\"]],\"epoch\":2,\"profile\":\"wwcp-poi-commit-v3\",\"profiles\":{\"canonicalization\":\"styx-canonical-json-v1\",\"checkpoint\":\"wwcp-poi-checkpoint-v1\",\"commit\":\"wwcp-poi-commit-v3\",\"identificationHash\":\"sha512\",\"priceStatement\":\"wwcp-poi-price-statement-v1\",\"signatureAlgorithms\":[\"Ed25519\",\"ML-DSA-65\"]},\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
-            const String Id     = "4ce205c4e6d07d54838b0740f8b9c0ff12941a6f38c4ab37145f115f734a870cbe8b0dd429b569a59bcb34dfe3a924a066fbe2fbeee8e0c07ea2e8d983254a3f";
+            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"eTags\":[[\"json\",\"sha256\",\"hex\",\"8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224\"],[\"cbor\",\"sha256\",\"hex\",\"291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549\"],[\"effectiveTree\",\"sha256\",\"hex\",\"87923ecc05779a7440e8da51589252f95eeed4977afabd211190c7b3b6602221\"]],\"epoch\":2,\"profiles\":{\"canonicalization\":\"styx-canonical-json-v1\",\"checkpoint\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpoint/v1\",\"commit\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"identificationHash\":\"sha512\",\"priceStatement\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1\",\"signatureAlgorithms\":[\"Ed25519\",\"ML-DSA-65\"]},\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
+            const String Id     = "22dd391f9190a4a9a5a8c7fbe1c9c38b2202d1f11ad7d6552b10af28be5b5559992b56b144752c112e4f884b426f5302dce0a5ce86e909a63e33b071fb95f7cc";
 
             var genesis = RoamingNetworkCommit.Genesis(Network(),
                                                        new RoamingNetworkEpoch(2, new RoamingNetworkEpochProfiles(ETagHashAlgorithm.SHA512, [ "Ed25519", "ML-DSA-65" ])));
 
-            var content = genesis.ToJSON(Embedded: true);
+            // What its identification is calculated over: its content with its JSON-LD context, without its @id.
+            var content = genesis.ToJSON();
             content.Remove("@id");
-            content.AddFirst(new Newtonsoft.Json.Linq.JProperty("profile", RoamingNetworkCommit.IdentityProfile));
 
             using (Assert.EnterMultipleScope())
             {
@@ -268,8 +268,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void A_key_statement()
         {
 
-            const String Input  = "{\"algorithm\":\"Ed25519\",\"encoding\":\"base64\",\"identityKeys\":[{\"@id\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"key\":\"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w==\"}],\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"minConsensus\":1,\"profile\":\"wwcp-poi-key-statement-v2\",\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKeys\":[{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\"}],\"validUntil\":\"2026-11-16T00:00:00.000Z\"}";
-            const String Value  = "KvWnqA1SgEBkZl7HUh3n0QaYNQPVBb1KLcHJ7KwPRB0Ev5trafUrg5ldv3AZ/wsFbDkfzH85C2gEKeDOB1whAw==";
+            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/keyStatement/v2\",\"algorithm\":\"Ed25519\",\"identityKeys\":[{\"@id\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"key\":\"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w==\"}],\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"minConsensus\":1,\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKeys\":[{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\"}],\"validUntil\":\"2026-11-16T00:00:00.000Z\"}";
+            const String Value  = "+xLjrUX+ty7PBE1XHUgSmlKAljbhXdm3ccs1HjAW0tyJPAOuAuP/Dh+r/3nLWdhwt2ugx72eek5kTmKNvaP+AA==";
 
             var signingKey   = new Ed25519PrivateKeyParameters(Convert.FromHexString("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), 0);
             var identityKey  = new Ed25519PrivateKeyParameters(Convert.FromHexString("303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f"), 0);
@@ -304,9 +304,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void A_key_statement_of_a_quorum()
         {
 
-            const String InputOfAlpha  = "{\"algorithm\":\"Ed25519\",\"encoding\":\"base64\",\"identityKeys\":[{\"@id\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w==\"},{\"@id\":\"a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f\",\"holder\":\"Beta\",\"key\":\"owEBIAYhWCAc5WpIyC/5kWKhS8VEYSZ05dYfuTF+ZdQFV4D9vLTcNQ==\"}],\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"minConsensus\":2,\"profile\":\"wwcp-poi-key-statement-v2\",\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKeys\":[{\"@id\":\"c1924d610e8d9f1c5efdbca564a2f19991517ab8252807651f94ac5332afe3f9\",\"holder\":\"Beta\",\"key\":\"owEBIAYhWCAXRVO0Vt3fxpCOyrHBAf5qsh4rqgYXeVt9Q6Y0gpk/1Q==\"},{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\"}],\"validUntil\":\"2026-11-16T00:00:00.000Z\"}";
-            const String ValueOfAlpha  = "+aCgAP2Y/8nIwRDpnOkx8gaRnO9SP96dq31VSocHN3v0+TXsOE0mVU2DdO9mglFjZOaHsAWtNDMrv9H3Tjx9Cg==";
-            const String ValueOfBeta   = "S9n8fy68dcR2YV08EVa1y3QllkuyqiBrAvY8iOZlGg1h7UJqUMYF6jnPmOT+tgUIFhFUAj7C8vLx3iuaYmoxBw==";
+            const String InputOfAlpha  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/keyStatement/v2\",\"algorithm\":\"Ed25519\",\"identityKeys\":[{\"@id\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w==\"},{\"@id\":\"a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f\",\"holder\":\"Beta\",\"key\":\"owEBIAYhWCAc5WpIyC/5kWKhS8VEYSZ05dYfuTF+ZdQFV4D9vLTcNQ==\"}],\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"minConsensus\":2,\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKeys\":[{\"@id\":\"c1924d610e8d9f1c5efdbca564a2f19991517ab8252807651f94ac5332afe3f9\",\"holder\":\"Beta\",\"key\":\"owEBIAYhWCAXRVO0Vt3fxpCOyrHBAf5qsh4rqgYXeVt9Q6Y0gpk/1Q==\"},{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\"}],\"validUntil\":\"2026-11-16T00:00:00.000Z\"}";
+            const String ValueOfAlpha  = "EjbREsL+/wWCJh3cNLUIDIC0Jh5Pou8VAyRhSZTNU/0ll3zTJThaTaIzc721O1T7tqj/1sm0ceaw2nOSJ7DvAw==";
+            const String ValueOfBeta   = "Om7vDbZvLwtvW1qpiVguNhZ7K1zNtsaqt1bcMGDot/md+bBZWNeVHFhg2VpH5BMioseZzpP6WLvXdQqrhrqgBg==";
 
             var alphaSigning   = new Ed25519PrivateKeyParameters(Convert.FromHexString("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), 0);
             var alphaIdentity  = new Ed25519PrivateKeyParameters(Convert.FromHexString("303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f"), 0);
@@ -372,9 +372,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             const String OperatorPublicKey  = "JUO5L/EJVRFHatyDadtt3JM2ZaEZeN2hQE7hBmypVZ0=";
             const String KeyId              = "8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d";
-            const String Input              = "{\"algorithm\":\"Ed25519\",\"encoding\":\"base64\",\"entityId\":\"DE*GEF*E1*1\",\"entityType\":\"EVSE\",\"keyId\":\"8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d\",\"priceStatus\":{\"prices\":[{\"chargingTariffId\":\"DE*GEF*T1\",\"elements\":[{\"priceComponents\":[{\"price\":0.39,\"stepSize\":1,\"type\":\"ENERGY\"}]}]}]},\"profile\":\"wwcp-poi-price-statement-v1\",\"roamingNetworkId\":\"rn1\",\"role\":\"chargingStationOperator\",\"sequence\":0,\"signedAt\":\"2026-10-19T11:59:58.000Z\",\"signer\":\"DE*GEF\",\"validFrom\":\"2026-10-19T12:00:00.000Z\",\"validUntil\":\"2026-10-19T12:15:00.000Z\"}";
-            const String Value              = "95n+aTF2ZF3WqdHA8BSZPWqfSvxkMhzSQjCScPsZn13Jhehdi4d/aokA4507iZBy9fmuHRj9vNq5dfiaa0NQDw==";
-            const String Digest             = "efbd7b8f0d28a0affe44a872dbaefdd37b6afa5366202d4653b8a5b58bcef772";
+            const String Input              = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1\",\"algorithm\":\"Ed25519\",\"entityId\":\"DE*GEF*E1*1\",\"entityType\":\"EVSE\",\"keyId\":\"8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d\",\"priceStatus\":{\"prices\":[{\"chargingTariffId\":\"DE*GEF*T1\",\"elements\":[{\"priceComponents\":[{\"price\":0.39,\"stepSize\":1,\"type\":\"ENERGY\"}]}]}]},\"roamingNetworkId\":\"rn1\",\"role\":\"chargingStationOperator\",\"sequence\":0,\"signedAt\":\"2026-10-19T11:59:58.000Z\",\"signer\":\"DE*GEF\",\"validFrom\":\"2026-10-19T12:00:00.000Z\",\"validUntil\":\"2026-10-19T12:15:00.000Z\"}";
+            const String Value              = "jj4tV4hmXg0mK2kdRCo6KF8kvAuKlBkjnXGjdMfjcpzRPhVm36KcLBGbqAAVisA5BUKEQmcI1MKWvENp2+hZDw==";
+            const String Digest             = "de4139029cd1791f6a7de0c34f77d22f5747386f166cd406128d46a8a1fb3885";
 
             var operatorKey  = new Ed25519PrivateKeyParameters(Convert.FromHexString("404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"), 0);
             var publicKey    = POIPublicKey.From(operatorKey);
@@ -394,7 +394,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                    DateTimeOffset.Parse("2026-10-19T12:00:00Z"),
                                                                    DateTimeOffset.Parse("2026-10-19T12:15:00Z"));
 
-            // The digest is the SHA-256 of the canonical JSON of the statement, its signature value included.
+            // The digest is the SHA-256 of the canonical JSON of the statement with its JSON-LD context, its signature value included.
             var withValue    = Input[..^1] + ",\"value\":\"" + Value + "\"}";
 
             using (Assert.EnterMultipleScope())
@@ -403,7 +403,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(publicKey.Id,                                                                       Is.EqualTo(KeyId));
                 Assert.That(Encoding.UTF8.GetString(statement.GetSigningBytes()),                               Is.EqualTo(Input));
                 Assert.That(statement.Value,                                                                    Is.EqualTo(Value));
-                Assert.That(CanonicalJSON.Serialize(statement.ToJSON(Embedded: true)),                                        Is.EqualTo(withValue));
+                Assert.That(CanonicalJSON.Serialize(statement.ToJSON(Embedded: false)),                                       Is.EqualTo(withValue));
                 Assert.That(statement.Digest,                                                                   Is.EqualTo(Digest));
                 Assert.That(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(withValue))),       Is.EqualTo(Digest));
                 Assert.That(statement.TryVerify([ publicKey ], out var error),                                  Is.True, error);

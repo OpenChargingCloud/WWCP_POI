@@ -29,8 +29,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// An immutable peer envelope used by the batch signing profile.
-    /// Profile selects the signed content; Value carries Base64 signature bytes.
+    /// One signature of a change set: the algorithm, the key and the Base64 signature bytes. What it signs, and in which
+    /// version, the JSON-LD context of the change set names in its signature input (RoamingNetworkChangeSet.JSONLDContext).
     /// </summary>
     public sealed record RoamingNetworkChangeSetSignature
     {
@@ -40,7 +40,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkChangeSetSignature";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/changeSetSignature/v1";
 
         #endregion
 
@@ -74,23 +74,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  Value       = "value";
 
-            /// <summary>
-            /// The property of its signature profile.
-            /// </summary>
-            public const String  Profile     = "profile";
-
-            /// <summary>
-            /// The property of its signature encoding.
-            /// </summary>
-            public const String  Encoding    = "encoding";
-
         }
 
         #endregion
 
 
         /// <summary>
-        /// The canonical Styx COSE algorithm name for the built-in signing profile.
+        /// The canonical Styx COSE algorithm name.
         /// </summary>
         public String  Algorithm    { get; }
 
@@ -100,19 +90,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public String  KeyId        { get; }
 
         /// <summary>
-        /// Signature bytes encoded as canonical standard Base64 in the built-in profile.
+        /// The signature bytes, as canonical standard Base64.
         /// </summary>
         public String  Value        { get; }
-
-        /// <summary>
-        /// The versioned signature-input profile.
-        /// </summary>
-        public String  Profile      { get; }
-
-        /// <summary>
-        /// The signature byte encoding, base64 for the built-in profile.
-        /// </summary>
-        public String  Encoding     { get; }
 
         #endregion
 
@@ -123,21 +103,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Algorithm">The canonical Styx COSE algorithm name.</param>
         /// <param name="KeyId">The application identifier used to resolve a trusted public key.</param>
-        /// <param name="Value">The encoded signature bytes.</param>
-        /// <param name="Profile">The versioned signature-input profile.</param>
-        /// <param name="Encoding">The signature byte encoding.</param>
+        /// <param name="Value">The signature bytes, as canonical standard Base64.</param>
         public RoamingNetworkChangeSetSignature(String  Algorithm,
                                                 String  KeyId,
-                                                String  Value,
-                                                String  Profile    = RoamingNetworkChangeSet.SigningProfile,
-                                                String  Encoding   = "base64")
+                                                String  Value)
         {
 
             this.Algorithm  = Required(Algorithm, nameof(Algorithm));
             this.KeyId      = Required(KeyId,     nameof(KeyId));
             this.Value      = Required(Value,     nameof(Value));
-            this.Profile    = Required(Profile,   nameof(Profile));
-            this.Encoding   = Required(Encoding,  nameof(Encoding));
 
         }
 
@@ -171,9 +145,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!JSON.ParseMandatoryText(PropertyKeys.Algorithm, "signature algorithm", out var algorithm, out ErrorResponse) ||
                     !JSON.ParseMandatoryText(PropertyKeys.KeyId,     "key identification",  out var keyId,     out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Value,     "signature value",     out var value,     out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Profile,   "signature profile",   out var profile,   out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Encoding,  "signature encoding",  out var encoding,  out ErrorResponse))
+                    !JSON.ParseMandatoryText(PropertyKeys.Value,     "signature value",     out var value,     out ErrorResponse))
                 {
                     return false;
                 }
@@ -181,9 +153,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Signature = new RoamingNetworkChangeSetSignature(
                                 algorithm,
                                 keyId,
-                                value,
-                                profile,
-                                encoding
+                                value
                             );
 
                 ErrorResponse = null;
@@ -220,8 +190,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             json.Add(PropertyKeys.Algorithm,      Algorithm);
             json.Add(PropertyKeys.KeyId,          KeyId);
             json.Add(PropertyKeys.Value,          Value);
-            json.Add(PropertyKeys.Profile,        Profile);
-            json.Add(PropertyKeys.Encoding,       Encoding);
 
             return CustomRoamingNetworkChangeSetSignatureSerializer is not null
                        ? CustomRoamingNetworkChangeSetSignatureSerializer(this, json)

@@ -364,7 +364,10 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
 - **Rebase:** `rn2.TryRebase(cs, …)` prepares a change set of an older version again, unless it conflicts;
   the rebased change set is unsigned, its owners sign it again.
 - **Signatures:** `Sign(…)` and `VerifySignature(…)` over canonical JSON (COSE algorithms of Styx);
-  an optional `VerifyChangeSetSignature` checks them in addition.
+  an optional `VerifyChangeSetSignature` checks them in addition. What is signed, and in which version, the
+  versioned JSON-LD context of the signed object names, e.g. `https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/changeSet/v3`:
+  it is part of every signature input and identification, also where the object is embedded; signatures name
+  no profile and no encoding (SPECIFICATION.md, section 4).
 - **Wire:** JSON and CBOR; `RoamingNetworkChangeSetLimits` bound bytes, depth, changes, signatures and preconditions (by default 16 MiB, 32, 10,000, 16 and 1,000).
 
 ## History and sync
@@ -384,7 +387,7 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
 ```
 
 - **Commits:** a change set, its `parentIds`, its revision and the ETags of the result: `json`, `cbor` and its
-  `effectiveTree` ETags (below); a commit without them is refused (profile `wwcp-poi-commit-v3`).
+  `effectiveTree` ETags (below); a commit without them is refused (context `…/roamingNetwork/commit/v3`).
   The id is the SHA-256 of the commit's canonical JSON without signatures; it is checked when read.
   The revision is one more than the highest one of the parents.
 - **Commit:** `Commit(cs)` commits a change set to the version it was made for, named by its before
@@ -448,7 +451,7 @@ proof.Verify(checkpoint, out _);
 
 - **Content:** `epoch` (1), `sequence`, `previousId`, the commit with its revision and ETags, and `commits`, the
   RFC 9162 Merkle tree hash of the commits since the previous checkpoint, each leaf `{commitId, eTags, revision}`.
-  The id is the SHA-256 of its canonical JSON without signatures (profile `wwcp-poi-checkpoint-v1`).
+  The id is the SHA-256 of its canonical JSON without signatures (with its context `…/roamingNetwork/checkpoint/v1`).
 - **Signatures:** the roaming network operator signs first (`CheckpointSigners`), witnesses later
   (`TryWitness(checkpointId, witnessSigner, …)`, which signs only checkpoints the history checked, one per
   sequence). `TryAddCheckpoint` checks a checkpoint of another server against the history: its commit, the
@@ -490,7 +493,7 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   and certificates it and its energy meters name, its parking spaces and the grid connection point of its pool, and
   embeds `commitId` and `revision`, so that the proof of the commit in a checkpoint keeps it evidence for months.
 - **Attestations:** `{roamingNetworkId, commitId, revision, eTag, role, signer, signedAt, validUntil}`, signed
-  (profile `wwcp-poi-attestation-v1`). The `AttestationSigners` attest every new head, valid for
+  (context `…/roamingNetwork/attestation/v1`). The `AttestationSigners` attest every new head, valid for
   `AttestationValidity` (15 minutes); `RefreshAttestations()` attests it again after `AttestationInterval` (5
   minutes), e.g. called every minute. `TryAddAttestation(…)` takes those of another server for a commit held, whose
   version has the attested ETag, with a signature `VerifyAttestation` trusts; `OnAttestation` tells of every one.

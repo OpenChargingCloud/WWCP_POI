@@ -63,7 +63,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkAttestationSubject";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/attestationSubject/v1";
 
         #endregion
 
@@ -140,14 +140,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The profile of the signature of an attestation.
+        /// The JSON-LD context of the object, which names what its signature signs and in which version: it is part of its
+        /// signature input also where it is embedded.
         /// </summary>
-        public const String SigningProfile  = "wwcp-poi-attestation-v1";
-
-        /// <summary>
-        /// The JSON-LD context of the object.
-        /// </summary>
-        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkAttestation";
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/attestation/v1";
 
         #endregion
 
@@ -226,16 +222,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  Value             = "value";
 
-            /// <summary>
-            /// The property of the profile of its signature.
-            /// </summary>
-            public const String  Profile           = "profile";
-
-            /// <summary>
-            /// The property of the encoding of its signature value.
-            /// </summary>
-            public const String  Encoding          = "encoding";
-
         }
 
         #endregion
@@ -301,16 +287,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public String                             Value               { get; }
 
-        /// <summary>
-        /// The profile of the signature.
-        /// </summary>
-        public String                             Profile             { get; }
-
-        /// <summary>
-        /// The encoding of the signature value: base64.
-        /// </summary>
-        public String                             Encoding            { get; }
-
         #endregion
 
         #region Constructor(s)
@@ -329,9 +305,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          RoamingNetworkAttestationSubject?  Subject,
                                          String                             Algorithm,
                                          String                             KeyId,
-                                         String                             Value,
-                                         String                             Profile    = SigningProfile,
-                                         String                             Encoding   = "base64")
+                                         String                             Value)
         {
 
             if (ETag.Format != ETagFormat.EffectiveTree || !ETag.IsValid)
@@ -358,8 +332,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Algorithm         = Algorithm;
             this.KeyId             = KeyId;
             this.Value             = Value;
-            this.Profile           = Profile;
-            this.Encoding          = Encoding;
 
         }
 
@@ -472,9 +444,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (PublicKey.IsPrivate)
                     throw new ArgumentException("Verification requires a public asymmetric key.", nameof(PublicKey));
 
-                if (Profile != SigningProfile || Encoding != "base64")
-                    throw new ArgumentException("Unsupported attestation profile or encoding.");
-
                 if (KeyId != ExpectedKeyId)
                     throw new ArgumentException("The key ID of the attestation does not match the trusted key ID.");
 
@@ -502,7 +471,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region GetSigningBytes()
 
         /// <summary>
-        /// The signature input of this attestation, as Styx canonical JSON: its signed fields, without its value.
+        /// The signature input of this attestation, as Styx canonical JSON: its JSON-LD context and its signed fields,
+        /// without its value.
         /// </summary>
         public Byte[] GetSigningBytes()
         {
@@ -512,10 +482,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = Content();
 
-            json.AddFirst(new JProperty(PropertyKeys.Encoding,   "base64"));
             json.AddFirst(new JProperty(PropertyKeys.KeyId,      KeyId));
             json.AddFirst(new JProperty(PropertyKeys.Algorithm,  Algorithm));
-            json.AddFirst(new JProperty(PropertyKeys.Profile,    SigningProfile));
+            json.AddFirst(new JProperty(PropertyKeys.Context,    JSONLDContext));
 
             return CanonicalJSON.ToUTF8Bytes(json);
 
@@ -619,11 +588,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Text(JSON, PropertyKeys.Role)      is not String role      || role.     Length == 0 ||
                     Text(JSON, PropertyKeys.Algorithm) is not String algorithm || algorithm.Length == 0 ||
                     Text(JSON, PropertyKeys.KeyId)     is not String keyId     || keyId.    Length == 0 ||
-                    Text(JSON, PropertyKeys.Value)     is not String value     || value.    Length == 0 ||
-                    Text(JSON, PropertyKeys.Profile)   is not String profile   ||
-                    Text(JSON, PropertyKeys.Encoding)  is not String encoding)
+                    Text(JSON, PropertyKeys.Value)     is not String value     || value.    Length == 0)
                 {
-                    ErrorResponse = "An attestation requires a role, an algorithm, a key identification, a value, a profile and an encoding!";
+                    ErrorResponse = "An attestation requires a role, an algorithm, a key identification and a value!";
                     return false;
                 }
 
@@ -693,9 +660,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                subject,
                                                                algorithm,
                                                                keyId,
-                                                               value,
-                                                               profile,
-                                                               encoding);
+                                                               value);
 
                 ErrorResponse  = null;
                 return true;
@@ -765,8 +730,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             json.Add(PropertyKeys.Algorithm,  Algorithm);
             json.Add(PropertyKeys.KeyId,      KeyId);
             json.Add(PropertyKeys.Value,      Value);
-            json.Add(PropertyKeys.Profile,    Profile);
-            json.Add(PropertyKeys.Encoding,   Encoding);
 
             return CustomAttestationSerializer is not null
                        ? CustomAttestationSerializer(this, json)
@@ -818,8 +781,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             cbor.Add(CBORValue.FromText(PropertyKeys.Algorithm),             CBORValue.FromText(Algorithm));
             cbor.Add(CBORValue.FromText(PropertyKeys.KeyId),                 CBORValue.FromText(KeyId));
             cbor.Add(CBORValue.FromText(PropertyKeys.Value),                 CBORValue.FromText(Value));
-            cbor.Add(CBORValue.FromText(PropertyKeys.Profile),               CBORValue.FromText(Profile));
-            cbor.Add(CBORValue.FromText(PropertyKeys.Encoding),              CBORValue.FromText(Encoding));
 
             return CustomAttestationSerializer is not null
                        ? CustomAttestationSerializer(this, cbor)

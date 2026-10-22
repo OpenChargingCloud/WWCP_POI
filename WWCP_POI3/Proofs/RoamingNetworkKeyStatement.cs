@@ -26,6 +26,8 @@ using Newtonsoft.Json.Linq;
 using Org.BouncyCastle.Crypto;
 
 using org.GraphDefined.Vanaheimr.Illias;
+using Org.BouncyCastle.X509;
+using Org.BouncyCastle.Pkcs;
 
 #endregion
 
@@ -74,20 +76,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The profile of a key statement, what and which version of it its signatures sign: naming the minConsensus of the
-        /// operator, signed by identity keys of as many holders. The single signature form wwcp-poi-key-statement-v1 is gone.
-        /// </summary>
-        public const String SigningProfile  = "wwcp-poi-key-statement-v2";
-
-        /// <summary>
         /// The name of the property of the roaming network operator embedding it.
         /// </summary>
         public const String JSONProperty    = "keyStatement";
 
         /// <summary>
-        /// The JSON-LD context of the object.
+        /// The JSON-LD context of the object, which names what its signatures sign and in which version: naming the
+        /// minConsensus of the operator, signed by identity keys of as many holders. It is part of their signature input
+        /// also where it is embedded, as in the roaming network operator.
         /// </summary>
-        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkKeyStatement";
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/keyStatement/v2";
 
         #endregion
 
@@ -161,16 +159,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  Value                     = "value";
 
-            /// <summary>
-            /// The property of the profile of its signatures.
-            /// </summary>
-            public const String  Profile                   = "profile";
-
-            /// <summary>
-            /// The property of the encoding of its signature values.
-            /// </summary>
-            public const String  Encoding                  = "encoding";
-
         }
 
         #endregion
@@ -218,16 +206,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<RoamingNetworkKeyStatementSignature>  Signatures                  { get; }
 
-        /// <summary>
-        /// The profile of its signatures: wwcp-poi-key-statement-v2.
-        /// </summary>
-        public String                                               Profile                     { get; }
-
-        /// <summary>
-        /// The encoding of its signature values: base64.
-        /// </summary>
-        public String                                               Encoding                    { get; }
-
         #endregion
 
         #region Constructor(s)
@@ -243,13 +221,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           Byte                                              MinConsensus,
                                           DateTimeOffset                                    SignedAt,
                                           DateTimeOffset                                    ValidUntil,
-                                          IEnumerable<RoamingNetworkKeyStatementSignature>  Signatures,
-                                          String                                            Profile    = SigningProfile,
-                                          String                                            Encoding   = "base64")
+                                          IEnumerable<RoamingNetworkKeyStatementSignature>  Signatures)
         {
 
-            this.SigningKeys   = POIPublicKey.Ordered(SigningKeys,  "the signing keys of a key statement");
             this.IdentityKeys  = POIPublicKey.Ordered(IdentityKeys, "the identity keys of a key statement");
+            this.SigningKeys   = POIPublicKey.Ordered(SigningKeys,  "the signing keys of a key statement");
             this.Signatures    = [ .. Signatures ?? [] ];
 
             if (this.SigningKeys.IsEmpty)
@@ -281,8 +257,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.MinConsensus              = MinConsensus;
             this.SignedAt                  = SignedAt;
             this.ValidUntil                = ValidUntil;
-            this.Profile                   = Profile;
-            this.Encoding                  = Encoding;
 
         }
 
@@ -397,7 +371,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         COSEAlgorithm           Algorithm,
                                                         Boolean                 Deterministic   = true)
 
-            => Signed(IdentityKey, Algorithm, Deterministic, Replace: false);
+            => Signed(
+                   IdentityKey,
+                   Algorithm,
+                   Deterministic,
+                   Replace: false
+               );
 
         #endregion
 
@@ -436,9 +415,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   MinConsensus,
                                                   SignedAt,
                                                   ValidUntil,
-                                                  Replace ? [ signature ] : [ .. Signatures, signature ],
-                                                  Profile,
-                                                  Encoding);
+                                                  Replace ? [ signature ] : [ .. Signatures, signature ]);
 
         }
 
@@ -490,9 +467,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             try
             {
-
-                if (Profile != SigningProfile || Encoding != "base64")
-                    throw new ArgumentException("Unsupported key statement profile or encoding.");
 
                 if (Signature.KeyId != IdentityKey.Id)
                     throw new ArgumentException("The key statement is signed by another key.");
@@ -615,7 +589,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The signature input of a signature of this key statement with the given algorithm and identity key, as Styx
-        /// canonical JSON: what it states, its profile, the algorithm, the keyId and the encoding; no signature.
+        /// canonical JSON: its JSON-LD context, what it states, the algorithm and the keyId; no signature.
         /// </summary>
         /// <param name="Algorithm">The COSE name of the signature algorithm.</param>
         /// <param name="KeyId">The @id of the identity key.</param>
@@ -625,10 +599,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = Content();
 
-            json.Add(PropertyKeys.Profile,    Profile);
+            json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
             json.Add(PropertyKeys.Algorithm,  Algorithm);
             json.Add(PropertyKeys.KeyId,      KeyId);
-            json.Add(PropertyKeys.Encoding,   "base64");
 
             return CanonicalJSON.ToUTF8Bytes(json);
 
@@ -636,12 +609,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        private static String SerializeToBase64(AsymmetricKeyParameter key)
+        {
+
+            byte[] der;
+
+            if (key.IsPrivate)
+            {
+                // PKCS#8 PrivateKeyInfo
+                var privateKeyInfo = PrivateKeyInfoFactory.CreatePrivateKeyInfo(key);
+                der = privateKeyInfo.GetDerEncoded();
+            }
+            else
+            {
+                // X.509 SubjectPublicKeyInfo
+                var publicKeyInfo = SubjectPublicKeyInfoFactory.CreateSubjectPublicKeyInfo(key);
+                der = publicKeyInfo.GetDerEncoded();
+            }
+
+            return Convert.ToBase64String(der);
+
+        }
+
+
 
         #region (static) TryParse(JSON, out KeyStatement, out ErrorResponse)
 
         /// <summary>
-        /// Try to parse the given JSON representation of a key statement, read with strings as strings: of the profile
-        /// wwcp-poi-key-statement-v2, with its minConsensus and its signatures. Its signatures are not verified here.
+        /// Try to parse the given JSON representation of a key statement, read with strings as strings: with its
+        /// minConsensus and its signatures. Its signatures are not verified here.
         /// </summary>
         public static Boolean TryParse(JObject                                               JSON,
                                        [NotNullWhen(true)]  out RoamingNetworkKeyStatement?  KeyStatement,
@@ -687,19 +683,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (Text(JSON, PropertyKeys.Profile)   is not String profile ||
-                    Text(JSON, PropertyKeys.Encoding)  is not String encoding)
-                {
-                    ErrorResponse = "A key statement requires a profile and an encoding!";
-                    return false;
-                }
-
-                if (profile != SigningProfile)
-                {
-                    ErrorResponse = $"The profile of a key statement must be '{SigningProfile}', not '{profile}'!";
-                    return false;
-                }
-
                 if (JSON[PropertyKeys.MinConsensus] is not JToken minConsensusJSON  ||
                     minConsensusJSON.Type != JTokenType.Integer                     ||
                     minConsensusJSON.Value<Int64>() is < 1 or > Byte.MaxValue)
@@ -739,9 +722,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                 (Byte) minConsensusJSON.Value<Int64>(),
                                                                 signedAt,
                                                                 validUntil,
-                                                                signatures,
-                                                                profile,
-                                                                encoding);
+                                                                signatures);
 
                 ErrorResponse  = null;
                 return true;
@@ -761,7 +742,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region ToJSON(Embedded = false, CustomKeyStatementSerializer = null)
 
         /// <summary>
-        /// Return the JSON representation of this key statement: what it states, its signatures, its profile and encoding.
+        /// Return the JSON representation of this key statement: what it states and its signatures.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="CustomKeyStatementSerializer">An optional custom serializer of key statements.</param>
@@ -775,8 +756,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
 
             json.Add(PropertyKeys.Signatures,      new JArray(Signatures.Select(signature => signature.ToJSON())));
-            json.Add(PropertyKeys.Profile,         Profile);
-            json.Add(PropertyKeys.Encoding,        Encoding);
 
             return CustomKeyStatementSerializer is not null
                        ? CustomKeyStatementSerializer(this, json)
@@ -785,6 +764,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         #endregion
+
+
+        #region ToQRCodeJSON()
+
+        /// <summary>
+        /// Return the QR-Code JSON representation of this key statement.
+        /// </summary>
+        public JObject ToQRCodeJSON()
+        {
+
+            var json = JSONObject.Create(
+                           new JProperty("id",  RoamingNetworkId.        ToString()),
+                           new JProperty("op",  RoamingNetworkOperatorId.ToString()),
+                           new JProperty("ik",  new JArray(IdentityKeys.Select(identityKey => new JArray(
+                                                                                                  SerializeToBase64(identityKey.Key.ToPublicKey())
+                                                                                              )))),
+                           new JProperty("mc",  MinConsensus),
+                           new JProperty("s",   new JArray(Signatures.  Select(signature   => new JArray(
+                                                                                                  signature.Algorithm,
+                                                                                                  signature.KeyId,
+                                                                                                  signature.Value
+                                                                                              )))),
+                           new JProperty("ts",  SignedAt.  ToISO8601()),
+                           new JProperty("vu",  ValidUntil.ToISO8601())
+                       );
+
+            // Without profile and encoding: what and which version it is, JSONLDContext names, also in the signature input.
+
+            return json;
+
+        }
+
+        #endregion
+
 
 
         #region (private) Content()

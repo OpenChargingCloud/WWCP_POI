@@ -341,7 +341,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(parsed.IsValidAt(since),                Is.False, "Not before it is valid from.");
                 Assert.That(parsed.IsValidAt(since.AddMinutes(1)),  Is.True);
                 Assert.That(parsed.IsValidAt(since.AddMinutes(16)), Is.False);
-                Assert.That(text,                                   Does.Contain($"\"profile\": \"{RoamingNetworkPriceStatement.SigningProfile}\""));
+                Assert.That(text,                                   Does.Contain($"\"@context\": \"{RoamingNetworkPriceStatement.JSONLDContext}\""));
+                Assert.That(text,                                   Does.Not.Contain("\"profile\"").And.Not.Contain("\"encoding\""));
 
                 Assert.That(RoamingNetworkPriceStatement.TryParse(json, out var otherValue, out _),  Is.True);
                 Assert.That(otherValue!.Digest,                     Is.Not.EqualTo(statement.Digest), "The digest covers the signature.");

@@ -70,7 +70,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkCommitSignature";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commitSignature/v1";
 
         #endregion
 
@@ -120,16 +120,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  Value       = "value";
 
             /// <summary>
-            /// The property of the profile of its signature input.
-            /// </summary>
-            public const String  Profile     = "profile";
-
-            /// <summary>
-            /// The property of the encoding of its signature value.
-            /// </summary>
-            public const String  Encoding    = "encoding";
-
-            /// <summary>
             /// The property of the identification of the commit of the signatures of a commit, { commitId, signatures }.
             /// </summary>
             public const String  CommitId    = "commitId";
@@ -174,16 +164,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public String          Value        { get; }
 
-        /// <summary>
-        /// The versioned profile of the signature input.
-        /// </summary>
-        public String          Profile      { get; }
-
-        /// <summary>
-        /// The encoding of the signature bytes: base64.
-        /// </summary>
-        public String          Encoding     { get; }
-
         #endregion
 
         #region Constructor(s)
@@ -197,16 +177,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Algorithm">The canonical Styx COSE algorithm name.</param>
         /// <param name="KeyId">The application identifier used to resolve a trusted public key.</param>
         /// <param name="Value">The signature bytes, as canonical standard Base64.</param>
-        /// <param name="Profile">The versioned profile of the signature input.</param>
-        /// <param name="Encoding">The encoding of the signature bytes.</param>
         public RoamingNetworkCommitSignature(String          Role,
                                              String?         Signer,
                                              DateTimeOffset  SignedAt,
                                              String          Algorithm,
                                              String          KeyId,
-                                             String          Value,
-                                             String          Profile    = RoamingNetworkCommit.SigningProfile,
-                                             String          Encoding   = "base64")
+                                             String          Value)
         {
 
             this.Role       = Required(Role,      nameof(Role));
@@ -215,8 +191,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Algorithm  = Required(Algorithm, nameof(Algorithm));
             this.KeyId      = Required(KeyId,     nameof(KeyId));
             this.Value      = Required(Value,     nameof(Value));
-            this.Profile    = Required(Profile,   nameof(Profile));
-            this.Encoding   = Required(Encoding,  nameof(Encoding));
 
         }
 
@@ -254,9 +228,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !JSON.ParseMandatoryText(PropertyKeys.SignedAt,   "signing timestamp",    out var signedAt,   out ErrorResponse) ||
                     !JSON.ParseMandatoryText(PropertyKeys.Algorithm,  "signature algorithm",  out var algorithm,  out ErrorResponse) ||
                     !JSON.ParseMandatoryText(PropertyKeys.KeyId,      "key identification",   out var keyId,      out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Value,      "signature value",      out var value,      out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Profile,    "signature profile",    out var profile,    out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Encoding,   "signature encoding",   out var encoding,   out ErrorResponse))
+                    !JSON.ParseMandatoryText(PropertyKeys.Value,      "signature value",      out var value,      out ErrorResponse))
                 {
                     return false;
                 }
@@ -286,9 +258,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 signedAtTimestamp,
                                 algorithm,
                                 keyId,
-                                value,
-                                profile,
-                                encoding
+                                value
                             );
 
                 ErrorResponse = null;
@@ -393,8 +363,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             json.Add(PropertyKeys.Algorithm,      Algorithm);
             json.Add(PropertyKeys.KeyId,          KeyId);
             json.Add(PropertyKeys.Value,          Value);
-            json.Add(PropertyKeys.Profile,        Profile);
-            json.Add(PropertyKeys.Encoding,       Encoding);
 
             return CustomCommitSignatureSerializer is not null
                        ? CustomCommitSignatureSerializer(this, json)
