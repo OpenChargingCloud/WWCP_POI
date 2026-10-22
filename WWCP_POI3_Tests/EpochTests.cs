@@ -143,7 +143,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 foreach (var (property, value) in new[] { ("canonicalization",    (JToken) "jcs-rfc8785"),
                                                           ("identificationHash",  "sha3-256"),
                                                           ("commit",              "wwcp-poi-commit-v4"),
-                                                          ("signatureAlgorithms", new JArray("RS256")) })
+                                                          ("signatureAlgorithms", new JArray("HMAC 256/256")) })
                 {
                     var other = (JObject) json.DeepClone();
                     other[property] = value;
