@@ -62,14 +62,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region (static) Network(MinConsensus = 2, ExtraSigningKeyOf = null)
+        #region (static) Network(MinConsensus = 2, ExtraSigningKeyOf = null, ExtraIdentityKeyOf = null)
 
         /// <summary>
         /// The network of the station proof tests, its operator with the signing and identity keys of three holders and
-        /// the given minConsensus; optionally one holder with a second signing key, e.g. while it renews its key.
+        /// the given minConsensus; optionally one holder with a second signing key, e.g. while it renews its key, and one
+        /// with a second identity key, valid from a day before T0 for two years, its first one until 30 days after T0.
         /// </summary>
-        private static RoamingNetwork Network(Byte     MinConsensus        = 2,
-                                              String?  ExtraSigningKeyOf   = null)
+        private static RoamingNetwork Network(Byte     MinConsensus         = 2,
+                                              String?  ExtraSigningKeyOf    = null,
+                                              String?  ExtraIdentityKeyOf   = null)
         {
 
             var network       = StationProofTests.NewNetwork();
@@ -81,8 +83,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             if (ExtraSigningKeyOf is not null)
                 signingKeys.Add(Key(network, ExtraSigningKeyOf, POIKeyKind.Signing, 2).Public);
 
-            operatorJSON[POIPartyKeys.SigningKeysProperty]   = new JArray(signingKeys.Select(key => key.ToJSON(Embedded: true)));
-            operatorJSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(Holders.Select(holder => Key(network, holder, POIKeyKind.Identity).Public.ToJSON(Embedded: true)));
+            var identityKeys  = Holders.Select(holder => holder == ExtraIdentityKeyOf
+                                                             ? POIPublicKey.From(Key(network, holder, POIKeyKind.Identity).Private, NotAfter: T0.AddDays(30), Holder: holder)
+                                                             : Key(network, holder, POIKeyKind.Identity).Public).ToList();
+
+            if (ExtraIdentityKeyOf is not null)
+                identityKeys.Add(POIPublicKey.From(Key(network, ExtraIdentityKeyOf, POIKeyKind.Identity, 2).Private,
+                                                   NotBefore:  T0.AddDays(-1),
+                                                   NotAfter:   T0.AddYears(2),
+                                                   Holder:     ExtraIdentityKeyOf));
+
+            operatorJSON[POIPartyKeys.SigningKeysProperty]   = new JArray(signingKeys. Select(key => key.ToJSON(Embedded: true)));
+            operatorJSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(identityKeys.Select(key => key.ToJSON(Embedded: true)));
 
             if (MinConsensus > 1)
                 operatorJSON[POIPartyKeys.MinConsensusProperty] = MinConsensus;
@@ -192,6 +204,148 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(network.TryApplyChangeSet(Signed(changeSet, network, POIKeyKind.Signing, "Alpha", "Gamma"),   out var changed, out var error3),  Is.True, error3);
                 Assert.That(changed!.DataSource,  Is.EqualTo("quorum"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Who_is_a_member_needs_the_quorum(Member)
+
+        /// <summary>
+        /// What the operator adds and removes (SPECIFICATION.md, section 4.1): the parties, charging station operators,
+        /// e-mobility providers, grid operators and parking operators, with their keys, and the manufacturers.
+        /// </summary>
+        public static IEnumerable<TestCaseData> Members()
+        {
+
+            yield return new TestCaseData("DE*NEW",    (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Add(new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*NEW"), Name: I18NString.Create(Languages.en, "A new operator"), Created: T0).WithKeys())),
+                                                       (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Remove(ChargingStationOperator_Id.Parse("DE*NEW")))).
+                             SetName("Who_is_a_member_needs_the_quorum(ChargingStationOperator)");
+
+            yield return new TestCaseData("DE-NEW",    (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Add(new EMobilityProvider(EMobilityProvider_Id.Parse("DE-NEW"), Name: I18NString.Create(Languages.en, "A new provider"), Created: T0).WithKeys())),
+                                                       (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Remove(EMobilityProvider_Id.Parse("DE-NEW")))).
+                             SetName("Who_is_a_member_needs_the_quorum(EMobilityProvider)");
+
+            yield return new TestCaseData("DE*NEW",    (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Add(new GridOperator(GridOperator_Id.Parse("DE*NEW"), Name: I18NString.Create(Languages.en, "A new grid operator"), Created: T0).WithKeys())),
+                                                       (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Remove(GridOperator_Id.Parse("DE*NEW")))).
+                             SetName("Who_is_a_member_needs_the_quorum(GridOperator)");
+
+            yield return new TestCaseData("DE*NEW",    (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Add(new ParkingOperator(ParkingOperator_Id.Parse("DE*NEW"), Name: I18NString.Create(Languages.en, "A new parking operator"), Created: T0).WithKeys())),
+                                                       (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Remove(ParkingOperator_Id.Parse("DE*NEW")))).
+                             SetName("Who_is_a_member_needs_the_quorum(ParkingOperator)");
+
+            yield return new TestCaseData("NEWCO",     (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Add(new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("NEWCO"), Name: I18NString.Create(Languages.en, "A new manufacturer"), Created: T0))),
+                                                       (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Remove(ChargingStationManufacturer_Id.Parse("NEWCO")))).
+                             SetName("Who_is_a_member_needs_the_quorum(ChargingStationManufacturer)");
+
+            yield return new TestCaseData("NEWMETERS", (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Add(new EnergyMeterManufacturer(EnergyMeterManufacturer_Id.Parse("NEWMETERS"), Name: ImmutableI18NString.Create(Languages.en, "A new meter manufacturer"), Created: T0))),
+                                                       (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Remove(EnergyMeterManufacturer_Id.Parse("NEWMETERS")))).
+                             SetName("Who_is_a_member_needs_the_quorum(EnergyMeterManufacturer)");
+
+        }
+
+        /// <summary>
+        /// Who is a member is the operator's (SPECIFICATION.md, section 4.1): adding one, and removing it, needs signing
+        /// keys of two of its three holders; one holder alone is not enough, nor with two keys.
+        /// </summary>
+        [TestCaseSource(nameof(Members))]
+        public void Who_is_a_member_needs_the_quorum(String                      Id,
+                                                     Func<RoamingNetworkChange>  Add,
+                                                     Func<RoamingNetworkChange>  Remove)
+        {
+
+            var network      = Network(2, ExtraSigningKeyOf: "Alpha");
+            var add          = network.CreateChangeSet([ Add() ], CreatedAt: T0);
+
+            // Whether the network names it: by its @id in its JSON.
+            Boolean Names(RoamingNetwork Network)
+                => Network.ToJSON(IncludeETags: false).ToString(Newtonsoft.Json.Formatting.None).Contains($"\"@id\":\"{Id}\"");
+
+            Assert.That(Names(network), Is.False);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(network.TryApplyChangeSet(Signed(add, network, POIKeyKind.Signing, "Alpha"),            out _, out var error1),  Is.False, "one holder adds");
+                Assert.That(error1,  Does.Contain("needs signatures by signing keys of 2 holders of"));
+
+                Assert.That(network.TryApplyChangeSet(Signed(add, network, POIKeyKind.Signing, "Alpha", "Alpha#2"), out _, out var error2),  Is.False, "one holder, two keys, adds");
+                Assert.That(error2,  Does.Contain("needs signatures by signing keys of 2 holders of"));
+
+            }
+
+            Assert.That(network.TryApplyChangeSet(Signed(add, network, POIKeyKind.Signing, "Alpha", "Beta"), out var added, out var error3), Is.True, error3);
+            Assert.That(Names(added!), Is.True);
+
+            var remove       = added!.CreateChangeSet([ Remove() ], CreatedAt: T0.AddMinutes(1));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(added.TryApplyChangeSet(Signed(remove, added, POIKeyKind.Signing, "Gamma"),             out _, out var error4),  Is.False, "one holder removes");
+                Assert.That(error4,  Does.Contain("needs signatures by signing keys of 2 holders of"));
+
+                Assert.That(added.TryApplyChangeSet(Signed(remove, added, POIKeyKind.Signing, "Gamma", "Gamma"),    out _, out var error5),  Is.False, "one holder, twice, removes");
+                Assert.That(error5,  Does.Contain("needs signatures by signing keys of 2 holders of"));
+
+                Assert.That(added.TryApplyChangeSet(Signed(remove, added, POIKeyKind.Signing, "Beta", "Gamma"),     out var removed, out var error6),  Is.True, error6);
+                Assert.That(Names(removed!),  Is.False);
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_holder_with_two_identity_keys_has_one_voice()
+
+        /// <summary>
+        /// A holder may name several identity keys, e.g. with overlapping notBefore and notAfter while it replaces one: the
+        /// quorum counts holders, not keys, for what minConsensus may be, for a change of the quorum, and for a key
+        /// statement.
+        /// </summary>
+        [Test]
+        public void A_holder_with_two_identity_keys_has_one_voice()
+        {
+
+            var network  = Network(2, ExtraIdentityKeyOf: "Alpha");
+            var toThree  = network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(network.Operator!, POIPartyKeys.MinConsensusProperty, 2, 3) ], CreatedAt: T0);
+
+            RoamingNetworkKeyStatement StatementOf(params (String Holder, Int32 Number)[] Signers)
+
+                => RoamingNetworkKeyStatement.Create([ .. Signers.Select(signer => ((Org.BouncyCastle.Crypto.AsymmetricKeyParameter) Key(network, signer.Holder, POIKeyKind.Identity, signer.Number).Private, COSEAlgorithm.ES512)) ],
+                                                     network.Operator!.MinConsensus,
+                                                     network.Id,
+                                                     network.Operator!.Id,
+                                                     network.Operator!.SigningKeys,
+                                                     network.Operator!.IdentityKeys,
+                                                     T0,
+                                                     T0.AddDays(30));
+
+            var trusted  = network.Operator!.IdentityKeys.Select(key => key.Id).ToArray();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // Four identity keys of three holders: 3 of them is the most, and 2 is more than half.
+                Assert.That(network.Operator!.IdentityKeys.Length,                      Is.EqualTo(4));
+                Assert.That(Network(3, ExtraIdentityKeyOf: "Alpha").Operator!.MinConsensus,  Is.EqualTo(3));
+                Assert.That(() => Network(4, ExtraIdentityKeyOf: "Alpha"),              Throws.ArgumentException.With.Message.Contains("as many holders, not of 3"));
+
+                // A change of the quorum: two keys of Alpha are one voice.
+                Assert.That(network.TryApplyChangeSet(Signed(toThree, network, POIKeyKind.Identity, "Alpha", "Alpha#2"),  out _, out var error1),  Is.False, "one holder, two identity keys");
+                Assert.That(error1,  Does.Contain("identity keys of 2 holders"));
+
+                Assert.That(network.TryApplyChangeSet(Signed(toThree, network, POIKeyKind.Identity, "Alpha#2", "Beta"),   out var changed, out var error2),  Is.True, error2);
+                Assert.That(changed!.Operator!.MinConsensus,  Is.EqualTo(3));
+
+                // A key statement: the same.
+                Assert.That(StatementOf(("Alpha", 1), ("Alpha", 2)).TryVerify(trusted, null, out var error3, At: T0),  Is.False, "one holder, two identity keys");
+                Assert.That(error3,  Does.Contain("of 1 holder, not of 2"));
+
+                Assert.That(StatementOf(("Alpha", 2), ("Gamma", 1)).TryVerify(trusted, null, out var error4, At: T0),  Is.True, error4);
 
             }
 

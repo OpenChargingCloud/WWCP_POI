@@ -254,19 +254,29 @@ RNO can not be changed where only the RNO may.
 
 Nobody can replace the identity keys of the RNO once they are lost or expired. An RNO SHOULD name
 at least two identity keys with different `notAfter`, and SHOULD replace an identity key before it
-expires.
+expires; with a quorum, each holder SHOULD, e.g. a next identity key whose `notBefore` and `notAfter`
+overlap those of its current one.
 
 **Quorum.** So that no single company decides for the network, several holders MAY share the keys of the
 RNO: each names its keys with its `holder`, and the RNO names its `minConsensus`, e.g. 2 of 3 holders, written
 unless 1. Where the RNO must sign, signatures with keys of `minConsensus` different holders are needed, keys
 naming no holder having one holder together: for the data it owns signing keys, for its keys, its
 `minConsensus` and the recovery of other parties identity keys, of the kinds the rules above allow for one
-signature. Holders are counted, not keys, so a holder renewing its key has one voice. `minConsensus` MUST be
+signature. A holder MAY name several keys of a kind, e.g. identity keys of different `notBefore` and
+`notAfter`: holders are counted, not keys, in `minConsensus` and wherever signatures are counted, so a holder
+signing with all its keys, or renewing one, still has one voice. `minConsensus` MUST be
 more than half of the holders of each kind of keys of the RNO and at most as many, so that two quorums
 always share a holder: two contradicting decisions need a holder signing both, and that holder can be named;
 an odd number of holders is not needed, e.g. 3 of 4. A version that breaks this rule MUST be refused. The
 quorum of the version a change set is applied to counts, as its keys do. The key statement of an RNO with a
 quorum is signed by as many holders (8.6), and a verifier needs attestations of as many (8.5).
+
+This holds for every change the RNO owns (see the table above), above all for who is a member: adding or
+removing a charging station operator, an e-mobility provider, a grid operator or a parking operator, and
+replacing their keys for recovery, MUST be signed by `minConsensus` holders, never by one alone. However the
+signing keys of a holder come to be trusted, now by the key statement of the quorum (8.6), later possibly by
+each holder for its own keys, such a key gives its holder one voice only; no way of trusting keys may let fewer
+holders than `minConsensus` decide what the RNO owns.
 
 ### 4.2 Co-signing
 
