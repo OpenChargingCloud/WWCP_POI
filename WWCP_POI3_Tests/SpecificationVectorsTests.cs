@@ -96,7 +96,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static RoamingNetwork Network()
 
             => new (RoamingNetwork_Id.Parse("rn1"),
-                    Name:                      new ImmutableI18NString(I18NString.Create(Languages.en, "Example")),
+                    Name:                      ImmutableI18NString.Create(Languages.en, "Example"),
                     Created:                   Created,
                     ChargingStationOperators:  [ new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"),
                                                                              Created:        Created,
@@ -350,7 +350,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                        URL.Parse("https://hub.example/poi/RNs/rn1"),
                                                        [ "1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802" ],
                                                        1,
-                                                       new ImmutableI18NString(I18NString.Create(Languages.en, "Example")),
+                                                       ImmutableI18NString.Create(Languages.en, "Example"),
                                                        null);
 
             using (Assert.EnterMultipleScope())

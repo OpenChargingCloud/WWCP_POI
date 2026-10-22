@@ -57,7 +57,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static TransparencySoftware NewRelease(TransparencySoftware_Id Id, String Version)
 
             => new (Id,
-                    new ImmutableI18NString(I18NString.Create(Languages.en, "Chargy")),
+                    ImmutableI18NString.Create(Languages.en, "Chargy"),
                     TransparencySoftwareVersion.Parse(Version),
                     [ OpenSourceLicense.AGPL3 ],
                     "GraphDefined GmbH",

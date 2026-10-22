@@ -92,13 +92,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                              HotlinePhoneNumber:  Hotline1,
                                                                                                              Accessibility:       AccessibilityType.PayingPubliclyAccessible,
                                                                                                              Features:            [ ChargingStationFeature.StatusInfoAvailable ],
-                                                                                                             Brands:              [ new Brand(Blue, new ImmutableI18NString(I18NString.Create(Languages.en, "Blue Charge"))) ],
+                                                                                                             Brands:              [ new Brand(Blue, ImmutableI18NString.Create(Languages.en, "Blue Charge")) ],
                                                                                                              MaxPower:            Watt.FromW(30000),
                                                                                                              Created:             Created),
                                                                                  new ChargingStationTemplate(Premium,
                                                                                                              HotlinePhoneNumber:  Hotline2,
                                                                                                              VehicleTypes:        [ VehicleType.MOTORCYCLE ],
-                                                                                                             Brands:              [ new Brand(Blue, new ImmutableI18NString(I18NString.Create(Languages.en, "Blue Charge Premium"))) ],
+                                                                                                             Brands:              [ new Brand(Blue, ImmutableI18NString.Create(Languages.en, "Blue Charge Premium")) ],
                                                                                                              Created:             Created,
                                                                                                              LastChange:          Changed) ]) ]).WithKeys();
 

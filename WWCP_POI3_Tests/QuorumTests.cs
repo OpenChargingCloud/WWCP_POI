@@ -384,8 +384,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                          URL.Parse($"https://hub.example/poi/RNs/{network.Id}"),
                                                          [ .. network.Operator!.IdentityKeys.Select(key => key.Id) ],
                                                          2,
-                                                         new ImmutableI18NString(I18NString.Create(Languages.de, "Beispielnetz").Set(Languages.en, "Example network")),
-                                                         new ImmutableI18NString(I18NString.Create(Languages.en, "Charging stations of the example operators")));
+                                                         ImmutableI18NString.Create(Languages.de, "Beispielnetz").Set(Languages.en, "Example network"),
+                                                         ImmutableI18NString.Create(Languages.en, "Charging stations of the example operators"));
 
             var qrCode   = anchor.ToQRCode();
 

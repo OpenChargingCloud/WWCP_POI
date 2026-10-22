@@ -100,7 +100,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
         private static Brand BrandOf(String Id, String Name)
 
-            => new (Brand_Id.Parse(Id), new ImmutableI18NString(I18NString.Create(Languages.en, Name)));
+            => new (Brand_Id.Parse(Id), ImmutableI18NString.Create(Languages.en, Name));
 
         #endregion
 

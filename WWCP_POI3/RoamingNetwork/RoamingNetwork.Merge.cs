@@ -278,7 +278,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         [ .. changes ],
                                                         Left.CalcChangeSetETags(),
                                                         Left.CalcChangeSetETags(),
-                                                        new ImmutableI18NString(I18NString.Create(Languages.en, "Merge")));
+                                                        ImmutableI18NString.Create(Languages.en, "Merge"));
 
             if (!Left.TryApplyChanges(pending, out var merge, out var changesWithOldValues, out var applyError))
             {

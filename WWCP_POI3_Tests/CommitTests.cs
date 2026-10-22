@@ -62,7 +62,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
             // The change set the network makes of the changes knows the ETags after them.
             var cs1 = rn1.CreateSignedChangeSet(
                           Changes:      c1,
-                          Description:  new ImmutableI18NString(I18NString.Create("Hello world!")),
+                          Description:  ImmutableI18NString.Create("Hello world!"),
                           Metadata:     new JObject(new JProperty("hello", "world!")),
                           CreatedAt:    DateTimeOffset.Parse("2026-10-12T12:00:00Z")
                       );

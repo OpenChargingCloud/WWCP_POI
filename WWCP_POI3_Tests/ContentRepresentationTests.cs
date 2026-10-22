@@ -85,7 +85,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                     I18NString.Create(Languages.en, "Example Netz"),
                                                                                     Created: Created) ],
                                       EnergyMeterManufacturers:  [ new EnergyMeterManufacturer(EnergyMeterManufacturer_Id.Parse("ACME"),
-                                                                                               new ImmutableI18NString(I18NString.Create(Languages.en, "ACME Meters")),
+                                                                                               ImmutableI18NString.Create(Languages.en, "ACME Meters"),
                                                                                                Homepage:  URL.Parse("https://meters.example.org"),
                                                                                                Created:   Created) ]).WithKeys();
 

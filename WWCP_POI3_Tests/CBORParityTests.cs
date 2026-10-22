@@ -130,7 +130,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                   RoamingNetworkChange.UpdateProperty(network, "dataSource", null, "v1"),
                                                   RoamingNetworkChange.UpdateProperty(network, "name",       null, new JObject(new JProperty("en", "Example Roaming"), new JProperty("de", "Beispiel-Roaming")))
                                               ],
-                                              Description:  new ImmutableI18NString(I18NString.Create(Languages.en, "Named the network").Set(Languages.de, "Das Netz benannt")),
+                                              Description:  ImmutableI18NString.Create(Languages.en, "Named the network").Set(Languages.de, "Das Netz benannt"),
                                               Metadata:     new JObject(new JProperty("ticket", "POI-42"), new JProperty("validFrom", "2026-01-01T00:00:00Z"), new JProperty("weight", 0.75m)),
                                               CreatedAt:    T0
                                           ));
@@ -273,7 +273,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                            RoamingNetworkChange.UpdateProperty(network, "description", null,  new JObject(new JProperty("de", "Ein Netz"))),
                            RoamingNetworkChange.UpdateProperty(network, "customData",  null,  RichCustomData.ToJObject())
                        ],
-                       Description:  new ImmutableI18NString(I18NString.Create(Languages.en, "Hello world!").Set(Languages.de, "Hallo Welt!")),
+                       Description:  ImmutableI18NString.Create(Languages.en, "Hello world!").Set(Languages.de, "Hallo Welt!"),
                        Metadata:     new JObject(new JProperty("validFrom", "2026-01-01T00:00:00Z"), new JProperty("weight", 0.75m), new JProperty("count", 3)),
                        Id:           ChangeSet_Id.Parse("cs-rich"),
                        CreatedAt:    DateTimeOffset.Parse("2026-10-11T12:34:56.7891234Z")
@@ -305,7 +305,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                        ChargingStationGroups:  [ new ChargingStationGroup(ChargingStationGroup_Id.Parse("DE*GEF*SG1"),                                          ChargingStationIds: [ S1 ],       Created: Created) ],
                        ChargingPoolGroups:     [ new ChargingPoolGroup   (ChargingPoolGroup_Id.   Parse("DE*GEF*PG1"),                                          ChargingPoolIds:    [ ChargingPool_Id.Parse("DE*GEF*P1") ], Created: Created) ],
                        ChargingTariffGroups:   [ new ChargingTariffGroup (ChargingTariffGroup_Id. Parse("DE*GEF*TG1"),                                          ChargingTariffIds:  [ T1 ],       Created: Created) ],
-                       Brands:                 [ new Brand(Brand_Id.Parse("blue-charge"), new ImmutableI18NString(I18NString.Create(Languages.en, "Blue Charge"))) ],
+                       Brands:                 [ new Brand(Brand_Id.Parse("blue-charge"), ImmutableI18NString.Create(Languages.en, "Blue Charge")) ],
                        SigningKeys:            gef.SigningKeys,
                        IdentityKeys:           gef.IdentityKeys,
                        EVSETemplates:          gef.EVSETemplates,
@@ -353,8 +353,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             => new EnergyMeterManufacturer(
                    EnergyMeterManufacturer_Id.Parse("METERS"),
-                   Name:                new ImmutableI18NString(I18NString.Create(Languages.en, "ACME Meters")),
-                   Description:         new ImmutableI18NString(I18NString.Create(Languages.de, "Ein Zählerhersteller")),
+                   Name:                ImmutableI18NString.Create(Languages.en, "ACME Meters"),
+                   Description:         ImmutableI18NString.Create(Languages.de, "Ein Zählerhersteller"),
                    Address:             RichAddress,
                    Homepage:            URL.Parse("https://meters.example.org"),
                    HotlinePhoneNumber:  PhoneNumber.Parse("+49 800 222222"),

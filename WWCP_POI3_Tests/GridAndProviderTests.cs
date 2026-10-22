@@ -67,7 +67,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                        I18NString.Create(Languages.en, "Example Mobility"),
                                                                        Created: Created) ],
                     EnergyMeterManufacturers:  [ new EnergyMeterManufacturer(ACME,
-                                                                             new ImmutableI18NString(I18NString.Create(Languages.en, "ACME Meters")),
+                                                                             ImmutableI18NString.Create(Languages.en, "ACME Meters"),
                                                                              Homepage:  URL.Parse("https://meters.example.org"),
                                                                              Created:   Created) ],
                     GridOperators:             [ new GridOperator(NET,
@@ -312,7 +312,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var point    = NewNetwork().GridOperators.Single().GridConnectionPoints.Single().ToJSON();
             var product  = new ParkingProduct(ParkingProduct_Id.Parse("hourly")).ToJSON();
-            var brand    = new Brand(Brand_Id.Parse("brand-1"), new ImmutableI18NString(I18NString.Create(Languages.en, "Brand 1"))).ToJSON();
+            var brand    = new Brand(Brand_Id.Parse("brand-1"), ImmutableI18NString.Create(Languages.en, "Brand 1")).ToJSON();
 
             using (Assert.EnterMultipleScope())
             {

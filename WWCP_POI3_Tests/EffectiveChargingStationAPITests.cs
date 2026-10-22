@@ -129,7 +129,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                                                                                                                            EVSEs:        [ new EVSE(EVSE_Id.Parse("DE*GEF*E1*1"), TemplateIds: [ EVSETemplate_Id.Parse("DE*GEF*ET1") ], Created: Created) ]) ]) ],
                                                     ChargingStationTemplates:  [ new ChargingStationTemplate(ST1,
                                                                                                              HotlinePhoneNumber:  PhoneNumber.Parse("+49 800 424242"),
-                                                                                                             Brands:              [ new Brand(Brand_Id.Parse("blue-charge"), new ImmutableI18NString(I18NString.Create(Languages.en, "Blue Charge"))) ],
+                                                                                                             Brands:              [ new Brand(Brand_Id.Parse("blue-charge"), ImmutableI18NString.Create(Languages.en, "Blue Charge")) ],
                                                                                                              Created:             Created) ],
                                                     EVSETemplates:             [ new EVSETemplate(EVSETemplate_Id.Parse("DE*GEF*ET1"),
                                                                                                   MaxPower:  Watt.FromW(22000),

@@ -62,15 +62,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static Brand FastBrand()
 
-            => new (Fast,  new ImmutableI18NString(I18NString.Create(Languages.en, "Fast Charge")), Logo: URL.Parse("https://fast.example/logo.png"));
+            => new (Fast,  ImmutableI18NString.Create(Languages.en, "Fast Charge"), Logo: URL.Parse("https://fast.example/logo.png"));
 
         private static Brand GreenBrand()
 
-            => new (Green, new ImmutableI18NString(I18NString.Create(Languages.en, "Green Charge")));
+            => new (Green, ImmutableI18NString.Create(Languages.en, "Green Charge"));
 
         private static Brand WhiteBrand()
 
-            => new (White, new ImmutableI18NString(I18NString.Create(Languages.en, "White Charge")));
+            => new (White, ImmutableI18NString.Create(Languages.en, "White Charge"));
 
         #endregion
 
@@ -93,8 +93,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                       new PercentageOf<EnergySourceCategory>(EnergySourceCategory.Parse("wind"),  40) ],
                     // Unknown environmental impacts.
                     [],
-                    new ImmutableI18NString(I18NString.Create(Languages.en, "Green Power Inc.")),
-                    new ImmutableI18NString(I18NString.Create(Languages.en, Product)));
+                    ImmutableI18NString.Create(Languages.en, "Green Power Inc."),
+                    ImmutableI18NString.Create(Languages.en, Product));
 
         #endregion
 
@@ -244,7 +244,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var pool    = rn1.GetChargingStationOperatorById(GEF)!.ChargingPools.Single();
             rn1.TryGetChargingTariffById(T1, out var t1);
 
-            var blue    = new Brand(Brand_Id.Parse("blue-charge"), new ImmutableI18NString(I18NString.Create(Languages.en, "Blue Charge")));
+            var blue    = new Brand(Brand_Id.Parse("blue-charge"), ImmutableI18NString.Create(Languages.en, "Blue Charge"));
 
             ImmutableArray<POIElementPathSegment> BrandPath(String BrandId)
                 => [ new POIElementPathSegment("brands", BrandId) ];
@@ -306,7 +306,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var rn1       = NewNetwork();
 
             Brand Named(String Id)
-                => new (Brand_Id.Parse(Id), new ImmutableI18NString(I18NString.Create(Languages.en, Id)));
+                => new (Brand_Id.Parse(Id), ImmutableI18NString.Create(Languages.en, Id));
 
             ImmutableArray<POIElementPathSegment> BrandPath(String BrandId)
                 => [ new POIElementPathSegment("brands", BrandId) ];
