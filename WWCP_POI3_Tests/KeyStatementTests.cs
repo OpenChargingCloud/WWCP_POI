@@ -148,10 +148,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             {
                 Assert.That(stated,                                                                    Is.Not.Null);
                 Assert.That(JToken.DeepEquals(stated!.ToJSON(), statement.ToJSON()),                   Is.True);
-                Assert.That(stated.KeyId,                                                              Is.EqualTo(identity.Public.Id));
+                Assert.That(stated.Signatures.Single().KeyId,                                                              Is.EqualTo(identity.Public.Id));
                 Assert.That(stated.SigningKeys,                                                        Is.EqualTo(new[] { signing.Public }));
                 Assert.That(stated.TryVerify([ identity.Public.Id ], null, out error),                 Is.True, error);
-                Assert.That(stated.ToJSON()["profile"]!.Value<String>(),                               Is.EqualTo("wwcp-poi-key-statement-v1"));
+                Assert.That(stated.ToJSON()["profile"]!.Value<String>(),                               Is.EqualTo("wwcp-poi-key-statement-v2"));
                 Assert.That(JToken.DeepEquals(parsed!.Operator!.KeyStatement!.ToJSON(), statement.ToJSON()),  Is.True);
             }
 
@@ -298,7 +298,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             {
                 Assert.That(anchor.RoamingNetworkURL.ToString(),                         Is.EqualTo($"http://127.0.0.1:{httpServer.TCPPort}/RNs/rn1"));
                 Assert.That(anchor.IdentityKeyIds,                                       Is.EqualTo(new[] { identity.Public.Id }));
-                Assert.That(keyStatementJSON["keyId"]!.Value<String>(),                  Is.EqualTo(identity.Public.Id));
+                Assert.That(keyStatementJSON["signatures"]![0]!["keyId"]!.Value<String>(),  Is.EqualTo(identity.Public.Id));
                 Assert.That(proof!.Verify(anchor.IdentityKeyIds, out _, out error),      Is.True, error);
             }
 

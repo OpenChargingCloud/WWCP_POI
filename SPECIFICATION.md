@@ -552,17 +552,17 @@ p8lSj39s8tNH2kaoJXIMcGqLGCHlm7x2IVrZje4IxFfakk6juMlk3QG5MDOJeYN4Q7QyNFoOmLVZcGSh
 above, `@id` `ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554`, stated with the Ed25519 identity
 key of the private seed `303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f` (public key, Base64:
 `i7BOHBuD3d8xH1vN33xQ7ePAgC9H7HluKhMc9BKY2fM=`, `@id`
-`1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802`), signed at 2026-10-17T00:00:00.000Z, valid until
-2026-11-16T00:00:00.000Z. Signature input:
+`1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802`), `minConsensus` 1, signed at 2026-10-17T00:00:00.000Z,
+valid until 2026-11-16T00:00:00.000Z. Signature input:
 
 ```json
-{"algorithm":"Ed25519","encoding":"base64","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","profile":"wwcp-poi-key-statement-v1","roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKeys":[{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w=="}],"validUntil":"2026-11-16T00:00:00.000Z"}
+{"algorithm":"Ed25519","encoding":"base64","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","minConsensus":1,"profile":"wwcp-poi-key-statement-v2","roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKeys":[{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w=="}],"validUntil":"2026-11-16T00:00:00.000Z"}
 ```
 
 Signature value:
 
 ```
-wStKI6DfjrT9oDvyenKRCUtHsyDj/7SCO2rnTq4+S5QoejTkaudDzqt+Ir8PXjXojYsiolJVdE/ZKhuyaEWVCg==
+KvWnqA1SgEBkZl7HUh3n0QaYNQPVBb1KLcHJ7KwPRB0Ev5trafUrg5ldv3AZ/wsFbDkfzH85C2gEKeDOB1whAw==
 ```
 
 **Key statement of a quorum** (sections 4.1 and 8.6): the same signing and identity keys of the holder `Alpha`
@@ -878,25 +878,8 @@ encoding and verification are as in section 4; timestamps are written and signed
 ### 8.6 Key statements and trust anchors
 
 A verifier trusts the key of an attestation independently of the proof (8.5). So that it pins only a few
-long-lived keys, the roaming network operator states its signing keys in a **key statement**, signed with
-one of its identity keys (section 4.1):
-
-```json
-{ "roamingNetworkId": "rn1", "roamingNetworkOperatorId": "DE*RNO",
-  "signingKeys":  [ { "@id": "<thumbprint>", "key": "<Base64>", "notBefore": "…", "notAfter": "…" } ],
-  "identityKeys": [ { "@id": "<thumbprint>", "key": "<Base64>" } ],
-  "signedAt": "2026-10-17T00:00:00.000Z", "validUntil": "2026-11-16T00:00:00.000Z",
-  "algorithm": "ES512", "keyId": "<@id of the identity key>", "value": "<Base64>",
-  "profile": "wwcp-poi-key-statement-v1", "encoding": "base64" }
-```
-
-The signature input is the canonical JSON of the statement without `value`, with
-`"profile": "wwcp-poi-key-statement-v1"` and `"encoding": "base64"`; `identityKeys` is left out where
-absent.
-
-The statement of an RNO with a quorum (section 4.1) has the profile `wwcp-poi-key-statement-v2`: it names the
-`minConsensus` of the RNO, and its `signatures` replace `algorithm`, `keyId` and `value`, each signature by
-another identity key:
+long-lived keys, the roaming network operator states its signing keys in a **key statement**, signed with identity keys of
+`minConsensus` of its holders (section 4.1), one of them for an RNO without a quorum:
 
 ```json
 { "roamingNetworkId": "rn1", "roamingNetworkOperatorId": "DE*RNO",
@@ -907,9 +890,11 @@ another identity key:
   "profile": "wwcp-poi-key-statement-v2", "encoding": "base64" }
 ```
 
-The signature input of each signature is the canonical JSON of the statement without `signatures`, with its
-`algorithm` and `keyId`: every holder signs the same statement on its own and adds its signature to those of
-the others. A statement of `wwcp-poi-key-statement-v1` has a `minConsensus` of 1. Keys are written as in section 4.1, in the order of their `@id`s, at least one signing key, none a
+Its `profile` is `wwcp-poi-key-statement-v2`; a reader MUST refuse another one, also the former single signature
+form `wwcp-poi-key-statement-v1` with `algorithm`, `keyId` and `value` beside the statement. The signature input of
+each signature is the canonical JSON of the statement without `signatures`, with its `algorithm` and `keyId`,
+`"profile": "wwcp-poi-key-statement-v2"` and `"encoding": "base64"`; `identityKeys` is left out where absent.
+Every holder signs the same statement on its own and adds its signature to those of the others. Keys are written as in section 4.1, in the order of their `@id`s, at least one signing key, none a
 signing and an identity key; timestamps as in section 5.4, `validUntil` not before `signedAt`. Section 6
 has an example.
 

@@ -287,7 +287,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(byTwo.ToJSON()["profile"]!.Value<String>(),        Is.EqualTo(RoamingNetworkKeyStatement.QuorumProfile));
+                Assert.That(byTwo.ToJSON()["profile"]!.Value<String>(),        Is.EqualTo(RoamingNetworkKeyStatement.SigningProfile));
                 Assert.That(byTwo.ToJSON()["minConsensus"]!.Value<Int32>(),    Is.EqualTo(2));
                 Assert.That(byTwo.Signatures.Select(signature => signature.KeyId),  Is.EqualTo(new[] { Key(network, "Alpha", POIKeyKind.Identity).Public.Id, Key(network, "Beta", POIKeyKind.Identity).Public.Id }));
                 Assert.That(JToken.DeepEquals(read!.ToJSON(), byTwo.ToJSON()), Is.True);
