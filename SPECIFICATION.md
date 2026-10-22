@@ -259,6 +259,54 @@ an odd number of holders is not needed, e.g. 3 of 4. A version that breaks this 
 quorum of the version a change set is applied to counts, as its keys do. The key statement of an RNO with a
 quorum is signed by as many holders (8.6), and a verifier needs attestations of as many (8.5).
 
+### 4.2 Co-signing
+
+The holders of a quorum, and the owners of the changes of one change set, sign it each on its own, in any order:
+signatures sign the change set without the others (4), so adding one changes nothing it says. A server MAY offer a
+place where a change set **waits** for the signatures still missing, `~/history/changeSets/pending`:
+
+- It takes a change set to wait only when it fits a version (5), every signature it has is valid by a key of that
+  version valid at its `createdAt`, at least one is by an owner of one of its changes (4.1), and its changes apply
+  to that version, leading to its after ETags. So nobody makes it hold change sets nobody owning anything signed.
+- More signatures come with the change set again, or by themselves for its `@id`; a change set of the same `@id`
+  saying something else is refused. Signatures by the same holder count once, as in 4.1.
+- Once its owners signed it, by as many holders as their quorums need, the server commits it as it commits any
+  change set, and it waits no longer. Also when it is committed otherwise, e.g. as a peer sends its commit.
+- It waits until then, without a time limit, unless withdrawn, or once it fits no version any longer, e.g. after a
+  compaction, or its commit is refused: then it can never be committed. A server MAY limit how many wait.
+- A **withdrawal** is signed by a key of an owner of one of its changes, of the kind that owner signs it with,
+  valid when it is withdrawn:
+
+  ```json
+  { "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkChangeSetWithdrawal",
+    "roamingNetworkId": "rn1", "changeSetId": "…", "withdrawnAt": "2026-10-22T12:05:00.000Z",
+    "algorithm": "ES256", "keyId": "<@id>", "value": "<Base64>",
+    "profile": "wwcp-poi-change-set-withdrawal-v1", "encoding": "base64" }
+  ```
+
+  Its signature signs the canonical JSON of `profile`, `algorithm`, `keyId`, `encoding`, `roamingNetworkId`,
+  `changeSetId` and `withdrawnAt`, the timestamp written as here.
+- The server keeps the change sets waiting in its store, `{type: "pendingChangeSet", changeSet}` with the
+  signatures it has and `{type: "pendingChangeSetDropped", changeSetId}`, so that they still wait after a restart.
+  They wait at this server only; a peer learns of them by their commit.
+
+POI_API answers `{status, changeSet?, missing?, commitId?, description?}`, `status` one of `pending`,
+`committed`, `alreadyCommitted`, `withdrawn`, `refused` and `notFound`, `missing` one text per change whose owners
+have not signed it yet:
+
+| Request | |
+|---|---|
+| `GET ~/history/changeSets/pending` | the change sets waiting, `{pendingChangeSets: [ … ]}` |
+| `POST ~/history/changeSets/pending` | a change set to wait, or to be committed: 202 Accepted while it waits, 201 Created once committed |
+| `GET ~/history/changeSets/pending/{changeSetId}` | one of them |
+| `POST ~/history/changeSets/pending/{changeSetId}/signatures` | `{signatures: [ … ]}` of it |
+| `DELETE ~/history/changeSets/pending/{changeSetId}` | its withdrawal |
+
+and over the WebSocket of the history `pendingChangeSets`, `pendingChangeSet {changeSetId}`, `coSignChangeSet
+{changeSet}`, `addPendingSignatures {changeSetId, signatures}` and `withdrawChangeSet {withdrawal}`, with the topic
+`pendingChangeSets` of every change set that starts or keeps waiting, or waits no longer. Who may submit is the
+server's to decide, as for `COMMIT ~/history/changeSets`.
+
 
 ## 5. Commits
 
@@ -612,9 +660,8 @@ is its commit identification
 The HTTP `ETag` of an entity is the SHA-256 of its canonical representation as the roaming network embeds it,
 and change sets name it as a precondition (section 4).
 
-1. **Co-signing:** the holders of a quorum (section 4.1) sign a change set each on its own, and one of them
-   commits it with all signatures; a place where a change set waits for the signatures still missing, e.g.
-   `…/history/changeSets/pending`, is open.
+1. **Co-signing across servers:** a change set waits for signatures at one server (4.2); holders using other
+   servers sign it there, as peers learn of it only by its commit.
 
 
 ## 8. Proofs of entities by a signed hash tree

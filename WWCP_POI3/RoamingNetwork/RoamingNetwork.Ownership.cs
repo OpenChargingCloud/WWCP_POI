@@ -372,10 +372,137 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            if (!TryGetSigners(ChangeSet, out var signedBy, out ErrorResponse) ||
+                !TryCheckOwners(ChangeSet, signedBy, true, out var missing, out _, out ErrorResponse))
+            {
+                return false;
+            }
+
+            if (missing.Count > 0)
+            {
+                ErrorResponse = missing[0];
+                return false;
+            }
+
+            ErrorResponse = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region TryCheckCoSigning(ChangeSet, out Missing, out SignedByAnOwner, out ErrorResponse)
+
+        /// <summary>
+        /// Whether the signatures the given change set has so far are all valid, by keys of this version, the one it is
+        /// applied to, valid at its creation; and which signatures are still missing (SPECIFICATION.md, section 4.2): one
+        /// text per change whose owners have not signed it by as many holders as their quorums need.
+        /// </summary>
+        /// <param name="ChangeSet">The change set.</param>
+        /// <param name="Missing">The signatures still missing, by change; none once its owners signed it.</param>
+        /// <param name="SignedByAnOwner">Whether an owner of one of its changes signed it already.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public Boolean TryCheckCoSigning(RoamingNetworkChangeSet           ChangeSet,
+                                         out IReadOnlyList<String>         Missing,
+                                         out Boolean                       SignedByAnOwner,
+                                         [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Missing          = [];
+            SignedByAnOwner  = false;
+
+            return TryGetSigners(ChangeSet, out var signedBy, out ErrorResponse) &&
+                   TryCheckOwners(ChangeSet, signedBy, false, out Missing, out SignedByAnOwner, out ErrorResponse);
+
+        }
+
+        #endregion
+
+        #region TryCheckWithdrawal(Withdrawal, ChangeSet, out ErrorResponse)
+
+        /// <summary>
+        /// Whether the given withdrawal of the given change set waiting for signatures is signed by a key of an owner of
+        /// one of its changes, of the kind that owner signs it with, a key of this version valid when it was withdrawn
+        /// (SPECIFICATION.md, section 4.2).
+        /// </summary>
+        /// <param name="Withdrawal">The withdrawal.</param>
+        /// <param name="ChangeSet">The change set it withdraws.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public Boolean TryCheckWithdrawal(RoamingNetworkChangeSetWithdrawal  Withdrawal,
+                                          RoamingNetworkChangeSet            ChangeSet,
+                                          [NotNullWhen(false)] out String?   ErrorResponse)
+        {
+
+            if (Withdrawal.RoamingNetworkId != ChangeSet.RoamingNetworkId || Withdrawal.ChangeSetId != ChangeSet.Id)
+            {
+                ErrorResponse = $"The withdrawal is one of the change set '{Withdrawal.ChangeSetId}' of the roaming network '{Withdrawal.RoamingNetworkId}', not of '{ChangeSet.Id}' of '{ChangeSet.RoamingNetworkId}'!";
+                return false;
+            }
+
+            var addedParking               = new Dictionary<(String, Object), POIPartyId>();
+            var addedGridConnectionPoints  = new Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>();
+            var addedEnergyMeterChildren   = new Dictionary<(String, Object), POIPartyId>();
+            var addedProviderGroups        = new Dictionary<(String, Object), POIPartyId>();
+
+            for (var index = 0; index < ChangeSet.Changes.Length; index++)
+            {
+
+                if (!TryGetOwners(ChangeSet.Changes[index], addedParking, addedGridConnectionPoints, addedEnergyMeterChildren, addedProviderGroups, out var owners, out ErrorResponse))
+                {
+                    ErrorResponse = $"Change {index}: {ErrorResponse}";
+                    return false;
+                }
+
+                foreach (var (partyId, kind) in owners)
+                {
+
+                    if (!TryGetParty(partyId, out var party))
+                        continue;
+
+                    if ((kind == POIKeyKind.Identity ? party.IdentityKeys : party.SigningKeys).FirstOrDefault(key => key.Id == Withdrawal.KeyId) is not POIPublicKey key)
+                        continue;
+
+                    if (!key.IsValidAt(Withdrawal.WithdrawnAt))
+                    {
+                        ErrorResponse = $"The key '{key.Id}' of {partyId} is not valid at {Withdrawal.WithdrawnAt.ToISO8601()}!";
+                        return false;
+                    }
+
+                    if (!Withdrawal.Verify(key.Key.ToPublicKey(), out var verificationError))
+                    {
+                        ErrorResponse = $"The withdrawal by the key '{key.Id}' of {partyId} is invalid: {verificationError}";
+                        return false;
+                    }
+
+                    ErrorResponse = null;
+                    return true;
+
+                }
+
+            }
+
+            ErrorResponse = $"The key '{Withdrawal.KeyId}' is no key of an owner of a change of the change set '{ChangeSet.Id}'!";
+            return false;
+
+        }
+
+        #endregion
+
+        #region (private) TryGetSigners(ChangeSet, out SignedBy, out ErrorResponse)
+
+        /// <summary>
+        /// The parties and kinds of keys that signed the given change set, with the holders of the keys; every signature
+        /// must be valid, by a key of a party of this version valid at the creation of the change set.
+        /// </summary>
+        private Boolean TryGetSigners(RoamingNetworkChangeSet                                    ChangeSet,
+                                      out Dictionary<(POIPartyId, POIKeyKind), HashSet<String>>  SignedBy,
+                                      [NotNullWhen(false)] out String?                           ErrorResponse)
+        {
+
             #region The parties and kinds of keys that signed it, with the holders of the keys
 
             // A quorum counts holders, not keys: a holder renewing its key signs with both once.
-            var signedBy = new Dictionary<(POIPartyId, POIKeyKind), HashSet<String>>();
+            var signedBy = SignedBy = new Dictionary<(POIPartyId, POIKeyKind), HashSet<String>>();
 
             for (var index = 0; index < ChangeSet.Signatures.Length; index++)
             {
@@ -423,6 +550,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            ErrorResponse = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region (private) TryCheckOwners(ChangeSet, SignedBy, StopAtMissing, out Missing, out SignedByAnOwner, out ErrorResponse)
+
+        /// <summary>
+        /// Whether every change of the given change set is one its owners may make, and which of them miss signatures of
+        /// their owners: only the first, when told to stop there.
+        /// </summary>
+        private Boolean TryCheckOwners(RoamingNetworkChangeSet                                ChangeSet,
+                                       Dictionary<(POIPartyId, POIKeyKind), HashSet<String>>  SignedBy,
+                                       Boolean                                                StopAtMissing,
+                                       out IReadOnlyList<String>                              Missing,
+                                       out Boolean                                            SignedByAnOwner,
+                                       [NotNullWhen(false)] out String?                       ErrorResponse)
+        {
+
+            var signedBy  = SignedBy;
+            var missing   = new List<String>();
+
+            Missing          = missing;
+            SignedByAnOwner  = false;
+
             #region Every change needs one of its owners
 
             // Parking entities added by an earlier change of this change set, by their parking operator;
@@ -452,19 +606,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 // One of its owners, by as many holders of its keys of the kinds named as its quorum needs.
-                if (!owners.GroupBy(owner => owner.Item1).
-                            Any(party => party.SelectMany(owner => signedBy.TryGetValue(owner, out var holders) ? holders : []).
-                                               Distinct(StringComparer.Ordinal).
-                                               Count() >= MinConsensusOf(party.Key)))
+                var holdersByParty = owners.GroupBy(owner => owner.Item1).
+                                            Select (party => (Party:    party.Key,
+                                                              Holders:  party.SelectMany(owner => signedBy.TryGetValue(owner, out var holders) ? holders : []).
+                                                                              Distinct(StringComparer.Ordinal).
+                                                                              Count())).
+                                            ToArray();
+
+                if (holdersByParty.Any(party => party.Holders > 0))
+                    SignedByAnOwner = true;
+
+                if (!holdersByParty.Any(party => party.Holders >= MinConsensusOf(party.Party)))
                 {
 
                     var quorums = owners.Any(owner => MinConsensusOf(owner.Item1) > 1);
 
-                    ErrorResponse = $"Change {index}: {change.Kind} of the {change.EntityType} '{change.EntityId}'{(change.EntityPropertyName is not null ? $" ('{change.EntityPropertyName}')" : "")} needs {(quorums ? "signatures" : "a signature")} by " +
-                                    String.Join(" or ", owners.Select(owner => MinConsensusOf(owner.Item1) > 1
-                                                                                   ? $"{(owner.Item2 == POIKeyKind.Identity ? "identity" : "signing")} keys of {MinConsensusOf(owner.Item1)} holders of {owner.Item1}"
-                                                                                   : $"a{(owner.Item2 == POIKeyKind.Identity ? "n identity" : " signing")} key of {owner.Item1}")) + "!";
-                    return false;
+                    missing.Add($"Change {index}: {change.Kind} of the {change.EntityType} '{change.EntityId}'{(change.EntityPropertyName is not null ? $" ('{change.EntityPropertyName}')" : "")} needs {(quorums ? "signatures" : "a signature")} by " +
+                                String.Join(" or ", owners.Select(owner => MinConsensusOf(owner.Item1) > 1
+                                                                               ? $"{(owner.Item2 == POIKeyKind.Identity ? "identity" : "signing")} keys of {MinConsensusOf(owner.Item1)} holders of {owner.Item1}"
+                                                                               : $"a{(owner.Item2 == POIKeyKind.Identity ? "n identity" : " signing")} key of {owner.Item1}")) + "!");
+
+                    if (StopAtMissing)
+                    {
+                        ErrorResponse = null;
+                        return true;
+                    }
 
                 }
 

@@ -1784,8 +1784,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             commits.Add(Commit);
 
             if (Commit.ChangeSet is RoamingNetworkChangeSet changeSet && !Commit.IsMerge)
+            {
+
                 foreach (var changeSetId in ChangeSetIds(changeSet))
                     committedChangeSets.TryAdd(changeSetId, Commit.Id);
+
+                ForgetPendingChangeSet(Commit, changeSet);
+
+            }
 
         }
 

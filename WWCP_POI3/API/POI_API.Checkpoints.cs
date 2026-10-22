@@ -400,6 +400,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             AddArchiveCommands(WebSocketServer, History);
             AddProofCommands  (WebSocketServer, History);
             AddPriceStatementCommands(WebSocketServer, History);
+            AddCoSigningCommands     (WebSocketServer, History);
             AddEpochCommands         (WebSocketServer, History);
 
             WebSocketServer.AddCommand("checkpoints", request =>
@@ -556,12 +557,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var disconnectAttestations     = ConnectAttestations   (History, WebSocketServer);
             var disconnectPriceStatements  = ConnectPriceStatements(History, WebSocketServer);
+            var disconnectPending          = ConnectPendingChangeSets(History, WebSocketServer);
 
             return () => {
                 History.OnCheckpoint            -= onCheckpoint;
                 History.OnCheckpointSignatures  -= onCheckpointSignatures;
                 disconnectAttestations();
                 disconnectPriceStatements();
+                disconnectPending();
             };
 
         }

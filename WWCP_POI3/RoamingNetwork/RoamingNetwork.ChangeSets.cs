@@ -254,6 +254,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          [NotNullWhen(true)]  out RoamingNetwork?  RoamingNetwork,
                                          [NotNullWhen(false)] out String?          ErrorResponse,
                                          VerifyChangeSetSignatureDelegate?         VerifySignature   = null)
+
+            => TryApplyChangeSet(ChangeSet, true, out RoamingNetwork, out ErrorResponse, VerifySignature);
+
+        #endregion
+
+        #region TryApplyPendingChangeSet(ChangeSet, out RoamingNetwork, out ErrorResponse)
+
+        /// <summary>
+        /// Try to apply all changes of the given change set waiting for signatures (SPECIFICATION.md, section 4.2) to a new
+        /// version of this roaming network, as TryApplyChangeSet(…) does, without asking for the signatures of its owners:
+        /// whether it will be committed once they signed it. This version stays unchanged.
+        /// </summary>
+        /// <param name="ChangeSet">The change set.</param>
+        /// <param name="RoamingNetwork">The new version of this roaming network.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public Boolean TryApplyPendingChangeSet(RoamingNetworkChangeSet                   ChangeSet,
+                                                [NotNullWhen(true)]  out RoamingNetwork?  RoamingNetwork,
+                                                [NotNullWhen(false)] out String?          ErrorResponse)
+
+            => TryApplyChangeSet(ChangeSet, false, out RoamingNetwork, out ErrorResponse, null);
+
+        #endregion
+
+        #region (private) TryApplyChangeSet(ChangeSet, CheckOwnership, out RoamingNetwork, out ErrorResponse, VerifySignature)
+
+        private Boolean TryApplyChangeSet(RoamingNetworkChangeSet                   ChangeSet,
+                                          Boolean                                   CheckOwnership,
+                                          [NotNullWhen(true)]  out RoamingNetwork?  RoamingNetwork,
+                                          [NotNullWhen(false)] out String?          ErrorResponse,
+                                          VerifyChangeSetSignatureDelegate?         VerifySignature)
         {
 
             RoamingNetwork = null;
@@ -275,7 +305,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Signatures: by the owners of everything it changes, and of the optional verifier
 
-                if (!TryCheckOwnership(ChangeSet, out var ownershipError))
+                if (CheckOwnership && !TryCheckOwnership(ChangeSet, out var ownershipError))
                 {
                     ErrorResponse = ownershipError;
                     return false;

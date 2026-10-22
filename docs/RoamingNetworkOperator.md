@@ -113,7 +113,9 @@ and the RNO names its `minConsensus`, e.g. 2 of 3.
   that two quorums always share a holder (`POIPartyKeys.CheckQuorum`): 2 of 3, 3 of 4, 3 of 5. An odd number of
   holders is not needed.
 - **Signing on one's own:** each holder signs a change set or key statement with its own key and adds its
-  signature to the others (`changeSet.Sign(…)`, `keyStatement.WithSignature(…)`); one of them commits it.
+  signature to the others (`changeSet.Sign(…)`, `keyStatement.WithSignature(…)`); one of them commits it, or the
+  change set waits at a server for the signatures still missing, and is committed once they are there
+  (`~/history/changeSets/pending`, [SPECIFICATION.md](../SPECIFICATION.md#42-co-signing), section 4.2).
 
 ```csharp
 var statement = RoamingNetworkKeyStatement.Create([ (alphaIdentityKey, COSEAlgorithm.ES512) ], 2,

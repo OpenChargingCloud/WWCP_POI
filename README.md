@@ -356,6 +356,11 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
     the RNO its `minConsensus`, more than half of the holders of each kind of keys: then everything it signs needs
     keys of `minConsensus` different holders, its key statement included, and an app needs attestations of as many.
     Holders are counted, not keys ([docs/RoamingNetworkOperator.md](docs/RoamingNetworkOperator.md#quorum)).
+  - **Co-signing:** `history.CoSign(changeSet)` lets a change set signed by an owner of one of its changes wait for
+    the signatures still missing, `history.AddPendingSignatures(id, signatures)` adds more, and once its owners
+    signed it, it is committed; `history.Withdraw(withdrawal)` withdraws it, signed by an owner
+    (`RoamingNetworkChangeSetWithdrawal.Create(…)`). The store keeps the change sets waiting (SPECIFICATION.md,
+    section 4.2).
 - **Rebase:** `rn2.TryRebase(cs, …)` prepares a change set of an older version again, unless it conflicts;
   the rebased change set is unsigned, its owners sign it again.
 - **Signatures:** `Sign(…)` and `VerifySignature(…)` over canonical JSON (COSE algorithms of Styx);
@@ -619,6 +624,11 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/history/commits/{commitId}` | one commit |
 | `COMMIT ~/RNs/{id}/history/changeSets` | 201 committed, 200 already committed (the commit, the `head`, the `conflicts` left), 422 refused |
 | `POST ~/RNs/{id}/history/commits/{commitId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403, 404, 422 invalid |
+| `GET ~/RNs/{id}/history/changeSets/pending` | the change sets waiting for signatures: `{pendingChangeSets: [{status, changeSet, missing}]}` |
+| `POST ~/RNs/{id}/history/changeSets/pending` | a change set signed by an owner: 202 waiting (`missing`), 201 committed, 200 committed before, 403, 422 refused |
+| `GET ~/RNs/{id}/history/changeSets/pending/{changeSetId}` | one of them, 404 |
+| `POST ~/RNs/{id}/history/changeSets/pending/{changeSetId}/signatures` `{signatures: […]}` | as above, 404 |
+| `DELETE ~/RNs/{id}/history/changeSets/pending/{changeSetId}` (its withdrawal) | 200 withdrawn, 403, 404, 422 refused |
 | `GET ~/RNs/{id}/history/checkpoints?since={sequence}&max={n}` | the checkpoints after the sequence |
 | `GET ~/RNs/{id}/history/checkpoints/{checkpointId}` | one checkpoint |
 | `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/snapshot` | the version of its commit, to join from |
@@ -752,11 +762,13 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   proofs: `attestations`, `chargingStationProof {chargingStationId | EVSEId, hashAlgorithm?}`; price statements:
   `priceStatements {chargingStationId | EVSEId}?`, `addPriceStatements {priceStatements}`, `checkpointPriceStatements
   {checkpointId}`, `priceStatementProof {checkpointId, digest}`; `pushCheckpoints` takes `priceStatements` as well;
-  epochs: `epoch`.
+  epochs: `epoch`; co-signing: `pendingChangeSets`, `pendingChangeSet {changeSetId}`, `coSignChangeSet {changeSet}`,
+  `addPendingSignatures {changeSetId, signatures}`, `withdrawChangeSet {withdrawal}` → `{status, changeSet?, missing?,
+  commitId?, description?}`.
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
   `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced),
   `commitSignatures` (`{commitId, signatures}` added later), `checkpoints`, `checkpointSignatures`, `attestations`, `adminStatusUpdates`,
-  `statusUpdates`, `energyStatusUpdates`, `priceStatusUpdates`, `priceStatements`. Pushes are sends, `[6, "p1", action, payload]`,
+  `statusUpdates`, `energyStatusUpdates`, `priceStatusUpdates`, `priceStatements`, `pendingChangeSets`. Pushes are sends, `[6, "p1", action, payload]`,
   in the format of the last `subscribe`. They end with the connection; a client that falls more than
   `MaxQueuedPushes` pushes or `MaxQueuedPushBytes` behind is disconnected and catches up after reconnecting.
 - **Async:** requests are processed concurrently, up to `MaxConcurrentRequests` per connection;
@@ -776,7 +788,7 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   of `subscribe` (1 turns it off); `PushCoalescingDelay` lets more gather.
 - **Errors:** the codes of OCPP-J plus `NotFound`; an unreadable frame is answered on id `"-1"`.
 - **Access:** open like the HTTP reads, unless `AuthenticateWebSocketClient` is set;
-  `commitChangeSet` asks `AuthorizeChangeSetSubmission` with the upgrade request.
+  `commitChangeSet` and the co-signing actions ask `AuthorizeChangeSetSubmission` with the upgrade request.
 
 ### Peer
 

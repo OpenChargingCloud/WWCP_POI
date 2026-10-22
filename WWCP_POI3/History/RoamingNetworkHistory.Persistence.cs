@@ -262,6 +262,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 }
                                 break;
 
+                            case RoamingNetworkHistoryLogEntryType.PendingChangeSet:
+                            case RoamingNetworkHistoryLogEntryType.PendingChangeSetDropped:
+                                history.TakeStoredPendingChangeSet(entry);
+                                break;
+
                             default:
                                 history.RuntimeStatus.TryUpdate(entry.StatusUpdate!, out _);
                                 break;
@@ -336,8 +341,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     ArchiveDropped(newRoot, dropped);
 
                     // The checkpoints are all kept, also those of the commits dropped: they are the evidence of what was.
+                    // The change sets waiting for signatures are kept, too; those fitting no version afterwards are let go.
                     Store?.Compact(SnapshotJSON(newRoot, rootVersion, Head.RoamingNetwork),
-                                   kept.Skip(1).Select(RoamingNetworkHistoryLogEntry.ForCommit).Concat(CheckpointLogEntries()));
+                                   kept.Skip(1).Select(RoamingNetworkHistoryLogEntry.ForCommit).Concat(CheckpointLogEntries()).Concat(PendingChangeSetLogEntries()));
 
                     #region Drop them from memory, too
 
@@ -366,7 +372,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     #endregion
 
-                    Interlocked.Exchange(ref logEntries, kept.Count - 1 + checkpoints.Count);
+                    Interlocked.Exchange(ref logEntries, kept.Count - 1 + checkpoints.Count + pendingChangeSets.Count);
+
+                    if (dropped.Count > 0)
+                        DropUnfittingPendingChangeSets();
 
                     ErrorResponse = null;
                     return true;

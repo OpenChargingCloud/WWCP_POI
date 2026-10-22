@@ -85,6 +85,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  ChangeSet                = "changeSet";
 
             /// <summary>
+            /// The property of the identification of a change set.
+            /// </summary>
+            public const String  ChangeSetId              = "changeSetId";
+
+            /// <summary>
+            /// The property of the change sets waiting for signatures.
+            /// </summary>
+            public const String  PendingChangeSets        = "pendingChangeSets";
+
+            /// <summary>
+            /// The property of signatures, e.g. of a change set waiting for them.
+            /// </summary>
+            public const String  Signatures               = "signatures";
+
+            /// <summary>
+            /// The property of the withdrawal of a change set waiting for signatures.
+            /// </summary>
+            public const String  Withdrawal               = "withdrawal";
+
+            /// <summary>
             /// The property of a list of attestations.
             /// </summary>
             public const String  Attestations             = "attestations";
@@ -323,6 +343,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             RegisterQueryURLTemplates();
             RegisterLocationURLTemplates();
             RegisterHistoryURLTemplates();
+            RegisterCoSigningURLTemplates();
             RegisterProofURLTemplates();
             RegisterPriceStatementURLTemplates();
             RegisterPeerURLTemplates();

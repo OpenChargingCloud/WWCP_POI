@@ -48,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
         /// <summary>
         /// A .NET ClientWebSocket, which matches the answers to its requests by their identifications.
         /// </summary>
-        private sealed class TestClient : IAsyncDisposable
+        internal sealed class TestClient : IAsyncDisposable
         {
 
             private readonly ClientWebSocket                                                    webSocket  = new ();
@@ -609,7 +609,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(topics.Payload!["topics"]!.Select(topic => topic["name"]!.Value<String>()),
-                            Is.EqualTo(new[] { "adminStatusUpdates", "attestations", "checkpointSignatures", "checkpoints", "commitAnnouncements", "commitSignatures", "commits", "energyStatusUpdates", "priceStatements", "priceStatusUpdates", "statusUpdates" }));
+                            Is.EqualTo(new[] { "adminStatusUpdates", "attestations", "checkpointSignatures", "checkpoints", "commitAnnouncements", "commitSignatures", "commits", "energyStatusUpdates", "pendingChangeSets", "priceStatements", "priceStatusUpdates", "statusUpdates" }));
                 Assert.That(topics.Payload["topics"]![4]!["action"]!.Value<String>(),  Is.EqualTo("commitAnnouncement"));
             }
 

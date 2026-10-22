@@ -117,17 +117,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The price statements a checkpoint names, held since.
         /// </summary>
-        CheckpointPriceStatements
+        CheckpointPriceStatements,
+
+        /// <summary>
+        /// A change set waiting for the signatures of its owners, with those it has (SPECIFICATION.md, section 4.2).
+        /// </summary>
+        PendingChangeSet,
+
+        /// <summary>
+        /// A change set no longer waiting: withdrawn, or fitting no version.
+        /// </summary>
+        PendingChangeSetDropped
 
     }
 
 
     /// <summary>
     /// One entry of the log of a history: a commit, signatures added to one, a status update, a checkpoint,
-    /// signatures added to one, a price statement, or the price statements of a checkpoint.
+    /// signatures added to one, a price statement, the price statements of a checkpoint, a change set waiting for
+    /// signatures, or one no longer waiting.
     /// One line of JSON in a file: { type, commit } | { type, commitId, signatures } | { type, statusUpdate } |
     /// { type, checkpoint } | { type, checkpointId, signatures } | { type, priceStatement } |
-    /// { type, checkpointId, priceStatements }.
+    /// { type, checkpointId, priceStatements } | { type, changeSet } | { type, changeSetId }.
     /// </summary>
     public sealed class RoamingNetworkHistoryLogEntry
     {
@@ -201,6 +212,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  PriceStatements  = "priceStatements";
 
+            /// <summary>
+            /// The property of the change set of a pending change set entry.
+            /// </summary>
+            public const String  ChangeSet        = "changeSet";
+
+            /// <summary>
+            /// The property of the change set of a pending change set dropped entry.
+            /// </summary>
+            public const String  ChangeSetId      = "changeSetId";
+
         }
 
         #endregion
@@ -251,6 +272,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IReadOnlyList<RoamingNetworkPriceStatement>      PriceStatements { get; }
 
+        /// <summary>
+        /// The change set of a PendingChangeSet entry, with the signatures it has.
+        /// </summary>
+        public RoamingNetworkChangeSet?                         ChangeSet       { get; }
+
+        /// <summary>
+        /// The change set of a PendingChangeSetDropped entry.
+        /// </summary>
+        public ChangeSet_Id?                                    ChangeSetId     { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -263,7 +294,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               RoamingNetworkCheckpoint?                     Checkpoint       = null,
                                               RoamingNetworkCheckpoint_Id?                  CheckpointId     = null,
                                               RoamingNetworkPriceStatement?                 PriceStatement   = null,
-                                              IReadOnlyList<RoamingNetworkPriceStatement>?  PriceStatements  = null)
+                                              IReadOnlyList<RoamingNetworkPriceStatement>?  PriceStatements  = null,
+                                              RoamingNetworkChangeSet?                      ChangeSet        = null,
+                                              ChangeSet_Id?                                 ChangeSetId      = null)
         {
             this.Type             = Type;
             this.Commit           = Commit;
@@ -274,6 +307,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.CheckpointId     = CheckpointId;
             this.PriceStatement   = PriceStatement;
             this.PriceStatements  = PriceStatements ?? [];
+            this.ChangeSet        = ChangeSet;
+            this.ChangeSetId      = ChangeSetId;
         }
 
         /// <summary>
@@ -320,6 +355,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkHistoryLogEntry ForCheckpointPriceStatements(RoamingNetworkCheckpoint_Id                  CheckpointId,
                                                                                  IReadOnlyList<RoamingNetworkPriceStatement>  PriceStatements)
             => new (RoamingNetworkHistoryLogEntryType.CheckpointPriceStatements, CheckpointId: CheckpointId, PriceStatements: PriceStatements);
+
+        /// <summary>
+        /// The entry of the given change set waiting for signatures, with those it has.
+        /// </summary>
+        public static RoamingNetworkHistoryLogEntry ForPendingChangeSet(RoamingNetworkChangeSet ChangeSet)
+
+            => new (RoamingNetworkHistoryLogEntryType.PendingChangeSet, ChangeSet: ChangeSet);
+
+        /// <summary>
+        /// The entry of the given change set no longer waiting for signatures.
+        /// </summary>
+        public static RoamingNetworkHistoryLogEntry ForPendingChangeSetDropped(ChangeSet_Id ChangeSetId)
+
+            => new (RoamingNetworkHistoryLogEntryType.PendingChangeSetDropped, ChangeSetId: ChangeSetId);
 
         #endregion
 
@@ -371,6 +420,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                 new JProperty(PropertyKeys.Type,             "checkpointPriceStatements"),
                                                                                 new JProperty(PropertyKeys.CheckpointId,     CheckpointId!.Value.ToString()),
                                                                                 new JProperty(PropertyKeys.PriceStatements,  new JArray(PriceStatements.Select(priceStatement => priceStatement.ToJSON(Embedded: true))))
+                                                                            ),
+
+                           RoamingNetworkHistoryLogEntryType.PendingChangeSet
+                                                                         => new JObject(
+                                                                                new JProperty(PropertyKeys.Type,             "pendingChangeSet"),
+                                                                                new JProperty(PropertyKeys.ChangeSet,        ChangeSet!.ToJSON(Embedded: true))
+                                                                            ),
+
+                           RoamingNetworkHistoryLogEntryType.PendingChangeSetDropped
+                                                                         => new JObject(
+                                                                                new JProperty(PropertyKeys.Type,             "pendingChangeSetDropped"),
+                                                                                new JProperty(PropertyKeys.ChangeSetId,      ChangeSetId!.Value.ToString())
                                                                             ),
 
                            _                                             => new JObject(
@@ -519,6 +580,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     Entry          = ForCheckpointPriceStatements(priceStatementsCheckpointId, priceStatements);
+                    ErrorResponse  = null;
+                    return true;
+
+                case "pendingChangeSet":
+
+                    if (JSON[PropertyKeys.ChangeSet] is not JObject changeSetJSON ||
+                        !RoamingNetworkChangeSet.TryParse(changeSetJSON, out var changeSet, out ErrorResponse, Limits))
+                    {
+                        ErrorResponse = "Invalid pending change set entry!";
+                        return false;
+                    }
+
+                    Entry = ForPendingChangeSet(changeSet);
+                    return true;
+
+                case "pendingChangeSetDropped":
+
+                    if (!ChangeSet_Id.TryParse(JSON[PropertyKeys.ChangeSetId]?.Value<String>() ?? "", out var changeSetId))
+                    {
+                        ErrorResponse = "Invalid pending change set dropped entry!";
+                        return false;
+                    }
+
+                    Entry          = ForPendingChangeSetDropped(changeSetId);
                     ErrorResponse  = null;
                     return true;
 
