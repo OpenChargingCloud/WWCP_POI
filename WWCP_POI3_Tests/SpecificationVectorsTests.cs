@@ -344,7 +344,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void A_trust_anchor()
         {
 
-            const String QRCode  = "WWCPPOI1:++K..DF$D4IK1$CM2D$9FQ$DTVD38DUPCG/DB$CQWE-69MWEW9E0G7%:5I9E -DNPCGECD3D3/D+%5*VD$$EQ:5-3E7WEBAFCPES4FVPC:L5VQE$-D0LEBECZEDV2D7$CK4F-KEIUA7%EGVE:.D59D.KEPED1$CBWERWE-N9-FF$FGW24.+U3M0-$O1JV%LLP-T2OR-7U%J0WP7ZXAW7RI33:PKFFM*D00LEBECZEDV2D7$CK4F-KENC9XPC*-DHFES3EJ$D3/D:+9PWE04ERPD5IAG8FA9DIWENPEJ/5B9DOICB$CBECP9ESZCS9EHDDAIACPE:KE41";
+            const String QRCode  = "WWCPPOI1:++K..DF$D4IK1$CM2D$9FQ$DTVD38DUPCG/DB$CQWEUT9MWEW9E0G7%:5I9E -DNPCGECD3D3/D+%5*VD$$EQ:5-3E7WEBAFCPES4FVPC:L5VQE$-D0LEBECZEDV2D7$CK4F-KE/:56LE QEAC8NPC04E0067B6PED1$CBWERWE-N9-FF$FGW24.+U3M0-$O1JV%LLP-T2OR-7U%J0WP7ZXAW7RI33:PKFFM*D00LEBECZEDV2D7$CK4F-KENC9XPC*-DHFES3EJ$D3/D:+9PWE04ERPD5IAG8FA9DIWENPEJ/5B9DOICB$CBECP9ESZCS9EHDDAIACPE:KE41";
 
             var anchor = new RoamingNetworkTrustAnchor(RoamingNetwork_Id.Parse("rn1"),
                                                        URL.Parse("https://hub.example/poi/RNs/rn1"),
@@ -355,7 +355,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(anchor.ToJSON().ToString(Formatting.None),  Is.EqualTo("{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetworkTrustAnchor\",\"roamingNetworkId\":\"rn1\",\"name\":{\"en\":\"Example\"},\"roamingNetworkURI\":\"https://hub.example/poi/RNs/rn1\",\"identityKeys\":[\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\"]}"));
+                Assert.That(anchor.ToJSON().ToString(Formatting.None),  Is.EqualTo("{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/trustAnchor/v1\",\"roamingNetworkId\":\"rn1\",\"name\":{\"en\":\"Example\"},\"roamingNetworkURI\":\"https://hub.example/poi/RNs/rn1\",\"identityKeys\":[\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\"]}"));
                 Assert.That(anchor.ToQRCode(),                          Is.EqualTo(QRCode));
                 Assert.That(RoamingNetworkTrustAnchor.TryParse(QRCode, out var read, out var error),  Is.True, error);
             }

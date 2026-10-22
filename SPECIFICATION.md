@@ -591,13 +591,13 @@ Om7vDbZvLwtvW1qpiVguNhZ7K1zNtsaqt1bcMGDot/md+bBZWNeVHFhg2VpH5BMioseZzpP6WLvXdQqr
 **Trust anchor** (section 8.6) of the example, with the identity key of the key statement above:
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetworkTrustAnchor","roamingNetworkId":"rn1","name":{"en":"Example"},"roamingNetworkURI":"https://hub.example/poi/RNs/rn1","identityKeys":["1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802"]}
+{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/trustAnchor/v1","roamingNetworkId":"rn1","name":{"en":"Example"},"roamingNetworkURI":"https://hub.example/poi/RNs/rn1","identityKeys":["1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802"]}
 ```
 
-Its QR code, 221 bytes of CBOR:
+Its QR code, 225 bytes of CBOR:
 
 ```
-WWCPPOI1:++K..DF$D4IK1$CM2D$9FQ$DTVD38DUPCG/DB$CQWE-69MWEW9E0G7%:5I9E -DNPCGECD3D3/D+%5*VD$$EQ:5-3E7WEBAFCPES4FVPC:L5VQE$-D0LEBECZEDV2D7$CK4F-KEIUA7%EGVE:.D59D.KEPED1$CBWERWE-N9-FF$FGW24.+U3M0-$O1JV%LLP-T2OR-7U%J0WP7ZXAW7RI33:PKFFM*D00LEBECZEDV2D7$CK4F-KENC9XPC*-DHFES3EJ$D3/D:+9PWE04ERPD5IAG8FA9DIWENPEJ/5B9DOICB$CBECP9ESZCS9EHDDAIACPE:KE41
+WWCPPOI1:++K..DF$D4IK1$CM2D$9FQ$DTVD38DUPCG/DB$CQWEUT9MWEW9E0G7%:5I9E -DNPCGECD3D3/D+%5*VD$$EQ:5-3E7WEBAFCPES4FVPC:L5VQE$-D0LEBECZEDV2D7$CK4F-KE/:56LE QEAC8NPC04E0067B6PED1$CBWERWE-N9-FF$FGW24.+U3M0-$O1JV%LLP-T2OR-7U%J0WP7ZXAW7RI33:PKFFM*D00LEBECZEDV2D7$CK4F-KENC9XPC*-DHFES3EJ$D3/D:+9PWE04ERPD5IAG8FA9DIWENPEJ/5B9DOICB$CBECP9ESZCS9EHDDAIACPE:KE41
 ```
 
 **Station proof** (section 8.4)
@@ -606,7 +606,7 @@ index 0 and an empty audit path; the station is complete. A verifier calculates 
 checks it against the attestation, which it embeds:
 
 ```json
-{ "@context": "https://open.charging.cloud/contexts/wwcp+json/poiProof",
+{ "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/proof/v1",
   "hashAlgorithm": "sha256",
   "commitId": "fb45b9c960d2ece9085219b391a1d3bda793cd834d13f590cf9b7c2bd441f5d0", "revision": 0,
   "roamingNetwork": {
@@ -796,7 +796,7 @@ proof gives completely is then attested, and nothing else. It MUST read the proo
 fraction as decimals and strings as strings (section 1).
 
 ```json
-{ "@context": "https://open.charging.cloud/contexts/wwcp+json/poiProof",
+{ "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/proof/v1",
   "hashAlgorithm": "sha256",
   "commitId": "<commit of the proven version>", "revision": 4711,
   "roamingNetwork": <the roaming network, pruned>,
@@ -919,7 +919,7 @@ has an example.
   documents of the roaming network operator:
 
   ```json
-  { "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetworkTrustAnchor",
+  { "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/trustAnchor/v1",
     "roamingNetworkId": "rn1", "name": { "en": "…" }, "description": { "en": "…" },
     "roamingNetworkURI": "https://hub.example/poi/RNs/rn1",
     "identityKeys": [ "<@id>", "<@id>", "<@id>" ], "minConsensus": 2 }
