@@ -63,7 +63,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/attestationSubject/v1";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/attestationSubject/v1";
 
         #endregion
 
@@ -143,7 +143,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The JSON-LD context of the object, which names what its signature signs and in which version: it is part of its
         /// signature input also where it is embedded.
         /// </summary>
-        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/attestation/v1";
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/attestation/v1";
 
         #endregion
 

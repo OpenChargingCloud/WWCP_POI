@@ -31,7 +31,7 @@ MUST be refused, not rounded; so MUST an object that names a property twice.
 
 Every object of POI - an entity, a template, a group, a change set and its changes, a commit, a
 checkpoint, an epoch, an attestation, a key or price statement, a proof, a WebSocket message - has a
-JSON-LD context, `https://open.charging.cloud/contexts/wwcp+json/<type>`, its type in lowerCamelCase,
+JSON-LD context, `https://open.charging.cloud/contexts/wwcp/<type>`, its type in lowerCamelCase,
 e.g. `chargingPool`, `roamingNetworkChangeSet`, `roamingNetworkCommit`; a proof's is `poiProof`.
 
 - **Written on its own**, e.g. as the body of an HTTP response or a WebSocket message, an object names
@@ -53,7 +53,7 @@ A version of a roaming network is identified by its **content**: its JSON repres
 `RoamingNetwork.ToJSON(Embedded: false, IncludeETags: false)` writes it.
 
 - **Included:** `@context`
-  (`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1`), `@id`, `name`, `description`,
+  (`https://open.charging.cloud/contexts/wwcp/roamingNetwork/v1`), `@id`, `name`, `description`,
   `dataSource`, `dataLicenses`, its operator `operator`, every embedded entity completely (operators with their pools,
   stations, EVSEs, connectors, energy meters, tariffs, templates, groups and offers; manufacturers;
   e-mobility providers with their groups and offers; grid operators with their grid connection points,
@@ -176,13 +176,13 @@ representation, and so its ETag, changes with everything it embeds, and the hist
 Grid connection points, brands (embedded in operators, pools, stations, EVSEs and RFID authentication modes) and
 parking products have no timestamps.
 
-**What is signed** is named by a versioned JSON-LD context, `https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/<object>/v<n>`:
+**What is signed** is named by a versioned JSON-LD context, `https://open.charging.cloud/contexts/wwcp/roamingNetwork/<object>/v<n>`:
 it tells what an object is and in which version, and every signature input and every identification
 contains it as `@context`, also where the object is embedded and its JSON leaves `@context` out. A new
 version of an object, or of how its signature input is made, is a new context. A verifier compares it as
 text, never fetches it, and MUST refuse a context it does not know. Signature values are canonical
 standard Base64; there is no `profile` and no `encoding`. Every other object has a context of the same
-form, the roaming network (`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1`) and the
+form, the roaming network (`https://open.charging.cloud/contexts/wwcp/roamingNetwork/v1`) and the
 entities and values it holds (for example `…/roamingNetwork/evse/v1`) included; embedded, they leave it
 out, so of these only the context of the roaming network is part of its content (section 2).
 
@@ -190,7 +190,7 @@ out, so of these only the context of the roaming network is part of its content 
 signature input is the canonical JSON of
 
 ```json
-{ "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/changeSet/v3", "algorithm": "…", "keyId": "…",
+{ "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/changeSet/v3", "algorithm": "…", "keyId": "…",
   "changeSet": <the change set without its signatures> }
 ```
 
@@ -287,7 +287,7 @@ place where a change set **waits** for the signatures still missing, `~/history/
   valid when it is withdrawn:
 
   ```json
-  { "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/changeSetWithdrawal/v1",
+  { "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/changeSetWithdrawal/v1",
     "roamingNetworkId": "rn1", "changeSetId": "…", "withdrawnAt": "2026-10-22T12:05:00.000Z",
     "algorithm": "ES256", "keyId": "<@id>", "value": "<Base64>" }
   ```
@@ -328,7 +328,7 @@ The commit identification is the digest, with the identification hash of its epo
 first one, of the canonical JSON of
 
 ```json
-{ "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3", "roamingNetworkId": "rn1", "revision": 1,
+{ "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3", "roamingNetworkId": "rn1", "revision": 1,
   "eTags": [ <the ETags of the resulting version> ],
   "parentIds": [ "<first parent commit id>", "<second one, for a merge>" ],
   "changeSet": <the change set without its signatures> }
@@ -448,7 +448,7 @@ it, the charging station operator itself, or others.
 The signature input is the canonical JSON of
 
 ```json
-{ "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commitSignature/v1", "algorithm": "…", "keyId": "…",
+{ "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/commitSignature/v1", "algorithm": "…", "keyId": "…",
   "role": "…", "signer": "…", "signedAt": "…",
   "commit": <the commit with its @context, its @id and the signatures of its change set, without the signatures of the commit> }
 ```
@@ -471,24 +471,24 @@ one pool, one station and one EVSE `DE*GEF*E1*1` of 22000 W and 230.5 V.
 **Content** (canonical JSON):
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1","@id":"rn1","chargingStationOperators":[{"@id":"DE*GEF","chargingPools":[{"@id":"DE*GEF*P1","chargingStations":[{"@id":"DE*GEF*S1","EVSEs":[{"@id":"DE*GEF*E1*1","created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","maxPower":22000,"maxVoltage":230.5}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z"}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z"}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","name":{"en":"Charging Station Operator DE*GEF"}}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","name":{"en":"Example"}}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/v1","@id":"rn1","chargingStationOperators":[{"@id":"DE*GEF","chargingPools":[{"@id":"DE*GEF*P1","chargingStations":[{"@id":"DE*GEF*S1","EVSEs":[{"@id":"DE*GEF*E1*1","created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","maxPower":22000,"maxVoltage":230.5}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z"}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z"}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","name":{"en":"Charging Station Operator DE*GEF"}}],"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","name":{"en":"Example"}}
 ```
 
 **ETags:**
 
 ```
-json:sha256:hex:d94dd8fa2690260ba327eb1869d5b590be22f85a048f490daf718d4961b5c9b8
-cbor:sha256:hex:8629469375dcf330b80b091aa0d653f4fc955612c6d7b8f4a762f5e1e69dddde
-effectiveTree:sha256:hex:bbec03d7dabb2707403ef3a5a37d8d7c621abcd7e7ccc50b7e000835a55cec8a
+json:sha256:hex:a7b015193f9402f4819f4665aeddc7b4b4802eb4b0d639b56cbcc763abd60f43
+cbor:sha256:hex:5f0a57368dc8e45a35ca3d5d2dfd7677633c0a6b158cc33c218c0e840ec3af05
+effectiveTree:sha256:hex:824a0100d080752e9974aad8fe506536ce6b8a95b7002db04de05e769e47564a
 ```
 
 **Genesis commit:** the SHA-256 of
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3","eTags":[["json","sha256","hex","d94dd8fa2690260ba327eb1869d5b590be22f85a048f490daf718d4961b5c9b8"],["cbor","sha256","hex","8629469375dcf330b80b091aa0d653f4fc955612c6d7b8f4a762f5e1e69dddde"],["effectiveTree","sha256","hex","bbec03d7dabb2707403ef3a5a37d8d7c621abcd7e7ccc50b7e000835a55cec8a"]],"revision":0,"roamingNetworkId":"rn1"}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3","eTags":[["json","sha256","hex","a7b015193f9402f4819f4665aeddc7b4b4802eb4b0d639b56cbcc763abd60f43"],["cbor","sha256","hex","5f0a57368dc8e45a35ca3d5d2dfd7677633c0a6b158cc33c218c0e840ec3af05"],["effectiveTree","sha256","hex","824a0100d080752e9974aad8fe506536ce6b8a95b7002db04de05e769e47564a"]],"revision":0,"roamingNetworkId":"rn1"}
 ```
 
-is the commit identification `339dd70482e3e73ac37fe861105837221d26fd1bac49142362bda23f66db7f9b`.
+is the commit identification `75523513ee43c679e13c540da81580a860819e45851c82e1f639fa9f71d65964`.
 
 **Leader signature** of the genesis commit, with the Ed25519 key of the private seed
 `101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f` (public key, Base64:
@@ -496,13 +496,13 @@ is the commit identification `339dd70482e3e73ac37fe861105837221d26fd1bac49142362
 `leader.example.org`, signed at 2026-10-12T12:00:00.000Z. Signature input:
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commitSignature/v1","algorithm":"Ed25519","commit":{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3","@id":"339dd70482e3e73ac37fe861105837221d26fd1bac49142362bda23f66db7f9b","eTags":[["json","sha256","hex","d94dd8fa2690260ba327eb1869d5b590be22f85a048f490daf718d4961b5c9b8"],["cbor","sha256","hex","8629469375dcf330b80b091aa0d653f4fc955612c6d7b8f4a762f5e1e69dddde"],["effectiveTree","sha256","hex","bbec03d7dabb2707403ef3a5a37d8d7c621abcd7e7ccc50b7e000835a55cec8a"]],"revision":0,"roamingNetworkId":"rn1"},"keyId":"leader","role":"leader","signedAt":"2026-10-12T12:00:00.000Z","signer":"leader.example.org"}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commitSignature/v1","algorithm":"Ed25519","commit":{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3","@id":"75523513ee43c679e13c540da81580a860819e45851c82e1f639fa9f71d65964","eTags":[["json","sha256","hex","a7b015193f9402f4819f4665aeddc7b4b4802eb4b0d639b56cbcc763abd60f43"],["cbor","sha256","hex","5f0a57368dc8e45a35ca3d5d2dfd7677633c0a6b158cc33c218c0e840ec3af05"],["effectiveTree","sha256","hex","824a0100d080752e9974aad8fe506536ce6b8a95b7002db04de05e769e47564a"]],"revision":0,"roamingNetworkId":"rn1"},"keyId":"leader","role":"leader","signedAt":"2026-10-12T12:00:00.000Z","signer":"leader.example.org"}
 ```
 
 Signature value:
 
 ```
-zUrjtSAMPKDRNAqLV67Y3wrrCxIDE838ceikf74yXLQOke5nKgbi2bWeoMYvOInJsuxSGqByV8iZhesZWoQ9CQ==
+X1XyM2YTz5toEb4/L+QtYpb7ou5qfhryiMUnHENLN3D2XdnHu3549ggSJ6IyF8ylgGp4ochb+GY+R163ncnpBQ==
 ```
 
 **Effective tree** (section 8.2). The EVSE names no templates, so the effective content is the content.
@@ -534,10 +534,10 @@ charging pool: `8d4f6ed9ca2ffabf1862488a9cff9c8a224a86a247a9bb48b33751d0df5042fe
 charging station operator: `b137995cb4aacc1bc4f5c1b70f9620187d427bd150c3f9bc405ea079827de2ef`
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1","@id":"rn1","chargingStationOperators":{"@merkleRoot":"b137995cb4aacc1bc4f5c1b70f9620187d427bd150c3f9bc405ea079827de2ef","@size":1},"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","name":{"en":"Example"}}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/v1","@id":"rn1","chargingStationOperators":{"@merkleRoot":"b137995cb4aacc1bc4f5c1b70f9620187d427bd150c3f9bc405ea079827de2ef","@size":1},"created":"2026-01-01T00:00:00.000Z","lastChange":"2026-01-01T00:00:00.000Z","name":{"en":"Example"}}
 ```
 
-roaming network, the root: `bbec03d7dabb2707403ef3a5a37d8d7c621abcd7e7ccc50b7e000835a55cec8a`, the
+roaming network, the root: `824a0100d080752e9974aad8fe506536ce6b8a95b7002db04de05e769e47564a`, the
 `effectiveTree` ETag above.
 
 **Attestation** (section 8.5) of the genesis commit by the roaming network operator, with the Ed25519 key
@@ -546,13 +546,13 @@ of the private seed `202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3
 2026-10-17T18:00:00.000Z, valid until 2026-10-17T18:15:00.000Z. Signature input:
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/attestation/v1","algorithm":"Ed25519","commitId":"339dd70482e3e73ac37fe861105837221d26fd1bac49142362bda23f66db7f9b","eTag":["effectiveTree","sha256","hex","bbec03d7dabb2707403ef3a5a37d8d7c621abcd7e7ccc50b7e000835a55cec8a"],"keyId":"rno","revision":0,"roamingNetworkId":"rn1","role":"roamingNetworkOperator","signedAt":"2026-10-17T18:00:00.000Z","signer":"DE*RNO","validUntil":"2026-10-17T18:15:00.000Z"}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/attestation/v1","algorithm":"Ed25519","commitId":"75523513ee43c679e13c540da81580a860819e45851c82e1f639fa9f71d65964","eTag":["effectiveTree","sha256","hex","824a0100d080752e9974aad8fe506536ce6b8a95b7002db04de05e769e47564a"],"keyId":"rno","revision":0,"roamingNetworkId":"rn1","role":"roamingNetworkOperator","signedAt":"2026-10-17T18:00:00.000Z","signer":"DE*RNO","validUntil":"2026-10-17T18:15:00.000Z"}
 ```
 
 Signature value:
 
 ```
-e11PSKTTQCbEu7SGA09/xciRdmariF+MOJ5iK/1fSkT/oV9wQk7wvsm3O7amDuFdtss9CQtdOUoT3+Il7Ea6AQ==
+LrEYPlE05VmgMbbnT9LW5Id3ErLB+07at2sDxXUF1WniurbtW1Lg1dneSF+PG9ANaC7E3OZsjUHLxxgWpixVAA==
 ```
 
 **Key statement** (section 8.6) of the roaming network operator `DE*RNO`: the signing key of the attestation
@@ -563,13 +563,13 @@ key of the private seed `303132333435363738393a3b3c3d3e3f404142434445464748494a4
 valid until 2026-11-16T00:00:00.000Z. Signature input:
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/keyStatement/v2","algorithm":"Ed25519","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","minConsensus":1,"roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKeys":[{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w=="}],"validUntil":"2026-11-16T00:00:00.000Z"}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2","algorithm":"Ed25519","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","minConsensus":1,"roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKeys":[{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w=="}],"validUntil":"2026-11-16T00:00:00.000Z"}
 ```
 
 Signature value:
 
 ```
-+xLjrUX+ty7PBE1XHUgSmlKAljbhXdm3ccs1HjAW0tyJPAOuAuP/Dh+r/3nLWdhwt2ugx72eek5kTmKNvaP+AA==
+jgFqCKopOaX+W0DcgqH9t6eKmK0pbqyS0Mhhl4y8qCz94ScZFjbc1t++iTPeWe4zHpeayyTwjIRJpWeLWyVTBw==
 ```
 
 **Key statement of a quorum** (sections 4.1 and 8.6): the same signing and identity keys of the holder `Alpha`
@@ -581,26 +581,26 @@ and the Ed25519 keys of the holder `Beta` of the private seeds
 keys. Signature input of `Alpha`:
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/keyStatement/v2","algorithm":"Ed25519","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","holder":"Alpha","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="},{"@id":"a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f","holder":"Beta","key":"owEBIAYhWCAc5WpIyC/5kWKhS8VEYSZ05dYfuTF+ZdQFV4D9vLTcNQ=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","minConsensus":2,"roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKeys":[{"@id":"c1924d610e8d9f1c5efdbca564a2f19991517ab8252807651f94ac5332afe3f9","holder":"Beta","key":"owEBIAYhWCAXRVO0Vt3fxpCOyrHBAf5qsh4rqgYXeVt9Q6Y0gpk/1Q=="},{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","holder":"Alpha","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w=="}],"validUntil":"2026-11-16T00:00:00.000Z"}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2","algorithm":"Ed25519","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","holder":"Alpha","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="},{"@id":"a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f","holder":"Beta","key":"owEBIAYhWCAc5WpIyC/5kWKhS8VEYSZ05dYfuTF+ZdQFV4D9vLTcNQ=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","minConsensus":2,"roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKeys":[{"@id":"c1924d610e8d9f1c5efdbca564a2f19991517ab8252807651f94ac5332afe3f9","holder":"Beta","key":"owEBIAYhWCAXRVO0Vt3fxpCOyrHBAf5qsh4rqgYXeVt9Q6Y0gpk/1Q=="},{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","holder":"Alpha","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w=="}],"validUntil":"2026-11-16T00:00:00.000Z"}
 ```
 
 Signature values of `Alpha` and of `Beta`, whose input has its own `keyId`:
 
 ```
-EjbREsL+/wWCJh3cNLUIDIC0Jh5Pou8VAyRhSZTNU/0ll3zTJThaTaIzc721O1T7tqj/1sm0ceaw2nOSJ7DvAw==
-Om7vDbZvLwtvW1qpiVguNhZ7K1zNtsaqt1bcMGDot/md+bBZWNeVHFhg2VpH5BMioseZzpP6WLvXdQqrhrqgBg==
+KhACyQt93WyndatU6TyvoaZ6fHtlurRJvBKWeUYZZ472cbCEfSN8u//5gU8IVif3A6ZAuD/5JLTF4cE2PJvbDg==
+LdqMkizNekuc0PnnOo5gJqKAy3mP6JDcXhMG9SykkMTFvYSKHwnNWis5uEVQxl80qZFh/olqc5brn4Ct00GFAA==
 ```
 
 **Trust anchor** (section 8.6) of the example, with the identity key of the key statement above:
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/trustAnchor/v1","roamingNetworkId":"rn1","name":{"en":"Example"},"roamingNetworkURI":"https://hub.example/poi/RNs/rn1","identityKeys":["1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802"]}
+{"@id":"rn1","@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/trustAnchor/v1","url":"https://hub.example/poi/RNs/rn1","keys":["1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802"],"name":{"en":"Example"}}
 ```
 
-Its QR code, 225 bytes of CBOR:
+Its QR code, 185 bytes of CBOR:
 
 ```
-WWCPPOI1:++K..DF$D4IK1$CM2D$9FQ$DTVD38DUPCG/DB$CQWEUT9MWEW9E0G7%:5I9E -DNPCGECD3D3/D+%5*VD$$EQ:5-3E7WEBAFCPES4FVPC:L5VQE$-D0LEBECZEDV2D7$CK4F-KE/:56LE QEAC8NPC04E0067B6PED1$CBWERWE-N9-FF$FGW24.+U3M0-$O1JV%LLP-T2OR-7U%J0WP7ZXAW7RI33:PKFFM*D00LEBECZEDV2D7$CK4F-KENC9XPC*-DHFES3EJ$D3/D:+9PWE04ERPD5IAG8FA9DIWENPEJ/5B9DOICB$CBECP9ESZCS9EHDDAIACPE:KE41
+WWCPPOI1:*+KJ684VC:KE/A66%E3WDU/3MWEW9E0G7V:5Z$E.%5$9FQ$DTVD*:5 3E9:5D-9-:5*-DCVCC$C4REF6B4-3B8GGOS3PGC7IF/U6XMN1QVMMJ$F/%STG1M4ULVAS:O BNFVCBEC7%CYJC3/D9Z8BECP9E+ CD68-3E7WEBAFB9FA9DIWENPEJ/5/3E1$C+%5 8D$KEZED:1DRPC34E.TCUPCG/DB$CLWE10684F98E0LEBECZEDV2D7$CK4F-KE/:56LE QEAC8NPC04E00641
 ```
 
 **Station proof** (section 8.4)
@@ -609,11 +609,11 @@ index 0 and an empty audit path; the station is complete. A verifier calculates 
 checks it against the attestation, which it embeds:
 
 ```json
-{ "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/proof/v1",
+{ "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/proof/v1",
   "hashAlgorithm": "sha256",
-  "commitId": "339dd70482e3e73ac37fe861105837221d26fd1bac49142362bda23f66db7f9b", "revision": 0,
+  "commitId": "75523513ee43c679e13c540da81580a860819e45851c82e1f639fa9f71d65964", "revision": 0,
   "roamingNetwork": {
-    "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1", "@id": "rn1",
+    "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/v1", "@id": "rn1",
     "name": { "en": "Example" },
     "created": "2026-01-01T00:00:00.000Z", "lastChange": "2026-01-01T00:00:00.000Z",
     "chargingStationOperators": { "@size": 1, "@leaves": [ { "@index": 0, "@auditPath": [], "@entity": {
@@ -638,28 +638,28 @@ private seed `404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f` 
 Signature input:
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1","algorithm":"Ed25519","entityId":"DE*GEF*E1*1","entityType":"EVSE","keyId":"8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d","priceStatus":{"prices":[{"chargingTariffId":"DE*GEF*T1","elements":[{"priceComponents":[{"price":0.39,"stepSize":1,"type":"ENERGY"}]}]}]},"roamingNetworkId":"rn1","role":"chargingStationOperator","sequence":0,"signedAt":"2026-10-19T11:59:58.000Z","signer":"DE*GEF","validFrom":"2026-10-19T12:00:00.000Z","validUntil":"2026-10-19T12:15:00.000Z"}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/priceStatement/v1","algorithm":"Ed25519","entityId":"DE*GEF*E1*1","entityType":"EVSE","keyId":"8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d","priceStatus":{"prices":[{"chargingTariffId":"DE*GEF*T1","elements":[{"priceComponents":[{"price":0.39,"stepSize":1,"type":"ENERGY"}]}]}]},"roamingNetworkId":"rn1","role":"chargingStationOperator","sequence":0,"signedAt":"2026-10-19T11:59:58.000Z","signer":"DE*GEF","validFrom":"2026-10-19T12:00:00.000Z","validUntil":"2026-10-19T12:15:00.000Z"}
 ```
 
 Signature value:
 
 ```
-jj4tV4hmXg0mK2kdRCo6KF8kvAuKlBkjnXGjdMfjcpzRPhVm36KcLBGbqAAVisA5BUKEQmcI1MKWvENp2+hZDw==
+On32sQ3JD5yUHL3CDnc0XA9+wpfEVw9wvXF3exh+rpcWOmBoD/tuvFBmNcolWWV5lOxF54JC5aJ0PmX9gPERAw==
 ```
 
 Its digest, the SHA-256 of the signature input with `"value"` added, which the next statement of the EVSE
 names as its `previous` and a checkpoint takes as a leaf:
-`de4139029cd1791f6a7de0c34f77d22f5747386f166cd406128d46a8a1fb3885`.
+`4e0901a796be06c7332548becf01cc4066c4b4ced59975012304d4a50458e943`.
 
 **Genesis of a second epoch** (section 11.3) of the example, with SHA-512 identifications and the signature
 algorithms Ed25519 and ML-DSA-65: the SHA-512 of
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3","eTags":[["json","sha256","hex","d94dd8fa2690260ba327eb1869d5b590be22f85a048f490daf718d4961b5c9b8"],["cbor","sha256","hex","8629469375dcf330b80b091aa0d653f4fc955612c6d7b8f4a762f5e1e69dddde"],["effectiveTree","sha256","hex","bbec03d7dabb2707403ef3a5a37d8d7c621abcd7e7ccc50b7e000835a55cec8a"]],"epoch":2,"profiles":{"canonicalization":"styx-canonical-json-v1","checkpoint":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpoint/v1","commit":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3","identificationHash":"sha512","priceStatement":"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1","signatureAlgorithms":["Ed25519","ML-DSA-65"]},"revision":0,"roamingNetworkId":"rn1"}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3","eTags":[["json","sha256","hex","a7b015193f9402f4819f4665aeddc7b4b4802eb4b0d639b56cbcc763abd60f43"],["cbor","sha256","hex","5f0a57368dc8e45a35ca3d5d2dfd7677633c0a6b158cc33c218c0e840ec3af05"],["effectiveTree","sha256","hex","824a0100d080752e9974aad8fe506536ce6b8a95b7002db04de05e769e47564a"]],"epoch":2,"profiles":{"canonicalization":"styx-canonical-json-v1","checkpoint":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/checkpoint/v1","commit":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3","identificationHash":"sha512","priceStatement":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/priceStatement/v1","signatureAlgorithms":["Ed25519","ML-DSA-65"]},"revision":0,"roamingNetworkId":"rn1"}
 ```
 
 is its commit identification
-`8d9fc793eab4c8e375b7022a096492be87baab8b435c6cb021922160bb3730d3fbe3f1bbdf58cf414e716b4713786e72fd7ef915f048547676877aed6179360a`.
+`8c5816a1f231aa66c26977ae375482224fbecadc5e882fb9c6d65ca5cb6da25899520b070d4bfd70f00b9867667bdfcdf1518333ad8f485dfd5b4666c4e1f5ca`.
 
 
 ## 7. Open points
@@ -765,7 +765,7 @@ Section 6 has an example.
 - A version has one `effectiveTree` ETag per algorithm it names, in their order, after its `json`
   and `cbor` ETags. Naming two, e.g. `["sha256", "sha512"]`, lets clients move from one to the other.
 - A commit lists them in its `eTags` (section 5.1) and is identified with the context
-  `https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3`. A reader MUST refuse a commit without them, and one whose `effectiveTree` ETags
+  `https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3`. A reader MUST refuse a commit without them, and one whose `effectiveTree` ETags
   are not those of its version, of every algorithm it names, in their order.
 - Change sets name the `json` and `cbor` ETags of the versions before and after them; a change set MAY
   name `effectiveTree` ETags as well, which are then checked as the others. A precondition (section 4)
@@ -799,7 +799,7 @@ proof gives completely is then attested, and nothing else. It MUST read the proo
 fraction as decimals and strings as strings (section 1).
 
 ```json
-{ "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/proof/v1",
+{ "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/proof/v1",
   "hashAlgorithm": "sha256",
   "commitId": "<commit of the proven version>", "revision": 4711,
   "roamingNetwork": <the roaming network, pruned>,
@@ -849,7 +849,7 @@ the change set.
 The signature input is the canonical JSON of
 
 ```json
-{ "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/attestation/v1", "algorithm": "…", "keyId": "…",
+{ "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/attestation/v1", "algorithm": "…", "keyId": "…",
   "role": "…", "signer": "…", "signedAt": "…", "validUntil": "…",
   "roamingNetworkId": "…", "commitId": "…", "revision": …, "eTag": [ … ], "subject": { … } }
 ```
@@ -895,7 +895,7 @@ long-lived keys, the roaming network operator states its signing keys in a **key
   "signatures": [ { "algorithm": "Ed25519", "keyId": "<@id>", "value": "<Base64>" }, … ] }
 ```
 
-Its context is `https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/keyStatement/v2`; the former single signature form, with `algorithm`,
+Its context is `https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2`; the former single signature form, with `algorithm`,
 `keyId` and `value` beside the statement, is gone. The signature input of each signature is the canonical
 JSON of the statement without `signatures`, with its `@context`, also where it is embedded in the operator,
 its `algorithm` and its `keyId`; `identityKeys` is left out where absent.
@@ -922,19 +922,19 @@ has an example.
   documents of the roaming network operator:
 
   ```json
-  { "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/trustAnchor/v1",
-    "roamingNetworkId": "rn1", "name": { "en": "…" }, "description": { "en": "…" },
-    "roamingNetworkURI": "https://hub.example/poi/RNs/rn1",
-    "identityKeys": [ "<@id>", "<@id>", "<@id>" ], "minConsensus": 2 }
+  { "@id": "rn1", "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/trustAnchor/v1",
+    "url": "https://hub.example/poi/RNs/rn1",
+    "keys": [ "<@id>", "<@id>", "<@id>" ],
+    "name": { "en": "…" }, "description": { "en": "…" }, "minConsensus": 2 }
   ```
 
-  the roaming network, below whose URI its proofs are served (`…/CSs/{CS_Id}/proof`), the `@id`s of the identity
-  keys of its operator, 64 lowercase hexadecimal digits each, and its `minConsensus`, unless 1; to show, its
+  the roaming network and its `url`, below which its proofs are served (`…/CSs/{CS_Id}/proof`), as `keys` the `@id`s
+  of the identity keys of its operator, 64 lowercase hexadecimal digits each, and its `minConsensus`, unless 1; to show, its
   `name` and `description`. Only the `@id`s and the `minConsensus` are trusted: not one
   key, which would let its holder vouch for the network alone; the keys come with every proof. The QR code holds
   `WWCPPOI1:` and the Base45 [RFC 9285] of its deterministic CBOR, the keys and values of the JSON, the `@id`s as
   their 32 bytes, all of the alphanumeric mode of QR codes; a reader takes the URI
-  `https://hub.example/poi/RNs/rn1?identityKeys=<@id>,<@id>&minConsensus=2` as well. A QR code is as trustworthy
+  `https://hub.example/poi/RNs/rn1?keys=<@id>,<@id>&minConsensus=2` as well. A QR code is as trustworthy
   as the place it is found: one stuck on a charging station may be anybody's.
 - POI_API serves the key statement of the operator of the head as `GET ~/RNs/{RN_Id}/keyStatement` and its
   trust anchor as `GET ~/RNs/{RN_Id}/trustAnchor`, `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode,
@@ -1242,7 +1242,7 @@ identifications are as without it.
 
 The checkpoint identification is the digest, with the identification hash of its epoch (11.1), SHA-256 in
 the first one, of the canonical JSON of the checkpoint without `@id` and without `signatures`, with its
-`"@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpoint/v1"`, in lowercase hexadecimal digits; so are its trees. A reader MUST calculate it and refuse the checkpoint when it differs from `@id`. The CBOR
+`"@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/checkpoint/v1"`, in lowercase hexadecimal digits; so are its trees. A reader MUST calculate it and refuse the checkpoint when it differs from `@id`. The CBOR
 representation has the keys and values of the JSON one; ETags are written in hex (section 3.1).
 
 A server MUST refuse a checkpoint unless it has its commit and all commits of the checkpoint, the
@@ -1256,11 +1256,11 @@ of a commit it holds, without the commits before its root; its signatures carry 
 ### 10.2 Signatures
 
 A checkpoint is signed as a commit is (section 5.4), with the context
-`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpointSignature/v1` and the checkpoint, with its `@context` and `@id` and without its
+`https://open.charging.cloud/contexts/wwcp/roamingNetwork/checkpointSignature/v1` and the checkpoint, with its `@context` and `@id` and without its
 signatures, as `"checkpoint"` in place of `"commit"`:
 
 ```json
-{ "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpointSignature/v1", "algorithm": "…", "keyId": "…",
+{ "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/checkpointSignature/v1", "algorithm": "…", "keyId": "…",
   "role": "…", "signer": "…", "signedAt": "…",
   "checkpoint": <the checkpoint without its signatures> }
 ```
@@ -1369,9 +1369,9 @@ Every history begins in epoch 1, whose commits and checkpoints do not name it.
 ```json
 { "epoch": 2,
   "profiles": { "canonicalization": "styx-canonical-json-v1", "identificationHash": "sha512",
-                "commit": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3",
-                "checkpoint": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpoint/v1",
-                "priceStatement": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1",
+                "commit": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3",
+                "checkpoint": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/checkpoint/v1",
+                "priceStatement": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/priceStatement/v1",
                 "signatureAlgorithms": [ "Ed25519", "ML-DSA-65" ] } }
 ```
 
@@ -1404,7 +1404,7 @@ The **genesis** of the next epoch has the version of the commit of the final che
 applied, its `revision` is 0, and it names the epoch and its profiles:
 
 ```json
-{ "@context": "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3", "roamingNetworkId": "rn1", "revision": 0, "epoch": 2,
+{ "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3", "roamingNetworkId": "rn1", "revision": 0, "epoch": 2,
   "eTags": [ <the ETags of the final checkpoint> ], "profiles": { … } }
 ```
 
@@ -1452,7 +1452,7 @@ GET ~/RNs/{RN_Id}/history/epochs/{epoch}/commits/{commitId}[/proof]    a commit,
    that what they prove stays provable.
 2. **Lost keys:** an RNO that lost control of its keys can not sign the final checkpoint of its epoch;
    who starts the next one then, e.g. the witnesses, is open.
-3. **Price statement digests** stay SHA-256 (`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1`); a later context changes them.
+3. **Price statement digests** stay SHA-256 (`https://open.charging.cloud/contexts/wwcp/roamingNetwork/priceStatement/v1`); a later context changes them.
 4. **Archived epochs:** when a server drops an old epoch, and where it is kept then.
 
 ## 12. Prices at runtime
@@ -1490,7 +1490,7 @@ operator with one of its signing keys (section 4.1) when it sets the price.
   after it.
 
 The signature input is the canonical JSON of the statement without `value`, its `@context`
-(`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1`), `algorithm` and `keyId` included, as for an attestation (8.5). The key MUST be a signing key of the
+(`https://open.charging.cloud/contexts/wwcp/roamingNetwork/priceStatement/v1`), `algorithm` and `keyId` included, as for an attestation (8.5). The key MUST be a signing key of the
 operator of the entity, valid at `signedAt`. The CBOR representation has the keys and values of the JSON
 one.
 

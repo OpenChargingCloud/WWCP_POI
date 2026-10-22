@@ -73,6 +73,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
             return RoamingNetworkKeyStatement.Create(identity.Private,
                                                      COSEAlgorithm.ES512,
+                                                     1,
                                                      Network.Id,
                                                      Network.Operator!.Id,
                                                      [ signing.Public ],
@@ -151,8 +152,43 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(stated.Signatures.Single().KeyId,                                                              Is.EqualTo(identity.Public.Id));
                 Assert.That(stated.SigningKeys,                                                        Is.EqualTo(new[] { signing.Public }));
                 Assert.That(stated.TryVerify([ identity.Public.Id ], null, out error),                 Is.True, error);
-                Assert.That(stated.ToJSON()["@context"]!.Value<String>(),                              Is.EqualTo("https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/keyStatement/v2"));
+                Assert.That(stated.ToJSON()["@context"]!.Value<String>(),                              Is.EqualTo("https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2"));
                 Assert.That(JToken.DeepEquals(parsed!.Operator!.KeyStatement!.ToJSON(), statement.ToJSON()),  Is.True);
+            }
+
+        }
+
+        #endregion
+
+        #region A_key_statement_is_verified_at_a_time()
+
+        [Test]
+        public void A_key_statement_is_verified_at_a_time()
+        {
+
+            var network    = StationProofTests.NewNetwork();
+            var statement  = Statement(network, T0, T0.AddDays(30));
+            var (_, identity) = Keys(network);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // Without a time only its signatures, e.g. as part of the content.
+                Assert.That(statement.TryVerify([ identity.Public.Id ], null, out var error),                                Is.True, error);
+
+                Assert.That(statement.TryVerify([ identity.Public.Id ], null, out error, At: T0),                           Is.True, error);
+                Assert.That(statement.TryVerify([ identity.Public.Id ], null, out error, At: T0.AddDays(30)),               Is.True, error);
+
+                Assert.That(statement.TryVerify([ identity.Public.Id ], null, out error, At: T0.AddMilliseconds(-1)),       Is.False);
+                Assert.That(error,                                                                                           Does.Contain("is not valid at 2026-10-19T11:59:59.999Z"));
+
+                Assert.That(statement.TryVerify([ identity.Public.Id ], null, out error, At: T0.AddDays(30).AddSeconds(1)), Is.False);
+                Assert.That(error,                                                                                           Does.Contain("is valid until 2026-11-18T12:00:00.000Z"));
+
+                // The signatures first: an untrusted statement is refused for them, whenever it is valid.
+                Assert.That(statement.TryVerify([ "ab".PadRight(64, 'c') ], null, out error, At: T0),                        Is.False);
+                Assert.That(error,                                                                                           Does.Contain("not trusted"));
+
             }
 
         }
@@ -175,7 +211,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                                               RoamingNetwork_Id?                             NetworkId     = null,
                                               POIPublicKey[]?                                SigningKeys   = null)
 
-                => RoamingNetworkKeyStatement.Create(Key, Algorithm, NetworkId ?? network.Id, network.Operator!.Id, SigningKeys ?? [ signing.Public ], [ identity.Public ], T0, T0.AddDays(30));
+                => RoamingNetworkKeyStatement.Create(Key, Algorithm, 1, NetworkId ?? network.Id, network.Operator!.Id, SigningKeys ?? [ signing.Public ], [ identity.Public ], T0, T0.AddDays(30));
 
             var bySigningKey   = Signed(signing.Private,  COSEAlgorithm.ES256);
             var byOtherParty   = Signed(other.Private,    COSEAlgorithm.ES512);
@@ -243,21 +279,87 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
             var id      = new String('a', 64);
             var anchor  = new RoamingNetworkTrustAnchor(RoamingNetwork_Id.Parse("rn1"), URL.Parse("https://hub.example/poi/RNs/rn1"), [ id, new String('b', 64) ]);
-            var uri     = anchor.ToURI();
+            var uri     = anchor.ToURL();
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(uri,                                                                     Is.EqualTo($"https://hub.example/poi/RNs/rn1?identityKeys={id},{new String('b', 64)}"));
-                Assert.That(RoamingNetworkTrustAnchor.TryParse(uri, out var parsed, out var error),  Is.True, error);
-                Assert.That(parsed!.RoamingNetworkId.ToString(),                                     Is.EqualTo("rn1"));
-                Assert.That(parsed.IdentityKeyIds,                                                   Is.EqualTo(anchor.IdentityKeyIds));
-                Assert.That(parsed.RoamingNetworkURL,                                                Is.EqualTo(URL.Parse("https://hub.example/poi/RNs/rn1")));
+                Assert.That(uri,                                                                     Is.EqualTo($"https://hub.example/poi/RNs/rn1?keys={id},{new String('b', 64)}"));
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(URL.Parse(uri), out var parsed, out var error),  Is.True, error);
+                Assert.That(parsed!.Id.ToString(),                                                   Is.EqualTo("rn1"));
+                Assert.That(parsed.Keys,                                                             Is.EqualTo(anchor.Keys));
+                Assert.That(parsed.URL,                                                              Is.EqualTo(URL.Parse("https://hub.example/poi/RNs/rn1")));
 
-                Assert.That(RoamingNetworkTrustAnchor.TryParse("https://hub.example/poi/RNs/rn1",                                 out _, out _),  Is.False, "no identity keys");
-                Assert.That(RoamingNetworkTrustAnchor.TryParse("https://hub.example/poi/RNs/rn1?identityKeys=ABC",                out _, out _),  Is.False, "not a thumbprint");
-                Assert.That(RoamingNetworkTrustAnchor.TryParse($"https://hub.example/poi/CSOs/rn1?identityKeys={id}",             out _, out _),  Is.False, "not a roaming network");
-                Assert.That(RoamingNetworkTrustAnchor.TryParse($"ftp://hub.example/poi/RNs/rn1?identityKeys={id}",               out _, out _),  Is.False, "neither http nor https");
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(URL.Parse("https://hub.example/poi/RNs/rn1"),                      out _, out _),  Is.False, "no identity keys");
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(URL.Parse("https://hub.example/poi/RNs/rn1?keys=ABC"),     out _, out _),  Is.False, "not a thumbprint");
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(URL.Parse($"https://hub.example/poi/CSOs/rn1?keys={id}"),  out _, out _),  Is.False, "not a roaming network");
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(URL.Parse($"ftp://hub.example/poi/RNs/rn1?keys={id}"),    out _, out _),  Is.False, "neither http nor https");
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_trust_anchor_is_read_from_its_text_and_its_CBOR()
+
+        [Test]
+        public void A_trust_anchor_is_read_from_its_text_and_its_CBOR()
+        {
+
+            var id      = new String('a', 64);
+            var anchor  = new RoamingNetworkTrustAnchor(RoamingNetwork_Id.Parse("rn1"), URL.Parse("https://hub.example/poi/RNs/rn1"), [ id, new String('b', 64) ], 2,
+                                                        ImmutableI18NString.Create(Languages.en, "Example"));
+
+            // The CBOR of the anchor with one of its values replaced, or with one more key.
+            CBORValue With(String Key, CBORValue Value)
+            {
+                var map = new CBORMap();
+                foreach (var (key, value) in anchor.ToCBOR().AsMap())
+                    if (!(key.TryGetText(out var text) && text == Key))
+                        map.Add(key, value);
+                map.Add(CBORValue.FromText(Key), Value);
+                return map;
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // A scanned text is the QR code, or else the URL.
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(anchor.ToQRCode() + "\n", out var fromQRCode, out var error),  Is.True, error);
+                Assert.That(JToken.DeepEquals(fromQRCode!.ToJSON(), anchor.ToJSON()),                                         Is.True);
+
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(anchor.ToURL(), out var fromURL, out error),                    Is.True, error);
+                Assert.That(fromURL!.URL,                                                                                      Is.EqualTo(anchor.URL));
+                Assert.That(fromURL.Keys,                                                                                      Is.EqualTo(anchor.Keys));
+                Assert.That(fromURL.MinConsensus,                                                                              Is.EqualTo((Byte) 2));
+
+                Assert.That(RoamingNetworkTrustAnchor.TryParse("no trust anchor", out _, out error),                          Is.False);
+                Assert.That(error,                                                                                             Does.Contain("WWCPPOI1:"));
+
+                // Its CBOR, read as it is written.
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(anchor.ToCBOR(), out var fromCBOR, out error),                  Is.True, error);
+                Assert.That(JToken.DeepEquals(fromCBOR!.ToJSON(), anchor.ToJSON()),                                           Is.True);
+
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(With("@context",     CBORValue.FromText("https://example.org")), out _, out error),  Is.False);
+                Assert.That(error,  Does.Contain("JSON-LD context"));
+
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(With("@id",          CBORValue.FromText("rn9")),                 out _, out error),  Is.False);
+                Assert.That(error,  Does.Contain("names the URL of 'rn1'"));
+
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(With("keys",         CBORValue.FromArray(CBORValue.FromText(id))), out _, out error),  Is.False);
+                Assert.That(error,  Does.Contain("32 bytes each"));
+
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(With("minConsensus", CBORValue.FromUInt64(0)),                   out _, out error),  Is.False);
+                Assert.That(error,  Does.Contain("from 1 to"));
+
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(With("minConsensus", CBORValue.FromUInt64(3)),                   out _, out error),  Is.False);
+                Assert.That(error,  Does.Contain("needs as many identity keys"));
+
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(With("name",         CBORValue.FromText("Example")),             out _, out error),  Is.False);
+
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(CBORValue.FromArray(),                                           out _, out error),  Is.False);
+                Assert.That(error,  Does.Contain("must be a map"));
 
             }
 
@@ -285,10 +387,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             var trustAnchorJSON     = JObject.Parse(await httpClient.GetStringAsync($"http://127.0.0.1:{httpServer.TCPPort}/RNs/rn1/trustAnchor"));
             var keyStatementJSON    = JObject.Parse(await httpClient.GetStringAsync($"http://127.0.0.1:{httpServer.TCPPort}/RNs/rn1/keyStatement"));
 
-            Assert.That(RoamingNetworkTrustAnchor.TryParse(trustAnchorJSON["uri"]!.Value<String>()!, out var anchor, out var error), Is.True, error);
+            Assert.That(RoamingNetworkTrustAnchor.TryParse(URL.Parse(trustAnchorJSON["uri"]!.Value<String>()!), out var anchor, out var error), Is.True, error);
 
             // Where the app finds the proofs: below the roaming network the anchor names.
-            var proofText           = await httpClient.GetStringAsync($"{anchor!.RoamingNetworkURL}/CSs/{S1}/proof");
+            var proofText           = await httpClient.GetStringAsync($"{anchor!.URL}/CSs/{S1}/proof");
 
             Assert.That(RoamingNetworkProof.TryParse(proofText, out var proof, out error), Is.True, error);
 
@@ -296,10 +398,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(anchor.RoamingNetworkURL.ToString(),                         Is.EqualTo($"http://127.0.0.1:{httpServer.TCPPort}/RNs/rn1"));
-                Assert.That(anchor.IdentityKeyIds,                                       Is.EqualTo(new[] { identity.Public.Id }));
+                Assert.That(anchor.URL.ToString(),                                       Is.EqualTo($"http://127.0.0.1:{httpServer.TCPPort}/RNs/rn1"));
+                Assert.That(anchor.Keys,                                                 Is.EqualTo(new[] { identity.Public.Id }));
                 Assert.That(keyStatementJSON["signatures"]![0]!["keyId"]!.Value<String>(),  Is.EqualTo(identity.Public.Id));
-                Assert.That(proof!.Verify(anchor.IdentityKeyIds, out _, out error),      Is.True, error);
+                Assert.That(proof!.Verify(anchor.Keys, out _, out error),                Is.True, error);
             }
 
         }

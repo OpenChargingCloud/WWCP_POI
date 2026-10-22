@@ -83,7 +83,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/archiveSegmentInfo/v1";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/archiveSegmentInfo/v1";
 
         #endregion
 
@@ -276,7 +276,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/archiveSegment/v1";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/archiveSegment/v1";
 
         #endregion
 

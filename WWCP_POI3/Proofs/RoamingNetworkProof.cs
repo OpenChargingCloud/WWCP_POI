@@ -48,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of a proof.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/proof/v1";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/proof/v1";
 
         #endregion
 
@@ -273,14 +273,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               DateTimeOffset?                                       At   = null)
         {
 
-            if (TrustAnchor.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            if (TrustAnchor.Id.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
             {
                 Attestation    = null;
-                ErrorResponse  = $"The trust anchor is one of the roaming network '{TrustAnchor.RoamingNetworkId}'!";
+                ErrorResponse  = $"The trust anchor is one of the roaming network '{TrustAnchor.Id}'!";
                 return false;
             }
 
-            return Verify(TrustAnchor.IdentityKeyIds, out Attestation, out ErrorResponse, At, TrustAnchor.MinConsensus);
+            return Verify(TrustAnchor.Keys, out Attestation, out ErrorResponse, At, TrustAnchor.MinConsensus);
 
         }
 
@@ -313,16 +313,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!TryGetKeyStatement(out var keyStatement, out var operatorIdentityKeys, out ErrorResponse))
                 return false;
 
-            if (!keyStatement.TryVerify(TrustedIdentityKeyIds, operatorIdentityKeys, out ErrorResponse, MinConsensus))
-                return false;
-
             var at = At ?? Timestamp.Now;
 
-            if (!keyStatement.IsValidAt(at))
-            {
-                ErrorResponse = $"The key statement of the roaming network operator is not valid at {at.ToISO8601()}: it was signed at {keyStatement.SignedAt.ToISO8601()} and is valid until {keyStatement.ValidUntil.ToISO8601()}!";
+            if (!keyStatement.TryVerify(TrustedIdentityKeyIds, operatorIdentityKeys, out ErrorResponse, MinConsensus, at))
                 return false;
-            }
 
             if (keyStatement.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
             {

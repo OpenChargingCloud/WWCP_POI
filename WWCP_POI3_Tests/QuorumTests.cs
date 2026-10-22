@@ -360,7 +360,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(error2,  Does.Contain("of 1 holder"));
 
                 // A verifier pinning the keys without the minConsensus still needs the one the key statement names.
-                Assert.That(proofOfOne.Verify(anchor.IdentityKeyIds, out _, out _, at),  Is.False);
+                Assert.That(proofOfOne.Verify(anchor.Keys, out _, out _, at),  Is.False);
 
             }
 
@@ -390,7 +390,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var qrCode   = anchor.ToQRCode();
 
             Assert.That(RoamingNetworkTrustAnchor.TryParse(qrCode, out var read, out var error), Is.True, error);
-            Assert.That(anchor.ToCBOR().TryGetValue(CBORValue.FromText("identityKeys"), out var identityKeysCBOR), Is.True);
+            Assert.That(anchor.ToCBOR().TryGetValue(CBORValue.FromText(RoamingNetworkTrustAnchor.PropertyKeys.Keys), out var identityKeysCBOR), Is.True);
 
             using (Assert.EnterMultipleScope())
             {
@@ -399,9 +399,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(qrCode.All(character => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:".Contains(character)),  Is.True, "the alphanumeric mode");
                 Assert.That(qrCode.Length,             Is.LessThan(1000));
 
-                Assert.That(read!.RoamingNetworkId,    Is.EqualTo(network.Id));
-                Assert.That(read.RoamingNetworkURL,    Is.EqualTo(anchor.RoamingNetworkURL));
-                Assert.That(read.IdentityKeyIds,       Is.EqualTo(anchor.IdentityKeyIds));
+                Assert.That(read!.Id,                  Is.EqualTo(network.Id));
+                Assert.That(read.URL,                  Is.EqualTo(anchor.URL));
+                Assert.That(read.Keys,                 Is.EqualTo(anchor.Keys));
                 Assert.That(read.MinConsensus,         Is.EqualTo((Byte) 2));
                 Assert.That(read.Name,                 Is.EqualTo(anchor.Name));
                 Assert.That(read.Description,          Is.EqualTo(anchor.Description));
@@ -409,15 +409,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(identityKeysCBOR.AsArray().All(id => id.TryGetBytes(out var bytes) && bytes.Length == 32),  Is.True);
 
-                Assert.That(anchor.ToURI(),            Does.EndWith("&minConsensus=2"));
-                Assert.That(RoamingNetworkTrustAnchor.TryParse(anchor.ToURI(), out var fromURI, out error),  Is.True, error);
+                Assert.That(anchor.ToURL(),            Does.EndWith("&minConsensus=2"));
+                Assert.That(RoamingNetworkTrustAnchor.TryParse(URL.Parse(anchor.ToURL()), out var fromURI, out error),  Is.True, error);
                 Assert.That(fromURI!.MinConsensus,     Is.EqualTo((Byte) 2));
 
-                Assert.That(() => new RoamingNetworkTrustAnchor(anchor.RoamingNetworkId, anchor.RoamingNetworkURL, anchor.IdentityKeyIds, 4),
+                Assert.That(() => new RoamingNetworkTrustAnchor(anchor.Id, anchor.URL, anchor.Keys, 4),
                             Throws.ArgumentException.With.Message.Contains("needs as many identity keys"));
 
                 var otherNetwork = anchor.ToJSON();
-                otherNetwork["roamingNetworkId"] = "rn9";
+                otherNetwork[RoamingNetworkTrustAnchor.PropertyKeys.Id] = "rn9";
                 Assert.That(RoamingNetworkTrustAnchor.TryParse(otherNetwork, out _, out var error2),  Is.False);
                 Assert.That(error2,  Does.Contain("names the URL of"));
 

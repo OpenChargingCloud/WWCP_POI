@@ -62,7 +62,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The JSON-LD context of the signature input of a checkpoint signature, which names what it signs and in which
         /// version: a checkpoint signature is written as a commit signature is, its context separates the two.
         /// </summary>
-        public const String  SignatureContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpointSignature/v1";
+        public const String  SignatureContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/checkpointSignature/v1";
 
         /// <summary>
         /// The epoch every history begins in (SPECIFICATION.md, section 11).
@@ -73,7 +73,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The JSON-LD context of the object, which names the version of the content a checkpoint identification is
         /// calculated over, and is part of it also where it is embedded.
         /// </summary>
-        public const String  JSONLDContext    = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpoint/v1";
+        public const String  JSONLDContext    = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/checkpoint/v1";
 
         #endregion
 

@@ -119,9 +119,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   return EntityResponse(request,
                                                         new JObject(
                                                             new JProperty(PropertyKeys.RoamingNetworkId,  roamingNetwork.Id.ToString()),
-                                                            new JProperty(PropertyKeys.IdentityKeyIds,    new JArray(trustAnchor.IdentityKeyIds)),
+                                                            new JProperty(PropertyKeys.IdentityKeyIds,    new JArray(trustAnchor.Keys)),
                                                             new JProperty(PropertyKeys.MinConsensus,      trustAnchor.MinConsensus),
-                                                            new JProperty(PropertyKeys.URI,               trustAnchor.ToURI()),
+                                                            new JProperty(PropertyKeys.URI,               trustAnchor.ToURL()),
                                                             new JProperty(PropertyKeys.QRCode,            trustAnchor.ToQRCode()),
                                                             new JProperty(PropertyKeys.TrustAnchor,       trustAnchor.ToJSON())
                                                         ));

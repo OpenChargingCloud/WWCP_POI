@@ -51,7 +51,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// over, and is part of it also where it is embedded: its ETags include the effectiveTree ETags of its version
         /// (SPECIFICATION.md, section 8.3).
         /// </summary>
-        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3";
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3";
 
         #endregion
 

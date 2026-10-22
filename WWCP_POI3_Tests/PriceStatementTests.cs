@@ -144,6 +144,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
             var keyStatement = RoamingNetworkKeyStatement.Create(identity.Private,
                                                                  COSEAlgorithm.ES512,
+                                                                 1,
                                                                  network.Id,
                                                                  network.Operator!.Id,
                                                                  [ signing.Public ],

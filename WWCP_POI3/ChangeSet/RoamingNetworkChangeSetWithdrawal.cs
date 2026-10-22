@@ -43,7 +43,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The JSON-LD context of the object, which names what its signature signs and in which version: it is part of its
         /// signature input also where it is embedded.
         /// </summary>
-        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/changeSetWithdrawal/v1";
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/changeSetWithdrawal/v1";
 
         #endregion
 

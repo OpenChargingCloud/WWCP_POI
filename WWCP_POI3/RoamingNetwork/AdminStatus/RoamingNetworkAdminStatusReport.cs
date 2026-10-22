@@ -72,7 +72,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             : base(RoamingNetworks,
                    chargingStationOperator => chargingStationOperator.AdminStatus.Value,
                    Timestamp,
-                   "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/adminStatusReport/v1")
+                   "https://open.charging.cloud/contexts/wwcp/roamingNetwork/adminStatusReport/v1")
 
         { }
 

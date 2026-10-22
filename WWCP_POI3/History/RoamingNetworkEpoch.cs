@@ -78,7 +78,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String  JSONLDContext                    = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/epochProfiles/v1";
+        public const String  JSONLDContext                    = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/epochProfiles/v1";
 
         #endregion
 
@@ -417,7 +417,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/epoch/v1";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/epoch/v1";
 
         #endregion
 
@@ -544,7 +544,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext  = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/epochLink/v1";
+        public const String JSONLDContext  = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/epochLink/v1";
 
         #region (static) class PropertyKeys
 

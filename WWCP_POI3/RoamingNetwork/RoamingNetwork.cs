@@ -133,7 +133,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const               String                                             JSONLDContext                          = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1";
+        public const               String                                             JSONLDContext                          = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/v1";
 
         protected static readonly  SemaphoreSlim                                      eMobilityProvidersSemaphore            = new (1, 1);
         protected static readonly  SemaphoreSlim                                      chargingStationOperatorsSemaphore      = new (1, 1);

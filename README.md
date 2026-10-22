@@ -365,7 +365,7 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
   the rebased change set is unsigned, its owners sign it again.
 - **Signatures:** `Sign(…)` and `VerifySignature(…)` over canonical JSON (COSE algorithms of Styx);
   an optional `VerifyChangeSetSignature` checks them in addition. What is signed, and in which version, the
-  versioned JSON-LD context of the signed object names, e.g. `https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/changeSet/v3`:
+  versioned JSON-LD context of the signed object names, e.g. `https://open.charging.cloud/contexts/wwcp/roamingNetwork/changeSet/v3`:
   it is part of every signature input and identification, also where the object is embedded; signatures name
   no profile and no encoding (SPECIFICATION.md, section 4).
 - **Wire:** JSON and CBOR; `RoamingNetworkChangeSetLimits` bound bytes, depth, changes, signatures and preconditions (by default 16 MiB, 32, 10,000, 16 and 1,000).
@@ -503,7 +503,7 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   proof gives it. An app scans the QR code of the trust anchor (`GET ~/RNs/{id}/trustAnchor`): `WWCPPOI1:` and the
   Base45 of its CBOR, with the network, its name and description, the thumbprints of the identity
   keys and the `minConsensus` (`RoamingNetworkTrustAnchor.TryParse(text, …)`; the URI
-  `https://hub.example/poi/RNs/rn1?identityKeys=<@id>,…` is read as well), and verifies proofs with
+  `https://hub.example/poi/RNs/rn1?keys=<@id>,…` is read as well), and verifies proofs with
   `proof.Verify(anchor, …)`: only the thumbprints and the `minConsensus` are pinned.
 
 ### Price statements
