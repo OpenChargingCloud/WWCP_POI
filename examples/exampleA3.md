@@ -8,7 +8,7 @@ EVSE group for each current. Five commits:
 | Revision | Signed by | Commit |
 |---|---|---|
 | 0, 1 | `OCC`, as the roaming network operator | `QA` and `DE*GEF`, see [example A1](exampleA1.md) and [example A2](exampleA2.md) |
-| 2 | `DE*GEF` | `Add` of the charging station templates `DE*GEF*ST_DC` and `DE*GEF*ST_AC`, and of the EVSE templates `DE*GEF*ET_DC` and `DE*GEF*ET_AC` |
+| 2 | `DE*GEF`, its `infrastructure` key | `Add` of the charging station templates `DE*GEF*ST_DC` and `DE*GEF*ST_AC`, and of the EVSE templates `DE*GEF*ET_DC` and `DE*GEF*ET_AC` |
 | 3 | `DE*GEF` | `Add` of the pool `DE*GEF*P1`, Jena Paradies: the DC station `DE*GEF*S1` with `DE*GEF*E1*1` and `DE*GEF*E1*2`, the AC station `DE*GEF*S2` with `DE*GEF*E2*1` and `DE*GEF*E2*2`, each naming its template |
 | 4 | `DE*GEF` | `Add` of the pool `DE*GEF*P2`, Jena Nord: the DC station `DE*GEF*S3`, the AC station `DE*GEF*S4`, and their EVSEs |
 | 5 | `DE*GEF` | `Add` of the charging station groups `DE*GEF*SG_DC`, the DC stations `S1` and `S3`, and `DE*GEF*SG_AC`, the AC stations `S2` and `S4` |
@@ -23,76 +23,48 @@ socket. The network keeps them in the templates; the stations and EVSEs take the
 gives nothing: it collects members, here the stations and the EVSEs of one current, e.g. for an offer, see
 [ChargingStationGroup](../docs/ChargingStationGroup.md) and [EVSEGroup](../docs/EVSEGroup.md).
 
-**Only `DE*GEF` can do this.** Its data is its own: a change of it must be signed by a signing key of `DE*GEF`, and
-the hub has none - so neither the prompt nor the web interface adds a pool, they show it (see
-[step 7](#7-as-they-are-at-runtime)). The operator signs a change set in its own program and submits it to the
-history of `QA`, by anybody, without signing in: whether it may change what it changes, its signatures decide. In C#
-over HTTP below, with curl, or without the hub, with POI 3 alone.
+**Only `DE*GEF` can do this.** Its data is its own: a change of it must be signed by a signing key of `DE*GEF` that
+may sign its `infrastructure`, and nobody else has one - neither `OCC` nor a hub operating `QA`, whose prompt and web
+interface show a pool but add none. The operator signs a change set in its own program and commits it to the history
+of `QA`; [with the hub](#with-the-hub) anybody submits it, without signing in: whether it may change what it changes,
+its signatures decide.
 
-This example is not yet part of the console project [csharp/](csharp/) of examples A1 and A2: the code blocks of
-steps 1 to 6 are still one `Program.cs` of its own, the program of `DE*GEF`, in this order, in the directory where
-[example A2](exampleA2.md#1-degef-makes-its-keys) left `DE-GEF/`; the output is what a run prints, `…` for elided keys,
-signatures, digests and timestamps.
-
-
-## 1. The program of `DE*GEF`
-
-A console project referencing `WWCP_POI3`, as the one of examples A1 and A2, with `LoadKey` to read its key back. Two
-helpers do the rest for every step: `Head()` reads the head of `QA` as the hub serves it, checked against its ETags as
-it is read, and `Commit(…)` makes a change set of it, signs it with the signing key of `DE*GEF` and submits it. Both
-talk to the hub with the `HTTPClient` of Hermod; a change set goes by the method `COMMIT`, `http.COMMIT(…)`.
+The code is [exampleA3.cs](csharp/exampleA3.cs), called by [Program.cs](csharp/Program.cs) with what examples A1 and A2
+left, the history of `QA` and the private keys of `DE*GEF`:
 
 ```csharp
-using System.Security.Cryptography;
+ExampleA3.Run(a1, a2);
 
-using Newtonsoft.Json.Linq;
+ExampleA3.Validate();
+```
 
-using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Security;
+The output is what one run printed, `…` for elided keys, signatures, digests and timestamps.
 
-using org.GraphDefined.Vanaheimr.Aegir;
-using org.GraphDefined.Vanaheimr.Illias;
-using org.GraphDefined.Vanaheimr.Hermod;
-using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
-using cloud.charging.open.protocols.WWCP;
-using cloud.charging.open.protocols.WWCP.POI;
+## 1. The change sets of `DE*GEF`
 
-// A private key read from its PEM file, PKCS #8.
-static ECPrivateKeyParameters LoadKey(String File)
-{
-    var text = System.IO.File.ReadAllText(File);
-    return (ECPrivateKeyParameters) PrivateKeyFactory.CreateKey(Convert.FromBase64String(text[PemEncoding.Find(text).Base64Data]));
-}
+Two helpers do the work of every step: `ChangeSet(…)` makes a change set of the head of `QA` and signs it with the given
+key, `Commit(…)` signs it with the `infrastructure` key of `DE*GEF` and commits it to the history.
 
-// The signing key for its infrastructure DE*GEF made in example A2.
-var gefSigningKey     = LoadKey("DE-GEF/signing-infrastructure-privateKey.pem");
+```csharp
+var infrastructureKey     = A2.SigningKeys[POIKeyUsages.Infrastructure];
 
-await using var http  = new HTTPClient(URL.Parse(args.FirstOrDefault() ?? "http://127.0.0.1:2356"));
+RoamingNetworkChangeSet ChangeSet(String Description, COSEKeyPair Key, params RoamingNetworkChange[] Changes)
 
-// The head of QA as the hub serves it, checked against its ETags as it is read.
-async Task<RoamingNetwork> Head()
+    => A1.History.Head.RoamingNetwork.
+           CreateChangeSet(Changes, Description: ImmutableI18NString.Create(Languages.en, Description)).
+           Sign(Key.Private, POIPublicKey.From(Key.Private).Id, Key.Algorithm);
 
-    => RoamingNetwork.TryParse(JObject.Parse((await http.GET(HTTPPath.Root + "poi/RNs/QA")).HTTPBodyAsUTF8String!), out var head, out var error)
-           ? head
-           : throw new InvalidOperationException(error);
-
-// The given changes, as a change set of the head signed by DE*GEF, committed to the hub.
-async Task Commit(String Description, params RoamingNetworkChange[] Changes)
+// The given changes, as a change set of the head signed by DE*GEF, committed to the history of QA.
+void Commit(String Description, params RoamingNetworkChange[] Changes)
 {
 
-    var changeSet = (await Head()).CreateChangeSet(Changes, Description: new ImmutableI18NString(I18NString.Create(Languages.en, Description))).
-                                   Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);
+    var result = A1.History.Commit(ChangeSet(Description, infrastructureKey, Changes));
 
-    var response  = await http.COMMIT(HTTPPath.Root + "poi/RNs/QA/history/changeSets",
-                                      Content:      changeSet.ToJSON().ToString().ToUTF8Bytes(),
-                                      ContentType:  HTTPContentType.Application.JSON_UTF8);
+    if (!result.IsCommitted)
+        Helpers.Fail(result.ErrorResponse ?? result.Status.ToString());
 
-    var answer    = JObject.Parse(response.HTTPBodyAsUTF8String!);
-
-    Console.WriteLine(response.HTTPStatusCode.IsSuccessful
-                          ? $"{response.HTTPStatusCode.Code} {answer["status"]}, revision {answer["revision"]}: {Description}"
-                          : $"{response.HTTPStatusCode}: {answer}");
+    Console.WriteLine($"{result.Status}, revision {result.Commit?.Revision}: {Description}");
 
 }
 ```
@@ -114,7 +86,7 @@ EVSEs, a type 2 socket to the AC EVSEs; an EVSE takes the connectors of its temp
 identification its own.
 
 ```csharp
-await Commit("The templates of the DC and the AC stations and EVSEs",
+Commit("The templates of the DC and the AC stations and EVSEs",
              RoamingNetworkChange.Add(new ChargingStationTemplate(ChargingStationTemplate_Id.Parse("DE*GEF*ST_DC"),
                                                                   Name:                I18NString.Create(Languages.en, "DC charging station"),
                                                                   MaxPower:            Watt.FromKW(300))),
@@ -130,10 +102,10 @@ await Commit("The templates of the DC and the AC stations and EVSEs",
 ```
 
 ```
-201 Committed, revision 2: The templates of the DC and the AC stations and EVSEs
+Committed, revision 2: The templates of the DC and the AC stations and EVSEs
 ```
 
-All four in one change set, so in one commit. `GET /poi/RNs/QA/CSOs/DE*GEF/CSTs` lists the charging station templates
+All four in one change set, so in one commit. POI_API serves them, `GET ~/RNs/QA/CSOs/DE*GEF/CSTs` lists the charging station templates
 as the operator embeds them:
 
 ```json
@@ -155,7 +127,7 @@ as the operator embeds them:
 ]
 ```
 
-and `GET /poi/RNs/QA/CSOs/DE*GEF/EVSETs` the EVSE templates, the DC one of the two:
+and `GET ~/RNs/QA/CSOs/DE*GEF/EVSETs` the EVSE templates, the DC one of the two:
 
 ```json
 {
@@ -196,25 +168,34 @@ static ChargingPool Pool(Int32 N, String Name, Double Latitude, Double Longitude
                 Station(2 * N,     CurrentTypes.AC_ThreePhases,  22, "AC")
             ]);
 
-await Commit("Jena Paradies, a DC and an AC station", RoamingNetworkChange.Add(Pool(1, "Jena Paradies", 50.9271, 11.5892)));
+// Signed by its key for its tariffs, or by the roaming network operator: refused, the pool is DE*GEF's infrastructure.
+var byTariffsKey  = A1.History.Commit(ChangeSet("Jena Paradies, a DC and an AC station", A2.SigningKeys[POIKeyUsages.Tariffs], RoamingNetworkChange.Add(Pool(1, "Jena Paradies", 50.9271, 11.5892))));
+var byOCC         = A1.History.Commit(ChangeSet("Jena Paradies, a DC and an AC station", A1.SigningKeys["AlphaOrg"],           RoamingNetworkChange.Add(Pool(1, "Jena Paradies", 50.9271, 11.5892))));
+
+Commit("Jena Paradies, a DC and an AC station", RoamingNetworkChange.Add(Pool(1, "Jena Paradies", 50.9271, 11.5892)));
 ```
 
 ```
-201 Committed, revision 3: Jena Paradies, a DC and an AC station
+Signed by its tariffs key: Refused, Change 0: Add of the ChargingPool 'DE*GEF*P1' needs a signature by a signing key of the ChargingStationOperator 'DE*GEF' that may sign 'infrastructure'!
+Signed by AlphaOrg of OCC: Refused, Change 0: Add of the ChargingPool 'DE*GEF*P1' needs a signature by a signing key of the ChargingStationOperator 'DE*GEF'!
+Committed, revision 3: Jena Paradies, a DC and an AC station
 ```
+
+A key of `DE*GEF` for its tariffs signs no pools, and the roaming network operator signs none of the data of a party;
+nothing is committed then.
 
 One `Add` of the pool, with its stations and EVSEs embedded: the parent of a pool is the operator its identification
-names, and only that operator's signature lets it in. A template its members name must be one of that operator.
+names, and only that operator's signature, by a key that may sign its `infrastructure`, lets it in. A template its members name must be one of that operator.
 
 
 ## 4. The second pool, after the same pattern
 
 ```csharp
-await Commit("Jena Nord, a DC and an AC station", RoamingNetworkChange.Add(Pool(2, "Jena Nord", 50.9447, 11.5867)));
+Commit("Jena Nord, a DC and an AC station",     RoamingNetworkChange.Add(Pool(2, "Jena Nord",     50.9447, 11.5867)));
 ```
 
 ```
-201 Committed, revision 4: Jena Nord, a DC and an AC station
+Committed, revision 4: Jena Nord, a DC and an AC station
 ```
 
 
@@ -226,7 +207,7 @@ them nothing: here it collects the stations of one current across both pools, e.
 status of its own.
 
 ```csharp
-await Commit("The DC and the AC charging stations",
+Commit("The DC and the AC charging stations",
              RoamingNetworkChange.Add(new ChargingStationGroup(ChargingStationGroup_Id.Parse("DE*GEF*SG_DC"),
                                                                Name:                I18NString.Create(Languages.en, "DC charging stations"),
                                                                ChargingStationIds:  [ ChargingStation_Id.Parse("DE*GEF*S1"), ChargingStation_Id.Parse("DE*GEF*S3") ])),
@@ -236,10 +217,10 @@ await Commit("The DC and the AC charging stations",
 ```
 
 ```
-201 Committed, revision 5: The DC and the AC charging stations
+Committed, revision 5: The DC and the AC charging stations
 ```
 
-`GET /poi/RNs/QA/CSOs/DE*GEF/CSGs` lists both, as the operator embeds them:
+`GET ~/RNs/QA/CSOs/DE*GEF/CSGs` lists both, as the operator embeds them:
 
 ```json
 [
@@ -272,7 +253,7 @@ static IEnumerable<EVSE_Id> EVSEsOf(params Int32[] Stations)
 
     => Stations.SelectMany(s => new[] { EVSE_Id.Parse($"DE*GEF*E{s}*1"), EVSE_Id.Parse($"DE*GEF*E{s}*2") });
 
-await Commit("The DC and the AC EVSEs",
+Commit("The DC and the AC EVSEs",
              RoamingNetworkChange.Add(new EVSEGroup(EVSEGroup_Id.Parse("DE*GEF*EG_DC"),
                                                     Name:     I18NString.Create(Languages.en, "DC EVSEs"),
                                                     EVSEIds:  EVSEsOf(1, 3))),
@@ -282,10 +263,10 @@ await Commit("The DC and the AC EVSEs",
 ```
 
 ```
-201 Committed, revision 6: The DC and the AC EVSEs
+Committed, revision 6: The DC and the AC EVSEs
 ```
 
-`GET /poi/RNs/QA/CSOs/DE*GEF/EVSEGs/DE*GEF*EG_DC`:
+`GET ~/RNs/QA/CSOs/DE*GEF/EVSEGs/DE*GEF*EG_DC`:
 
 ```json
 {
@@ -298,7 +279,7 @@ await Commit("The DC and the AC EVSEs",
 ```
 
 Each member also lists its templates and its groups below itself. The templates of one station, in its order,
-`GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/CSTs`: the DC template alone; its groups, `…/CSGs`: the DC
+`GET ~/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/CSTs`: the DC template alone; its groups, `…/CSGs`: the DC
 station group; the groups of one of its EVSEs, `…/CSs/DE*GEF*S1/EVSEs/DE*GEF*E1*1/EVSEGs`: the DC EVSE group. A station
 may name several templates: of two giving a value, the one it names first gives it, see
 [templates](../docs/README.md#templates-and-effective-members).
@@ -306,8 +287,65 @@ may name several templates: of two giving a value, the one it names first gives 
 
 ## 7. As they are at runtime
 
-The POI API serves a pool, its stations and its EVSEs as they are at runtime, with what their templates give them:
-`GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1`, shortened to the first EVSE of each station:
+`ExampleA3.Validate()` checks `QA` as everybody does, now at revision 6, and shows the pools of `DE*GEF` as they are at
+runtime, with what their templates give them, from what is published only:
+
+```csharp
+ExampleA1.Validate();
+
+if (!RoamingNetwork.TryParse(Helpers.ReadJSON("published/QA.json"), out var qa, out var error))
+    Helpers.Fail(error);
+
+if (!qa.TryGetChargingStationOperatorById(ExampleA2.gefId, out var gef))
+    Helpers.Fail($"QA has no charging station operator '{ExampleA2.gefId}'");
+
+foreach (var pool in gef.EffectiveChargingPools)
+{
+
+    Console.WriteLine($"{pool.Id}  {pool.Name.FirstText()}");
+
+    foreach (var station in pool.ChargingStations)
+    {
+
+        Console.WriteLine($"  {station.Id}  {station.MaxPower?.kW} kW  (templates {String.Join(", ", station.TemplateIds)})");
+
+        foreach (var evse in station.EVSEs)
+            Console.WriteLine($"    {evse.Id}  {evse.CurrentTypes} {evse.MaxPower?.kW} kW  " +
+                              String.Join(", ", evse.ChargingConnectors.Select(connector => $"{connector.Type} {connector.Format}")) +
+                              $"  (templates {String.Join(", ", evse.TemplateIds)})");
+
+    }
+
+}
+```
+
+```
+QA is checked: revision 6, commit 6b4309ffd15468b8cb160bdaa7293e03475e1e281d35ede3238846acd8b538cc, signed by AlphaOrg and BetaOrg and GammaOrg
+
+DE*GEF*P1  Jena Paradies
+  DE*GEF*S1  300 kW  (templates DE*GEF*ST_DC)
+    DE*GEF*E1*1  DC 150 kW  IEC_62196_T2_COMBO CABLE  (templates DE*GEF*ET_DC)
+    DE*GEF*E1*2  DC 150 kW  IEC_62196_T2_COMBO CABLE  (templates DE*GEF*ET_DC)
+  DE*GEF*S2  44 kW  (templates DE*GEF*ST_AC)
+    DE*GEF*E2*1  AC_ThreePhases 22 kW  IEC_62196_T2 SOCKET  (templates DE*GEF*ET_AC)
+    DE*GEF*E2*2  AC_ThreePhases 22 kW  IEC_62196_T2 SOCKET  (templates DE*GEF*ET_AC)
+DE*GEF*P2  Jena Nord
+  DE*GEF*S3  300 kW  (templates DE*GEF*ST_DC)
+    …
+  DE*GEF*S4  44 kW  (templates DE*GEF*ST_AC)
+    …
+
+DE*GEF*SG_AC  DE*GEF*S2, DE*GEF*S4
+DE*GEF*SG_DC  DE*GEF*S1, DE*GEF*S3
+DE*GEF*EG_AC  DE*GEF*E2*1, DE*GEF*E2*2, DE*GEF*E4*1, DE*GEF*E4*2
+DE*GEF*EG_DC  DE*GEF*E1*1, DE*GEF*E1*2, DE*GEF*E3*1, DE*GEF*E3*2
+```
+
+The power of the stations and the connectors of the EVSEs are the templates'; the stations and EVSEs as they are
+stored name their templates only.
+
+POI_API serves a pool, its stations and its EVSEs as they are at runtime as well, with what their templates give them:
+`GET ~/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1`, shortened to the first EVSE of each station:
 
 ```json
 {
@@ -387,25 +425,79 @@ The OCPI and DATEX II publishers publish the stations as they are at runtime as 
 of a version gives them: `TryGetEffectiveEVSE(evseId, out var evse)`, `EffectiveChargingPools`, and
 `TemplatesOf(station)`, see [ChargingStationTemplate](../docs/ChargingStationTemplate.md).
 
+
+## With the hub
+
+A [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) serving `QA` takes the change sets of `DE*GEF`
+over HTTP, `COMMIT /poi/RNs/QA/history/changeSets`, from anybody, and serves the pools as above.
+
+### The program of `DE*GEF`, over HTTP
+
+A console project of `DE*GEF` of its own, talking to the hub, with `LoadKey` to read its key back. Two helpers do the
+rest for every step, in the place of those of [step 1](#1-the-change-sets-of-degef): `Head()` reads the head of `QA`
+as the hub serves it, checked against its ETags as it is read, and `Commit(…)` makes a change set of it, signs it with
+the signing key of `DE*GEF` and submits it. Both talk to the hub with the `HTTPClient` of Hermod; a change set goes by
+the method `COMMIT`, `http.COMMIT(…)`.
+
+```csharp
+using System.Security.Cryptography;
+
+using Newtonsoft.Json.Linq;
+
+using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Security;
+
+using org.GraphDefined.Vanaheimr.Aegir;
+using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+
+using cloud.charging.open.protocols.WWCP;
+using cloud.charging.open.protocols.WWCP.POI;
+
+// A private key read from its PEM file, PKCS #8.
+static ECPrivateKeyParameters LoadKey(String File)
+{
+    var text = System.IO.File.ReadAllText(File);
+    return (ECPrivateKeyParameters) PrivateKeyFactory.CreateKey(Convert.FromBase64String(text[PemEncoding.Find(text).Base64Data]));
+}
+
+// The signing key for its infrastructure DE*GEF made in example A2.
+var gefSigningKey     = LoadKey("DE-GEF/signing-infrastructure-privateKey.pem");
+
+await using var http  = new HTTPClient(URL.Parse(args.FirstOrDefault() ?? "http://127.0.0.1:2356"));
+
+// The head of QA as the hub serves it, checked against its ETags as it is read.
+async Task<RoamingNetwork> Head()
+
+    => RoamingNetwork.TryParse(JObject.Parse((await http.GET(HTTPPath.Root + "poi/RNs/QA")).HTTPBodyAsUTF8String!), out var head, out var error)
+           ? head
+           : throw new InvalidOperationException(error);
+
+// The given changes, as a change set of the head signed by DE*GEF, committed to the hub.
+async Task Commit(String Description, params RoamingNetworkChange[] Changes)
+{
+
+    var changeSet = (await Head()).CreateChangeSet(Changes, Description: new ImmutableI18NString(I18NString.Create(Languages.en, Description))).
+                                   Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);
+
+    var response  = await http.COMMIT(HTTPPath.Root + "poi/RNs/QA/history/changeSets",
+                                      Content:      changeSet.ToJSON().ToString().ToUTF8Bytes(),
+                                      ContentType:  HTTPContentType.Application.JSON_UTF8);
+
+    var answer    = JObject.Parse(response.HTTPBodyAsUTF8String!);
+
+    Console.WriteLine(response.HTTPStatusCode.IsSuccessful
+                          ? $"{response.HTTPStatusCode.Code} {answer["status"]}, revision {answer["revision"]}: {Description}"
+                          : $"{response.HTTPStatusCode}: {answer}");
+
+}
 ```
-RoamingHub> roamingNetworks
-QA  revision 6  Quality assurance  (operated by 'RNO-47EAB7CF', this hub, 1 charging station operator(s), 2 charging pool(s))
-```
 
-The web interface shows them under **Points of interest → QA → Charging station operators → DE\*GEF**: its pools,
-stations and EVSEs as they are at runtime, with the template each value comes from, its templates and its groups.
-Over HTTP, for everybody:
-
-| Request | Returns |
-|---|---|
-| `GET /poi/RNs/QA/CPs?operatorId=DE*GEF` | the pools of `DE*GEF` |
-| `GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1` | the pool at runtime, its keys in canonical order; `?view=stored` as it is stored |
-| `GET /poi/RNs/QA/EVSEs/DE*GEF*E1*2` | `307` to `/poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/EVSEs/DE*GEF*E1*2` |
-| `GET /poi/RNs/QA/CSOs/DE*GEF/{CSTs \| EVSETs \| CSGs \| EVSEGs}` | its templates and its groups |
-| `GET /poi/RNs/QA/history/head` | the head commit: `revision` 6, its `parentIds`, `eTags` and `signatureKeyIds`, the one of `DE*GEF` |
+Steps 2 to 6 then run with `await Commit(…)`; each answers `201 Committed, revision …`.
 
 
-## 8. What the hub answers
+### What the hub answers
 
 `201 Created` answers a change set with its commit and the new head, shortened:
 
@@ -437,39 +529,24 @@ curl -X COMMIT -H "Content-Type: application/json" --data-binary @pool.json http
 ```
 
 
-## 9. Without the hub: POI 3 alone
-
-The console project of [examples A1 and A2](csharp/), with the history of `QA` example A1 made, `var history =
-a1.History;`; [example A2](exampleA2.md#3-occ-adds-degef) added `DE*GEF` to it. Only `Commit` is another: it commits
-to the history itself, and steps 2 to 6 then run as they are.
-
-```csharp
-var gefSigningKey  = LoadKey("DE-GEF/signing-infrastructure-privateKey.pem");
-
-// The given changes, as a change set of the head signed by DE*GEF, committed to the history.
-Task Commit(String Description, params RoamingNetworkChange[] Changes)
-{
-
-    var result = history.Commit(history.Head.RoamingNetwork.
-                                    CreateChangeSet(Changes, Description: new ImmutableI18NString(I18NString.Create(Languages.en, Description))).
-                                    Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256));
-
-    Console.WriteLine($"{result.Status}, revision {result.Commit?.Revision}: {Description}");
-    return Task.CompletedTask;
-
-}
-```
+### Where the hub shows them
 
 ```
-Committed, revision 2: The templates of the DC and the AC stations and EVSEs
-Committed, revision 3: Jena Paradies, a DC and an AC station
-Committed, revision 4: Jena Nord, a DC and an AC station
-Committed, revision 5: The DC and the AC charging stations
-Committed, revision 6: The DC and the AC EVSEs
+RoamingHub> roamingNetworks
+QA  revision 6  Quality assurance  (operated by 'RNO-47EAB7CF', this hub, 1 charging station operator(s), 2 charging pool(s))
 ```
 
-The operator of a version gives the pools as they are at runtime: `history.Head.RoamingNetwork.
-GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*GEF"))!.EffectiveChargingPools`.
+The web interface shows them under **Points of interest → QA → Charging station operators → DE\*GEF**: its pools,
+stations and EVSEs as they are at runtime, with the template each value comes from, its templates and its groups.
+Over HTTP, for everybody:
+
+| Request | Returns |
+|---|---|
+| `GET /poi/RNs/QA/CPs?operatorId=DE*GEF` | the pools of `DE*GEF` |
+| `GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1` | the pool at runtime, its keys in canonical order; `?view=stored` as it is stored |
+| `GET /poi/RNs/QA/EVSEs/DE*GEF*E1*2` | `307` to `/poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/EVSEs/DE*GEF*E1*2` |
+| `GET /poi/RNs/QA/CSOs/DE*GEF/{CSTs \| EVSETs \| CSGs \| EVSEGs}` | its templates and its groups |
+| `GET /poi/RNs/QA/history/head` | the head commit: `revision` 6, its `parentIds`, `eTags` and `signatureKeyIds`, the one of `DE*GEF` |
 
 
 ## Next

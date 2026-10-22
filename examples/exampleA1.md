@@ -15,10 +15,11 @@ to be added to it.
 ## The program
 
 The examples are one console project, [csharp/](csharp/), referencing `WWCP_POI3`: one file per example,
-[exampleA1.cs](csharp/exampleA1.cs), [exampleA2.cs](csharp/exampleA2.cs), and [Program.cs](csharp/Program.cs) calling
-them in their order. What one example makes, the next is given: `ExampleA1.Run()` returns the private keys of the three
-organizations, the trust anchor and the history of `QA`, whose head is the current version of `QA`. Each check,
-`ExampleA1.Validate()` here, reads only what is published, as a charging station operator or an app would.
+[exampleA1.cs](csharp/exampleA1.cs), [exampleA2.cs](csharp/exampleA2.cs), [exampleA3.cs](csharp/exampleA3.cs), and
+[Program.cs](csharp/Program.cs) calling them in their order. What one example makes, the next is given:
+`ExampleA1.Run()` returns the private keys of the three organizations, the trust anchor and the history of `QA`, whose
+head is the current version of `QA`. Each check, `ExampleA1.Validate()` here, reads only what is published, as a
+charging station operator or an app would.
 
 ```csharp
 using var a1 = ExampleA1.Run();
@@ -453,14 +454,15 @@ signatures cover, and warns where the QR code names the network otherwise.
 they are signed as, and `FloatParseHandling.Decimal`, so that numbers stay the decimals they are. Read with
 `JObject.Parse`, `signedAt` would become a date, and the signatures would not verify.
 
-The ETags can also be calculated by hand, from the JSON alone, without the POI model, except for the tree:
+The ETags can also be calculated by hand, from the JSON alone, without the POI model, except for the tree; the CBOR
+from the canonical JSON as its bytes, so that a number with decimal places is a decimal fraction, as section 1 asks:
 
 ```csharp
 var content    = (JObject) networkJSON.DeepClone();
 content.Remove("eTags");
 
 var json       = ETag.Compute(ETagFormat.JSON, CanonicalJSON.ToUTF8Bytes(content));
-var cbor       = ETag.Compute(ETagFormat.CBOR, CBORJSON.ToCBOR(content).ToByteArray(CBORWriterOptions.Canonical));
+var cbor       = ETag.Compute(ETagFormat.CBOR, CBORJSON.ToCBOR(CanonicalJSON.ToUTF8Bytes(content)).ToByteArray(CBORWriterOptions.Canonical));
 var tree       = network.EffectiveTreeETag(ETagHashAlgorithm.SHA256);
 ```
 

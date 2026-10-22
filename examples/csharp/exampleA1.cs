@@ -290,7 +290,7 @@ public static class ExampleA1
         content.Remove("eTags");
 
         var json       = ETag.Compute(ETagFormat.JSON, CanonicalJSON.ToUTF8Bytes(content));
-        var cbor       = ETag.Compute(ETagFormat.CBOR, CBORJSON.ToCBOR(content).ToByteArray(CBORWriterOptions.Canonical));
+        var cbor       = ETag.Compute(ETagFormat.CBOR, CBORJSON.ToCBOR(CanonicalJSON.ToUTF8Bytes(content)).ToByteArray(CBORWriterOptions.Canonical));
         var tree       = network.EffectiveTreeETag(ETagHashAlgorithm.SHA256);
 
         Console.WriteLine($"json          {json}");

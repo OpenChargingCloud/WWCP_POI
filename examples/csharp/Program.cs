@@ -20,3 +20,13 @@ var a2 = ExampleA2.Run(a1);
 
 ExampleA2.Validate();
 
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// DE*GEF adds its templates, two pools of a DC and an AC station each, and the groups of its stations and EVSEs,
+// with change sets signed by its signing key for its infrastructure.
+ExampleA3.Run(a1, a2);
+
+ExampleA3.Validate();
