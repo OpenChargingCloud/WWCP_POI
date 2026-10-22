@@ -22,7 +22,7 @@ Inspired by Git and Merkle-tree-based distributed systems, WWCP/POI introduces a
 
 8. ***"Can existing EV roaming systems benefit without being fully replaced?"*** WWCP/POI as a *GNU-inspired* Open Source project is not intended to require the immediate replacement of OICP, OCHP, OCPI or the European DATEX II ecosystem. Existing systems can import data into the WWCP/POI domain model or expose synchronized information through established interfaces, including OCPI and DATEX II. WWCP/POI enables practical uses beyond conventional roaming, such as independently verifiable AFIR open-data publications, historical infrastructure audits, synchronization diagnostics and consumer-facing tariff transparency.
 
-9. ***"Is WWCP/POI yet-another-centralized-infrastructure?"*** Just like within Git in WWCP/POI there is no leader! Every server commits; the history is a graph of commits, and tips that do not conflict are merged deterministically, so that all servers make the same merge commits.
+9. ***"Is WWCP/POI yet-another-centralized-infrastructure?"*** Just like within Git there is no leader: every server commits; the history is a graph of commits, and tips that do not conflict are merged deterministically, so that all servers make the same merge commits. And there is no root private key either: every operator signs its own data with its own keys, and the roaming network operator may be a quorum of key holders, e.g. 2 of 3 companies. Then everything it signs, its key statement included, needs the keys of more than half of them, so no single company decides for the network.
 
 
 ## The Domain Model
