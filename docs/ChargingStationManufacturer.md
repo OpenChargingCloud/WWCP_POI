@@ -2,8 +2,8 @@
 
 A charging station manufacturer builds charging stations, e.g. wallboxes or DC chargers. POI keeps a registry of
 them, so that charging stations of every operator can name their manufacturer (`manufacturerId`, with a `modelId`)
-and transparency software certificates the manufacturer they were issued for. It is described by its name,
-headquarters address, homepage and hotline.
+and transparency software certificates the manufacturer they were issued for. It is described by its name, its
+contact data and data licenses, as a charging station operator is, and may name keys.
 
 Manufacturers are embedded completely in the [RoamingNetwork](RoamingNetwork.md) under
 `chargingStationManufacturers`, ordered by identification. They are a registry of the roaming network operator
@@ -42,9 +42,17 @@ See [README.md](README.md#common-properties). No `eTags`.
 
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
-| `address` | `Address` | [Address](#address) | update/remove | The address of the headquarters. |
-| `homepage` | `Homepage` | URL | update/remove | |
-| `hotline` | `HotlinePhoneNumber` | string | update/remove | The hotline phone number, e.g. `+49 30 1234567`. |
+| `dataLicenses` | `DataLicenses` | `ImmutableArray<DataLicense>` | update/remove | The licenses of its data, complete, ordered by identification; omitted when empty. As of a [charging station operator](ChargingStationOperator.md#data-licenses). |
+| `address` | `Address` | `Address?` | update/remove | The address of its headquarters, see [address](#address). |
+| `logos` | `Logo` | `URL?` | update/remove | Its logo: an array of at most one `{"uri": …}`, as of a [charging station operator](ChargingStationOperator.md#logos). |
+| `geoLocation` | `GeoLocation` | `GeoCoordinate?` | update/remove | The geographical location of its headquarters, `{"lat", "lng"}`. |
+| `telephone` | `Telephone` | `PhoneNumber?` | update/remove | The telephone number of its (sales) office. |
+| `eMailAddress` | `EMailAddress` | `EMailAddress?` | update/remove | The e-mail address of its (sales) office, also with a name: `"Example Office <info@example.org>"`. |
+| `homepage` | `Homepage` | `URL?` | update/remove | Its homepage. |
+| `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | The telephone number of its hotline, e.g. `+49 30 1234567`. |
+| `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | update/remove | The URL of its terms and conditions. |
+| `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update/remove | Its signing keys, as of a party; omitted when none. See [Keys](#keys). |
+| `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update/remove | Its identity keys, as of a party; omitted when none. See [Keys](#keys). |
 
 All are optional and omitted when absent. A manufacturer has no list of models: the `modelId` of a charging
 station is not checked against anything.
@@ -72,6 +80,15 @@ Styx's `Address`, written embedded (without `@context`):
 The address is replaced or removed as a whole: `UpdateProperty(manufacturer, "address", old, newAddress)`.
 
 
+## Keys
+
+A manufacturer may name `signingKeys` and `identityKeys`, as a party does (see
+[ChargingStationOperator](ChargingStationOperator.md#signing-and-identity-keys)), e.g. for what it signs outside
+the roaming network. It is no party: they sign no change sets, and the RNO changes them as every property of its
+registry. Every identity key a change enters anew signs the change set as well, as the proof that the manufacturer
+holds it (SPECIFICATION.md, section 4.1).
+
+
 ## References
 
 | Who | JSON key | Rule |
@@ -89,7 +106,8 @@ or certificate can not name an unknown one.
   unless `created` is given.
 - `RoamingNetworkChange.Remove(manufacturerId)` — optionally with its complete previous JSON as old value.
 - `UpdateProperty(manufacturer, …)` / `RemoveProperty(manufacturer, …)` of `name`, `description`, `dataSource`,
-  `address`, `homepage`, `hotline`, `customData`.
+  `dataLicenses`, `address`, `logos`, `geoLocation`, `telephone`, `eMailAddress`, `homepage`, `hotline`,
+  `termsAndConditions`, `signingKeys`, `identityKeys`, `customData`.
 - A given parent must be the roaming network itself. Signed with a signing key of the RNO.
 - Admin status, status and internal data go along to the changed version.
 
@@ -110,7 +128,9 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
 ## Validation
 
 - `@id` mandatory, a nonempty `ChargingStationManufacturer_Id`; unique within the roaming network.
-- `address`, when given, a JSON object with the mandatory address fields; `homepage` a URL; `hotline` a phone number.
+- `address`, when given, a JSON object with the mandatory address fields; `homepage`, `termsAndConditions` and the
+  `uri` of its logo URLs; `telephone` and `hotline` phone numbers; `eMailAddress` an e-mail address; `logos` an
+  array of at most one logo; `dataLicenses` licenses given completely, none twice; keys as of a party.
 - Network level: every `manufacturerId` of a charging station and every `chargingStationManufacturerId` of a
   certificate names a manufacturer of the network.
 
@@ -128,6 +148,7 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
     "country": "DEU",
     "houseNumber": "1"
   },
+  "eMailAddress": "ACME Sales <sales@charging.example.org>",
   "homepage": "https://charging.example.org",
   "hotline": "+49 3641 1234567",
   "created": "2026-01-01T00:00:00.000Z",

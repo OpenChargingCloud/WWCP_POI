@@ -66,6 +66,7 @@ flowchart TD
 | [EnergyMeterTemplate](EnergyMeterTemplate.md) | operator or grid operator, `energyMeterTemplates` | its operator or grid operator | What a series of energy meters naming it shares, e.g. manufacturer, model and firmware. |
 | [EnergyMeterGroup](EnergyMeterGroup.md) | operator or grid operator, `energyMeterGroups` | its operator or grid operator | Energy meters of the operator's pools, stations and EVSEs, or of the grid operator's grid connection points; a collection. |
 | [ChargingStationManufacturer](ChargingStationManufacturer.md) | roaming network, `chargingStationManufacturers` | RNO | A maker of charging stations, named by stations' `manufacturerId`. |
+| [EnergyMeterManufacturer](EnergyMeterManufacturer.md) | roaming network, `energyMeterManufacturers` | RNO | A maker of energy meters, named by meters and their templates (`manufacturerId`). |
 | [EMobilityProvider](EMobilityProvider.md) | roaming network, `eMobilityProviders` | the provider; added and removed by the RNO | An EMSP, with its keys, groups and offers. |
 | [GridOperator](GridOperator.md) | roaming network, `gridOperators` | the grid operator, or the RNO while it has no keys; added and removed by the RNO | A DSO with its grid connection points, each signed by its maintainer. |
 | [ParkingOperator](ParkingOperator.md) | roaming network, `parkingOperators` | the parking operator; added and removed by the RNO | Runs garages, spaces and sensors and offers parking products. |

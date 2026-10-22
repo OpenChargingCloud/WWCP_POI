@@ -37,7 +37,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// with its validity, its holder and its usages, signed by an identity key of the same holder. Each holder of a quorum
     /// certifies its own signing keys, so that it renews them without the others: a signing key gives its holder one
     /// voice only, so no holder decides more alone than with its signing key (section 4.1). The roaming network operator
-    /// embeds its certificates as signingKeyCertificates.
+    /// embeds its certificates as signingKeyCertificates, the only place naming its signing keys. A certificate names
+    /// the operator, not a roaming network: its signing keys are its own in every network it operates, and a network
+    /// trusts it only as far as it trusts the identity key that signed it.
     /// </summary>
     public sealed class RoamingNetworkSigningKeyCertificate
     {
@@ -53,7 +55,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The JSON-LD context of the object, which names what its signature signs and in which version. It is part of the
         /// signature input also where it is embedded, as in the roaming network operator.
         /// </summary>
-        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/signingKeyCertificate/v1";
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/signingKeyCertificate/v2";
 
         #endregion
 
@@ -71,11 +73,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of its JSON-LD context, written unless it is embedded.
             /// </summary>
             public const String  Context                   = "@context";
-
-            /// <summary>
-            /// The property of the identification of its roaming network.
-            /// </summary>
-            public const String  RoamingNetworkId          = "roamingNetworkId";
 
             /// <summary>
             /// The property of the identification of the roaming network operator.
@@ -111,11 +108,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-
-        /// <summary>
-        /// The roaming network.
-        /// </summary>
-        public RoamingNetwork_Id          RoamingNetworkId            { get; }
 
         /// <summary>
         /// The roaming network operator.
@@ -160,8 +152,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Create a certificate of its parts; Create(…) signs a new one.
         /// </summary>
-        public RoamingNetworkSigningKeyCertificate(RoamingNetwork_Id          RoamingNetworkId,
-                                                   RoamingNetworkOperator_Id  RoamingNetworkOperatorId,
+        public RoamingNetworkSigningKeyCertificate(RoamingNetworkOperator_Id  RoamingNetworkOperatorId,
                                                    POIPublicKey               SigningKey,
                                                    DateTimeOffset             SignedAt,
                                                    String                     Algorithm,
@@ -177,7 +168,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (KeyId == SigningKey.Id)
                 throw new ArgumentException("A signing key does not certify itself: an identity key certifies it.", nameof(KeyId));
 
-            this.RoamingNetworkId          = RoamingNetworkId;
             this.RoamingNetworkOperatorId  = RoamingNetworkOperatorId;
             this.SigningKey                = SigningKey;
             this.SignedAt                  = SignedAt;
@@ -190,21 +180,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) Create(IdentityKey,     Algorithm, RoamingNetworkId, RoamingNetworkOperatorId, SigningKey, SignedAt, Deterministic = true)
+        #region (static) Create(IdentityKey,     Algorithm, RoamingNetworkOperatorId, SigningKey, SignedAt, Deterministic = true)
 
         /// <summary>
         /// Certify the given signing key with the given private identity key of the same holder.
         /// </summary>
         /// <param name="IdentityKey">The private identity key.</param>
         /// <param name="Algorithm">The signature algorithm.</param>
-        /// <param name="RoamingNetworkId">The roaming network.</param>
         /// <param name="RoamingNetworkOperatorId">The roaming network operator.</param>
         /// <param name="SigningKey">The signing key it certifies, with its validity, its holder and its usages.</param>
         /// <param name="SignedAt">When it is signed.</param>
         /// <param name="Deterministic">Whether to sign deterministically.</param>
         public static RoamingNetworkSigningKeyCertificate Create(AsymmetricKeyParameter     IdentityKey,
                                                                  COSEAlgorithm              Algorithm,
-                                                                 RoamingNetwork_Id          RoamingNetworkId,
                                                                  RoamingNetworkOperator_Id  RoamingNetworkOperatorId,
                                                                  POIPublicKey               SigningKey,
                                                                  DateTimeOffset             SignedAt,
@@ -220,10 +208,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var signedAt     = DateTimeOffset.Parse(SignedAt.ToISO8601(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
 
             // Signed over what it says, with a placeholder value that the signature input leaves out.
-            var unsigned     = new RoamingNetworkSigningKeyCertificate(RoamingNetworkId, RoamingNetworkOperatorId, SigningKey, signedAt, Algorithm.Name, keyId, "-");
+            var unsigned     = new RoamingNetworkSigningKeyCertificate(RoamingNetworkOperatorId, SigningKey, signedAt, Algorithm.Name, keyId, "-");
 
-            return new RoamingNetworkSigningKeyCertificate(RoamingNetworkId,
-                                                           RoamingNetworkOperatorId,
+            return new RoamingNetworkSigningKeyCertificate(RoamingNetworkOperatorId,
                                                            SigningKey,
                                                            signedAt,
                                                            Algorithm.Name,
@@ -234,19 +221,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Create(IdentityKeyPair,            RoamingNetworkId, RoamingNetworkOperatorId, SigningKey, SignedAt, Deterministic = true)
+        #region (static) Create(IdentityKeyPair,            RoamingNetworkOperatorId, SigningKey, SignedAt, Deterministic = true)
 
         /// <summary>
         /// Certify the given signing key with the given identity key pair of the same holder and its signature algorithm.
         /// </summary>
         /// <param name="IdentityKeyPair">The COSE pair of the private identity key and its signature algorithm.</param>
-        /// <param name="RoamingNetworkId">The roaming network.</param>
         /// <param name="RoamingNetworkOperatorId">The roaming network operator.</param>
         /// <param name="SigningKey">The signing key it certifies, with its validity, its holder and its usages.</param>
         /// <param name="SignedAt">When it is signed.</param>
         /// <param name="Deterministic">Whether to sign deterministically.</param>
         public static RoamingNetworkSigningKeyCertificate Create(COSEKeyPair                IdentityKeyPair,
-                                                                 RoamingNetwork_Id          RoamingNetworkId,
                                                                  RoamingNetworkOperator_Id  RoamingNetworkOperatorId,
                                                                  POIPublicKey               SigningKey,
                                                                  DateTimeOffset             SignedAt,
@@ -254,7 +239,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => Create(IdentityKeyPair.Private,
                       IdentityKeyPair.Algorithm,
-                      RoamingNetworkId,
                       RoamingNetworkOperatorId,
                       SigningKey,
                       SignedAt,
@@ -407,12 +391,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!JSON.ParseMandatory(PropertyKeys.RoamingNetworkId,
-                                         "roaming network identification",
-                                         RoamingNetwork_Id.TryParse,
-                                         out RoamingNetwork_Id roamingNetworkId,
-                                         out ErrorResponse) ||
-                    !JSON.ParseMandatory(PropertyKeys.RoamingNetworkOperatorId,
+                if (!JSON.ParseMandatory(PropertyKeys.RoamingNetworkOperatorId,
                                          "roaming network operator identification",
                                          RoamingNetworkOperator_Id.TryParse,
                                          out RoamingNetworkOperator_Id roamingNetworkOperatorId,
@@ -428,7 +407,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (Text(JSON, PropertyKeys.SignedAt) is not String signedAtText ||
+                // Signed as text: written exactly so, or read as a date by a reader parsing dates, to the millisecond.
+                var signedAtText = JSON[PropertyKeys.SignedAt] is JValue { Type: JTokenType.Date } signedAtDate
+                                       ? signedAtDate.Value is DateTimeOffset dateTimeOffset
+                                             ? dateTimeOffset.ToISO8601()
+                                             : new DateTimeOffset(DateTime.SpecifyKind(signedAtDate.Value<DateTime>(), DateTimeKind.Utc)).ToISO8601()
+                                       : Text(JSON, PropertyKeys.SignedAt);
+
+                if (signedAtText is null ||
                     !DateTimeOffset.TryParse(signedAtText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var signedAt) ||
                     signedAt.ToISO8601() != signedAtText)
                 {
@@ -444,8 +430,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                Certificate    = new RoamingNetworkSigningKeyCertificate(roamingNetworkId,
-                                                                         roamingNetworkOperatorId,
+                Certificate    = new RoamingNetworkSigningKeyCertificate(roamingNetworkOperatorId,
                                                                          signingKey,
                                                                          signedAt,
                                                                          algorithm,
@@ -512,13 +497,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) Content()
 
         /// <summary>
-        /// What this certificate says, without its value: its roaming network, operator, signing key, signing time, and the
-        /// algorithm and identity key of its signature.
+        /// What this certificate says, without its value: its operator, signing key, signing time, and the algorithm and
+        /// identity key of its signature.
         /// </summary>
         private JObject Content()
 
-            => new (new JProperty(PropertyKeys.RoamingNetworkId,          RoamingNetworkId.        ToString()),
-                    new JProperty(PropertyKeys.RoamingNetworkOperatorId,  RoamingNetworkOperatorId.ToString()),
+            => new (new JProperty(PropertyKeys.RoamingNetworkOperatorId,  RoamingNetworkOperatorId.ToString()),
                     new JProperty(PropertyKeys.SigningKey,                SigningKey.              ToJSON(Embedded: true)),
                     new JProperty(PropertyKeys.SignedAt,                  SignedAt.                ToISO8601()),
                     new JProperty(PropertyKeys.Algorithm,                 Algorithm),
@@ -554,7 +538,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"Certificate of the signing key '{SigningKey.Id}' of {RoamingNetworkOperatorId} in {RoamingNetworkId}, signed by '{KeyId}' at {SignedAt.ToISO8601()}";
+            => $"Certificate of the signing key '{SigningKey.Id}' of {RoamingNetworkOperatorId}, signed by '{KeyId}' at {SignedAt.ToISO8601()}";
 
         #endregion
 

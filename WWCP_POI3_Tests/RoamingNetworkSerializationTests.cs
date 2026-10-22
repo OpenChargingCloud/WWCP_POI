@@ -215,7 +215,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             json[RoamingNetwork.PropertyKeys.Operator] = "GraphDefined";
 
             var withKeys         = Full().ToJSON(IncludeETags: false);
-            withKeys[RoamingNetworkOperator.PropertyKeys.SigningKeys] = new JArray();
+            withKeys[POIPartyKeys.SigningKeysProperty] = new JArray();
 
             using (Assert.EnterMultipleScope())
             {

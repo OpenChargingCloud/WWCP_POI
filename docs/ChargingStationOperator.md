@@ -50,7 +50,7 @@ The operator writes no `eTags`.
 | `logos` | `Logo` | `URL?` | update/remove | Its logo, see [Logos](#logos). |
 | `geoLocation` | `GeoLocation` | `GeoCoordinate?` | update/remove | Its geographical location. |
 | `telephone` | `Telephone` | `PhoneNumber?` | update/remove | See [Contact](#contact). |
-| `eMailAddress` | `EMailAddress` | `SimpleEMailAddress?` | update/remove | See [Contact](#contact). |
+| `eMailAddress` | `EMailAddress` | `EMailAddress?` | update/remove | See [Contact](#contact). |
 | `homepage` | `Homepage` | `URL?` | update/remove | See [Contact](#contact). |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | See [Contact](#contact). |
 | `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | update/remove | See [Contact](#contact). |
@@ -238,15 +238,18 @@ Each key:
   is applied to; a signing key naming `usages` only changes of what they name, e.g. one key for the pools and another
   for the tariffs.
 - **Add:** the RNO adds the operator with at least one key of each kind and without charging pools, tariffs,
-  templates, groups or offers: those are the operator's own to add. `RoamingNetworkChange.Add(operator)` leaves them
-  out; `RoamingNetworkChange.AddChildren(operator)` gives the changes adding them, tariffs and templates first, groups
+  templates, groups or offers: those are the operator's own to add. Each of its identity keys signs the change set
+  as well, as the proof that the operator holds it (SPECIFICATION.md, section 4.1): the operator makes the change
+  set, signs it and hands it to the RNO, whose holders sign it then. `RoamingNetworkChange.Add(operator)` leaves the
+  children out; `RoamingNetworkChange.AddChildren(operator)` gives the changes adding them, tariffs and templates first, groups
   and offers last, for a
   change set the operator signs once it is a member.
 - **Remove:** the RNO removes the operator with its pools, stations, EVSEs, tariffs, templates, groups and offers, with one of its
   signing keys and without the operator's signature: the RNO decides who is a member of the roaming network.
   The history keeps the versions before.
 - **Change:** `signingKeys` are rotated with a signature by one of the operator's current signing keys or, when none
-  of them can sign any more, one of its identity keys; `identityKeys` only with one of its identity keys. For recovery,
+  of them can sign any more, one of its identity keys; `identityKeys` only with one of its identity keys, and every new
+  one signs it as well, as its proof. For recovery,
   an identity key of the RNO changes both. Never removed or emptied: at least one key of each kind stays.
 
 See [SPECIFICATION.md, 4.1](../SPECIFICATION.md#41-keys-and-owners).
@@ -275,7 +278,7 @@ set updates `dataLicenses` as a whole, or [element by element](README.md#element
 | JSON key | C# property | Type | Description |
 |---|---|---|---|
 | `telephone` | `Telephone` | `PhoneNumber?` | The telephone number of its (sales) office. |
-| `eMailAddress` | `EMailAddress` | `SimpleEMailAddress?` | The e-mail address of its (sales) office. |
+| `eMailAddress` | `EMailAddress` | `EMailAddress?` | The e-mail address of its (sales) office, also with a name: `"Example Office <info@example.org>"`. |
 | `homepage` | `Homepage` | `URL?` | Its homepage. |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | The telephone number of its hotline for drivers. |
 | `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | The URL of its terms and conditions for charging. |

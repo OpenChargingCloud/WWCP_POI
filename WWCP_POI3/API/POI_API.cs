@@ -275,7 +275,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  MinConsensus             = POIPartyKeys.MinConsensusProperty;
 
             /// <summary>
-            /// The property of the text of the QR code of a trust anchor: WWCPPOI1: and the Base45 of its CBOR.
+            /// The property of the text of the QR code of a trust anchor: WWCP/TA-2: and the Base45 of its CBOR.
             /// </summary>
             public const String  QRCode                   = "qrCode";
 

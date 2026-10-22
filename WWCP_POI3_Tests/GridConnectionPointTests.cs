@@ -293,7 +293,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Grid
             var keyed      = rn1.CreateChangeSet([
                                  RoamingNetworkChange.UpdateProperty(ne2Entity, POIPartyKeys.SigningKeysProperty,  null, new JArray(TestParties.Key(ne2, POIKeyKind.Signing). Public.ToJSON())),
                                  RoamingNetworkChange.UpdateProperty(ne2Entity, POIPartyKeys.IdentityKeysProperty, null, new JArray(TestParties.Key(ne2, POIKeyKind.Identity).Public.ToJSON()))
-                             ], CreatedAt: T0).SignedBy(RNO, POIKeyKind.Identity);
+                             ], CreatedAt: T0).SignedBy(RNO, POIKeyKind.Identity).ProvenByNewIdentityKeys();
 
             Assert.That(rn1.TryApplyChangeSet(keyed, out var rn2, out var keyedError),  Is.True, keyedError);
 

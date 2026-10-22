@@ -264,8 +264,12 @@ leading to the version named by its after ETags.
 ```csharp
 var rno = new RoamingNetworkOperator(
               RoamingNetworkOperator_Id.Parse("GraphDefined"),
-              IdentityKeys:  [ POIPublicKey.From(rnoIdentityKey) ],  // e.g. secp521r1
-              SigningKeys:   [ POIPublicKey.From(rnoSigningKey)  ]   // e.g. secp256r1
+              IdentityKeys:            [ POIPublicKey.From(rnoIdentityKey) ],  // e.g. secp521r1
+              SigningKeyCertificates:  [ RoamingNetworkSigningKeyCertificate.Create(       // its signing keys, each
+                                             rnoIdentityKey, COSEAlgorithm.ES512,           // certified by its holder
+                                             RoamingNetworkOperator_Id.Parse("GraphDefined"),
+                                             POIPublicKey.From(rnoSigningKey),              // e.g. secp256r1
+                                             Timestamp.Now) ]
           );
 
 var gef = new ChargingStationOperator(
@@ -331,7 +335,8 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
   a key of a party. Nobody else's signature counts, there is no external trust configuration.
   - The **RNO** owns itself, the roaming network itself, manufacturers, energy meter manufacturers and
     transparency software, and adds and removes parties: with their keys (a grid operator not taking part
-    without, then the RNO signs in its place until it gives it keys), without their children:
+    without, then the RNO signs in its place until it gives it keys), each of their identity keys signing the change
+    set as well, as the proof that the party holds it and asks to be added, without their children:
     `RoamingNetworkChange.Add(party)` leaves them out, `AddChildren(party)` gives the changes the party then
     signs to add them. The RNO decides
     who is a member: removing a party removes all its data with it, without the party's signature; the history
@@ -503,10 +508,11 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   keys with one of its identity keys (`RoamingNetworkSigningKeyCertificate.Create(…)`, as `signingKeyCertificates`),
   so that it renews them alone; both are committed as properties of the operator, so that every proof gives them.
   Signing keys may name `usages` (`infrastructure`, `tariffs`, `priceStatements`, `party`), e.g. one key of a charging
-  station operator for its pools and one for its tariffs. An app scans the QR code of the trust anchor (`GET ~/RNs/{id}/trustAnchor`): `WWCPPOI1:` and the
+  station operator for its pools and one for its tariffs. An app scans the QR code of the trust anchor (`GET ~/RNs/{id}/trustAnchor`): `WWCP/TA-2:` and the
   Base45 of its CBOR, with the network, its name and description, the thumbprints of the identity
   keys and the `minConsensus` (`RoamingNetworkTrustAnchor.TryParse(text, …)`; the URI
-  `https://hub.example/poi/RNs/rn1?keys=<@id>,…` is read as well), and verifies proofs with
+  `https://hub.example/poi/RNs/rn1?keys=<@id>,…&alsoAt=…` is read as well), at one URL or more, e.g. a mirror for
+  when the hub is down (`RoamingNetwork.CreateTrustAnchor(keyStatement, url, mirrorURL)`), and verifies proofs with
   `proof.Verify(anchor, …)`: only the thumbprints and the `minConsensus` are pinned.
 
 ### Price statements

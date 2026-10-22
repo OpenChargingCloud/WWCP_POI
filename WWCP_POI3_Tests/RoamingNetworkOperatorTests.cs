@@ -54,9 +54,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             => new (RNO,
                     I18NString.Create(Languages.en, "GraphDefined"),
-                    SigningKeys:   [ TestParties.Key(Party, POIKeyKind.Signing). Public ],
-                    IdentityKeys:  [ TestParties.Key(Party, POIKeyKind.Identity).Public ],
-                    Created:       Created);
+                    IdentityKeys:            [ TestParties.Key(Party, POIKeyKind.Identity).Public ],
+                    SigningKeyCertificates:  [ RoamingNetworkSigningKeyCertificate.Create(TestParties.Key(Party, POIKeyKind.Identity).Private,
+                                                                                         COSEAlgorithm.ES512,
+                                                                                         RNO,
+                                                                                         TestParties.Key(Party, POIKeyKind.Signing).Public,
+                                                                                         Created) ],
+                    Created:                 Created);
 
         private static RoamingNetwork NewNetwork(String                   Id        = "QA",
                                                  RoamingNetworkOperator?  Operator  = null,
@@ -100,7 +104,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var json      = qa.ToJSON();
 
             var withKeys  = (JObject) json.DeepClone();
-            withKeys[POIPartyKeys.SigningKeysProperty] = json[RoamingNetwork.PropertyKeys.Operator]![POIPartyKeys.SigningKeysProperty]!.DeepClone();
+            withKeys[POIPartyKeys.SigningKeysProperty] = json[RoamingNetwork.PropertyKeys.Operator]![POIPartyKeys.IdentityKeysProperty]!.DeepClone();
 
             Assert.That(RoamingNetwork.TryParse(JObject.Parse(json.ToString()),  out var fromJSON, out var errorJSON),  Is.True, errorJSON);
             Assert.That(RoamingNetwork.TryParse(qa.ToCBOR(),                     out var fromCBOR, out var errorCBOR),  Is.True, errorCBOR);
@@ -147,7 +151,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                     RoamingNetworkChange.UpdateProperty(qa.Operator!, "homepage",   null, "https://open.charging.cloud"),
                                     RoamingNetworkChange.Add(newCSO));
 
-            var byOperator = Apply(qa, changes.SignedBy(Party));
+            var byOperator = Apply(qa, changes.SignedBy(Party).ProvenByNewIdentityKeys());
             var byGEF      = Apply(qa, changes.SignedBy(TestParties.Party(GEF)));
             var nameByGEF  = Apply(qa, Change(qa, RoamingNetworkChange.UpdateProperty(qa.Operator!, "name", null, new JObject(new JProperty("en", "Not GraphDefined")))).
                                            SignedBy(TestParties.Party(GEF)));

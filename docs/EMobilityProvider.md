@@ -41,9 +41,15 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
-| `address` | `Address` | `Address?` | update/remove | Address of the headquarters, as Styx writes it embedded (`street`, `houseNumber`, `postalCode`, `city`, `country` as ISO 3166 alpha-3, …). |
-| `homepage` | `Homepage` | `URL?` | update/remove | Homepage. |
-| `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | Hotline phone number. |
+| `dataLicenses` | `DataLicenses` | `ImmutableArray<DataLicense>` | update/remove | The licenses of its data, complete, ordered by identification; omitted when empty. As of a [charging station operator](ChargingStationOperator.md#data-licenses). |
+| `address` | `Address` | `Address?` | update/remove | The address of its headquarters, as Styx writes it embedded (`street`, `houseNumber`, `postalCode`, `city`, `country` as ISO 3166 alpha-3, …). |
+| `logos` | `Logo` | `URL?` | update/remove | Its logo: an array of at most one `{"uri": …}`, as of a [charging station operator](ChargingStationOperator.md#logos). |
+| `geoLocation` | `GeoLocation` | `GeoCoordinate?` | update/remove | The geographical location of its headquarters, `{"lat", "lng"}`. |
+| `telephone` | `Telephone` | `PhoneNumber?` | update/remove | The telephone number of its (sales) office. |
+| `eMailAddress` | `EMailAddress` | `EMailAddress?` | update/remove | The e-mail address of its (sales) office, also with a name: `"Example Office <info@example.org>"`. |
+| `homepage` | `Homepage` | `URL?` | update/remove | Its homepage. |
+| `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | The telephone number of its hotline, e.g. `+49 30 1234567`. |
+| `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | update/remove | The URL of its terms and conditions. |
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update (signing or identity key) | Keys signing its change sets, see [Keys](#keys). |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update (identity key) | Long-term keys signing changes of its identity keys, see [Keys](#keys). |
 
@@ -126,8 +132,9 @@ Events: `OnAdminStatusChanged` (`OnEMobilityProviderAdminStatusChangedDelegate`)
   read case-insensitively and written in upper case in the separator style it was read with. Two
   identifications differing only in the separator are the same provider.
 - An e-mobility provider must not be given twice in a roaming network.
-- `name`/`description` must be multi-language objects, `homepage` a URL, `hotline` a phone number,
-  `address` an object.
+- `name`/`description` must be multi-language objects, `homepage`, `termsAndConditions` and the `uri` of its logo
+  URLs, `telephone` and `hotline` phone numbers, `eMailAddress` an e-mail address, `address` and `geoLocation`
+  objects, `logos` an array of at most one logo, `dataLicenses` licenses given completely, none twice.
 - Keys: see [Keys](#keys).
 - Groups and offers: given completely, none twice; group identifications naming this provider, unique in the roaming
   network, as offer identifications are; see [Groups and offers](#groups-and-offers).
@@ -143,8 +150,12 @@ Events: `OnAdminStatusChanged` (`OnEMobilityProviderAdminStatusChangedDelegate`)
   "name":         { "en": "GraphDefined Mobility" },
   "dataSource":   "registry import",
   "address":      { "street": "Musterstraße", "houseNumber": "1", "postalCode": "07743", "city": { "de": "Jena" }, "country": "DEU" },
+  "logos":        [ { "uri": "https://mobility.example.org/logo.svg" } ],
+  "telephone":    "+49 3641 7654321",
+  "eMailAddress": "GraphDefined Mobility <service@mobility.example.org>",
   "homepage":     "https://mobility.example.org",
   "hotline":      "+49 3641 1234567",
+  "termsAndConditions": "https://mobility.example.org/terms",
   "signingKeys":  [ { "@id": "0c5e…9a1f", "key": "…" } ],
   "identityKeys": [ { "@id": "7b21…e04d", "key": "…", "notAfter": "2031-01-01T00:00:00.000Z" } ],
   "created":      "2026-01-01T00:00:00.000Z",

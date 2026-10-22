@@ -153,7 +153,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
             var certificate  = RoamingNetworkSigningKeyCertificate.Create(identity.Private,
                                                                           COSEAlgorithm.ES512,
-                                                                          network.Id,
                                                                           network.Operator!.Id,
                                                                           signing.Public,
                                                                           Now.AddMinutes(-1));

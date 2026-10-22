@@ -237,7 +237,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var withPool     = new ChargingStationOperator(NEW, Created: Created,
                                                            ChargingPools: [ new ChargingPool(ChargingPool_Id.Parse("DE*NEW*P1")) ]).WithKeys();
 
-            var byRNO        = Change(rn1, RoamingNetworkChange.Add(withKeys)).SignedBy(TestParties.Party(rn1));
+            var byRNO        = Change(rn1, RoamingNetworkChange.Add(withKeys)).SignedBy(TestParties.Party(rn1)).ProvenByNewIdentityKeys();
             var byGEF        = Change(rn1, RoamingNetworkChange.Add(withKeys)).SignedBy(TestParties.Party(GEF));
 
             using (Assert.EnterMultipleScope())
@@ -307,7 +307,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var added = Change(rn1, RoamingNetworkChange.Add(cso),
                                     RoamingNetworkChange.Add(prk),
-                                    RoamingNetworkChange.Add(grid)).SignedBy(TestParties.Party(rn1));
+                                    RoamingNetworkChange.Add(grid)).SignedBy(TestParties.Party(rn1)).ProvenByNewIdentityKeys();
 
             Assert.That(rn1.TryApplyChangeSet(added, out var rn2, out var error), Is.True, error);
 
@@ -401,7 +401,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(Apply(rn1, identityChange.SignedBy(TestParties.Party(GEF))).Error,
                             Does.Contain("needs a signature by an identity key of the ChargingStationOperator 'DE*GEF' or an identity key of the roaming network operator"));
-                Assert.That(Apply(rn1, identityChange.SignedBy(TestParties.Party(GEF), POIKeyKind.Identity)).Applied,
+                Assert.That(Apply(rn1, identityChange.SignedBy(TestParties.Party(GEF), POIKeyKind.Identity)).Error,
+                            Does.Contain($"needs a signature by the new identity key '{rotatedIdentity.Public.Id}'"));
+                Assert.That(Apply(rn1, identityChange.SignedBy(TestParties.Party(GEF), POIKeyKind.Identity).ProvenByNewIdentityKeys()).Applied,
                             Is.True);
 
                 // From now on, the new key signs, the old one no longer.
@@ -421,20 +423,33 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                            SignedBy(TestParties.Party(GEF), POIKeyKind.Identity)).Error,
                             Does.Contain("must keep at least one of its identityKeys"));
 
-                // The keys of the roaming network operator itself, without anybody to recover them:
-                // its signing keys by a signing or an identity key, its identity keys only by an identity key.
-                var rnoSigningKeys   = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1.Operator!, "signingKeys",  null, newKeys));
-                var rnoIdentityKeys  = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1.Operator!, "identityKeys", null, new JArray(rotatedIdentity.Public.ToJSON())));
+                // The keys of the roaming network operator itself, without anybody to recover them: its signing keys are
+                // its certificates, changed by a signing or an identity key; its identity keys only by an identity key,
+                // with its signing keys certified anew by the new one.
+                var rnoIdentity      = TestParties.Key(TestParties.Party(rn1), POIKeyKind.Identity);
 
-                // The roaming network has no keys of its own.
+                JArray Certified(POIPublicKey SigningKey, Org.BouncyCastle.Crypto.AsymmetricKeyParameter By)
+                    => new (RoamingNetworkSigningKeyCertificate.Create(By, COSEAlgorithm.ES512, rn1.Operator!.Id, SigningKey, T0).ToJSON(Embedded: true));
+
+                var rnoSigningKeys   = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1.Operator!, "signingKeyCertificates", null, Certified(rotated.Public, rnoIdentity.Private)));
+                var rnoIdentityKeys  = Change(rn1, RoamingNetworkChange.UpdateProperty(rn1.Operator!, "identityKeys",           null, new JArray(rotatedIdentity.Public.ToJSON())),
+                                                   RoamingNetworkChange.UpdateProperty(rn1.Operator!, "signingKeyCertificates", null, Certified(rotated.Public, rotatedIdentity.Private)));
+
+                // The roaming network has no keys of its own, and its operator no signing keys but those of its certificates.
                 Assert.That(() => Change(rn1, RoamingNetworkChange.UpdateProperty(rn1, "signingKeys", null, newKeys)),
                             Throws.ArgumentException.With.Message.Contains("a roaming network has no keys of its own"));
+                Assert.That(() => Change(rn1, RoamingNetworkChange.UpdateProperty(rn1.Operator!, "signingKeys", null, newKeys)),
+                            Throws.ArgumentException.With.Message.Contains("can not be changed"));
 
                 Assert.That(Apply(rn1, rnoSigningKeys. SignedBy(TestParties.Party(rn1))).Applied,                       Is.True);
                 Assert.That(Apply(rn1, rnoSigningKeys. SignedBy(TestParties.Party(rn1), POIKeyKind.Identity)).Applied,  Is.True);
                 Assert.That(Apply(rn1, rnoIdentityKeys.SignedBy(TestParties.Party(rn1))).Error,
                             Does.Contain("needs a signature by an identity key of the roaming network operator"));
-                Assert.That(Apply(rn1, rnoIdentityKeys.SignedBy(TestParties.Party(rn1), POIKeyKind.Identity)).Applied,  Is.True);
+                Assert.That(Apply(rn1, rnoIdentityKeys.SignedBy(TestParties.Party(rn1), POIKeyKind.Identity).ProvenByNewIdentityKeys()).Applied,  Is.True);
+
+                // Its signing keys are never emptied.
+                Assert.That(() => Change(rn1, RoamingNetworkChange.UpdateProperty(rn1.Operator!, "signingKeyCertificates", null, new JArray())),
+                            Throws.ArgumentException.With.Message.Contains("must be a nonempty array"));
 
             }
 

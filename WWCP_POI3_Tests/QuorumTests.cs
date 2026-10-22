@@ -93,10 +93,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                    NotAfter:   T0.AddYears(2),
                                                    Holder:     ExtraIdentityKeyOf));
 
-            operatorJSON[POIPartyKeys.SigningKeysProperty]   = new JArray(signingKeys. Select(key => key.ToJSON(Embedded: true)));
             operatorJSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(identityKeys.Select(key => key.ToJSON(Embedded: true)));
 
-            // Each holder certifies its own signing keys with its first identity key.
+            // Its signing keys are those of its certificates: each holder certifies its own with its first identity key.
+            operatorJSON.Remove(POIPartyKeys.SigningKeysProperty);
             operatorJSON[RoamingNetworkSigningKeyCertificate.JSONProperty] = new JArray(signingKeys.Select(key => Certificate(network, key).ToJSON(Embedded: true)));
 
             if (MinConsensus > 1)
@@ -123,7 +123,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             => RoamingNetworkSigningKeyCertificate.Create(Key(Network, By ?? SigningKey.Holder!, POIKeyKind.Identity, Number).Private,
                                                           COSEAlgorithm.ES512,
-                                                          Network.Id,
                                                           TestParties.OperatorId(Network.Id),
                                                           SigningKey,
                                                           T0);
@@ -279,7 +278,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         {
 
             var network      = Network(2, ExtraSigningKeyOf: "Alpha");
-            var add          = network.CreateChangeSet([ Add() ], CreatedAt: T0);
+            var add          = network.CreateChangeSet([ Add() ], CreatedAt: T0).ProvenByNewIdentityKeys();
 
             // Whether the network names it: by its @id in its JSON.
             Boolean Names(RoamingNetwork Network)
@@ -321,6 +320,96 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region New_identity_keys_prove_their_possession()
+
+        /// <summary>
+        /// Every identity key a change enters anew signs its change set as well (SPECIFICATION.md, section 4.1): those of
+        /// a party added, so that none is added without asking for it, and new ones of a party later, also one valid only
+        /// later; the proof of possession only, no signature of an owner. A party asking to be added signs the change set
+        /// first, and the holders of the operator then as their quorum needs.
+        /// </summary>
+        [Test]
+        public void New_identity_keys_prove_their_possession()
+        {
+
+            var network      = Network(2);
+            var newId        = ChargingStationOperator_Id.Parse("DE*NEW");
+            var newParty     = TestParties.Party(newId);
+            var secondKey    = COSEKeyPair.NewEd448();
+            var newOperator  = new ChargingStationOperator(newId,
+                                                           Name:          I18NString.Create(Languages.en, "A new operator"),
+                                                           SigningKeys:   [ TestParties.Key(newParty).Public ],
+                                                           IdentityKeys:  [ TestParties.Key(newParty, POIKeyKind.Identity).Public, POIPublicKey.From(secondKey.Private) ],
+                                                           Created:       T0);
+
+            var add          = network.CreateChangeSet([ RoamingNetworkChange.Add(newOperator) ], CreatedAt: T0);
+
+            // Signed by the new party with both its identity keys: the proof that it holds them, and that it asks.
+            var askedFor     = add.SignedBy(newParty, POIKeyKind.Identity).
+                                   Sign(secondKey.Private, POIPublicKey.From(secondKey.Private).Id, secondKey.Algorithm);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // The quorum of the operator alone: no party is added without asking for it.
+                Assert.That(network.TryApplyChangeSet(Signed(add, network, POIKeyKind.Signing, "Alpha", "Beta"), out _, out var error1),  Is.False);
+                Assert.That(error1,  Does.Contain("needs a signature by the new identity key").And.Contain("of the ChargingStationOperator 'DE*NEW', as the proof that it holds it"));
+
+                // One of its two identity keys: the other is missing.
+                Assert.That(network.TryApplyChangeSet(Signed(add.SignedBy(newParty, POIKeyKind.Identity), network, POIKeyKind.Signing, "Alpha", "Beta"), out _, out var error2),  Is.False);
+                Assert.That(error2,  Does.Contain($"the new identity key '{POIPublicKey.From(secondKey.Private).Id}'"));
+
+                // Asked for, but not decided: its own signatures are no signatures of an owner.
+                Assert.That(network.TryApplyChangeSet(askedFor,                                                out _, out var error3),  Is.False);
+                Assert.That(error3,  Does.Contain("needs signatures by signing keys of 2 holders of"));
+
+                Assert.That(network.TryApplyChangeSet(Signed(askedFor, network, POIKeyKind.Signing, "Alpha"), out _, out var error4),  Is.False);
+                Assert.That(error4,  Does.Contain("needs signatures by signing keys of 2 holders of"));
+
+                // While it waits, what is missing is named, the proofs included.
+                Assert.That(network.TryCheckCoSigning(Signed(add, network, POIKeyKind.Signing, "Alpha"), out var missing, out var signedByAnOwner, out var error5),  Is.True, error5);
+                Assert.That(signedByAnOwner,  Is.True);
+                Assert.That(missing,          Has.Count.EqualTo(3));
+
+            }
+
+            Assert.That(network.TryApplyChangeSet(Signed(askedFor, network, POIKeyKind.Signing, "Alpha", "Beta"), out var added, out var error), Is.True, error);
+            Assert.That(added!.TryGetChargingStationOperatorById(newId, out var addedOperator), Is.True);
+            Assert.That(addedOperator!.IdentityKeys.Select(key => key.Id),  Is.EqualTo(newOperator.IdentityKeys.Select(key => key.Id)));
+
+            // Later, a third identity key, valid only from next year: signed by one of its identity keys, as its owner,
+            // and by the new one, as its proof.
+            var thirdKey      = COSEKeyPair.NewES512();
+            var third         = POIPublicKey.From(thirdKey.Private, NotBefore: T0.AddYears(1), NotAfter: T0.AddYears(3));
+            var oldKeys       = new JArray(addedOperator.IdentityKeys.Select(key => key.ToJSON(Embedded: true)));
+            var newKeys       = new JArray(addedOperator.IdentityKeys.Append(third).Select(key => key.ToJSON(Embedded: true)));
+            var renew         = added.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(addedOperator, POIPartyKeys.IdentityKeysProperty, oldKeys, newKeys) ],
+                                                      CreatedAt: T0.AddMinutes(1)).
+                                      SignedBy(newParty, POIKeyKind.Identity);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(added.TryApplyChangeSet(renew, out _, out var error6),  Is.False, "without the new key");
+                Assert.That(error6,  Does.Contain($"needs a signature by the new identity key '{third.Id}'"));
+
+                Assert.That(added.TryApplyChangeSet(renew.Sign(thirdKey.Private, third.Id, thirdKey.Algorithm), out var renewed, out var error7),  Is.True, error7);
+                Assert.That(renewed!.GetChargingStationOperatorById(newId)!.IdentityKeys,  Has.Length.EqualTo(3));
+
+                // The new key alone is not its owner.
+                var byNewKeyOnly  = added.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(addedOperator, POIPartyKeys.IdentityKeysProperty, oldKeys, newKeys) ],
+                                                          CreatedAt: T0.AddMinutes(1)).
+                                          Sign(thirdKey.Private, third.Id, thirdKey.Algorithm);
+
+                Assert.That(added.TryApplyChangeSet(byNewKeyOnly, out _, out var error8),  Is.False, "by the new key alone");
+                Assert.That(error8,  Does.Contain("an identity key of the ChargingStationOperator 'DE*NEW'"));
+
+            }
+
+        }
+
+        #endregion
+
         #region A_holder_renews_its_own_signing_key_alone()
 
         /// <summary>
@@ -339,14 +428,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var beta1        = Key(network, "Beta",  POIKeyKind.Signing).Public;
             var beta2        = Key(network, "Beta",  POIKeyKind.Signing, 2).Public;
 
-            // The signing keys and their certificates with the given ones replaced.
+            // The signing keys, its certificates, with the given ones replaced.
             RoamingNetworkChangeSet Replacing(params (POIPublicKey Old, POIPublicKey New)[] Keys)
 
-                => network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(op, POIPartyKeys.SigningKeysProperty, null,
-                                                                                 new JArray(op.SigningKeys.Where (key => !Keys.Any(replaced => replaced.Old.Id == key.Id)).
-                                                                                                           Concat(Keys.Select(replaced => replaced.New)).
-                                                                                                           Select(key => key.ToJSON(Embedded: true)))),
-                                             RoamingNetworkChange.UpdateProperty(op, RoamingNetworkSigningKeyCertificate.JSONProperty, null,
+                => network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(op, RoamingNetworkSigningKeyCertificate.JSONProperty, null,
                                                                                  new JArray(op.SigningKeyCertificates.Where (certificate => !Keys.Any(replaced => replaced.Old.Id == certificate.SigningKey.Id)).
                                                                                                                       Concat(Keys.Select(replaced => Certificate(network, replaced.New))).
                                                                                                                       Select(certificate => certificate.ToJSON(Embedded: true)))) ],
@@ -582,7 +667,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var byTwo     = AttestedBy("Alpha", "Gamma");
             var network   = byTwo.Head.RoamingNetwork;
             var anchor    = new RoamingNetworkTrustAnchor(network.Id,
-                                                          URL.Parse($"https://hub.example/poi/RNs/{network.Id}"),
+                                                          [ URL.Parse($"https://hub.example/poi/RNs/{network.Id}") ],
                                                           [ .. network.Operator!.IdentityKeys.Select(key => key.Id) ],
                                                           network.Operator!.MinConsensus);
 
@@ -611,7 +696,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         /// <summary>
         /// The trust anchor of a roaming network with a quorum, with its name, description and further information: the
-        /// text of its QR code is WWCPPOI1: and the Base45 of its CBOR, all of the alphanumeric mode of QR codes, and reads
+        /// text of its QR code is WWCP/TA-2: and the Base45 of its CBOR, all of the alphanumeric mode of QR codes, and reads
         /// back as it was; the identity keys are their 32 bytes in CBOR.
         /// </summary>
         [Test]
@@ -620,7 +705,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var network  = Network(2);
             var anchor   = new RoamingNetworkTrustAnchor(network.Id,
-                                                         URL.Parse($"https://hub.example/poi/RNs/{network.Id}"),
+                                                         [ URL.Parse($"https://hub.example/poi/RNs/{network.Id}") ],
                                                          [ .. network.Operator!.IdentityKeys.Select(key => key.Id) ],
                                                          2,
                                                          ImmutableI18NString.Create(Languages.de, "Beispielnetz").Set(Languages.en, "Example network"),
@@ -634,12 +719,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(qrCode,                    Does.StartWith("WWCPPOI1:"));
+                Assert.That(qrCode,                    Does.StartWith(RoamingNetworkTrustAnchor.QRCodePrefix));
                 Assert.That(qrCode.All(character => "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:".Contains(character)),  Is.True, "the alphanumeric mode");
                 Assert.That(qrCode.Length,             Is.LessThan(1000));
 
                 Assert.That(read!.Id,                  Is.EqualTo(network.Id));
-                Assert.That(read.URL,                  Is.EqualTo(anchor.URL));
+                Assert.That(read.URLs,                 Is.EqualTo(anchor.URLs));
                 Assert.That(read.Keys,                 Is.EqualTo(anchor.Keys));
                 Assert.That(read.MinConsensus,         Is.EqualTo((Byte) 2));
                 Assert.That(read.Name,                 Is.EqualTo(anchor.Name));
@@ -652,7 +737,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(RoamingNetworkTrustAnchor.TryParse(URL.Parse(anchor.ToURL()), out var fromURI, out error),  Is.True, error);
                 Assert.That(fromURI!.MinConsensus,     Is.EqualTo((Byte) 2));
 
-                Assert.That(() => new RoamingNetworkTrustAnchor(anchor.Id, anchor.URL, anchor.Keys, 4),
+                Assert.That(() => new RoamingNetworkTrustAnchor(anchor.Id, anchor.URLs, anchor.Keys, 4),
                             Throws.ArgumentException.With.Message.Contains("needs as many identity keys"));
 
                 var otherNetwork = anchor.ToJSON();

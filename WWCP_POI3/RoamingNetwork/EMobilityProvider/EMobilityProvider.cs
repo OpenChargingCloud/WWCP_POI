@@ -25,6 +25,8 @@ using Newtonsoft.Json.Linq;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+using org.GraphDefined.Vanaheimr.Aegir;
+using org.GraphDefined.Vanaheimr.Hermod.Mail;
 
 #endregion
 
@@ -86,9 +88,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             /// <summary>
+            /// The property of its logos: at most one, as of a charging station operator.
+            /// </summary>
+            public const String  Logos                     = "logos";
+
+            /// <summary>
+            /// The property of the URI of its logo.
+            /// </summary>
+            public const String  LogoURI                   = "uri";
+
+            /// <summary>
             /// The property of its address.
             /// </summary>
             public const String  Address                   = "address";
+
+            /// <summary>
+            /// The property of its geographical location.
+            /// </summary>
+            public const String  GeoLocation               = "geoLocation";
+
+            /// <summary>
+            /// The property of its telephone number.
+            /// </summary>
+            public const String  Telephone                 = "telephone";
+
+            /// <summary>
+            /// The property of its e-mail address.
+            /// </summary>
+            public const String  EMailAddress              = "eMailAddress";
 
             /// <summary>
             /// The property of its homepage.
@@ -99,6 +126,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of its hotline phone number.
             /// </summary>
             public const String  HotlinePhoneNumber        = "hotline";
+
+            /// <summary>
+            /// The property of the URL of its terms and conditions.
+            /// </summary>
+            public const String  TermsAndConditions        = "termsAndConditions";
 
             /// <summary>
             /// The property of its signing keys, as of every party.
@@ -156,19 +188,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         /// <summary>
+        /// The URL of its logo.
+        /// </summary>
+        public URL?                          Logo                     { get; }
+
+        /// <summary>
         /// The address of the headquarters.
         /// </summary>
-        public Address?      Address               { get; }
+        public Address?                      Address                  { get; }
+
+        /// <summary>
+        /// The geographical location of the headquarters.
+        /// </summary>
+        public GeoCoordinate?                GeoLocation              { get; }
+
+        /// <summary>
+        /// The telephone number of its (sales) office.
+        /// </summary>
+        public PhoneNumber?                  Telephone                { get; }
+
+        /// <summary>
+        /// The e-mail address of its (sales) office, also with a name: "Example Office &lt;info@example.org&gt;".
+        /// </summary>
+        public EMailAddress?                 EMailAddress             { get; }
 
         /// <summary>
         /// The homepage.
         /// </summary>
-        public URL?          Homepage              { get; }
+        public URL?                          Homepage                 { get; }
 
         /// <summary>
         /// The hotline phone number.
         /// </summary>
-        public PhoneNumber?  HotlinePhoneNumber    { get; }
+        public PhoneNumber?                  HotlinePhoneNumber       { get; }
+
+        /// <summary>
+        /// The URL of its terms and conditions.
+        /// </summary>
+        public URL?                          TermsAndConditionsURL    { get; }
+
+        /// <summary>
+        /// The licenses of its data, ordered by their identifications.
+        /// </summary>
+        public ImmutableArray<DataLicense>   DataLicenses             { get; }
 
         /// <inheritdoc/>
         public ImmutableArray<POIPublicKey>  SigningKeys     { get; }
@@ -204,16 +266,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Create a new e-mobility provider.
         /// </summary>
         public EMobilityProvider(EMobilityProvider_Id                              Id,
-                                 I18NString?                                       Name                         = null,
-                                 I18NString?                                       Description                  = null,
+                                 ImmutableI18NString?                              Name                         = null,
+                                 ImmutableI18NString?                              Description                  = null,
+
+                                 URL?                                              Logo                         = null,
                                  Address?                                          Address                      = null,
+                                 GeoCoordinate?                                    GeoLocation                  = null,
+                                 PhoneNumber?                                      Telephone                    = null,
+                                 EMailAddress?                                     EMailAddress                 = null,
                                  URL?                                              Homepage                     = null,
                                  PhoneNumber?                                      HotlinePhoneNumber           = null,
-                                 IEnumerable<POIPublicKey>?                        SigningKeys                  = null,
+                                 URL?                                              TermsAndConditionsURL        = null,
+                                 IEnumerable<DataLicense>?                         DataLicenses                 = null,
+
                                  IEnumerable<POIPublicKey>?                        IdentityKeys                 = null,
-                                 IEnumerable<EVSEGroup>?                           EVSEGroups                   = null,
-                                 IEnumerable<ChargingStationGroup>?                ChargingStationGroups        = null,
+                                 IEnumerable<POIPublicKey>?                        SigningKeys                  = null,
+
                                  IEnumerable<ChargingPoolGroup>?                   ChargingPoolGroups           = null,
+                                 IEnumerable<ChargingStationGroup>?                ChargingStationGroups        = null,
+                                 IEnumerable<EVSEGroup>?                           EVSEGroups                   = null,
                                  IEnumerable<ChargingTariffOffer>?                 ChargingTariffOffers         = null,
 
                                  Timestamped<EMobilityProviderAdminStatusType>?    InitialAdminStatus           = null,
@@ -229,7 +300,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  UserDefinedDictionary?                            InternalData                 = null)
 
             : base(Id,
-                   Name,
+                   Name ?? I18NString.Create($"E-Mobility Provider '{Id}'"),
                    Description,
 
                    // Since its creation, unless told otherwise.
@@ -247,9 +318,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
-            this.Address             = Address;
-            this.Homepage            = Homepage;
-            this.HotlinePhoneNumber  = HotlinePhoneNumber;
+            this.Logo                   = Logo;
+            this.Address                = Address;
+            this.GeoLocation            = GeoLocation;
+            this.Telephone              = Telephone;
+            this.EMailAddress           = EMailAddress;
+            this.Homepage               = Homepage;
+            this.HotlinePhoneNumber     = HotlinePhoneNumber;
+            this.TermsAndConditionsURL  = TermsAndConditionsURL;
+
+            var dataLicenses = (DataLicenses ?? []).ToArray();
+
+            if (dataLicenses.Any(dataLicense => dataLicense is null))
+                throw new ArgumentException($"The data licenses of the e-mobility provider '{Id}' must not contain null entries!", nameof(DataLicenses));
+
+            if (dataLicenses.Select(dataLicense => dataLicense.Id).Distinct().Count() != dataLicenses.Length)
+                throw new ArgumentException($"A data license of the e-mobility provider '{Id}' must not be given twice!", nameof(DataLicenses));
+
+            this.DataLicenses           = [ .. dataLicenses.Ordered() ];
 
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the e-mobility provider '{Id}'");
 
@@ -478,14 +564,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (DataSource is not null)
                 json.Add(BasePropertyKeys.DataSource,       DataSource);
 
+            // No data licenses, no property: as the roaming network and the charging station operators write them.
+            if (DataLicenses.Length > 0)
+                json.Add(BasePropertyKeys.DataLicenses,     DataLicenses.ToPOIJSON());
+
             if (Address is not null)
                 json.Add(PropertyKeys.Address,              Address.ToJSON(Embedded: true));
+
+            if (Logo.HasValue)
+                json.Add(PropertyKeys.Logos,                new JArray(new JObject(new JProperty(PropertyKeys.LogoURI, Logo.Value.ToString()))));
+
+            if (GeoLocation.HasValue)
+                json.Add(PropertyKeys.GeoLocation,          GeoLocation.Value.ToJSON(Embedded: true));
+
+            if (Telephone.HasValue)
+                json.Add(PropertyKeys.Telephone,            Telephone.Value.ToString());
+
+            if (EMailAddress is not null)
+                json.Add(PropertyKeys.EMailAddress,         EMailAddress.ToString());
 
             if (Homepage.HasValue)
                 json.Add(PropertyKeys.Homepage,             Homepage.Value.ToString());
 
             if (HotlinePhoneNumber.HasValue)
                 json.Add(PropertyKeys.HotlinePhoneNumber,   HotlinePhoneNumber.Value.ToString());
+
+            if (TermsAndConditionsURL.HasValue)
+                json.Add(PropertyKeys.TermsAndConditions,   TermsAndConditionsURL.Value.ToString());
 
             if (IncludeChildArrays && EVSEGroups.Count > 0)
                 json.Add(PropertyKeys.EVSEGroups,             new JArray(EVSEGroups.           Select(group => group.ToJSON(Embedded: true))));
@@ -509,87 +614,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return CustomEMobilityProviderSerializer is not null
                        ? CustomEMobilityProviderSerializer(this, json)
                        : json;
-
-        }
-
-        #endregion
-
-        #region ToCBOR(Embedded = false, ...)
-
-        /// <summary>
-        /// Return the CBOR representation of this e-mobility provider: the keys and values of its JSON representation.
-        /// </summary>
-        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
-        /// <param name="CustomEMobilityProviderSerializer">A delegate to serialize custom e-mobility provider CBOR maps.</param>
-        public CBORValue ToCBOR(Boolean                                            Embedded                            = false,
-                                Boolean                                            IncludeETags                        = false,
-                                CustomCBORSerializerDelegate<EMobilityProvider>?   CustomEMobilityProviderSerializer   = null)
-        {
-
-            var cbor = new CBORMap {
-                           { CBORValue.FromText(BasePropertyKeys.Id),           CBORValue.FromText(Id.ToString()) }
-                       };
-
-            if (!Embedded)
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.Context),          CBORValue.FromText(JSONLDContext));
-
-            if (Name.IsNotNullOrEmpty())
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.Name),             Name.       ToCBOR());
-
-            if (Description.IsNotNullOrEmpty())
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.Description),      Description.ToCBOR());
-
-            if (DataSource is not null)
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),       CBORValue.FromText(DataSource));
-
-            // The address, the charging pool groups, the charging tariff offers and the keys have no CBOR representation
-            // of their own: theirs are the keys and values of their JSON representation.
-            if (Address is not null)
-                cbor.Add(CBORValue.FromText(PropertyKeys.Address),              CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
-
-            if (Homepage.HasValue)
-                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),             CBORValue.FromText(Homepage.Value.ToString()));
-
-            if (HotlinePhoneNumber.HasValue)
-                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),   CBORValue.FromText(HotlinePhoneNumber.Value.ToString()));
-
-            if (EVSEGroups.Count > 0)
-                cbor.Add(CBORValue.FromText(PropertyKeys.EVSEGroups),
-                         CBORValue.FromArray(EVSEGroups.           Select(group => group.ToCBOR(Embedded: true))));
-
-            if (ChargingStationGroups.Count > 0)
-                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingStationGroups),
-                         CBORValue.FromArray(ChargingStationGroups.Select(group => group.ToCBOR(Embedded: true))));
-
-            if (ChargingPoolGroups.Count > 0)
-                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingPoolGroups),
-                         CBORValue.FromArray(ChargingPoolGroups.   Select(group => CBORJSON.ToCBOR(group.ToJSON(Embedded: true)))));
-
-            if (ChargingTariffOffers.Count > 0)
-                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingTariffOffers),
-                         CBORValue.FromArray(ChargingTariffOffers. Select(offer => CBORJSON.ToCBOR(offer.ToJSON(Embedded: true)))));
-
-            if (SigningKeys.Length > 0)
-                cbor.Add(CBORValue.FromText(PropertyKeys.SigningKeys),
-                         CBORValue.FromArray(SigningKeys. Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
-
-            if (IdentityKeys.Length > 0)
-                cbor.Add(CBORValue.FromText(PropertyKeys.IdentityKeys),
-                         CBORValue.FromArray(IdentityKeys.Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
-
-            // Always part of the content, as in the JSON representation; custom data is JSON.
-            cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),              CBORValue.FromText(Created.       ToISO8601()));
-            cbor.Add(CBORValue.FromText(BasePropertyKeys.LastChange),           CBORValue.FromText(LastChangeDate.ToISO8601()));
-
-            if (CustomData.HasValues)
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),       CBORJSON.ToCBOR(CustomData.ToJObject()));
-
-            AddETagsTo(cbor, IncludeETags);
-
-            return CustomEMobilityProviderSerializer is not null
-                       ? CustomEMobilityProviderSerializer(this, cbor)
-                       : cbor;
 
         }
 
@@ -631,10 +655,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Name,            "e-mobility provider name",         out var name,         out ErrorResponse) ||
                     !POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Description,     "e-mobility provider description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString (JSON, BasePropertyKeys.DataSource,      "data source",                      out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseAddress(JSON, PropertyKeys.Address,             "address",                          out var address,      out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, PropertyKeys.Homepage,            "homepage",                         URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",             PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                    !POIJSON.TryParseString (JSON, BasePropertyKeys.DataSource,      "data source",                      out var dataSource,   out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIJSON.TryParseContact(JSON,
+                                     out var logo,
+                                     out var address,
+                                     out var geoLocation,
+                                     out var telephone,
+                                     out var eMailAddress,
+                                     out var homepage,
+                                     out var hotline,
+                                     out var termsAndConditions,
+                                     out var dataLicenses,
+                                     out ErrorResponse))
                 {
                     return false;
                 }
@@ -662,9 +698,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 EMobilityProvider = new EMobilityProvider(id,
                                                           name,
                                                           description,
+                                                          logo,
                                                           address,
+                                                          geoLocation,
+                                                          telephone,
+                                                          eMailAddress,
                                                           homepage,
                                                           hotline,
+                                                          termsAndConditions,
+                                                          dataLicenses,
                                                           SigningKeys:            signingKeys,
                                                           IdentityKeys:           identityKeys,
                                                           EVSEGroups:             evseGroups,
@@ -692,6 +734,109 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ErrorResponse      = "The given JSON representation of an e-mobility provider is invalid: " + e.Message;
                 return false;
             }
+
+        }
+
+        #endregion
+
+
+        #region ToCBOR(Embedded = false, ...)
+
+        /// <summary>
+        /// Return the CBOR representation of this e-mobility provider: the keys and values of its JSON representation.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="CustomEMobilityProviderSerializer">A delegate to serialize custom e-mobility provider CBOR maps.</param>
+        public CBORValue ToCBOR(Boolean                                            Embedded                            = false,
+                                Boolean                                            IncludeETags                        = false,
+                                CustomCBORSerializerDelegate<EMobilityProvider>?   CustomEMobilityProviderSerializer   = null)
+        {
+
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(BasePropertyKeys.Id),           CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Context),          CBORValue.FromText(JSONLDContext));
+
+            if (Name.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Name),             Name.       ToCBOR());
+
+            if (Description.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Description),      Description.ToCBOR());
+
+            if (DataSource is not null)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),       CBORValue.FromText(DataSource));
+
+            if (DataLicenses.Length > 0)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataLicenses),     DataLicenses.ToPOICBOR());
+
+            // The address, the geo location, the charging pool groups, the charging tariff offers and the keys have no
+            // CBOR representation of their own: theirs are the keys and values of their JSON representation.
+            if (Address is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Address),              CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
+
+            if (Logo.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Logos),
+                         CBORValue.FromArray(new CBORMap {
+                             { CBORValue.FromText(PropertyKeys.LogoURI),                CBORValue.FromText(Logo.Value.ToString()) }
+                         }));
+
+            if (GeoLocation.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.GeoLocation),          CBORJSON.ToCBOR(GeoLocation.Value.ToJSON(Embedded: true)));
+
+            if (Telephone.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Telephone),            CBORValue.FromText(Telephone.Value.ToString()));
+
+            if (EMailAddress is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.EMailAddress),         CBORValue.FromText(EMailAddress.ToString()));
+
+            if (Homepage.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),             CBORValue.FromText(Homepage.Value.ToString()));
+
+            if (HotlinePhoneNumber.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),   CBORValue.FromText(HotlinePhoneNumber.Value.ToString()));
+
+            if (TermsAndConditionsURL.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.TermsAndConditions),   CBORValue.FromText(TermsAndConditionsURL.Value.ToString()));
+
+            if (EVSEGroups.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.EVSEGroups),
+                         CBORValue.FromArray(EVSEGroups.           Select(group => group.ToCBOR(Embedded: true))));
+
+            if (ChargingStationGroups.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingStationGroups),
+                         CBORValue.FromArray(ChargingStationGroups.Select(group => group.ToCBOR(Embedded: true))));
+
+            if (ChargingPoolGroups.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingPoolGroups),
+                         CBORValue.FromArray(ChargingPoolGroups.   Select(group => CBORJSON.ToCBOR(group.ToJSON(Embedded: true)))));
+
+            if (ChargingTariffOffers.Count > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ChargingTariffOffers),
+                         CBORValue.FromArray(ChargingTariffOffers. Select(offer => CBORJSON.ToCBOR(offer.ToJSON(Embedded: true)))));
+
+            if (SigningKeys.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.SigningKeys),
+                         CBORValue.FromArray(SigningKeys. Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
+
+            if (IdentityKeys.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.IdentityKeys),
+                         CBORValue.FromArray(IdentityKeys.Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
+
+            // Always part of the content, as in the JSON representation; custom data is JSON.
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),              CBORValue.FromText(Created.       ToISO8601()));
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.LastChange),           CBORValue.FromText(LastChangeDate.ToISO8601()));
+
+            if (CustomData.HasValues)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),       CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            AddETagsTo(cbor, IncludeETags);
+
+            return CustomEMobilityProviderSerializer is not null
+                       ? CustomEMobilityProviderSerializer(this, cbor)
+                       : cbor;
 
         }
 
@@ -757,13 +902,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 // What has no CBOR representation of its own is read as its JSON, with the parsers of the JSON
-                // representation: the address, the homepage, the hotline, the keys, the charging pool groups,
-                // the charging tariff offers and the metadata.
+                // representation: the contact data and the data licenses, the keys, the charging pool groups, the
+                // charging tariff offers and the metadata.
                 var json = new JObject();
 
-                foreach (var key in new[] { PropertyKeys.Address,
+                foreach (var key in new[] { PropertyKeys.Logos,
+                                            PropertyKeys.Address,
+                                            PropertyKeys.GeoLocation,
+                                            PropertyKeys.Telephone,
+                                            PropertyKeys.EMailAddress,
                                             PropertyKeys.Homepage,
                                             PropertyKeys.HotlinePhoneNumber,
+                                            PropertyKeys.TermsAndConditions,
+                                            BasePropertyKeys.DataLicenses,
+                                            BasePropertyKeys.DataLicenseIds,
                                             PropertyKeys.SigningKeys,
                                             PropertyKeys.IdentityKeys,
                                             PropertyKeys.ChargingPoolGroups,
@@ -778,9 +930,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         json.Add(key, CBORJSON.ToJSON(value));
                 }
 
-                if (!POIJSON.TryParseAddress(json, PropertyKeys.Address,             "address",               out var address,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (json, PropertyKeys.Homepage,            "homepage",              URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (json, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",  PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                if (!POIJSON.TryParseContact(json,
+                                     out var logo,
+                                     out var address,
+                                     out var geoLocation,
+                                     out var telephone,
+                                     out var eMailAddress,
+                                     out var homepage,
+                                     out var hotline,
+                                     out var termsAndConditions,
+                                     out var dataLicenses,
+                                     out ErrorResponse))
                 {
                     return false;
                 }
@@ -806,9 +966,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 EMobilityProvider = new EMobilityProvider(id,
                                                           name,
                                                           description,
+                                                          logo,
                                                           address,
+                                                          geoLocation,
+                                                          telephone,
+                                                          eMailAddress,
                                                           homepage,
                                                           hotline,
+                                                          termsAndConditions,
+                                                          dataLicenses,
                                                           SigningKeys:            signingKeys,
                                                           IdentityKeys:           identityKeys,
                                                           EVSEGroups:             evseGroups,

@@ -122,6 +122,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<RoamingNetworkAttestation>  Attestations      { get; }
 
+
+        /// <summary>
+        /// The multilingual name of the roaming network as this proof gives it, in its root: to show once the proof is
+        /// verified (Verify(…)), as the attested root covers it, unlike the name of a trust anchor, which is not trusted.
+        /// </summary>
+        public ImmutableI18NString                        RoamingNetworkName
+            => I18NOf(RoamingNetwork, POI.RoamingNetwork.BasePropertyKeys.Name);
+
+        /// <summary>
+        /// The multilingual description of the roaming network as this proof gives it, in its root: to show once the
+        /// proof is verified.
+        /// </summary>
+        public ImmutableI18NString                        RoamingNetworkDescription
+            => I18NOf(RoamingNetwork, POI.RoamingNetwork.BasePropertyKeys.Description);
+
+        /// <summary>
+        /// The multilingual name of the roaming network operator as this proof gives it, in its root: to show once the
+        /// proof is verified.
+        /// </summary>
+        public ImmutableI18NString                        RoamingNetworkOperatorName
+            => RoamingNetwork[POI.RoamingNetwork.PropertyKeys.Operator] is JObject operatorJSON
+                   ? I18NOf(operatorJSON, RoamingNetworkOperator.BasePropertyKeys.Name)
+                   : ImmutableI18NString.Empty;
+
         #endregion
 
         #region Constructor(s)
@@ -286,6 +310,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TrustAnchorTextMismatch(TrustAnchor)
+
+        /// <summary>
+        /// Why the name or the description the given trust anchor shows differs from the one of the roaming network this
+        /// proof gives, or null (SPECIFICATION.md, section 8.6): each of its texts must be the one of the network in that
+        /// language. The texts of a trust anchor are not trusted, those of a verified proof are, so a verifier shows the
+        /// latter and warns of a difference, e.g. of a QR code naming the network otherwise.
+        /// </summary>
+        /// <param name="TrustAnchor">The trust anchor, e.g. as scanned.</param>
+        public String? TrustAnchorTextMismatch(RoamingNetworkTrustAnchor TrustAnchor)
+        {
+
+            foreach (var (kind, shown, proven) in new[] { ("name",        TrustAnchor.Name,        RoamingNetworkName),
+                                                          ("description", TrustAnchor.Description, RoamingNetworkDescription) })
+            {
+                foreach (var text in shown)
+                {
+                    if (!proven.Has(text.Language) || proven[text.Language] != text.Text)
+                        return $"The trust anchor shows the {kind} '{text.Text}' ({text.Language}) of the roaming network '{TrustAnchor.Id}', " +
+                               (proven.Has(text.Language)
+                                    ? $"which is '{proven[text.Language]}' in the proof!"
+                                    : $"which has no {kind} in this language in the proof!");
+                }
+            }
+
+            return null;
+
+        }
+
+        #endregion
+
         #region Verify(TrustedIdentityKeyIds, out Attestation, out ErrorResponse, At = null, MinConsensus = 1)
 
         /// <summary>
@@ -380,6 +435,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #endregion
 
         }
+
+        #endregion
+
+        #region (private static) I18NOf(JSON, PropertyName)
+
+        /// <summary>
+        /// The multilingual text of the given property, or none.
+        /// </summary>
+        private static ImmutableI18NString I18NOf(JObject  JSON,
+                                                  String   PropertyName)
+
+            => JSON[PropertyName] is JObject textJSON && ImmutableI18NString.TryParse(textJSON, out var text, out _)
+                   ? text
+                   : ImmutableI18NString.Empty;
 
         #endregion
 

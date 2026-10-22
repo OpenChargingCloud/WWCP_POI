@@ -483,9 +483,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var rn1   = NewNetwork();
             var acme  = rn1.ChargingStationManufacturers.Single();
 
+            var acmeKey  = TestParties.Key(new POIPartyId(nameof(ChargingStationManufacturer), "ACME"), POIKeyKind.Identity).Public;
+
             var rn2   = Apply(rn1,
                               RoamingNetworkChange.Add           (new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("ZAP"))),
-                              RoamingNetworkChange.UpdateProperty(acme, "homepage", null, "https://acme.example"));
+                              RoamingNetworkChange.UpdateProperty(acme, "homepage",      null, "https://acme.example"),
+                              RoamingNetworkChange.UpdateProperty(acme, "eMailAddress",  null, "ACME Sales <sales@acme.example>"),
+                              RoamingNetworkChange.UpdateProperty(acme, "logos",         null, new JArray(new JObject(new JProperty("uri", "https://acme.example/logo.png")))),
+                              RoamingNetworkChange.UpdateProperty(acme, "identityKeys",  null, new JArray(acmeKey.ToJSON(Embedded: true))));
 
             rn2.TryGetChargingStationManufacturerById(ACME, out var changedAcme);
 
@@ -493,6 +498,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             {
                 Assert.That(rn2.ChargingStationManufacturers.Select(manufacturer => manufacturer.Id.ToString()).Order(),  Is.EqualTo(new[] { "ACME", "ZAP" }));
                 Assert.That(changedAcme!.Homepage?.ToString(),                                                          Is.EqualTo("https://acme.example"));
+                Assert.That(changedAcme.EMailAddress?.ToString(),                                                       Is.EqualTo("ACME Sales <sales@acme.example>"));
+                Assert.That(changedAcme.Logo?.ToString(),                                                               Is.EqualTo("https://acme.example/logo.png"));
+                Assert.That(changedAcme.IdentityKeys.Select(key => key.Id),                                             Is.EqualTo(new[] { acmeKey.Id }));
             }
 
         }

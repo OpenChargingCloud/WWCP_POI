@@ -54,8 +54,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             // The operator of the roaming network, who may operate other roaming networks as well.
             var rno = new RoamingNetworkOperator(RoamingNetworkOperator_Id.Parse("GraphDefined"),
-                                                 SigningKeys:   [ POIPublicKey.From(rnoSigningKey)  ],
-                                                 IdentityKeys:  [ POIPublicKey.From(rnoIdentityKey) ]);
+                                                 IdentityKeys:            [ POIPublicKey.From(rnoIdentityKey) ],
+                                                 SigningKeyCertificates:  [ RoamingNetworkSigningKeyCertificate.Create(rnoIdentityKey,
+                                                                                                                       COSEAlgorithm.ES512,
+                                                                                                                       RoamingNetworkOperator_Id.Parse("GraphDefined"),
+                                                                                                                       POIPublicKey.From(rnoSigningKey),
+                                                                                                                       Timestamp.Now) ]);
 
             var rn1 = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                                          DataSource:                "v1",
@@ -71,8 +75,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                           RoamingNetworkChange.Add           (newOperator),                               // a new operator
                           RoamingNetworkChange.UpdateProperty(gef, "telephone",  null, "+49 30 7654321")  // the operator DE*GEF
                       ]).
-                      Sign(rnoSigningKey, POIPublicKey.From(rnoSigningKey).Id, COSEAlgorithm.ES256).      // owns the network and adds operators
-                      Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);      // owns DE*GEF
+                      Sign(rnoSigningKey,  POIPublicKey.From(rnoSigningKey). Id, COSEAlgorithm.ES256).    // owns the network and adds operators
+                      Sign(newIdentityKey, POIPublicKey.From(newIdentityKey).Id, COSEAlgorithm.ES512).    // DE*NEW holds its identity key
+                      Sign(gefSigningKey,  POIPublicKey.From(gefSigningKey). Id, COSEAlgorithm.ES256);    // owns DE*GEF
 
             var rn2 = rn1.ApplyChangeSet(cs);   // rn1 stays as it was
 

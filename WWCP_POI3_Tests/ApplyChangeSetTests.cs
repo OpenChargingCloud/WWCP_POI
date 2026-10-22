@@ -65,7 +65,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                    Address:                new Address("Hauptstraße", "07743", I18NString.Create(Languages.de, "Jena"), Country.Germany, HouseNumber: "1"),
                    GeoLocation:            GeoCoordinate.Parse(50.9271, 11.5892),
                    Telephone:              PhoneNumber.Parse("+49 3641 123456"),
-                   EMailAddress:           SimpleEMailAddress.Parse("info@example.org"),
+                   EMailAddress:           EMailAddress.Parse("Example Office <info@example.org>"),
                    Homepage:               URL.Parse("https://example.org"),
                    HotlinePhoneNumber:     PhoneNumber.Parse("+49 800 123456"),
                    TermsAndConditionsURL:  URL.Parse("https://example.org/terms"),

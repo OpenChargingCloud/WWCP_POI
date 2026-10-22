@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
@@ -24,6 +25,8 @@ using Newtonsoft.Json.Linq;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+using org.GraphDefined.Vanaheimr.Aegir;
+using org.GraphDefined.Vanaheimr.Hermod.Mail;
 
 #endregion
 
@@ -31,12 +34,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// A manufacturer of energy meters, embedded completely in its roaming network.
-    /// Energy meters name it by its identification. It has no runtime status.
+    /// The admin status of an energy meter manufacturer changed.
     /// </summary>
-    public sealed class EnergyMeterManufacturer : IEquatable<EnergyMeterManufacturer>,
-                                                  IComparable<EnergyMeterManufacturer>,
-                                                  IComparable
+    public delegate Task OnEnergyMeterManufacturerAdminStatusChangedDelegate(DateTimeOffset                                            Timestamp,
+                                                                                 EventTracking_Id                                          EventTrackingId,
+                                                                                 EnergyMeterManufacturer                               EnergyMeterManufacturer,
+                                                                                 Timestamped<EnergyMeterManufacturerAdminStatusType>   OldStatus,
+                                                                                 Timestamped<EnergyMeterManufacturerAdminStatusType>   NewStatus,
+                                                                                 Context?                                                  DataSource);
+
+    /// <summary>
+    /// The status of an energy meter manufacturer changed.
+    /// </summary>
+    public delegate Task OnEnergyMeterManufacturerStatusChangedDelegate(DateTimeOffset                                       Timestamp,
+                                                                            EventTracking_Id                                     EventTrackingId,
+                                                                            EnergyMeterManufacturer                          EnergyMeterManufacturer,
+                                                                            Timestamped<EnergyMeterManufacturerStatusType>   OldStatus,
+                                                                            Timestamped<EnergyMeterManufacturerStatusType>   NewStatus,
+                                                                            Context?                                             DataSource);
+
+
+    /// <summary>
+    /// A manufacturer of energy meters, embedded completely in its roaming network.
+    /// Energy meters name it by its identification.
+    /// </summary>
+    public sealed class EnergyMeterManufacturer : AImmutableEMobilityEntity<EnergyMeterManufacturer_Id,
+                                                                                EnergyMeterManufacturerAdminStatusType,
+                                                                                EnergyMeterManufacturerStatusType>,
+                                                      IEquatable<EnergyMeterManufacturer>,
+                                                      IComparable<EnergyMeterManufacturer>
     {
 
         #region Data
@@ -59,59 +85,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             /// <summary>
-            /// The property of its identification.
+            /// The property of its logos: at most one, as of a charging station operator.
             /// </summary>
-            public const String  Id                   = "@id";
+            public const String  Logos                = POIJSON.ContactKeys.Logos;
 
             /// <summary>
-            /// The property of its JSON-LD context, written unless it is embedded.
+            /// The property of the URI of its logo.
             /// </summary>
-            public const String  Context              = "@context";
-
-            /// <summary>
-            /// The property of its multilingual name.
-            /// </summary>
-            public const String  Name                 = "name";
-
-            /// <summary>
-            /// The property of its multilingual description.
-            /// </summary>
-            public const String  Description          = "description";
-
-            /// <summary>
-            /// The property of its data source.
-            /// </summary>
-            public const String  DataSource           = "dataSource";
+            public const String  LogoURI              = POIJSON.ContactKeys.LogoURI;
 
             /// <summary>
             /// The property of its address.
             /// </summary>
-            public const String  Address              = "address";
+            public const String  Address              = POIJSON.ContactKeys.Address;
+
+            /// <summary>
+            /// The property of its geographical location.
+            /// </summary>
+            public const String  GeoLocation          = POIJSON.ContactKeys.GeoLocation;
+
+            /// <summary>
+            /// The property of its telephone number.
+            /// </summary>
+            public const String  Telephone            = POIJSON.ContactKeys.Telephone;
+
+            /// <summary>
+            /// The property of its e-mail address.
+            /// </summary>
+            public const String  EMailAddress         = POIJSON.ContactKeys.EMailAddress;
 
             /// <summary>
             /// The property of its homepage.
             /// </summary>
-            public const String  Homepage             = "homepage";
+            public const String  Homepage             = POIJSON.ContactKeys.Homepage;
 
             /// <summary>
             /// The property of its hotline phone number.
             /// </summary>
-            public const String  HotlinePhoneNumber   = "hotline";
+            public const String  HotlinePhoneNumber   = POIJSON.ContactKeys.HotlinePhoneNumber;
 
             /// <summary>
-            /// The property of its creation timestamp, as of every entity.
+            /// The property of the URL of its terms and conditions.
             /// </summary>
-            public const String  Created              = "created";
+            public const String  TermsAndConditions   = POIJSON.ContactKeys.TermsAndConditions;
 
             /// <summary>
-            /// The property of its last change timestamp, as of every entity.
+            /// The property of its signing keys, as of a party.
             /// </summary>
-            public const String  LastChange           = "lastChange";
+            public const String  SigningKeys          = POIPartyKeys.SigningKeysProperty;
 
             /// <summary>
-            /// The property of its custom data, as of every entity.
+            /// The property of its identity keys, as of a party.
             /// </summary>
-            public const String  CustomData           = "customData";
+            public const String  IdentityKeys         = POIPartyKeys.IdentityKeysProperty;
 
         }
 
@@ -119,54 +145,60 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         /// <summary>
-        /// The identification of this manufacturer.
+        /// The URL of its logo.
         /// </summary>
-        public EnergyMeterManufacturer_Id  Id                    { get; }
-
-        /// <summary>
-        /// The multi-language name.
-        /// </summary>
-        public ImmutableI18NString         Name                  { get; }
-
-        /// <summary>
-        /// The multi-language description.
-        /// </summary>
-        public ImmutableI18NString         Description           { get; }
-
-        /// <summary>
-        /// The source of this information.
-        /// </summary>
-        public String?                     DataSource            { get; }
+        public URL?                          Logo                     { get; }
 
         /// <summary>
         /// The address of the headquarters.
         /// </summary>
-        public Address?                    Address               { get; }
+        public Address?                      Address                  { get; }
+
+        /// <summary>
+        /// The geographical location of the headquarters.
+        /// </summary>
+        public GeoCoordinate?                GeoLocation              { get; }
+
+        /// <summary>
+        /// The telephone number of its (sales) office.
+        /// </summary>
+        public PhoneNumber?                  Telephone                { get; }
+
+        /// <summary>
+        /// The e-mail address of its (sales) office, also with a name: "Example Office &lt;info@example.org&gt;".
+        /// </summary>
+        public EMailAddress?                 EMailAddress             { get; }
 
         /// <summary>
         /// The homepage.
         /// </summary>
-        public URL?                        Homepage              { get; }
+        public URL?                          Homepage                 { get; }
 
         /// <summary>
         /// The hotline phone number.
         /// </summary>
-        public PhoneNumber?                HotlinePhoneNumber    { get; }
+        public PhoneNumber?                  HotlinePhoneNumber       { get; }
 
         /// <summary>
-        /// When it was added to its roaming network.
+        /// The URL of its terms and conditions.
         /// </summary>
-        public DateTimeOffset              Created               { get; }
+        public URL?                          TermsAndConditionsURL    { get; }
 
         /// <summary>
-        /// When it was changed last.
+        /// The licenses of its data, ordered by their identifications.
         /// </summary>
-        public DateTimeOffset              LastChangeDate        { get; }
+        public ImmutableArray<DataLicense>   DataLicenses             { get; }
 
         /// <summary>
-        /// Optional custom data.
+        /// Its signing keys, as of a party; none unless given. A manufacturer is no party: the roaming network operator
+        /// changes them, as all of its registries.
         /// </summary>
-        public CustomDataNew               CustomData            { get; }
+        public ImmutableArray<POIPublicKey>  SigningKeys              { get; }
+
+        /// <summary>
+        /// Its identity keys, as of a party; none unless given.
+        /// </summary>
+        public ImmutableArray<POIPublicKey>  IdentityKeys             { get; }
 
         #endregion
 
@@ -175,129 +207,137 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Create a new energy meter manufacturer.
         /// </summary>
-        public EnergyMeterManufacturer(EnergyMeterManufacturer_Id  Id,
-                                       ImmutableI18NString?        Name                 = null,
-                                       ImmutableI18NString?        Description          = null,
-                                       Address?                    Address              = null,
-                                       URL?                        Homepage             = null,
-                                       PhoneNumber?                HotlinePhoneNumber   = null,
-                                       String?                     DataSource           = null,
-                                       DateTimeOffset?             Created              = null,
-                                       DateTimeOffset?             LastChange           = null,
-                                       CustomDataNew?              CustomData           = null)
+        public EnergyMeterManufacturer(EnergyMeterManufacturer_Id                              Id,
+                                           ImmutableI18NString?                                        Name                         = null,
+                                           ImmutableI18NString?                                        Description                  = null,
+
+                                           URL?                                                        Logo                         = null,
+                                           Address?                                                    Address                      = null,
+                                           GeoCoordinate?                                              GeoLocation                  = null,
+                                           PhoneNumber?                                                Telephone                    = null,
+                                           EMailAddress?                                               EMailAddress                 = null,
+                                           URL?                                                        Homepage                     = null,
+                                           PhoneNumber?                                                HotlinePhoneNumber           = null,
+                                           URL?                                                        TermsAndConditionsURL        = null,
+                                           IEnumerable<DataLicense>?                                   DataLicenses                 = null,
+
+                                           IEnumerable<POIPublicKey>?                                  IdentityKeys                 = null,
+                                           IEnumerable<POIPublicKey>?                                  SigningKeys                  = null,
+
+                                           Timestamped<EnergyMeterManufacturerAdminStatusType>?    InitialAdminStatus           = null,
+                                           Timestamped<EnergyMeterManufacturerStatusType>?         InitialStatus                = null,
+                                           UInt16?                                                     MaxAdminStatusScheduleSize   = null,
+                                           UInt16?                                                     MaxStatusScheduleSize        = null,
+
+                                           String?                                                     DataSource                   = null,
+                                           DateTimeOffset?                                             Created                      = null,
+                                           DateTimeOffset?                                             LastChange                   = null,
+
+                                           CustomDataNew?                                              CustomData                   = null,
+                                           UserDefinedDictionary?                                      InternalData                 = null)
+
+            : base(Id,
+                   Name ?? I18NString.Create($"Energy Meter Manufacturer '{Id}'"),
+                   Description,
+
+                   // Since its creation, unless told otherwise.
+                   InitialAdminStatus         ?? new Timestamped<EnergyMeterManufacturerAdminStatusType>(Created ?? Timestamp.Now, EnergyMeterManufacturerAdminStatusType.Operational),
+                   InitialStatus              ?? new Timestamped<EnergyMeterManufacturerStatusType>     (Created ?? Timestamp.Now, EnergyMeterManufacturerStatusType.Available),
+                   MaxAdminStatusScheduleSize ?? DefaultMaxAdminStatusScheduleSize,
+                   MaxStatusScheduleSize      ?? DefaultMaxStatusScheduleSize,
+
+                   DataSource,
+                   Created,
+                   LastChange,
+
+                   CustomData,
+                   InternalData)
+
         {
 
-            this.Id                  = Id;
-            this.Name                = Name        ?? ImmutableI18NString.Empty;
-            this.Description         = Description ?? ImmutableI18NString.Empty;
-            this.DataSource          = DataSource;
-            this.Address             = Address;
-            this.Homepage            = Homepage;
-            this.HotlinePhoneNumber  = HotlinePhoneNumber;
-            this.Created             = POIEntityMetadata.Timestamp(Created    ?? Timestamp.Now);
-            this.LastChangeDate      = POIEntityMetadata.Timestamp(LastChange ?? this.Created);
-            this.CustomData          = (CustomData ?? CustomDataNew.Empty).Clone();
+            this.Logo                   = Logo;
+            this.Address                = Address;
+            this.GeoLocation            = GeoLocation;
+            this.Telephone              = Telephone;
+            this.EMailAddress           = EMailAddress;
+            this.Homepage               = Homepage;
+            this.HotlinePhoneNumber     = HotlinePhoneNumber;
+            this.TermsAndConditionsURL  = TermsAndConditionsURL;
+
+            var dataLicenses = (DataLicenses ?? []).ToArray();
+
+            if (dataLicenses.Any(dataLicense => dataLicense is null))
+                throw new ArgumentException($"The data licenses of the energy meter manufacturer '{Id}' must not contain null entries!", nameof(DataLicenses));
+
+            if (dataLicenses.Select(dataLicense => dataLicense.Id).Distinct().Count() != dataLicenses.Length)
+                throw new ArgumentException($"A data license of the energy meter manufacturer '{Id}' must not be given twice!", nameof(DataLicenses));
+
+            this.DataLicenses           = [ .. dataLicenses.Ordered() ];
+
+            (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the energy meter manufacturer '{Id}'");
 
         }
 
         #endregion
 
 
-        #region ToJSON(Embedded = false, CustomEnergyMeterManufacturerSerializer = null)
+        #region Status events
+
+        private readonly Lock                                                      statusEventsLock  = new ();
+        private          OnEnergyMeterManufacturerAdminStatusChangedDelegate?  onAdminStatusChanged;
+        private          OnEnergyMeterManufacturerStatusChangedDelegate?       onStatusChanged;
 
         /// <summary>
-        /// Return the JSON representation of this energy meter manufacturer, as its roaming network embeds it.
+        /// An event fired whenever the admin status changed.
         /// </summary>
-        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        /// <param name="CustomEnergyMeterManufacturerSerializer">A delegate to serialize custom energy meter manufacturer JSON objects.</param>
-        public JObject ToJSON(Boolean                                                    Embedded                                  = false,
-                              CustomJObjectSerializerDelegate<EnergyMeterManufacturer>?  CustomEnergyMeterManufacturerSerializer   = null)
+        public event OnEnergyMeterManufacturerAdminStatusChangedDelegate? OnAdminStatusChanged
         {
+            add    { lock (statusEventsLock) { onAdminStatusChanged += value; ListenToAdminStatus(onAdminStatusChanged is not null); } }
+            remove { lock (statusEventsLock) { onAdminStatusChanged -= value; ListenToAdminStatus(onAdminStatusChanged is not null); } }
+        }
 
-            var json = new JObject(
-                           new JProperty(PropertyKeys.Id, Id.ToString())
-                       );
+        /// <summary>
+        /// An event fired whenever the status changed.
+        /// </summary>
+        public event OnEnergyMeterManufacturerStatusChangedDelegate? OnStatusChanged
+        {
+            add    { lock (statusEventsLock) { onStatusChanged += value; ListenToStatus(onStatusChanged is not null); } }
+            remove { lock (statusEventsLock) { onStatusChanged -= value; ListenToStatus(onStatusChanged is not null); } }
+        }
 
-            if (!Embedded)
-                json.Add(PropertyKeys.Context,             JSONLDContext);
+        /// <inheritdoc/>
+        protected override async Task OnAdminStatusScheduleChanged(DateTimeOffset                                           Timestamp,
+                                                                   EventTracking_Id                                         EventTrackingId,
+                                                                   Timestamped<EnergyMeterManufacturerAdminStatusType>  NewStatus,
+                                                                   Timestamped<EnergyMeterManufacturerAdminStatusType>  OldStatus,
+                                                                   Context?                                                 DataSource)
+        {
+            var onAdminStatusChanged = this.onAdminStatusChanged;
+            if (onAdminStatusChanged is not null)
+                await onAdminStatusChanged(Timestamp, EventTrackingId, this, OldStatus, NewStatus, DataSource);
+        }
 
-            if (Name.IsNotNullOrEmpty())
-                json.Add(PropertyKeys.Name,                Name.ToJSON());
-
-            if (Description.IsNotNullOrEmpty())
-                json.Add(PropertyKeys.Description,         Description.ToJSON());
-
-            if (DataSource is not null)
-                json.Add(PropertyKeys.DataSource,          DataSource);
-
-            if (Address is not null)
-                json.Add(PropertyKeys.Address,             Address.ToJSON(Embedded: true));
-
-            if (Homepage.HasValue)
-                json.Add(PropertyKeys.Homepage,            Homepage.Value.ToString());
-
-            if (HotlinePhoneNumber.HasValue)
-                json.Add(PropertyKeys.HotlinePhoneNumber,  HotlinePhoneNumber.Value.ToString());
-
-            POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
-
-            return CustomEnergyMeterManufacturerSerializer is not null
-                       ? CustomEnergyMeterManufacturerSerializer(this, json)
-                       : json;
-
+        /// <inheritdoc/>
+        protected override async Task OnStatusScheduleChanged(DateTimeOffset                                      Timestamp,
+                                                              EventTracking_Id                                    EventTrackingId,
+                                                              Timestamped<EnergyMeterManufacturerStatusType>  NewStatus,
+                                                              Timestamped<EnergyMeterManufacturerStatusType>  OldStatus,
+                                                              Context?                                            DataSource)
+        {
+            var onStatusChanged = this.onStatusChanged;
+            if (onStatusChanged is not null)
+                await onStatusChanged(Timestamp, EventTrackingId, this, OldStatus, NewStatus, DataSource);
         }
 
         #endregion
 
-        #region ToCBOR(Embedded = false, CustomEnergyMeterManufacturerSerializer = null)
 
-        /// <summary>
-        /// Return the CBOR representation of this energy meter manufacturer: the keys and values of its JSON representation.
-        /// </summary>
-        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        /// <param name="CustomEnergyMeterManufacturerSerializer">A delegate to serialize custom energy meter manufacturer CBOR values.</param>
-        public CBORValue ToCBOR(Boolean                                                  Embedded                                  = false,
-                                CustomCBORSerializerDelegate<EnergyMeterManufacturer>?   CustomEnergyMeterManufacturerSerializer   = null)
-        {
+        #region (protected override) ContentJSON()
 
-            var cbor = new CBORMap {
-                           { CBORValue.FromText(PropertyKeys.Id),                  CBORValue.FromText(Id.ToString()) }
-                       };
+        /// <inheritdoc/>
+        protected override JObject ContentJSON()
 
-            if (!Embedded)
-                cbor.Add(CBORValue.FromText(PropertyKeys.Context),             CBORValue.FromText(JSONLDContext));
-
-            if (Name.IsNotNullOrEmpty())
-                cbor.Add(CBORValue.FromText(PropertyKeys.Name),                Name.       ToCBOR());
-
-            if (Description.IsNotNullOrEmpty())
-                cbor.Add(CBORValue.FromText(PropertyKeys.Description),         Description.ToCBOR());
-
-            if (DataSource is not null)
-                cbor.Add(CBORValue.FromText(PropertyKeys.DataSource),          CBORValue.FromText(DataSource));
-
-            // The address has no CBOR representation of its own: it is the keys and values of its JSON representation.
-            if (Address is not null)
-                cbor.Add(CBORValue.FromText(PropertyKeys.Address),             CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
-
-            if (Homepage.HasValue)
-                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),            CBORValue.FromText(Homepage.Value.ToString()));
-
-            if (HotlinePhoneNumber.HasValue)
-                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),  CBORValue.FromText(HotlinePhoneNumber.Value.ToString()));
-
-            // Always part of the content, as in the JSON representation; custom data is JSON.
-            cbor.Add(CBORValue.FromText(PropertyKeys.Created),                 CBORValue.FromText(Created.       ToISO8601()));
-            cbor.Add(CBORValue.FromText(PropertyKeys.LastChange),              CBORValue.FromText(LastChangeDate.ToISO8601()));
-
-            if (CustomData.HasValues)
-                cbor.Add(CBORValue.FromText(PropertyKeys.CustomData),          CBORJSON.ToCBOR(CustomData.ToJObject()));
-
-            return CustomEnergyMeterManufacturerSerializer is not null
-                       ? CustomEnergyMeterManufacturerSerializer(this, cbor)
-                       : cbor;
-
-        }
+            => ToJSON(Embedded: true);
 
         #endregion
 
@@ -309,9 +349,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="EnergyMeterManufacturer">The parsed energy meter manufacturer.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
-        public static Boolean TryParse(JObject                                            JSON,
+        public static Boolean TryParse(JObject                                                JSON,
                                        [NotNullWhen(true)]  out EnergyMeterManufacturer?  EnergyMeterManufacturer,
-                                       [NotNullWhen(false)] out String?                   ErrorResponse)
+                                       [NotNullWhen(false)] out String?                       ErrorResponse)
         {
 
             EnergyMeterManufacturer = null;
@@ -319,7 +359,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (!JSON.ParseMandatory(PropertyKeys.Id,
+                if (!JSON.ParseMandatory(BasePropertyKeys.Id,
                                          "energy meter manufacturer identification",
                                          EnergyMeterManufacturer_Id.TryParse,
                                          out EnergyMeterManufacturer_Id id,
@@ -328,22 +368,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (JSON[PropertyKeys.Context] is JToken context &&
+                if (JSON[BasePropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
                 {
                     ErrorResponse = $"The JSON-LD context of the energy meter manufacturer '{id}' must be '{JSONLDContext}'!";
                     return false;
                 }
 
-                if (!POIJSON.TryParseI18N   (JSON, PropertyKeys.Name,                "manufacturer name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N   (JSON, PropertyKeys.Description,         "manufacturer description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString (JSON, PropertyKeys.DataSource,          "data source",               out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseAddress(JSON, PropertyKeys.Address,             "address",                   out var address,      out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, PropertyKeys.Homepage,            "homepage",                  URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                if (!POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Name,            "manufacturer name",         out var name,         out ErrorResponse) ||
+                    !POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Description,     "manufacturer description",  out var description,  out ErrorResponse) ||
+                    !POIJSON.TryParseString (JSON, BasePropertyKeys.DataSource,      "data source",               out var dataSource,   out ErrorResponse))
                 {
                     return false;
                 }
+
+                if (!POIJSON.TryParseContact(JSON,
+                                             out var logo,
+                                             out var address,
+                                             out var geoLocation,
+                                             out var telephone,
+                                             out var eMailAddress,
+                                             out var homepage,
+                                             out var hotline,
+                                             out var termsAndConditions,
+                                             out var dataLicenses,
+                                             out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
@@ -355,15 +410,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 EnergyMeterManufacturer = new EnergyMeterManufacturer(id,
-                                                                      name,
-                                                                      description,
-                                                                      address,
-                                                                      homepage,
-                                                                      hotline,
-                                                                      dataSource,
-                                                                      created,
-                                                                      lastChange,
-                                                                      customData);
+                                                                              name,
+                                                                              description,
+                                                                              logo,
+                                                                              address,
+                                                                              geoLocation,
+                                                                              telephone,
+                                                                              eMailAddress,
+                                                                              homepage,
+                                                                              hotline,
+                                                                              termsAndConditions,
+                                                                              dataLicenses,
+                                                                              IdentityKeys:  identityKeys,
+                                                                              SigningKeys:   signingKeys,
+                                                                              DataSource:  dataSource,
+                                                                              Created:     created,
+                                                                              LastChange:  lastChange,
+                                                                              CustomData:  customData);
+
+                if (!TryCheckETagsOf(JSON, EnergyMeterManufacturer, out ErrorResponse))
+                {
+                    EnergyMeterManufacturer = null;
+                    return false;
+                }
 
                 ErrorResponse = null;
                 return true;
@@ -372,13 +441,92 @@ namespace cloud.charging.open.protocols.WWCP.POI
             catch (Exception e)
             {
                 EnergyMeterManufacturer  = null;
-                ErrorResponse            = "The given JSON representation of an energy meter manufacturer is invalid: " + e.Message;
+                ErrorResponse                = "The given JSON representation of an energy meter manufacturer is invalid: " + e.Message;
                 return false;
             }
 
         }
 
         #endregion
+
+        #region ToJSON(Embedded = false, ...)
+
+        /// <summary>
+        /// Return the JSON representation of this energy meter manufacturer; embedded, as its roaming network embeds it.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
+        /// <param name="CustomEnergyMeterManufacturerSerializer">A delegate to serialize custom energy meter manufacturer JSON objects.</param>
+        public JObject ToJSON(Boolean                                                        Embedded                                      = false,
+                              Boolean                                                        IncludeETags                                  = false,
+                              ETagDigestEncoding?                                            ETagDigestEncoding                            = null,
+                              CustomJObjectSerializerDelegate<EnergyMeterManufacturer>?  CustomEnergyMeterManufacturerSerializer   = null)
+        {
+
+            var json = new JObject(
+                           new JProperty(BasePropertyKeys.Id,  Id.ToString())
+                       );
+
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,          JSONLDContext);
+
+            if (Name.IsNotNullOrEmpty())
+                json.Add(BasePropertyKeys.Name,             Name.ToJSON());
+
+            if (Description.IsNotNullOrEmpty())
+                json.Add(BasePropertyKeys.Description,      Description.ToJSON());
+
+            if (DataSource is not null)
+                json.Add(BasePropertyKeys.DataSource,       DataSource);
+
+            // No data licenses, no property: as the roaming network and the charging station operators write them.
+            if (DataLicenses.Length > 0)
+                json.Add(BasePropertyKeys.DataLicenses,     DataLicenses.ToPOIJSON());
+
+            if (Address is not null)
+                json.Add(PropertyKeys.Address,              Address.ToJSON(Embedded: true));
+
+            if (Logo.HasValue)
+                json.Add(PropertyKeys.Logos,                new JArray(new JObject(new JProperty(PropertyKeys.LogoURI, Logo.Value.ToString()))));
+
+            if (GeoLocation.HasValue)
+                json.Add(PropertyKeys.GeoLocation,          GeoLocation.Value.ToJSON(Embedded: true));
+
+            if (Telephone.HasValue)
+                json.Add(PropertyKeys.Telephone,            Telephone.Value.ToString());
+
+            if (EMailAddress is not null)
+                json.Add(PropertyKeys.EMailAddress,         EMailAddress.ToString());
+
+            if (Homepage.HasValue)
+                json.Add(PropertyKeys.Homepage,             Homepage.Value.ToString());
+
+            if (HotlinePhoneNumber.HasValue)
+                json.Add(PropertyKeys.HotlinePhoneNumber,   HotlinePhoneNumber.Value.ToString());
+
+            if (TermsAndConditionsURL.HasValue)
+                json.Add(PropertyKeys.TermsAndConditions,   TermsAndConditionsURL.Value.ToString());
+
+            if (SigningKeys.Length > 0)
+                json.Add(PropertyKeys.SigningKeys,          new JArray(SigningKeys. Select(key => key.ToJSON(Embedded: true))));
+
+            if (IdentityKeys.Length > 0)
+                json.Add(PropertyKeys.IdentityKeys,         new JArray(IdentityKeys.Select(key => key.ToJSON(Embedded: true))));
+
+            POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
+
+            if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
+                json.Add(eTags);
+
+            return CustomEnergyMeterManufacturerSerializer is not null
+                       ? CustomEnergyMeterManufacturerSerializer(this, json)
+                       : json;
+
+        }
+
+        #endregion
+
 
         #region (static) TryParse(CBOR, out EnergyMeterManufacturer, out ErrorResponse)
 
@@ -389,9 +537,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="CBOR">The CBOR to parse.</param>
         /// <param name="EnergyMeterManufacturer">The parsed energy meter manufacturer.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
-        public static Boolean TryParse(CBORValue                                          CBOR,
+        public static Boolean TryParse(CBORValue                                              CBOR,
                                        [NotNullWhen(true)]  out EnergyMeterManufacturer?  EnergyMeterManufacturer,
-                                       [NotNullWhen(false)] out String?                   ErrorResponse)
+                                       [NotNullWhen(false)] out String?                       ErrorResponse)
         {
 
             EnergyMeterManufacturer = null;
@@ -405,7 +553,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!CBOR.ParseMandatory(PropertyKeys.Id,
+                if (!CBOR.ParseMandatory(BasePropertyKeys.Id,
                                          "energy meter manufacturer identification",
                                          EnergyMeterManufacturer_Id.TryParse,
                                          out EnergyMeterManufacturer_Id id,
@@ -414,44 +562,66 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (CBOR.TryGetValue(CBORValue.FromText(PropertyKeys.Context), out var context) &&
-                    !(context.TryGetText(out var contextText) && contextText == JSONLDContext))
+                if (CBOR.TryGetValue(CBORValue.FromText(BasePropertyKeys.Context), out var contextCBOR) &&
+                    !(contextCBOR.TryGetText(out var context) && context == JSONLDContext))
                 {
                     ErrorResponse = $"The JSON-LD context of the energy meter manufacturer '{id}' must be '{JSONLDContext}'!";
                     return false;
                 }
 
-                CBOR.ParseOptionalText(PropertyKeys.DataSource, "data source", out var dataSource, out ErrorResponse);
+                CBOR.ParseOptional    (BasePropertyKeys.Name,         "manufacturer name",         I18NString.TryParse, out I18NString? name,         out ErrorResponse);
                 if (ErrorResponse is not null)
                     return false;
 
-                // What has no CBOR parser of its own is read as its JSON, with the parsers of the JSON representation:
-                // the multilingual texts, the address, the homepage, the hotline and the metadata.
-                var json = new JObject(
-                               new JProperty(PropertyKeys.Id, id.ToString())
-                           );
+                CBOR.ParseOptional    (BasePropertyKeys.Description,  "manufacturer description",  I18NString.TryParse, out I18NString? description,  out ErrorResponse);
+                if (ErrorResponse is not null)
+                    return false;
 
-                foreach (var key in new[] { PropertyKeys.Name,
-                                            PropertyKeys.Description,
+                CBOR.ParseOptionalText(BasePropertyKeys.DataSource,   "data source",                                    out var         dataSource,   out ErrorResponse);
+                if (ErrorResponse is not null)
+                    return false;
+
+                // What has no CBOR representation of its own is read as its JSON, with the parsers of the JSON
+                // representation: the contact data and the data licenses, the keys and the metadata.
+                var json = new JObject();
+
+                foreach (var key in new[] { PropertyKeys.Logos,
                                             PropertyKeys.Address,
+                                            PropertyKeys.GeoLocation,
+                                            PropertyKeys.Telephone,
+                                            PropertyKeys.EMailAddress,
                                             PropertyKeys.Homepage,
                                             PropertyKeys.HotlinePhoneNumber,
-                                            PropertyKeys.Created,
-                                            PropertyKeys.LastChange,
-                                            PropertyKeys.CustomData })
+                                            PropertyKeys.TermsAndConditions,
+                                            BasePropertyKeys.DataLicenses,
+                                            BasePropertyKeys.DataLicenseIds,
+                                            PropertyKeys.SigningKeys,
+                                            PropertyKeys.IdentityKeys,
+                                            BasePropertyKeys.Created,
+                                            BasePropertyKeys.LastChange,
+                                            BasePropertyKeys.CustomData })
                 {
                     if (CBOR.TryGetValue(CBORValue.FromText(key), out var value))
                         json.Add(key, CBORJSON.ToJSON(value));
                 }
 
-                if (!POIJSON.TryParseI18N   (json, PropertyKeys.Name,                "manufacturer name",         out var name,         out ErrorResponse) ||
-                    !POIJSON.TryParseI18N   (json, PropertyKeys.Description,         "manufacturer description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseAddress(json, PropertyKeys.Address,             "address",                   out var address,      out ErrorResponse) ||
-                    !POIJSON.TryParseText   (json, PropertyKeys.Homepage,            "homepage",                  URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (json, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                if (!POIJSON.TryParseContact(json,
+                                             out var logo,
+                                             out var address,
+                                             out var geoLocation,
+                                             out var telephone,
+                                             out var eMailAddress,
+                                             out var homepage,
+                                             out var hotline,
+                                             out var termsAndConditions,
+                                             out var dataLicenses,
+                                             out ErrorResponse))
                 {
                     return false;
                 }
+
+                if (!POIPartyKeys.TryParse(json, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
 
                 if (!POIEntityMetadata.TryParse(json,
                                                 out var created,
@@ -463,15 +633,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 EnergyMeterManufacturer = new EnergyMeterManufacturer(id,
-                                                                      name,
-                                                                      description,
-                                                                      address,
-                                                                      homepage,
-                                                                      hotline,
-                                                                      dataSource,
-                                                                      created,
-                                                                      lastChange,
-                                                                      customData);
+                                                                              name,
+                                                                              description,
+                                                                              logo,
+                                                                              address,
+                                                                              geoLocation,
+                                                                              telephone,
+                                                                              eMailAddress,
+                                                                              homepage,
+                                                                              hotline,
+                                                                              termsAndConditions,
+                                                                              dataLicenses,
+                                                                              IdentityKeys:  identityKeys,
+                                                                              SigningKeys:   signingKeys,
+                                                                              DataSource:  dataSource,
+                                                                              Created:     created,
+                                                                              LastChange:  lastChange,
+                                                                              CustomData:  customData);
+
+                if (!TryCheckETagsOf(CBOR, EnergyMeterManufacturer, out ErrorResponse))
+                {
+                    EnergyMeterManufacturer = null;
+                    return false;
+                }
 
                 ErrorResponse = null;
                 return true;
@@ -480,9 +664,95 @@ namespace cloud.charging.open.protocols.WWCP.POI
             catch (Exception e)
             {
                 EnergyMeterManufacturer  = null;
-                ErrorResponse            = "The given CBOR representation of an energy meter manufacturer is invalid: " + e.Message;
+                ErrorResponse                = "The given CBOR representation of an energy meter manufacturer is invalid: " + e.Message;
                 return false;
             }
+
+        }
+
+        #endregion
+
+        #region ToCBOR(Embedded = false, ...)
+
+        /// <summary>
+        /// Return the CBOR representation of this energy meter manufacturer: the keys and values of its JSON representation.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="CustomEnergyMeterManufacturerSerializer">A delegate to serialize custom energy meter manufacturer CBOR maps.</param>
+        public CBORValue ToCBOR(Boolean                                                      Embedded                                      = false,
+                                Boolean                                                      IncludeETags                                  = false,
+                                CustomCBORSerializerDelegate<EnergyMeterManufacturer>?   CustomEnergyMeterManufacturerSerializer   = null)
+        {
+
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(BasePropertyKeys.Id),           CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Context),          CBORValue.FromText(JSONLDContext));
+
+            if (Name.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Name),             Name.       ToCBOR());
+
+            if (Description.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Description),      Description.ToCBOR());
+
+            if (DataSource is not null)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),       CBORValue.FromText(DataSource));
+
+            if (DataLicenses.Length > 0)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataLicenses),     DataLicenses.ToPOICBOR());
+
+            // The address, the geo location and the keys have no CBOR representation of their own: they are written as
+            // the keys and values of their JSON representation.
+            if (Address is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Address),              CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
+
+            if (Logo.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Logos),
+                         CBORValue.FromArray(new CBORMap {
+                             { CBORValue.FromText(PropertyKeys.LogoURI),                CBORValue.FromText(Logo.Value.ToString()) }
+                         }));
+
+            if (GeoLocation.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.GeoLocation),          CBORJSON.ToCBOR(GeoLocation.Value.ToJSON(Embedded: true)));
+
+            if (Telephone.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Telephone),            CBORValue.FromText(Telephone.Value.ToString()));
+
+            if (EMailAddress is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.EMailAddress),         CBORValue.FromText(EMailAddress.ToString()));
+
+            if (Homepage.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),             CBORValue.FromText(Homepage.Value.ToString()));
+
+            if (HotlinePhoneNumber.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),   CBORValue.FromText(HotlinePhoneNumber.Value.ToString()));
+
+            if (TermsAndConditionsURL.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.TermsAndConditions),   CBORValue.FromText(TermsAndConditionsURL.Value.ToString()));
+
+            if (SigningKeys.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.SigningKeys),
+                         CBORValue.FromArray(SigningKeys. Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
+
+            if (IdentityKeys.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.IdentityKeys),
+                         CBORValue.FromArray(IdentityKeys.Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
+
+            // Always part of the content, as in the JSON representation; custom data is JSON.
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),              CBORValue.FromText(Created.       ToISO8601()));
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.LastChange),           CBORValue.FromText(LastChangeDate.ToISO8601()));
+
+            if (CustomData.HasValues)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),       CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            AddETagsTo(cbor, IncludeETags);
+
+            return CustomEnergyMeterManufacturerSerializer is not null
+                       ? CustomEnergyMeterManufacturerSerializer(this, cbor)
+                       : cbor;
 
         }
 
@@ -507,7 +777,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => !(Manufacturer1 == Manufacturer2);
 
         /// <inheritdoc/>
-        public Int32 CompareTo(Object? Object)
+        public override Int32 CompareTo(Object? Object)
 
             => Object is EnergyMeterManufacturer manufacturer
                    ? CompareTo(manufacturer)

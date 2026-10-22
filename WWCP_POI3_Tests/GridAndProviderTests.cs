@@ -300,6 +300,47 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region The_contact_data_of_a_provider_is_changed_by_change_sets()
+
+        /// <summary>
+        /// An e-mobility provider has the contact data and data licenses of a charging station operator: its logo, geo
+        /// location, telephone number, e-mail address, also with a name, and the URL of its terms and conditions.
+        /// </summary>
+        [Test]
+        public void The_contact_data_of_a_provider_is_changed_by_change_sets()
+        {
+
+            var rn1       = NewNetwork();
+            var provider  = rn1.EMobilityProviders.Single();
+
+            var rn2       = Apply(rn1,
+                                  RoamingNetworkChange.UpdateProperty(provider, "logos",               null, new JArray(new JObject(new JProperty("uri", "https://gdf.example/logo.png")))),
+                                  RoamingNetworkChange.UpdateProperty(provider, "geoLocation",         null, new JObject(new JProperty("lat", 52.52), new JProperty("lng", 13.405))),
+                                  RoamingNetworkChange.UpdateProperty(provider, "telephone",           null, "+49 30 1234567"),
+                                  RoamingNetworkChange.UpdateProperty(provider, "eMailAddress",        null, "GDF Service <service@gdf.example>"),
+                                  RoamingNetworkChange.UpdateProperty(provider, "termsAndConditions",  null, "https://gdf.example/terms"));
+
+            var changed   = rn2.EMobilityProviders.Single();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(changed.Logo?.ToString(),                   Is.EqualTo("https://gdf.example/logo.png"));
+                Assert.That(changed.GeoLocation?.Latitude.Value,        Is.EqualTo(52.52));
+                Assert.That(changed.Telephone?.ToString(),              Is.EqualTo("+49 30 1234567"));
+                Assert.That(changed.EMailAddress?.ToString(),           Is.EqualTo("GDF Service <service@gdf.example>"));
+                Assert.That(changed.EMailAddress?.Address.ToString(),   Is.EqualTo("service@gdf.example"));
+                Assert.That(changed.TermsAndConditionsURL?.ToString(),  Is.EqualTo("https://gdf.example/terms"));
+
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(changed, "eMailAddress", null, "no e-mail address")),
+                            Throws.ArgumentException.With.Message.Contains("e-mail address"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Objects_without_timestamps_refuse_them()
 
         /// <summary>

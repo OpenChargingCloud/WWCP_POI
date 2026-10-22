@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
@@ -24,6 +25,8 @@ using Newtonsoft.Json.Linq;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+using org.GraphDefined.Vanaheimr.Aegir;
+using org.GraphDefined.Vanaheimr.Hermod.Mail;
 
 #endregion
 
@@ -82,19 +85,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             /// <summary>
+            /// The property of its logos: at most one, as of a charging station operator.
+            /// </summary>
+            public const String  Logos                = POIJSON.ContactKeys.Logos;
+
+            /// <summary>
+            /// The property of the URI of its logo.
+            /// </summary>
+            public const String  LogoURI              = POIJSON.ContactKeys.LogoURI;
+
+            /// <summary>
             /// The property of its address.
             /// </summary>
-            public const String  Address              = "address";
+            public const String  Address              = POIJSON.ContactKeys.Address;
+
+            /// <summary>
+            /// The property of its geographical location.
+            /// </summary>
+            public const String  GeoLocation          = POIJSON.ContactKeys.GeoLocation;
+
+            /// <summary>
+            /// The property of its telephone number.
+            /// </summary>
+            public const String  Telephone            = POIJSON.ContactKeys.Telephone;
+
+            /// <summary>
+            /// The property of its e-mail address.
+            /// </summary>
+            public const String  EMailAddress         = POIJSON.ContactKeys.EMailAddress;
 
             /// <summary>
             /// The property of its homepage.
             /// </summary>
-            public const String  Homepage             = "homepage";
+            public const String  Homepage             = POIJSON.ContactKeys.Homepage;
 
             /// <summary>
             /// The property of its hotline phone number.
             /// </summary>
-            public const String  HotlinePhoneNumber   = "hotline";
+            public const String  HotlinePhoneNumber   = POIJSON.ContactKeys.HotlinePhoneNumber;
+
+            /// <summary>
+            /// The property of the URL of its terms and conditions.
+            /// </summary>
+            public const String  TermsAndConditions   = POIJSON.ContactKeys.TermsAndConditions;
+
+            /// <summary>
+            /// The property of its signing keys, as of a party.
+            /// </summary>
+            public const String  SigningKeys          = POIPartyKeys.SigningKeysProperty;
+
+            /// <summary>
+            /// The property of its identity keys, as of a party.
+            /// </summary>
+            public const String  IdentityKeys         = POIPartyKeys.IdentityKeysProperty;
 
         }
 
@@ -102,19 +145,60 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         /// <summary>
+        /// The URL of its logo.
+        /// </summary>
+        public URL?                          Logo                     { get; }
+
+        /// <summary>
         /// The address of the headquarters.
         /// </summary>
-        public Address?      Address               { get; }
+        public Address?                      Address                  { get; }
+
+        /// <summary>
+        /// The geographical location of the headquarters.
+        /// </summary>
+        public GeoCoordinate?                GeoLocation              { get; }
+
+        /// <summary>
+        /// The telephone number of its (sales) office.
+        /// </summary>
+        public PhoneNumber?                  Telephone                { get; }
+
+        /// <summary>
+        /// The e-mail address of its (sales) office, also with a name: "Example Office &lt;info@example.org&gt;".
+        /// </summary>
+        public EMailAddress?                 EMailAddress             { get; }
 
         /// <summary>
         /// The homepage.
         /// </summary>
-        public URL?          Homepage              { get; }
+        public URL?                          Homepage                 { get; }
 
         /// <summary>
         /// The hotline phone number.
         /// </summary>
-        public PhoneNumber?  HotlinePhoneNumber    { get; }
+        public PhoneNumber?                  HotlinePhoneNumber       { get; }
+
+        /// <summary>
+        /// The URL of its terms and conditions.
+        /// </summary>
+        public URL?                          TermsAndConditionsURL    { get; }
+
+        /// <summary>
+        /// The licenses of its data, ordered by their identifications.
+        /// </summary>
+        public ImmutableArray<DataLicense>   DataLicenses             { get; }
+
+        /// <summary>
+        /// Its signing keys, as of a party; none unless given. A manufacturer is no party: the roaming network operator
+        /// changes them, as all of its registries.
+        /// </summary>
+        public ImmutableArray<POIPublicKey>  SigningKeys              { get; }
+
+        /// <summary>
+        /// Its identity keys, as of a party; none unless given.
+        /// </summary>
+        public ImmutableArray<POIPublicKey>  IdentityKeys             { get; }
 
         #endregion
 
@@ -126,9 +210,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ChargingStationManufacturer(ChargingStationManufacturer_Id                              Id,
                                            I18NString?                                                 Name                         = null,
                                            I18NString?                                                 Description                  = null,
+
+                                           URL?                                                        Logo                         = null,
                                            Address?                                                    Address                      = null,
+                                           GeoCoordinate?                                              GeoLocation                  = null,
+                                           PhoneNumber?                                                Telephone                    = null,
+                                           EMailAddress?                                               EMailAddress                 = null,
                                            URL?                                                        Homepage                     = null,
                                            PhoneNumber?                                                HotlinePhoneNumber           = null,
+                                           URL?                                                        TermsAndConditionsURL        = null,
+                                           IEnumerable<DataLicense>?                                   DataLicenses                 = null,
+
+                                           IEnumerable<POIPublicKey>?                                  IdentityKeys                 = null,
+                                           IEnumerable<POIPublicKey>?                                  SigningKeys                  = null,
 
                                            Timestamped<ChargingStationManufacturerAdminStatusType>?    InitialAdminStatus           = null,
                                            Timestamped<ChargingStationManufacturerStatusType>?         InitialStatus                = null,
@@ -143,7 +237,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            UserDefinedDictionary?                                      InternalData                 = null)
 
             : base(Id,
-                   Name,
+                   Name ?? I18NString.Create($"Charging Station Manufacturer '{Id}'"),
                    Description,
 
                    // Since its creation, unless told otherwise.
@@ -161,9 +255,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         {
 
-            this.Address             = Address;
-            this.Homepage            = Homepage;
-            this.HotlinePhoneNumber  = HotlinePhoneNumber;
+            this.Logo                   = Logo;
+            this.Address                = Address;
+            this.GeoLocation            = GeoLocation;
+            this.Telephone              = Telephone;
+            this.EMailAddress           = EMailAddress;
+            this.Homepage               = Homepage;
+            this.HotlinePhoneNumber     = HotlinePhoneNumber;
+            this.TermsAndConditionsURL  = TermsAndConditionsURL;
+
+            var dataLicenses = (DataLicenses ?? []).ToArray();
+
+            if (dataLicenses.Any(dataLicense => dataLicense is null))
+                throw new ArgumentException($"The data licenses of the charging station manufacturer '{Id}' must not contain null entries!", nameof(DataLicenses));
+
+            if (dataLicenses.Select(dataLicense => dataLicense.Id).Distinct().Count() != dataLicenses.Length)
+                throw new ArgumentException($"A data license of the charging station manufacturer '{Id}' must not be given twice!", nameof(DataLicenses));
+
+            this.DataLicenses           = [ .. dataLicenses.Ordered() ];
+
+            (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the charging station manufacturer '{Id}'");
 
         }
 
@@ -230,115 +341,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region ToJSON(Embedded = false, ...)
-
-        /// <summary>
-        /// Return the JSON representation of this charging station manufacturer; embedded, as its roaming network embeds it.
-        /// </summary>
-        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
-        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
-        /// <param name="CustomChargingStationManufacturerSerializer">A delegate to serialize custom charging station manufacturer JSON objects.</param>
-        public JObject ToJSON(Boolean                                                        Embedded                                      = false,
-                              Boolean                                                        IncludeETags                                  = false,
-                              ETagDigestEncoding?                                            ETagDigestEncoding                            = null,
-                              CustomJObjectSerializerDelegate<ChargingStationManufacturer>?  CustomChargingStationManufacturerSerializer   = null)
-        {
-
-            var json = new JObject(
-                           new JProperty(BasePropertyKeys.Id,  Id.ToString())
-                       );
-
-            if (!Embedded)
-                json.Add(BasePropertyKeys.Context,          JSONLDContext);
-
-            if (Name.IsNotNullOrEmpty())
-                json.Add(BasePropertyKeys.Name,             Name.ToJSON());
-
-            if (Description.IsNotNullOrEmpty())
-                json.Add(BasePropertyKeys.Description,      Description.ToJSON());
-
-            if (DataSource is not null)
-                json.Add(BasePropertyKeys.DataSource,       DataSource);
-
-            if (Address is not null)
-                json.Add(PropertyKeys.Address,              Address.ToJSON(Embedded: true));
-
-            if (Homepage.HasValue)
-                json.Add(PropertyKeys.Homepage,             Homepage.Value.ToString());
-
-            if (HotlinePhoneNumber.HasValue)
-                json.Add(PropertyKeys.HotlinePhoneNumber,   HotlinePhoneNumber.Value.ToString());
-
-            POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
-
-            if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
-                json.Add(eTags);
-
-            return CustomChargingStationManufacturerSerializer is not null
-                       ? CustomChargingStationManufacturerSerializer(this, json)
-                       : json;
-
-        }
-
-        #endregion
-
-        #region ToCBOR(Embedded = false, ...)
-
-        /// <summary>
-        /// Return the CBOR representation of this charging station manufacturer: the keys and values of its JSON representation.
-        /// </summary>
-        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
-        /// <param name="CustomChargingStationManufacturerSerializer">A delegate to serialize custom charging station manufacturer CBOR maps.</param>
-        public CBORValue ToCBOR(Boolean                                                      Embedded                                      = false,
-                                Boolean                                                      IncludeETags                                  = false,
-                                CustomCBORSerializerDelegate<ChargingStationManufacturer>?   CustomChargingStationManufacturerSerializer   = null)
-        {
-
-            var cbor = new CBORMap {
-                           { CBORValue.FromText(BasePropertyKeys.Id),           CBORValue.FromText(Id.ToString()) }
-                       };
-
-            if (!Embedded)
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.Context),          CBORValue.FromText(JSONLDContext));
-
-            if (Name.IsNotNullOrEmpty())
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.Name),             Name.       ToCBOR());
-
-            if (Description.IsNotNullOrEmpty())
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.Description),      Description.ToCBOR());
-
-            if (DataSource is not null)
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),       CBORValue.FromText(DataSource));
-
-            // The address has no CBOR representation of its own: it is written as the keys and values of its JSON representation.
-            if (Address is not null)
-                cbor.Add(CBORValue.FromText(PropertyKeys.Address),              CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
-
-            if (Homepage.HasValue)
-                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),             CBORValue.FromText(Homepage.Value.ToString()));
-
-            if (HotlinePhoneNumber.HasValue)
-                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),   CBORValue.FromText(HotlinePhoneNumber.Value.ToString()));
-
-            // Always part of the content, as in the JSON representation; custom data is JSON.
-            cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),              CBORValue.FromText(Created.       ToISO8601()));
-            cbor.Add(CBORValue.FromText(BasePropertyKeys.LastChange),           CBORValue.FromText(LastChangeDate.ToISO8601()));
-
-            if (CustomData.HasValues)
-                cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),       CBORJSON.ToCBOR(CustomData.ToJObject()));
-
-            AddETagsTo(cbor, IncludeETags);
-
-            return CustomChargingStationManufacturerSerializer is not null
-                       ? CustomChargingStationManufacturerSerializer(this, cbor)
-                       : cbor;
-
-        }
-
-        #endregion
-
         #region (static) TryParse(JSON, out ChargingStationManufacturer, out ErrorResponse)
 
         /// <summary>
@@ -375,13 +377,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Name,            "manufacturer name",         out var name,         out ErrorResponse) ||
                     !POIJSON.TryParseI18N   (JSON, BasePropertyKeys.Description,     "manufacturer description",  out var description,  out ErrorResponse) ||
-                    !POIJSON.TryParseString (JSON, BasePropertyKeys.DataSource,      "data source",               out var dataSource,   out ErrorResponse) ||
-                    !POIJSON.TryParseAddress(JSON, PropertyKeys.Address,             "address",                   out var address,      out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, PropertyKeys.Homepage,            "homepage",                  URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                    !POIJSON.TryParseString (JSON, BasePropertyKeys.DataSource,      "data source",               out var dataSource,   out ErrorResponse))
                 {
                     return false;
                 }
+
+                if (!POIJSON.TryParseContact(JSON,
+                                             out var logo,
+                                             out var address,
+                                             out var geoLocation,
+                                             out var telephone,
+                                             out var eMailAddress,
+                                             out var homepage,
+                                             out var hotline,
+                                             out var termsAndConditions,
+                                             out var dataLicenses,
+                                             out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
 
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
@@ -395,9 +412,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ChargingStationManufacturer = new ChargingStationManufacturer(id,
                                                                               name,
                                                                               description,
+                                                                              logo,
                                                                               address,
+                                                                              geoLocation,
+                                                                              telephone,
+                                                                              eMailAddress,
                                                                               homepage,
                                                                               hotline,
+                                                                              termsAndConditions,
+                                                                              dataLicenses,
+                                                                              IdentityKeys:  identityKeys,
+                                                                              SigningKeys:   signingKeys,
                                                                               DataSource:  dataSource,
                                                                               Created:     created,
                                                                               LastChange:  lastChange,
@@ -423,6 +448,85 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         #endregion
+
+        #region ToJSON(Embedded = false, ...)
+
+        /// <summary>
+        /// Return the JSON representation of this charging station manufacturer; embedded, as its roaming network embeds it.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
+        /// <param name="CustomChargingStationManufacturerSerializer">A delegate to serialize custom charging station manufacturer JSON objects.</param>
+        public JObject ToJSON(Boolean                                                        Embedded                                      = false,
+                              Boolean                                                        IncludeETags                                  = false,
+                              ETagDigestEncoding?                                            ETagDigestEncoding                            = null,
+                              CustomJObjectSerializerDelegate<ChargingStationManufacturer>?  CustomChargingStationManufacturerSerializer   = null)
+        {
+
+            var json = new JObject(
+                           new JProperty(BasePropertyKeys.Id,  Id.ToString())
+                       );
+
+            if (!Embedded)
+                json.Add(BasePropertyKeys.Context,          JSONLDContext);
+
+            if (Name.IsNotNullOrEmpty())
+                json.Add(BasePropertyKeys.Name,             Name.ToJSON());
+
+            if (Description.IsNotNullOrEmpty())
+                json.Add(BasePropertyKeys.Description,      Description.ToJSON());
+
+            if (DataSource is not null)
+                json.Add(BasePropertyKeys.DataSource,       DataSource);
+
+            // No data licenses, no property: as the roaming network and the charging station operators write them.
+            if (DataLicenses.Length > 0)
+                json.Add(BasePropertyKeys.DataLicenses,     DataLicenses.ToPOIJSON());
+
+            if (Address is not null)
+                json.Add(PropertyKeys.Address,              Address.ToJSON(Embedded: true));
+
+            if (Logo.HasValue)
+                json.Add(PropertyKeys.Logos,                new JArray(new JObject(new JProperty(PropertyKeys.LogoURI, Logo.Value.ToString()))));
+
+            if (GeoLocation.HasValue)
+                json.Add(PropertyKeys.GeoLocation,          GeoLocation.Value.ToJSON(Embedded: true));
+
+            if (Telephone.HasValue)
+                json.Add(PropertyKeys.Telephone,            Telephone.Value.ToString());
+
+            if (EMailAddress is not null)
+                json.Add(PropertyKeys.EMailAddress,         EMailAddress.ToString());
+
+            if (Homepage.HasValue)
+                json.Add(PropertyKeys.Homepage,             Homepage.Value.ToString());
+
+            if (HotlinePhoneNumber.HasValue)
+                json.Add(PropertyKeys.HotlinePhoneNumber,   HotlinePhoneNumber.Value.ToString());
+
+            if (TermsAndConditionsURL.HasValue)
+                json.Add(PropertyKeys.TermsAndConditions,   TermsAndConditionsURL.Value.ToString());
+
+            if (SigningKeys.Length > 0)
+                json.Add(PropertyKeys.SigningKeys,          new JArray(SigningKeys. Select(key => key.ToJSON(Embedded: true))));
+
+            if (IdentityKeys.Length > 0)
+                json.Add(PropertyKeys.IdentityKeys,         new JArray(IdentityKeys.Select(key => key.ToJSON(Embedded: true))));
+
+            POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
+
+            if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
+                json.Add(eTags);
+
+            return CustomChargingStationManufacturerSerializer is not null
+                       ? CustomChargingStationManufacturerSerializer(this, json)
+                       : json;
+
+        }
+
+        #endregion
+
 
         #region (static) TryParse(CBOR, out ChargingStationManufacturer, out ErrorResponse)
 
@@ -478,12 +582,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
 
                 // What has no CBOR representation of its own is read as its JSON, with the parsers of the JSON
-                // representation: the address, the homepage, the hotline and the metadata.
+                // representation: the contact data and the data licenses, the keys and the metadata.
                 var json = new JObject();
 
-                foreach (var key in new[] { PropertyKeys.Address,
+                foreach (var key in new[] { PropertyKeys.Logos,
+                                            PropertyKeys.Address,
+                                            PropertyKeys.GeoLocation,
+                                            PropertyKeys.Telephone,
+                                            PropertyKeys.EMailAddress,
                                             PropertyKeys.Homepage,
                                             PropertyKeys.HotlinePhoneNumber,
+                                            PropertyKeys.TermsAndConditions,
+                                            BasePropertyKeys.DataLicenses,
+                                            BasePropertyKeys.DataLicenseIds,
+                                            PropertyKeys.SigningKeys,
+                                            PropertyKeys.IdentityKeys,
                                             BasePropertyKeys.Created,
                                             BasePropertyKeys.LastChange,
                                             BasePropertyKeys.CustomData })
@@ -492,12 +605,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         json.Add(key, CBORJSON.ToJSON(value));
                 }
 
-                if (!POIJSON.TryParseAddress(json, PropertyKeys.Address,             "address",               out var address,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (json, PropertyKeys.Homepage,            "homepage",              URL.        TryParse, out URL?          homepage,  out ErrorResponse) ||
-                    !POIJSON.TryParseText   (json, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",  PhoneNumber.TryParse, out PhoneNumber?  hotline,   out ErrorResponse))
+                if (!POIJSON.TryParseContact(json,
+                                             out var logo,
+                                             out var address,
+                                             out var geoLocation,
+                                             out var telephone,
+                                             out var eMailAddress,
+                                             out var homepage,
+                                             out var hotline,
+                                             out var termsAndConditions,
+                                             out var dataLicenses,
+                                             out ErrorResponse))
                 {
                     return false;
                 }
+
+                if (!POIPartyKeys.TryParse(json, out var signingKeys, out var identityKeys, out ErrorResponse))
+                    return false;
 
                 if (!POIEntityMetadata.TryParse(json,
                                                 out var created,
@@ -511,9 +635,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ChargingStationManufacturer = new ChargingStationManufacturer(id,
                                                                               name,
                                                                               description,
+                                                                              logo,
                                                                               address,
+                                                                              geoLocation,
+                                                                              telephone,
+                                                                              eMailAddress,
                                                                               homepage,
                                                                               hotline,
+                                                                              termsAndConditions,
+                                                                              dataLicenses,
+                                                                              IdentityKeys:  identityKeys,
+                                                                              SigningKeys:   signingKeys,
                                                                               DataSource:  dataSource,
                                                                               Created:     created,
                                                                               LastChange:  lastChange,
@@ -535,6 +667,92 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ErrorResponse                = "The given CBOR representation of a charging station manufacturer is invalid: " + e.Message;
                 return false;
             }
+
+        }
+
+        #endregion
+
+        #region ToCBOR(Embedded = false, ...)
+
+        /// <summary>
+        /// Return the CBOR representation of this charging station manufacturer: the keys and values of its JSON representation.
+        /// </summary>
+        /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="CustomChargingStationManufacturerSerializer">A delegate to serialize custom charging station manufacturer CBOR maps.</param>
+        public CBORValue ToCBOR(Boolean                                                      Embedded                                      = false,
+                                Boolean                                                      IncludeETags                                  = false,
+                                CustomCBORSerializerDelegate<ChargingStationManufacturer>?   CustomChargingStationManufacturerSerializer   = null)
+        {
+
+            var cbor = new CBORMap {
+                           { CBORValue.FromText(BasePropertyKeys.Id),           CBORValue.FromText(Id.ToString()) }
+                       };
+
+            if (!Embedded)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Context),          CBORValue.FromText(JSONLDContext));
+
+            if (Name.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Name),             Name.       ToCBOR());
+
+            if (Description.IsNotNullOrEmpty())
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.Description),      Description.ToCBOR());
+
+            if (DataSource is not null)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),       CBORValue.FromText(DataSource));
+
+            if (DataLicenses.Length > 0)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.DataLicenses),     DataLicenses.ToPOICBOR());
+
+            // The address, the geo location and the keys have no CBOR representation of their own: they are written as
+            // the keys and values of their JSON representation.
+            if (Address is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Address),              CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
+
+            if (Logo.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Logos),
+                         CBORValue.FromArray(new CBORMap {
+                             { CBORValue.FromText(PropertyKeys.LogoURI),                CBORValue.FromText(Logo.Value.ToString()) }
+                         }));
+
+            if (GeoLocation.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.GeoLocation),          CBORJSON.ToCBOR(GeoLocation.Value.ToJSON(Embedded: true)));
+
+            if (Telephone.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Telephone),            CBORValue.FromText(Telephone.Value.ToString()));
+
+            if (EMailAddress is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.EMailAddress),         CBORValue.FromText(EMailAddress.ToString()));
+
+            if (Homepage.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Homepage),             CBORValue.FromText(Homepage.Value.ToString()));
+
+            if (HotlinePhoneNumber.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.HotlinePhoneNumber),   CBORValue.FromText(HotlinePhoneNumber.Value.ToString()));
+
+            if (TermsAndConditionsURL.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.TermsAndConditions),   CBORValue.FromText(TermsAndConditionsURL.Value.ToString()));
+
+            if (SigningKeys.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.SigningKeys),
+                         CBORValue.FromArray(SigningKeys. Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
+
+            if (IdentityKeys.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.IdentityKeys),
+                         CBORValue.FromArray(IdentityKeys.Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
+
+            // Always part of the content, as in the JSON representation; custom data is JSON.
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),              CBORValue.FromText(Created.       ToISO8601()));
+            cbor.Add(CBORValue.FromText(BasePropertyKeys.LastChange),           CBORValue.FromText(LastChangeDate.ToISO8601()));
+
+            if (CustomData.HasValues)
+                cbor.Add(CBORValue.FromText(BasePropertyKeys.CustomData),       CBORJSON.ToCBOR(CustomData.ToJObject()));
+
+            AddETagsTo(cbor, IncludeETags);
+
+            return CustomChargingStationManufacturerSerializer is not null
+                       ? CustomChargingStationManufacturerSerializer(this, cbor)
+                       : cbor;
 
         }
 

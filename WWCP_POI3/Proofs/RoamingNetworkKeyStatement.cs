@@ -359,13 +359,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("A key statement is signed by at least one identity key.", nameof(SigningIdentityKeys));
 
             // The first signature, then the others: each signs the same input with its own algorithm and keyId.
-            var statement = new RoamingNetworkKeyStatement(RoamingNetworkId,
-                                                           RoamingNetworkOperatorId,
-                                                           IdentityKeys,
-                                                           MinConsensus,
-                                                           Truncated(SignedAt),
-                                                           Truncated(ValidUntil),
-                                                           [ new RoamingNetworkKeyStatementSignature("-", "-", "-") ]);
+            var statement = new RoamingNetworkKeyStatement(
+                                RoamingNetworkId,
+                                RoamingNetworkOperatorId,
+                                IdentityKeys,
+                                MinConsensus,
+                                Truncated(SignedAt),
+                                Truncated(ValidUntil),
+                                [ new RoamingNetworkKeyStatementSignature("-", "-", "-") ]
+                            );
 
             statement = statement.Signed(signingIdentityKeys[0].Key, signingIdentityKeys[0].Algorithm, Deterministic, Replace: true);
 

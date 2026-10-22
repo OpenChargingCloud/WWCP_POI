@@ -369,6 +369,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     Authoritative, at, out normalized, out oldTimestamp, out oldValue);
                     break;
 
+                case nameof(EnergyMeterManufacturer):
+
+                    if (!EnergyMeterManufacturer_Id.TryParse(EntityId, out var meterManufacturerId) ||
+                        !network.TryGetEnergyMeterManufacturerById(meterManufacturerId, out var meterManufacturer))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<EnergyMeterManufacturerAdminStatusType>(Value, EnergyMeterManufacturerAdminStatusType.TryParse,
+                                                    () => meterManufacturer.CurrentAdminStatus,
+                                                    (status, timestamp) => meterManufacturer.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => meterManufacturer.SetAdminStatus([ new Timestamped<EnergyMeterManufacturerAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<EnergyMeterManufacturerStatusType>(Value, EnergyMeterManufacturerStatusType.TryParse,
+                                                    () => meterManufacturer.CurrentStatus,
+                                                    (status, timestamp) => meterManufacturer.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => meterManufacturer.SetStatus([ new Timestamped<EnergyMeterManufacturerStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
                 case nameof(EMobilityProvider):
 
                     if (!EMobilityProvider_Id.TryParse(EntityId, out var eMobilityProviderId) ||
@@ -1091,6 +1114,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     Add(statuses, POIRuntimeStatusKind.Status,      nameof(ChargingStationManufacturer), manufacturer.Id.ToString(), manufacturer.CurrentStatus);
                 }
 
+                foreach (var manufacturer in network.EnergyMeterManufacturers)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(EnergyMeterManufacturer),     manufacturer.Id.ToString(), manufacturer.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(EnergyMeterManufacturer),     manufacturer.Id.ToString(), manufacturer.CurrentStatus);
+                }
+
                 foreach (var chargingStationOperator in network.ChargingStationOperators)
                 {
 
@@ -1252,6 +1281,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     entities.Add(RoamingNetwork.Operator);
 
                 entities.UnionWith(RoamingNetwork.ChargingStationManufacturers);
+                entities.UnionWith(RoamingNetwork.EnergyMeterManufacturers);
                 entities.UnionWith(RoamingNetwork.EVSEGroups);
                 entities.UnionWith(RoamingNetwork.ChargingStationGroups);
                 entities.UnionWith(RoamingNetwork.ChargingPoolGroups);
@@ -1302,6 +1332,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             ParkingSpaceGroup            parkingSpaceGroup        => ListenTo(parkingSpaceGroup),
                                             EnergyMeterGroup             energyMeterGroup         => ListenTo(energyMeterGroup),
                                             ChargingStationManufacturer  manufacturer             => ListenTo(manufacturer),
+                                            EnergyMeterManufacturer      meterManufacturer        => ListenTo(meterManufacturer),
                                             ChargingStationOperator      chargingStationOperator  => ListenTo(chargingStationOperator),
                                             _                                                     => throw new InvalidOperationException($"No status events of a {entity.GetType().Name}!")
                                         };
@@ -1365,6 +1396,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             OnChargingStationManufacturerStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
                 Raise(POIRuntimeStatusKind.Status, nameof(ChargingStationManufacturer), entity.Id.ToString(), newStatus, oldStatus, dataSource);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(EnergyMeterManufacturer)
+
+        private Action ListenTo(EnergyMeterManufacturer Entity)
+        {
+
+            OnEnergyMeterManufacturerAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(EnergyMeterManufacturer), entity.Id.ToString(), newStatus, oldStatus, dataSource);
+                return Task.CompletedTask;
+            };
+
+            OnEnergyMeterManufacturerStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(EnergyMeterManufacturer), entity.Id.ToString(), newStatus, oldStatus, dataSource);
                 return Task.CompletedTask;
             };
 
@@ -2148,7 +2206,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    Concat(RoamingNetwork.ChargingTariffOffers).
                                    Concat(RoamingNetwork.ParkingSpaceGroups).
                                    Concat(RoamingNetwork.EnergyMeterGroups).
-                                   Concat(RoamingNetwork.ChargingStationManufacturers))
+                                   Concat(RoamingNetwork.ChargingStationManufacturers).
+                                   Concat(RoamingNetwork.EnergyMeterManufacturers))
             {
                 yield return entity;
             }
@@ -2188,6 +2247,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    ParkingSpaceGroup            parkingSpaceGroup     => [ parkingSpaceGroup.    NextAdminStatus?.Timestamp, parkingSpaceGroup.    NextStatus?.Timestamp ],
                    EnergyMeterGroup             energyMeterGroup      => [ energyMeterGroup.     NextAdminStatus?.Timestamp, energyMeterGroup.     NextStatus?.Timestamp ],
                    ChargingStationManufacturer  manufacturer          => [ manufacturer.         NextAdminStatus?.Timestamp, manufacturer.         NextStatus?.Timestamp ],
+                   EnergyMeterManufacturer      meterManufacturer     => [ meterManufacturer.    NextAdminStatus?.Timestamp, meterManufacturer.    NextStatus?.Timestamp ],
                    _                                                  => []
                };
 
@@ -2351,6 +2411,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 foreach (var manufacturer in network.ChargingStationManufacturers)
+                {
+                    _ = manufacturer.AdminStatus;
+                    _ = manufacturer.Status;
+                }
+
+                foreach (var manufacturer in network.EnergyMeterManufacturers)
                 {
                     _ = manufacturer.AdminStatus;
                     _ = manufacturer.Status;

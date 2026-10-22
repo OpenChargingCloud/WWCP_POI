@@ -197,7 +197,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 json["@id"]   = Id;
                 json["name"]  = new JObject(new JProperty("en", Name));
                 return rn1.ApplyChangeSet(rn1.CreateChangeSet([ RoamingNetworkChange.Add(nameof(EMobilityProvider), Id, json) ], CreatedAt: T0).
-                                              SignedBy(TestParties.Party(rn1)));
+                                              SignedBy(TestParties.Party(rn1)).
+                                              ProvenByNewIdentityKeys());
             }
 
             var left      = Added("DE-ABC", "ABC Mobility");

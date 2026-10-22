@@ -372,8 +372,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!TryGetSigners(ChangeSet, out var signedBy, out ErrorResponse) ||
-                !TryCheckOwners(ChangeSet, signedBy, true, out var missing, out _, out ErrorResponse))
+            if (!TryGetSigners(ChangeSet, out var signedBy, out var possessed, out ErrorResponse) ||
+                !TryCheckOwners(ChangeSet, signedBy, possessed, true, out var missing, out _, out ErrorResponse))
             {
                 return false;
             }
@@ -411,8 +411,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Missing          = [];
             SignedByAnOwner  = false;
 
-            return TryGetSigners(ChangeSet, out var signedBy, out ErrorResponse) &&
-                   TryCheckOwners(ChangeSet, signedBy, false, out Missing, out SignedByAnOwner, out ErrorResponse);
+            return TryGetSigners(ChangeSet, out var signedBy, out var possessed, out ErrorResponse) &&
+                   TryCheckOwners(ChangeSet, signedBy, possessed, false, out Missing, out SignedByAnOwner, out ErrorResponse);
 
         }
 
@@ -489,14 +489,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryGetSigners(ChangeSet, out SignedBy, out ErrorResponse)
+        #region (private) TryGetSigners(ChangeSet, out SignedBy, out Possessed, out ErrorResponse)
 
         /// <summary>
-        /// The parties and kinds of keys that signed the given change set, with the keys, their holders and usages; every
-        /// signature must be valid, by a key of a party of this version valid at the creation of the change set.
+        /// The parties and kinds of keys that signed the given change set, with the keys, their holders and usages, and the
+        /// new identity keys that signed it, as the proof that their parties hold them; every signature must be valid, by a
+        /// key of a party of this version valid at the creation of the change set, or by a new identity key of one of its
+        /// changes (NewIdentityKeysOf).
         /// </summary>
         private Boolean TryGetSigners(RoamingNetworkChangeSet                                       ChangeSet,
                                       out Dictionary<(POIPartyId, POIKeyKind), List<POIPublicKey>>  SignedBy,
+                                      out HashSet<String>                                           Possessed,
                                       [NotNullWhen(false)] out String?                              ErrorResponse)
         {
 
@@ -504,6 +507,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // A quorum counts holders, not keys: a holder renewing its key signs with both once.
             var signedBy = SignedBy = new Dictionary<(POIPartyId, POIKeyKind), List<POIPublicKey>>();
+
+            // The new identity keys that signed it: a key proves its possession only, so it is not yet one of its party,
+            // and also one valid only later does.
+            var possessed = Possessed = new HashSet<String>(StringComparer.Ordinal);
+            var newKeys   = ChangeSet.Changes.SelectMany(NewIdentityKeysOf).ToArray();
 
             for (var index = 0; index < ChangeSet.Signatures.Length; index++)
             {
@@ -541,6 +549,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
                 }
 
+                foreach (var (partyId, key) in newKeys.Where(newKey => newKey.Key.Id == signature.KeyId))
+                {
+
+                    keyFound = true;
+
+                    if (!ChangeSet.VerifySignature(signature, key.Key, signature.KeyId, out var verificationError))
+                    {
+                        ErrorResponse = $"Signature {index} by the new identity key '{key.Id}' of {partyId} is invalid: {verificationError}";
+                        return false;
+                    }
+
+                    possessed.Add(key.Id);
+
+                }
+
                 if (!keyFound)
                 {
                     ErrorResponse = $"Signature {index}: the key '{signature.KeyId}' is no key of a party of the roaming network '{Id}'!";
@@ -558,14 +581,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryCheckOwners(ChangeSet, SignedBy, StopAtMissing, out Missing, out SignedByAnOwner, out ErrorResponse)
+        #region (private) TryCheckOwners(ChangeSet, SignedBy, Possessed, StopAtMissing, out Missing, out SignedByAnOwner, out ErrorResponse)
 
         /// <summary>
         /// Whether every change of the given change set is one its owners may make, and which of them miss signatures of
-        /// their owners: only the first, when told to stop there.
+        /// their owners, or of the new identity keys they enter: only the first, when told to stop there.
         /// </summary>
         private Boolean TryCheckOwners(RoamingNetworkChangeSet                                   ChangeSet,
                                        Dictionary<(POIPartyId, POIKeyKind), List<POIPublicKey>>  SignedBy,
+                                       IReadOnlySet<String>                                      Possessed,
                                        Boolean                                                StopAtMissing,
                                        out IReadOnlyList<String>                              Missing,
                                        out Boolean                                            SignedByAnOwner,
@@ -661,6 +685,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                // Every identity key it enters signs it as well: the proof that its party holds it.
+                foreach (var (partyId, key) in NewIdentityKeysOf(change).Where(newKey => !Possessed.Contains(newKey.Key.Id)))
+                {
+
+                    missing.Add($"Change {index}: {change.Kind} of the {change.EntityType} '{change.EntityId}'{(change.EntityPropertyName is not null ? $" ('{change.EntityPropertyName}')" : "")} needs a signature by the new identity key '{key.Id}' of {partyId}, as the proof that it holds it!");
+
+                    if (StopAtMissing)
+                    {
+                        ErrorResponse = null;
+                        return true;
+                    }
+
+                }
+
             }
 
             #endregion
@@ -672,12 +710,72 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private) NewIdentityKeysOf(Change)
+
+        /// <summary>
+        /// The identity keys the given change enters anew (SPECIFICATION.md, section 4.1): those of a party it adds, or
+        /// those of the new identity keys of a party, also of the roaming network operator, its party has not in this
+        /// version; and so of a charging station or energy meter manufacturer, which names keys as a party does, though no
+        /// party. Each
+        /// must sign the change set, as the proof that its party holds it: no party is added, and none gets an identity
+        /// key, by a key it does not hold.
+        /// </summary>
+        private IEnumerable<(POIPartyId Party, POIPublicKey Key)> NewIdentityKeysOf(RoamingNetworkChange Change)
+        {
+
+            var isManufacturer = Change.EntityType is nameof(ChargingStationManufacturer) or nameof(EnergyMeterManufacturer);
+
+            if (!PartyTypes.Contains(Change.EntityType) && Change.EntityType != nameof(RoamingNetworkOperator) && !isManufacturer)
+                return [];
+
+            var partyId = PartyIdOf(new POIPartyId(Change.EntityType, Change.EntityId));
+
+            // Keys it can not read are refused when it is applied.
+            if (Change.Kind == RoamingNetworkChangeKind.Add && (PartyTypes.Contains(Change.EntityType) || isManufacturer))
+                return Change.NewValue is JObject party &&
+                       POIPartyKeys.TryParse(party, out _, out var identityKeys, out _)
+                           ? identityKeys.Select(identityKey => (partyId, identityKey))
+                           : [];
+
+            if (Change.Kind == RoamingNetworkChangeKind.UpdateProperty &&
+                Change.EntityPropertyName == POIPartyKeys.IdentityKeysProperty &&
+                Change.NewValue is JArray newIdentityKeys &&
+                POIPartyKeys.TryParse(new JObject(new JProperty(POIPartyKeys.IdentityKeysProperty, newIdentityKeys)), out _, out var keys, out _))
+            {
+
+                var currentKeys = Change.EntityType == nameof(ChargingStationManufacturer)
+                                      ? ChargingStationManufacturer_Id.TryParse(Change.EntityId, out var manufacturerId) &&
+                                        TryGetChargingStationManufacturerById(manufacturerId, out var manufacturer)
+                                            ? manufacturer.IdentityKeys
+                                            : []
+                                  : Change.EntityType == nameof(EnergyMeterManufacturer)
+                                      ? EnergyMeterManufacturer_Id.TryParse(Change.EntityId, out var meterManufacturerId) &&
+                                        TryGetEnergyMeterManufacturerById(meterManufacturerId, out var meterManufacturer)
+                                            ? meterManufacturer.IdentityKeys
+                                            : []
+                                      : TryGetParty(partyId, out var knownParty)
+                                            ? knownParty.IdentityKeys
+                                            : [];
+
+                var current     = currentKeys.Select(identityKey => identityKey.Id).ToHashSet(StringComparer.Ordinal);
+
+                return keys.Where (identityKey => !current.Contains(identityKey.Id)).
+                            Select(identityKey => (partyId, identityKey));
+
+            }
+
+            return [];
+
+        }
+
+        #endregion
+
         #region (private) OwnSigningKeysHolderOf(Change)
 
         /// <summary>
-        /// The holder of the roaming network operator whose own signing keys, or their certificates, the given change alone
+        /// The holder of the roaming network operator whose own signing keys, their certificates, the given change alone
         /// changes, or null (SPECIFICATION.md, section 4.1): what it adds and removes, compared with this version, are
-        /// entries of that holder only, so that it renews its signing keys with one of its identity keys, without the
+        /// certificates of that holder only, so that it renews its signing keys with one of its identity keys, without the
         /// others. Its signing keys give it one voice only, so no holder decides more alone than with them.
         /// </summary>
         private String? OwnSigningKeysHolderOf(RoamingNetworkChange Change)
@@ -685,19 +783,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (Operator is null                                                                                                                      ||
                 Change.EntityType != nameof(RoamingNetworkOperator)                                                                                    ||
-                Change.EntityPropertyName is not (POIPartyKeys.SigningKeysProperty or RoamingNetworkOperator.PropertyKeys.SigningKeyCertificates)      ||
+                Change.EntityPropertyName != RoamingNetworkOperator.PropertyKeys.SigningKeyCertificates                                             ||
                 Change.Kind is not (RoamingNetworkChangeKind.UpdateProperty or RoamingNetworkChangeKind.RemoveProperty)                            ||
                 !RoamingNetworkOperator_Id.TryParse(Change.EntityId, out var operatorId) || operatorId != Operator.Id)
             {
                 return null;
             }
 
-            var isCertificates  = Change.EntityPropertyName == RoamingNetworkOperator.PropertyKeys.SigningKeyCertificates;
-
-            var current         = (isCertificates
-                                      ? Operator.SigningKeyCertificates.Select(certificate => certificate.ToJSON(Embedded: true))
-                                      : Operator.SigningKeys.           Select(key         => key.        ToJSON(Embedded: true))).
-                                      ToList();
+            var current         = Operator.SigningKeyCertificates.Select(certificate => certificate.ToJSON(Embedded: true)).ToList();
 
             var changed         = Change.Kind == RoamingNetworkChangeKind.RemoveProperty
                                       ? []
@@ -726,9 +819,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var entry in added.Concat(removed))
             {
 
-                String? entryHolder = isCertificates
-                                          ? RoamingNetworkSigningKeyCertificate.TryParse(entry, out var certificate, out _) ? certificate.Holder        : null
-                                          : POIPublicKey.                       TryParse(entry, out var key,         out _) ? key.        HolderOrUnnamed : null;
+                var entryHolder = RoamingNetworkSigningKeyCertificate.TryParse(entry, out var certificate, out _)
+                                      ? certificate.Holder
+                                      : null;
 
                 if (entryHolder is null || (holder is not null && holder != entryHolder))
                     return null;
@@ -818,9 +911,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (Change.EntityType == nameof(RoamingNetworkOperator))
             {
-                // Its quorum as its identity keys: who must sign is decided by those signing its keys. Its signing keys
-                // and their certificates also by one holder for its own (OwnSigningKeysHolderOf).
-                Owners = Change.EntityPropertyName is POIPartyKeys.SigningKeysProperty or RoamingNetworkOperator.PropertyKeys.SigningKeyCertificates
+                // Its quorum as its identity keys: who must sign is decided by those signing its keys. Its signing keys,
+                // its certificates, also by one holder for its own (OwnSigningKeysHolderOf).
+                Owners = Change.EntityPropertyName == RoamingNetworkOperator.PropertyKeys.SigningKeyCertificates
                              ? [ (roamingNetworkOperator, POIKeyKind.Signing), (roamingNetworkOperator, POIKeyKind.Identity) ]
                              : [ (roamingNetworkOperator, POIPartyKeys.IsKeyProperty(Change.EntityPropertyName) ||
                                                          Change.EntityPropertyName == POIPartyKeys.MinConsensusProperty
@@ -1259,8 +1352,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            if (!POIPartyKeys.IsKeyProperty(Change.PropertyName))
+            // The signing keys of the roaming network operator are its certificates.
+            if (!POIPartyKeys.IsKeyProperty(Change.PropertyName) &&
+                !(Change.EntityType == nameof(RoamingNetworkOperator) && Change.PropertyName == RoamingNetworkOperator.PropertyKeys.SigningKeyCertificates))
+            {
                 return true;
+            }
 
             if (Change.Kind == RoamingNetworkChangeKind.RemoveProperty ||
                (Change.Kind == RoamingNetworkChangeKind.UpdateProperty && Change.NewValue is not JArray { Count: > 0 }))

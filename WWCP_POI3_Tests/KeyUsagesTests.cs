@@ -239,8 +239,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 var json        = network.ToJSON(IncludeETags: false);
                 var op          = (JObject) json[RoamingNetwork.PropertyKeys.Operator]!;
 
-                op[POIPartyKeys.SigningKeysProperty]                = new JArray(signingKey.ToJSON(Embedded: true));
-                op[RoamingNetworkSigningKeyCertificate.JSONProperty] = new JArray(RoamingNetworkSigningKeyCertificate.Create(identity.Private, COSEAlgorithm.ES512, network.Id, network.Operator!.Id, signingKey, now.AddMinutes(-1)).ToJSON(Embedded: true));
+                op.Remove(POIPartyKeys.SigningKeysProperty);
+                op[RoamingNetworkSigningKeyCertificate.JSONProperty] = new JArray(RoamingNetworkSigningKeyCertificate.Create(identity.Private, COSEAlgorithm.ES512, network.Operator!.Id, signingKey, now.AddMinutes(-1)).ToJSON(Embedded: true));
                 op[RoamingNetworkKeyStatement.JSONProperty]          = RoamingNetworkKeyStatement.Create(identity.Private, COSEAlgorithm.ES512, 1, network.Id, network.Operator!.Id, [ identity.Public ], now.AddMinutes(-1), now.AddDays(30)).ToJSON(Embedded: true);
 
                 Assert.That(RoamingNetwork.TryParse(json, out var withKeys, out var parseError), Is.True, parseError);

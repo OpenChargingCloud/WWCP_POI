@@ -249,7 +249,9 @@ A change set must be signed by the owner of each of its changes ([../README.md](
 
 - A party is added with at least one `signingKeys` and one `identityKeys` entry, and without embedded children
   (`chargingPools`, `chargingTariffs`, the four group arrays; `parkingGarages`, `parkingSpaces`, `parkingSensors`,
-  `parkingSpaceGroups`, `parkingProducts`): they are its own to add. Its other properties it changes itself.
+  `parkingSpaceGroups`, `parkingProducts`): they are its own to add. Its other properties it changes itself. Each
+  identity key it is added with signs the change set as well, as does every new identity key of a party later: the
+  proof that the party holds it (SPECIFICATION.md, section 4.1).
 - Removing a party removes it with everything it embeds, unless something remaining still names part of it. This
   is intended: the RNO decides who is a member of the roaming network, also without the party's consent, e.g. when
   its contract ended; its data goes with it. The history keeps the versions before.

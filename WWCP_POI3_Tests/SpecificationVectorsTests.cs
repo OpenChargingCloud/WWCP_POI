@@ -45,19 +45,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static readonly DateTimeOffset Created = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
 
-        private const String ContentJSON     = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/v1\",\"@id\":\"rn1\",\"chargingStationOperators\":[{\"@id\":\"DE*GEF\",\"chargingPools\":[{\"@id\":\"DE*GEF*P1\",\"chargingStations\":[{\"@id\":\"DE*GEF*S1\",\"EVSEs\":[{\"@id\":\"DE*GEF*E1*1\",\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"maxPower\":22000,\"maxVoltage\":230.5}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"name\":{\"en\":\"Charging Station Operator DE*GEF\"}}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"name\":{\"en\":\"Example\"}}";
-        private const String JSONETag        = "json:sha256:hex:a7b015193f9402f4819f4665aeddc7b4b4802eb4b0d639b56cbcc763abd60f43";
-        private const String CBORETag        = "cbor:sha256:hex:5f0a57368dc8e45a35ca3d5d2dfd7677633c0a6b158cc33c218c0e840ec3af05";
-        private const String TreeETag        = "effectiveTree:sha256:hex:824a0100d080752e9974aad8fe506536ce6b8a95b7002db04de05e769e47564a";
-        private const String NoTreeETagsJSON = "[[\"json\",\"sha256\",\"hex\",\"a7b015193f9402f4819f4665aeddc7b4b4802eb4b0d639b56cbcc763abd60f43\"],[\"cbor\",\"sha256\",\"hex\",\"5f0a57368dc8e45a35ca3d5d2dfd7677633c0a6b158cc33c218c0e840ec3af05\"]]";
-        private const String TreeETagJSON    = "[\"effectiveTree\",\"sha256\",\"hex\",\"824a0100d080752e9974aad8fe506536ce6b8a95b7002db04de05e769e47564a\"]";
-        private const String ETagsJSON       = "[[\"json\",\"sha256\",\"hex\",\"a7b015193f9402f4819f4665aeddc7b4b4802eb4b0d639b56cbcc763abd60f43\"],[\"cbor\",\"sha256\",\"hex\",\"5f0a57368dc8e45a35ca3d5d2dfd7677633c0a6b158cc33c218c0e840ec3af05\"]," + TreeETagJSON + "]";
+        private const String ContentJSON     = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/v1\",\"@id\":\"rn1\",\"chargingStationOperators\":[{\"@id\":\"DE*GEF\",\"chargingPools\":[{\"@id\":\"DE*GEF*P1\",\"chargingStations\":[{\"@id\":\"DE*GEF*S1\",\"EVSEs\":[{\"@id\":\"DE*GEF*E1*1\",\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"maxPower\":22000,\"maxVoltage\":230.5}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"name\":{\"en\":\"Charging Station Operator 'DE*GEF'\"}}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"name\":{\"en\":\"Example\"}}";
+        private const String JSONETag        = "json:sha256:hex:5592afaf5dfcceebc17c8a29f4493e061406f648b76a6fee8b6fe15d553c7108";
+        private const String CBORETag        = "cbor:sha256:hex:567697f19947efa4679a0e401e1e7c5f528ffb7ca0d3d7928d3b2ed02abef52d";
+        private const String TreeETag        = "effectiveTree:sha256:hex:84acb445aa41df13e83b7af61f25a8387dc65c0c7e83b29b907e9ed06045b44a";
+        private const String NoTreeETagsJSON = "[[\"json\",\"sha256\",\"hex\",\"5592afaf5dfcceebc17c8a29f4493e061406f648b76a6fee8b6fe15d553c7108\"],[\"cbor\",\"sha256\",\"hex\",\"567697f19947efa4679a0e401e1e7c5f528ffb7ca0d3d7928d3b2ed02abef52d\"]]";
+        private const String TreeETagJSON    = "[\"effectiveTree\",\"sha256\",\"hex\",\"84acb445aa41df13e83b7af61f25a8387dc65c0c7e83b29b907e9ed06045b44a\"]";
+        private const String ETagsJSON       = "[[\"json\",\"sha256\",\"hex\",\"5592afaf5dfcceebc17c8a29f4493e061406f648b76a6fee8b6fe15d553c7108\"],[\"cbor\",\"sha256\",\"hex\",\"567697f19947efa4679a0e401e1e7c5f528ffb7ca0d3d7928d3b2ed02abef52d\"]," + TreeETagJSON + "]";
 
         private const String CommitContent   = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3\",\"eTags\":" + ETagsJSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
-        private const String CommitId        = "75523513ee43c679e13c540da81580a860819e45851c82e1f639fa9f71d65964";
+        private const String CommitId        = "498e076a90b8d71254c017a80d164442abaa99b4d11d4deb9b8c86576917c29a";
 
         private const String SigningInput    = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commitSignature/v1\",\"algorithm\":\"Ed25519\",\"commit\":{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3\",\"@id\":\"" + CommitId + "\",\"eTags\":" + ETagsJSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"},\"keyId\":\"leader\",\"role\":\"leader\",\"signedAt\":\"2026-10-12T12:00:00.000Z\",\"signer\":\"leader.example.org\"}";
-        private const String SignatureValue  = "X1XyM2YTz5toEb4/L+QtYpb7ou5qfhryiMUnHENLN3D2XdnHu3549ggSJ6IyF8ylgGp4ochb+GY+R163ncnpBQ==";
+        private const String SignatureValue  = "x/h7//+MgkH18ljzmyXAIoirilwduHRjK9j/9/vKZIOPyO2Ir1eSbvfFkj1kSy9TwTIeMdqLAU22aOj7g1cGAA==";
         private const String PublicKey       = "d3bocLkzVPKgskwj8qNsxOgOIjIYwbl5Jv3QGDlqK5s=";
 
         private const String Timestamps      = "\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"";
@@ -65,10 +65,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private const String EVSEDigest      = "f37f52daaf5db8a3db648ac8ea7f3ef9955a1afff133803d1a9ff84b99fdc443";
         private const String StationDigest   = "d111c66efd73a1ff910cf674270046cfe3b6a2e0cab85034993df80025623f40";
         private const String PoolDigest      = "8d4f6ed9ca2ffabf1862488a9cff9c8a224a86a247a9bb48b33751d0df5042fe";
-        private const String OperatorDigest  = "b137995cb4aacc1bc4f5c1b70f9620187d427bd150c3f9bc405ea079827de2ef";
+        private const String OperatorDigest  = "d76ebfb110df2bf7c0db6194f69dc563ab2349189580ccfa0a1292e71d90d3fd";
 
         private const String AttestationInput = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/attestation/v1\",\"algorithm\":\"Ed25519\",\"commitId\":\"" + CommitId + "\",\"eTag\":" + TreeETagJSON + ",\"keyId\":\"rno\",\"revision\":0,\"roamingNetworkId\":\"rn1\",\"role\":\"roamingNetworkOperator\",\"signedAt\":\"2026-10-17T18:00:00.000Z\",\"signer\":\"DE*RNO\",\"validUntil\":\"2026-10-17T18:15:00.000Z\"}";
-        private const String AttestationValue = "LrEYPlE05VmgMbbnT9LW5Id3ErLB+07at2sDxXUF1WniurbtW1Lg1dneSF+PG9ANaC7E3OZsjUHLxxgWpixVAA==";
+        private const String AttestationValue = "enreFD6NAwKbGJBHryNsNNtgFn2wbVlI+w1PqplrkNzmnFSMPrvRp+AC1XVmUdeZ6jYh9BD1VoP/Iihq2YJ1CA==";
         private const String RNOPublicKey     = "Kay64UG8yvCyLhqU000LxzYeUm0L/hLIl5S8kyKWbdc=";
 
         #endregion
@@ -185,8 +185,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void The_genesis_of_a_second_epoch()
         {
 
-            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3\",\"eTags\":[[\"json\",\"sha256\",\"hex\",\"a7b015193f9402f4819f4665aeddc7b4b4802eb4b0d639b56cbcc763abd60f43\"],[\"cbor\",\"sha256\",\"hex\",\"5f0a57368dc8e45a35ca3d5d2dfd7677633c0a6b158cc33c218c0e840ec3af05\"],[\"effectiveTree\",\"sha256\",\"hex\",\"824a0100d080752e9974aad8fe506536ce6b8a95b7002db04de05e769e47564a\"]],\"epoch\":2,\"profiles\":{\"canonicalization\":\"styx-canonical-json-v1\",\"checkpoint\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/checkpoint/v1\",\"commit\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3\",\"identificationHash\":\"sha512\",\"priceStatement\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/priceStatement/v1\",\"signatureAlgorithms\":[\"Ed25519\",\"ML-DSA-65\"]},\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
-            const String Id     = "8c5816a1f231aa66c26977ae375482224fbecadc5e882fb9c6d65ca5cb6da25899520b070d4bfd70f00b9867667bdfcdf1518333ad8f485dfd5b4666c4e1f5ca";
+            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3\",\"eTags\":[[\"json\",\"sha256\",\"hex\",\"5592afaf5dfcceebc17c8a29f4493e061406f648b76a6fee8b6fe15d553c7108\"],[\"cbor\",\"sha256\",\"hex\",\"567697f19947efa4679a0e401e1e7c5f528ffb7ca0d3d7928d3b2ed02abef52d\"],[\"effectiveTree\",\"sha256\",\"hex\",\"84acb445aa41df13e83b7af61f25a8387dc65c0c7e83b29b907e9ed06045b44a\"]],\"epoch\":2,\"profiles\":{\"canonicalization\":\"styx-canonical-json-v1\",\"checkpoint\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/checkpoint/v1\",\"commit\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/commit/v3\",\"identificationHash\":\"sha512\",\"priceStatement\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/priceStatement/v1\",\"signatureAlgorithms\":[\"Ed25519\",\"ML-DSA-65\"]},\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
+            const String Id     = "ae070918e0d75696682a5d28ecf31216ef8b87a4872740facc3f5945b1c0d9616b1ddaa131d472016d08b2418e4c206700a2d2f9056f977731f4272fe26b8b34";
 
             var genesis = RoamingNetworkCommit.Genesis(Network(),
                                                        new RoamingNetworkEpoch(2, new RoamingNetworkEpochProfiles(ETagHashAlgorithm.SHA512, [ "Ed25519", "ML-DSA-65" ])));
@@ -236,7 +236,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var stationSkeleton   = "{\"@id\":\"DE*GEF*S1\",\"EVSEs\":"             + Pruned(EVSEDigest)     + "," + Timestamps + "}";
             var poolSkeleton      = "{\"@id\":\"DE*GEF*P1\",\"chargingStations\":"  + Pruned(StationDigest)  + "," + Timestamps + "}";
-            var operatorSkeleton  = "{\"@id\":\"DE*GEF\",\"chargingPools\":"        + Pruned(PoolDigest)     + "," + Timestamps + ",\"name\":{\"en\":\"Charging Station Operator DE*GEF\"}}";
+            var operatorSkeleton  = "{\"@id\":\"DE*GEF\",\"chargingPools\":"        + Pruned(PoolDigest)     + "," + Timestamps + ",\"name\":{\"en\":\"Charging Station Operator 'DE*GEF'\"}}";
             var networkSkeleton   = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/v1\",\"@id\":\"rn1\",\"chargingStationOperators\":" + Pruned(OperatorDigest) + "," + Timestamps + ",\"name\":{\"en\":\"Example\"}}";
 
             var network           = Network();
@@ -340,8 +340,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void A_signing_key_certificate()
         {
 
-            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/signingKeyCertificate/v1\",\"algorithm\":\"Ed25519\",\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKey\":{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\",\"notAfter\":\"2027-10-17T00:00:00.000Z\",\"usages\":[\"party\"]}}";
-            const String Value  = "UfEDYBZ2+KeTplEX+fhu1Oj1kUA3gJNzxq57qbagJQHQvnXZi3jVBe1IGR9JxEwvAcEUaTIpQXaw3VTd2wZKCw==";
+            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/signingKeyCertificate/v2\",\"algorithm\":\"Ed25519\",\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKey\":{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\",\"notAfter\":\"2027-10-17T00:00:00.000Z\",\"usages\":[\"party\"]}}";
+            const String Value  = "QndT4IDJA/YPtnq47eZKRvELDUDEiXkEe9qHTzgIkjwNYPhkKuaTksr8iOb4aqahqS/+QSzcjJVx0M6bz5jICg==";
 
             var alphaSigning   = new Ed25519PrivateKeyParameters(Convert.FromHexString("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), 0);
             var alphaIdentity  = new Ed25519PrivateKeyParameters(Convert.FromHexString("303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f"), 0);
@@ -350,7 +350,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var signingKey     = POIPublicKey.From(alphaSigning, NotAfter: DateTimeOffset.Parse("2027-10-17T00:00:00Z"), Holder: "Alpha", Usages: [ POIKeyUsages.Party ]);
             var certificate    = RoamingNetworkSigningKeyCertificate.Create(alphaIdentity,
                                                                             COSEAlgorithm.Ed25519,
-                                                                            RoamingNetwork_Id.Parse("rn1"),
                                                                             RoamingNetworkOperator_Id.Parse("DE*RNO"),
                                                                             signingKey,
                                                                             DateTimeOffset.Parse("2026-10-17T00:00:00Z"));
@@ -359,7 +358,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var byBeta         = RoamingNetworkSigningKeyCertificate.Create(betaIdentity,
                                                                             COSEAlgorithm.Ed25519,
-                                                                            RoamingNetwork_Id.Parse("rn1"),
                                                                             RoamingNetworkOperator_Id.Parse("DE*RNO"),
                                                                             signingKey,
                                                                             DateTimeOffset.Parse("2026-10-17T00:00:00Z"));
@@ -384,16 +382,17 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region A_trust_anchor()
 
         /// <summary>
-        /// The trust anchor of the example network as the text of a QR code: WWCPPOI1: and the Base45 of its CBOR.
+        /// The trust anchor of the example network, at two servers, as the text of a QR code: WWCP/TA-2: and the Base45 of
+        /// its CBOR.
         /// </summary>
         [Test]
         public void A_trust_anchor()
         {
 
-            const String QRCode  = "WWCPPOI1:*+KJ684VC:KE/A66%E3WDU/3MWEW9E0G7V:5Z$E.%5$9FQ$DTVD*:5 3E9:5D-9-:5*-DCVCC$C4REF6B4-3B8GGOS3PGC7IF/U6XMN1QVMMJ$F/%STG1M4ULVAS:O BNFVCBEC7%CYJC3/D9Z8BECP9E+ CD68-3E7WEBAFB9FA9DIWENPEJ/5/3E1$C+%5 8D$KEZED:1DRPC34E.TCUPCG/DB$CLWE10684F98E0LEBECZEDV2D7$CK4F-KE/:56LE QEAC8NPC04E00641";
+            const String QRCode  = "WWCP/TA-2:*+KJ684VC:KE:A6/PD-FF$FGW24.+U3M0-$O1JV%LLP-T2OR-7U%J0WP7ZXAW7RI33:PKFFMRD0..DF$D4IK1$CM2D$9FQ$DTVDMVC.KE5REG8FA9DIWENPEJ/5B9DOICB$CBECP9ESZCS9EHDDAIACPE:KEJB6XF4MWEW9E0G7 :5*ED0LEPJEB$CBECP9ESZCS9EHDDAIACPE:KE3B6D68-3E7WEBAFB9FA9DIWENPEJ/5/3E1$C+%5 8D$KEZED:1DRPC34E.TCUPCG/DB$CLWE10684F98E0LEBECZEDV2D7$CK4F-KE/:56LE QEAC8NPC04E00651";
 
             var anchor = new RoamingNetworkTrustAnchor(RoamingNetwork_Id.Parse("rn1"),
-                                                       URL.Parse("https://hub.example/poi/RNs/rn1"),
+                                                       [ URL.Parse("https://hub.example/poi/RNs/rn1"), URL.Parse("https://mirror.example/poi/RNs/rn1") ],
                                                        [ "1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802" ],
                                                        1,
                                                        ImmutableI18NString.Create(Languages.en, "Example"),
@@ -401,7 +400,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(anchor.ToJSON().ToString(Formatting.None),  Is.EqualTo("{\"@id\":\"rn1\",\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/trustAnchor/v1\",\"url\":\"https://hub.example/poi/RNs/rn1\",\"keys\":[\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\"],\"name\":{\"en\":\"Example\"}}"));
+                Assert.That(anchor.ToJSON().ToString(Formatting.None),  Is.EqualTo("{\"@id\":\"rn1\",\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/trustAnchor/v2\",\"urls\":[\"https://hub.example/poi/RNs/rn1\",\"https://mirror.example/poi/RNs/rn1\"],\"keys\":[\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\"],\"name\":{\"en\":\"Example\"}}"));
                 Assert.That(anchor.ToQRCode(),                          Is.EqualTo(QRCode));
                 Assert.That(RoamingNetworkTrustAnchor.TryParse(QRCode, out var read, out var error),  Is.True, error);
             }

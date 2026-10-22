@@ -257,7 +257,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var add       = RoamingNetworkChange.Add(provider);
             var children  = RoamingNetworkChange.AddChildren(provider);
 
-            var rn2       = rn1.ApplyChangeSet(rn1.CreateChangeSet([ add ], CreatedAt: T0).SignedBy(TestParties.Party(rn1)));
+            var rn2       = rn1.ApplyChangeSet(rn1.CreateChangeSet([ add ], CreatedAt: T0).SignedBy(TestParties.Party(rn1)).ProvenByNewIdentityKeys());
             var rn3       = Apply(rn2, [ .. children ]);
 
             rn3.TryGetEMobilityProviderById(provider.Id, out var added);

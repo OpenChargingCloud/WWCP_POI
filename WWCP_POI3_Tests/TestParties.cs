@@ -144,9 +144,24 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static JObject WithKeys(JObject     JSON,
                                         POIPartyId  Party)
         {
-            JSON[POIPartyKeys.SigningKeysProperty]   = new JArray(Key(Party, POIKeyKind.Signing). Public.ToJSON());
+
             JSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(Key(Party, POIKeyKind.Identity).Public.ToJSON());
+
+            // The signing keys of the roaming network operator are those of its certificates.
+            if (Party.EntityType == nameof(RoamingNetworkOperator))
+            {
+                JSON.Remove(POIPartyKeys.SigningKeysProperty);
+                JSON[RoamingNetworkSigningKeyCertificate.JSONProperty] = new JArray(RoamingNetworkSigningKeyCertificate.Create(Key(Party, POIKeyKind.Identity).Private,
+                                                                                                                               COSEAlgorithm.ES512,
+                                                                                                                               RoamingNetworkOperator_Id.Parse(Party.EntityId),
+                                                                                                                               Key(Party, POIKeyKind.Signing).Public,
+                                                                                                                               DateTimeOffset.Parse("2026-01-01T00:00:00Z")).ToJSON(Embedded: true));
+            }
+            else
+                JSON[POIPartyKeys.SigningKeysProperty]   = new JArray(Key(Party, POIKeyKind.Signing). Public.ToJSON());
+
             return JSON;
+
         }
 
         #endregion
@@ -257,6 +272,45 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 foreach (var kind in new[] { POIKeyKind.Signing, POIKeyKind.Identity })
                     if ((kind == POIKeyKind.Signing ? party.SigningKeys : party.IdentityKeys).Any(key => key.Id == Key(partyId, kind).Public.Id))
                         ChangeSet = ChangeSet.SignedBy(partyId, kind);
+
+            return ChangeSet.ProvenByNewIdentityKeys();
+
+        }
+
+        #endregion
+
+        #region ProvenByNewIdentityKeys(this ChangeSet)
+
+        /// <summary>
+        /// The given change set, signed with every test key that a change of it enters as an identity key, of a party it
+        /// adds or of new identity keys of a party: the proof that the party holds it (SPECIFICATION.md, section 4.1).
+        /// </summary>
+        public static RoamingNetworkChangeSet ProvenByNewIdentityKeys(this RoamingNetworkChangeSet ChangeSet)
+        {
+
+            foreach (var change in ChangeSet.Changes)
+            {
+
+                var identityKeys = change.Kind == RoamingNetworkChangeKind.Add && change.NewValue is JObject party
+                                       ? party[POIPartyKeys.IdentityKeysProperty] as JArray
+                                       : change.Kind == RoamingNetworkChangeKind.UpdateProperty && change.EntityPropertyName == POIPartyKeys.IdentityKeysProperty
+                                             ? change.NewValue as JArray
+                                             : null;
+
+                foreach (var keyId in (identityKeys ?? []).Select(identityKey => identityKey["@id"]?.Value<String>()))
+                {
+
+                    // A test key of any party and kind, as a test may take one for another, e.g. its next identity key.
+                    var testKey = keys.FirstOrDefault(key => key.Value.Public.Id == keyId);
+
+                    if (testKey.Value.Private is not null && !ChangeSet.Signatures.Any(signature => signature.KeyId == keyId))
+                        ChangeSet = ChangeSet.Sign(testKey.Value.Private,
+                                                   testKey.Value.Public.Id,
+                                                   testKey.Key.Item2 == POIKeyKind.Signing ? COSEAlgorithm.ES256 : COSEAlgorithm.ES512);
+
+                }
+
+            }
 
             return ChangeSet;
 

@@ -59,7 +59,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var json          = network.ToJSON(IncludeETags: false);
             var operatorJSON  = (JObject) json[RoamingNetwork.PropertyKeys.Operator]!;
 
-            operatorJSON[POIPartyKeys.SigningKeysProperty]   = new JArray(Holders.Select(holder => TestParties.QuorumKey(network.Id, holder, POIKeyKind.Signing). Public.ToJSON(Embedded: true)));
+            // The signing keys of each holder, certified by its identity key.
+            operatorJSON.Remove(POIPartyKeys.SigningKeysProperty);
+            operatorJSON[RoamingNetworkSigningKeyCertificate.JSONProperty] = new JArray(Holders.Select(holder => RoamingNetworkSigningKeyCertificate.Create(TestParties.QuorumKey(network.Id, holder, POIKeyKind.Identity).Private,
+                                                                                                                             COSEAlgorithm.ES512,
+                                                                                                                             TestParties.OperatorId(network.Id),
+                                                                                                                             TestParties.QuorumKey(network.Id, holder, POIKeyKind.Signing).Public,
+                                                                                                                             DateTimeOffset.Parse("2026-01-01T00:00:00Z")).ToJSON(Embedded: true)));
             operatorJSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(Holders.Select(holder => TestParties.QuorumKey(network.Id, holder, POIKeyKind.Identity).Public.ToJSON(Embedded: true)));
             operatorJSON[POIPartyKeys.MinConsensusProperty]  = 2;
 

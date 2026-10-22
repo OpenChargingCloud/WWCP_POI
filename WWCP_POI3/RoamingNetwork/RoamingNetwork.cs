@@ -749,7 +749,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse Operator       [optional]
 
                 // The keys of a roaming network are the keys of its operator.
-                if (JSON.ContainsKey(RoamingNetworkOperator.PropertyKeys.SigningKeys) || JSON.ContainsKey(RoamingNetworkOperator.PropertyKeys.IdentityKeys))
+                if (JSON.ContainsKey(POIPartyKeys.SigningKeysProperty) || JSON.ContainsKey(RoamingNetworkOperator.PropertyKeys.IdentityKeys))
                 {
                     ErrorResponse = $"A roaming network has no keys of its own: they are the keys of its operator, '{PropertyKeys.Operator}'!";
                     return false;
@@ -1373,7 +1373,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse Operator       [optional]
 
                 // The keys of a roaming network are the keys of its operator.
-                foreach (var keysProperty in new[] { RoamingNetworkOperator.PropertyKeys.SigningKeys, RoamingNetworkOperator.PropertyKeys.IdentityKeys })
+                foreach (var keysProperty in new[] { POIPartyKeys.SigningKeysProperty, RoamingNetworkOperator.PropertyKeys.IdentityKeys })
                 {
                     if (CBOR.TryGetValue(CBORValue.FromText(keysProperty), out _))
                     {

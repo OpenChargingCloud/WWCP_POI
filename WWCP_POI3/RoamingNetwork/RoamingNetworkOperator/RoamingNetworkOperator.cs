@@ -212,11 +212,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  HotlineEMailAddress   = "hotlineEMailAddress";
 
             /// <summary>
-            /// The property of its signing keys, as of every party.
-            /// </summary>
-            public const String  SigningKeys           = POIPartyKeys.SigningKeysProperty;
-
-            /// <summary>
             /// The property of its identity keys, as of every party.
             /// </summary>
             public const String  IdentityKeys          = POIPartyKeys.IdentityKeysProperty;
@@ -282,7 +277,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public EMailAddress?                 HotlineEMail          { get; }
 
         /// <summary>
-        /// The keys signing the change sets and commits of the roaming network operator, in the order of their identifications.
+        /// The keys signing the change sets and commits of the roaming network operator, in the order of their
+        /// identifications: those its certificates certify, the only place naming them.
         /// </summary>
         public ImmutableArray<POIPublicKey>  SigningKeys           { get; }
 
@@ -317,6 +313,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Constructor(s)
 
+        #region RoamingNetworkOperator (Id, ...)
+
         /// <summary>
         /// Create a new roaming network operator.
         /// </summary>
@@ -328,11 +326,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EMail">The general contact email address of the roaming network operator.</param>
         /// <param name="HotlinePhoneNumber">The hotline phone number for support or incident handling.</param>
         /// <param name="HotlineEMail">The hotline email address for support or incident handling.</param>
-        /// <param name="SigningKeys">The public keys used to verify signatures created by the roaming network operator.</param>
         /// <param name="IdentityKeys">The public keys used to identify the roaming network operator.</param>
         /// <param name="KeyStatement">The key statement describing key ownership or trust information.</param>
         /// <param name="MinConsensus">How many holders of its keys of one kind sign what it owns, one by default.</param>
-        /// <param name="SigningKeyCertificates">The certificates of its signing keys, each by an identity key of the holder of the signing key.</param>
+        /// <param name="SigningKeyCertificates">The certificates of its signing keys, each by an identity key of the holder of the signing key: its signing keys.</param>
         /// 
         /// <param name="InitialAdminStatus">The initial administrative status with timestamp.</param>
         /// <param name="InitialStatus">The initial operational status with timestamp.</param>
@@ -353,7 +350,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       EMailAddress?                                        EMail                        = null,
                                       PhoneNumber?                                         HotlinePhoneNumber           = null,
                                       EMailAddress?                                        HotlineEMail                 = null,
-                                      IEnumerable<POIPublicKey>?                           SigningKeys                  = null,
                                       IEnumerable<POIPublicKey>?                           IdentityKeys                 = null,
                                       RoamingNetworkKeyStatement?                          KeyStatement                 = null,
                                       Byte?                                                MinConsensus                 = null,
@@ -395,17 +391,76 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.HotlinePhoneNumber  = HotlinePhoneNumber;
             this.HotlineEMail        = HotlineEMail;
 
-            (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the roaming network operator '{Id}'");
+            // Its signing keys are those its certificates certify: a key certified by two identity keys of its holder once.
+            this.SigningKeyCertificates  = RoamingNetworkSigningKeyCertificate.Ordered(SigningKeyCertificates, $"certificate of a signing key of the roaming network operator '{Id}'");
+
+            (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(this.SigningKeyCertificates.Select(certificate => certificate.SigningKey).Distinct(),
+                                                                       IdentityKeys,
+                                                                       $"the roaming network operator '{Id}'");
 
             this.MinConsensus        = MinConsensus ?? 1;
 
             POIPartyKeys.CheckQuorum(this.MinConsensus, this.SigningKeys, this.IdentityKeys, $"the roaming network operator '{Id}'");
 
             this.KeyStatement            = KeyStatement;
-            this.SigningKeyCertificates  = RoamingNetworkSigningKeyCertificate.Ordered(SigningKeyCertificates, $"certificate of a signing key of the roaming network operator '{Id}'");
             this.keyStatementError       = new (CheckKeyStatement);
 
         }
+
+        #endregion
+
+        #region RoamingNetworkOperator (KeyStatement, ...)
+
+        public RoamingNetworkOperator(RoamingNetworkKeyStatement                           KeyStatement,
+                                      I18NString?                                          Name                         = null,
+                                      I18NString?                                          Description                  = null,
+                                      Address?                                             Address                      = null,
+                                      URL?                                                 Homepage                     = null,
+                                      EMailAddress?                                        EMail                        = null,
+                                      PhoneNumber?                                         HotlinePhoneNumber           = null,
+                                      EMailAddress?                                        HotlineEMail                 = null,
+                                      IEnumerable<RoamingNetworkSigningKeyCertificate>?    SigningKeyCertificates       = null,
+
+                                      Timestamped<RoamingNetworkOperatorAdminStatusType>?  InitialAdminStatus           = null,
+                                      Timestamped<RoamingNetworkOperatorStatusType>?       InitialStatus                = null,
+                                      UInt16?                                              MaxAdminStatusScheduleSize   = null,
+                                      UInt16?                                              MaxStatusScheduleSize        = null,
+
+                                      String?                                              DataSource                   = null,
+                                      DateTimeOffset?                                      Created                      = null,
+                                      DateTimeOffset?                                      LastChange                   = null,
+
+                                      CustomDataNew?                                       CustomData                   = null,
+                                      UserDefinedDictionary?                               InternalData                 = null)
+
+            : this(KeyStatement.RoamingNetworkOperatorId,
+                   Name,
+                   Description,
+                   Address,
+                   Homepage,
+                   EMail,
+                   HotlinePhoneNumber,
+                   HotlineEMail,
+                   KeyStatement.IdentityKeys,
+                   KeyStatement,
+                   KeyStatement.MinConsensus,
+                   SigningKeyCertificates,
+
+                   InitialAdminStatus,
+                   InitialStatus,
+                   MaxAdminStatusScheduleSize,
+                   MaxStatusScheduleSize,
+
+                   DataSource,
+                   Created,
+                   LastChange,
+
+                   CustomData,
+                   InternalData)
+
+        { }
+
+        #endregion
 
         #endregion
 
@@ -418,17 +473,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Why its key statement or the certificates of its signing keys do not fit it in the given roaming network, or
         /// null: the key statement states this operator and network, only identity keys this operator names, its
         /// minConsensus, and is signed by identity keys of as many holders valid then; every certificate states this
-        /// operator and network, certifies one of its signing keys as it names it, and is signed by one of its identity keys
-        /// of the same holder, valid then. Their validity in time is the one of the verifier: a version keeps a key
-        /// statement that expired.
+        /// operator and is signed by one of its identity keys of the holder of the signing key, valid then. Their validity
+        /// in time is the one of the verifier: a version keeps a key statement that expired.
         /// </summary>
         internal String? KeyStatementError(RoamingNetwork_Id RoamingNetworkId)
 
             => KeyStatement is not null && KeyStatement.RoamingNetworkId != RoamingNetworkId
                    ? $"The key statement of the roaming network operator '{Id}' is one of the roaming network '{KeyStatement.RoamingNetworkId}', not of '{RoamingNetworkId}'!"
-                   : SigningKeyCertificates.FirstOrDefault(certificate => certificate.RoamingNetworkId != RoamingNetworkId) is RoamingNetworkSigningKeyCertificate otherNetwork
-                         ? $"The certificate of the signing key '{otherNetwork.SigningKey.Id}' of the roaming network operator '{Id}' is one of the roaming network '{otherNetwork.RoamingNetworkId}', not of '{RoamingNetworkId}'!"
-                         : keyStatementError.Value;
+                   : keyStatementError.Value;
 
         private String? CheckKeyStatement()
         {
@@ -439,9 +491,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (certificate.RoamingNetworkOperatorId != Id)
                     return $"The certificate of the signing key '{certificate.SigningKey.Id}' of the roaming network operator '{Id}' is one of '{certificate.RoamingNetworkOperatorId}'!";
-
-                if (!SigningKeys.Contains(certificate.SigningKey))
-                    return $"The roaming network operator '{Id}' certifies the signing key '{certificate.SigningKey.Id}' as it does not name it: a certificate names one of its signing keys with its validity, its holder and its usages!";
 
                 if (!certificate.TryVerify(IdentityKeys, out _, out var certificateError))
                     return $"The roaming network operator '{Id}': {certificateError}";
@@ -692,13 +741,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseAddress(JSON, PropertyKeys.Address,              "address",                out var address,      out ErrorResponse) ||
                     !POIJSON.TryParseText   (JSON, PropertyKeys.Homepage,             "homepage",               URL.        TryParse, out URL?          homepage, out ErrorResponse) ||
                     !POIJSON.TryParseText   (JSON, PropertyKeys.HotlinePhoneNumber,   "hotline phone number",   PhoneNumber.TryParse, out PhoneNumber?  hotline,  out ErrorResponse) ||
-                    !TryParseEMailAddress   (JSON[ PropertyKeys.EMailAddress],        "e-mail address",         out var eMail,        out ErrorResponse) ||
-                    !TryParseEMailAddress   (JSON[ PropertyKeys.HotlineEMailAddress], "hotline e-mail address", out var hotlineEMail, out ErrorResponse))
+                    !POIJSON.TryParseEMailAddress(JSON[ PropertyKeys.EMailAddress],        "e-mail address",         out var eMail,        out ErrorResponse) ||
+                    !POIJSON.TryParseEMailAddress(JSON[ PropertyKeys.HotlineEMailAddress], "hotline e-mail address", out var hotlineEMail, out ErrorResponse))
                 {
                     return false;
                 }
 
-                if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
+                if (JSON[POIPartyKeys.SigningKeysProperty] is not null)
+                {
+                    ErrorResponse = $"The signing keys of a roaming network operator are those of its {PropertyKeys.SigningKeyCertificates}!";
+                    return false;
+                }
+
+                if (!POIPartyKeys.TryParse(JSON, out _, out var identityKeys, out ErrorResponse))
                     return false;
 
                 if (!TryParseMinConsensus(JSON, out var minConsensus, out ErrorResponse))
@@ -740,7 +795,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              eMail,
                                              hotline,
                                              hotlineEMail,
-                                             signingKeys,
                                              identityKeys,
                                              keyStatement,
                                              minConsensus,
@@ -859,7 +913,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             );
 
-            POIPartyKeys.     AddTo(json, this);
+            // Its signing keys are those of its certificates, written once there.
+            if (IdentityKeys.Length > 0)
+                json.Add(PropertyKeys.IdentityKeys, new JArray(IdentityKeys.Select(key => key.ToJSON(Embedded: true))));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return CustomRoamingNetworkOperatorSerializer is not null
@@ -957,23 +1014,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 CBOR.ParseOptionalText(PropertyKeys.EMailAddress,         "e-mail address",          out var eMailText,         out ErrorResponse);
-                if (ErrorResponse is not null || !TryParseEMailAddress(eMailText,         "e-mail address",          out var eMail,         out ErrorResponse))
+                if (ErrorResponse is not null || !POIJSON.TryParseEMailAddress(eMailText,         "e-mail address",          out var eMail,         out ErrorResponse))
                     return false;
 
                 CBOR.ParseOptionalText(PropertyKeys.HotlineEMailAddress,  "hotline e-mail address",  out var hotlineEMailText,  out ErrorResponse);
-                if (ErrorResponse is not null || !TryParseEMailAddress(hotlineEMailText,  "hotline e-mail address",  out var hotlineEMail,  out ErrorResponse))
+                if (ErrorResponse is not null || !POIJSON.TryParseEMailAddress(hotlineEMailText,  "hotline e-mail address",  out var hotlineEMail,  out ErrorResponse))
                     return false;
 
                 #endregion
 
-                #region Parse Address, SigningKeys, IdentityKeys, KeyStatement, Created, LastChange, CustomData
+                #region Parse Address, IdentityKeys, KeyStatement, SigningKeyCertificates, Created, LastChange, CustomData
 
                 // What has no CBOR representation of its own is read as its JSON, with the parsers of the JSON
                 // representation: the address, the keys, the key statement and the metadata.
                 var json = new JObject();
 
+                if (CBOR.TryGetValue(CBORValue.FromText(POIPartyKeys.SigningKeysProperty), out _))
+                {
+                    ErrorResponse = $"The signing keys of a roaming network operator are those of its {PropertyKeys.SigningKeyCertificates}!";
+                    return false;
+                }
+
                 foreach (var key in new[] { PropertyKeys.Address,
-                                            PropertyKeys.SigningKeys,
                                             PropertyKeys.IdentityKeys,
                                             PropertyKeys.MinConsensus,
                                             PropertyKeys.KeyStatement,
@@ -989,7 +1051,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseAddress(json, PropertyKeys.Address, "address", out var address, out ErrorResponse))
                     return false;
 
-                if (!POIPartyKeys.TryParse(json, out var signingKeys, out var identityKeys, out ErrorResponse))
+                if (!POIPartyKeys.TryParse(json, out _, out var identityKeys, out ErrorResponse))
                     return false;
 
                 if (!TryParseMinConsensus(json, out var minConsensus, out ErrorResponse))
@@ -1033,7 +1095,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              eMail,
                                              hotline,
                                              hotlineEMail,
-                                             signingKeys,
                                              identityKeys,
                                              keyStatement,
                                              minConsensus,
@@ -1112,10 +1173,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (HotlineEMail is not null)
                 cbor.Add(CBORValue.FromText(PropertyKeys.HotlineEMailAddress),    CBORValue.FromText(HotlineEMail.ToString()));
-
-            if (SigningKeys.Length > 0)
-                cbor.Add(CBORValue.FromText(PropertyKeys.SigningKeys),
-                         CBORValue.FromArray(SigningKeys. Select(key => CBORJSON.ToCBOR(key.ToJSON(Embedded: true)))));
 
             if (IdentityKeys.Length > 0)
                 cbor.Add(CBORValue.FromText(PropertyKeys.IdentityKeys),
@@ -1262,69 +1319,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         #endregion
-
-        #region (private static) TryParseEMailAddress(Value, PropertyDescription, out EMailAddress, out ErrorResponse)
-
-        /// <summary>
-        /// An optional e-mail address, as its text: "info@example.org", or with the name of its owner,
-        /// "Example Hotline &lt;hotline@example.org&gt;", as EMailAddress.ToString() writes it.
-        /// </summary>
-        private static Boolean TryParseEMailAddress(JToken?                           Value,
-                                                    String                            PropertyDescription,
-                                                    out EMailAddress?                 EMailAddress,
-                                                    [NotNullWhen(false)] out String?  ErrorResponse)
-        {
-
-            if (Value is null)
-            {
-                EMailAddress   = null;
-                ErrorResponse  = null;
-                return true;
-            }
-
-            if (Value.Type != JTokenType.String)
-            {
-                EMailAddress   = null;
-                ErrorResponse  = $"Invalid {PropertyDescription} '{Value}'!";
-                return false;
-            }
-
-            return TryParseEMailAddress(Value.Value<String>(), PropertyDescription, out EMailAddress, out ErrorResponse);
-
-        }
-
-        private static Boolean TryParseEMailAddress(String?                           Text,
-                                                    String                            PropertyDescription,
-                                                    out EMailAddress?                 EMailAddress,
-                                                    [NotNullWhen(false)] out String?  ErrorResponse)
-        {
-
-            EMailAddress   = null;
-            ErrorResponse  = null;
-
-            if (Text is null)
-                return true;
-
-            try
-            {
-                EMailAddress = EMailAddress.Parse(Text);
-            }
-            catch (Exception)
-            { }
-
-            if (EMailAddress is null)
-            {
-                ErrorResponse = $"Invalid {PropertyDescription} '{Text}'!";
-                return false;
-            }
-
-            return true;
-
-        }
-
-        #endregion
-
-
 
         #region Operator overloading, IEquatable, IComparable
 

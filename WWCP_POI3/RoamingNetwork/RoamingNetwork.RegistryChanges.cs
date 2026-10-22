@@ -89,10 +89,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ]);
 
         /// <summary>
-        /// The properties of the roaming network operator: those of a party, its e-mail addresses, its key statement and the
-        /// certificates of its signing keys.
+        /// The properties of the roaming network operator: those of a party but its signing keys, its e-mail addresses, its
+        /// key statement and the certificates of its signing keys, the only place naming them.
         /// </summary>
-        private static readonly ImmutableHashSet<String> ChangeableRoamingNetworkOperatorProperties = ChangeablePartyProperties.Union([
+        private static readonly ImmutableHashSet<String> ChangeableRoamingNetworkOperatorProperties = ChangeablePartyProperties.Remove(POIPartyKeys.SigningKeysProperty).Union([
             RoamingNetworkOperator.PropertyKeys.EMailAddress,
             RoamingNetworkOperator.PropertyKeys.HotlineEMailAddress,
             RoamingNetworkOperator.PropertyKeys.MinConsensus,
@@ -111,10 +111,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
             (changed, previous)    => changed.ShareRuntimeOf(previous)
         );
 
+        /// <summary>
+        /// The properties of a charging station or energy meter manufacturer: those of an entity of a registry, its contact
+        /// data and data licenses, as of a charging station operator, and its keys.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> ChangeableManufacturerProperties = ChangeableRegistryProperties.Union([
+            ChargingStationManufacturer.BasePropertyKeys.DataLicenses,
+            ChargingStationManufacturer.PropertyKeys.Logos,
+            ChargingStationManufacturer.PropertyKeys.GeoLocation,
+            ChargingStationManufacturer.PropertyKeys.Telephone,
+            ChargingStationManufacturer.PropertyKeys.EMailAddress,
+            ChargingStationManufacturer.PropertyKeys.TermsAndConditions,
+            ChargingStationManufacturer.PropertyKeys.SigningKeys,
+            ChargingStationManufacturer.PropertyKeys.IdentityKeys
+        ]);
+
         private static readonly Registry<ChargingStationManufacturer_Id, ChargingStationManufacturer> ManufacturerRegistry = new (
             "charging station manufacturer",
             "a",
-            ChangeableRegistryProperties,
+            ChangeableManufacturerProperties,
             ChargingStationManufacturer_Id.TryParse,
             ChargingStationManufacturer.TryParse,
             manufacturer        => manufacturer.Id,
@@ -122,10 +137,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
             (changed, previous) => changed.ShareRuntimeOf(previous)
         );
 
+        /// <summary>
+        /// The properties of an e-mobility provider: those of a party, and its contact data and data licenses, as of a
+        /// charging station operator.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> ChangeableEMobilityProviderProperties = ChangeablePartyProperties.Union([
+            EMobilityProvider.BasePropertyKeys.DataLicenses,
+            EMobilityProvider.PropertyKeys.Logos,
+            EMobilityProvider.PropertyKeys.GeoLocation,
+            EMobilityProvider.PropertyKeys.Telephone,
+            EMobilityProvider.PropertyKeys.EMailAddress,
+            EMobilityProvider.PropertyKeys.TermsAndConditions
+        ]);
+
         private static readonly Registry<EMobilityProvider_Id, EMobilityProvider> EMobilityProviderRegistry = new (
             "e-mobility provider",
             "an",
-            ChangeablePartyProperties,
+            ChangeableEMobilityProviderProperties,
             EMobilityProvider_Id.TryParse,
             EMobilityProvider.TryParse,
             eMobilityProvider => eMobilityProvider.Id,
@@ -162,13 +190,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly Registry<EnergyMeterManufacturer_Id, EnergyMeterManufacturer> EnergyMeterManufacturerRegistry = new (
             "energy meter manufacturer",
             "an",
-            ChangeableRegistryProperties,
+            // The same as of a charging station manufacturer.
+            ChangeableManufacturerProperties,
             EnergyMeterManufacturer_Id.TryParse,
             EnergyMeterManufacturer.TryParse,
             energyMeterManufacturer => energyMeterManufacturer.Id,
             energyMeterManufacturer => energyMeterManufacturer.ToJSON(Embedded: true),
-            // Energy meter manufacturers have no runtime status.
-            (changed, previous) => { }
+            (changed, previous)     => changed.ShareRuntimeOf(previous)
         );
 
         private static readonly Registry<TransparencySoftware_Id, TransparencySoftware> TransparencySoftwareRegistry = new (

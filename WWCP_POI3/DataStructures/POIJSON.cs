@@ -28,6 +28,9 @@ using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Aegir;
 using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+using org.GraphDefined.Vanaheimr.Hermod.Mail;
 
 #endregion
 
@@ -68,6 +71,73 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of its geographical location.
             /// </summary>
             public const String  GeoLocation   = "geoLocation";
+
+        }
+
+        #endregion
+
+        #region (static) class ContactKeys
+
+        /// <summary>
+        /// The property keys of the contact data of an organization, as TryParseContact(…) reads them.
+        /// </summary>
+        public static class ContactKeys
+        {
+
+            /// <summary>
+            /// The property of its logos: at most one.
+            /// </summary>
+            public const String  Logos                = "logos";
+
+            /// <summary>
+            /// The property of the URI of its logo.
+            /// </summary>
+            public const String  LogoURI              = "uri";
+
+            /// <summary>
+            /// The property of its address.
+            /// </summary>
+            public const String  Address              = "address";
+
+            /// <summary>
+            /// The property of its geographical location.
+            /// </summary>
+            public const String  GeoLocation          = "geoLocation";
+
+            /// <summary>
+            /// The property of its telephone number.
+            /// </summary>
+            public const String  Telephone            = "telephone";
+
+            /// <summary>
+            /// The property of its e-mail address.
+            /// </summary>
+            public const String  EMailAddress         = "eMailAddress";
+
+            /// <summary>
+            /// The property of its homepage.
+            /// </summary>
+            public const String  Homepage             = "homepage";
+
+            /// <summary>
+            /// The property of its hotline phone number.
+            /// </summary>
+            public const String  HotlinePhoneNumber   = "hotline";
+
+            /// <summary>
+            /// The property of the URL of its terms and conditions.
+            /// </summary>
+            public const String  TermsAndConditions   = "termsAndConditions";
+
+            /// <summary>
+            /// The property of its data licenses, given completely.
+            /// </summary>
+            public const String  DataLicenses         = "dataLicenses";
+
+            /// <summary>
+            /// The property of the identifications of its data licenses.
+            /// </summary>
+            public const String  DataLicenseIds       = "dataLicenseIds";
 
         }
 
@@ -1255,6 +1325,144 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Children       = children.MoveToImmutable();
             ErrorResponse  = null;
             return true;
+
+        }
+
+        #endregion
+
+        #region TryParseEMailAddress(Value, PropertyDescription, out EMailAddress, out ErrorResponse)
+
+        /// <summary>
+        /// An optional e-mail address, as its text: "info@example.org", or with the name of its owner,
+        /// "Example Hotline &lt;hotline@example.org&gt;", as EMailAddress.ToString() writes it.
+        /// </summary>
+        public static Boolean TryParseEMailAddress(JToken?                           Value,
+                                                    String                            PropertyDescription,
+                                                    out EMailAddress?                 EMailAddress,
+                                                    [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            if (Value is null)
+            {
+                EMailAddress   = null;
+                ErrorResponse  = null;
+                return true;
+            }
+
+            if (Value.Type != JTokenType.String)
+            {
+                EMailAddress   = null;
+                ErrorResponse  = $"Invalid {PropertyDescription} '{Value}'!";
+                return false;
+            }
+
+            return TryParseEMailAddress(Value.Value<String>(), PropertyDescription, out EMailAddress, out ErrorResponse);
+
+        }
+
+        public static Boolean TryParseEMailAddress(String?                           Text,
+                                                    String                            PropertyDescription,
+                                                    out EMailAddress?                 EMailAddress,
+                                                    [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            EMailAddress   = null;
+            ErrorResponse  = null;
+
+            if (Text is null)
+                return true;
+
+            try
+            {
+                EMailAddress = EMailAddress.Parse(Text);
+            }
+            catch (Exception)
+            { }
+
+            if (EMailAddress is null)
+            {
+                ErrorResponse = $"Invalid {PropertyDescription} '{Text}'!";
+                return false;
+            }
+
+            return true;
+
+        }
+
+        #endregion
+
+        #region TryParseContact(JSON, out Logo, out Address, ..., out DataLicenses, out ErrorResponse)
+
+        /// <summary>
+        /// The optional contact data and data licenses of the given JSON representation of an organization, e.g. an
+        /// e-mobility provider or a manufacturer, as a charging station operator writes them: its logo, as "logos" of at
+        /// most one { "uri" }, its address, geo location, telephone number, e-mail address, homepage, hotline and the URL
+        /// of its terms and conditions.
+        /// </summary>
+        public static Boolean TryParseContact(JObject                           JSON,
+                                              out URL?                          Logo,
+                                              out Address?                      Address,
+                                              out GeoCoordinate?                GeoLocation,
+                                              out PhoneNumber?                  Telephone,
+                                              out EMailAddress?                 EMailAddress,
+                                              out URL?                          Homepage,
+                                              out PhoneNumber?                  HotlinePhoneNumber,
+                                              out URL?                          TermsAndConditionsURL,
+                                              out ImmutableArray<DataLicense>   DataLicenses,
+                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Logo                   = null;
+            Address                = null;
+            GeoLocation            = null;
+            Telephone              = null;
+            EMailAddress           = null;
+            Homepage               = null;
+            HotlinePhoneNumber     = null;
+            TermsAndConditionsURL  = null;
+            DataLicenses           = [];
+
+            if (JSON[ContactKeys.Logos] is JToken logosJSON)
+            {
+
+                if (logosJSON is not JArray logosArray || logosArray.Count > 1 ||
+                    (logosArray.Count == 1 && logosArray[0] is not JObject))
+                {
+                    ErrorResponse = "The logos must be a JSON array of at most one logo object!";
+                    return false;
+                }
+
+                if (logosArray.Count == 1)
+                {
+
+                    if (!TryParseText((JObject) logosArray[0], ContactKeys.LogoURI, "logo URI", URL.TryParse, out Logo, out ErrorResponse))
+                        return false;
+
+                    if (Logo is null)
+                    {
+                        ErrorResponse = "A logo requires an URI!";
+                        return false;
+                    }
+
+                }
+
+            }
+
+            if (!TryParseAddress     (JSON, ContactKeys.Address,             "address",                   out Address,      out ErrorResponse) ||
+                !TryParseGeoLocation (JSON, ContactKeys.GeoLocation,         "geo location",              out GeoLocation,  out ErrorResponse) ||
+                !TryParseText        (JSON, ContactKeys.Telephone,           "telephone number",          PhoneNumber.TryParse, out Telephone,              out ErrorResponse) ||
+                !TryParseEMailAddress(JSON[ ContactKeys.EMailAddress],       "e-mail address",            out EMailAddress, out ErrorResponse) ||
+                !TryParseText        (JSON, ContactKeys.Homepage,            "homepage",                  URL.        TryParse, out Homepage,               out ErrorResponse) ||
+                !TryParseText        (JSON, ContactKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.TryParse, out HotlinePhoneNumber,     out ErrorResponse) ||
+                !TryParseText        (JSON, ContactKeys.TermsAndConditions,  "terms and conditions URL",  URL.        TryParse, out TermsAndConditionsURL,  out ErrorResponse))
+            {
+                return false;
+            }
+
+            return POIDataLicenses.TryParse(JSON[ContactKeys.DataLicenses],
+                                            JSON[ContactKeys.DataLicenseIds],
+                                            out DataLicenses,
+                                            out ErrorResponse);
 
         }
 

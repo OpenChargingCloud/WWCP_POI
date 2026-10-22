@@ -296,11 +296,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Parse Telephone, EMailAddress, Homepage, Hotline, TermsAndConditions [optional]
 
-                if (!TryParseOptionalText(JSON, PropertyKeys.Telephone,           "telephone number",          PhoneNumber.       TryParse, out PhoneNumber?         telephone,             out ErrorResponse) ||
-                    !TryParseOptionalText(JSON, PropertyKeys.EMailAddress,        "e-mail address",            SimpleEMailAddress.TryParse, out SimpleEMailAddress?  eMailAddress,          out ErrorResponse) ||
-                    !TryParseOptionalText(JSON, PropertyKeys.Homepage,            "homepage",                  URL.               TryParse, out URL?                 homepage,              out ErrorResponse) ||
-                    !TryParseOptionalText(JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.       TryParse, out PhoneNumber?         hotlinePhoneNumber,    out ErrorResponse) ||
-                    !TryParseOptionalText(JSON, PropertyKeys.TermsAndConditions,  "terms and conditions URL",  URL.               TryParse, out URL?                 termsAndConditionsURL, out ErrorResponse))
+                if (!TryParseOptionalText        (JSON, PropertyKeys.Telephone,           "telephone number",          PhoneNumber.TryParse, out PhoneNumber?  telephone,             out ErrorResponse) ||
+                    !POIJSON.TryParseEMailAddress(JSON[ PropertyKeys.EMailAddress],       "e-mail address",                                  out var           eMailAddress,          out ErrorResponse) ||
+                    !TryParseOptionalText        (JSON, PropertyKeys.Homepage,            "homepage",                  URL.        TryParse, out URL?          homepage,              out ErrorResponse) ||
+                    !TryParseOptionalText        (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.TryParse, out PhoneNumber?  hotlinePhoneNumber,    out ErrorResponse) ||
+                    !TryParseOptionalText        (JSON, PropertyKeys.TermsAndConditions,  "terms and conditions URL",  URL.        TryParse, out URL?          termsAndConditionsURL, out ErrorResponse))
                 {
                     return false;
                 }
@@ -457,6 +457,298 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (protected override) ContentJSON()
+
+        /// <inheritdoc/>
+        protected override JObject ContentJSON()
+
+            => ToJSON(Embedded: true);
+
+        #endregion
+
+        #region ToJSON(Embedded = false, ...)
+
+        /// <summary>
+        /// Return a JSON representation for the given charging station operator.
+        /// </summary>
+        /// <param name="Embedded">Whether this data is embedded into another data structure, e.g. into a roaming network.</param>
+        /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
+        public JObject ToJSON(Boolean                                                    Embedded                                  = false,
+                              InfoStatus                                                 ExpandChargingPoolIds                     = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandChargingStationIds                  = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandEVSEIds                             = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandBrandIds                            = InfoStatus.ShowIdOnly,
+                              InfoStatus                                                 ExpandDataLicenses                        = InfoStatus.Expanded,
+                              Boolean                                                    IncludeETags                              = false,
+                              ETagDigestEncoding?                                        ETagDigestEncoding                        = null,
+                              CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer   = null)
+
+            => ToJSON(Embedded,
+                      ExpandChargingPoolIds,
+                      ExpandChargingStationIds,
+                      ExpandEVSEIds,
+                      ExpandBrandIds,
+                      ExpandDataLicenses,
+                      CustomChargingStationOperatorSerializer,
+                      IncludeChildArrays:  true,
+                      IncludeETags:        IncludeETags,
+                      ETagDigestEncoding:  ETagDigestEncoding);
+
+        /// <summary>
+        /// The JSON representation of this charging station operator, with or without its child arrays: without them for the skeleton of its
+        /// tree (SPECIFICATION.md, section 8.2), which names their roots in their place.
+        /// </summary>
+        /// <param name="IncludeChildArrays">Whether to include its child arrays.</param>
+        /// <param name="OnlyChargingPools">Optionally, the only charging pools of it to include, e.g. those a change of a change set changes.</param>
+        /// <param name="IncludeETags">Whether to include its ETags.</param>
+        /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
+        internal JObject ToJSON(Boolean                                                    Embedded,
+                                InfoStatus                                                 ExpandChargingPoolIds,
+                                InfoStatus                                                 ExpandChargingStationIds,
+                                InfoStatus                                                 ExpandEVSEIds,
+                                InfoStatus                                                 ExpandBrandIds,
+                                InfoStatus                                                 ExpandDataLicenses,
+                                CustomJObjectSerializerDelegate<ChargingStationOperator>?  CustomChargingStationOperatorSerializer,
+                                Boolean                                                    IncludeChildArrays,
+                                IReadOnlyCollection<ChargingPool>?                         OnlyChargingPools   = null,
+                                Boolean                                                    IncludeETags        = false,
+                                ETagDigestEncoding?                                        ETagDigestEncoding  = null)
+        {
+
+            try
+            {
+
+                var json = JSONObject.Create(
+
+                                     new JProperty(BasePropertyKeys.Id,                   Id.ToString()),
+
+
+                               !Embedded
+                                   ? new JProperty(BasePropertyKeys.Context,              JSONLDContext)
+                                   : null,
+
+                                     new JProperty(BasePropertyKeys.Name,                 Name.       ToJSON()),
+
+                               Description.IsNotNullOrEmpty()
+                                   ? new JProperty(BasePropertyKeys.Description,          Description.ToJSON())
+                                   : null,
+
+                               DataSource.IsNotNullOrEmpty()
+                                   ? new JProperty(BasePropertyKeys.DataSource,           DataSource)
+                                   : null,
+
+                               // No data licenses, no property: as the roaming network and its charging pools write them.
+                               ExpandDataLicenses != InfoStatus.Hidden && DataLicenses.Any()
+                                   ? ExpandDataLicenses.Switch(
+                                         () => new JProperty(BasePropertyKeys.DataLicenseIds,  DataLicenses.ToPOIIdsJSON()),
+                                         () => new JProperty(BasePropertyKeys.DataLicenses,    DataLicenses.ToPOIJSON()))
+                                   : null,
+
+                               Address is not null
+                                   ? new JProperty(PropertyKeys.Address,                  Address.ToJSON(Embedded: true))
+                                   : null,
+
+                               // API
+                               // MainKeys
+                               // RobotKeys
+                               // Endpoints
+                               // DNS SRV
+
+                               Logo.IsNotNullOrEmpty()
+                                   ? new JProperty(PropertyKeys.Logos,                    JSONArray.Create(
+                                                                              JSONObject.Create(
+                                                                                  new JProperty(PropertyKeys.LogoURI,  Logo.     ToString())
+                                                                                  //new JProperty("description",  I18NString.Empty.ToJSON())
+                                                                              )
+                                                                          ))
+                                   : null,
+
+                               GeoLocation.HasValue
+                                   ? new JProperty(PropertyKeys.GeoLocation,              GeoLocation.Value.ToJSON(Embedded: true))
+                                   : null,
+
+                               Telephone.HasValue
+                                   ? new JProperty(PropertyKeys.Telephone,                Telephone.ToString())
+                                   : null,
+
+                               EMailAddress is not null
+                                   ? new JProperty(PropertyKeys.EMailAddress,             EMailAddress.ToString())
+                                   : null,
+
+                               Homepage.HasValue
+                                   ? new JProperty(PropertyKeys.Homepage,                 Homepage.ToString())
+                                   : null,
+
+                               HotlinePhoneNumber.HasValue
+                                   ? new JProperty(PropertyKeys.HotlinePhoneNumber,       HotlinePhoneNumber.ToString())
+                                   : null,
+
+                               TermsAndConditionsURL.HasValue
+                                   ? new JProperty(PropertyKeys.TermsAndConditions,       TermsAndConditionsURL.ToString())
+                                   : null,
+
+
+                               //ExpandChargingPoolIds != InfoStatus.Hidden && ChargingPools.Any()
+                               //    ? ExpandChargingPoolIds.Switch(
+
+                               //          () => new JProperty("chargingPoolIds",
+                               //                              new JArray(ChargingPoolIds().
+                               //                                                                 OrderBy(poolId => poolId).
+                               //                                                                 Select (poolId => poolId.ToString()))),
+
+                               //          () => new JProperty("chargingPools",
+                               //                              new JArray(ChargingPools.
+                               //                                                                 OrderBy(poolId => poolId).
+                               //                                                                 ToJSON (Embedded:                           true,
+                               //                                                                         ExpandRoamingNetworkId:             InfoStatus.Hidden,
+                               //                                                                         ExpandChargingStationOperatorId:    InfoStatus.Hidden,
+                               //                                                                         ExpandChargingStationIds:           ExpandChargingStationIds,
+                               //                                                                         ExpandEVSEIds:                      ExpandEVSEIds,
+                               //                                                                         ExpandBrandIds:                     ExpandBrandIds,
+                               //                                                                         ExpandDataLicenses:                 ExpandDataLicenses,
+                               //                                                                         CustomChargingPoolSerializer:       CustomChargingPoolSerializer,
+                               //                                                                         CustomChargingStationSerializer:    CustomChargingStationSerializer,
+                               //                                                                         CustomEVSESerializer:               CustomEVSESerializer,
+                               //                                                                         CustomChargingConnectorSerializer:  CustomChargingConnectorSerializer))))
+                               //    : null,
+
+
+                               //ExpandChargingPoolIds != InfoStatus.Expanded && ExpandChargingStationIds != InfoStatus.Hidden && ChargingStations.Any()
+                               //    ? ExpandChargingStationIds.Switch(
+
+                               //          () => new JProperty("chargingStationIds",
+                               //                              new JArray(ChargingStationIds().
+                               //                                                                 OrderBy(stationid => stationid).
+                               //                                                                 Select (stationid => stationid.ToString()))),
+
+                               //          () => new JProperty("chargingStations",
+                               //                              new JArray(ChargingStations.
+                               //                                                                 OrderBy(station   => station).
+                               //                                                                 ToJSON (Embedded:                         true,
+                               //                                                                         ExpandRoamingNetworkId:           InfoStatus.Hidden,
+                               //                                                                         ExpandChargingStationOperatorId:  InfoStatus.Hidden,
+                               //                                                                         ExpandChargingPoolId:             InfoStatus.Hidden,
+                               //                                                                         ExpandEVSEIds:                    InfoStatus.Expanded,
+                               //                                                                         ExpandBrandIds:                   InfoStatus.ShowIdOnly,
+                               //                                                                         ExpandDataLicenses:               InfoStatus.Hidden,
+                               //                                                                         CustomChargingStationSerializer:  CustomChargingStationSerializer,
+                               //                                                                         CustomEVSESerializer:             CustomEVSESerializer))))
+                               //    : null,
+
+
+                               //ExpandChargingPoolIds != InfoStatus.Expanded && ExpandChargingStationIds != InfoStatus.Expanded && ExpandEVSEIds != InfoStatus.Hidden && EVSEs.Any()
+                               //    ? ExpandEVSEIds.Switch(
+
+                               //          () => new JProperty("EVSEIds",
+                               //                              new JArray(EVSEIds().
+                               //                                                                 OrderBy(evseId => evseId).
+                               //                                                                 Select (evseId => evseId.ToString()))),
+
+                               //          () => new JProperty("EVSEs",
+                               //                              new JArray(EVSEs.
+                               //                                                                 OrderBy(evse   => evse).
+                               //                                                                 ToJSON (Embedded:                         true,
+                               //                                                                         ExpandRoamingNetworkId:           InfoStatus.Hidden,
+                               //                                                                         ExpandChargingStationOperatorId:  InfoStatus.Hidden,
+                               //                                                                         ExpandChargingPoolId:             InfoStatus.Hidden,
+                               //                                                                         ExpandChargingStationId:          InfoStatus.Hidden,
+                               //                                                                         ExpandBrandIds:                   InfoStatus.ShowIdOnly,
+                               //                                                                         ExpandDataLicenses:               InfoStatus.Hidden,
+                               //                                                                         CustomEVSESerializer:             CustomEVSESerializer))))
+                               //    : null,
+
+
+                               // created, lastChange and customData: see below
+                               null
+
+                               );
+
+                // Embedded completely, as content.
+                if (Brands.Count > 0)
+                    json.Add(PropertyKeys.Brands, new JArray(Brands.Select(brand => brand.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && ChargingTariffs.Count > 0)
+                    json.Add(PropertyKeys.ChargingTariffs, new JArray(ChargingTariffs.Select(chargingTariff => chargingTariff.ToJSON(Embedded: true))));
+
+                var chargingPools = OnlyChargingPools ?? ChargingPools;
+
+                if (IncludeChildArrays && chargingPools.Count > 0)
+                    json.Add(PropertyKeys.ChargingPools, new JArray(chargingPools.Select(chargingPool => chargingPool.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && EVSETemplates.Count > 0)
+                    json.Add(PropertyKeys.EVSETemplates, new JArray(EVSETemplates.Select(template => template.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && ChargingStationTemplates.Count > 0)
+                    json.Add(PropertyKeys.ChargingStationTemplates, new JArray(ChargingStationTemplates.Select(template => template.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && ChargingPoolTemplates.Count > 0)
+                    json.Add(PropertyKeys.ChargingPoolTemplates, new JArray(ChargingPoolTemplates.Select(template => template.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && ChargingTariffTemplates.Count > 0)
+                    json.Add(PropertyKeys.ChargingTariffTemplates, new JArray(ChargingTariffTemplates.Select(template => template.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && EnergyMeterTemplates.Count > 0)
+                    json.Add(PropertyKeys.EnergyMeterTemplates, new JArray(EnergyMeterTemplates.Select(template => template.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && EVSEGroups.Count > 0)
+                    json.Add(PropertyKeys.EVSEGroups, new JArray(EVSEGroups.Select(group => group.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && ChargingStationGroups.Count > 0)
+                    json.Add(PropertyKeys.ChargingStationGroups, new JArray(ChargingStationGroups.Select(group => group.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && ChargingPoolGroups.Count > 0)
+                    json.Add(PropertyKeys.ChargingPoolGroups, new JArray(ChargingPoolGroups.Select(group => group.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && ChargingTariffGroups.Count > 0)
+                    json.Add(PropertyKeys.ChargingTariffGroups, new JArray(ChargingTariffGroups.Select(group => group.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && EnergyMeterGroups.Count > 0)
+                    json.Add(PropertyKeys.EnergyMeterGroups, new JArray(EnergyMeterGroups.Select(group => group.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && ChargingTariffOffers.Count > 0)
+                    json.Add(PropertyKeys.ChargingTariffOffers, new JArray(ChargingTariffOffers.Select(offer => offer.ToJSON(Embedded: true))));
+
+                if (IncludeChildArrays && ParkingSpaces.Count > 0)
+                    json.Add(PropertyKeys.ParkingSpaces, new JArray(ParkingSpaces.Select(parkingSpace => parkingSpace.ToJSON(Embedded: true))));
+
+                POIPartyKeys.AddTo(json, this);
+
+                // Always part of the content.
+                POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
+
+                if (ETagsProperty(IncludeETags, ETagDigestEncoding) is JProperty eTags)
+                    json.Add(eTags);
+
+                //json["EVSEGroups"] = POIJSON.Children(EVSEGroups);
+                //json["chargingStationGroups"] = POIJSON.Children(ChargingStationGroups);
+                //json["chargingPoolGroups"] = POIJSON.Children(ChargingPoolGroups);
+                //json["chargingTariffGroups"] = POIJSON.Children(ChargingTariffGroups);
+
+                //return POIRepresentation.AddETags(this, CustomChargingStationOperatorSerializer is not null
+                //           ? CustomChargingStationOperatorSerializer(this, json)
+                //           : json);
+
+
+                return CustomChargingStationOperatorSerializer is not null
+                           ? CustomChargingStationOperatorSerializer(this, json)
+                           : json;
+
+            }
+            catch (Exception e)
+            {
+                return new JObject(
+                           new JProperty(BasePropertyKeys.Id,       Id.ToString()),
+                           new JProperty(BasePropertyKeys.Context,  JSONLDContext),
+                           new JProperty(PropertyKeys.Exception,    e.Message),
+                           new JProperty(PropertyKeys.StackTrace,   e.StackTrace)
+                       );
+            }
+
+        }
+
+        #endregion
+
 
         #region Parse    (CBOR)
 
@@ -594,7 +886,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Telephone.HasValue)
                 cbor.Add(CBORValue.FromText(PropertyKeys.Telephone),                     CBORValue.FromText(Telephone.ToString()));
 
-            if (EMailAddress.HasValue)
+            if (EMailAddress is not null)
                 cbor.Add(CBORValue.FromText(PropertyKeys.EMailAddress),                  CBORValue.FromText(EMailAddress.ToString()));
 
             if (Homepage.HasValue)

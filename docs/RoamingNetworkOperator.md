@@ -49,11 +49,11 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `address` | `Address` | `Address?` | update/remove | Address of the headquarters, as Styx writes it embedded. |
 | `homepage` | `Homepage` | `URL?` | update/remove | Homepage. |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | Hotline phone number. |
-| `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update (signing or identity key; a holder's own by one of its identity keys) | Keys signing its change sets, see [Keys](#keys). Can not be removed. |
+| `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | — (not written) | Its keys signing change sets, those its `signingKeyCertificates` certify, see [Keys](#keys). |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update (identity key) | Long-term keys signing changes of keys, see [Keys](#keys). Can not be removed. |
 | `minConsensus` | `MinConsensus` | `Byte`, 1 by default, written unless 1 | update (identity keys) | How many holders of its keys of one kind sign what it owns, see [Quorum](#quorum). |
 | `keyStatement` | `KeyStatement` | `RoamingNetworkKeyStatement?` | update/remove | Its identity keys and its `minConsensus`, stated by identity keys of the quorum, for apps ([SPECIFICATION.md](../SPECIFICATION.md#86-key-statements-and-trust-anchors), section 8.6). |
-| `signingKeyCertificates` | `SigningKeyCertificates` | `ImmutableArray<RoamingNetworkSigningKeyCertificate>` | update/remove (as `signingKeys`) | Each signing key certified by an identity key of its holder, for apps (section 8.6). |
+| `signingKeyCertificates` | `SigningKeyCertificates` | `ImmutableArray<RoamingNetworkSigningKeyCertificate>` | update (signing or identity key; a holder's own by one of its identity keys) | Its signing keys, each certified by an identity key of its holder, for apps (section 8.6). Can not be removed or emptied. |
 
 A change set names the properties above by their JSON keys (`RoamingNetworkOperatorRegistry` in
 [RoamingNetwork.RegistryChanges.cs](../WWCP_POI3/RoamingNetwork/RoamingNetwork.RegistryChanges.cs)), with
@@ -62,7 +62,9 @@ roaming network it operates.
 
 ```csharp
 RoamingNetworkChange.UpdateProperty(rn.Operator!, "homepage",    null, "https://open.charging.cloud")  // signed by its signing key
-RoamingNetworkChange.UpdateProperty(rn.Operator!, "signingKeys", null, new JArray(newKey.ToJSON()))   // signed by a signing or an identity key
+RoamingNetworkChange.UpdateProperty(rn.Operator!, "signingKeyCertificates", null,
+                                    new JArray(RoamingNetworkSigningKeyCertificate.Create(identityKey, COSEAlgorithm.ES512, rn.Operator!.Id,
+                                                                                          newKey, now).ToJSON(Embedded: true)))  // signed by a signing or an identity key
 ```
 
 The party of its signatures is `POIPartyId("RoamingNetworkOperator", id)`, `RoamingNetwork.OperatorParty`; it is
@@ -85,10 +87,14 @@ The public keys of the RNO (`POIPublicKey`, [source](../WWCP_POI3/DataStructures
 | `usages` | array of texts | Optional, signing keys only: what it may sign (`infrastructure`, `tariffs`, `priceStatements`, `party`); everything without. Commits and attestations of the RNO need `party`. No part of `@id`. |
 
 - **signingKeys** — short keys (e.g. secp256r1) signing change sets of RNO data: its own properties, the network's
-  properties, the registries, adding and removing parties, and the rotation of the `signingKeys` themselves. A
-  server operating the network signs its commits with one as well, in the role `roamingNetworkOperator`.
+  properties, the registries, adding and removing parties, and the rotation of the signing keys themselves. A
+  server operating the network signs its commits with one as well, in the role `roamingNetworkOperator`. The RNO
+  names them in its `signingKeyCertificates` only, each certified by an identity key of its holder; it writes no
+  `signingKeys`, and one naming them is refused. A certificate names the operator, not a network: the same keys in
+  every network it operates.
 - **identityKeys** — long-term keys (e.g. secp521r1) signing changes of the RNO's `identityKeys`, of its
-  `signingKeys` when none of them can sign any more, and, for recovery, of the keys of any other party.
+  certificates when none of its signing keys can sign any more, and, for recovery, of the keys of any other party.
+  A change of them certifies the signing keys anew in the same change set.
 - **Two identity keys at least.** Nobody can replace the RNO's identity keys once they are lost or expired: there is
   nobody above the RNO, and no external trust configuration. An RNO should therefore name at least two identity keys
   with different `notAfter`, one of them kept offline, and replace an identity key well before it expires. This is

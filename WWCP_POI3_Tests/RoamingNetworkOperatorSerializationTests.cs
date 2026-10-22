@@ -71,7 +71,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                        EMail:               EMailAddress.Parse("info@roaming.example.org"),
                        HotlinePhoneNumber:  PhoneNumber.Parse("+49 3641 123456"),
                        HotlineEMail:        EMailAddress.Parse("Example Hotline <hotline@roaming.example.org>"),
-                       SigningKeys:         signingKeys. Select(key => key.Public),
                        IdentityKeys:        identityKeys.Select(key => key.Public),
                        KeyStatement:        RoamingNetworkKeyStatement.Create([ (identityKeys[0].Private, COSEAlgorithm.ES512),
                                                                                 (identityKeys[1].Private, COSEAlgorithm.ES512) ],
@@ -84,7 +83,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                        MinConsensus:        2,
                        SigningKeyCertificates:  signingKeys.Select((key, index) => RoamingNetworkSigningKeyCertificate.Create(identityKeys[index].Private,
                                                                                                                                 COSEAlgorithm.ES512,
-                                                                                                                                network.Id,
                                                                                                                                 networkOperator.Id,
                                                                                                                                 key.Public,
                                                                                                                                 T0)),
@@ -296,7 +294,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         {
 
             var withoutId  = CBORJSON.ToCBOR(new JObject(new JProperty(RoamingNetworkOperator.BasePropertyKeys.Name, new JObject(new JProperty("en", "Nobody")))));
-            var badKeys    = CBORJSON.ToCBOR(new JObject(new JProperty(RoamingNetworkOperator.BasePropertyKeys.Id, "RNO1"), new JProperty(RoamingNetworkOperator.PropertyKeys.SigningKeys, "no keys")));
+            var badKeys    = CBORJSON.ToCBOR(new JObject(new JProperty(RoamingNetworkOperator.BasePropertyKeys.Id, "RNO1"), new JProperty(RoamingNetworkOperator.PropertyKeys.IdentityKeys, "no keys")));
 
             Assert.Multiple(() => {
                 Assert.That(RoamingNetworkOperator.TryParse(CBORValue.FromText("RNO1"), out _, out var notAMap),  Is.False);

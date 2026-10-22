@@ -857,7 +857,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     customData = CustomDataNew.ParseJObject(newCustomData);
                                     break;
 
-                                case RoamingNetworkOperator.PropertyKeys.SigningKeys:
+                                case POIPartyKeys.SigningKeysProperty:
                                 case RoamingNetworkOperator.PropertyKeys.IdentityKeys:
                                     ErrorResponse = $"Change {index}: a roaming network has no keys of its own: they are the keys of its {nameof(POI.RoamingNetworkOperator)}!";
                                     return false;

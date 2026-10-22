@@ -165,8 +165,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region EffectiveEVSE                  (EVSE)
 
         /// <summary>
-        /// The given EVSE of this operator as it is at runtime, with the properties its templates give it: the EVSE itself,
-        /// when they give it none.
+        /// The given EVSE of this operator as it is at runtime, with the properties its templates give it:
+        /// the EVSE itself, when they give it none.
         /// </summary>
         /// <param name="EVSE">An EVSE of this operator.</param>
         public EVSE EffectiveEVSE(EVSE EVSE)

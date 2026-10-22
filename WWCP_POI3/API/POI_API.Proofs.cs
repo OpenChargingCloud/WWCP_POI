@@ -110,7 +110,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   var local         = host.Name is "localhost" or "127.0.0.1" or "[::1]" or "::1";
                                   var path          = request.Path.ToString();
                                   var trustAnchor   = new RoamingNetworkTrustAnchor(roamingNetwork.Id,
-                                                                                    URL.Parse($"{(local ? "http" : "https")}://{host}{path[..path.LastIndexOf("/trustAnchor", StringComparison.Ordinal)]}"),
+                                                                                    [ URL.Parse($"{(local ? "http" : "https")}://{host}{path[..path.LastIndexOf("/trustAnchor", StringComparison.Ordinal)]}") ],
                                                                                     [ .. roamingNetwork.Operator.IdentityKeys.Select(identityKey => identityKey.Id) ],
                                                                                     roamingNetwork.Operator.MinConsensus,
                                                                                     roamingNetwork.Name,
