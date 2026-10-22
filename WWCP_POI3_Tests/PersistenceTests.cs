@@ -186,6 +186,31 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region A_change_of_a_property_the_network_had_not_is_loaded_again()
+
+        /// <summary>
+        /// A change set made without an old value expects the value it found: of a property the roaming network has not,
+        /// JSON null. Read again from the store, it must still fit the version it was made for.
+        /// </summary>
+        [Test]
+        public void A_change_of_a_property_the_network_had_not_is_loaded_again()
+        {
+
+            var store    = new RoamingNetworkHistoryMemoryStore();
+            var history  = RoamingNetworkHistory.Start(new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
+                                                                          Created:                   Created,
+                                                                          ChargingStationOperators:  [ new ChargingStationOperator(GEF, Created: Created) ]).WithKeys(),
+                                                       Store: store);
+
+            Assert.That(Change(history, 1, "dataSource", "v2").IsCommitted);
+
+            Assert.That(RoamingNetworkHistory.TryLoad(store, out var loaded, out var error),  Is.True, error);
+            Assert.That(loaded!.Head.RoamingNetwork.DataSource,                                Is.EqualTo("v2"));
+
+        }
+
+        #endregion
+
         #region A_line_written_only_partly_is_dropped()
 
         [Test]

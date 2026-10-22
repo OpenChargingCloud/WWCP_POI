@@ -1202,7 +1202,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    PropertyKeys.    TreeHashAlgorithms  => TreeHashAlgorithms.HasValue          ? POITreeHashAlgorithms.ToJSON(TreeHashAlgorithms.Value) : null,
                    BasePropertyKeys.Name                => Name.       IsNotNullOrEmpty()       ? Name.       ToJSON()      : null,
                    BasePropertyKeys.Description         => Description.IsNotNullOrEmpty()       ? Description.ToJSON()      : null,
-                   BasePropertyKeys.DataSource          => DataSource.IsNeitherNullNorEmpty()   ? DataSource                : null,
+                   BasePropertyKeys.DataSource          => DataSource.IsNeitherNullNorEmpty()   ? (JToken) DataSource       : null,
                    BasePropertyKeys.DataLicenses        => DataLicenses.Length > 0              ? DataLicenses.ToPOIJSON()  : null,
                    BasePropertyKeys.CustomData          => CustomData.HasValues                 ? CustomData.ToJObject()    : null,
                    _                                    => null
