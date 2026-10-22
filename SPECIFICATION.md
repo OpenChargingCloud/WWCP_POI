@@ -913,7 +913,13 @@ has an example.
   others are kept as they are, with their charging stations, EVSEs and effective members (section 9),
   so also one changed EVSE of one operator of 50,000 EVSEs costs some milliseconds. An effective member
   is calculated again where a template it takes changed: a commit changing a template 100,000 members
-  name changes all of them. The `json` and `cbor` ETags hash the whole version, once per version (8.8).
+  name changes all of them. The `json` and `cbor` ETags are made the same way: canonical JSON and
+  deterministic CBOR are made of the representations of the children, so the roaming network, its
+  parties and charging pools keep their contents as the pieces between their child arrays and the
+  contents of their children, a charging station its content with its EVSEs. A version writes the
+  contents of the entities that are new in it and hashes the others as they are kept, e.g. for one
+  changed EVSE of one operator of 50,000 EVSEs (7.7 MB of JSON, 6.6 MB of CBOR) some tens of milliseconds
+  instead of 0.8 seconds, keeping some 17 MiB. What a commit then costs is mostly applying its changes.
 - **Serving:** a proof is calculated from the tree of the head, made of the digests and the skeletons
   the network and its parties keep: a pool and its stations are calculated again, the audit paths from
   the digests.
@@ -943,11 +949,7 @@ has an example.
    for preconditions and owners, the same way. The station proof does not need it.
 7. **CBOR skeletons:** whether the tree also hashes deterministic CBOR skeletons, for clients that read
    CBOR only.
-8. **Incremental content ETags:** the tree hashes only what a version has new (8.7), but its `json` and
-   `cbor` ETags serialize the whole version, once per version: for 50,000 EVSEs about a second, most of
-   what a commit costs. Canonical JSON and CBOR are made of the representations of the children, so the
-   entities could keep theirs as they keep their digests.
-9. **Offers:** a station proof gives no charging tariff offers (9.5, point 2).
+8. **Offers:** a station proof gives no charging tariff offers (9.5, point 2).
 
 
 ## 9. Templates, groups and offers

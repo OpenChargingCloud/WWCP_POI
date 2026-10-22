@@ -10,6 +10,11 @@
     <RootNamespace>cloud.charging.open.protocols.WWCP.POI3.tests</RootNamespace>
   </PropertyGroup>
 
+  <!-- In Debug, the tests check the content ETags of entities having child arrays against their contents written as a whole. -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+    <RuntimeHostConfigurationOption Include="WWCP.POI.VerifyContentRepresentations" Value="true" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="NUnit" Version="5.0.0" />

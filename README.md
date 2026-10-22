@@ -849,7 +849,8 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   statements of checkpoints are kept (section 12.6)
 - Proofs: signed lists of roaming network operators and their identity keys, proofs of absence
   ([SPECIFICATION.md](SPECIFICATION.md), section 8.8)
-- Cost: the `json` and `cbor` ETags of a version serialize all of it, most of what a commit costs (section 8.8)
+- Cost: applying the changes of a change set, most of what a commit costs now that its ETags are made of what the
+  entities keep (section 8.7)
 
 ## Tests
 

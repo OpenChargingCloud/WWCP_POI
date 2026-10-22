@@ -38,7 +38,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
     /// <remarks>
     /// The tree of a version after a change is calculated from the digests the entities keep (POIEffectiveDigests); a
     /// change reads again only the charging pools it changes, the other ones of its operator are kept, with their
-    /// effective members. The JSON and CBOR ETags hash the whole version, once per version: most of what a commit costs.
+    /// effective members. The JSON and CBOR ETags are made of the contents the entities keep (POIContentRepresentations):
+    /// a change writes its charging station, charging pool, operator and roaming network anew, and hashes the rest as kept.
     /// </remarks>
     [TestFixture, Explicit]
     public class CommitCostBenchmark

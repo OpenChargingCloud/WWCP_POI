@@ -769,16 +769,52 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (contentETags is null)
                 Interlocked.CompareExchange(ref contentETags, new (), null);
 
-            return contentETags.GetOrAdd((Format, HashAlgorithm),
-                                         key => ETag.Compute(key.Format,
-                                                             key.HashAlgorithm,
-                                                             key.Format switch {
-                                                                 ETagFormat.JSON  => CanonicalJSON.ToUTF8Bytes(ContentJSON()),
-                                                                 ETagFormat.CBOR  => ContentCBOR().ToByteArray(CBORWriterOptions.Canonical),
-                                                                 _                => throw new ArgumentOutOfRangeException(nameof(Format), "Only the JSON and CBOR representations have content ETags!")
-                                                             }));
+            return contentETags.GetOrAdd((Format, HashAlgorithm), key => CalcContentETag(key.Format, key.HashAlgorithm));
 
         }
+
+        /// <summary>
+        /// The ETag of the content of this entity: of an entity having child arrays as it keeps it, made of the contents of
+        /// its children (POIContentRepresentations), else of its content written as a whole.
+        /// </summary>
+        private ETag CalcContentETag(ETagFormat         Format,
+                                     ETagHashAlgorithm  HashAlgorithm)
+        {
+
+            if (Format is not (ETagFormat.JSON or ETagFormat.CBOR))
+                throw new ArgumentOutOfRangeException(nameof(Format), "Only the JSON and CBOR representations have content ETags!");
+
+            if (!POIContentRepresentations.TryDigest(this, Format, HashAlgorithm, out var digest))
+                return ETag.Compute(Format, HashAlgorithm, ContentBytes(Format));
+
+            var eTag = new ETag(Format, HashAlgorithm, digest);
+
+            if (VerifyContentRepresentations &&
+                !eTag.Equals(ETag.Compute(Format, HashAlgorithm, ContentBytes(Format))))
+            {
+                throw new InvalidOperationException($"The {Format} content of the {GetType().Name} '{Id}' made of the contents of its children is not its content written as a whole!");
+            }
+
+            return eTag;
+
+        }
+
+        /// <summary>
+        /// The content of this entity written as a whole: its canonical JSON or its deterministic CBOR.
+        /// </summary>
+        private Byte[] ContentBytes(ETagFormat Format)
+
+            => Format == ETagFormat.JSON
+                   ? CanonicalJSON.ToUTF8Bytes(ContentJSON())
+                   : ContentCBOR().ToByteArray(CBORWriterOptions.Canonical);
+
+        /// <summary>
+        /// Whether the content ETags of entities having child arrays are checked against their contents written as a whole:
+        /// the AppContext switch WWCP.POI.VerifyContentRepresentations, set by the tests.
+        /// </summary>
+        private static Boolean VerifyContentRepresentations
+
+            => AppContext.TryGetSwitch("WWCP.POI.VerifyContentRepresentations", out var verify) && verify;
 
         #endregion
 
