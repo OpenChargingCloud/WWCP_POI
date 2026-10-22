@@ -418,7 +418,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.Address,              Address.ToJSON(Embedded: true));
 
             if (GeoLocation.HasValue)
-                json.Add(PropertyKeys.GeoLocation,          GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,          POIJSON.GeoCoordinateJSON(GeoLocation.Value));
 
             if (HotlinePhoneNumber.HasValue)
                 json.Add(PropertyKeys.HotlinePhoneNumber,   HotlinePhoneNumber.Value.ToString());

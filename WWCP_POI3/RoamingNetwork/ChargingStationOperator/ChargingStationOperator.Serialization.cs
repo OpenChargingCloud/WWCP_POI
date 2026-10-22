@@ -565,7 +565,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    : null,
 
                                GeoLocation.HasValue
-                                   ? new JProperty(PropertyKeys.GeoLocation,              GeoLocation.Value.ToJSON(Embedded: true))
+                                   ? new JProperty(PropertyKeys.GeoLocation,              POIJSON.GeoCoordinateJSON(GeoLocation.Value))
                                    : null,
 
                                Telephone.HasValue
@@ -881,7 +881,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          }));
 
             if (GeoLocation.HasValue)
-                cbor.Add(CBORValue.FromText(PropertyKeys.GeoLocation),                   CBORJSON.ToCBOR(GeoLocation.Value.ToJSON(Embedded: true)));
+                cbor.Add(CBORValue.FromText(PropertyKeys.GeoLocation),                   CBORJSON.ToCBOR(POIJSON.GeoCoordinateJSON(GeoLocation.Value)));
 
             if (Telephone.HasValue)
                 cbor.Add(CBORValue.FromText(PropertyKeys.Telephone),                     CBORValue.FromText(Telephone.ToString()));

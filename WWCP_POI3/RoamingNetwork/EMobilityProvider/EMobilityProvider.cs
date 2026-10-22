@@ -575,7 +575,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.Logos,                new JArray(new JObject(new JProperty(PropertyKeys.LogoURI, Logo.Value.ToString()))));
 
             if (GeoLocation.HasValue)
-                json.Add(PropertyKeys.GeoLocation,          GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,          POIJSON.GeoCoordinateJSON(GeoLocation.Value));
 
             if (Telephone.HasValue)
                 json.Add(PropertyKeys.Telephone,            Telephone.Value.ToString());
@@ -784,7 +784,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          }));
 
             if (GeoLocation.HasValue)
-                cbor.Add(CBORValue.FromText(PropertyKeys.GeoLocation),          CBORJSON.ToCBOR(GeoLocation.Value.ToJSON(Embedded: true)));
+                cbor.Add(CBORValue.FromText(PropertyKeys.GeoLocation),          CBORJSON.ToCBOR(POIJSON.GeoCoordinateJSON(GeoLocation.Value)));
 
             if (Telephone.HasValue)
                 cbor.Add(CBORValue.FromText(PropertyKeys.Telephone),            CBORValue.FromText(Telephone.Value.ToString()));

@@ -706,7 +706,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.Images,                        new JArray(Images.Select(image => image.ToJSON(Embedded: true))));
 
             if (GeoLocation.HasValue)
-                json.Add(PropertyKeys.GeoLocation,                   GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,                   POIJSON.GeoCoordinateJSON(GeoLocation.Value));
 
             if (MaxReservationDuration.HasValue)
                 json.Add(PropertyKeys.MaxReservationDuration,        POIJSON.Seconds(MaxReservationDuration.Value));

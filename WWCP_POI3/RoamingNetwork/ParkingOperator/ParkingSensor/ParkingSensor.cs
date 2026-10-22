@@ -251,7 +251,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(BasePropertyKeys.DataSource,      DataSource);
 
             if (GeoLocation.HasValue)
-                json.Add(PropertyKeys.GeoLocation,         GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,         POIJSON.GeoCoordinateJSON(GeoLocation.Value));
 
             if (ChargingStationIds.Length > 0)
                 json.Add(PropertyKeys.ChargingStationIds,  POIJSON.IdsToJSON(ChargingStationIds));

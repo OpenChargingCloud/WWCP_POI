@@ -795,7 +795,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.Address,           Address.ToJSON(Embedded: true));
 
             if (GeoLocation.HasValue)
-                json.Add(PropertyKeys.GeoLocation,       GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,       POIJSON.GeoCoordinateJSON(GeoLocation.Value));
 
             if (ParkingType.HasValue)
                 json.Add(PropertyKeys.ParkingType,       ParkingType.Value.ToString());
@@ -852,13 +852,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.EntranceAddress,      EntranceAddress.ToJSON(Embedded: true));
 
             if (EntranceLocation.HasValue)
-                json.Add(PropertyKeys.EntranceLocation,     EntranceLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.EntranceLocation,     POIJSON.GeoCoordinateJSON(EntranceLocation.Value));
 
             if (ExitAddress is not null)
                 json.Add(PropertyKeys.ExitAddress,          ExitAddress.ToJSON(Embedded: true));
 
             if (ExitLocation.HasValue)
-                json.Add(PropertyKeys.ExitLocation,         ExitLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.ExitLocation,         POIJSON.GeoCoordinateJSON(ExitLocation.Value));
 
             if (ArrivalInstructions.IsNotNullOrEmpty())
                 json.Add(PropertyKeys.ArrivalInstructions,  ArrivalInstructions.ToJSON());

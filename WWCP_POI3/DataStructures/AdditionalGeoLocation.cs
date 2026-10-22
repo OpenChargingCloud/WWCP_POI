@@ -96,7 +96,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!Embedded)
                 json.Add(PropertyKeys.Context,  JSONLDContext);
 
-            json.Add(PropertyKeys.GeoLocation,  GeoLocation.ToJSON(Embedded: true));
+            json.Add(PropertyKeys.GeoLocation,  POIJSON.GeoCoordinateJSON(GeoLocation));
 
             if (Name.IsNotNullOrEmpty())
                 json.Add(PropertyKeys.Name,     Name.ToJSON());

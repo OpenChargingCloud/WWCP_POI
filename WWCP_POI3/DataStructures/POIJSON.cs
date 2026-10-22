@@ -349,6 +349,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region GeoCoordinateJSON   (GeoCoordinate)
+
+        /// <summary>
+        /// The JSON representation of the given geographical coordinate, embedded, as Styx writes it, but its latitude,
+        /// longitude and altitude as decimals, each with the text of its double: written as doubles, the deterministic CBOR
+        /// of a POI3 entity had them as floats, while the CBOR of its canonical JSON has a number with decimal places as a
+        /// decimal fraction (tag 4, SPECIFICATION.md, section 1), and so its CBOR ETag would be another one.
+        /// </summary>
+        public static JObject GeoCoordinateJSON(GeoCoordinate GeoCoordinate)
+        {
+
+            // Made anew: Newtonsoft keeps the type of a value it replaces, and so a double.
+            return new JObject(GeoCoordinate.ToJSON(Embedded: true).
+                                   Properties().
+                                   Select(property => new JProperty(property.Name,
+                                                                    property.Value.Type == JTokenType.Float
+                                                                        ? Number(Decimal.Parse(property.Value.Value<Double>().ToString("R", CultureInfo.InvariantCulture),
+                                                                                               NumberStyles.Float,
+                                                                                               CultureInfo.InvariantCulture))
+                                                                        : property.Value)));
+
+        }
+
+        #endregion
+
         #region (private static) IsWhole(Value)
 
         /// <summary>

@@ -208,6 +208,49 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Coordinates_are_decimal_fractions_in_CBOR()
+
+        /// <summary>
+        /// A geographical coordinate is a number with decimal places: the deterministic CBOR has it as a decimal fraction
+        /// (tag 4, section 1), so that the CBOR ETag follows from the canonical JSON alone, also of a pool with its location
+        /// and its entrance.
+        /// </summary>
+        [Test]
+        public void Coordinates_are_decimal_fractions_in_CBOR()
+        {
+
+            var network  = new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
+                                              Created:                   Created,
+                                              ChargingStationOperators:  [ new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"),
+                                                                                                       Created:        Created,
+                                                                                                       GeoLocation:    org.GraphDefined.Vanaheimr.Aegir.GeoCoordinate.Parse(50.9271, 11.5892),
+                                                                                                       ChargingPools:  [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
+                                                                                                                                          Created:           Created,
+                                                                                                                                          GeoLocation:       org.GraphDefined.Vanaheimr.Aegir.GeoCoordinate.Parse(50.9447, 11.5867),
+                                                                                                                                          EntranceLocation:  org.GraphDefined.Vanaheimr.Aegir.GeoCoordinate.Parse(50.9448, 11.5868)) ]) ]);
+
+            var content  = network.ToJSON(IncludeETags: false);
+            var cbor     = network.ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(CanonicalJSON.Serialize(content),  Does.Contain("\"geoLocation\":{\"lat\":50.9447,\"lng\":11.5867}"));
+                Assert.That(Convert.ToHexString(cbor),         Is.EqualTo(Convert.ToHexString(CBORJSON.ToCBOR(CanonicalJSON.ToUTF8Bytes(content)).ToByteArray(CBORWriterOptions.Canonical))));
+                Assert.That(network.CalcETags().Select(eTag => eTag.ToString()).ElementAt(1),
+                            Is.EqualTo(ETag.Compute(ETagFormat.CBOR, CBORJSON.ToCBOR(CanonicalJSON.ToUTF8Bytes(content)).ToByteArray(CBORWriterOptions.Canonical)).ToString()));
+
+                // Read back, from its JSON and from its CBOR, at the same place.
+                Assert.That(RoamingNetwork.TryParse(network.ToCBOR(IncludeETags: true), out var fromCBOR, out var error),  Is.True, error);
+                Assert.That(fromCBOR!.GetChargingStationOperatorById(ChargingStationOperator_Id.Parse("DE*GEF"))!.ChargingPools.Single().GeoLocation?.Latitude.Value,
+                            Is.EqualTo(50.9447));
+
+            }
+
+        }
+
+        #endregion
+
         #region A_commit_without_effective_trees_is_refused()
 
         [Test]

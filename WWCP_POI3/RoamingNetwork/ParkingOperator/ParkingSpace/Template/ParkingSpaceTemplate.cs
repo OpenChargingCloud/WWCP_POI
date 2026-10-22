@@ -549,7 +549,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // The properties of a parking space, as a parking space writes them.
             if (GeoLocation.HasValue)
-                json.Add(PropertyKeys.GeoLocation,              GeoLocation.Value.ToJSON(Embedded: true));
+                json.Add(PropertyKeys.GeoLocation,              POIJSON.GeoCoordinateJSON(GeoLocation.Value));
 
             if (ParkingGarageId.HasValue)
                 json.Add(PropertyKeys.ParkingGarageId,          ParkingGarageId.Value.ToString());
