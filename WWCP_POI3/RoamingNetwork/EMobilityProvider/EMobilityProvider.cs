@@ -71,7 +71,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/eMobilityProvider";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/eMobilityProvider/v1";
 
         #endregion
 

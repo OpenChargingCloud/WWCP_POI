@@ -45,19 +45,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static readonly DateTimeOffset Created = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
 
-        private const String ContentJSON     = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork\",\"@id\":\"rn1\",\"chargingStationOperators\":[{\"@id\":\"DE*GEF\",\"chargingPools\":[{\"@id\":\"DE*GEF*P1\",\"chargingStations\":[{\"@id\":\"DE*GEF*S1\",\"EVSEs\":[{\"@id\":\"DE*GEF*E1*1\",\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"maxPower\":22000,\"maxVoltage\":230.5}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"name\":{\"en\":\"Charging Station Operator DE*GEF\"}}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"name\":{\"en\":\"Example\"}}";
-        private const String JSONETag        = "json:sha256:hex:8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224";
-        private const String CBORETag        = "cbor:sha256:hex:291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549";
-        private const String TreeETag        = "effectiveTree:sha256:hex:87923ecc05779a7440e8da51589252f95eeed4977afabd211190c7b3b6602221";
-        private const String NoTreeETagsJSON = "[[\"json\",\"sha256\",\"hex\",\"8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224\"],[\"cbor\",\"sha256\",\"hex\",\"291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549\"]]";
-        private const String TreeETagJSON    = "[\"effectiveTree\",\"sha256\",\"hex\",\"87923ecc05779a7440e8da51589252f95eeed4977afabd211190c7b3b6602221\"]";
-        private const String ETagsJSON       = "[[\"json\",\"sha256\",\"hex\",\"8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224\"],[\"cbor\",\"sha256\",\"hex\",\"291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549\"]," + TreeETagJSON + "]";
+        private const String ContentJSON     = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1\",\"@id\":\"rn1\",\"chargingStationOperators\":[{\"@id\":\"DE*GEF\",\"chargingPools\":[{\"@id\":\"DE*GEF*P1\",\"chargingStations\":[{\"@id\":\"DE*GEF*S1\",\"EVSEs\":[{\"@id\":\"DE*GEF*E1*1\",\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"maxPower\":22000,\"maxVoltage\":230.5}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"name\":{\"en\":\"Charging Station Operator DE*GEF\"}}],\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\",\"name\":{\"en\":\"Example\"}}";
+        private const String JSONETag        = "json:sha256:hex:d94dd8fa2690260ba327eb1869d5b590be22f85a048f490daf718d4961b5c9b8";
+        private const String CBORETag        = "cbor:sha256:hex:8629469375dcf330b80b091aa0d653f4fc955612c6d7b8f4a762f5e1e69dddde";
+        private const String TreeETag        = "effectiveTree:sha256:hex:bbec03d7dabb2707403ef3a5a37d8d7c621abcd7e7ccc50b7e000835a55cec8a";
+        private const String NoTreeETagsJSON = "[[\"json\",\"sha256\",\"hex\",\"d94dd8fa2690260ba327eb1869d5b590be22f85a048f490daf718d4961b5c9b8\"],[\"cbor\",\"sha256\",\"hex\",\"8629469375dcf330b80b091aa0d653f4fc955612c6d7b8f4a762f5e1e69dddde\"]]";
+        private const String TreeETagJSON    = "[\"effectiveTree\",\"sha256\",\"hex\",\"bbec03d7dabb2707403ef3a5a37d8d7c621abcd7e7ccc50b7e000835a55cec8a\"]";
+        private const String ETagsJSON       = "[[\"json\",\"sha256\",\"hex\",\"d94dd8fa2690260ba327eb1869d5b590be22f85a048f490daf718d4961b5c9b8\"],[\"cbor\",\"sha256\",\"hex\",\"8629469375dcf330b80b091aa0d653f4fc955612c6d7b8f4a762f5e1e69dddde\"]," + TreeETagJSON + "]";
 
         private const String CommitContent   = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"eTags\":" + ETagsJSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
-        private const String CommitId        = "fb45b9c960d2ece9085219b391a1d3bda793cd834d13f590cf9b7c2bd441f5d0";
+        private const String CommitId        = "339dd70482e3e73ac37fe861105837221d26fd1bac49142362bda23f66db7f9b";
 
         private const String SigningInput    = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commitSignature/v1\",\"algorithm\":\"Ed25519\",\"commit\":{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"@id\":\"" + CommitId + "\",\"eTags\":" + ETagsJSON + ",\"revision\":0,\"roamingNetworkId\":\"rn1\"},\"keyId\":\"leader\",\"role\":\"leader\",\"signedAt\":\"2026-10-12T12:00:00.000Z\",\"signer\":\"leader.example.org\"}";
-        private const String SignatureValue  = "ZdqzPpoX2rpxR/zyFw5YGG9fWVZ32guEZi1L/QSeCxHa+5T1iScOiYQSTX91kkBuSMiQZaeHCbq53N/pk/t+Cg==";
+        private const String SignatureValue  = "zUrjtSAMPKDRNAqLV67Y3wrrCxIDE838ceikf74yXLQOke5nKgbi2bWeoMYvOInJsuxSGqByV8iZhesZWoQ9CQ==";
         private const String PublicKey       = "d3bocLkzVPKgskwj8qNsxOgOIjIYwbl5Jv3QGDlqK5s=";
 
         private const String Timestamps      = "\"created\":\"2026-01-01T00:00:00.000Z\",\"lastChange\":\"2026-01-01T00:00:00.000Z\"";
@@ -68,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private const String OperatorDigest  = "b137995cb4aacc1bc4f5c1b70f9620187d427bd150c3f9bc405ea079827de2ef";
 
         private const String AttestationInput = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/attestation/v1\",\"algorithm\":\"Ed25519\",\"commitId\":\"" + CommitId + "\",\"eTag\":" + TreeETagJSON + ",\"keyId\":\"rno\",\"revision\":0,\"roamingNetworkId\":\"rn1\",\"role\":\"roamingNetworkOperator\",\"signedAt\":\"2026-10-17T18:00:00.000Z\",\"signer\":\"DE*RNO\",\"validUntil\":\"2026-10-17T18:15:00.000Z\"}";
-        private const String AttestationValue = "fPklC2Inr+ayWGWTYxcXnOXGia9fGT6NdS02iNBNwUkvjTKeB04K+UdSjYT/bt6t9qbeEjBJ+xiu4sXw2eg9AA==";
+        private const String AttestationValue = "e11PSKTTQCbEu7SGA09/xciRdmariF+MOJ5iK/1fSkT/oV9wQk7wvsm3O7amDuFdtss9CQtdOUoT3+Il7Ea6AQ==";
         private const String RNOPublicKey     = "Kay64UG8yvCyLhqU000LxzYeUm0L/hLIl5S8kyKWbdc=";
 
         #endregion
@@ -185,8 +185,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void The_genesis_of_a_second_epoch()
         {
 
-            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"eTags\":[[\"json\",\"sha256\",\"hex\",\"8319cc9794532447aa505995a52e2be10c4b02198e280fc430bc4b6e5d1d5224\"],[\"cbor\",\"sha256\",\"hex\",\"291ec92c68d771f97a3e90869f7735beda533584f69668cf7a2ca26f3246e549\"],[\"effectiveTree\",\"sha256\",\"hex\",\"87923ecc05779a7440e8da51589252f95eeed4977afabd211190c7b3b6602221\"]],\"epoch\":2,\"profiles\":{\"canonicalization\":\"styx-canonical-json-v1\",\"checkpoint\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpoint/v1\",\"commit\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"identificationHash\":\"sha512\",\"priceStatement\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1\",\"signatureAlgorithms\":[\"Ed25519\",\"ML-DSA-65\"]},\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
-            const String Id     = "22dd391f9190a4a9a5a8c7fbe1c9c38b2202d1f11ad7d6552b10af28be5b5559992b56b144752c112e4f884b426f5302dce0a5ce86e909a63e33b071fb95f7cc";
+            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"eTags\":[[\"json\",\"sha256\",\"hex\",\"d94dd8fa2690260ba327eb1869d5b590be22f85a048f490daf718d4961b5c9b8\"],[\"cbor\",\"sha256\",\"hex\",\"8629469375dcf330b80b091aa0d653f4fc955612c6d7b8f4a762f5e1e69dddde\"],[\"effectiveTree\",\"sha256\",\"hex\",\"bbec03d7dabb2707403ef3a5a37d8d7c621abcd7e7ccc50b7e000835a55cec8a\"]],\"epoch\":2,\"profiles\":{\"canonicalization\":\"styx-canonical-json-v1\",\"checkpoint\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/checkpoint/v1\",\"commit\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/commit/v3\",\"identificationHash\":\"sha512\",\"priceStatement\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/priceStatement/v1\",\"signatureAlgorithms\":[\"Ed25519\",\"ML-DSA-65\"]},\"revision\":0,\"roamingNetworkId\":\"rn1\"}";
+            const String Id     = "8d9fc793eab4c8e375b7022a096492be87baab8b435c6cb021922160bb3730d3fbe3f1bbdf58cf414e716b4713786e72fd7ef915f048547676877aed6179360a";
 
             var genesis = RoamingNetworkCommit.Genesis(Network(),
                                                        new RoamingNetworkEpoch(2, new RoamingNetworkEpochProfiles(ETagHashAlgorithm.SHA512, [ "Ed25519", "ML-DSA-65" ])));
@@ -237,7 +237,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var stationSkeleton   = "{\"@id\":\"DE*GEF*S1\",\"EVSEs\":"             + Pruned(EVSEDigest)     + "," + Timestamps + "}";
             var poolSkeleton      = "{\"@id\":\"DE*GEF*P1\",\"chargingStations\":"  + Pruned(StationDigest)  + "," + Timestamps + "}";
             var operatorSkeleton  = "{\"@id\":\"DE*GEF\",\"chargingPools\":"        + Pruned(PoolDigest)     + "," + Timestamps + ",\"name\":{\"en\":\"Charging Station Operator DE*GEF\"}}";
-            var networkSkeleton   = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork\",\"@id\":\"rn1\",\"chargingStationOperators\":" + Pruned(OperatorDigest) + "," + Timestamps + ",\"name\":{\"en\":\"Example\"}}";
+            var networkSkeleton   = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1\",\"@id\":\"rn1\",\"chargingStationOperators\":" + Pruned(OperatorDigest) + "," + Timestamps + ",\"name\":{\"en\":\"Example\"}}";
 
             var network           = Network();
             var tree              = network.EffectiveTree(ETagHashAlgorithm.SHA256);

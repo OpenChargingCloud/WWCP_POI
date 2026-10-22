@@ -51,7 +51,7 @@ See [README.md](README.md#common-properties).
 
 | JSON key | C# property | Type | Change set | Description |
 |---|---|---|---|---|
-| `@context` | `JSONLDContext` (const) | string | — | `https://open.charging.cloud/contexts/wwcp+json/roamingNetwork`, see [below](#context). |
+| `@context` | `JSONLDContext` (const) | string | — | `https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1`, see [below](#context). |
 | `dataLicenses` | `DataLicenses` | [DataLicense](#datalicenses)[] | update/remove | The licenses of the data, ordered by `@id` (ordinal); omitted when empty. |
 | `operator` | `Operator` | [RoamingNetworkOperator](RoamingNetworkOperator.md)? | its properties: update/remove | Its operator, with the keys of the network; omitted for a network without one, which nobody can change where only the RNO may. Neither added nor removed. |
 | `chargingStationOperators` | `ChargingStationOperators` | [ChargingStationOperator](ChargingStationOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
@@ -90,7 +90,7 @@ with the default view options ([SPECIFICATION.md](../SPECIFICATION.md#2-the-cont
 
 ## @context
 
-`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork`, written by `ToJSON()` and `ToCBOR()` unless
+`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1`, written by `ToJSON()` and `ToCBOR()` unless
 `Embedded: true`. It is part of the content, so of the ETags. `TryParse` refuses another one; it may be left out.
 
 
@@ -324,7 +324,7 @@ Checked when a change set is applied:
 ```json
 {
   "@id":         "rn1",
-  "@context":    "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork",
+  "@context":    "https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/v1",
   "name":        { "en": "Example" },
   "description": { "en": "Public charging infrastructure in Jena" },
   "dataSource":  "v2",

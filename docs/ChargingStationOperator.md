@@ -94,7 +94,7 @@ Children are written only when there are any; collections in the ordinal order o
 |---|---|
 | `ToEmbeddedJSON()` | The content, as the roaming network embeds it: no `@context`, `dataLicenses` complete. Change sets compare and edit this representation, `RoamingNetworkChange.Add(operator)` sends it without children, and `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}` serves it. |
 | `ToCBOR(Embedded = false)` | The keys and values of `ToJSON(Embedded, ExpandDataLicenses: Expanded)`. |
-| `ToJSON(Embedded = false, …)` | With its defaults: `@context` (`https://open.charging.cloud/contexts/wwcp+json/chargingStationOperator`) unless embedded, and `dataLicenses` complete; `ExpandDataLicenses: ShowIdOnly` writes `dataLicenseIds` instead, which reads again only for well-known licenses. |
+| `ToJSON(Embedded = false, …)` | With its defaults: `@context` (`https://open.charging.cloud/contexts/wwcp+json/roamingNetwork/chargingStationOperator/v1`) unless embedded, and `dataLicenses` complete; `ExpandDataLicenses: ShowIdOnly` writes `dataLicenseIds` instead, which reads again only for well-known licenses. |
 
 `TryParse(JSON)` reads all of them: it refuses an `@context` other than its own, ignores `roamingNetworkId`, and reads `dataLicenseIds` only
 for well-known licenses. `TryParse(CBOR)` reads the CBOR map as JSON.
