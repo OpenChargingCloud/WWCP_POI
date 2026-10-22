@@ -227,6 +227,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  KeyStatement          = RoamingNetworkKeyStatement.JSONProperty;
 
             /// <summary>
+            /// The property of the certificates of its signing keys.
+            /// </summary>
+            public const String  SigningKeyCertificates  = RoamingNetworkSigningKeyCertificate.JSONProperty;
+
+            /// <summary>
             /// The property of how many holders of its keys of one kind sign what it owns: written unless one.
             /// </summary>
             public const String  MinConsensus          = POIPartyKeys.MinConsensusProperty;
@@ -288,10 +293,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<POIPublicKey>  IdentityKeys          { get; }
 
         /// <summary>
-        /// Its key statement, if any: which signing keys it uses, signed with one of its identity keys, so that an app pinning
-        /// its identity keys trusts them (SPECIFICATION.md, section 8.6).
+        /// Its key statement, if any: its identity keys and its minConsensus, signed with identity keys of as many holders,
+        /// so that an app pinning identity keys of it trusts them all (SPECIFICATION.md, section 8.6).
         /// </summary>
         public RoamingNetworkKeyStatement?   KeyStatement          { get; }
+
+        /// <summary>
+        /// The certificates of its signing keys, each by an identity key of the holder of the signing key, in the order of
+        /// the signing keys: so that an app trusting its identity keys trusts the signing keys they certify, and each holder
+        /// renews its own signing keys without the others (SPECIFICATION.md, section 8.6).
+        /// </summary>
+        public ImmutableArray<RoamingNetworkSigningKeyCertificate>  SigningKeyCertificates    { get; }
 
         /// <summary>
         /// How many holders of its keys of one kind sign what it owns, its key statement included: one, unless several
@@ -320,6 +332,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="IdentityKeys">The public keys used to identify the roaming network operator.</param>
         /// <param name="KeyStatement">The key statement describing key ownership or trust information.</param>
         /// <param name="MinConsensus">How many holders of its keys of one kind sign what it owns, one by default.</param>
+        /// <param name="SigningKeyCertificates">The certificates of its signing keys, each by an identity key of the holder of the signing key.</param>
         /// 
         /// <param name="InitialAdminStatus">The initial administrative status with timestamp.</param>
         /// <param name="InitialStatus">The initial operational status with timestamp.</param>
@@ -344,6 +357,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       IEnumerable<POIPublicKey>?                           IdentityKeys                 = null,
                                       RoamingNetworkKeyStatement?                          KeyStatement                 = null,
                                       Byte?                                                MinConsensus                 = null,
+                                      IEnumerable<RoamingNetworkSigningKeyCertificate>?    SigningKeyCertificates       = null,
 
                                       Timestamped<RoamingNetworkOperatorAdminStatusType>?  InitialAdminStatus           = null,
                                       Timestamped<RoamingNetworkOperatorStatusType>?       InitialStatus                = null,
@@ -387,8 +401,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             POIPartyKeys.CheckQuorum(this.MinConsensus, this.SigningKeys, this.IdentityKeys, $"the roaming network operator '{Id}'");
 
-            this.KeyStatement        = KeyStatement;
-            this.keyStatementError   = new (CheckKeyStatement);
+            this.KeyStatement            = KeyStatement;
+            this.SigningKeyCertificates  = RoamingNetworkSigningKeyCertificate.Ordered(SigningKeyCertificates, $"certificate of a signing key of the roaming network operator '{Id}'");
+            this.keyStatementError       = new (CheckKeyStatement);
 
         }
 
@@ -400,30 +415,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly Lazy<String?> keyStatementError;
 
         /// <summary>
-        /// Why its key statement does not fit it in the given roaming network, or null: it states this operator and network,
-        /// only signing and identity keys this operator names, its minConsensus, and is signed by identity keys of as many
-        /// holders valid then. Its
-        /// validity in time is the one of the verifier: a version keeps a key statement that expired.
+        /// Why its key statement or the certificates of its signing keys do not fit it in the given roaming network, or
+        /// null: the key statement states this operator and network, only identity keys this operator names, its
+        /// minConsensus, and is signed by identity keys of as many holders valid then; every certificate states this
+        /// operator and network, certifies one of its signing keys as it names it, and is signed by one of its identity keys
+        /// of the same holder, valid then. Their validity in time is the one of the verifier: a version keeps a key
+        /// statement that expired.
         /// </summary>
         internal String? KeyStatementError(RoamingNetwork_Id RoamingNetworkId)
 
-            => KeyStatement is null
-                   ? null
-                   : KeyStatement.RoamingNetworkId != RoamingNetworkId
-                         ? $"The key statement of the roaming network operator '{Id}' is one of the roaming network '{KeyStatement.RoamingNetworkId}', not of '{RoamingNetworkId}'!"
+            => KeyStatement is not null && KeyStatement.RoamingNetworkId != RoamingNetworkId
+                   ? $"The key statement of the roaming network operator '{Id}' is one of the roaming network '{KeyStatement.RoamingNetworkId}', not of '{RoamingNetworkId}'!"
+                   : SigningKeyCertificates.FirstOrDefault(certificate => certificate.RoamingNetworkId != RoamingNetworkId) is RoamingNetworkSigningKeyCertificate otherNetwork
+                         ? $"The certificate of the signing key '{otherNetwork.SigningKey.Id}' of the roaming network operator '{Id}' is one of the roaming network '{otherNetwork.RoamingNetworkId}', not of '{RoamingNetworkId}'!"
                          : keyStatementError.Value;
 
         private String? CheckKeyStatement()
         {
+
+            // Each certificate by an identity key of the holder of the signing key it certifies.
+            foreach (var certificate in SigningKeyCertificates)
+            {
+
+                if (certificate.RoamingNetworkOperatorId != Id)
+                    return $"The certificate of the signing key '{certificate.SigningKey.Id}' of the roaming network operator '{Id}' is one of '{certificate.RoamingNetworkOperatorId}'!";
+
+                if (!SigningKeys.Contains(certificate.SigningKey))
+                    return $"The roaming network operator '{Id}' certifies the signing key '{certificate.SigningKey.Id}' as it does not name it: a certificate names one of its signing keys with its validity, its holder and its usages!";
+
+                if (!certificate.TryVerify(IdentityKeys, out _, out var certificateError))
+                    return $"The roaming network operator '{Id}': {certificateError}";
+
+            }
 
             if (KeyStatement is null)
                 return null;
 
             if (KeyStatement.RoamingNetworkOperatorId != Id)
                 return $"The key statement of the roaming network operator '{Id}' is one of '{KeyStatement.RoamingNetworkOperatorId}'!";
-
-            if (KeyStatement.SigningKeys.FirstOrDefault(key => !SigningKeys.Contains(key)) is POIPublicKey unknownSigningKey)
-                return $"The key statement of the roaming network operator '{Id}' names the signing key '{unknownSigningKey.Id}', which is not one of its signing keys!";
 
             if (KeyStatement.IdentityKeys.FirstOrDefault(key => !IdentityKeys.Contains(key)) is POIPublicKey unknownIdentityKey)
                 return $"The key statement of the roaming network operator '{Id}' names the identity key '{unknownIdentityKey.Id}', which is not one of its identity keys!";
@@ -689,6 +718,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
+                if (!TryParseSigningKeyCertificates(JSON, out var signingKeyCertificates, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(JSON,
                                                 out var created,
                                                 out var lastChange,
@@ -712,6 +744,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              identityKeys,
                                              keyStatement,
                                              minConsensus,
+                                             signingKeyCertificates,
 
                                              DataSource:  dataSource,
                                              Created:     created,
@@ -816,6 +849,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                            KeyStatement is not null
                                ? new JProperty(PropertyKeys.    KeyStatement,          KeyStatement.            ToJSON(Embedded: true))
+                               : null,
+
+                           SigningKeyCertificates.Length > 0
+                               ? new JProperty(PropertyKeys.    SigningKeyCertificates,  new JArray(SigningKeyCertificates.Select(certificate => certificate.ToJSON(Embedded: true))))
                                : null,
 
                            ETagsProperty(IncludeETags, ETagDigestEncoding)
@@ -940,6 +977,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             PropertyKeys.IdentityKeys,
                                             PropertyKeys.MinConsensus,
                                             PropertyKeys.KeyStatement,
+                                            PropertyKeys.SigningKeyCertificates,
                                             PropertyKeys.Created,
                                             PropertyKeys.LastChange,
                                             PropertyKeys.CustomData })
@@ -971,6 +1009,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
+                if (!TryParseSigningKeyCertificates(json, out var signingKeyCertificates, out ErrorResponse))
+                    return false;
+
                 if (!POIEntityMetadata.TryParse(json,
                                                 out var created,
                                                 out var lastChange,
@@ -996,6 +1037,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              identityKeys,
                                              keyStatement,
                                              minConsensus,
+                                             signingKeyCertificates,
 
                                              DataSource:  dataSource,
                                              Created:     created,
@@ -1054,7 +1096,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (DataSource is not null)
                 cbor.Add(CBORValue.FromText(BasePropertyKeys.DataSource),         CBORValue.FromText(DataSource));
 
-            // The address, the keys and the key statement have no CBOR representation of their own: theirs are the keys
+            // The address, the keys, the key statement and the certificates have no CBOR representation of their own: theirs are the keys
             // and values of their JSON representation.
             if (Address is not null)
                 cbor.Add(CBORValue.FromText(PropertyKeys.Address),                CBORJSON.ToCBOR(Address.ToJSON(Embedded: true)));
@@ -1085,6 +1127,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (KeyStatement is not null)
                 cbor.Add(CBORValue.FromText(PropertyKeys.KeyStatement),           CBORJSON.ToCBOR(KeyStatement.ToJSON(Embedded: true)));
 
+            if (SigningKeyCertificates.Length > 0)
+                cbor.Add(CBORValue.FromText(PropertyKeys.SigningKeyCertificates),
+                         CBORValue.FromArray(SigningKeyCertificates.Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON(Embedded: true)))));
+
             // Always part of the content, as in the JSON representation; custom data is JSON.
             cbor.Add(CBORValue.FromText(PropertyKeys.Created),                    CBORValue.FromText(Created.       ToISO8601()));
             cbor.Add(CBORValue.FromText(PropertyKeys.LastChange),                 CBORValue.FromText(LastChangeDate.ToISO8601()));
@@ -1103,6 +1149,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (private static) TryParseSigningKeyCertificates(JSON, out Certificates, out ErrorResponse)
+
+        /// <summary>
+        /// The optional certificates of the signing keys: a nonempty JSON array of signing key certificates.
+        /// </summary>
+        private static Boolean TryParseSigningKeyCertificates(JObject                                                   JSON,
+                                                              out List<RoamingNetworkSigningKeyCertificate>             Certificates,
+                                                              [NotNullWhen(false)] out String?                          ErrorResponse)
+        {
+
+            Certificates  = [];
+            ErrorResponse = null;
+
+            if (JSON[PropertyKeys.SigningKeyCertificates] is not JToken certificatesJSON)
+                return true;
+
+            if (certificatesJSON is not JArray { Count: > 0 } certificatesArray)
+            {
+                ErrorResponse = $"The {PropertyKeys.SigningKeyCertificates} of a roaming network operator must be a nonempty array!";
+                return false;
+            }
+
+            foreach (var certificateJSON in certificatesArray)
+            {
+
+                if (certificateJSON is not JObject certificateObject ||
+                    !RoamingNetworkSigningKeyCertificate.TryParse(certificateObject, out var certificate, out ErrorResponse))
+                {
+                    ErrorResponse ??= "A certificate of a signing key must be a JSON object!";
+                    return false;
+                }
+
+                Certificates.Add(certificate);
+
+            }
+
+            return true;
+
+        }
+
+        #endregion
 
         #region (private static) TryParseMinConsensus(JSON, out MinConsensus, out ErrorResponse)
 

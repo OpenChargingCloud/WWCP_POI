@@ -96,6 +96,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             operatorJSON[POIPartyKeys.SigningKeysProperty]   = new JArray(signingKeys. Select(key => key.ToJSON(Embedded: true)));
             operatorJSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(identityKeys.Select(key => key.ToJSON(Embedded: true)));
 
+            // Each holder certifies its own signing keys with its first identity key.
+            operatorJSON[RoamingNetworkSigningKeyCertificate.JSONProperty] = new JArray(signingKeys.Select(key => Certificate(network, key).ToJSON(Embedded: true)));
+
             if (MinConsensus > 1)
                 operatorJSON[POIPartyKeys.MinConsensusProperty] = MinConsensus;
 
@@ -104,6 +107,26 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                        : throw new ArgumentException(error);
 
         }
+
+        #endregion
+
+        #region (static) Certificate(Network, SigningKey, By = null, Number = 1)
+
+        /// <summary>
+        /// The certificate of the given signing key of the operator of the given network by the given identity key of its
+        /// holder, the first one by default.
+        /// </summary>
+        private static RoamingNetworkSigningKeyCertificate Certificate(RoamingNetwork  Network,
+                                                                       POIPublicKey    SigningKey,
+                                                                       String?         By       = null,
+                                                                       Int32           Number   = 1)
+
+            => RoamingNetworkSigningKeyCertificate.Create(Key(Network, By ?? SigningKey.Holder!, POIKeyKind.Identity, Number).Private,
+                                                          COSEAlgorithm.ES512,
+                                                          Network.Id,
+                                                          TestParties.OperatorId(Network.Id),
+                                                          SigningKey,
+                                                          T0);
 
         #endregion
 
@@ -147,7 +170,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                  Network.Operator!.MinConsensus,
                                                  Network.Id,
                                                  Network.Operator!.Id,
-                                                 Network.Operator!.SigningKeys,
                                                  Network.Operator!.IdentityKeys,
                                                  T0,
                                                  T0.AddDays(30));
@@ -299,6 +321,59 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_holder_renews_its_own_signing_key_alone()
+
+        /// <summary>
+        /// Each holder certifies its own signing keys (SPECIFICATION.md, sections 4.1 and 8.6): replacing its signing key
+        /// and its certificate needs one of its identity keys only, not the quorum; the keys of another holder, also among
+        /// its own, still need the quorum, and so does its signing key alone.
+        /// </summary>
+        [Test]
+        public void A_holder_renews_its_own_signing_key_alone()
+        {
+
+            var network      = Network(2);
+            var op           = network.Operator!;
+            var alpha1       = Key(network, "Alpha", POIKeyKind.Signing).Public;
+            var alpha2       = Key(network, "Alpha", POIKeyKind.Signing, 2).Public;
+            var beta1        = Key(network, "Beta",  POIKeyKind.Signing).Public;
+            var beta2        = Key(network, "Beta",  POIKeyKind.Signing, 2).Public;
+
+            // The signing keys and their certificates with the given ones replaced.
+            RoamingNetworkChangeSet Replacing(params (POIPublicKey Old, POIPublicKey New)[] Keys)
+
+                => network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(op, POIPartyKeys.SigningKeysProperty, null,
+                                                                                 new JArray(op.SigningKeys.Where (key => !Keys.Any(replaced => replaced.Old.Id == key.Id)).
+                                                                                                           Concat(Keys.Select(replaced => replaced.New)).
+                                                                                                           Select(key => key.ToJSON(Embedded: true)))),
+                                             RoamingNetworkChange.UpdateProperty(op, RoamingNetworkSigningKeyCertificate.JSONProperty, null,
+                                                                                 new JArray(op.SigningKeyCertificates.Where (certificate => !Keys.Any(replaced => replaced.Old.Id == certificate.SigningKey.Id)).
+                                                                                                                      Concat(Keys.Select(replaced => Certificate(network, replaced.New))).
+                                                                                                                      Select(certificate => certificate.ToJSON(Embedded: true)))) ],
+                                           CreatedAt: T0);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(network.TryApplyChangeSet(Signed(Replacing((alpha1, alpha2)), network, POIKeyKind.Identity, "Alpha"),  out var renewed, out var error1),  Is.True, error1);
+                Assert.That(renewed!.Operator!.SigningKeys,                          Does.Contain(alpha2).And.Not.Contain(alpha1));
+                Assert.That(renewed.Operator.SigningKeyCertificates.Select(certificate => certificate.SigningKey),  Does.Contain(alpha2));
+
+                Assert.That(network.TryApplyChangeSet(Signed(Replacing((alpha1, alpha2), (beta1, beta2)), network, POIKeyKind.Identity, "Alpha"),  out _, out var error2),  Is.False, "the key of Beta by Alpha");
+                Assert.That(error2,  Does.Contain("2 holders of"));
+
+                Assert.That(network.TryApplyChangeSet(Signed(Replacing((beta1, beta2)), network, POIKeyKind.Identity, "Alpha"),  out _, out _),  Is.False, "the key of Beta by Alpha alone");
+
+                Assert.That(network.TryApplyChangeSet(Signed(Replacing((alpha1, alpha2)), network, POIKeyKind.Signing, "Alpha"),  out _, out _),  Is.False, "by its signing key alone");
+
+                Assert.That(network.TryApplyChangeSet(Signed(Replacing((alpha1, alpha2), (beta1, beta2)), network, POIKeyKind.Identity, "Alpha", "Beta"),  out _, out var error3),  Is.True, error3);
+
+            }
+
+        }
+
+        #endregion
+
         #region A_holder_with_two_identity_keys_has_one_voice()
 
         /// <summary>
@@ -319,7 +394,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                      network.Operator!.MinConsensus,
                                                      network.Id,
                                                      network.Operator!.Id,
-                                                     network.Operator!.SigningKeys,
                                                      network.Operator!.IdentityKeys,
                                                      T0,
                                                      T0.AddDays(30));
@@ -419,9 +493,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region A_key_statement_is_signed_by_the_quorum()
 
         /// <summary>
-        /// The key statement of an operator with a quorum names its minConsensus and is signed by identity keys of as many
-        /// holders (profile wwcp-poi-key-statement-v2): signed by one of them, the version is refused; the others add their
-        /// signatures each on its own, and it reads back as written.
+        /// The key statement of an operator with a quorum names its identity keys and its minConsensus and is signed by
+        /// identity keys of as many holders (context …/keyStatement/v3): signed by one of them, the version is refused; the
+        /// others add their signatures each on its own, and it reads back as written.
         /// </summary>
         [Test]
         public void A_key_statement_is_signed_by_the_quorum()
@@ -470,13 +544,24 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void A_proof_needs_attestations_of_the_quorum()
         {
 
+            // Attested now: a history keeps only attestations valid by its clock, so a fixed time in the past would let the
+            // attestation of one holder drop the one of another.
+            var now = Timestamp.Now;
+
             RoamingNetworkHistory AttestedBy(params String[] Holders)
             {
 
-                var history  = RoamingNetworkHistory.Start(Network(2));
-                var network  = history.Head.RoamingNetwork;
-                var result   = history.Commit(Signed(network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(network.Operator!, RoamingNetworkKeyStatement.JSONProperty, null, Statement(network, "Alpha", "Beta").ToJSON(Embedded: true)) ], CreatedAt: T0),
-                                                     network, POIKeyKind.Signing, "Alpha", "Beta"));
+                var history    = RoamingNetworkHistory.Start(Network(2));
+                var network    = history.Head.RoamingNetwork;
+                var statement  = RoamingNetworkKeyStatement.Create([ .. new[] { "Alpha", "Beta" }.Select(holder => ((Org.BouncyCastle.Crypto.AsymmetricKeyParameter) Key(network, holder, POIKeyKind.Identity).Private, COSEAlgorithm.ES512)) ],
+                                                                   network.Operator!.MinConsensus,
+                                                                   network.Id,
+                                                                   network.Operator!.Id,
+                                                                   network.Operator!.IdentityKeys,
+                                                                   now.AddMinutes(-1),
+                                                                   now.AddDays(30));
+                var result     = history.Commit(Signed(network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(network.Operator!, RoamingNetworkKeyStatement.JSONProperty, null, statement.ToJSON(Embedded: true)) ], CreatedAt: now.AddMinutes(-1)),
+                                                       network, POIKeyKind.Signing, "Alpha", "Beta"));
 
                 Assert.That(result.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), result.ErrorResponse);
 
@@ -486,13 +571,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                           RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator,
                                                                                                           holder)) ];
 
-                Assert.That(history.TryAttest(out _, out var error, T0.AddDays(1)), Is.True, error);
+                Assert.That(history.TryAttest(out _, out var error, now), Is.True, error);
 
                 return history;
 
             }
 
-            var at        = T0.AddDays(1).AddMinutes(1);
+            var at        = now.AddMinutes(1);
             var byOne     = AttestedBy("Alpha");
             var byTwo     = AttestedBy("Alpha", "Gamma");
             var network   = byTwo.Head.RoamingNetwork;

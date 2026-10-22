@@ -367,13 +367,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) VersionEpochError(RoamingNetwork)
 
         /// <summary>
-        /// Why the given new version does not fit this epoch, if it does not: a signature of its key statement is made with
-        /// an algorithm the epoch does not accept.
+        /// Why the given new version does not fit this epoch, if it does not: a signature of its key statement, or of a
+        /// certificate of a signing key, is made with an algorithm the epoch does not accept.
         /// </summary>
         private String? VersionEpochError(RoamingNetwork RoamingNetwork)
 
-            => RoamingNetwork.Operator?.KeyStatement?.Signatures.
-                   Select(signature => SignatureAlgorithmError(signature.Algorithm, "the key statement of the roaming network operator")).
+            => (RoamingNetwork.Operator?.KeyStatement?.Signatures ?? []).
+                   Select(signature   => SignatureAlgorithmError(signature.Algorithm,   "the key statement of the roaming network operator")).
+               Concat((RoamingNetwork.Operator?.SigningKeyCertificates ?? []).
+                   Select(certificate => SignatureAlgorithmError(certificate.Algorithm, $"the certificate of the signing key '{certificate.SigningKey.Id}' of the roaming network operator"))).
                    FirstOrDefault(error => error is not null);
 
         #endregion

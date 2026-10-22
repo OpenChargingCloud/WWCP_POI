@@ -292,9 +292,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Verify this proof against the identity keys of the roaming network operator the verifier trusts by their @ids,
         /// e.g. those of a QR code it scanned (RoamingNetworkTrustAnchor): the key statement of the operator the proof gives
         /// must be signed by trusted identity keys of as many holders as the given minConsensus and its own require, and be
-        /// valid at the given time, now by default; and the attestations of the proof signed by signing keys it states of
-        /// as many holders, valid when they were signed (SPECIFICATION.md, sections 4.1 and 8.6): so that no holder of a
-        /// quorum attests a version alone.
+        /// valid at the given time, now by default; its identity keys are trusted then as well. The attestations of the
+        /// proof must be signed by signing keys of as many holders, valid when they were signed and allowed to sign for the
+        /// party, each certified by a trusted identity key of its holder (SPECIFICATION.md, sections 4.1 and 8.6): so that
+        /// no holder of a quorum attests a version alone.
         /// </summary>
         /// <param name="TrustedIdentityKeyIds">The @ids of the identity keys the verifier trusts: their SHA-256 thumbprints.</param>
         /// <param name="Attestation">One of the attestations it was verified against.</param>
@@ -310,13 +311,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Attestation = null;
 
-            if (!TryGetKeyStatement(out var keyStatement, out var operatorIdentityKeys, out ErrorResponse))
+            if (!TryGetKeyStatement(out var keyStatement, out var operatorIdentityKeys, out ErrorResponse) ||
+                !TryGetSigningKeyCertificates(out var certificates, out ErrorResponse))
+            {
                 return false;
+            }
 
             var at = At ?? Timestamp.Now;
 
             if (!keyStatement.TryVerify(TrustedIdentityKeyIds, operatorIdentityKeys, out ErrorResponse, MinConsensus, at))
                 return false;
+
+            // A key statement trusted names identity keys to trust, e.g. those replacing pinned ones.
+            var identityKeys  = keyStatement.IdentityKeys.Concat(operatorIdentityKeys).ToArray();
+            var trustedIds    = TrustedIdentityKeyIds.Concat(keyStatement.IdentityKeys.Select(key => key.Id)).ToHashSet(StringComparer.Ordinal);
+
+            // The signing key of an attestation, certified by a trusted identity key of its holder.
+            POIPublicKey? CertifiedSigningKeyOf(RoamingNetworkAttestation Attestation)
+
+                => certificates.FirstOrDefault(certificate => certificate.SigningKey.Id == Attestation.KeyId              &&
+                                                              certificate.SigningKey.IsValidAt(Attestation.SignedAt)      &&
+                                                              certificate.SigningKey.MaySign(POIKeyUsages.Party)          &&
+                                                              certificate.TryVerify(identityKeys, out _, out _, trustedIds))?.
+                                SigningKey;
 
             if (keyStatement.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
             {
@@ -327,13 +344,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var required = Math.Max(MinConsensus, keyStatement.MinConsensus);
 
             if (required == 1)
-                return Verify(attestation => keyStatement.SigningKeyOf(attestation.KeyId, attestation.SignedAt) is POIPublicKey signingKey &&
+                return Verify(attestation => CertifiedSigningKeyOf(attestation) is POIPublicKey signingKey &&
                                              attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _),
                               out Attestation,
                               out ErrorResponse,
                               at);
 
-            #region Attested by as many holders of the signing keys it states
+            #region Attested by as many holders of the signing keys certified
 
             if (!TryCalculateETag(out var eTag, out ErrorResponse))
                 return false;
@@ -342,7 +359,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var attestation in AttestationsOf(eTag, at))
             {
-                if (keyStatement.SigningKeyOf(attestation.KeyId, attestation.SignedAt) is POIPublicKey signingKey &&
+                if (CertifiedSigningKeyOf(attestation) is POIPublicKey signingKey &&
                     attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _))
                 {
                     Attestation ??= attestation;
@@ -361,6 +378,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return false;
 
             #endregion
+
+        }
+
+        #endregion
+
+        #region TryGetSigningKeyCertificates(out Certificates, out ErrorResponse)
+
+        /// <summary>
+        /// The certificates of the signing keys of the roaming network operator this proof gives, unless none.
+        /// </summary>
+        public Boolean TryGetSigningKeyCertificates(out IReadOnlyList<RoamingNetworkSigningKeyCertificate>  Certificates,
+                                                    [NotNullWhen(false)] out String?                        ErrorResponse)
+        {
+
+            var certificates = new List<RoamingNetworkSigningKeyCertificate>();
+
+            Certificates   = certificates;
+            ErrorResponse  = null;
+
+            if (RoamingNetwork[POI.RoamingNetwork.PropertyKeys.Operator] is not JObject operatorJSON ||
+                operatorJSON[RoamingNetworkOperator.PropertyKeys.SigningKeyCertificates] is not JArray certificatesJSON)
+            {
+                return true;
+            }
+
+            foreach (var certificateJSON in certificatesJSON)
+            {
+
+                if (certificateJSON is not JObject certificateObject ||
+                    !RoamingNetworkSigningKeyCertificate.TryParse(certificateObject, out var certificate, out ErrorResponse))
+                {
+                    ErrorResponse ??= "A certificate of a signing key of the roaming network operator must be a JSON object!";
+                    return false;
+                }
+
+                certificates.Add(certificate);
+
+            }
+
+            return true;
 
         }
 

@@ -230,11 +230,13 @@ Each key:
 | `key` | text | Canonical Base64 of the deterministic CBOR of the public COSE key; private parts are refused. |
 | `notBefore` | timestamp | Optional: valid from. |
 | `notAfter` | timestamp | Optional: valid until; not before `notBefore`. |
+| `usages` | array of texts | Optional, signing keys only: what it may sign, `infrastructure` (pools, stations, EVSEs, templates and groups), `tariffs` (tariffs, their templates and groups, offers), `priceStatements` and `party` (its own properties, rotating its signing keys); everything without. In their ordinal order; unknown ones are refused. |
 
 - Both arrays are in the ordinal order of the key identifications, a key at most once, and no key both a signing
   and an identity key. An array is written only when it is not empty.
 - A key signs only a change set whose `createdAt` lies within its validity, and only in the version the change set
-  is applied to.
+  is applied to; a signing key naming `usages` only changes of what they name, e.g. one key for the pools and another
+  for the tariffs.
 - **Add:** the RNO adds the operator with at least one key of each kind and without charging pools, tariffs,
   templates, groups or offers: those are the operator's own to add. `RoamingNetworkChange.Add(operator)` leaves them
   out; `RoamingNetworkChange.AddChildren(operator)` gives the changes adding them, tariffs and templates first, groups

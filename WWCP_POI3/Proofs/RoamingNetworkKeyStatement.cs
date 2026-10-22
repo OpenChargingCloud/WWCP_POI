@@ -58,11 +58,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
-    /// A key statement of a roaming network operator (SPECIFICATION.md, section 8.6): which signing keys it uses, signed
-    /// with its identity keys. An app that pins the identity keys of the operator, e.g. by scanning the QR code of a
-    /// RoamingNetworkTrustAnchor, trusts the signing keys it names, and so the attestations they sign, without trusting the
-    /// network that names them. It is part of the content: the roaming network operator embeds it as keyStatement, so that
-    /// every proof of a charging station gives it, peers take it and witnesses see it.
+    /// A key statement of a roaming network operator (SPECIFICATION.md, section 8.6): its identity keys and its
+    /// minConsensus, signed with identity keys of as many holders. An app that pins identity keys of the operator, e.g. by
+    /// scanning the QR code of a RoamingNetworkTrustAnchor, trusts the identity keys it names, and through them the
+    /// signing keys they certify (RoamingNetworkSigningKeyCertificate), without trusting the network that names them. It
+    /// changes only with the identity keys or the quorum, not with the signing keys, which each holder certifies on its
+    /// own. It is part of the content: the roaming network operator embeds it as keyStatement, so that every proof of a
+    /// charging station gives it, peers take it and witnesses see it.
     /// </summary>
     /// <remarks>
     /// It names the minConsensus of the operator and is signed by identity keys of as many holders, each signature in its
@@ -85,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// minConsensus of the operator, signed by identity keys of as many holders. It is part of their signature input
         /// also where it is embedded, as in the roaming network operator.
         /// </summary>
-        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2";
+        public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v3";
 
         #endregion
 
@@ -113,11 +115,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of the identification of the roaming network operator stating it.
             /// </summary>
             public const String  RoamingNetworkOperatorId  = "roamingNetworkOperatorId";
-
-            /// <summary>
-            /// The property of the signing keys it states.
-            /// </summary>
-            public const String  SigningKeys               = POIPartyKeys.SigningKeysProperty;
 
             /// <summary>
             /// The property of the identity keys of the roaming network operator.
@@ -175,19 +172,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RoamingNetworkOperator_Id                            RoamingNetworkOperatorId    { get; }
 
         /// <summary>
-        /// The signing keys it states, e.g. those of attestations, each with its validity and its holder, if named.
-        /// </summary>
-        public ImmutableArray<POIPublicKey>                         SigningKeys                 { get; }
-
-        /// <summary>
-        /// The identity keys of the roaming network operator, which sign its next key statements: a verifier trusting this
-        /// statement may trust them as well, e.g. when the operator replaces an identity key.
+        /// The identity keys of the roaming network operator, with their holders: they certify its signing keys and sign
+        /// its next key statements, so a verifier trusting this statement may trust them as well, e.g. when the operator
+        /// replaces an identity key.
         /// </summary>
         public ImmutableArray<POIPublicKey>                         IdentityKeys                { get; }
 
         /// <summary>
-        /// How many holders of the identity keys sign it, and of the signing keys attest a version: the minConsensus of the
-        /// roaming network operator (SPECIFICATION.md, section 4.1).
+        /// How many holders of the identity keys sign it, and of the signing keys they certify attest a version: the
+        /// minConsensus of the roaming network operator (SPECIFICATION.md, section 4.1).
         /// </summary>
         public Byte                                                 MinConsensus                { get; }
 
@@ -216,8 +209,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public RoamingNetworkKeyStatement(RoamingNetwork_Id                                 RoamingNetworkId,
                                           RoamingNetworkOperator_Id                         RoamingNetworkOperatorId,
-                                          IEnumerable<POIPublicKey>                         SigningKeys,
-                                          IEnumerable<POIPublicKey>?                        IdentityKeys,
+                                          IEnumerable<POIPublicKey>                         IdentityKeys,
                                           Byte                                              MinConsensus,
                                           DateTimeOffset                                    SignedAt,
                                           DateTimeOffset                                    ValidUntil,
@@ -225,14 +217,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             this.IdentityKeys  = POIPublicKey.Ordered(IdentityKeys, "the identity keys of a key statement");
-            this.SigningKeys   = POIPublicKey.Ordered(SigningKeys,  "the signing keys of a key statement");
             this.Signatures    = [ .. Signatures ?? [] ];
 
-            if (this.SigningKeys.IsEmpty)
-                throw new ArgumentException("A key statement names at least one signing key.", nameof(SigningKeys));
-
-            if (this.SigningKeys.Any(signingKey => this.IdentityKeys.Any(identityKey => identityKey.Id == signingKey.Id)))
-                throw new ArgumentException("A key is not both a signing key and an identity key.", nameof(SigningKeys));
+            if (this.IdentityKeys.IsEmpty)
+                throw new ArgumentException("A key statement names at least one identity key.", nameof(IdentityKeys));
 
             if (ValidUntil < SignedAt)
                 throw new ArgumentException("A key statement is not valid until before it was signed.", nameof(ValidUntil));
@@ -263,7 +251,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) Create(IdentityKey,      Algorithm,    MinConsensus, RoamingNetworkId, RoamingNetworkOperatorId, SigningKeys, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
+        #region (static) Create(IdentityKey,      Algorithm,    MinConsensus, RoamingNetworkId, RoamingNetworkOperatorId, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
 
         /// <summary>
         /// Sign a new key statement with the given private identity key of a roaming network operator: with a minConsensus
@@ -275,8 +263,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="MinConsensus">The minConsensus of the roaming network operator.</param>    
         /// <param name="RoamingNetworkId">The roaming network.</param>
         /// <param name="RoamingNetworkOperatorId">The roaming network operator.</param>
-        /// <param name="SigningKeys">The signing keys it states.</param>
-        /// <param name="IdentityKeys">The identity keys of the operator, which sign its next key statements.</param>
+        /// <param name="IdentityKeys">The identity keys of the operator, which certify its signing keys and sign its next key statements.</param>
         /// <param name="SignedAt">When it is signed.</param>
         /// <param name="ValidUntil">Until when it is valid.</param>
         /// <param name="Deterministic">Whether to sign deterministically.</param>
@@ -285,8 +272,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         Byte                        MinConsensus,
                                                         RoamingNetwork_Id           RoamingNetworkId,
                                                         RoamingNetworkOperator_Id   RoamingNetworkOperatorId,
-                                                        IEnumerable<POIPublicKey>   SigningKeys,
-                                                        IEnumerable<POIPublicKey>?  IdentityKeys,
+                                                        IEnumerable<POIPublicKey>   IdentityKeys,
                                                         DateTimeOffset              SignedAt,
                                                         DateTimeOffset              ValidUntil,
                                                         Boolean                     Deterministic   = true)
@@ -298,7 +284,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                           MinConsensus,
                           RoamingNetworkId,
                           RoamingNetworkOperatorId,
-                          SigningKeys,
                           IdentityKeys,
                           SignedAt,
                           ValidUntil,
@@ -308,7 +293,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Create(SigningCOSEPair,                MinConsensus, RoamingNetworkId, RoamingNetworkOperatorId, SigningKeys, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
+        #region (static) Create(SigningCOSEPair,                MinConsensus, RoamingNetworkId, RoamingNetworkOperatorId, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
 
         /// <summary>
         /// Sign a new key statement with the given private identity key of a roaming network operator: with a minConsensus
@@ -319,8 +304,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="MinConsensus">The minConsensus of the roaming network operator.</param>
         /// <param name="RoamingNetworkId">The roaming network.</param>
         /// <param name="RoamingNetworkOperatorId">The roaming network operator.</param>
-        /// <param name="SigningKeys">The signing keys it states.</param>
-        /// <param name="IdentityKeys">The identity keys of the operator, which sign its next key statements.</param>
+        /// <param name="IdentityKeys">The identity keys of the operator, which certify its signing keys and sign its next key statements.</param>
         /// <param name="SignedAt">When it is signed.</param>
         /// <param name="ValidUntil">Until when it is valid.</param>
         /// <param name="Deterministic">Whether to sign deterministically.</param>
@@ -328,8 +312,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         Byte                        MinConsensus,
                                                         RoamingNetwork_Id           RoamingNetworkId,
                                                         RoamingNetworkOperator_Id   RoamingNetworkOperatorId,
-                                                        IEnumerable<POIPublicKey>   SigningKeys,
-                                                        IEnumerable<POIPublicKey>?  IdentityKeys,
+                                                        IEnumerable<POIPublicKey>   IdentityKeys,
                                                         DateTimeOffset              SignedAt,
                                                         DateTimeOffset              ValidUntil,
                                                         Boolean                     Deterministic   = true)
@@ -338,7 +321,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                       MinConsensus,
                       RoamingNetworkId,
                       RoamingNetworkOperatorId,
-                      SigningKeys,
                       IdentityKeys,
                       SignedAt,
                       ValidUntil,
@@ -346,7 +328,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Create(IdentityKeys,     MinConsensus, RoamingNetworkId, RoamingNetworkOperatorId, SigningKeys, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
+        #region (static) Create(IdentityKeys,     MinConsensus, RoamingNetworkId, RoamingNetworkOperatorId, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
 
         /// <summary>
         /// Sign a new key statement with the given private identity keys of the roaming network operator, e.g. of the
@@ -357,8 +339,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="MinConsensus">The minConsensus of the roaming network operator.</param>
         /// <param name="RoamingNetworkId">The roaming network.</param>
         /// <param name="RoamingNetworkOperatorId">The roaming network operator.</param>
-        /// <param name="SigningKeys">The signing keys it states.</param>
-        /// <param name="IdentityKeys">The identity keys of the operator, which sign its next key statements.</param>
+        /// <param name="IdentityKeys">The identity keys of the operator, which certify its signing keys and sign its next key statements.</param>
         /// <param name="SignedAt">When it is signed.</param>
         /// <param name="ValidUntil">Until when it is valid.</param>
         /// <param name="Deterministic">Whether to sign deterministically.</param>
@@ -366,8 +347,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         Byte                                                                MinConsensus,
                                                         RoamingNetwork_Id                                                   RoamingNetworkId,
                                                         RoamingNetworkOperator_Id                                           RoamingNetworkOperatorId,
-                                                        IEnumerable<POIPublicKey>                                           SigningKeys,
-                                                        IEnumerable<POIPublicKey>?                                          IdentityKeys,
+                                                        IEnumerable<POIPublicKey>                                           IdentityKeys,
                                                         DateTimeOffset                                                      SignedAt,
                                                         DateTimeOffset                                                      ValidUntil,
                                                         Boolean                                                             Deterministic   = true)
@@ -381,7 +361,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // The first signature, then the others: each signs the same input with its own algorithm and keyId.
             var statement = new RoamingNetworkKeyStatement(RoamingNetworkId,
                                                            RoamingNetworkOperatorId,
-                                                           SigningKeys,
                                                            IdentityKeys,
                                                            MinConsensus,
                                                            Truncated(SignedAt),
@@ -399,7 +378,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) Create(SigningCOSEPairs, MinConsensus, RoamingNetworkId, RoamingNetworkOperatorId, SigningKeys, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
+        #region (static) Create(SigningCOSEPairs, MinConsensus, RoamingNetworkId, RoamingNetworkOperatorId, IdentityKeys, SignedAt, ValidUntil, Deterministic = true)
 
         /// <summary>
         /// Sign a new key statement with the given private identity keys of the roaming network operator, e.g. of the
@@ -410,8 +389,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="MinConsensus">The minConsensus of the roaming network operator.</param>
         /// <param name="RoamingNetworkId">The roaming network.</param>
         /// <param name="RoamingNetworkOperatorId">The roaming network operator.</param>
-        /// <param name="SigningKeys">The signing keys it states.</param>
-        /// <param name="IdentityKeys">The identity keys of the operator, which sign its next key statements.</param>
+        /// <param name="IdentityKeys">The identity keys of the operator, which certify its signing keys and sign its next key statements.</param>
         /// <param name="SignedAt">When it is signed.</param>
         /// <param name="ValidUntil">Until when it is valid.</param>
         /// <param name="Deterministic">Whether to sign deterministically.</param>
@@ -419,8 +397,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         Byte                        MinConsensus,
                                                         RoamingNetwork_Id           RoamingNetworkId,
                                                         RoamingNetworkOperator_Id   RoamingNetworkOperatorId,
-                                                        IEnumerable<POIPublicKey>   SigningKeys,
-                                                        IEnumerable<POIPublicKey>?  IdentityKeys,
+                                                        IEnumerable<POIPublicKey>   IdentityKeys,
                                                         DateTimeOffset              SignedAt,
                                                         DateTimeOffset              ValidUntil,
                                                         Boolean                     Deterministic   = true)
@@ -435,7 +412,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var statement = new RoamingNetworkKeyStatement(
                                 RoamingNetworkId,
                                 RoamingNetworkOperatorId,
-                                SigningKeys,
                                 IdentityKeys,
                                 MinConsensus,
                                 Truncated(SignedAt),
@@ -528,7 +504,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             return new RoamingNetworkKeyStatement(RoamingNetworkId,
                                                   RoamingNetworkOperatorId,
-                                                  SigningKeys,
                                                   IdentityKeys,
                                                   MinConsensus,
                                                   SignedAt,
@@ -694,18 +669,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region SigningKeyOf(KeyId, At)
-
-        /// <summary>
-        /// The signing key it states with the given @id, valid at the given time, or null.
-        /// </summary>
-        public POIPublicKey? SigningKeyOf(String          KeyId,
-                                          DateTimeOffset  At)
-
-            => SigningKeys.FirstOrDefault(signingKey => signingKey.Id == KeyId && signingKey.IsValidAt(At));
-
-        #endregion
-
         #region GetSigningBytes()
 
         /// <summary>
@@ -803,9 +766,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!TryParseKeys(JSON, PropertyKeys.SigningKeys,   out var signingKeys,  out ErrorResponse) ||
-                    !TryParseKeys(JSON, PropertyKeys.IdentityKeys,  out var identityKeys, out ErrorResponse))
+                if (!TryParseKeys(JSON, PropertyKeys.IdentityKeys, out var identityKeys, out ErrorResponse))
+                    return false;
+
+                if (identityKeys.Count == 0)
                 {
+                    ErrorResponse = $"A key statement requires its {PropertyKeys.IdentityKeys}!";
                     return false;
                 }
 
@@ -850,7 +816,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 KeyStatement   = new RoamingNetworkKeyStatement(roamingNetworkId,
                                                                 roamingNetworkOperatorId,
-                                                                signingKeys,
                                                                 identityKeys,
                                                                 (Byte) minConsensusJSON.Value<Int64>(),
                                                                 signedAt,
@@ -902,7 +867,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) Content()
 
         /// <summary>
-        /// What this key statement states, without its signatures: with the minConsensus of the operator.
+        /// What this key statement states, without its signatures: the identity keys and the minConsensus of the operator.
         /// </summary>
         private JObject Content()
         {
@@ -910,11 +875,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var json = new JObject(
                            new JProperty(PropertyKeys.RoamingNetworkId,          RoamingNetworkId.        ToString()),
                            new JProperty(PropertyKeys.RoamingNetworkOperatorId,  RoamingNetworkOperatorId.ToString()),
-                           new JProperty(PropertyKeys.SigningKeys,               new JArray(SigningKeys.Select(signingKey => signingKey.ToJSON(Embedded: true))))
+                           new JProperty(PropertyKeys.IdentityKeys,              new JArray(IdentityKeys.Select(identityKey => identityKey.ToJSON(Embedded: true))))
                        );
-
-            if (!IdentityKeys.IsEmpty)
-                json.Add(PropertyKeys.IdentityKeys,  new JArray(IdentityKeys.Select(identityKey => identityKey.ToJSON(Embedded: true))));
 
             json.Add(PropertyKeys.MinConsensus,      MinConsensus);
             json.Add(PropertyKeys.SignedAt,          SignedAt.  ToISO8601());
@@ -1017,7 +979,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"Key statement of {RoamingNetworkOperatorId} for {RoamingNetworkId}: {SigningKeys.Length} signing keys, valid until {ValidUntil.ToISO8601()}, signed by {String.Join(", ", Signatures.Select(signature => $"'{signature.KeyId}'"))}";
+            => $"Key statement of {RoamingNetworkOperatorId} for {RoamingNetworkId}: {IdentityKeys.Length} identity keys, minConsensus {MinConsensus}, valid until {ValidUntil.ToISO8601()}, signed by {String.Join(", ", Signatures.Select(signature => $"'{signature.KeyId}'"))}";
 
         #endregion
 

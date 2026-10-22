@@ -60,7 +60,8 @@ A version of a roaming network is identified by its **content**: its JSON repres
   energy meter templates and groups; parking operators; energy meter manufacturers, transparency
   software releases and certificates), the brands of operators, pools,
   stations, EVSEs and RFID authentication modes, the `signingKeys` and `identityKeys` of its
-  operator and of its parties, the key statement of its operator (section 8.6), `created`, `lastChange`
+  operator and of its parties, the key statement of its operator and the certificates of its signing keys
+  (section 8.6), `created`, `lastChange`
   and `customData`.
 - **Excluded:** `eTags`; the runtime status (admin status, status, energy status); the local
   revision counter; internal data.
@@ -207,11 +208,26 @@ A **key** of a party is a public COSE key in its static data:
 ```json
 { "@id": "<SHA-256 COSE key thumbprint [RFC 9679], 64 lowercase hex digits>",
   "key": "<Base64 of the deterministic CBOR of the public COSE key>",
-  "notBefore": "…", "notAfter": "…", "holder": "…" }
+  "notBefore": "…", "notAfter": "…", "holder": "…", "usages": [ "…" ] }
 ```
 
 `holder`, optional, names who holds the private key, e.g. one of several companies holding the keys of the RNO
 together; it is no part of the thumbprint.
+
+`usages`, optional, names what a **signing key** may sign; a signing key naming none signs everything its party
+owns. So a charging station operator signs its pools with one key and its tariffs with another. The usages are
+written in their ordinal order, each once, and are no part of the thumbprint; a reader MUST refuse an unknown one,
+and an identity key naming any:
+
+| Usage | What a signing key naming it signs |
+|---|---|
+| `infrastructure` | charging pools, stations, EVSEs, their templates and groups, energy meter templates and groups, grid connection points, parking garages, spaces, sensors, products and their templates and groups |
+| `tariffs` | charging tariffs, their templates and groups, charging tariff offers |
+| `priceStatements` | price statements (section 12) |
+| `party` | everything else the party owns: its own properties, its `signingKeys` by a signing key; of the RNO also the roaming network, its registries, adding and removing parties, commits and attestations (8.5) |
+
+A change is signed by a signing key of its owner that may sign the usage of the entity it changes, whoever owns
+it.
 
 A reader MUST calculate the thumbprint and refuse a key whose `@id` differs, and a key with
 private parts. The roaming network operator (RNO), charging station operators,
@@ -243,8 +259,9 @@ the network; its identification is unique within the network.
 
 A change set MUST be refused unless, for every owner of one of its changes, it has a valid
 signature with a key that owner names **in the version the change set is applied to**, valid at
-its `createdAt`: a signing key for data; for the `signingKeys` of a party one of its signing keys
-or one of its identity keys; for its `identityKeys` one of its identity keys. For recovery, an
+its `createdAt`: a signing key for data, one that may sign its usage; for the `signingKeys` of a party one of
+its signing keys that may sign for the `party`, or one of its identity keys; for its `identityKeys` one of its
+identity keys. For recovery, an
 identity key of the RNO also counts for both kinds of keys of every other party. Every signature
 MUST be by a key of a party. A party is added with at least one key of each kind, a grid operator
 also with none, and without embedded children, and keeps at least one of each once it has them. The RNO decides who is a member: removing a
@@ -264,19 +281,26 @@ naming no holder having one holder together: for the data it owns signing keys, 
 `minConsensus` and the recovery of other parties identity keys, of the kinds the rules above allow for one
 signature. A holder MAY name several keys of a kind, e.g. identity keys of different `notBefore` and
 `notAfter`: holders are counted, not keys, in `minConsensus` and wherever signatures are counted, so a holder
-signing with all its keys, or renewing one, still has one voice. `minConsensus` MUST be
+signing with all its keys, or renewing one, still has one voice; a signing key counts only where it may sign the
+usage. `minConsensus` MUST be
 more than half of the holders of each kind of keys of the RNO and at most as many, so that two quorums
 always share a holder: two contradicting decisions need a holder signing both, and that holder can be named;
 an odd number of holders is not needed, e.g. 3 of 4. A version that breaks this rule MUST be refused. The
 quorum of the version a change set is applied to counts, as its keys do. The key statement of an RNO with a
 quorum is signed by as many holders (8.6), and a verifier needs attestations of as many (8.5).
 
+**Own signing keys.** Each holder certifies its own signing keys with one of its identity keys (8.6). A change of
+the `signingKeys` of the RNO, or of their `signingKeyCertificates`, that adds and removes only entries of one holder,
+compared with the version it is applied to, is also signed by one identity key of that holder alone: so a holder
+renews its signing keys without the others. A change touching the entries of another holder, or naming another
+holder, needs the quorum as above.
+
 This holds for every change the RNO owns (see the table above), above all for who is a member: adding or
 removing a charging station operator, an e-mobility provider, a grid operator or a parking operator, and
 replacing their keys for recovery, MUST be signed by `minConsensus` holders, never by one alone. However the
-signing keys of a holder come to be trusted, now by the key statement of the quorum (8.6), later possibly by
-each holder for its own keys, such a key gives its holder one voice only; no way of trusting keys may let fewer
-holders than `minConsensus` decide what the RNO owns.
+signing keys of a holder come to be trusted, by the certificate of its own identity key (8.6) or otherwise, such
+a key gives its holder one voice only; no way of trusting keys may let fewer holders than `minConsensus` decide
+what the RNO owns.
 
 ### 4.2 Co-signing
 
@@ -565,40 +589,52 @@ Signature value:
 LrEYPlE05VmgMbbnT9LW5Id3ErLB+07at2sDxXUF1WniurbtW1Lg1dneSF+PG9ANaC7E3OZsjUHLxxgWpixVAA==
 ```
 
-**Key statement** (section 8.6) of the roaming network operator `DE*RNO`: the signing key of the attestation
-above, `@id` `ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554`, stated with the Ed25519 identity
-key of the private seed `303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f` (public key, Base64:
+**Key statement** (section 8.6) of the roaming network operator `DE*RNO`: its Ed25519 identity key of the
+private seed `303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f` (public key, Base64:
 `i7BOHBuD3d8xH1vN33xQ7ePAgC9H7HluKhMc9BKY2fM=`, `@id`
-`1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802`), `minConsensus` 1, signed at 2026-10-17T00:00:00.000Z,
-valid until 2026-11-16T00:00:00.000Z. Signature input:
+`1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802`), stated with itself, `minConsensus` 1, signed at
+2026-10-17T00:00:00.000Z, valid until 2026-11-16T00:00:00.000Z. Signature input:
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2","algorithm":"Ed25519","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","minConsensus":1,"roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKeys":[{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w=="}],"validUntil":"2026-11-16T00:00:00.000Z"}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v3","algorithm":"Ed25519","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","minConsensus":1,"roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","validUntil":"2026-11-16T00:00:00.000Z"}
 ```
 
 Signature value:
 
 ```
-jgFqCKopOaX+W0DcgqH9t6eKmK0pbqyS0Mhhl4y8qCz94ScZFjbc1t++iTPeWe4zHpeayyTwjIRJpWeLWyVTBw==
+ismqBONH+YxKTywJdYYovEUT6JkZQ4t0xl3nGB8cJTfn3d7hTX/PoUjO+518kESsmgHuRZ4aenyMRutWKfinCw==
 ```
 
-**Key statement of a quorum** (sections 4.1 and 8.6): the same signing and identity keys of the holder `Alpha`
-and the Ed25519 keys of the holder `Beta` of the private seeds
-`606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f` (signing, `@id`
-`c1924d610e8d9f1c5efdbca564a2f19991517ab8252807651f94ac5332afe3f9`) and
-`707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f` (identity, `@id`
+**Key statement of a quorum** (sections 4.1 and 8.6): the same identity key of the holder `Alpha` and the
+Ed25519 identity key of the holder `Beta` of the private seed
+`707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f` (`@id`
 `a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f`), `minConsensus` 2, signed by both identity
 keys. Signature input of `Alpha`:
 
 ```json
-{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2","algorithm":"Ed25519","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","holder":"Alpha","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="},{"@id":"a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f","holder":"Beta","key":"owEBIAYhWCAc5WpIyC/5kWKhS8VEYSZ05dYfuTF+ZdQFV4D9vLTcNQ=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","minConsensus":2,"roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKeys":[{"@id":"c1924d610e8d9f1c5efdbca564a2f19991517ab8252807651f94ac5332afe3f9","holder":"Beta","key":"owEBIAYhWCAXRVO0Vt3fxpCOyrHBAf5qsh4rqgYXeVt9Q6Y0gpk/1Q=="},{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","holder":"Alpha","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w=="}],"validUntil":"2026-11-16T00:00:00.000Z"}
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v3","algorithm":"Ed25519","identityKeys":[{"@id":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","holder":"Alpha","key":"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w=="},{"@id":"a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f","holder":"Beta","key":"owEBIAYhWCAc5WpIyC/5kWKhS8VEYSZ05dYfuTF+ZdQFV4D9vLTcNQ=="}],"keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","minConsensus":2,"roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","validUntil":"2026-11-16T00:00:00.000Z"}
 ```
 
 Signature values of `Alpha` and of `Beta`, whose input has its own `keyId`:
 
 ```
-KhACyQt93WyndatU6TyvoaZ6fHtlurRJvBKWeUYZZ472cbCEfSN8u//5gU8IVif3A6ZAuD/5JLTF4cE2PJvbDg==
-LdqMkizNekuc0PnnOo5gJqKAy3mP6JDcXhMG9SykkMTFvYSKHwnNWis5uEVQxl80qZFh/olqc5brn4Ct00GFAA==
+FZyTQgtDgx3qvcVnBwQU0c4iyNT4CLIWXg1Lr/oF/YLMyRNwZXuWIhwusnDim5eW7++hApGcyrbeGruURLGQAg==
+IAYgeNI2NS/atdxYZW8ty/1IjBUTTqmkjE0tgW3fjs+3xDbaIhZrsHLWVV9y7MyMrD2K8zKpJ2w1P0DNzjo1Dw==
+```
+
+**Certificate of a signing key** (section 8.6): the signing key of the attestation above, `@id`
+`ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554`, of the holder `Alpha`, valid until
+2027-10-17T00:00:00.000Z and for the `party` only, certified by the identity key of `Alpha` at
+2026-10-17T00:00:00.000Z. Signature input:
+
+```json
+{"@context":"https://open.charging.cloud/contexts/wwcp/roamingNetwork/signingKeyCertificate/v1","algorithm":"Ed25519","keyId":"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802","roamingNetworkId":"rn1","roamingNetworkOperatorId":"DE*RNO","signedAt":"2026-10-17T00:00:00.000Z","signingKey":{"@id":"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554","holder":"Alpha","key":"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==","notAfter":"2027-10-17T00:00:00.000Z","usages":["party"]}}
+```
+
+Signature value:
+
+```
+UfEDYBZ2+KeTplEX+fhu1Oj1kUA3gJNzxq57qbagJQHQvnXZi3jVBe1IGR9JxEwvAcEUaTIpQXaw3VTd2wZKCw==
 ```
 
 **Trust anchor** (section 8.6) of the example, with the identity key of the key statement above:
@@ -873,10 +909,12 @@ algorithms and verification are as in section 4; timestamps are written and sign
   `RefreshAttestations()` attests the head again where the newest attestation of a signer is older than
   5 minutes. A verifier SHOULD refuse an attestation after its `validUntil`.
 - **Trust:** the verifier MUST trust the key of an attestation independently of the proof. A key the
-  attested network names proves nothing, as whoever forged the network would name their own; a key
-  statement (8.6) names them. Of an RNO with a quorum (section 4.1), the verifier MUST take a version only
-  attested by signing keys of `minConsensus` different holders the statement names, so that no holder vouches
-  for a version alone; each holder attests at its own server, and the servers exchange their attestations.
+  attested network names proves nothing, as whoever forged the network would name their own; the
+  certificate of an identity key it trusts (8.6) names them. The key MUST be one that may sign for the
+  `party` (4.1). Of an RNO with a quorum (section 4.1), the verifier MUST take a version only attested by signing
+  keys of `minConsensus` different holders, each certified by a trusted identity key of its holder, so that no
+  holder vouches for a version alone; each holder attests at its own server, and the servers exchange their
+  attestations.
 - **Audit:** whoever has the history checks that the commit `commitId` has the attested ETag. An RNO
   attesting a version it does not have is caught by it. A server takes an attestation of another server
   only for a commit it holds, whose version has the attested ETag, with a signature of a key it trusts.
@@ -894,38 +932,53 @@ algorithms and verification are as in section 4; timestamps are written and sign
 ### 8.6 Key statements and trust anchors
 
 A verifier trusts the key of an attestation independently of the proof (8.5). So that it pins only a few
-long-lived keys, the roaming network operator states its signing keys in a **key statement**, signed with identity keys of
-`minConsensus` of its holders (section 4.1), one of them for an RNO without a quorum:
+long-lived keys, the roaming network operator states its identity keys and its quorum in a **key statement**,
+signed with identity keys of `minConsensus` of its holders (section 4.1), one of them for an RNO without a quorum,
+and each holder certifies its own signing keys in a **certificate**, signed with one of its identity keys:
 
 ```json
 { "roamingNetworkId": "rn1", "roamingNetworkOperatorId": "DE*RNO",
-  "signingKeys":  [ { "@id": "…", "key": "…", "holder": "Alpha" }, { "@id": "…", "key": "…", "holder": "Beta" } ],
   "identityKeys": [ { "@id": "…", "key": "…", "holder": "Alpha" }, { "@id": "…", "key": "…", "holder": "Beta" } ],
   "minConsensus": 2, "signedAt": "…", "validUntil": "…",
   "signatures": [ { "algorithm": "Ed25519", "keyId": "<@id>", "value": "<Base64>" }, … ] }
 ```
 
-Its context is `https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2`; the former single signature form, with `algorithm`,
-`keyId` and `value` beside the statement, is gone. The signature input of each signature is the canonical
-JSON of the statement without `signatures`, with its `@context`, also where it is embedded in the operator,
-its `algorithm` and its `keyId`; `identityKeys` is left out where absent.
-Every holder signs the same statement on its own and adds its signature to those of the others. Keys are written as in section 4.1, in the order of their `@id`s, at least one signing key, none a
-signing and an identity key; timestamps as in section 5.4, `validUntil` not before `signedAt`. Section 6
-has an example.
+Its context is `https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v3`; it names no signing keys, so it changes only with the
+identity keys or the quorum. The signature input of each signature is the canonical JSON of the statement without
+`signatures`, with its `@context`, also where it is embedded in the operator, its `algorithm` and its `keyId`.
+Every holder signs the same statement on its own and adds its signature to those of the others. Keys are written
+as in section 4.1, in the order of their `@id`s, at least one identity key; timestamps as in section 5.4,
+`validUntil` not before `signedAt`. Section 6 has an example.
 
-- **Content:** the roaming network operator embeds it as `keyStatement`, a property of its own (section
-  4.1). A version MUST be refused unless the statement names this roaming network and this operator, only
-  signing and identity keys the operator names, its `minConsensus`, and is signed by identity keys of
-  `minConsensus` holders valid at `signedAt`; every signature MUST be valid. Its validity in time is not checked there: a version keeps a statement that expired. So every
+```json
+{ "roamingNetworkId": "rn1", "roamingNetworkOperatorId": "DE*RNO",
+  "signingKey": { "@id": "…", "key": "…", "notAfter": "…", "holder": "Alpha", "usages": [ "party" ] },
+  "signedAt": "…", "algorithm": "Ed25519", "keyId": "<@id of an identity key of Alpha>", "value": "<Base64>" }
+```
+
+A certificate has the context `https://open.charging.cloud/contexts/wwcp/roamingNetwork/signingKeyCertificate/v1`; its signature input is its canonical
+JSON without `value`, with its `@context`, also where it is embedded. It certifies the signing key with its
+validity, its holder and its usages, and is signed by an identity key of the **same holder**, valid at `signedAt`:
+each holder certifies its own signing keys and renews them without the others (4.1), as such a key gives its
+holder one voice only. It has no validity of its own beyond the one of the key; a key is revoked by removing it.
+Section 6 has an example.
+
+- **Content:** the roaming network operator embeds it as `keyStatement` and its certificates as
+  `signingKeyCertificates`, properties of its own (section 4.1). A version MUST be refused unless the statement
+  names this roaming network and this operator, only identity keys the operator names, its `minConsensus`, and is
+  signed by identity keys of `minConsensus` holders valid at `signedAt`; and unless every certificate names this
+  roaming network and this operator, certifies one of its signing keys as it names it, and is signed by one of its
+  identity keys of the holder of that key, valid at `signedAt`. Every signature MUST be valid. Its validity in time is not checked there: a version keeps a statement that expired. So every
   proof of a charging station gives it with the operator, peers take it with the commits, and witnesses see
   it in the checkpoints: an operator stating other keys to some is a split view (10.2).
 - **Verification:** a verifier trusting identity keys by their `@id`s checks that the statement the proof
   gives is signed by trusted ones of as many holders as the `minConsensus` it pinned and the one of the
   statement require, found among its `identityKeys` or those of the operator, each `@id` the thumbprint of its
   key (section 4.1); that it is valid at the time it checks, `signedAt` ≤ time ≤
-  `validUntil`; that it names the roaming network of the proof; and that an attestation of the proof is
-  signed by one of the signing keys it states, valid at the attestation's `signedAt`. The attestation is then
-  trusted as 8.5 says.
+  `validUntil`; and that it names the roaming network of the proof. The identity keys the statement names are
+  trusted then as well. An attestation of the proof counts when its signing key is certified by a trusted identity
+  key of its holder, is valid at the attestation's `signedAt` and may sign for the `party`; it is then trusted as
+  8.5 says.
 - **Succession:** a verifier trusting a statement MAY trust its `identityKeys` for later statements, e.g.
   when the operator replaces an identity key before it expires.
 - **Trust anchor:** what a verifier pins of a roaming network, e.g. from a QR code on the website or in the
@@ -1392,7 +1445,8 @@ Every history begins in epoch 1, whose commits and checkpoints do not name it.
   `sha256`.
 - **commit, checkpoint, priceStatement:** the contexts of their contents and signatures (section 4).
 - **signatureAlgorithms:** the COSE names of the signature algorithms the epoch accepts, for the
-  signatures of change sets, commits, checkpoints, attestations, key statements and price statements;
+  signatures of change sets, commits, checkpoints, attestations, key statements, certificates of signing keys
+  and price statements;
   every one the implementation signs with, when empty, as in the first epoch.
 
 A server MUST refuse profiles it can not calculate. The `effectiveTree` ETags follow the
@@ -1501,7 +1555,7 @@ operator with one of its signing keys (section 4.1) when it sets the price.
 
 The signature input is the canonical JSON of the statement without `value`, its `@context`
 (`https://open.charging.cloud/contexts/wwcp/roamingNetwork/priceStatement/v1`), `algorithm` and `keyId` included, as for an attestation (8.5). The key MUST be a signing key of the
-operator of the entity, valid at `signedAt`. The CBOR representation has the keys and values of the JSON
+operator of the entity, valid at `signedAt`, that may sign `priceStatements` (4.1). The CBOR representation has the keys and values of the JSON
 one.
 
 ### 12.2 Taking a statement

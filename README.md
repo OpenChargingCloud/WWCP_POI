@@ -22,7 +22,7 @@ Inspired by Git and Merkle-tree-based distributed systems, WWCP/POI introduces a
 
 8. ***"Can existing EV roaming systems benefit without being fully replaced?"*** WWCP/POI as a *GNU-inspired* Open Source project is not intended to require the immediate replacement of OICP, OCHP, OCPI or the European DATEX II ecosystem. Existing systems can import data into the WWCP/POI domain model or expose synchronized information through established interfaces, including OCPI and DATEX II. WWCP/POI enables practical uses beyond conventional roaming, such as independently verifiable AFIR open-data publications, historical infrastructure audits, synchronization diagnostics and consumer-facing tariff transparency.
 
-9. ***"Is WWCP/POI yet-another-centralized-infrastructure?"*** Just like within Git there is no leader: every server commits; the history is a graph of commits, and tips that do not conflict are merged deterministically, so that all servers make the same merge commits. And there is no root private key either: every operator signs its own data with its own keys, and the roaming network operator may be a quorum of key holders, e.g. 2 of 3 companies. Then everything it signs, its key statement included, needs the keys of more than half of them, so no single company decides for the network.
+9. ***"Is WWCP/POI yet-another-centralized-infrastructure?"*** Just like within Git there is no leader: every server commits; the history is a graph of commits, and tips that do not conflict are merged deterministically, so that all servers make the same merge commits. And there is no root private key either: every operator signs its own data with its own keys, and the roaming network operator may be a quorum of key holders, e.g. 2 of 3 companies. Then everything it signs, its key statement included, needs enough signatures to reach the defined and signed quorum. No single company decides for the entire roaming network.
 
 
 ## The Domain Model
@@ -497,10 +497,13 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   `AttestationValidity` (15 minutes); `RefreshAttestations()` attests it again after `AttestationInterval` (5
   minutes), e.g. called every minute. `TryAddAttestation(…)` takes those of another server for a commit held, whose
   version has the attested ETag, with a signature `VerifyAttestation` trusts; `OnAttestation` tells of every one.
-- **Key statements and trust anchors:** the roaming network operator states its signing keys in a
-  `keyStatement`, signed with one of its identity keys, or with a quorum by those of `minConsensus` holders
-  (`RoamingNetworkKeyStatement.Create(…)`, `WithSignature(…)`, committed as a property of the operator), so that every
-  proof gives it. An app scans the QR code of the trust anchor (`GET ~/RNs/{id}/trustAnchor`): `WWCPPOI1:` and the
+- **Key statements, certificates and trust anchors:** the roaming network operator states its identity keys and its
+  `minConsensus` in a `keyStatement`, signed with one of its identity keys, or with a quorum by those of `minConsensus`
+  holders (`RoamingNetworkKeyStatement.Create(…)`, `WithSignature(…)`), and each holder certifies its own signing
+  keys with one of its identity keys (`RoamingNetworkSigningKeyCertificate.Create(…)`, as `signingKeyCertificates`),
+  so that it renews them alone; both are committed as properties of the operator, so that every proof gives them.
+  Signing keys may name `usages` (`infrastructure`, `tariffs`, `priceStatements`, `party`), e.g. one key of a charging
+  station operator for its pools and one for its tariffs. An app scans the QR code of the trust anchor (`GET ~/RNs/{id}/trustAnchor`): `WWCPPOI1:` and the
   Base45 of its CBOR, with the network, its name and description, the thumbprints of the identity
   keys and the `minConsensus` (`RoamingNetworkTrustAnchor.TryParse(text, …)`; the URI
   `https://hub.example/poi/RNs/rn1?keys=<@id>,…` is read as well), and verifies proofs with

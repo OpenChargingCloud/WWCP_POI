@@ -89,13 +89,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         ]);
 
         /// <summary>
-        /// The properties of the roaming network operator: those of a party, its e-mail addresses and its key statement.
+        /// The properties of the roaming network operator: those of a party, its e-mail addresses, its key statement and the
+        /// certificates of its signing keys.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableRoamingNetworkOperatorProperties = ChangeablePartyProperties.Union([
             RoamingNetworkOperator.PropertyKeys.EMailAddress,
             RoamingNetworkOperator.PropertyKeys.HotlineEMailAddress,
             RoamingNetworkOperator.PropertyKeys.MinConsensus,
-            RoamingNetworkOperator.PropertyKeys.KeyStatement
+            RoamingNetworkOperator.PropertyKeys.KeyStatement,
+            RoamingNetworkOperator.PropertyKeys.SigningKeyCertificates
         ]);
 
         private static readonly Registry<RoamingNetworkOperator_Id, RoamingNetworkOperator> RoamingNetworkOperatorRegistry = new (

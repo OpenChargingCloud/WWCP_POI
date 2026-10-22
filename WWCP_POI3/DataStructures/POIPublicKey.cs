@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
@@ -91,6 +92,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  Holder      = "holder";
 
+            /// <summary>
+            /// The property of what a signing key may sign, unless everything its party owns (POIKeyUsages).
+            /// </summary>
+            public const String  Usages      = "usages";
+
         }
 
         #endregion
@@ -129,6 +135,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public String           HolderOrUnnamed
             => Holder ?? "";
 
+        /// <summary>
+        /// What a signing key may sign, in their ordinal order (POIKeyUsages): everything its party owns unless it names
+        /// some. Not part of its identification.
+        /// </summary>
+        public ImmutableArray<String>  Usages    { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -140,10 +152,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NotBefore">Since when it may be used, unless always.</param>
         /// <param name="NotAfter">Until when it may be used, unless always.</param>
         /// <param name="Holder">Who holds its private key, if named.</param>
-        public POIPublicKey(COSEKey          Key,
-                            DateTimeOffset?  NotBefore   = null,
-                            DateTimeOffset?  NotAfter    = null,
-                            String?          Holder      = null)
+        /// <param name="Usages">What a signing key may sign, unless everything its party owns (POIKeyUsages).</param>
+        public POIPublicKey(COSEKey               Key,
+                            DateTimeOffset?       NotBefore   = null,
+                            DateTimeOffset?       NotAfter    = null,
+                            String?               Holder      = null,
+                            IEnumerable<String>?  Usages      = null)
         {
 
             ArgumentNullException.ThrowIfNull(Key);
@@ -159,13 +173,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.NotBefore  = NotBefore?.ToUniversalTime();
             this.NotAfter   = NotAfter?. ToUniversalTime();
             this.Holder     = Holder;
+            this.Usages     = [ .. (Usages ?? []).Order(StringComparer.Ordinal) ];
+
+            if (this.Usages.FirstOrDefault(usage => !POIKeyUsages.All.Contains(usage)) is String unknownUsage)
+                throw new ArgumentException($"The usage '{unknownUsage}' of a public key is unknown: it is one of {String.Join(", ", POIKeyUsages.All.Order(StringComparer.Ordinal))}!");
+
+            if (this.Usages.Distinct(StringComparer.Ordinal).Count() != this.Usages.Length)
+                throw new ArgumentException("A public key names each of its usages once!");
 
         }
 
         #endregion
 
 
-        #region (static) From(Key, NotBefore = null, NotAfter = null, Holder = null)
+        #region (static) From(Key, NotBefore = null, NotAfter = null, Holder = null, Usages = null)
 
         /// <summary>
         /// The public key of the given asymmetric key, e.g. of a private signing key.
@@ -173,9 +194,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static POIPublicKey From(AsymmetricKeyParameter  Key,
                                         DateTimeOffset?         NotBefore   = null,
                                         DateTimeOffset?         NotAfter    = null,
-                                        String?                 Holder      = null)
+                                        String?                 Holder      = null,
+                                        IEnumerable<String>?    Usages      = null)
 
-            => new (COSEKey.From(Key), NotBefore, NotAfter, Holder);
+            => new (COSEKey.From(Key), NotBefore, NotAfter, Holder, Usages);
+
+        #endregion
+
+        #region MaySign(Usage)
+
+        /// <summary>
+        /// Whether this signing key may sign what needs the given usage (POIKeyUsages): it names none, or that one.
+        /// </summary>
+        public Boolean MaySign(String Usage)
+
+            => Usages.IsEmpty || Usages.Contains(Usage);
 
         #endregion
 
@@ -196,7 +229,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Return the JSON representation of this public key: its identification,
-        /// its COSE key as Base64 of its deterministic CBOR, and its validity.
+        /// its COSE key as Base64 of its deterministic CBOR, its validity, its holder and the usages of a signing key.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="CustomPOIPublicKeySerializer">An optional custom serializer.</param>
@@ -221,6 +254,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (Holder is not null)
                 json.Add(PropertyKeys.Holder,     Holder);
+
+            if (!Usages.IsEmpty)
+                json.Add(PropertyKeys.Usages,     new JArray(Usages));
 
             return CustomPOIPublicKeySerializer is not null
                        ? CustomPOIPublicKeySerializer(this, json)
@@ -300,7 +336,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                var publicKey = new POIPublicKey(coseKey, notBefore, notAfter, holder);
+                var usages = new List<String>();
+
+                if (JSON[PropertyKeys.Usages] is JToken usagesJSON)
+                {
+
+                    if (usagesJSON is not JArray { Count: > 0 } usagesArray || usagesArray.Any(usage => usage.Type != JTokenType.String))
+                    {
+                        ErrorResponse = $"The usages of the public key '{id}' must be a nonempty JSON array of texts!";
+                        return false;
+                    }
+
+                    usages.AddRange(usagesArray.Select(usage => usage.Value<String>()!));
+
+                    if (usages.FirstOrDefault(usage => !POIKeyUsages.All.Contains(usage)) is String unknownUsage)
+                    {
+                        ErrorResponse = $"The usage '{unknownUsage}' of the public key '{id}' is unknown: it is one of {String.Join(", ", POIKeyUsages.All.Order(StringComparer.Ordinal))}!";
+                        return false;
+                    }
+
+                    if (usages.Distinct(StringComparer.Ordinal).Count() != usages.Count)
+                    {
+                        ErrorResponse = $"The public key '{id}' names each of its usages once!";
+                        return false;
+                    }
+
+                    if (!usages.SequenceEqual(usages.Order(StringComparer.Ordinal)))
+                    {
+                        ErrorResponse = $"The usages of the public key '{id}' are written in their ordinal order!";
+                        return false;
+                    }
+
+                }
+
+                var publicKey = new POIPublicKey(coseKey, notBefore, notAfter, holder, usages);
 
                 if (publicKey.Id != id)
                 {

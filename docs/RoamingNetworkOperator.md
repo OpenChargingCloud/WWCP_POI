@@ -49,10 +49,11 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `address` | `Address` | `Address?` | update/remove | Address of the headquarters, as Styx writes it embedded. |
 | `homepage` | `Homepage` | `URL?` | update/remove | Homepage. |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | Hotline phone number. |
-| `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update (signing or identity key) | Keys signing its change sets, see [Keys](#keys). Can not be removed. |
+| `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update (signing or identity key; a holder's own by one of its identity keys) | Keys signing its change sets, see [Keys](#keys). Can not be removed. |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update (identity key) | Long-term keys signing changes of keys, see [Keys](#keys). Can not be removed. |
 | `minConsensus` | `MinConsensus` | `Byte`, 1 by default, written unless 1 | update (identity keys) | How many holders of its keys of one kind sign what it owns, see [Quorum](#quorum). |
-| `keyStatement` | `KeyStatement` | `RoamingNetworkKeyStatement?` | update/remove | Its signing keys stated by its identity keys, for apps ([SPECIFICATION.md](../SPECIFICATION.md#86-key-statements-and-trust-anchors), section 8.6). |
+| `keyStatement` | `KeyStatement` | `RoamingNetworkKeyStatement?` | update/remove | Its identity keys and its `minConsensus`, stated by identity keys of the quorum, for apps ([SPECIFICATION.md](../SPECIFICATION.md#86-key-statements-and-trust-anchors), section 8.6). |
+| `signingKeyCertificates` | `SigningKeyCertificates` | `ImmutableArray<RoamingNetworkSigningKeyCertificate>` | update/remove (as `signingKeys`) | Each signing key certified by an identity key of its holder, for apps (section 8.6). |
 
 A change set names the properties above by their JSON keys (`RoamingNetworkOperatorRegistry` in
 [RoamingNetwork.RegistryChanges.cs](../WWCP_POI3/RoamingNetwork/RoamingNetwork.RegistryChanges.cs)), with
@@ -81,6 +82,7 @@ The public keys of the RNO (`POIPublicKey`, [source](../WWCP_POI3/DataStructures
 | `notBefore` | timestamp | Optional start of validity (UTC, to the millisecond). |
 | `notAfter` | timestamp | Optional end of validity; not before `notBefore`. |
 | `holder` | string | Optional: who holds the private key, e.g. one company of a [quorum](#quorum). No part of `@id`. |
+| `usages` | array of texts | Optional, signing keys only: what it may sign (`infrastructure`, `tariffs`, `priceStatements`, `party`); everything without. Commits and attestations of the RNO need `party`. No part of `@id`. |
 
 - **signingKeys** — short keys (e.g. secp256r1) signing change sets of RNO data: its own properties, the network's
   properties, the registries, adding and removing parties, and the rotation of the `signingKeys` themselves. A
@@ -105,8 +107,13 @@ and the RNO names its `minConsensus`, e.g. 2 of 3.
 
 - **What needs it:** everything the RNO signs needs signatures with keys of `minConsensus` different holders: its
   data and that of the network with signing keys; its keys, its `minConsensus` and the recovery of the keys of
-  other parties with identity keys; its key statement (`wwcp-poi-key-statement-v2`, signed by identity keys of as
-  many holders). An app takes a version only when signing keys of as many holders attest it.
+  other parties with identity keys; its key statement (`…/keyStatement/v3`, its identity keys and its
+  `minConsensus`, signed by identity keys of as many holders). An app takes a version only when signing keys of as
+  many holders attest it, each certified by an identity key of its holder.
+- **Own signing keys:** each holder certifies its own signing keys with one of its identity keys
+  (`RoamingNetworkSigningKeyCertificate.Create(…)`), and replaces them, with their certificates, by a change set
+  signed by one of its identity keys alone: a signing key gives its holder one voice only. The keys of another
+  holder need the quorum.
 - **Holders, not keys:** a holder renewing its key signs with two keys, but has one voice. Keys naming no holder
   have one holder together: an RNO without a quorum is one holder with `minConsensus` 1.
 - **More than half:** `minConsensus` is more than half of the holders of each kind of keys and at most as many, so
@@ -118,10 +125,13 @@ and the RNO names its `minConsensus`, e.g. 2 of 3.
   (`~/history/changeSets/pending`, [SPECIFICATION.md](../SPECIFICATION.md#42-co-signing), section 4.2).
 
 ```csharp
-var statement = RoamingNetworkKeyStatement.Create([ (alphaIdentityKey, COSEAlgorithm.ES512) ], 2,
-                                                  rn.Id, rn.Operator!.Id, rn.Operator.SigningKeys, rn.Operator.IdentityKeys,
-                                                  now, now.AddDays(30)).
-                    WithSignature(betaIdentityKey, COSEAlgorithm.ES512);   // at the place of Beta
+var statement   = RoamingNetworkKeyStatement.Create([ (alphaIdentityKey, COSEAlgorithm.ES512) ], 2,
+                                                    rn.Id, rn.Operator!.Id, rn.Operator.IdentityKeys,
+                                                    now, now.AddDays(30)).
+                      WithSignature(betaIdentityKey, COSEAlgorithm.ES512);   // at the place of Beta
+
+var certificate = RoamingNetworkSigningKeyCertificate.Create(alphaIdentityKey, COSEAlgorithm.ES512,
+                                                             rn.Id, rn.Operator!.Id, alphaSigningKey, now);   // Alpha alone
 ```
 
 

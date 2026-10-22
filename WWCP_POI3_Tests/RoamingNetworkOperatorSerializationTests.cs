@@ -50,7 +50,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         /// <summary>
         /// An operator with everything it can have: the keys of three holders of a quorum of two, a key statement signed
-        /// with identity keys of two of them, an address, contacts and metadata.
+        /// with identity keys of two of them, the certificates of their signing keys, an address, contacts and metadata.
         /// </summary>
         internal static RoamingNetworkOperator Full()
         {
@@ -78,11 +78,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                               2,
                                                                               network.Id,
                                                                               networkOperator.Id,
-                                                                              signingKeys. Select(key => key.Public),
                                                                               identityKeys.Select(key => key.Public),
                                                                               T0,
                                                                               T0.AddDays(30)),
                        MinConsensus:        2,
+                       SigningKeyCertificates:  signingKeys.Select((key, index) => RoamingNetworkSigningKeyCertificate.Create(identityKeys[index].Private,
+                                                                                                                                COSEAlgorithm.ES512,
+                                                                                                                                network.Id,
+                                                                                                                                networkOperator.Id,
+                                                                                                                                key.Public,
+                                                                                                                                T0)),
                        DataSource:          "test",
                        Created:             T0,
                        LastChange:          T0.AddHours(1),

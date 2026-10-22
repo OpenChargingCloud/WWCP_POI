@@ -483,7 +483,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Verify the signature of this price statement with the one of the given signing keys of its operator it names,
-        /// which must be valid when it was signed.
+        /// which must be valid when it was signed and may sign price statements (POIKeyUsages).
         /// </summary>
         /// <param name="SigningKeys">The signing keys of the charging station operator of the entity.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
@@ -500,6 +500,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!signingKey.IsValidAt(SignedAt))
             {
                 ErrorResponse = $"The signing key '{KeyId}' of the charging station operator '{Signer}' is not valid at {SignedAt.ToISO8601()}, when the price statement was signed!";
+                return false;
+            }
+
+            if (!signingKey.MaySign(POIKeyUsages.PriceStatements))
+            {
+                ErrorResponse = $"The signing key '{KeyId}' of the charging station operator '{Signer}' may not sign '{POIKeyUsages.PriceStatements}', only {String.Join(", ", signingKey.Usages.Select(usage => $"'{usage}'"))}!";
                 return false;
             }
 

@@ -268,17 +268,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void A_key_statement()
         {
 
-            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2\",\"algorithm\":\"Ed25519\",\"identityKeys\":[{\"@id\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"key\":\"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w==\"}],\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"minConsensus\":1,\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKeys\":[{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\"}],\"validUntil\":\"2026-11-16T00:00:00.000Z\"}";
-            const String Value  = "jgFqCKopOaX+W0DcgqH9t6eKmK0pbqyS0Mhhl4y8qCz94ScZFjbc1t++iTPeWe4zHpeayyTwjIRJpWeLWyVTBw==";
+            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v3\",\"algorithm\":\"Ed25519\",\"identityKeys\":[{\"@id\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"key\":\"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w==\"}],\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"minConsensus\":1,\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"validUntil\":\"2026-11-16T00:00:00.000Z\"}";
+            const String Value  = "ismqBONH+YxKTywJdYYovEUT6JkZQ4t0xl3nGB8cJTfn3d7hTX/PoUjO+518kESsmgHuRZ4aenyMRutWKfinCw==";
 
-            var signingKey   = new Ed25519PrivateKeyParameters(Convert.FromHexString("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), 0);
             var identityKey  = new Ed25519PrivateKeyParameters(Convert.FromHexString("303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f"), 0);
             var statement    = RoamingNetworkKeyStatement.Create(identityKey,
                                                                  COSEAlgorithm.Ed25519,
                                                                  1,
                                                                  RoamingNetwork_Id.Parse("rn1"),
                                                                  RoamingNetworkOperator_Id.Parse("DE*RNO"),
-                                                                 [ POIPublicKey.From(signingKey) ],
                                                                  [ POIPublicKey.From(identityKey) ],
                                                                  DateTimeOffset.Parse("2026-10-17T00:00:00Z"),
                                                                  DateTimeOffset.Parse("2026-11-16T00:00:00Z"));
@@ -288,7 +286,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(Encoding.UTF8.GetString(statement.GetSigningBytes()),                                                 Is.EqualTo(Input));
                 Assert.That(statement.Signatures.Single().Value,                                                                  Is.EqualTo(Value));
                 Assert.That(statement.TryVerify([ "1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802" ], null, out var error),  Is.True, error);
-                Assert.That(statement.SigningKeyOf("ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554", DateTimeOffset.Parse("2026-10-20T00:00:00Z")),  Is.Not.Null);
             }
 
         }
@@ -298,27 +295,24 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region A_key_statement_of_a_quorum()
 
         /// <summary>
-        /// A key statement of the profile wwcp-poi-key-statement-v2 of an operator whose keys two holders share, of which both
-        /// must sign: each signs the same input with its own keyId.
+        /// A key statement of an operator whose keys two holders share, of which both must sign: each signs the same input
+        /// with its own keyId.
         /// </summary>
         [Test]
         public void A_key_statement_of_a_quorum()
         {
 
-            const String InputOfAlpha  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2\",\"algorithm\":\"Ed25519\",\"identityKeys\":[{\"@id\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w==\"},{\"@id\":\"a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f\",\"holder\":\"Beta\",\"key\":\"owEBIAYhWCAc5WpIyC/5kWKhS8VEYSZ05dYfuTF+ZdQFV4D9vLTcNQ==\"}],\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"minConsensus\":2,\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKeys\":[{\"@id\":\"c1924d610e8d9f1c5efdbca564a2f19991517ab8252807651f94ac5332afe3f9\",\"holder\":\"Beta\",\"key\":\"owEBIAYhWCAXRVO0Vt3fxpCOyrHBAf5qsh4rqgYXeVt9Q6Y0gpk/1Q==\"},{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\"}],\"validUntil\":\"2026-11-16T00:00:00.000Z\"}";
-            const String ValueOfAlpha  = "KhACyQt93WyndatU6TyvoaZ6fHtlurRJvBKWeUYZZ472cbCEfSN8u//5gU8IVif3A6ZAuD/5JLTF4cE2PJvbDg==";
-            const String ValueOfBeta   = "LdqMkizNekuc0PnnOo5gJqKAy3mP6JDcXhMG9SykkMTFvYSKHwnNWis5uEVQxl80qZFh/olqc5brn4Ct00GFAA==";
+            const String InputOfAlpha  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v3\",\"algorithm\":\"Ed25519\",\"identityKeys\":[{\"@id\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCCLsE4cG4Pd3zEfW83ffFDt48CAL0fseW4qExz0EpjZ8w==\"},{\"@id\":\"a287cebcd93b836a712b6393a914a86e63516d401285f3c642f734a28146f83f\",\"holder\":\"Beta\",\"key\":\"owEBIAYhWCAc5WpIyC/5kWKhS8VEYSZ05dYfuTF+ZdQFV4D9vLTcNQ==\"}],\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"minConsensus\":2,\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"validUntil\":\"2026-11-16T00:00:00.000Z\"}";
+            const String ValueOfAlpha  = "FZyTQgtDgx3qvcVnBwQU0c4iyNT4CLIWXg1Lr/oF/YLMyRNwZXuWIhwusnDim5eW7++hApGcyrbeGruURLGQAg==";
+            const String ValueOfBeta   = "IAYgeNI2NS/atdxYZW8ty/1IjBUTTqmkjE0tgW3fjs+3xDbaIhZrsHLWVV9y7MyMrD2K8zKpJ2w1P0DNzjo1Dw==";
 
-            var alphaSigning   = new Ed25519PrivateKeyParameters(Convert.FromHexString("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), 0);
             var alphaIdentity  = new Ed25519PrivateKeyParameters(Convert.FromHexString("303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f"), 0);
-            var betaSigning    = new Ed25519PrivateKeyParameters(Convert.FromHexString("606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f"), 0);
             var betaIdentity   = new Ed25519PrivateKeyParameters(Convert.FromHexString("707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f"), 0);
 
             var statement      = RoamingNetworkKeyStatement.Create([ (alphaIdentity, COSEAlgorithm.Ed25519) ],
                                                                    2,
                                                                    RoamingNetwork_Id.Parse("rn1"),
                                                                    RoamingNetworkOperator_Id.Parse("DE*RNO"),
-                                                                   [ POIPublicKey.From(alphaSigning,  Holder: "Alpha"), POIPublicKey.From(betaSigning,  Holder: "Beta") ],
                                                                    [ POIPublicKey.From(alphaIdentity, Holder: "Alpha"), POIPublicKey.From(betaIdentity, Holder: "Beta") ],
                                                                    DateTimeOffset.Parse("2026-10-17T00:00:00Z"),
                                                                    DateTimeOffset.Parse("2026-11-16T00:00:00Z")).
@@ -330,6 +324,57 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(statement.Signatures[0].Value,                          Is.EqualTo(ValueOfAlpha));
                 Assert.That(statement.Signatures[1].Value,                          Is.EqualTo(ValueOfBeta));
                 Assert.That(statement.TryVerify(statement.IdentityKeys.Select(key => key.Id), null, out var error),  Is.True, error);
+            }
+
+        }
+
+        #endregion
+
+        #region A_signing_key_certificate()
+
+        /// <summary>
+        /// The certificate of a signing key of the holder Alpha, which may sign for the party only, by the identity key of
+        /// Alpha: each holder certifies its own signing keys.
+        /// </summary>
+        [Test]
+        public void A_signing_key_certificate()
+        {
+
+            const String Input  = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/signingKeyCertificate/v1\",\"algorithm\":\"Ed25519\",\"keyId\":\"1ef48003e1c482f88fa9f4ecb3d9cdeeb2037d3be4550ad6ee1854a2c5b0b802\",\"roamingNetworkId\":\"rn1\",\"roamingNetworkOperatorId\":\"DE*RNO\",\"signedAt\":\"2026-10-17T00:00:00.000Z\",\"signingKey\":{\"@id\":\"ea671729aa29c6140b5129b8d59e13fd9fbd4b96e37b3c5185fb11c3eeeac554\",\"holder\":\"Alpha\",\"key\":\"owEBIAYhWCAprLrhQbzK8LIuGpTTTQvHNh5SbQv+EsiXlLyTIpZt1w==\",\"notAfter\":\"2027-10-17T00:00:00.000Z\",\"usages\":[\"party\"]}}";
+            const String Value  = "UfEDYBZ2+KeTplEX+fhu1Oj1kUA3gJNzxq57qbagJQHQvnXZi3jVBe1IGR9JxEwvAcEUaTIpQXaw3VTd2wZKCw==";
+
+            var alphaSigning   = new Ed25519PrivateKeyParameters(Convert.FromHexString("202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"), 0);
+            var alphaIdentity  = new Ed25519PrivateKeyParameters(Convert.FromHexString("303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f"), 0);
+            var betaIdentity   = new Ed25519PrivateKeyParameters(Convert.FromHexString("707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f"), 0);
+
+            var signingKey     = POIPublicKey.From(alphaSigning, NotAfter: DateTimeOffset.Parse("2027-10-17T00:00:00Z"), Holder: "Alpha", Usages: [ POIKeyUsages.Party ]);
+            var certificate    = RoamingNetworkSigningKeyCertificate.Create(alphaIdentity,
+                                                                            COSEAlgorithm.Ed25519,
+                                                                            RoamingNetwork_Id.Parse("rn1"),
+                                                                            RoamingNetworkOperator_Id.Parse("DE*RNO"),
+                                                                            signingKey,
+                                                                            DateTimeOffset.Parse("2026-10-17T00:00:00Z"));
+
+            var identityKeys   = new[] { POIPublicKey.From(alphaIdentity, Holder: "Alpha"), POIPublicKey.From(betaIdentity, Holder: "Beta") };
+
+            var byBeta         = RoamingNetworkSigningKeyCertificate.Create(betaIdentity,
+                                                                            COSEAlgorithm.Ed25519,
+                                                                            RoamingNetwork_Id.Parse("rn1"),
+                                                                            RoamingNetworkOperator_Id.Parse("DE*RNO"),
+                                                                            signingKey,
+                                                                            DateTimeOffset.Parse("2026-10-17T00:00:00Z"));
+
+            Assert.That(RoamingNetworkSigningKeyCertificate.TryParse(certificate.ToJSON(), out var read, out var parseError), Is.True, parseError);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Encoding.UTF8.GetString(certificate.GetSigningBytes()),                     Is.EqualTo(Input));
+                Assert.That(certificate.Value,                                                          Is.EqualTo(Value));
+                Assert.That(certificate.TryVerify(identityKeys, out var certifiedBy, out var error),    Is.True, error);
+                Assert.That(certifiedBy!.Holder,                                                        Is.EqualTo("Alpha"));
+                Assert.That(read!.ToJSON().ToString(Formatting.None),                                   Is.EqualTo(certificate.ToJSON().ToString(Formatting.None)));
+                Assert.That(byBeta.TryVerify(identityKeys, out _, out error),                           Is.False, "a holder certifies its own signing keys only");
+                Assert.That(error,                                                                      Does.Contain("each holder certifies its own signing keys only"));
             }
 
         }

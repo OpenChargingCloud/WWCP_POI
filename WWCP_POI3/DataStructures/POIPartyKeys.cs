@@ -126,6 +126,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (signingKeys.Select(key => key.Id).Intersect(identityKeys.Select(key => key.Id)).FirstOrDefault() is String both)
                 throw new ArgumentException($"The key '{both}' of {Party} must not be both a signing and an identity key!");
 
+            // Usages restrict what a signing key signs; an identity key signs changes of keys only.
+            if (identityKeys.FirstOrDefault(key => !key.Usages.IsEmpty) is POIPublicKey withUsages)
+                throw new ArgumentException($"The identity key '{withUsages.Id}' of {Party} names no usages: they are of signing keys!");
+
             return (signingKeys, identityKeys);
 
         }

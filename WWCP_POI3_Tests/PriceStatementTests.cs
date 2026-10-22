@@ -147,12 +147,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                                                                  1,
                                                                  network.Id,
                                                                  network.Operator!.Id,
-                                                                 [ signing.Public ],
                                                                  [ identity.Public ],
                                                                  Now.AddMinutes(-1),
                                                                  Now.AddDays(30));
 
-            var result = history.Commit(network.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(network.Operator!, RoamingNetworkKeyStatement.JSONProperty, null, keyStatement.ToJSON()) ],
+            var certificate  = RoamingNetworkSigningKeyCertificate.Create(identity.Private,
+                                                                          COSEAlgorithm.ES512,
+                                                                          network.Id,
+                                                                          network.Operator!.Id,
+                                                                          signing.Public,
+                                                                          Now.AddMinutes(-1));
+
+            var result = history.Commit(network.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(network.Operator!, RoamingNetworkKeyStatement.JSONProperty, null, keyStatement.ToJSON()),
+                                                                        RoamingNetworkChange.UpdateProperty(network.Operator!, RoamingNetworkSigningKeyCertificate.JSONProperty, null, new JArray(certificate.ToJSON(Embedded: true))) ],
                                                                       CreatedAt: Now.AddMinutes(-1)));
 
             Assert.That(result.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), result.ErrorResponse);

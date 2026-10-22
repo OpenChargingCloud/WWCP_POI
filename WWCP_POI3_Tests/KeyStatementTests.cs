@@ -69,14 +69,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                                                             DateTimeOffset  ValidUntil)
         {
 
-            var (signing, identity) = Keys(Network);
+            var (_, identity) = Keys(Network);
 
             return RoamingNetworkKeyStatement.Create(identity.Private,
                                                      COSEAlgorithm.ES512,
                                                      1,
                                                      Network.Id,
                                                      Network.Operator!.Id,
-                                                     [ signing.Public ],
                                                      [ identity.Public ],
                                                      SignedAt,
                                                      ValidUntil);
@@ -85,14 +84,43 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
-        #region (static) Commit(History, Statement)
+        #region (static) Certificate(Network, SignedAt)
 
+        /// <summary>
+        /// The certificate of the signing key of the operator of the given network, signed with its identity key.
+        /// </summary>
+        private static RoamingNetworkSigningKeyCertificate Certificate(RoamingNetwork  Network,
+                                                                       DateTimeOffset  SignedAt)
+        {
+
+            var (signing, identity) = Keys(Network);
+
+            return RoamingNetworkSigningKeyCertificate.Create(identity.Private,
+                                                              COSEAlgorithm.ES512,
+                                                              Network.Id,
+                                                              Network.Operator!.Id,
+                                                              signing.Public,
+                                                              SignedAt);
+
+        }
+
+        #endregion
+
+        #region (static) Commit(History, Statement, Certificates = null)
+
+        /// <summary>
+        /// Commit the given key statement and, unless null, certificates of signing keys of the operator, in one change set.
+        /// </summary>
         private static RoamingNetworkCommitResult Commit(RoamingNetworkHistory  History,
                                                          JToken                 Statement,
-                                                         DateTimeOffset?        CreatedAt   = null)
+                                                         DateTimeOffset?        CreatedAt      = null,
+                                                         JArray?                Certificates   = null)
 
             => History.Commit(History.Head.RoamingNetwork.CreateSignedChangeSet(
-                                  [ RoamingNetworkChange.UpdateProperty(History.Head.RoamingNetwork.Operator!, RoamingNetworkKeyStatement.JSONProperty, null, Statement) ],
+                                  [ RoamingNetworkChange.UpdateProperty(History.Head.RoamingNetwork.Operator!, RoamingNetworkKeyStatement.JSONProperty, null, Statement),
+                                    .. Certificates is not null
+                                           ? new[] { RoamingNetworkChange.UpdateProperty(History.Head.RoamingNetwork.Operator!, RoamingNetworkSigningKeyCertificate.JSONProperty, null, Certificates) }
+                                           : [] ],
                                   CreatedAt: CreatedAt ?? T0));
 
         #endregion
@@ -100,7 +128,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
         #region (static) Attested(SignedAt, ValidUntil, out History)
 
         /// <summary>
-        /// A history whose operator states its signing key, and attests its head with it at the given time.
+        /// A history whose operator states its identity key and certifies its signing key with it, and attests its head
+        /// with that signing key at the given time.
         /// </summary>
         private static RoamingNetworkHistory Attested(DateTimeOffset  SignedAt,
                                                       DateTimeOffset  ValidUntil,
@@ -108,7 +137,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
         {
 
             var history = RoamingNetworkHistory.Start(StationProofTests.NewNetwork());
-            var result  = Commit(history, Statement(history.Head.RoamingNetwork, SignedAt, ValidUntil).ToJSON());
+            var result  = Commit(history,
+                                 Statement(history.Head.RoamingNetwork, SignedAt, ValidUntil).ToJSON(),
+                                 Certificates: [ Certificate(history.Head.RoamingNetwork, SignedAt).ToJSON(Embedded: true) ]);
 
             Assert.That(result.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), result.ErrorResponse);
 
@@ -134,9 +165,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
         public void A_key_statement_is_part_of_the_content()
         {
 
-            var history    = RoamingNetworkHistory.Start(StationProofTests.NewNetwork());
-            var statement  = Statement(history.Head.RoamingNetwork, T0, T0.AddDays(30));
-            var result     = Commit(history, statement.ToJSON());
+            var history      = RoamingNetworkHistory.Start(StationProofTests.NewNetwork());
+            var statement    = Statement  (history.Head.RoamingNetwork, T0, T0.AddDays(30));
+            var certificate  = Certificate(history.Head.RoamingNetwork, T0);
+            var result       = Commit(history, statement.ToJSON(), Certificates: [ certificate.ToJSON(Embedded: true) ]);
 
             Assert.That(result.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), result.ErrorResponse);
 
@@ -150,10 +182,17 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(stated,                                                                    Is.Not.Null);
                 Assert.That(JToken.DeepEquals(stated!.ToJSON(), statement.ToJSON()),                   Is.True);
                 Assert.That(stated.Signatures.Single().KeyId,                                                              Is.EqualTo(identity.Public.Id));
-                Assert.That(stated.SigningKeys,                                                        Is.EqualTo(new[] { signing.Public }));
+                Assert.That(stated.IdentityKeys,                                                       Is.EqualTo(new[] { identity.Public }));
+                Assert.That(stated.ToJSON().ContainsKey("signingKeys"),                                Is.False, "the signing keys are certified each");
                 Assert.That(stated.TryVerify([ identity.Public.Id ], null, out error),                 Is.True, error);
-                Assert.That(stated.ToJSON()["@context"]!.Value<String>(),                              Is.EqualTo("https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v2"));
+                Assert.That(stated.ToJSON()["@context"]!.Value<String>(),                              Is.EqualTo("https://open.charging.cloud/contexts/wwcp/roamingNetwork/keyStatement/v3"));
                 Assert.That(JToken.DeepEquals(parsed!.Operator!.KeyStatement!.ToJSON(), statement.ToJSON()),  Is.True);
+
+                Assert.That(history.Head.RoamingNetwork.Operator!.SigningKeyCertificates.Single().SigningKey,  Is.EqualTo(signing.Public));
+                Assert.That(certificate.ToJSON()["@context"]!.Value<String>(),                         Is.EqualTo("https://open.charging.cloud/contexts/wwcp/roamingNetwork/signingKeyCertificate/v1"));
+                Assert.That(certificate.TryVerify([ identity.Public ], out var certifiedBy, out error, [ identity.Public.Id ]),  Is.True, error);
+                Assert.That(certifiedBy,                                                               Is.EqualTo(identity.Public));
+                Assert.That(JToken.DeepEquals(parsed.Operator.SigningKeyCertificates.Single().ToJSON(), certificate.ToJSON()),  Is.True);
             }
 
         }
@@ -208,15 +247,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
             RoamingNetworkKeyStatement Signed(Org.BouncyCastle.Crypto.AsymmetricKeyParameter  Key,
                                               COSEAlgorithm                                  Algorithm,
-                                              RoamingNetwork_Id?                             NetworkId     = null,
-                                              POIPublicKey[]?                                SigningKeys   = null)
+                                              RoamingNetwork_Id?                             NetworkId     = null)
 
-                => RoamingNetworkKeyStatement.Create(Key, Algorithm, 1, NetworkId ?? network.Id, network.Operator!.Id, SigningKeys ?? [ signing.Public ], [ identity.Public ], T0, T0.AddDays(30));
+                => RoamingNetworkKeyStatement.Create(Key, Algorithm, 1, NetworkId ?? network.Id, network.Operator!.Id, [ identity.Public ], T0, T0.AddDays(30));
+
+            JArray Certified(POIPublicKey                                   SigningKey,
+                             Org.BouncyCastle.Crypto.AsymmetricKeyParameter  By)
+
+                => [ RoamingNetworkSigningKeyCertificate.Create(By, COSEAlgorithm.ES512, network.Id, network.Operator!.Id, SigningKey, T0).ToJSON(Embedded: true) ];
 
             var bySigningKey   = Signed(signing.Private,  COSEAlgorithm.ES256);
             var byOtherParty   = Signed(other.Private,    COSEAlgorithm.ES512);
             var otherNetwork   = Signed(identity.Private, COSEAlgorithm.ES512, RoamingNetwork_Id.Parse("rn2"));
-            var foreignKey     = Signed(identity.Private, COSEAlgorithm.ES512, SigningKeys: [ other.Public ]);
+            var valid          = Signed(identity.Private, COSEAlgorithm.ES512);
 
             var tampered       = (JObject) Statement(network, T0, T0.AddDays(30)).ToJSON();
             tampered["validUntil"] = T0.AddYears(10).ToISO8601();
@@ -226,7 +269,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(() => Commit(history, bySigningKey.ToJSON()),  Throws.ArgumentException.With.Message.Contains("identity keys"));
                 Assert.That(() => Commit(history, byOtherParty.ToJSON()),  Throws.ArgumentException.With.Message.Contains("identity keys"));
                 Assert.That(() => Commit(history, otherNetwork.ToJSON()),  Throws.ArgumentException.With.Message.Contains("rn2"));
-                Assert.That(() => Commit(history, foreignKey.ToJSON()),    Throws.ArgumentException.With.Message.Contains("not one of its signing keys"));
+                Assert.That(() => Commit(history, valid.ToJSON(), Certificates: Certified(other.Public,   identity.Private)),  Throws.ArgumentException.With.Message.Contains("as it does not name it"));
+                Assert.That(() => Commit(history, valid.ToJSON(), Certificates: Certified(signing.Public, other.Private)),     Throws.ArgumentException.With.Message.Contains("is not given"));
                 Assert.That(() => Commit(history, tampered),               Throws.ArgumentException.With.Message.Contains("identity keys"));
                 Assert.That(history.Head.RoamingNetwork.Operator!.KeyStatement,  Is.Null);
             }
@@ -248,7 +292,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             Assert.That(history.TryGetChargingStationProof(S1, out var proof, out var error, At: at), Is.True, error);
             Assert.That(RoamingNetworkProof.TryParse(proof!.ToJSON().ToString(), out var read, out error), Is.True, error);
 
-            // An attestation of a key the statement does not name.
+            // An attestation of a signing key no identity key of the operator certifies.
             var byOther   = StationProofTests.OtherSigner.Attest(history.RoamingNetworkId, history.Head.Commit.Id, history.Head.Commit.Revision,
                                                                  history.Head.RoamingNetwork.EffectiveTreeETag(ETagHashAlgorithm.SHA256), T0.AddDays(1), T0.AddDays(1).AddMinutes(15));
             var unstated  = new RoamingNetworkProof(read!.HashAlgorithm, read.RoamingNetwork, read.CommitId, read.Revision, [ byOther ]);
@@ -256,7 +300,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(read.TryGetKeyStatement(out var keyStatement, out _, out error),                Is.True, error);
-                Assert.That(keyStatement!.SigningKeyOf(signing.Public.Id, at),                              Is.EqualTo(signing.Public));
+                Assert.That(read.TryGetSigningKeyCertificates(out var certificates, out error),             Is.True, error);
+                Assert.That(certificates.Single().SigningKey,                                               Is.EqualTo(signing.Public));
 
                 Assert.That(read.Verify([ identity.Public.Id ], out var attestation, out error, at),        Is.True, error);
                 Assert.That(attestation!.KeyId,                                                             Is.EqualTo(signing.Public.Id));
@@ -264,7 +309,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(read.Verify([ signing.Public.Id ], out _, out error, at),                       Is.False, "a signing key is no identity key");
                 Assert.That(read.Verify([ new String('0', 64) ], out _, out error, at),                     Is.False, "an identity key not pinned");
                 Assert.That(read.Verify([ identity.Public.Id ], out _, out error, T0.AddDays(31)),          Is.False, "after the key statement");
-                Assert.That(unstated.Verify([ identity.Public.Id ], out _, out error, at),                  Is.False, "a key the statement does not name");
+                Assert.That(unstated.Verify([ identity.Public.Id ], out _, out error, at),                  Is.False, "a signing key without a certificate");
             }
 
         }
