@@ -15,6 +15,8 @@ flowchart TD
     RoamingNetwork --> RoamingNetworkOperator
     RoamingNetwork --> ChargingStationOperator
     RoamingNetwork --> ChargingStationManufacturer
+    RoamingNetwork --> EnergyMeterManufacturer
+    EnergyMeter -. manufacturerId .-> EnergyMeterManufacturer
     RoamingNetwork --> EMobilityProvider
     RoamingNetwork --> GridOperator
     RoamingNetwork --> ParkingOperator

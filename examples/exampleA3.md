@@ -1,13 +1,13 @@
-# Example 3: two pools of a DC and an AC station, their templates and their groups
+# Example A3: two pools of a DC and an AC station, their templates and their groups
 
-The charging station operator `DE*GEF` of [example 2](example2.md) adds its data to `QA`, with change sets it signs
-with the signing key it keeps: the templates of a DC and an AC station and of their EVSEs, two charging pools, each
+The charging station operator `DE*GEF` of [example A2](exampleA2.md) adds its data to `QA`, with change sets it signs
+with its `infrastructure` signing key: the templates of a DC and an AC station and of their EVSEs, two charging pools, each
 with a DC station and an AC station of two EVSEs each naming their templates, then a charging station group and an
 EVSE group for each current. Five commits:
 
 | Revision | Signed by | Commit |
 |---|---|---|
-| 0, 1 | the hub, as the roaming network operator | `QA` and `DE*GEF`, see [example 1](example1.md) and [example 2](example2.md) |
+| 0, 1 | `OCC`, as the roaming network operator | `QA` and `DE*GEF`, see [example A1](exampleA1.md) and [example A2](exampleA2.md) |
 | 2 | `DE*GEF` | `Add` of the charging station templates `DE*GEF*ST_DC` and `DE*GEF*ST_AC`, and of the EVSE templates `DE*GEF*ET_DC` and `DE*GEF*ET_AC` |
 | 3 | `DE*GEF` | `Add` of the pool `DE*GEF*P1`, Jena Paradies: the DC station `DE*GEF*S1` with `DE*GEF*E1*1` and `DE*GEF*E1*2`, the AC station `DE*GEF*S2` with `DE*GEF*E2*1` and `DE*GEF*E2*2`, each naming its template |
 | 4 | `DE*GEF` | `Add` of the pool `DE*GEF*P2`, Jena Nord: the DC station `DE*GEF*S3`, the AC station `DE*GEF*S4`, and their EVSEs |
@@ -29,14 +29,15 @@ the hub has none - so neither the prompt nor the web interface adds a pool, they
 history of `QA`, by anybody, without signing in: whether it may change what it changes, its signatures decide. In C#
 over HTTP below, with curl, or without the hub, with POI 3 alone.
 
-The code blocks of steps 1 to 6 are one `Program.cs`, the program of `DE*GEF`, in this order, in the directory where
-[example 2](example2.md#1-degef-makes-its-keys) left `DE-GEF/`; the output is what a run prints, `…` for elided keys,
+This example is not yet part of the console project [csharp/](csharp/) of examples A1 and A2: the code blocks of
+steps 1 to 6 are still one `Program.cs` of its own, the program of `DE*GEF`, in this order, in the directory where
+[example A2](exampleA2.md#1-degef-makes-its-keys) left `DE-GEF/`; the output is what a run prints, `…` for elided keys,
 signatures, digests and timestamps.
 
 
 ## 1. The program of `DE*GEF`
 
-The project of example 2, with `LoadKey` of [example 1](example1.md#5-without-the-hub-poi-3-alone) to read its key back. Two
+A console project referencing `WWCP_POI3`, as the one of examples A1 and A2, with `LoadKey` to read its key back. Two
 helpers do the rest for every step: `Head()` reads the head of `QA` as the hub serves it, checked against its ETags as
 it is read, and `Commit(…)` makes a change set of it, signs it with the signing key of `DE*GEF` and submits it. Both
 talk to the hub with the `HTTPClient` of Hermod; a change set goes by the method `COMMIT`, `http.COMMIT(…)`.
@@ -64,8 +65,8 @@ static ECPrivateKeyParameters LoadKey(String File)
     return (ECPrivateKeyParameters) PrivateKeyFactory.CreateKey(Convert.FromBase64String(text[PemEncoding.Find(text).Base64Data]));
 }
 
-// The signing key DE*GEF made in example 2.
-var gefSigningKey     = LoadKey("DE-GEF/signing-key.pem");
+// The signing key for its infrastructure DE*GEF made in example A2.
+var gefSigningKey     = LoadKey("DE-GEF/signing-infrastructure-privateKey.pem");
 
 await using var http  = new HTTPClient(URL.Parse(args.FirstOrDefault() ?? "http://127.0.0.1:2356"));
 
@@ -438,12 +439,12 @@ curl -X COMMIT -H "Content-Type: application/json" --data-binary @pool.json http
 
 ## 9. Without the hub: POI 3 alone
 
-The program of [example 1, step 5](example1.md#5-without-the-hub-poi-3-alone), in the same directory, its usings and
-helpers, and `QA` loaded with `TryLoad`; [example 2](example2.md#5-without-the-hub-poi-3-alone) added `DE*GEF` to it.
-Only `Commit` is another: it commits to the history itself, and steps 2 to 6 then run as they are.
+The console project of [examples A1 and A2](csharp/), with the history of `QA` example A1 made, `var history =
+a1.History;`; [example A2](exampleA2.md#3-occ-adds-degef) added `DE*GEF` to it. Only `Commit` is another: it commits
+to the history itself, and steps 2 to 6 then run as they are.
 
 ```csharp
-var gefSigningKey  = LoadKey("DE-GEF/signing-key.pem");
+var gefSigningKey  = LoadKey("DE-GEF/signing-infrastructure-privateKey.pem");
 
 // The given changes, as a change set of the head signed by DE*GEF, committed to the history.
 Task Commit(String Description, params RoamingNetworkChange[] Changes)

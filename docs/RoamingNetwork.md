@@ -59,7 +59,7 @@ See [README.md](README.md#common-properties).
 | `eMobilityProviders` | `EMobilityProviders` | [EMobilityProvider](EMobilityProvider.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `gridOperators` | `GridOperators` | [GridOperator](GridOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `parkingOperators` | `ParkingOperators` | [ParkingOperator](ParkingOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
-| `energyMeterManufacturers` | `EnergyMeterManufacturers` | [EnergyMeterManufacturer](#energymetermanufacturers)[] | add/remove | Ordered by `@id` (ordinal). |
+| `energyMeterManufacturers` | `EnergyMeterManufacturers` | [EnergyMeterManufacturer](EnergyMeterManufacturer.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `transparencySoftware` | `TransparencySoftware` | [TransparencySoftware](#transparencysoftware)[] | add/remove | Releases, one per version of a software, ordered by `@id` (ordinal). |
 | `transparencySoftwareCertificates` | `TransparencySoftwareCertificates` | [TransparencySoftwareCertificate](#transparencysoftwarecertificates)[] | add/remove | Ordered by `@id` (ordinal). |
 
@@ -161,24 +161,11 @@ products, under `parkingOperators`, ordered by `@id` (ordinal). Added and remove
 
 ## energyMeterManufacturers
 
-Manufacturers of [EnergyMeter](EnergyMeter.md)s, named by their `manufacturerId` (`EnergyMeterManufacturer`,
-[source](../WWCP_POI3/RoamingNetwork/EnergyMeterManufacturer/EnergyMeterManufacturer.cs)). Without runtime status.
-
-| JSON key | Type | Change set | Description |
-|---|---|---|---|
-| `@id` | string | — | `EnergyMeterManufacturer_Id`, nonempty after trimming, compared case-insensitively. |
-| `name` | I18N text | update/remove | Omitted when empty. |
-| `description` | I18N text | update/remove | Omitted when empty. |
-| `dataSource` | string | update/remove | |
-| `address` | Address | update/remove | The headquarters (Styx `Address`, embedded: `street`, `houseNumber`, `postalCode`, `city`, `country`, …). |
-| `homepage` | URL | update/remove | |
-| `hotline` | string | update/remove | A phone number. |
-| `created` | timestamp | — | Set to the change set's `createdAt` when added, unless given. |
-| `lastChange` | timestamp | — | Set to the change set's `createdAt` by every change. |
-| `customData` | object | update/remove | Omitted when empty. |
-
-`RoamingNetworkChange.Add(energyMeterManufacturer)`, `Remove(energyMeterManufacturerId)`,
-`UpdateProperty(…)`/`RemoveProperty(…)`, signed by the RNO. One still named can not be removed.
+The [EnergyMeterManufacturer](EnergyMeterManufacturer.md)s, named by the `manufacturerId` of energy meters and their
+templates, under `energyMeterManufacturers`, ordered by `@id` (ordinal), with a runtime status as the charging
+station manufacturers. Owned by the RNO: `RoamingNetworkChange.Add(energyMeterManufacturer)`,
+`Remove(energyMeterManufacturerId)`, `UpdateProperty(energyMeterManufacturer, …)`. One still named can not be
+removed.
 
 
 ## transparencySoftware

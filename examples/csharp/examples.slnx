@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Dependencies/">
+    <Project Path="../../../Hermod/Hermod/Hermod.csproj" />
+    <Project Path="../../../Styx/Styx/Styx.csproj" />
+    <Project Path="../../../WWCP_Node/WWCP_Node/WWCP_Node.csproj" />
+    <Project Path="../../WWCP_POI2/WWCP_POI2.csproj" />
+    <Project Path="../../WWCP_POI3/WWCP_POI3.csproj" />
+  </Folder>
+  <Project Path="examples.csproj" />
+</Solution>
