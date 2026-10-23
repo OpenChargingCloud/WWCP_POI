@@ -15,8 +15,8 @@ to be added to it.
 ## The program
 
 The examples are one console project, [csharp/](csharp/), referencing `WWCP_POI3`: one file per example,
-[exampleA1.cs](csharp/exampleA1.cs), [exampleA2.cs](csharp/exampleA2.cs), [exampleA3.cs](csharp/exampleA3.cs), and
-[Program.cs](csharp/Program.cs) calling them in their order. What one example makes, the next is given:
+[exampleA1.cs](csharp/exampleA1.cs), [exampleA2.cs](csharp/exampleA2.cs), [exampleA3.cs](csharp/exampleA3.cs),
+[exampleA4.cs](csharp/exampleA4.cs), [exampleA5.cs](csharp/exampleA5.cs), and [Program.cs](csharp/Program.cs) calling them in their order. What one example makes, the next is given:
 `ExampleA1.Run()` returns the private keys of the three organizations, the trust anchor and the history of `QA`, whose
 head is the current version of `QA`. Each check, `ExampleA1.Validate()` here, reads only what is published, as a
 charging station operator or an app would.

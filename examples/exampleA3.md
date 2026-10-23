@@ -551,6 +551,7 @@ Over HTTP, for everybody:
 
 ## Next
 
+- The first checkpoint of `QA`, two pools more, and joining `QA` from the checkpoint: [example A4](exampleA4.md).
 - A charging tariff for all members of a template: `chargingTariffId` of the template, a tariff of its operator, see
   [ChargingTariff](../docs/ChargingTariff.md); an EVSE takes the one of the first of its EVSE templates naming one, else
   of the templates of its station, else of the templates of its pool.

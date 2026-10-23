@@ -30,3 +30,25 @@ Console.WriteLine();
 ExampleA3.Run(a1, a2);
 
 ExampleA3.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// The roaming network operator makes the first checkpoint of QA; DE*GEF adds two pools more, their AC stations recorded
+// with 44 kW and EVSEs of 22 kW; a server or an app joins QA from the checkpoint.
+ExampleA4.Run(a1, a2);
+
+ExampleA4.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// The next checkpoint, the correction of these AC stations to 22 kW with EVSEs of 11 kW, and the checkpoint after;
+// the AC stations checked at every checkpoint.
+ExampleA5.Run(a1, a2);
+
+ExampleA5.Validate();

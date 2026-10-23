@@ -29,6 +29,16 @@ public static class Helpers
         return JObject.Load(reader);
     }
 
+    // A JSON file of an array, read as ReadJSON reads one of an object.
+    public static JArray ReadJSONArray(String File)
+    {
+        using var reader = new JsonTextReader(new StringReader(System.IO.File.ReadAllText(File))) {
+                               DateParseHandling   = DateParseHandling.None,
+                               FloatParseHandling  = FloatParseHandling.Decimal
+                           };
+        return JArray.Load(reader);
+    }
+
     // Stops with the given error.
     [DoesNotReturn]
     public static void Fail(String Error)
