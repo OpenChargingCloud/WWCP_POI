@@ -63,3 +63,14 @@ Console.WriteLine();
 ExampleA6.Run(a1);
 
 ExampleA6.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// The roaming network operator compacts the history of QA after its checkpoints, archiving what it drops;
+// the archive is checked against the checkpoints.
+ExampleA7.Run(a1);
+
+ExampleA7.Validate();

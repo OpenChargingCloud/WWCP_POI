@@ -240,5 +240,6 @@ adding them is enabled and its verifier trusts the witness. The RoamingHubCLI ma
 
 ## Next
 
+- Compacting the history after the checkpoints, with an archive: [example A7](exampleA7.md).
 - Witness discovery: how a client learns which witnesses there are, and their keys, is open (section 10.7).
 - A witness also checks the price statements a checkpoint names before it signs (section 12.3).
