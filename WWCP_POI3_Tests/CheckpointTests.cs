@@ -316,6 +316,36 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region Signatures_are_verified_with_a_COSE_key_and_its_algorithm_restriction()
+
+        [Test]
+        public void Signatures_are_verified_with_a_COSE_key_and_its_algorithm_restriction()
+        {
+
+            var history     = NewHistory();
+            Commit(history, "v1");
+            var checkpoint  = Checkpoint(history, 10);
+            var signature   = checkpoint.Signatures.Single();
+            var publicKey   = RNOKey.GeneratePublicKey();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(checkpoint.VerifySignature(signature, COSEKey.From(publicKey),                                    "rno", out var error),       Is.True, error);
+                Assert.That(checkpoint.VerifySignature(signature, COSEKey.From(publicKey, Algorithm: COSEAlgorithm.Ed25519),  "rno", out error),           Is.True, error);
+
+                // A key restricted to another algorithm, and a private key, verify nothing.
+                Assert.That(checkpoint.VerifySignature(signature, COSEKey.From(publicKey, Algorithm: COSEAlgorithm.EdDSA),    "rno", out var restricted),  Is.False);
+                Assert.That(restricted,                                                                                                                      Does.Contain("algorithm restriction"));
+                Assert.That(checkpoint.VerifySignature(signature, COSEKey.From(RNOKey),                                       "rno", out var privateKey),  Is.False);
+                Assert.That(privateKey,                                                                                                                      Does.Contain("public COSE key"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Witnesses_check_and_sign_checkpoints()
 
         [Test]

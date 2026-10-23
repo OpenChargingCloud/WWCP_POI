@@ -630,6 +630,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region VerifySignature(Signature, PublicKey (COSE), ExpectedKeyId, out ErrorResponse)
+
+        /// <summary>
+        /// Verify the given signature of this checkpoint with a trusted Styx COSE public key, honoring its algorithm restriction,
+        /// e.g. the key of a POIPublicKey.
+        /// </summary>
+        /// <param name="Signature">A signature of this checkpoint.</param>
+        /// <param name="PublicKey">The trusted public COSE key.</param>
+        /// <param name="ExpectedKeyId">The key identification of the trusted public key.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public Boolean VerifySignature(RoamingNetworkCommitSignature     Signature,
+                                       COSEKey                           PublicKey,
+                                       String                            ExpectedKeyId,
+                                       [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            ErrorResponse = null;
+
+            try
+            {
+
+                ArgumentNullException.ThrowIfNull(Signature);
+                ArgumentNullException.ThrowIfNull(PublicKey);
+
+                if (PublicKey.IsPrivate)
+                    throw new ArgumentException("Supply the public COSE key for verification.", nameof(PublicKey));
+
+                if (PublicKey.Algorithm is { } restricted && Signature.Algorithm != restricted.Name)
+                    throw new ArgumentException("The signature algorithm differs from the key's algorithm restriction.");
+
+                return VerifySignature(Signature, PublicKey.ToPublicKey(), ExpectedKeyId, out ErrorResponse);
+
+            }
+            catch (Exception exception)
+            {
+                ErrorResponse = exception.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
         #region GetSigningBytes(Signature)
 
         /// <summary>
