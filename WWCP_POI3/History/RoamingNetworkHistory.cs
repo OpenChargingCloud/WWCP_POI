@@ -197,15 +197,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The first commit this history holds: a genesis commit, or the head of the snapshot it started from.
         /// </summary>
         public RoamingNetworkCommit  Root
-        {
-            get
-            {
-                lock (historyLock)
-                {
-                    return commits[0];
-                }
-            }
-        }
+            => View.Commits[0];
 
         /// <summary>
         /// The first tip and the version it leads to: the commit of the highest revision,
@@ -249,15 +241,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The number of commits this history holds, including its root.
         /// </summary>
         public Int32                 Count
-        {
-            get
-            {
-                lock (historyLock)
-                {
-                    return commits.Count;
-                }
-            }
-        }
+            => View.Commits.Count;
 
         #endregion
 
@@ -300,6 +284,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Remember(Root, RoamingNetwork);
             tips.Add(Root.Id);
+            PublishTips();
 
         }
 
@@ -1097,6 +1082,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 commit          = commit.WithSignatures(newSignatures);
                 commits[index]  = commit;
+                PublishReplacedCommit(index, commit);
 
                 var head = Head;
 
@@ -1221,6 +1207,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             tips.Add(Commit.Id);
             tips.Sort((tip1, tip2) => IsCanonicalOrder(commits[commitIndex[tip1]], commits[commitIndex[tip2]]) ? (tip1 == tip2 ? 0 : -1) : 1);
+
+            // The view before the head: every commit a reader sees as the head is in it.
+            PublishTips();
 
             var newHead = new RoamingNetworkHead(commits[commitIndex[tips[0]]], VersionOf(tips[0]));
 
@@ -1585,12 +1574,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="CommitId">A commit identification.</param>
         public Boolean Contains(RoamingNetworkCommit_Id CommitId)
-        {
-            lock (historyLock)
-            {
-                return commitIndex.ContainsKey(CommitId);
-            }
-        }
+
+            => View.CommitIndex.ContainsKey(CommitId);
 
         #endregion
 
@@ -1603,23 +1588,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Commit">The commit.</param>
         public Boolean TryGetCommit(RoamingNetworkCommit_Id                         CommitId,
                                     [NotNullWhen(true)] out RoamingNetworkCommit?   Commit)
-        {
 
-            lock (historyLock)
-            {
-
-                if (commitIndex.TryGetValue(CommitId, out var index))
-                {
-                    Commit = commits[index];
-                    return true;
-                }
-
-                Commit = null;
-                return false;
-
-            }
-
-        }
+            => View.TryGetCommit(CommitId, out Commit);
 
         #endregion
 
@@ -1640,23 +1610,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           Int32                                                      MaxCount   = DefaultMaxCommits)
         {
 
-            lock (historyLock)
+            var view = View;
+
+            if (!view.CommitIndex.ContainsKey(CommitId))
             {
-
-                if (!commitIndex.TryGetValue(CommitId, out var index))
-                {
-                    Commits        = null;
-                    ErrorResponse  = $"The commit '{CommitId}' is unknown here; start from a new snapshot!";
-                    return false;
-                }
-
-                var held       = Ancestors(CommitId);
-
-                Commits        = commits.Where(commit => !held.Contains(commit.Id)).Take(Math.Max(0, MaxCount)).ToArray();
-                ErrorResponse  = null;
-                return true;
-
+                Commits        = null;
+                ErrorResponse  = $"The commit '{CommitId}' is unknown here; start from a new snapshot!";
+                return false;
             }
+
+            var held       = view.Ancestors(CommitId);
+
+            Commits        = view.Commits.Where(commit => !held.Contains(commit.Id)).Take(Math.Max(0, MaxCount)).ToArray();
+            ErrorResponse  = null;
+            return true;
 
         }
 
@@ -1672,27 +1639,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IReadOnlyList<RoamingNetworkCommit_Id> HaveIds()
         {
 
-            lock (historyLock)
+            var view  = View;
+            var have  = new List<RoamingNetworkCommit_Id>(view.Tips);
+            var step  = 1;
+
+            for (var index = view.Commits.Count - 1; index >= 0; index -= step)
             {
 
-                var have  = new List<RoamingNetworkCommit_Id>(tips);
-                var step  = 1;
+                have.Add(view.Commits[index].Id);
 
-                for (var index = commits.Count - 1; index >= 0; index -= step)
-                {
-
-                    have.Add(commits[index].Id);
-
-                    if (have.Count > 16)
-                        step *= 2;
-
-                }
-
-                have.Add(commits[0].Id);
-
-                return [ .. have.Distinct() ];
+                if (have.Count > 16)
+                    step *= 2;
 
             }
+
+            have.Add(view.Commits[0].Id);
+
+            return [ .. have.Distinct() ];
 
         }
 
@@ -1715,28 +1678,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             Int32                                                      MaxCount   = DefaultMaxCommits)
         {
 
-            lock (historyLock)
+            var view   = View;
+            var known  = Have.Where(view.CommitIndex.ContainsKey).ToArray();
+
+            if (known.Length == 0)
             {
-
-                var known = Have.Where(commitIndex.ContainsKey).ToArray();
-
-                if (known.Length == 0)
-                {
-                    Commits        = null;
-                    ErrorResponse  = "None of the given commits is known here; start from a new snapshot!";
-                    return false;
-                }
-
-                var held = new HashSet<RoamingNetworkCommit_Id>();
-
-                foreach (var commitId in known)
-                    held.UnionWith(Ancestors(commitId));
-
-                Commits        = commits.Where(commit => !held.Contains(commit.Id)).Take(Math.Max(0, MaxCount)).ToArray();
-                ErrorResponse  = null;
-                return true;
-
+                Commits        = null;
+                ErrorResponse  = "None of the given commits is known here; start from a new snapshot!";
+                return false;
             }
+
+            var held = new HashSet<RoamingNetworkCommit_Id>();
+
+            foreach (var commitId in known)
+                held.UnionWith(view.Ancestors(commitId));
+
+            Commits        = view.Commits.Where(commit => !held.Contains(commit.Id)).Take(Math.Max(0, MaxCount)).ToArray();
+            ErrorResponse  = null;
+            return true;
 
         }
 
@@ -1785,6 +1744,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             commitIndex[Commit.Id]  = commits.Count;
             versions   [Commit.Id]  = RoamingNetwork;
             commits.Add(Commit);
+            PublishAddedCommit(Commit);
 
             if (Commit.ChangeSet is RoamingNetworkChangeSet changeSet && !Commit.IsMerge)
             {

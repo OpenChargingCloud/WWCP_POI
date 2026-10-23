@@ -1,0 +1,215 @@
+/*
+ * Copyright (c) 2014-2026 GraphDefined GmbH <achim.friedland@graphdefined.com>
+ * This file is part of WWCP POI <https://github.com/OpenChargingCloud/WWCP_POI>
+ *
+ * Licensed under the Affero GPL license, Version 3.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.gnu.org/licenses/agpl.html
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#region Usings
+
+using Newtonsoft.Json.Linq;
+
+using NUnit.Framework;
+
+using org.GraphDefined.Vanaheimr.Illias;
+
+#endregion
+
+namespace cloud.charging.open.protocols.WWCP.POI.tests.History
+{
+
+    /// <summary>
+    /// Readers of a history while a commit holds its lock, e.g. syncing to a slow disk or merging a large network: they
+    /// read the state published last, without waiting for it.
+    /// </summary>
+    [TestFixture]
+    public class ConcurrentReadTests
+    {
+
+        #region Data
+
+        private static readonly DateTimeOffset              Created  = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        private static readonly ChargingStationOperator_Id  GEF      = ChargingStationOperator_Id.Parse("DE*GEF");
+        private static readonly ChargingStation_Id          S1       = ChargingStation_Id.        Parse("DE*GEF*S1");
+        private static readonly EVSE_Id                     E11      = EVSE_Id.                   Parse("DE*GEF*E1*1");
+
+        /// <summary>
+        /// How long a reader may take: far more than it needs, far less than the commit is held.
+        /// </summary>
+        private static readonly TimeSpan                    Patience = TimeSpan.FromSeconds(5);
+
+        #endregion
+
+        #region (class) BlockingStore
+
+        /// <summary>
+        /// A store in memory that holds every commit appended until it is released, as a slow disk would: the commit
+        /// waits while it holds the lock of the history.
+        /// </summary>
+        private sealed class BlockingStore : IRoamingNetworkHistoryStore
+        {
+
+            private readonly RoamingNetworkHistoryMemoryStore  store     = new ();
+            private readonly ManualResetEventSlim              released  = new (true);
+
+            public ManualResetEventSlim                        Entered   { get; } = new (false);
+
+            public void Block()
+                => released.Reset();
+
+            public void Release()
+                => released.Set();
+
+            public RoamingNetworkHistoryStoreContent? Load()
+                => store.Load();
+
+            public void WriteBase(JObject Snapshot)
+                => store.WriteBase(Snapshot);
+
+            public void Append(RoamingNetworkHistoryLogEntry Entry)
+            {
+
+                if (Entry.Type == RoamingNetworkHistoryLogEntryType.Commit && !released.IsSet)
+                {
+                    Entered.Set();
+                    released.Wait();
+                }
+
+                store.Append(Entry);
+
+            }
+
+            public void Compact(JObject                                     Snapshot,
+                                IEnumerable<RoamingNetworkHistoryLogEntry>  Entries)
+
+                => store.Compact(Snapshot, Entries);
+
+            public void Dispose()
+            {
+                released.Set();
+                store.Dispose();
+            }
+
+        }
+
+        #endregion
+
+        #region (static) NewNetwork()
+
+        private static RoamingNetwork NewNetwork()
+
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
+                                  Created:                   Created,
+                                  ChargingStationOperators:  [ new ChargingStationOperator(GEF,
+                                                                   Created:        Created,
+                                                                   ChargingPools:  [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
+                                                                                                      Created:           Created,
+                                                                                                      ChargingStations:  [ new ChargingStation(S1,
+                                                                                                                                               Created:  Created,
+                                                                                                                                               EVSEs:    [ new EVSE(E11, Created: Created) ]) ]) ]) ]).WithKeys();
+
+        #endregion
+
+        #region (static) Within(What, Read)
+
+        /// <summary>
+        /// The result of the given read, which must not wait for the commit holding the lock.
+        /// </summary>
+        private static T Within<T>(String   What,
+                                   Func<T>  Read)
+        {
+
+            var task = Task.Run(Read);
+
+            Assert.That(task.Wait(Patience), Is.True, $"{What} waits for the commit holding the lock of the history!");
+
+            return task.Result;
+
+        }
+
+        #endregion
+
+
+        #region Readers_do_not_wait_for_a_commit()
+
+        [Test]
+        public void Readers_do_not_wait_for_a_commit()
+        {
+
+            using var store  = new BlockingStore();
+
+            var history      = RoamingNetworkHistory.Start(NewNetwork(), Store: store);
+            history.AttestationSigners = [ Proofs.StationProofTests.RNOSigner ];
+            history.RefreshAttestations();
+
+            var before       = history.Head;
+            var changeSet    = before.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(nameof(EVSE), E11.ToString(), EVSE.PropertyKeys.PhysicalReference, null, "P-1") ],
+                                                                           CreatedAt: Created.AddMinutes(1));
+
+            store.Block();
+
+            var commit       = Task.Run(() => history.Commit(changeSet));
+
+            try
+            {
+
+                Assert.That(store.Entered.Wait(Patience), Is.True, "The commit did not reach the store!");
+
+                // The commit holds the lock now; every reader reads the state before it.
+                Assert.That(Within("Head",                    () => history.Head.Commit.Id),                                    Is.EqualTo(before.Commit.Id));
+                Assert.That(Within("Count",                   () => history.Count),                                             Is.EqualTo(1));
+                Assert.That(Within("Root",                    () => history.Root.Id),                                           Is.EqualTo(before.Commit.Id));
+                Assert.That(Within("Contains",                () => history.Contains(before.Commit.Id)),                        Is.True);
+                Assert.That(Within("TryGetCommit",            () => history.TryGetCommit(before.Commit.Id, out _)),             Is.True);
+                Assert.That(Within("HaveIds",                 () => history.HaveIds()),                                         Is.EqualTo(new[] { before.Commit.Id }));
+                Assert.That(Within("TryGetCommitsSince",      () => history.TryGetCommitsSince(before.Commit.Id, out var since, out _) ? since.Count : -1), Is.Zero);
+                Assert.That(Within("TryGetMissingCommits",    () => history.TryGetMissingCommits([ before.Commit.Id ], out var missing, out _) ? missing.Count : -1), Is.Zero);
+                Assert.That(Within("CurrentAttestations",     () => history.CurrentAttestations().Count),                       Is.EqualTo(1));
+                Assert.That(Within("Checkpoints",             () => history.Checkpoints.Count),                                 Is.Zero);
+                Assert.That(Within("LatestCheckpoint",        () => history.LatestCheckpoint),                                  Is.Null);
+                Assert.That(Within("GetCheckpointsSince",     () => history.GetCheckpointsSince().Count),                       Is.Zero);
+
+                var proof = Within("TryGetChargingStationProof", () => history.TryGetChargingStationProof(S1, out var made, out var error) ? made : throw new AssertionException(error));
+
+                Assert.That(proof.CommitId,            Is.EqualTo(before.Commit.Id));
+                Assert.That(proof.Attestations.Length, Is.EqualTo(1));
+
+            }
+            finally
+            {
+                store.Release();
+            }
+
+            // Released: the commit is complete, and the readers see it, attested.
+            Assert.That(commit.Wait(Patience), Is.True);
+            Assert.That(commit.Result.IsCommitted, Is.True, commit.Result.ErrorResponse);
+
+            var after = history.Head;
+
+            Assert.That(after.Commit.Id,                                 Is.Not.EqualTo(before.Commit.Id));
+            Assert.That(history.Count,                                   Is.EqualTo(2));
+            Assert.That(history.TryGetCommit(after.Commit.Id, out _),    Is.True);
+            Assert.That(history.TryGetCommitsSince(before.Commit.Id, out var commits, out var sinceError), Is.True, sinceError);
+            Assert.That(commits!.Select(commit => commit.Id),             Is.EqualTo(new[] { after.Commit.Id }));
+            Assert.That(history.CurrentAttestations().Single().CommitId, Is.EqualTo(after.Commit.Id));
+
+            Assert.That(history.TryGetChargingStationProof(S1, out var proofAfter, out var proofError), Is.True, proofError);
+            Assert.That(proofAfter.CommitId, Is.EqualTo(after.Commit.Id));
+
+        }
+
+        #endregion
+
+    }
+
+}

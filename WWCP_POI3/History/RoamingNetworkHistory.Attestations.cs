@@ -93,16 +93,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="At">When they must be valid, now by default.</param>
         public IReadOnlyList<RoamingNetworkAttestation> CurrentAttestations(DateTimeOffset? At = null)
-        {
 
-            var at = At ?? Timestamp.Now;
-
-            lock (historyLock)
-            {
-                return [ .. attestations.Where(attestation => attestation.CommitId == head.Commit.Id && attestation.IsValidAt(at)) ];
-            }
-
-        }
+            => AttestedHead(At).Attestations;
 
         #endregion
 
@@ -293,7 +285,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Proof = null;
 
-            var head = Head;
+            var (head, attestations) = AttestedHead(At);
 
             if (!TryGetEffectiveTree(head.RoamingNetwork, HashAlgorithm, out var tree, out ErrorResponse))
                 return false;
@@ -303,7 +295,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    out ErrorResponse,
                                                    head.Commit.Id,
                                                    head.Commit.Revision,
-                                                   AttestationsOf(head.Commit.Id, At));
+                                                   attestations);
 
         }
 
@@ -328,7 +320,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Proof = null;
 
-            var head = Head;
+            var (head, attestations) = AttestedHead(At);
 
             if (!TryGetEffectiveTree(head.RoamingNetwork, HashAlgorithm, out var tree, out ErrorResponse))
                 return false;
@@ -338,7 +330,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    out ErrorResponse,
                                                    head.Commit.Id,
                                                    head.Commit.Revision,
-                                                   AttestationsOf(head.Commit.Id, At));
+                                                   attestations);
 
         }
 
@@ -425,6 +417,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (attestations.Count > MaxAttestations)
                 attestations.RemoveRange(0, attestations.Count - MaxAttestations);
 
+            PublishAttestations();
+
             // One failing subscriber must neither fail the attestation nor keep it from the others.
             foreach (var subscriber in OnAttestation?.GetInvocationList().Cast<OnRoamingNetworkAttestationDelegate>() ?? [])
             {
@@ -451,10 +445,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var at = At ?? Timestamp.Now;
 
-            lock (historyLock)
+            return [ .. View.Attestations.Where(attestation => attestation.CommitId == CommitId && attestation.IsValidAt(at)) ];
+
+        }
+
+        #endregion
+
+        #region (private) AttestedHead(At)
+
+        /// <summary>
+        /// The head and its attestations valid at the given time, without the lock. A head is shown right before it is
+        /// attested here (Take): a reader coming in between, while the AttestationSigners sign it, waits once for the
+        /// history, as every reader did before, and takes the head it finds then.
+        /// </summary>
+        private (RoamingNetworkHead Head, IReadOnlyList<RoamingNetworkAttestation> Attestations) AttestedHead(DateTimeOffset? At)
+        {
+
+            var head          = Head;
+            var attestations  = AttestationsOf(head.Commit.Id, At);
+
+            if (attestations.Count == 0 && !AttestationSigners.IsDefaultOrEmpty)
             {
-                return [ .. attestations.Where(attestation => attestation.CommitId == CommitId && attestation.IsValidAt(at)) ];
+
+                lock (historyLock)
+                {
+                    head = Head;
+                }
+
+                attestations = AttestationsOf(head.Commit.Id, At);
+
             }
+
+            return (head, attestations);
 
         }
 

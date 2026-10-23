@@ -368,6 +368,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         versions[newRoot.Id] = rootVersion;
 
+                        PublishCommits();
+
                     }
 
                     #endregion
@@ -556,6 +558,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var commit = commits[index].WithSignatures(Signatures);
 
             commits[index] = commit;
+            PublishReplacedCommit(index, commit);
 
             if (Head.Commit.Id == CommitId)
                 Volatile.Write(ref head, Head with { Commit = commit });

@@ -73,29 +73,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The checkpoints this history holds, in their order.
         /// </summary>
         public IReadOnlyList<RoamingNetworkCheckpoint>     Checkpoints
-        {
-            get
-            {
-                lock (historyLock)
-                {
-                    return [ .. checkpoints ];
-                }
-            }
-        }
+            => View.Checkpoints;
 
         /// <summary>
         /// The latest checkpoint this history holds, if any.
         /// </summary>
         public RoamingNetworkCheckpoint?                   LatestCheckpoint
-        {
-            get
-            {
-                lock (historyLock)
-                {
-                    return checkpoints.Count > 0 ? checkpoints[^1] : null;
-                }
-            }
-        }
+            => View.Checkpoints is { Count: > 0 } checkpoints ? checkpoints[^1] : null;
 
         #endregion
 
@@ -385,6 +369,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 checkpoint          = checkpoint.WithSignatures(newSignatures);
                 checkpoints[index]  = checkpoint;
+                PublishReplacedCheckpoint(index, checkpoint);
 
                 // One failing subscriber must neither fail the signatures nor keep them from the others.
                 foreach (var subscriber in OnCheckpointSignatures?.GetInvocationList().Cast<OnRoamingNetworkCheckpointSignaturesDelegate>() ?? [])
@@ -471,19 +456,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         [NotNullWhen(true)] out RoamingNetworkCheckpoint?   Checkpoint)
         {
 
-            lock (historyLock)
+            var view = View;
+
+            if (view.CheckpointIndex.TryGetValue(CheckpointId, out var index))
             {
-
-                if (checkpointIndex.TryGetValue(CheckpointId, out var index))
-                {
-                    Checkpoint = checkpoints[index];
-                    return true;
-                }
-
-                Checkpoint = null;
-                return false;
-
+                Checkpoint = view.Checkpoints[index];
+                return true;
             }
+
+            Checkpoint = null;
+            return false;
 
         }
 
@@ -500,11 +482,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                            Int32    MaxCount   = DefaultMaxCommits)
         {
 
-            lock (historyLock)
-            {
-                return [ .. checkpoints.Where(checkpoint => !Sequence.HasValue || checkpoint.Sequence > Sequence.Value).
-                                        Take (Math.Max(0, MaxCount)) ];
-            }
+            return [ .. View.Checkpoints.Where(checkpoint => !Sequence.HasValue || checkpoint.Sequence > Sequence.Value).
+                                         Take (Math.Max(0, MaxCount)) ];
 
         }
 
@@ -943,6 +922,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             checkpointIndex[Checkpoint.Id] = checkpoints.Count;
             checkpoints.Add(Checkpoint);
+            PublishAddedCheckpoint(Checkpoint);
 
             if (PriceStatements is not null && Checkpoint.PriceStatementsSize > 0)
                 TakeCheckpointPriceStatements(Checkpoint.Id, PriceStatements);
@@ -979,6 +959,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             checkpointIndex[Checkpoint.Id] = checkpoints.Count;
             checkpoints.Add(Checkpoint);
+            PublishAddedCheckpoint(Checkpoint);
 
             lock (priceStatementLock)
             {
