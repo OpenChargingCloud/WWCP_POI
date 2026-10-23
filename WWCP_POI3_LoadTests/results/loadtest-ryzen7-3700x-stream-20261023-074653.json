@@ -1,0 +1,648 @@
+{
+  "name": "loadtest-ryzen7-3700x-stream-20261023-074653",
+  "started": "2026-10-23T07:46:53.7592311+00:00",
+  "written": "2026-10-23T08:35:44.9816876+00:00",
+  "environment": {
+    "cpu": "AMD Ryzen 7 3700X 8-Core Processor",
+    "logicalProcessors": 16,
+    "memoryBytes": 137361444864,
+    "os": "Microsoft Windows 10.0.26300",
+    "architecture": "X64",
+    "runtime": ".NET 10.0.13",
+    "serverGC": true,
+    "gcLatencyMode": "Interactive",
+    "gcConfiguration": {
+      "ServerGC": true,
+      "ConcurrentGC": true,
+      "RetainVM": false,
+      "NoAffinitize": false,
+      "GCCpuGroup": false,
+      "GCLargePages": false,
+      "LOHThreshold": 85000,
+      "HeapCount": 16,
+      "MaxHeapCount": 0,
+      "GCHeapAffinitizeMask": 0,
+      "GCHeapAffinitizeRanges": "",
+      "GCHighMemPercent": 95,
+      "GCGen0MaxBudget": 209715200,
+      "GCHeapHardLimit": 0,
+      "GCHeapHardLimitPercent": 0,
+      "GCRegionRange": 274877906944,
+      "GCRegionSize": 0,
+      "UOHWaitBGCSizeIncPercent": 200,
+      "GCHeapHardLimitSOH": 0,
+      "GCHeapHardLimitLOH": 0,
+      "GCHeapHardLimitPOH": 0,
+      "GCHeapHardLimitSOHPercent": 0,
+      "GCHeapHardLimitLOHPercent": 0,
+      "GCHeapHardLimitPOHPercent": 0,
+      "GCConserveMem": 0,
+      "GCName": "",
+      "GCPath": "",
+      "GCDynamicAdaptationMode": 1,
+      "GCDTargetTCP": 2,
+      "GCDGen0GrowthPercent": 100,
+      "GCDGen0GrowthMinFactor": 100,
+      "GCDGen0GrowthMaxFactor": 10000
+    },
+    "environmentVariables": {},
+    "builds": [
+      {
+        "assembly": "WWCP_POI3",
+        "configuration": "Release",
+        "gitRepository": "WWCP_POI",
+        "gitCommit": "646ba5e1892cd60465ca9ea6db7f3368e433885f-dirty"
+      },
+      {
+        "assembly": "Styx",
+        "configuration": "Release",
+        "gitRepository": "Styx",
+        "gitCommit": "e721646f19ed37d531c2316140e4abc72a2f22b8-dirty"
+      },
+      {
+        "assembly": "WWCP_POI3_LoadTests",
+        "configuration": "Release",
+        "gitRepository": "WWCP_POI",
+        "gitCommit": "646ba5e1892cd60465ca9ea6db7f3368e433885f-dirty"
+      }
+    ],
+    "options": {
+      "Stations": [
+        1000000
+      ],
+      "Operators": 200,
+      "Zipf": 1.0,
+      "StationsPerPool": 2,
+      "EVSEsPerStation": 2,
+      "Templates": false,
+      "Stores": [
+        "File"
+      ],
+      "Directory": "C:\\Users\\achim\\AppData\\Local\\Temp\\wwcp-poi3-loadtests",
+      "Keep": false,
+      "RecentVersions": 100,
+      "VersionInterval": 100,
+      "Attest": true,
+      "Warmup": 5,
+      "Commits": 50,
+      "ChangesPerCommit": 1,
+      "Mix": {
+        "UpdateEVSE": 85,
+        "AddStation": 7,
+        "RemoveStation": 4,
+        "AddPool": 4
+      },
+      "Merges": 0,
+      "Writers": [
+        0,
+        1
+      ],
+      "Readers": {
+        "EVSE": 3,
+        "Proof": 1,
+        "Commit": 1
+      },
+      "StatusRate": 1000,
+      "Duration": "00:00:20",
+      "MaxMerge": "00:01:00",
+      "Output": "results",
+      "Label": "ryzen7-3700x-stream",
+      "Seed": 1,
+      "Help": false,
+      "Child": false,
+      "ResultFile": null,
+      "StoreDirectory": null,
+      "Reload": null
+    },
+    "warnings": []
+  },
+  "runs": [
+    {
+      "stations": 1000000,
+      "store": "file",
+      "network": {
+        "operators": 200,
+        "largestOperator": 170125,
+        "smallestOperator": 850,
+        "pools": 500050,
+        "stations": 1000000,
+        "evses": 2000000,
+        "stationsPerPool": 2,
+        "evsesPerStation": 2,
+        "zipf": 1.0,
+        "templates": false
+      },
+      "phases": {
+        "entities": {
+          "wallMs": 74643.058,
+          "cpuMs": 250718.75,
+          "cpuUtilization": 0.2099,
+          "allocatedBytes": 66963820576,
+          "gen0": 108,
+          "gen1": 31,
+          "gen2": 8,
+          "gcPauseMs": 22501.581,
+          "peakWorkingSetBytes": 23188992000,
+          "peakManagedBytes": 21879067792,
+          "memoryAfter": {
+            "managedBytes": 21337027728,
+            "heapBytes": 21342064992,
+            "committedBytes": 22674690048,
+            "workingSetBytes": 22994948096,
+            "privateBytes": 23225888768
+          }
+        },
+        "network": {
+          "wallMs": 4690.909,
+          "cpuMs": 4640.625,
+          "cpuUtilization": 0.0618,
+          "allocatedBytes": 1113342992,
+          "gen0": 1,
+          "gen1": 0,
+          "gen2": 0,
+          "gcPauseMs": 2.22,
+          "peakWorkingSetBytes": 23000690688,
+          "peakManagedBytes": 22326872712,
+          "memoryAfter": {
+            "managedBytes": 21337168112,
+            "heapBytes": 21342205376,
+            "committedBytes": 22646558720,
+            "workingSetBytes": 22971211776,
+            "privateBytes": 23197847552
+          }
+        },
+        "start": {
+          "wallMs": 276776.432,
+          "cpuMs": 687234.375,
+          "cpuUtilization": 0.1552,
+          "allocatedBytes": 155067204776,
+          "gen0": 1131,
+          "gen1": 111,
+          "gen2": 1,
+          "gcPauseMs": 141608.559,
+          "peakWorkingSetBytes": 58216198144,
+          "peakManagedBytes": 50078691544,
+          "memoryAfter": {
+            "managedBytes": 25745085816,
+            "heapBytes": 25801830576,
+            "committedBytes": 46249730048,
+            "workingSetBytes": 57907433472,
+            "privateBytes": 58253717504
+          },
+          "disk": {
+            "generation": "gen-000001",
+            "baseBytes": 1590629255,
+            "logBytes": 0,
+            "logLines": 0,
+            "archiveBytes": 0,
+            "totalBytes": 1590629265
+          }
+        },
+        "firstProof": {
+          "coldMs": 71.447,
+          "warmMs": 31.717
+        },
+        "sequential": {
+          "commits": 50,
+          "changesPerCommit": 1,
+          "outcomes": {
+            "Committed": 50
+          },
+          "commitsPerSecond": 0.045,
+          "merges": 0,
+          "prepare": {
+            "count": 50,
+            "meanMs": 10838.577,
+            "minMs": 7398.974,
+            "p50Ms": 11088.356,
+            "p90Ms": 12562.428,
+            "p99Ms": 13040.472,
+            "p999Ms": 13040.472,
+            "maxMs": 13040.472,
+            "over10msCount": 50,
+            "over10msSumMs": 541928.864
+          },
+          "commit": {
+            "count": 50,
+            "meanMs": 11522.43,
+            "minMs": 7676.912,
+            "p50Ms": 11997.988,
+            "p90Ms": 13185.845,
+            "p99Ms": 14876.796,
+            "p999Ms": 14876.796,
+            "maxMs": 14876.796,
+            "over10msCount": 50,
+            "over10msSumMs": 576121.497
+          },
+          "cpuPerCommit": {
+            "count": 50,
+            "meanMs": 15909.375,
+            "minMs": 8015.625,
+            "p50Ms": 17187.5,
+            "p90Ms": 20796.875,
+            "p99Ms": 21640.625,
+            "p999Ms": 21640.625,
+            "maxMs": 21640.625,
+            "over10msCount": 50,
+            "over10msSumMs": 795468.75
+          },
+          "allocatedBytesPerCommit": 1531786525,
+          "gen2": 0,
+          "gcPauseMs": 155378.373,
+          "resources": {
+            "wallMs": 1118062.271,
+            "cpuMs": 1528875.0,
+            "cpuUtilization": 0.0855,
+            "allocatedBytes": 151307939448,
+            "gen0": 1964,
+            "gen1": 52,
+            "gen2": 0,
+            "gcPauseMs": 294820.428
+          },
+          "peakWorkingSetBytes": 43049357312,
+          "peakManagedBytes": 31233038568,
+          "memoryAfter": {
+            "managedBytes": 26636568056,
+            "heapBytes": 28062346480,
+            "committedBytes": 30462562304,
+            "workingSetBytes": 30860255232,
+            "privateBytes": 31283421184
+          },
+          "errors": []
+        },
+        "merge": {
+          "commits": 0,
+          "mergeCommits": 0,
+          "outcomes": {},
+          "commit": {
+            "count": 0,
+            "meanMs": 0.0,
+            "minMs": 0.0,
+            "p50Ms": 0.0,
+            "p90Ms": 0.0,
+            "p99Ms": 0.0,
+            "p999Ms": 0.0,
+            "maxMs": 0.0,
+            "over10msCount": 0,
+            "over10msSumMs": 0.0
+          },
+          "cpuPerCommit": {
+            "count": 0,
+            "meanMs": 0.0,
+            "minMs": 0.0,
+            "p50Ms": 0.0,
+            "p90Ms": 0.0,
+            "p99Ms": 0.0,
+            "p999Ms": 0.0,
+            "maxMs": 0.0,
+            "over10msCount": 0,
+            "over10msSumMs": 0.0
+          },
+          "allocatedBytesPerCommit": 0,
+          "peakWorkingSetBytes": 30860759040,
+          "peakManagedBytes": 26636875464,
+          "memoryAfter": {
+            "managedBytes": 26636635696,
+            "heapBytes": 28062417592,
+            "committedBytes": 30428942336,
+            "workingSetBytes": 30812762112,
+            "privateBytes": 31233875968
+          },
+          "errors": []
+        },
+        "concurrent": [
+          {
+            "writers": 0,
+            "readers": {
+              "evse": 3,
+              "proof": 1,
+              "commit": 1
+            },
+            "statusRate": 1000,
+            "changesPerCommit": 1,
+            "commits": {
+              "outcomes": {},
+              "perSecond": 0.0,
+              "merges": 0,
+              "revisions": 0
+            },
+            "prepare": {
+              "count": 0,
+              "meanMs": 0.0,
+              "minMs": 0.0,
+              "p50Ms": 0.0,
+              "p90Ms": 0.0,
+              "p99Ms": 0.0,
+              "p999Ms": 0.0,
+              "maxMs": 0.0,
+              "over10msCount": 0,
+              "over10msSumMs": 0.0
+            },
+            "commit": {
+              "count": 0,
+              "meanMs": 0.0,
+              "minMs": 0.0,
+              "p50Ms": 0.0,
+              "p90Ms": 0.0,
+              "p99Ms": 0.0,
+              "p999Ms": 0.0,
+              "maxMs": 0.0,
+              "over10msCount": 0,
+              "over10msSumMs": 0.0
+            },
+            "reads": {
+              "evse": {
+                "count": 741878,
+                "meanMs": 0.081,
+                "minMs": 0.002,
+                "p50Ms": 0.007,
+                "p90Ms": 0.009,
+                "p99Ms": 0.013,
+                "p999Ms": 0.046,
+                "maxMs": 173.199,
+                "over10msCount": 374,
+                "over10msSumMs": 55154.645,
+                "perSecond": 36797.412,
+                "notFound": 2
+              },
+              "proof": {
+                "count": 76,
+                "meanMs": 265.274,
+                "minMs": 0.682,
+                "p50Ms": 145.412,
+                "p90Ms": 834.454,
+                "p99Ms": 1173.9,
+                "p999Ms": 1173.9,
+                "maxMs": 1173.9,
+                "over10msCount": 40,
+                "over10msSumMs": 20072.043,
+                "perSecond": 3.77,
+                "notFound": 0
+              },
+              "commit": {
+                "count": 7193759,
+                "meanMs": 0.001,
+                "minMs": 0.0,
+                "p50Ms": 0.0,
+                "p90Ms": 0.0,
+                "p99Ms": 0.0,
+                "p999Ms": 0.0,
+                "maxMs": 162.071,
+                "over10msCount": 36,
+                "over10msSumMs": 5375.021,
+                "perSecond": 356813.001,
+                "notFound": 0
+              }
+            },
+            "status": {
+              "count": 20004,
+              "meanMs": 0.089,
+              "minMs": 0.002,
+              "p50Ms": 0.023,
+              "p90Ms": 0.052,
+              "p99Ms": 0.163,
+              "p999Ms": 0.913,
+              "maxMs": 162.788,
+              "over10msCount": 9,
+              "over10msSumMs": 1225.778,
+              "perSecond": 992.206,
+              "outcomes": {
+                "Updated": 10008,
+                "Unchanged": 9996
+              },
+              "errors": []
+            },
+            "resources": {
+              "wallMs": 20161.146,
+              "cpuMs": 58453.125,
+              "cpuUtilization": 0.1812,
+              "allocatedBytes": 4586671528,
+              "gen0": 123,
+              "gen1": 4,
+              "gen2": 0,
+              "gcPauseMs": 18243.118
+            },
+            "peakWorkingSetBytes": 30814797824,
+            "peakManagedBytes": 26654827720,
+            "memoryAfter": {
+              "managedBytes": 26649114616,
+              "heapBytes": 28071160192,
+              "committedBytes": 28321443840,
+              "workingSetBytes": 29048369152,
+              "privateBytes": 29450907648
+            },
+            "errors": []
+          },
+          {
+            "writers": 1,
+            "readers": {
+              "evse": 3,
+              "proof": 1,
+              "commit": 1
+            },
+            "statusRate": 1000,
+            "changesPerCommit": 1,
+            "commits": {
+              "outcomes": {
+                "Committed": 1
+              },
+              "perSecond": 0.023,
+              "merges": 0,
+              "revisions": 1
+            },
+            "prepare": {
+              "count": 1,
+              "meanMs": 31266.007,
+              "minMs": 31266.007,
+              "p50Ms": 31266.007,
+              "p90Ms": 31266.007,
+              "p99Ms": 31266.007,
+              "p999Ms": 31266.007,
+              "maxMs": 31266.007,
+              "over10msCount": 1,
+              "over10msSumMs": 31266.007
+            },
+            "commit": {
+              "count": 1,
+              "meanMs": 13055.187,
+              "minMs": 13055.187,
+              "p50Ms": 13055.187,
+              "p90Ms": 13055.187,
+              "p99Ms": 13055.187,
+              "p999Ms": 13055.187,
+              "maxMs": 13055.187,
+              "over10msCount": 1,
+              "over10msSumMs": 13055.187
+            },
+            "reads": {
+              "evse": {
+                "count": 354226,
+                "meanMs": 0.169,
+                "minMs": 0.003,
+                "p50Ms": 0.006,
+                "p90Ms": 0.009,
+                "p99Ms": 0.013,
+                "p999Ms": 0.058,
+                "maxMs": 2940.682,
+                "over10msCount": 188,
+                "over10msSumMs": 57530.344,
+                "perSecond": 7992.181,
+                "notFound": 2
+              },
+              "proof": {
+                "count": 50,
+                "meanMs": 400.456,
+                "minMs": 0.643,
+                "p50Ms": 154.09,
+                "p90Ms": 1262.651,
+                "p99Ms": 2809.01,
+                "p999Ms": 2809.01,
+                "maxMs": 2809.01,
+                "over10msCount": 29,
+                "over10msSumMs": 19977.995,
+                "perSecond": 1.128,
+                "notFound": 0
+              },
+              "commit": {
+                "count": 4095361,
+                "meanMs": 0.002,
+                "minMs": 0.0,
+                "p50Ms": 0.0,
+                "p90Ms": 0.0,
+                "p99Ms": 0.0,
+                "p999Ms": 0.0,
+                "maxMs": 1205.643,
+                "over10msCount": 23,
+                "over10msSumMs": 6152.394,
+                "perSecond": 92401.087,
+                "notFound": 0
+              }
+            },
+            "status": {
+              "count": 8956,
+              "meanMs": 0.278,
+              "minMs": 0.002,
+              "p50Ms": 0.023,
+              "p90Ms": 0.046,
+              "p99Ms": 0.165,
+              "p999Ms": 0.953,
+              "maxMs": 1289.815,
+              "over10msCount": 3,
+              "over10msSumMs": 2268.984,
+              "perSecond": 202.069,
+              "outcomes": {
+                "Updated": 4483,
+                "Unchanged": 4473
+              },
+              "errors": []
+            },
+            "resources": {
+              "wallMs": 44321.567,
+              "cpuMs": 72125.0,
+              "cpuUtilization": 0.1017,
+              "allocatedBytes": 5004721256,
+              "gen0": 132,
+              "gen1": 2,
+              "gen2": 0,
+              "gcPauseMs": 28985.54
+            },
+            "peakWorkingSetBytes": 29050015744,
+            "peakManagedBytes": 26721005616,
+            "memoryAfter": {
+              "managedBytes": 26653658680,
+              "heapBytes": 28075767832,
+              "committedBytes": 28208168960,
+              "workingSetBytes": 28653973504,
+              "privateBytes": 29011337216
+            },
+            "errors": []
+          }
+        ],
+        "compact": {
+          "wallMs": 82638.966,
+          "cpuMs": 244703.125,
+          "cpuUtilization": 0.1851,
+          "allocatedBytes": 46352157856,
+          "gen0": 61,
+          "gen1": 16,
+          "gen2": 1,
+          "gcPauseMs": 25666.576,
+          "peakWorkingSetBytes": 59302969344,
+          "peakManagedBytes": 51172185672,
+          "memoryAfter": {
+            "managedBytes": 26649385752,
+            "heapBytes": 28075817184,
+            "committedBytes": 48049266688,
+            "workingSetBytes": 59034554368,
+            "privateBytes": 59443101696
+          },
+          "ok": true,
+          "error": null,
+          "diskBefore": {
+            "generation": "gen-000001",
+            "baseBytes": 1590629255,
+            "logBytes": 3321295,
+            "logLines": 14547,
+            "archiveBytes": 0,
+            "totalBytes": 1593950560
+          },
+          "diskAfter": {
+            "generation": "gen-000002",
+            "baseBytes": 1590617580,
+            "logBytes": 100395,
+            "logLines": 56,
+            "archiveBytes": 0,
+            "totalBytes": 1590717985
+          }
+        }
+      },
+      "head": {
+        "revision": 56,
+        "commitId": "8c3e3c7f04b8e32acd601a5a5e7a8b64c876f96dc114274fc7a9c9a4d43876de"
+      },
+      "memoryAtEnd": {
+        "managedBytes": 26649355432,
+        "heapBytes": 28075820760,
+        "committedBytes": 42491813888,
+        "workingSetBytes": 59002507264,
+        "privateBytes": 59410644992
+      },
+      "peakWorkingSetBytes": 59320954880,
+      "exitCode": 0,
+      "processWallMs": 1871419.052,
+      "reload": {
+        "load": {
+          "wallMs": 1034730.256,
+          "cpuMs": 2250984.375,
+          "cpuUtilization": 0.136,
+          "allocatedBytes": 335463288184,
+          "gen0": 3347,
+          "gen1": 182,
+          "gen2": 9,
+          "gcPauseMs": 315538.189,
+          "peakWorkingSetBytes": 62546632704,
+          "peakManagedBytes": 58930515440,
+          "memoryAfter": {
+            "managedBytes": 27044043208,
+            "heapBytes": 28436656832,
+            "committedBytes": 40863977472,
+            "workingSetBytes": 61243621376,
+            "privateBytes": 61816139776
+          }
+        },
+        "head": {
+          "revision": 56,
+          "commitId": "8c3e3c7f04b8e32acd601a5a5e7a8b64c876f96dc114274fc7a9c9a4d43876de"
+        },
+        "firstProof": {
+          "coldMs": 78.012,
+          "warmMs": 36.468
+        },
+        "peakWorkingSetBytes": 62546632704,
+        "exitCode": 0,
+        "processWallMs": 1059484.339,
+        "sameHead": true
+      }
+    }
+  ]
+}

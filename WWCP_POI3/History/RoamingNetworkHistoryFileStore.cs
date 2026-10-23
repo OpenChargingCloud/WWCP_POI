@@ -146,7 +146,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 generation = File.ReadAllText(currentFile, utf8).Trim();
 
-                var baseJSON  = ParseLine(File.ReadAllText(Path.Combine(Directory, generation, BaseFileName), utf8));
+                // Read as a stream: the base of a large roaming network is longer than a string may be.
+                JObject baseJSON;
+
+                using (var baseStream = new FileStream(Path.Combine(Directory, generation, BaseFileName), FileMode.Open, FileAccess.Read, FileShare.Read, ReadBufferSize))
+                {
+                    baseJSON = POIJSON.Read(baseStream) as JObject
+                                   ?? throw new InvalidOperationException($"The base of the history store '{Directory}' is no JSON object!");
+                }
+
                 var logFile   = Path.Combine(Directory, generation, LogFileName);
                 var entries   = new List<RoamingNetworkHistoryLogEntry>();
 
@@ -420,7 +428,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             System.IO.Directory.CreateDirectory(directory);
 
-            WriteSynced(Path.Combine(directory, BaseFileName), utf8.GetBytes(POIJSON.ToText(Snapshot)));
+            // Written as a stream: the base of a large roaming network is longer than a string may be.
+            using (var baseStream = new FileStream(Path.Combine(directory, BaseFileName), FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20))
+            {
+                POIJSON.Write(baseStream, Snapshot);
+                baseStream.Flush(true);
+            }
 
             using (var logStream = new FileStream(Path.Combine(directory, LogFileName), FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {

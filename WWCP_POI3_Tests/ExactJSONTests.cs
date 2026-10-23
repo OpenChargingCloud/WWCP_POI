@@ -17,6 +17,7 @@
 
 #region Usings
 
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using NUnit.Framework;
@@ -138,6 +139,67 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(POIWebSocketMessage.TryParse("""[2, "m2", "setStatus", { "value": 1e-30 }]""",              out _, out _),          Is.False);
                 Assert.That(POIWebSocketMessage.TryParse("""[2, "m3", "setStatus", { "value": 1, "value": 2 }]""",      out _, out _),          Is.False);
 
+            }
+
+        }
+
+        #endregion
+
+
+        #region The_base_of_a_store_is_written_and_read_as_a_stream(Number, Held)
+
+        /// <summary>
+        /// The base of a file store, written and read as a stream, as the base of a large roaming network is longer than a
+        /// string may be: it has the bytes of the canonical JSON, and is read as text is read, also across the buffers of
+        /// the reader, a number cut at the end of one, and a number a decimal cannot hold, which is refused.
+        /// </summary>
+        [TestCase("1.50",                              true)]
+        [TestCase("150000",                            true)]
+        [TestCase("1e-30",                             false)]
+        [TestCase("7922816251426433759354395033.6",    false)]
+        public void The_base_of_a_store_is_written_and_read_as_a_stream(String Number, Boolean Held)
+        {
+
+            var directory  = Path.Combine(Path.GetTempPath(), "poi3-base-" + Guid.NewGuid().ToString("N"));
+            var filler     = String.Join(",", Enumerable.Range(0, 30_000).Select(i => $"{{\"name\":\"Ladepark Jena {i}\",\"power\":{i}.5}}"));
+            var text       = $"{{\"pools\":[{filler}],\"value\":{(Held ? Number : "1")}}}";
+            var snapshot   = (JObject) JToken.ReadFrom(new JsonTextReader(new StringReader(text)) { FloatParseHandling = FloatParseHandling.Decimal,
+                                                                                                     DateParseHandling  = DateParseHandling.None });
+
+            try
+            {
+
+                using (var store = new RoamingNetworkHistoryFileStore(directory))
+                    store.WriteBase(snapshot);
+
+                var baseFile = Path.Combine(directory, File.ReadAllText(Path.Combine(directory, "CURRENT")).Trim(), "base.json");
+
+                Assert.That(File.ReadAllBytes(baseFile), Is.EqualTo(CanonicalJSON.ToUTF8Bytes(snapshot)));
+
+                // The number last, behind more than one buffer of the reader.
+                if (!Held)
+                    File.WriteAllText(baseFile, text.Replace("\"value\":1}", $"\"value\":{Number}}}"));
+
+                using (var store = new RoamingNetworkHistoryFileStore(directory))
+                {
+
+                    if (!Held)
+                    {
+                        Assert.That(() => store.Load(), Throws.InstanceOf<JsonReaderException>().With.Message.Contains(Number));
+                        return;
+                    }
+
+                    var loaded = store.Load()!.Base;
+
+                    Assert.That(JToken.DeepEquals(loaded, snapshot), Is.True);
+                    Assert.That(loaded["value"]!.ToString(Formatting.None), Is.EqualTo(Number));
+
+                }
+
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
             }
 
         }

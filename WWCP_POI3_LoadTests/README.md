@@ -99,7 +99,10 @@ server GC, `--suite full` with the defaults: 200 operators, 2 charging stations 
 | 50,000 | 8,507 | 1.2 GiB | 411 ms | 81 MiB | 14 s | 11 GiB | 75 MiB | 550 s |
 | 100,000 | 17,013 | 2.4 GiB | 774 ms | 154 MiB | 32 s | 21 GiB | 151 MiB | 1,042 s |
 | 250,000 | 42,532 | 6.0 GiB | 2.0 s | 371 MiB | 78 s | 53 GiB | 378 MiB | 272 s |
-| 1,000,000 | 170,125 | 24.1 GiB | 10.5 s | 1.4 GiB | 666 s | 214 GiB | – | – |
+| 1,000,000 | 170,125 | 24.1 GiB | 10.5 s | 1.4 GiB | 666 s | 214 GiB | 1.5 GiB¹ | 1,035 s¹ |
+
+¹ Of the run `loadtest-ryzen7-3700x-stream-20261023-074653` (`--stations 1M --stores file --merges 0 --writers 0,1`), after
+the base is written and read as a stream; the first run could not write it.
 
 What it showed:
 
@@ -116,8 +119,11 @@ What it showed:
   `--max-merge`, and the levels of several writers are skipped.
 - **Reading a file store again replays every commit, merges included**: the 100k store of 63 commits, 30 of them merged,
   took 17 minutes.
-- **A file store of 1M charging stations can not be written**: `WriteBase` serializes the snapshot into one string, longer
-  than .NET strings may be (`OutOfMemoryException` with 26 GiB of 128 in use).
+- **A file store of 1M charging stations could not be written**: `WriteBase` serialized the snapshot into one string, longer
+  than .NET strings may be (`OutOfMemoryException` with 26 GiB of 128 in use), and `Load` read `base.json` as one. Both
+  stream it now (`CanonicalJSON.Write` of Styx, `POIJSON.Write` and `POIJSON.Read`): the base of 1.59 billion bytes is
+  written at the start and again by the compaction (83 s), and read again with the same head after 17 minutes, most of
+  them replaying its 56 commits.
 - **Readers waiting behind commits**: plain reads of the head never waited (EVSE p99 0.01 ms throughout), but every reader
   of the commits, attestations and checkpoints took the lock of the history, so a proof or a `TryGetCommit` waited as long
   as a commit with its merge: up to 47 s at 50k charging stations with 4 writers. Since readers take an immutable view of

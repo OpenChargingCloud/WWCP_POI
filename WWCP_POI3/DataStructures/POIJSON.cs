@@ -161,6 +161,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Write               (Stream, JSON)
+
+        /// <summary>
+        /// Write the JSON text of the given JSON to the given stream as UTF-8, the bytes of ToText(), without making it a
+        /// string first: also a JSON longer than a string may be, e.g. the snapshot of a large roaming network in a store.
+        /// The stream is flushed, not closed.
+        /// </summary>
+        /// <param name="Stream">A stream to write to.</param>
+        /// <param name="JSON">The JSON.</param>
+        public static void Write(Stream  Stream,
+                                 JToken  JSON)
+
+            => CanonicalJSON.Write(Stream, JSON);
+
+        #endregion
+
         #region Read                (Text, MaxDepth = 64)
 
         /// <summary>
@@ -184,6 +200,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
             using var reader = Reader(Text, MaxDepth);
 
             return ReadFrom(reader, Text);
+
+        }
+
+        #endregion
+
+        #region Read                (Stream, MaxDepth = 64)
+
+        /// <summary>
+        /// The first JSON value of the given stream of UTF-8, read as Read(Text) reads it, without making it a string
+        /// first: also a JSON longer than a string may be, e.g. the snapshot of a large roaming network in a store. The
+        /// stream must be seekable, as its numbers are checked in a second pass over it; it is not closed.
+        /// </summary>
+        /// <param name="Stream">A seekable stream of UTF-8 JSON.</param>
+        /// <param name="MaxDepth">The maximum depth of the JSON.</param>
+        /// <exception cref="JsonReaderException">When the stream holds no JSON, or no JSON so read.</exception>
+        public static JToken Read(Stream  Stream,
+                                  Int32   MaxDepth   = 64)
+        {
+
+            var start = Stream.Position;
+
+            JToken json;
+
+            using (var reader = new JsonTextReader(new StreamReader(Stream, new UTF8Encoding(false), false, 1 << 16, leaveOpen: true)) {
+                                    DateParseHandling   = DateParseHandling.None,
+                                    FloatParseHandling  = FloatParseHandling.Decimal,
+                                    MaxDepth            = MaxDepth
+                                })
+            {
+                json = JToken.ReadFrom(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+            }
+
+            if (HasDecimals(json))
+            {
+                Stream.Position = start;
+                CheckDecimals(Stream, MaxDepth);
+            }
+
+            return json;
 
         }
 
@@ -250,32 +305,89 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           Int32   MaxDepth)
         {
 
-            var reader = new System.Text.Json.Utf8JsonReader(Encoding.UTF8.GetBytes(Text),
-                                                              new System.Text.Json.JsonReaderOptions {
-                                                                  CommentHandling      = System.Text.Json.JsonCommentHandling.Skip,
-                                                                  AllowTrailingCommas  = true,
-                                                                  AllowMultipleValues  = true,
-                                                                  MaxDepth             = MaxDepth + 1
-                                                              });
+            var reader = new System.Text.Json.Utf8JsonReader(Encoding.UTF8.GetBytes(Text), CheckOptions(MaxDepth));
 
             while (reader.Read())
+                if (CheckedToTheEnd(ref reader))
+                    break;
+
+        }
+
+        /// <summary>
+        /// The same for the first JSON value of the given stream, read piece by piece.
+        /// </summary>
+        private static void CheckDecimals(Stream  Stream,
+                                          Int32   MaxDepth)
+        {
+
+            var buffer  = new Byte[1 << 16];
+            var length  = 0;
+            var final   = false;
+            var state   = new System.Text.Json.JsonReaderState(CheckOptions(MaxDepth));
+
+            while (true)
             {
 
-                if (reader.TokenType == System.Text.Json.JsonTokenType.Number &&
-                    !IsHeldByADecimal(reader.ValueSpan))
+                while (!final && length < buffer.Length)
                 {
-                    throw new JsonReaderException($"The number {Encoding.UTF8.GetString(reader.ValueSpan)} is no decimal as written: it has more than 28 decimal places or a mantissa above 96 bits!");
+                    var read = Stream.Read(buffer, length, buffer.Length - length);
+                    if (read == 0)
+                        final = true;
+                    else
+                        length += read;
                 }
 
-                if (reader.CurrentDepth == 0 &&
-                    reader.TokenType is not System.Text.Json.JsonTokenType.StartObject
-                                     and not System.Text.Json.JsonTokenType.StartArray
-                                     and not System.Text.Json.JsonTokenType.PropertyName)
-                {
-                    break;
-                }
+                var reader = new System.Text.Json.Utf8JsonReader(buffer.AsSpan(0, length), final, state);
+
+                while (reader.Read())
+                    if (CheckedToTheEnd(ref reader))
+                        return;
+
+                if (final)
+                    return;
+
+                // What was not read yet, e.g. a number cut by the end of the buffer, goes first into the next one;
+                // a token longer than the buffer makes it larger.
+                var consumed = (Int32) reader.BytesConsumed;
+
+                state = reader.CurrentState;
+
+                if (consumed == 0)
+                    Array.Resize(ref buffer, buffer.Length * 2);
+
+                Buffer.BlockCopy(buffer, consumed, buffer, 0, length - consumed);
+                length -= consumed;
 
             }
+
+        }
+
+        private static System.Text.Json.JsonReaderOptions CheckOptions(Int32 MaxDepth)
+
+            => new () {
+                   CommentHandling      = System.Text.Json.JsonCommentHandling.Skip,
+                   AllowTrailingCommas  = true,
+                   AllowMultipleValues  = true,
+                   MaxDepth             = MaxDepth + 1
+               };
+
+        /// <summary>
+        /// Check the token the given reader is at: whether a decimal holds it, if it is a number, and whether it ends
+        /// the first JSON value.
+        /// </summary>
+        private static Boolean CheckedToTheEnd(ref System.Text.Json.Utf8JsonReader Reader)
+        {
+
+            if (Reader.TokenType == System.Text.Json.JsonTokenType.Number &&
+                !IsHeldByADecimal(Reader.ValueSpan))
+            {
+                throw new JsonReaderException($"The number {Encoding.UTF8.GetString(Reader.ValueSpan)} is no decimal as written: it has more than 28 decimal places or a mantissa above 96 bits!");
+            }
+
+            return Reader.CurrentDepth == 0 &&
+                   Reader.TokenType is not System.Text.Json.JsonTokenType.StartObject
+                                    and not System.Text.Json.JsonTokenType.StartArray
+                                    and not System.Text.Json.JsonTokenType.PropertyName;
 
         }
 

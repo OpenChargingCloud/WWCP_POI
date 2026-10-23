@@ -1,0 +1,3 @@
+stations,store,writers,readers evse+proof+commit,status/s target,commits/s,committed,merges,refused,commit p50 ms,commit p99 ms,prepare p50 ms,evse reads/s,evse p99 ms,proofs/s,proof p50 ms,proof p99 ms,commit reads/s,commit read max ms,commit reads >10 ms,commit read wait s,status/s,status p99 ms,CPU %,allocated MiB/s,gen2,gc pause ms,peak working set MiB
+1000000,file,0,3+1+1,1000,0.00,0,0,0,0.0,0.0,0.0,36797,0.01,4,145.41,1173.9,356813,162.1,36,5.4,992,0.16,18.1,217,0,18243,29387
+1000000,file,1,3+1+1,1000,0.02,1,0,0,13055.2,13055.2,31266.0,7992,0.01,1,154.09,2809.0,92401,1205.6,23,6.2,202,0.17,10.2,108,0,28986,27704
