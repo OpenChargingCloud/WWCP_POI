@@ -74,3 +74,14 @@ Console.WriteLine();
 ExampleA7.Run(a1);
 
 ExampleA7.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// DE*GEF adds its charging tariffs and states ad hoc prices of its DC EVSEs, signed price statements; checkpoint 4 names
+// them, and they are checked against it.
+ExampleA8.Run(a1, a2);
+
+ExampleA8.Validate();

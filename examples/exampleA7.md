@@ -194,5 +194,6 @@ of another server, or where it has none at all.
 
 ## Next
 
+- Price statements, named by checkpoints: [example A8](exampleA8.md).
 - Archives: how long they are kept, and how personal data is removed from a segment, keeping the identifications of its
   commits, are open (section 10.7).

@@ -189,9 +189,14 @@ public static class ExampleA4
 
     // The given changes, as a change set of the head signed by DE*GEF's key for its infrastructure, committed.
     internal static void Commit(ExampleA1.Result A1, ExampleA2.Result A2, String Description, params RoamingNetworkChange[] Changes)
+
+        => CommitWith(A1, A2.SigningKeys[POIKeyUsages.Infrastructure], Description, Changes);
+
+    // The given changes, as a change set of the head signed by the given key of DE*GEF, committed.
+    internal static void CommitWith(ExampleA1.Result A1, COSEKeyPair Key, String Description, params RoamingNetworkChange[] Changes)
     {
 
-        var key     = A2.SigningKeys[POIKeyUsages.Infrastructure];
+        var key     = Key;
 
         var result  = A1.History.Commit(A1.History.Head.RoamingNetwork.
                                             CreateChangeSet(Changes, Description: ImmutableI18NString.Create(Languages.en, Description)).
