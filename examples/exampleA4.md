@@ -139,7 +139,7 @@ and signed as the roaming network operator by signing keys of as many holders as
 by a trusted identity key of its holder, as A1 checks the signatures of a commit (`SigningKeyOf`):
 
 ```csharp
-foreach (var signature in checkpoint.Signatures)
+foreach (var signature in checkpoint.Signatures.Where(signature => signature.Role == RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator))
 {
 
     var key = SigningKeyOf(Anchor, Network, signature);
@@ -248,6 +248,6 @@ The RoamingHubCLI makes no checkpoints of its own yet: it has no checkpoint sign
 
 - Witnesses: independent third parties sign a checkpoint after they checked it against their own copy of the history,
   `TryWitness`, and the RNO takes their signatures, `TryAddCheckpointSignatures`; a verifier then requires the
-  `witness` role as well (section 10.2).
+  `witness` role as well (section 10.2): [example A6](exampleA6.md).
 - The next checkpoints, the correction of the AC stations between them, and the data at every checkpoint:
   [example A5](exampleA5.md).

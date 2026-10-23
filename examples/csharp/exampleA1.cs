@@ -181,6 +181,9 @@ public static class ExampleA1
         File.WriteAllText($"published/{qa.Id}.json",         history.Head.RoamingNetwork.ToJSON(IncludeETags: true).ToString());
         File.WriteAllText($"published/{qa.Id}-commit.json",  history.Head.Commit.        ToJSON().                  ToString());
 
+        // Where a server or a witness following QA from its start begins: the genesis version with its commit.
+        File.WriteAllText($"published/{qa.Id}-genesis.json", history.ToSnapshotJSON(IncludeRuntimeStatus: false).ToString());
+
         #endregion
 
 

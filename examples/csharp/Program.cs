@@ -52,3 +52,14 @@ Console.WriteLine();
 ExampleA5.Run(a1, a2);
 
 ExampleA5.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// Two witnesses, each with its own copy of the history of QA since the genesis, check and sign the three checkpoints;
+// a verifier then requires the roaming network operator and both witnesses.
+ExampleA6.Run(a1);
+
+ExampleA6.Validate();

@@ -214,6 +214,7 @@ Checkpoint 2 without checkpoint 1: The checkpoint does not follow the latest che
 
 ## Next
 
+- Witnesses sign the three checkpoints: [example A6](exampleA6.md).
 - Compaction: with checkpoints, a history drops older commits only before the commit of one of them and archives them,
   `RoamingNetworkHistoryRetention` and an archive, so that the proofs above stay possible (section 10.6).
 - Proofs of a single charging station with its EVSEs and tariffs against the commit of a checkpoint (sections 8.4, 10.4).

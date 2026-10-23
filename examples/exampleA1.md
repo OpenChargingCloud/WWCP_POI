@@ -16,7 +16,8 @@ to be added to it.
 
 The examples are one console project, [csharp/](csharp/), referencing `WWCP_POI3`: one file per example,
 [exampleA1.cs](csharp/exampleA1.cs), [exampleA2.cs](csharp/exampleA2.cs), [exampleA3.cs](csharp/exampleA3.cs),
-[exampleA4.cs](csharp/exampleA4.cs), [exampleA5.cs](csharp/exampleA5.cs), and [Program.cs](csharp/Program.cs) calling them in their order. What one example makes, the next is given:
+[exampleA4.cs](csharp/exampleA4.cs), [exampleA5.cs](csharp/exampleA5.cs), [exampleA6.cs](csharp/exampleA6.cs),
+and [Program.cs](csharp/Program.cs) calling them in their order. What one example makes, the next is given:
 `ExampleA1.Run()` returns the private keys of the three organizations, the trust anchor and the history of `QA`, whose
 head is the current version of `QA`. Each check, `ExampleA1.Validate()` here, reads only what is published, as a
 charging station operator or an app would.
@@ -270,10 +271,15 @@ var history               = RoamingNetworkHistory.Start(
 // What everybody may read: the roaming network with its ETags, and the commit leading to it.
 File.WriteAllText($"published/{qa.Id}.json",         history.Head.RoamingNetwork.ToJSON(IncludeETags: true).ToString());
 File.WriteAllText($"published/{qa.Id}-commit.json",  history.Head.Commit.        ToJSON().                  ToString());
+
+// Where a server or a witness following QA from its start begins: the genesis version with its commit.
+File.WriteAllText($"published/{qa.Id}-genesis.json", history.ToSnapshotJSON(IncludeRuntimeStatus: false).ToString());
 ```
 
 `published/` stands for what everybody may read; POI_API serves the same as `GET ~/RNs/QA` and
-`GET ~/RNs/QA/history/commits/{commitId}`. `published/QA.json`, the roaming network:
+`GET ~/RNs/QA/history/commits/{commitId}`. `QA.json` and `QA-commit.json` follow the head in the examples after this
+one; `QA-genesis.json` stays the snapshot of revision 0, `{ timestamp, commit, roamingNetwork }`, where a witness
+begins ([example A6](exampleA6.md)), as `GET ~/RNs/QA/history/snapshot` gives it now. `published/QA.json`, the roaming network:
 
 ```json
 {

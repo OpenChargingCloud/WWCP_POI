@@ -301,7 +301,8 @@ public static class ExampleA4
                                       checkpoint.VerifySignature(signature, key.Key, key.Id, out _);
 
     // The checkpoint of the given file: its @id the digest of its content, of QA, signed as the roaming network operator
-    // by signing keys of as many holders as the quorum requires.
+    // by signing keys of as many holders as the quorum requires. Signatures of witnesses are checked by those trusting
+    // them, see example A6.
     internal static RoamingNetworkCheckpoint CheckedCheckpoint(String File, RoamingNetworkTrustAnchor Anchor, RoamingNetwork Network)
     {
 
@@ -313,7 +314,7 @@ public static class ExampleA4
 
         var signedBy = new HashSet<String>();
 
-        foreach (var signature in checkpoint.Signatures)
+        foreach (var signature in checkpoint.Signatures.Where(signature => signature.Role == RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator))
         {
 
             var key = SigningKeyOf(Anchor, Network, signature);
