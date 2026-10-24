@@ -97,3 +97,15 @@ Console.WriteLine();
 ExampleA9.Run(a1, a6);
 
 ExampleA9.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// A driver charges at DE*GEF*E1*1: the app checks the proof of the station and the price statement of the EVSE offline,
+// keeps them, and later the proofs of both in checkpoints the witnesses signed; months later, they are evidence of the
+// price that applied when charging began.
+ExampleA10.Run(a1, a2, a6);
+
+ExampleA10.Validate();

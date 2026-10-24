@@ -123,5 +123,5 @@ checked it with checkpoint 4: kept by a driver or an e-mobility provider, it is 
 ## Next
 
 - What a driver's app keeps of a charging session, to prove later that exactly this tariff applied at exactly this
-  charging station when it charged: the proof of the station, the price statements valid then and the witnessed
-  checkpoints naming them; example A10, to come.
+  charging station when it charged: the proof of the station, the price statement valid then and the witnessed
+  checkpoints with the proofs of both: [example A10](exampleA10.md).

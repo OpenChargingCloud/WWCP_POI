@@ -271,7 +271,7 @@ public static class ExampleA8
     }
 
 
-    #region Helpers
+    #region Helpers, also of example A10
 
     // A charging tariff of DE*GEF of the given price per kWh.
     private static ChargingTariff Tariff(ChargingTariff_Id Id, String Name, Decimal Price)
@@ -287,7 +287,7 @@ public static class ExampleA8
         => new (new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, Price, StepSize: 1) ]).ToJSON());
 
     // A price status of a new price per kWh of the given charging tariff.
-    private static ChargingPrices Prices(ChargingTariff_Id TariffId, Decimal Price)
+    internal static ChargingPrices Prices(ChargingTariff_Id TariffId, Decimal Price)
 
         => new ([ new ChargingTariffPrices(TariffId, [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, Price, StepSize: 1) ]) ]) ]);
 

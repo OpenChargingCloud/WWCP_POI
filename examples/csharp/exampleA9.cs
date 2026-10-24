@@ -77,23 +77,7 @@ public static class ExampleA9
 
         #region 3. The roaming network operator takes their signatures
 
-        var verify = ExampleA6.VerifyCheckpointSignature(A1.TrustAnchor, A1.RoamingNetwork, ExampleA6.TrustedWitnesses());
-
-        foreach (var group in signatures.GroupBy(signature => signature.CheckpointId))
-        {
-
-            if (!A1.History.TryAddCheckpointSignatures(group.Key, [.. group.Select(signature => signature.Signature)], verify, out var signed, out var newSignatures, out var error))
-                Helpers.Fail(error);
-
-            if (!A1.History.TryGetCheckpointSnapshotJSON(signed.Id, out var snapshot, out error))
-                Helpers.Fail(error);
-
-            File.WriteAllText($"published/QA-checkpoint-{signed.Sequence}.json",           signed.  ToJSON().ToString());
-            File.WriteAllText($"published/QA-checkpoint-{signed.Sequence}-snapshot.json",  snapshot.ToString());
-
-            Console.WriteLine($"Checkpoint {signed.Sequence}, {signed.Id.ToString()[..8]}…: {newSignatures.Count} signatures more, {signed.Signatures.Length} in all");
-
-        }
+        TakeSignatures(A1, signatures);
 
         Console.WriteLine();
 
@@ -159,10 +143,35 @@ public static class ExampleA9
     }
 
 
-    #region Helpers
+    #region Helpers, also of example A10
+
+    // The signatures of the witnesses, taken by the roaming network operator with the witnesses it trusts, and the
+    // checkpoints and their snapshots published again, their @ids unchanged.
+    internal static void TakeSignatures(ExampleA1.Result A1, IEnumerable<(RoamingNetworkCheckpoint_Id CheckpointId, RoamingNetworkCommitSignature Signature)> Signatures)
+    {
+
+        var verify = ExampleA6.VerifyCheckpointSignature(A1.TrustAnchor, A1.RoamingNetwork, ExampleA6.TrustedWitnesses());
+
+        foreach (var group in Signatures.GroupBy(signature => signature.CheckpointId))
+        {
+
+            if (!A1.History.TryAddCheckpointSignatures(group.Key, [.. group.Select(signature => signature.Signature)], verify, out var signed, out var newSignatures, out var error))
+                Helpers.Fail(error);
+
+            if (!A1.History.TryGetCheckpointSnapshotJSON(signed.Id, out var snapshot, out error))
+                Helpers.Fail(error);
+
+            File.WriteAllText($"published/QA-checkpoint-{signed.Sequence}.json",           signed.  ToJSON().ToString());
+            File.WriteAllText($"published/QA-checkpoint-{signed.Sequence}-snapshot.json",  snapshot.ToString());
+
+            Console.WriteLine($"Checkpoint {signed.Sequence}, {signed.Id.ToString()[..8]}…: {newSignatures.Count} signatures more, {signed.Signatures.Length} in all");
+
+        }
+
+    }
 
     // The price statements of the given file.
-    private static IReadOnlyList<RoamingNetworkPriceStatement> Statements(String File)
+    internal static IReadOnlyList<RoamingNetworkPriceStatement> Statements(String File)
     {
 
         var statements = new List<RoamingNetworkPriceStatement>();
