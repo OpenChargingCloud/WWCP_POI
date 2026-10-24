@@ -236,8 +236,8 @@ makes no checkpoints yet ([example A4](exampleA4.md#with-the-hub)), it names no 
 
 ## Next
 
-- Witnesses check the price statements a checkpoint names before they sign it (sections 10.2, 12.3): given them with the
-  checkpoint, `TryAddCheckpoint(…, PriceStatements)`.
+- Witnesses check the price statements a checkpoint names before they sign it (sections 10.2, 12.3):
+  [example A9](exampleA9.md).
 - Statements of a charging pool or a station: `entityType` `ChargingPool` or `ChargingStation`; an app gets those of
   the pool, the station and the EVSE together.
 - Retention of price statements, and whether the archive takes them, is open (section 12.6).

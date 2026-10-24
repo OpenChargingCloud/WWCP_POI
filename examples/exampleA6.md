@@ -23,7 +23,7 @@ The code is [exampleA6.cs](csharp/exampleA6.cs), with the helpers of [exampleA4.
 [Program.cs](csharp/Program.cs) after example A5:
 
 ```csharp
-ExampleA6.Run(a1);
+var a6 = ExampleA6.Run(a1);
 
 ExampleA6.Validate();
 ```
@@ -79,15 +79,11 @@ File.WriteAllText("published/QA-commits-since-genesis.json", new JArray(commits.
   checkpoint before, with the Merkle root it signs, and signed by `OCC`. Signatures of other witnesses are not checked
   there.
 
-Then the witness signs each checkpoint, as itself and in the role `witness`. `TryWitness` signs only a checkpoint its
+Then the witness signs each checkpoint, as itself and in the role `witness`, `SignerOf(…)`. `TryWitness` signs only a checkpoint its
 history holds, and it holds one per sequence:
 
 ```csharp
-var signer  = new RoamingNetworkCommitSigner(key.Private,
-                                             POIPublicKey.From(key.Private).Id,
-                                             key.Algorithm,
-                                             RoamingNetworkCommitSignatureRoles.Witness,
-                                             witness);
+var signer  = SignerOf(witness, key);
 
 foreach (var checkpoint in history.Checkpoints)
 {
@@ -240,6 +236,7 @@ adding them is enabled and its verifier trusts the witness. The RoamingHubCLI ma
 
 ## Next
 
+- The witnesses go on with their copies, `ExampleA6.Result`, and check the price statements of a checkpoint: [example A9](exampleA9.md).
 - Compacting the history after the checkpoints, with an archive: [example A7](exampleA7.md).
 - Witness discovery: how a client learns which witnesses there are, and their keys, is open (section 10.7).
 - A witness also checks the price statements a checkpoint names before it signs (section 12.3).

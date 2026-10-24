@@ -1,9 +1,9 @@
 # Examples
 
-Eight examples, each going on from the one before: a roaming network whose operator three organizations hold, a
+Nine examples, each going on from the one before: a roaming network whose operator three organizations hold, a
 charging station operator asking to be added to it, its pools, their templates and their groups, checkpoints of the
 history, with a correction between two of them, witnesses signing them, the history compacted after them
-with an archive, and price statements named by checkpoints. They are C# with
+with an archive, price statements named by checkpoints, and witnesses checking them. They are C# with
 POI 3 alone, without a hub, in one console project, [csharp/](csharp/); A2 and A3 also show the same with the
 [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI): at its prompt or over SSH, in its web interface and
 over HTTP.
@@ -18,12 +18,13 @@ over HTTP.
 | [Example A6](exampleA6.md) | **Witnesses sign the checkpoints.** A calibration authority and an association of operators each take the history of `QA` from its genesis snapshot, commit by commit, check the three checkpoints against it and sign them; `OCC` takes their signatures. A second checkpoint of a sequence, a split view, is refused by a witness; a verifier requires `OCC` and both witnesses, and a proof of a commit is evidence of the history they saw. | checkpoints 0 to 2 | the witnesses, with keys trusted by configuration |
 | [Example A7](exampleA7.md) | **Compaction with an archive, after the checkpoints.** `OCC` compacts the history of `QA` to the commit of checkpoint 0, then of checkpoint 1, archiving what it drops, one segment each; dropped commits and their proofs come from the archive, also after a restart. Then each segment alone gives the versions from its root to its end again, its end the one its checkpoint states, its commits the Merkle root the checkpoint signs. | none new | - |
 | [Example A8](exampleA8.md) | **Price statements, named by checkpoints.** `DE*GEF` adds an AC and a DC charging tariff, its EVSE templates name them, `OCC` makes checkpoint 3; `DE*GEF` states ad hoc prices of its DC EVSEs, signed price statements chained per EVSE, then raises its AC tariff by a commit, and checkpoint 4 names the statements. They are checked against the keys of `DE*GEF` and the tree of checkpoint 4; a proof shows one was made between the two checkpoints; a split view and a statement signed by the infrastructure key are refused. | 10 to 12; checkpoints 3, 4 | `DE*GEF`, its `tariffs` and `infrastructure` keys |
+| [Example A9](exampleA9.md) | **Witnesses check the price statements.** The witnesses of A6 go on with their copies of the history: they take the commits of A8 and the checkpoints 3 and 4, and sign checkpoint 4 only after they checked the price statements it names; without them, with one missing or one changed, they refuse. Then the proof of a price statement is witnessed evidence. | checkpoints 3, 4 | the witnesses |
 
 What each way needs:
 
-| Way | Example A1 | Example A2 | Example A3 | Examples A4 to A8 |
+| Way | Example A1 | Example A2 | Example A3 | Examples A4 to A9 |
 |---|---|---|---|---|
-| C#, POI 3 alone ([csharp/](csharp/)) | `RoamingNetworkKeyStatement.Create`, `RoamingNetworkSigningKeyCertificate.Create`, `RoamingNetworkHistory.Start` | `CreateChangeSet([ Add(operator) ])`, signed by `DE*GEF`'s identity keys and two holders of `OCC` | `history.Commit`, signed by `DE*GEF`'s `infrastructure` key | `history.TryMakeCheckpoint`, `TryGetCommitProof`, `RoamingNetworkHistory.TryFromCheckpointSnapshot`, `TryWitness`, `TryAddCheckpointSignatures`, `history.Compact` with an archive, `RoamingNetworkPriceStatement.Create`, `TryAddPriceStatement` |
+| C#, POI 3 alone ([csharp/](csharp/)) | `RoamingNetworkKeyStatement.Create`, `RoamingNetworkSigningKeyCertificate.Create`, `RoamingNetworkHistory.Start` | `CreateChangeSet([ Add(operator) ])`, signed by `DE*GEF`'s identity keys and two holders of `OCC` | `history.Commit`, signed by `DE*GEF`'s `infrastructure` key | `history.TryMakeCheckpoint`, `TryGetCommitProof`, `RoamingNetworkHistory.TryFromCheckpointSnapshot`, `TryWitness`, `TryAddCheckpointSignatures`, `history.Compact` with an archive, `RoamingNetworkPriceStatement.Create`, `TryAddPriceStatement`, `TryAddCheckpointPriceStatements` |
 | prompt, SSH | `roamingNetworks add QA …` | `roamingNetworks QA add chargingStationOperator …` | shows: `roamingNetworks QA` | - |
 | web interface | **New roaming network** | **New party of a roaming network** | shows: **Points of interest** | - |
 | HTTP, as an administrator | `POST /api/v1/poi/RNs`, with an API key | `POST /api/v1/poi/RNs/QA/CSOs`, `202` | - | - |

@@ -19,7 +19,17 @@ public static class ExampleA6
     internal static readonly String[] Witnesses = [ "calibration.example", "association.example" ];
 
 
-    public static void Run(ExampleA1.Result A1)
+    /// <summary>
+    /// What the witnesses keep for the examples building on this one: their private keys, and their copies of the
+    /// history of QA.
+    /// </summary>
+    /// <param name="Keys">The key of each witness.</param>
+    /// <param name="Histories">The history of QA as each witness keeps it.</param>
+    public sealed record Result(IReadOnlyDictionary<String, COSEKeyPair>            Keys,
+                                IReadOnlyDictionary<String, RoamingNetworkHistory>  Histories);
+
+
+    public static Result Run(ExampleA1.Result A1)
     {
 
         #region 1. The witnesses and their keys
@@ -53,18 +63,15 @@ public static class ExampleA6
         #region 3. Each witness checks QA and signs its checkpoints
 
         var signatures = new List<(RoamingNetworkCheckpoint_Id CheckpointId, RoamingNetworkCommitSignature Signature)>();
+        var histories  = new Dictionary<String, RoamingNetworkHistory>();
 
         foreach (var (witness, key) in keys)
         {
 
             var history = WitnessHistory(witness);
+            var signer  = SignerOf(witness, key);
 
-            // The witness signs as itself, in the role witness, with its own key.
-            var signer  = new RoamingNetworkCommitSigner(key.Private,
-                                                         POIPublicKey.From(key.Private).Id,
-                                                         key.Algorithm,
-                                                         RoamingNetworkCommitSignatureRoles.Witness,
-                                                         witness);
+            histories.Add(witness, history);
 
             foreach (var checkpoint in history.Checkpoints)
             {
@@ -131,6 +138,8 @@ public static class ExampleA6
         Console.WriteLine();
 
         #endregion
+
+        return new (keys, histories);
 
     }
 
@@ -251,42 +260,87 @@ public static class ExampleA6
 
         // Every commit since, and then every checkpoint: its commit held, with its revision and ETags, its commits those
         // since the checkpoint before, with the root it signs, signed by the roaming network operator.
-        foreach (var json in Helpers.ReadJSONArray("published/QA-commits-since-genesis.json").Cast<JObject>())
-        {
+        AppendCommits(history, "published/QA-commits-since-genesis.json");
 
-            if (!RoamingNetworkCommit.TryParse(json, out var commit, out error))
+        for (UInt64 sequence = 0; File.Exists($"published/QA-checkpoint-{sequence}.json"); sequence++)
+            if (!TryTakeCheckpoint(history, sequence, out _, out error))
                 Helpers.Fail(error);
 
-            if (!history.TryAppend([ commit ],
+        Console.WriteLine($"{Witness}: the genesis and {history.Head.Commit.Revision} commits checked, {history.Checkpoints.Count} checkpoints taken");
+
+        return history;
+
+    }
+
+    // The witness signs as itself, in the role witness, with its own key.
+    internal static RoamingNetworkCommitSigner SignerOf(String Witness, COSEKeyPair Key)
+
+        => new (Key.Private,
+                POIPublicKey.From(Key.Private).Id,
+                Key.Algorithm,
+                RoamingNetworkCommitSignatureRoles.Witness,
+                Witness);
+
+    // The trust anchor of QA, as scanned.
+    private static RoamingNetworkTrustAnchor Anchor()
+    {
+
+        if (!RoamingNetworkTrustAnchor.TryParse(File.ReadAllText("published/QA-trustAnchor.txt"), out var anchor, out var error))
+            Helpers.Fail(error);
+
+        return anchor;
+
+    }
+
+    // The commits of the given file, appended to the history of a witness, each checked as every commit is: its change set
+    // signed by its owners and leading to its ETags, the commit signed as the roaming network operator by its signing keys
+    // in the version the witness holds.
+    internal static void AppendCommits(RoamingNetworkHistory History, String File)
+    {
+
+        var anchor = Anchor();
+
+        foreach (var json in Helpers.ReadJSONArray(File).Cast<JObject>())
+        {
+
+            if (!RoamingNetworkCommit.TryParse(json, out var commit, out var error))
+                Helpers.Fail(error);
+
+            if (!History.TryAppend([ commit ],
                                    out _,
                                    out error,
-                                   VerifyCommitSignature:   (c, signature) => ExampleA4.SigningKeyOf(anchor, genesis, signature) is POIPublicKey key &&
+                                   VerifyCommitSignature:   (c, signature) => ExampleA4.SigningKeyOf(anchor, History.Head.RoamingNetwork, signature) is POIPublicKey key &&
                                                                               c.VerifySignature(signature, key.Key, key.Id, out _),
                                    RequiredSignatureRoles:  [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ]))
                 Helpers.Fail(error);
 
         }
 
-        for (var sequence = 0; File.Exists($"published/QA-checkpoint-{sequence}.json"); sequence++)
-        {
+    }
 
-            // Only the signatures of the roaming network operator: those of witnesses are not checked here.
-            var json = Helpers.ReadJSON($"published/QA-checkpoint-{sequence}.json");
+    // The published checkpoint of the given sequence, taken by the history of a witness after it checked it against it,
+    // signed by the roaming network operator; with the price statements it names, when given, checked as well.
+    internal static Boolean TryTakeCheckpoint(RoamingNetworkHistory                       History,
+                                              UInt64                                      Sequence,
+                                              out RoamingNetworkCheckpoint?               Checkpoint,
+                                              out String?                                 ErrorResponse,
+                                              IEnumerable<RoamingNetworkPriceStatement>?  PriceStatements   = null)
+    {
 
-            foreach (var signature in ((JArray) json["signatures"]!).Where(signature => signature["role"]?.Value<String>() == RoamingNetworkCommitSignatureRoles.Witness).ToArray())
-                signature.Remove();
+        // Only the signatures of the roaming network operator: those of witnesses are not checked here.
+        var json = Helpers.ReadJSON($"published/QA-checkpoint-{Sequence}.json");
 
-            if (!RoamingNetworkCheckpoint.TryParse(json, out var checkpoint, out error))
-                Helpers.Fail(error);
+        foreach (var signature in ((JArray) json["signatures"]!).Where(signature => signature["role"]?.Value<String>() == RoamingNetworkCommitSignatureRoles.Witness).ToArray())
+            signature.Remove();
 
-            if (!history.TryAddCheckpoint(checkpoint, out error, ExampleA4.VerifyCheckpointSignature(anchor, genesis), [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ]))
-                Helpers.Fail(error);
+        if (!RoamingNetworkCheckpoint.TryParse(json, out Checkpoint, out ErrorResponse))
+            return false;
 
-        }
-
-        Console.WriteLine($"{Witness}: the genesis and {history.Head.Commit.Revision} commits checked, {history.Checkpoints.Count} checkpoints taken");
-
-        return history;
+        return History.TryAddCheckpoint(Checkpoint,
+                                        out ErrorResponse,
+                                        ExampleA4.VerifyCheckpointSignature(Anchor(), History.Head.RoamingNetwork),
+                                        [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ],
+                                        PriceStatements);
 
     }
 

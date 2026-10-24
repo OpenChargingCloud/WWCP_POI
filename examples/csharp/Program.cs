@@ -60,7 +60,7 @@ Console.WriteLine();
 
 // Two witnesses, each with its own copy of the history of QA since the genesis, check and sign the three checkpoints;
 // a verifier then requires the roaming network operator and both witnesses.
-ExampleA6.Run(a1);
+var a6 = ExampleA6.Run(a1);
 
 ExampleA6.Validate();
 
@@ -85,3 +85,15 @@ Console.WriteLine();
 ExampleA8.Run(a1, a2);
 
 ExampleA8.Validate();
+
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// The witnesses of example A6 go on: they take the commits of example A8 and the checkpoints 3 and 4, check the price
+// statements checkpoint 4 names, and sign them; the proof of a price statement is then witnessed evidence.
+ExampleA9.Run(a1, a6);
+
+ExampleA9.Validate();
