@@ -1,23 +1,25 @@
 # Example A3: two pools of a DC and an AC station, their templates and their groups
 
 The charging station operator `DE*GEF` of [example A2](exampleA2.md) adds its data to `QA`, with change sets it signs
-with its `infrastructure` signing key: the templates of a DC and an AC station and of their EVSEs, two charging pools, each
-with a DC station and an AC station of two EVSEs each naming their templates, then a charging station group and an
-EVSE group for each current. Five commits:
+with its `infrastructure` signing key: the templates of a DC and an AC station, of their EVSEs and of the energy meters
+of these, two charging pools, each with a DC station and an AC station of two EVSEs each naming their templates, every
+EVSE with its energy meter, then a charging station group and an EVSE group for each current. Five commits:
 
 | Revision | Signed by | Commit |
 |---|---|---|
-| 0, 1 | `OCC`, as the roaming network operator | `QA` and `DE*GEF`, see [example A1](exampleA1.md) and [example A2](exampleA2.md) |
-| 2 | `DE*GEF`, its `infrastructure` key | `Add` of the charging station templates `DE*GEF*ST_DC` and `DE*GEF*ST_AC`, and of the EVSE templates `DE*GEF*ET_DC` and `DE*GEF*ET_AC` |
-| 3 | `DE*GEF` | `Add` of the pool `DE*GEF*P1`, Jena Paradies: the DC station `DE*GEF*S1` with `DE*GEF*E1*1` and `DE*GEF*E1*2`, the AC station `DE*GEF*S2` with `DE*GEF*E2*1` and `DE*GEF*E2*2`, each naming its template |
+| 0, 1 | `OCC`, as the roaming network operator | `QA`, `DE*GEF` and the manufacturers, see [example A1](exampleA1.md) and [example A2](exampleA2.md) |
+| 2 | `DE*GEF`, its `infrastructure` key | `Add` of the charging station templates `DE*GEF*ST_DC` and `DE*GEF*ST_AC`, of the EVSE templates `DE*GEF*ET_DC` and `DE*GEF*ET_AC`, and of the energy meter templates `DE*GEF*EMT_DC` and `DE*GEF*EMT_AC` |
+| 3 | `DE*GEF` | `Add` of the pool `DE*GEF*P1`, Jena Paradies: the DC station `DE*GEF*S1` with `DE*GEF*E1*1` and `DE*GEF*E1*2`, the AC station `DE*GEF*S2` with `DE*GEF*E2*1` and `DE*GEF*E2*2`, each naming its template, each EVSE with its energy meter, `DE*GEF*M1*1` to `DE*GEF*M2*2` |
 | 4 | `DE*GEF` | `Add` of the pool `DE*GEF*P2`, Jena Nord: the DC station `DE*GEF*S3`, the AC station `DE*GEF*S4`, and their EVSEs |
 | 5 | `DE*GEF` | `Add` of the charging station groups `DE*GEF*SG_DC`, the DC stations `S1` and `S3`, and `DE*GEF*SG_AC`, the AC stations `S2` and `S4` |
 | 6 | `DE*GEF` | `Add` of the EVSE groups `DE*GEF*EG_DC`, the EVSEs of `S1` and `S3`, and `DE*GEF*EG_AC`, those of `S2` and `S4` |
 
-An EVSE says itself what it is: its current type and its power, 150 kW DC or 22 kW AC. What a series of stations or
-EVSEs has in common comes from a template it names in its `templateIds`: here each charging station template the power
-of its stations together, 300 kW and 44 kW, and each EVSE template the connector of its EVSEs, a CCS cable or a type 2
-socket. The network keeps them in the templates; the stations and EVSEs take them at runtime, see
+An EVSE says itself what it is: its current type and its power, 150 kW DC or 22 kW AC. What a series of stations,
+EVSEs or energy meters has in common comes from a template it names in its `templateIds`: here each charging station
+template the power of its stations together, 300 kW and 44 kW, and their manufacturer and model, each EVSE template the
+connector of its EVSEs, a CCS cable or a type 2 socket, and each energy meter template the manufacturer and model of its
+meters and how they sign their measurements. What belongs to the single device, the serial number of a meter and the
+public key it signs its measurements with, is its own. The network keeps them in the templates; the stations and EVSEs take them at runtime, see
 [step 7](#7-as-they-are-at-runtime). A template may also give a charging tariff, see
 [ChargingStationTemplate](../docs/ChargingStationTemplate.md) and [EVSETemplate](../docs/EVSETemplate.md). A group
 gives nothing: it collects members, here the stations and the EVSEs of one current, e.g. for an offer, see
@@ -79,50 +81,76 @@ meanwhile.
 A [charging station template](../docs/ChargingStationTemplate.md) has the properties of a charging station, an
 [EVSE template](../docs/EVSETemplate.md) those of an EVSE; their identifications are `{operatorId}*ST{suffix}` and
 `{operatorId}*ET{suffix}`, and they are embedded in their operator, `chargingStationTemplates` and `EVSETemplates`. A
-template names no members: a station or an EVSE names the templates it takes, so they come first. Each charging station
-template here gives its stations their power together, `maxPower`: a station takes it unless it has its own, and never
-above the one of all its EVSEs together. Each EVSE template gives its EVSEs their connector: a CCS cable to the DC
-EVSEs, a type 2 socket to the AC EVSEs; an EVSE takes the connectors of its templates besides its own, of the same
-identification its own.
+template names no members: a station, an EVSE or an energy meter names the templates it takes, so they come first. Each
+charging station template here gives its stations their power together, `maxPower`: a station takes it unless it has
+its own, and never above the one of all its EVSEs together; and their manufacturer, `GraphDefined` of
+[example A2](exampleA2.md), and model. Each EVSE template gives its EVSEs their connector: a CCS cable to the DC EVSEs,
+a type 2 socket to the AC EVSEs; an EVSE takes the connectors of its templates besides its own, of the same
+identification its own. An [energy meter template](../docs/EnergyMeterTemplate.md) gives its meters what a series has in
+common: their role, `evse`, their manufacturer, `KERNBERG` for the DC meters, `SAALE` for the AC meters, their model and
+their signature method, `OCMF`; its identification is free text, here `{operatorId}*EMT{suffix}`, unique in the network,
+and it is embedded in its operator as `energyMeterTemplates`, added with its operator as the parent.
 
 ```csharp
-Commit("The templates of the DC and the AC stations and EVSEs",
+Commit("The templates of the DC and the AC stations, EVSEs and energy meters",
              RoamingNetworkChange.Add(new ChargingStationTemplate(ChargingStationTemplate_Id.Parse("DE*GEF*ST_DC"),
                                                                   Name:                I18NString.Create(Languages.en, "DC charging station"),
+                                                                  ManufacturerId:      ExampleA2.stationMakerId,
+                                                                  ModelId:             ChargingStationModel_Id.Parse("GD-DC300"),
                                                                   MaxPower:            Watt.FromKW(300))),
              RoamingNetworkChange.Add(new ChargingStationTemplate(ChargingStationTemplate_Id.Parse("DE*GEF*ST_AC"),
                                                                   Name:                I18NString.Create(Languages.en, "AC charging station"),
+                                                                  ManufacturerId:      ExampleA2.stationMakerId,
+                                                                  ModelId:             ChargingStationModel_Id.Parse("GD-AC44"),
                                                                   MaxPower:            Watt.FromKW(44))),
              RoamingNetworkChange.Add(new EVSETemplate(EVSETemplate_Id.Parse("DE*GEF*ET_DC"),
                                                        Name:                I18NString.Create(Languages.en, "DC EVSE"),
                                                        ChargingConnectors:  [ new ChargingConnector(ChargingConnector_Id.Parse("1"), ChargingConnectorType.IEC_62196_T2_COMBO, Format: ChargingConnectorFormat.CABLE) ])),
              RoamingNetworkChange.Add(new EVSETemplate(EVSETemplate_Id.Parse("DE*GEF*ET_AC"),
                                                        Name:                I18NString.Create(Languages.en, "AC EVSE"),
-                                                       ChargingConnectors:  [ new ChargingConnector(ChargingConnector_Id.Parse("1"), ChargingConnectorType.IEC_62196_T2,       Format: ChargingConnectorFormat.SOCKET) ])));
+                                                       ChargingConnectors:  [ new ChargingConnector(ChargingConnector_Id.Parse("1"), ChargingConnectorType.IEC_62196_T2,       Format: ChargingConnectorFormat.SOCKET) ])),
+             RoamingNetworkChange.Add(new EnergyMeterTemplate(EnergyMeterTemplate_Id.Parse("DE*GEF*EMT_DC"),
+                                                              Name:                I18NString.Create(Languages.en, "DC energy meter"),
+                                                              Role:                EnergyMeterRole.EVSE,
+                                                              ManufacturerId:      ExampleA2.dcMeterMakerId,
+                                                              ModelId:             EnergyMeterModel_Id.Parse("KDM-500"),
+                                                              SignatureMethods:    [ SignatureMethod.OCMF ]),
+                                      ExampleA2.gefId),
+             RoamingNetworkChange.Add(new EnergyMeterTemplate(EnergyMeterTemplate_Id.Parse("DE*GEF*EMT_AC"),
+                                                              Name:                I18NString.Create(Languages.en, "AC energy meter"),
+                                                              Role:                EnergyMeterRole.EVSE,
+                                                              ManufacturerId:      ExampleA2.acMeterMakerId,
+                                                              ModelId:             EnergyMeterModel_Id.Parse("SM-3"),
+                                                              SignatureMethods:    [ SignatureMethod.OCMF ]),
+                                      ExampleA2.gefId));
 ```
 
 ```
-Committed, revision 2: The templates of the DC and the AC stations and EVSEs
+Committed, revision 2: The templates of the DC and the AC stations, EVSEs and energy meters
 ```
 
-All four in one change set, so in one commit. POI_API serves them, `GET ~/RNs/QA/CSOs/DE*GEF/CSTs` lists the charging station templates
+All six in one change set, so in one commit. POI_API serves them, `GET ~/RNs/QA/CSOs/DE*GEF/CSTs` lists the charging station templates
 as the operator embeds them:
 
 ```json
 [
   {
-    "@id":        "DE*GEF*ST_AC",
-    "created":    "…",
-    "lastChange": "…",
-    "maxPower":   44000,
-    "name":       { "en": "AC charging station" }
+    "@id":            "DE*GEF*ST_AC",
+    "created":        "…",
+    "lastChange":     "…",
+    "manufacturerId": "GraphDefined",
+    "maxPower":       44000,
+    "modelId":        "GD-AC44",
+    "name":           { "en": "AC charging station" }
   },
   {
-    "@id":        "DE*GEF*ST_DC",
-    "created":    "…",
-    "lastChange": "…",
-    "maxPower":   300000,
-    "name":       { "en": "DC charging station" }
+    "@id":            "DE*GEF*ST_DC",
+    "created":        "…",
+    "lastChange":     "…",
+    "manufacturerId": "GraphDefined",
+    "maxPower":       300000,
+    "modelId":        "GD-DC300",
+    "name":           { "en": "DC charging station" }
   }
 ]
 ```
@@ -139,35 +167,68 @@ and `GET ~/RNs/QA/CSOs/DE*GEF/EVSETs` the EVSE templates, the DC one of the two:
 }
 ```
 
+and `GET ~/RNs/QA/CSOs/DE*GEF/EMTs` the energy meter templates, the DC one of the two:
+
+```json
+{
+  "@id":              "DE*GEF*EMT_DC",
+  "created":          "…",
+  "lastChange":       "…",
+  "manufacturerId":   "KERNBERG",
+  "modelId":          "KDM-500",
+  "name":             { "en": "DC energy meter" },
+  "role":             "evse",
+  "signatureMethods": [ "OCMF" ]
+}
+```
+
 
 ## 3. The first pool: a DC and an AC station
 
 Both pools follow one pattern: pool `n` has the DC station `2n-1`, two EVSEs of 150 kW, and the AC station `2n`,
 two EVSEs of 22 kW; the EVSEs of station `s` are `DE*GEF*E{s}*1` and `DE*GEF*E{s}*2`. Each EVSE says its current
-type and its power, and names its EVSE template; each station names its charging station template.
+type and its power, names its EVSE template, and embeds its energy meter, `DE*GEF*M{s}*{e}`; each station names its
+charging station template. `Pool(…)`, `Station(…)` and `Meter(…)` are helpers of `ExampleA3`, which
+[example A4](exampleA4.md) builds its pools with as well:
 
 ```csharp
-// Station s: two EVSEs, DE*GEF*E{s}*1 and DE*GEF*E{s}*2, of the given current and power, and the templates of its kind.
-static ChargingStation Station(Int32 S, CurrentTypes CurrentTypes, Int32 kW, String Kind)
-
-    => new (ChargingStation_Id.Parse($"DE*GEF*S{S}"),
-            TemplateIds:  [ ChargingStationTemplate_Id.Parse($"DE*GEF*ST_{Kind}") ],
-            EVSEs: [
-                new EVSE(EVSE_Id.Parse($"DE*GEF*E{S}*1"), CurrentTypes: CurrentTypes, MaxPower: Watt.FromKW(kW), TemplateIds: [ EVSETemplate_Id.Parse($"DE*GEF*ET_{Kind}") ]),
-                new EVSE(EVSE_Id.Parse($"DE*GEF*E{S}*2"), CurrentTypes: CurrentTypes, MaxPower: Watt.FromKW(kW), TemplateIds: [ EVSETemplate_Id.Parse($"DE*GEF*ET_{Kind}") ])
-            ]);
-
-// Pool n: the DC station 2n-1, two EVSEs of 150 kW, and the AC station 2n, two of 22 kW.
-static ChargingPool Pool(Int32 N, String Name, Double Latitude, Double Longitude)
+// Pool n: the DC station 2n-1, two EVSEs of 150 kW, and the AC station 2n, two EVSEs of the given power.
+internal static ChargingPool Pool(Int32 N, String Name, Double Latitude, Double Longitude, Int32 ACkW = 22)
 
     => new (ChargingPool_Id.Parse($"DE*GEF*P{N}"),
             Name:              I18NString.Create(Languages.en, Name),
             GeoLocation:       GeoCoordinate.Parse(Latitude, Longitude),
             ChargingStations:  [
-                Station(2 * N - 1, CurrentTypes.DC,             150, "DC"),
-                Station(2 * N,     CurrentTypes.AC_ThreePhases,  22, "AC")
+                Station(2 * N - 1, CurrentTypes.DC,             150,  "DC"),
+                Station(2 * N,     CurrentTypes.AC_ThreePhases, ACkW, "AC")
             ]);
 
+// Station s: two EVSEs, DE*GEF*E{s}*1 and DE*GEF*E{s}*2, of the given current and power, and the templates of its kind.
+private static ChargingStation Station(Int32 S, CurrentTypes CurrentTypes, Int32 kW, String Kind)
+
+    => new (ChargingStation_Id.Parse($"DE*GEF*S{S}"),
+            TemplateIds:  [ ChargingStationTemplate_Id.Parse($"DE*GEF*ST_{Kind}") ],
+            EVSEs: [
+                new EVSE(EVSE_Id.Parse($"DE*GEF*E{S}*1"), CurrentTypes: CurrentTypes, MaxPower: Watt.FromKW(kW), TemplateIds: [ EVSETemplate_Id.Parse($"DE*GEF*ET_{Kind}") ], EnergyMeter: Meter(S, 1, Kind)),
+                new EVSE(EVSE_Id.Parse($"DE*GEF*E{S}*2"), CurrentTypes: CurrentTypes, MaxPower: Watt.FromKW(kW), TemplateIds: [ EVSETemplate_Id.Parse($"DE*GEF*ET_{Kind}") ], EnergyMeter: Meter(S, 2, Kind))
+            ]);
+
+// The energy meter of EVSE e of station s: its serial number and the public key it signs its measurements with, made
+// in the meter, whose private key never leaves it; the rest from its energy meter template.
+private static EnergyMeter Meter(Int32 S, Int32 E, String Kind)
+{
+
+    using var meterKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+
+    return new (EnergyMeter_Id.Parse($"DE*GEF*M{S}*{E}"),
+                SerialNumber:  $"{Kind}M-2026-{S:D3}-{E}",
+                PublicKeys:    [ new EnergyMeterPublicKey(meterKey.ExportSubjectPublicKeyInfo()) ],
+                TemplateIds:   [ EnergyMeterTemplate_Id.Parse($"DE*GEF*EMT_{Kind}") ]);
+
+}
+```
+
+```csharp
 // Signed by its key for its tariffs, or by the roaming network operator: refused, the pool is DE*GEF's infrastructure.
 var byTariffsKey  = A1.History.Commit(ChangeSet("Jena Paradies, a DC and an AC station", A2.SigningKeys[POIKeyUsages.Tariffs], RoamingNetworkChange.Add(Pool(1, "Jena Paradies", 50.9271, 11.5892))));
 var byOCC         = A1.History.Commit(ChangeSet("Jena Paradies, a DC and an AC station", A1.SigningKeys["AlphaOrg"],           RoamingNetworkChange.Add(Pool(1, "Jena Paradies", 50.9271, 11.5892))));
@@ -184,8 +245,12 @@ Committed, revision 3: Jena Paradies, a DC and an AC station
 A key of `DE*GEF` for its tariffs signs no pools, and the roaming network operator signs none of the data of a party;
 nothing is committed then.
 
-One `Add` of the pool, with its stations and EVSEs embedded: the parent of a pool is the operator its identification
-names, and only that operator's signature, by a key that may sign its `infrastructure`, lets it in. A template its members name must be one of that operator.
+One `Add` of the pool, with its stations, EVSEs and energy meters embedded: the parent of a pool is the operator its
+identification names, and only that operator's signature, by a key that may sign its `infrastructure`, lets it in. A
+template its members name must be one of that operator, a manufacturer they name one of the network. An energy meter is
+no entity of a change set of its own: it is embedded in its EVSE, and changes as its property `energyMeter`, see
+[EnergyMeter](../docs/EnergyMeter.md). Its public key is the DER encoded SubjectPublicKeyInfo, here of a P-256 key, `@id`
+its SHA-256; a transparency software checks the signed meter values of a charging session with it.
 
 
 ## 4. The second pool, after the same pattern
@@ -288,7 +353,7 @@ may name several templates: of two giving a value, the one it names first gives 
 ## 7. As they are at runtime
 
 `ExampleA3.Validate()` checks `QA` as everybody does, now at revision 6, and shows the pools of `DE*GEF` as they are at
-runtime, with what their templates give them, from what is published only:
+runtime, with what their templates give them, every EVSE with its energy meter, from what is published only:
 
 ```csharp
 ExampleA1.Validate();
@@ -307,12 +372,21 @@ foreach (var pool in gef.EffectiveChargingPools)
     foreach (var station in pool.ChargingStations)
     {
 
-        Console.WriteLine($"  {station.Id}  {station.MaxPower?.kW} kW  (templates {String.Join(", ", station.TemplateIds)})");
+        Console.WriteLine($"  {station.Id}  {station.MaxPower?.kW} kW  {station.ManufacturerId} {station.ModelId}  (templates {String.Join(", ", station.TemplateIds)})");
 
         foreach (var evse in station.EVSEs)
+        {
+
             Console.WriteLine($"    {evse.Id}  {evse.CurrentTypes} {evse.MaxPower?.kW} kW  " +
                               String.Join(", ", evse.ChargingConnectors.Select(connector => $"{connector.Type} {connector.Format}")) +
                               $"  (templates {String.Join(", ", evse.TemplateIds)})");
+
+            if (evse.EnergyMeter is EnergyMeter meter)
+                Console.WriteLine($"      {meter.Id}  {meter.ManufacturerId} {meter.ModelId}, serial {meter.SerialNumber}, {String.Join(", ", meter.SignatureMethods)}, " +
+                                  String.Join(", ", meter.PublicKeys.Select(publicKey => $"{publicKey.Algorithm} key {publicKey.Id[..8]}…")) +
+                                  $"  (templates {String.Join(", ", meter.TemplateIds)})");
+
+        }
 
     }
 
@@ -323,16 +397,20 @@ foreach (var pool in gef.EffectiveChargingPools)
 QA is checked: revision 6, commit 6b4309ffd15468b8cb160bdaa7293e03475e1e281d35ede3238846acd8b538cc, signed by AlphaOrg and BetaOrg and GammaOrg
 
 DE*GEF*P1  Jena Paradies
-  DE*GEF*S1  300 kW  (templates DE*GEF*ST_DC)
+  DE*GEF*S1  300 kW  GraphDefined GD-DC300  (templates DE*GEF*ST_DC)
     DE*GEF*E1*1  DC 150 kW  IEC_62196_T2_COMBO CABLE  (templates DE*GEF*ET_DC)
+      DE*GEF*M1*1  KERNBERG KDM-500, serial DCM-2026-001-1, OCMF, secp256r1 key 0cc14973…  (templates DE*GEF*EMT_DC)
     DE*GEF*E1*2  DC 150 kW  IEC_62196_T2_COMBO CABLE  (templates DE*GEF*ET_DC)
-  DE*GEF*S2  44 kW  (templates DE*GEF*ST_AC)
+      DE*GEF*M1*2  KERNBERG KDM-500, serial DCM-2026-001-2, OCMF, secp256r1 key 4a134d5c…  (templates DE*GEF*EMT_DC)
+  DE*GEF*S2  44 kW  GraphDefined GD-AC44  (templates DE*GEF*ST_AC)
     DE*GEF*E2*1  AC_ThreePhases 22 kW  IEC_62196_T2 SOCKET  (templates DE*GEF*ET_AC)
+      DE*GEF*M2*1  SAALE SM-3, serial ACM-2026-002-1, OCMF, secp256r1 key 860bdc5a…  (templates DE*GEF*EMT_AC)
     DE*GEF*E2*2  AC_ThreePhases 22 kW  IEC_62196_T2 SOCKET  (templates DE*GEF*ET_AC)
+      DE*GEF*M2*2  SAALE SM-3, serial ACM-2026-002-2, OCMF, secp256r1 key 801812ee…  (templates DE*GEF*EMT_AC)
 DE*GEF*P2  Jena Nord
-  DE*GEF*S3  300 kW  (templates DE*GEF*ST_DC)
+  DE*GEF*S3  300 kW  GraphDefined GD-DC300  (templates DE*GEF*ST_DC)
     …
-  DE*GEF*S4  44 kW  (templates DE*GEF*ST_AC)
+  DE*GEF*S4  44 kW  GraphDefined GD-AC44  (templates DE*GEF*ST_AC)
     …
 
 DE*GEF*SG_AC  DE*GEF*S2, DE*GEF*S4
@@ -341,8 +419,9 @@ DE*GEF*EG_AC  DE*GEF*E2*1, DE*GEF*E2*2, DE*GEF*E4*1, DE*GEF*E4*2
 DE*GEF*EG_DC  DE*GEF*E1*1, DE*GEF*E1*2, DE*GEF*E3*1, DE*GEF*E3*2
 ```
 
-The power of the stations and the connectors of the EVSEs are the templates'; the stations and EVSEs as they are
-stored name their templates only.
+The power, the manufacturer and the model of the stations, the connectors of the EVSEs, and the manufacturer, model and
+signature method of the energy meters are the templates'; the stations, EVSEs and energy meters as they are stored name
+their templates only, and a meter keeps its serial number and its public key.
 
 POI_API serves a pool, its stations and its EVSEs as they are at runtime as well, with what their templates give them:
 `GET ~/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1`, shortened to the first EVSE of each station:
@@ -359,16 +438,30 @@ POI_API serves a pool, its stations and its EVSEs as they are at runtime as well
           "chargingConnectors": [ { "@id": "1", "format": "CABLE", "type": "IEC_62196_T2_COMBO" } ],
           "created":            "…",
           "currentTypes":       [ "DC" ],
+          "energyMeter":        {
+            "@id":              "DE*GEF*M1*1",
+            "created":          "…",
+            "lastChange":       "…",
+            "manufacturerId":   "KERNBERG",
+            "modelId":          "KDM-500",
+            "publicKeys":       [ { "@id": "0cc14973…", "key": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE…" } ],
+            "role":             "evse",
+            "serialNumber":     "DCM-2026-001-1",
+            "signatureMethods": [ "OCMF" ],
+            "templateIds":      [ "DE*GEF*EMT_DC" ]
+          },
           "lastChange":         "…",
           "maxPower":           150000,
           "templateIds":        [ "DE*GEF*ET_DC" ]
         },
         …
       ],
-      "created":     "…",
-      "lastChange":  "…",
-      "maxPower":    300000,
-      "templateIds": [ "DE*GEF*ST_DC" ]
+      "created":        "…",
+      "lastChange":     "…",
+      "manufacturerId": "GraphDefined",
+      "maxPower":       300000,
+      "modelId":        "GD-DC300",
+      "templateIds":    [ "DE*GEF*ST_DC" ]
     },
     {
       "@id": "DE*GEF*S2",
@@ -378,16 +471,19 @@ POI_API serves a pool, its stations and its EVSEs as they are at runtime as well
           "chargingConnectors": [ { "@id": "1", "format": "SOCKET", "type": "IEC_62196_T2" } ],
           "created":            "…",
           "currentTypes":       [ "AC_ThreePhases" ],
+          "energyMeter":        { "@id": "DE*GEF*M2*1", …, "manufacturerId": "SAALE", "modelId": "SM-3", … },
           "lastChange":         "…",
           "maxPower":           22000,
           "templateIds":        [ "DE*GEF*ET_AC" ]
         },
         …
       ],
-      "created":     "…",
-      "lastChange":  "…",
-      "maxPower":    44000,
-      "templateIds": [ "DE*GEF*ST_AC" ]
+      "created":        "…",
+      "lastChange":     "…",
+      "manufacturerId": "GraphDefined",
+      "maxPower":       44000,
+      "modelId":        "GD-AC44",
+      "templateIds":    [ "DE*GEF*ST_AC" ]
     }
   ],
   "created":     "…",
@@ -397,7 +493,7 @@ POI_API serves a pool, its stations and its EVSEs as they are at runtime as well
 }
 ```
 
-The connectors and the station powers are the templates'; the `lastChange` of each is the latest of its own and of its
+The connectors, the station powers and manufacturers and what the energy meters share are the templates'; the `lastChange` of each is the latest of its own and of its
 templates, here its own, as the templates are older. `?view=stored` serves the pool as its operator embeds it - with the
 ETag a [precondition](../docs/README.md#etags) of a change set names - naming its templates, without what they give:
 
@@ -408,7 +504,9 @@ ETag a [precondition](../docs/README.md#etags) of a change set names - naming it
     {
       "@id": "DE*GEF*S1",
       "EVSEs": [
-        { "@id": "DE*GEF*E1*1", "created": "…", "currentTypes": [ "DC" ], "lastChange": "…", "maxPower": 150000, "templateIds": [ "DE*GEF*ET_DC" ] },
+        { "@id": "DE*GEF*E1*1", "created": "…", "currentTypes": [ "DC" ],
+          "energyMeter": { "@id": "DE*GEF*M1*1", "created": "…", "lastChange": "…", "publicKeys": [ … ], "serialNumber": "DCM-2026-001-1", "templateIds": [ "DE*GEF*EMT_DC" ] },
+          "lastChange": "…", "maxPower": 150000, "templateIds": [ "DE*GEF*ET_DC" ] },
         …
       ],
       "created":     "…",
@@ -429,7 +527,9 @@ of a version gives them: `TryGetEffectiveEVSE(evseId, out var evse)`, `Effective
 ## With the hub
 
 A [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) serving `QA` takes the change sets of `DE*GEF`
-over HTTP, `COMMIT /poi/RNs/QA/history/changeSets`, from anybody, and serves the pools as above.
+over HTTP, `COMMIT /poi/RNs/QA/history/changeSets`, from anybody, and serves the pools as above. The templates,
+stations and energy meters name the manufacturers of [example A2](exampleA2.md), which the hub added
+[before](exampleA2.md#the-manufacturers); its revisions are three higher than above.
 
 ### The program of `DE*GEF`, over HTTP
 
@@ -505,7 +605,7 @@ Steps 2 to 6 then run with `await Commit(…)`; each answers `201 Committed, rev
 {
   "status":          "Committed",
   "@id":             "2d2a60b9…",
-  "revision":        3,
+  "revision":        6,
   "parentIds":       [ "adcb769c…" ],
   "changeSetId":     "MSQ5AtSUtAG8542fS12Yh6rCW7x8xv2G",
   "createdAt":       "2026-10-17T18:16:17.709Z",
@@ -513,7 +613,7 @@ Steps 2 to 6 then run with `await Commit(…)`; each answers `201 Committed, rev
   "numberOfChanges": 1,
   "signatureKeyIds": [ "a3fec322…" ],
   "eTags":           [ [ "json", "sha256", "hex", "faf55b2e…" ], [ "cbor", "sha256", "hex", "23340139…" ] ],
-  "head":            { "@id": "2d2a60b9…", "revision": 3, … }
+  "head":            { "@id": "2d2a60b9…", "revision": 6, … }
 }
 ```
 
@@ -533,7 +633,7 @@ curl -X COMMIT -H "Content-Type: application/json" --data-binary @pool.json http
 
 ```
 RoamingHub> roamingNetworks
-QA  revision 6  Quality assurance  (operated by 'RNO-47EAB7CF', this hub, 1 charging station operator(s), 2 charging pool(s))
+QA  revision 9  Quality assurance  (operated by 'RNO-47EAB7CF', this hub, 1 charging station operator(s), 2 charging pool(s))
 ```
 
 The web interface shows them under **Points of interest → QA → Charging station operators → DE\*GEF**: its pools,
@@ -546,7 +646,7 @@ Over HTTP, for everybody:
 | `GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1` | the pool at runtime, its keys in canonical order; `?view=stored` as it is stored |
 | `GET /poi/RNs/QA/EVSEs/DE*GEF*E1*2` | `307` to `/poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/EVSEs/DE*GEF*E1*2` |
 | `GET /poi/RNs/QA/CSOs/DE*GEF/{CSTs \| EVSETs \| CSGs \| EVSEGs}` | its templates and its groups |
-| `GET /poi/RNs/QA/history/head` | the head commit: `revision` 6, its `parentIds`, `eTags` and `signatureKeyIds`, the one of `DE*GEF` |
+| `GET /poi/RNs/QA/history/head` | the head commit: `revision` 9, its `parentIds`, `eTags` and `signatureKeyIds`, the one of `DE*GEF` |
 
 
 ## Next

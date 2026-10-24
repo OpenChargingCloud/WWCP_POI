@@ -104,13 +104,14 @@ The checkpoint, as `published/QA-checkpoint-0.json` has it; its `@id` is the SHA
 
 ## 2. Two pools more, after the pattern of A3
 
-As in A3, pool n has the DC station 2n-1 and the AC station 2n, two EVSEs each. `Pool(…)` and `Commit(…)` are the
-helpers of A3, here with the power of the AC EVSEs as a parameter. The AC stations take the AC template, 44 kW, and their
+As in A3, pool n has the DC station 2n-1 and the AC station 2n, two EVSEs each, every EVSE with its energy meter.
+`ExampleA3.Pool(…)` is the helper of A3, here with the power of the AC EVSEs as a parameter, and `Commit(…)` the one of
+A3 as a helper of `ExampleA4`. The AC stations take the AC template, 44 kW, and their
 EVSEs 22 kW each: wrong, they have two EVSEs of 11 kW, 22 kW together.
 
 ```csharp
-Commit(A1, A2, "Jena Lobeda, a DC and an AC station",   RoamingNetworkChange.Add(Pool(3, "Jena Lobeda",   50.8858, 11.6157, ACkW: 22)));
-Commit(A1, A2, "Jena Winzerla, a DC and an AC station", RoamingNetworkChange.Add(Pool(4, "Jena Winzerla", 50.9105, 11.5555, ACkW: 22)));
+Commit(A1, A2, "Jena Lobeda, a DC and an AC station",   RoamingNetworkChange.Add(ExampleA3.Pool(3, "Jena Lobeda",   50.8858, 11.6157, ACkW: 22)));
+Commit(A1, A2, "Jena Winzerla, a DC and an AC station", RoamingNetworkChange.Add(ExampleA3.Pool(4, "Jena Winzerla", 50.9105, 11.5555, ACkW: 22)));
 ```
 
 The data must be wrong in a valid way: two EVSEs of 11 kW with the 44 kW of the AC template would be refused, as a

@@ -676,12 +676,12 @@ JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json
 |---|---|
 | `GET ~/RNs` | the roaming networks, as `{@id, name, description}` |
 | `GET ~/RNs/{RN_Id}` | the roaming network, the head of its history; with `?without=chargingStationOperators,…` without what it holds |
-| `GET ~/RNs/{RN_Id}/{CSOs\|GOs\|EMPs\|CSMs\|POs}` | its charging station operators, grid operators, e-mobility providers, charging station manufacturers or parking operators, as `{@id, name, description}` |
+| `GET ~/RNs/{RN_Id}/{CSOs\|GOs\|EMPs\|CSMs\|EMMs\|POs}` | its charging station operators, grid operators, e-mobility providers, charging station manufacturers, energy meter manufacturers or parking operators, as `{@id, name, description}` |
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}[/CPs/{CP_Id}[/CSs/{CS_Id}[/EVSEs/{EVSE_Id}]]]` | an operator, pool, station or EVSE as its parent embeds it; a pool with `?expand=gridConnectionPoint` |
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs[/{PS_Id}]` | the parking spaces a charging station names, or one of them: of parking operators or of its charging station operator, each as its operator embeds it |
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}[/CPs/{CP_Id}[/CSs/{CS_Id}[/EVSEs/{EVSE_Id}]]]/Brands[/{Brand_Id}]` | the brands of an operator, pool, station or EVSE, its own, or one of them |
 | `GET ~/RNs/{RN_Id}/GOs/{GO_Id}[/GCPs/{GCP_Id}]` | a grid operator, or one of its grid connection points |
-| `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer or parking operator |
+| `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|EMMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer, energy meter manufacturer or parking operator |
 | `GET ~/RNs/{RN_Id}/{CPs\|CSs\|EVSEs}/{Id}` | `307 Temporary Redirect` to where a charging pool, station or EVSE is, below its operator, the query kept |
 | `GET ~/RNs/{RN_Id}/CTOs/{CTO_Id}` | `307 Temporary Redirect` to a charging tariff offer below its owner, a charging station operator or an e-mobility provider |
 
@@ -703,8 +703,8 @@ The lists are the QUERY interface, beside the synchronization above: `GET ~/RNs/
 pools of all charging station operators of a roaming network, each as its operator embeds it, with
 `chargingStationOperator: {@id, name}`; `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}?without=chargingPools` is the operator
 without them, so that a large one is not read whole to show what it says of itself. So is the roaming network
-without any of `chargingStationOperators`, `gridOperators`, `eMobilityProviders`, `chargingStationManufacturers` and
-`parkingOperators`, each listed by `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}`, with its `eTags`, the ones of all of it;
+without any of `chargingStationOperators`, `gridOperators`, `eMobilityProviders`, `chargingStationManufacturers`,
+`energyMeterManufacturers` and `parkingOperators`, each listed by `~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|EMMs|POs}`, with its `eTags`, the ones of all of it;
 and
 `GET ~/RNs/{RN_Id}/GOs/{GO_Id}?without=gridConnectionPoints,energyMeterTemplates,energyMeterGroups`, and `GET ~/RNs/{RN_Id}/GOs/{GO_Id}/{GCPs|EMTs|EMGs}`
 lists them, the grid connection points as they are at runtime, `?view=stored` as the grid operator embeds them; a
@@ -727,7 +727,7 @@ names, in its order, are listed below it, each with its page below its owner: `�
 `…/CSs/{CS_Id}/CSTs`, `…/EVSEs/{EVSE_Id}/EVSETs`, `…/CTs/{CT_Id}/CTTs` and `~/RNs/{RN_Id}/POs/{PO_Id}/PSs/{PS_Id}/PSTs`;
 so are the groups it is in, `…/CPGs`, `…/CSGs`, `…/EVSEGs` and `…/PSGs`, and the charging tariff offers covering it,
 `…/CTOs` (`?applicable=true`, also `&at=`, those that apply now or then). Every list, `~/RNs`,
-`~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs}` and
+`~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|EMMs|POs}` and
 the lists of what an operator embeds as well, takes:
 
 | Parameter | |

@@ -3,13 +3,16 @@
 The roaming network `QA` of [example A1](exampleA1.md) gets its first party: the charging station operator `DE*GEF`,
 GraphDefined Charging Solutions. It makes its own keys and keeps them, makes the change set adding it to the version of
 `QA` it checked, and signs it with each of its identity keys: the proof that it holds them, and that it asks to be
-added. The roaming network operator `OCC` decides: two of its three holders sign the change set as well, and it is
-committed.
+added. The same change set adds the manufacturers its charging stations and their energy meters will name, which `QA`
+does not know yet: `GraphDefined`, GraphDefined Charging Stations, and the energy meter manufacturers `SAALE`, Saale
+Metering, of its AC meters, and `KERNBERG`, Kernberg DC Metering, of its DC meters. The roaming network operator `OCC`
+decides on both, a new member and its registries of manufacturers: two of its three holders sign the change set as well,
+and it is committed.
 
 | Revision | Signed by | Commit |
 |---|---|---|
 | 0 | `OCC`, as the RNO | Genesis: the roaming network `QA`, see [example A1](exampleA1.md) |
-| 1 | `OCC`, as the RNO; its change set by `DE*GEF`'s identity keys and two holders of `OCC` | `Add` of the charging station operator `DE*GEF`, with the public halves of its keys |
+| 1 | `OCC`, as the RNO; its change set by `DE*GEF`'s identity keys and two holders of `OCC` | `Add` of the charging station operator `DE*GEF`, with the public halves of its keys; of the charging station manufacturer `GraphDefined`; of the energy meter manufacturers `SAALE` and `KERNBERG` |
 
 From then on `DE*GEF` adds its data itself, with change sets it signs: [example A3](exampleA3.md). The code is
 [exampleA2.cs](csharp/exampleA2.cs), called by [Program.cs](csharp/Program.cs) with what example A1 left:
@@ -92,11 +95,42 @@ File.WriteAllText("DE-GEF/operator.json", gef.ToJSON().ToString());
 The private keys stay in `DE-GEF/`: `identity1-privateKey.pem` (P-521), `identity2-privateKey.pem` (Ed448) and
 `signing-infrastructure-…`, `signing-tariffs-…`, `signing-party-privateKey.pem` (P-256).
 
+Then the manufacturers its stations and the energy meters of its EVSEs will name, see
+[ChargingStationManufacturer](../docs/ChargingStationManufacturer.md) and
+[EnergyMeterManufacturer](../docs/EnergyMeterManufacturer.md). They are registries of the RNO, embedded in the roaming
+network as `chargingStationManufacturers` and `energyMeterManufacturers`; a station or an energy meter can name only a
+manufacturer of the network, so they come with `DE*GEF`:
+
+```csharp
+var manufacturers         = new[] {
+                                RoamingNetworkChange.Add(new ChargingStationManufacturer(
+                                                             stationMakerId,
+                                                             Name:      I18NString.Create(Languages.en, "GraphDefined Charging Stations"),
+                                                             Homepage:  URL.Parse("https://stations.graphdefined.example")
+                                                         )),
+                                RoamingNetworkChange.Add(new EnergyMeterManufacturer(
+                                                             acMeterMakerId,
+                                                             Name:         ImmutableI18NString.Create(Languages.en, "Saale Metering"),
+                                                             Description:  ImmutableI18NString.Create(Languages.en, "Calibrated AC energy meters"),
+                                                             Homepage:     URL.Parse("https://saale-metering.example")
+                                                         )),
+                                RoamingNetworkChange.Add(new EnergyMeterManufacturer(
+                                                             dcMeterMakerId,
+                                                             Name:         ImmutableI18NString.Create(Languages.en, "Kernberg DC Metering"),
+                                                             Description:  ImmutableI18NString.Create(Languages.en, "Calibrated DC energy meters"),
+                                                             Homepage:     URL.Parse("https://kernberg-metering.example")
+                                                         ))
+                            };
+```
+
+`stationMakerId`, `acMeterMakerId` and `dcMeterMakerId` are `GraphDefined`, `SAALE` and `KERNBERG`, fields of
+`ExampleA2` as `gefId` is, for the examples building on this one.
+
 
 ## 2. `DE*GEF` asks to be added
 
-`DE*GEF` makes the change set adding it, for the version of `QA` it checked with `ExampleA1.Validate()`, and signs it
-with each of its identity keys. Every identity key a change enters anew must sign its change set (SPECIFICATION.md,
+`DE*GEF` makes the change set adding it and the manufacturers, for the version of `QA` it checked with
+`ExampleA1.Validate()`, and signs it with each of its identity keys. Every identity key a change enters anew must sign its change set (SPECIFICATION.md,
 section 4.1): without, `OCC` could add `DE*GEF` without it knowing, or anybody the keys of another one.
 
 ```csharp
@@ -104,8 +138,8 @@ if (!RoamingNetwork.TryParse(Helpers.ReadJSON("published/QA.json"), out var chec
     Helpers.Fail(error);
 
 var addGEF                = checkedQA.CreateChangeSet(
-                                [ RoamingNetworkChange.Add(gef) ],
-                                Description:  ImmutableI18NString.Create(Languages.en, "DE*GEF, GraphDefined Charging Solutions")
+                                [ RoamingNetworkChange.Add(gef), .. manufacturers ],
+                                Description:  ImmutableI18NString.Create(Languages.en, "DE*GEF, GraphDefined Charging Solutions, and the manufacturers of its charging stations and energy meters")
                             );
 
 foreach (var identityKey in identityKeys)
@@ -124,13 +158,16 @@ File.WriteAllText("DE-GEF/addGEF.json", addGEF.ToJSON().ToString());
   "@context":         "https://open.charging.cloud/contexts/wwcp/roamingNetwork/changeSet/v3",
   "roamingNetworkId": "QA",
   "createdAt":        "2026-10-22T18:20:55.243Z",
-  "description":      { "en": "DE*GEF, GraphDefined Charging Solutions" },
+  "description":      { "en": "DE*GEF, GraphDefined Charging Solutions, and the manufacturers of its charging stations and energy meters" },
   "signatures": [
     { "algorithm": "ES512", "keyId": "93c7c440…", "value": "AVzksr72…" },
     { "algorithm": "Ed448", "keyId": "a6bb7043…", "value": "Zqi+zQ+N…" }
   ],
   "changes": [
-    { "kind": "Add", "entityType": "ChargingStationOperator", "entityId": "DE*GEF", "newValue": { "@id": "DE*GEF", "name": …, "signingKeys": […], "identityKeys": […], … } }
+    { "kind": "Add", "entityType": "ChargingStationOperator", "entityId": "DE*GEF", "newValue": { "@id": "DE*GEF", "name": …, "signingKeys": […], "identityKeys": […], … } },
+    { "kind": "Add", "entityType": "ChargingStationManufacturer", "entityId": "GraphDefined", "newValue": { "@id": "GraphDefined", "name": { "en": "GraphDefined Charging Stations" }, "homepage": "https://stations.graphdefined.example", … } },
+    { "kind": "Add", "entityType": "EnergyMeterManufacturer", "entityId": "SAALE", "newValue": { "@id": "SAALE", "name": { "en": "Saale Metering" }, … } },
+    { "kind": "Add", "entityType": "EnergyMeterManufacturer", "entityId": "KERNBERG", "newValue": { "@id": "KERNBERG", "name": { "en": "Kernberg DC Metering" }, … } }
   ],
   "beforeETags": [ [ "json", "sha256", "hex", "a19a65c7…" ], [ "cbor", "sha256", "hex", "86b2dd1a…" ] ],
   "afterETags":  [ [ "json", "sha256", "hex", "a8f48589…" ], [ "cbor", "sha256", "hex", "a42bde54…" ] ]
@@ -138,14 +175,14 @@ File.WriteAllText("DE-GEF/addGEF.json", addGEF.ToJSON().ToString());
 ```
 
 The `beforeETags` are those of the version `DE*GEF` checked: the change set applies to it alone. Its own signatures are
-no signatures of an owner: adding a party is the RNO's.
+no signatures of an owner: adding a party is the RNO's, and so are its registries of manufacturers.
 
 
 ## 3. `OCC` adds `DE*GEF`
 
 `OCC` reads what `DE*GEF` sent - the public halves of its keys only, a private key would be refused - and sees what is
 missing (`TryCheckCoSigning`, section 4.2). Who is a member is the RNO's, decided by its quorum: two of its three
-holders.
+holders. So are the manufacturers: each change of the change set needs the quorum.
 
 ```csharp
 if (!RoamingNetworkChangeSet.TryParse(Helpers.ReadJSON("DE-GEF/addGEF.json"), out var addGEFSent, out error))
@@ -175,7 +212,7 @@ File.WriteAllText($"published/{A1.RoamingNetwork.Id}-commit.json",  A1.History.H
 ```
 
 ```
-Sent by DE*GEF, signed by its 2 identity keys; missing: Change 0: Add of the ChargingStationOperator 'DE*GEF' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'!
+Sent by DE*GEF, signed by its 2 identity keys; missing: Change 0: Add of the ChargingStationOperator 'DE*GEF' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'! Change 1: Add of the ChargingStationManufacturer 'GraphDefined' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'! Change 2: Add of the EnergyMeterManufacturer 'SAALE' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'! Change 3: Add of the EnergyMeterManufacturer 'KERNBERG' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'!
 Signed by AlphaOrg alone: Refused, Change 0: Add of the ChargingStationOperator 'DE*GEF' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'!
 Signed by AlphaOrg and BetaOrg: Committed, revision 1, commit 65207f5c029f52d47d991d55fecdc794bd9809fde54acbaa554fe5e74d7db9bf
 ```
@@ -189,8 +226,9 @@ signatures, by the two identity keys of `DE*GEF` (`93c7c440…`, `a6bb7043…`) 
 
 ## 4. Checking, as `DE*GEF`, that `QA` names it with its keys
 
-`ExampleA2.Validate()` checks `QA` as everybody does, `ExampleA1.Validate()` now at revision 1, and then that it names
-`DE*GEF` with exactly the keys it sent, from what is published and its own `operator.json` only:
+`ExampleA2.Validate()` checks `QA` as everybody does, `ExampleA1.Validate()` now at revision 1, then that it names
+`DE*GEF` with exactly the keys it sent, from what is published and its own `operator.json` only, and shows the
+manufacturers:
 
 ```csharp
 ExampleA1.Validate();
@@ -225,6 +263,10 @@ DE*GEF is a member of QA with its keys:
   signing key  fa82f75c5b73b6acffc9c25d7292644f755af866031ab5ac6e13ca21f8427c75 for priceStatements, tariffs
   identity key 93c7c4407a0a96f7dcb6cfc500b2628a0cc92c05029cf845cba603de83754f58
   identity key a6bb704342b3615bc54e8cd377483b22befef538bfe242e7e8d1ee75e7a2ae85
+
+Charging station manufacturer GraphDefined: GraphDefined Charging Stations
+Energy meter manufacturer     KERNBERG: Kernberg DC Metering
+Energy meter manufacturer     SAALE: Saale Metering
 ```
 
 `ExampleA2.Run(a1)` returns the private keys of `DE*GEF`, its identity keys and its signing keys by usage, for the
@@ -292,6 +334,24 @@ curl -X POST http://127.0.0.1:2356/poi/RNs/QA/history/changeSets/pending/{change
 `{ "status": "committed", "commitId": "…", … }`: `DE*GEF` is a member. A grid operator not taking part comes without
 keys; it is committed at once, `201` with the commit.
 
+### The manufacturers
+
+The hub adds the party alone, and the manufacturers on their own, before or after it, each with a change set it signs as
+the RNO, committed at once: so on a hub they are commits of their own, and the revisions of the examples after this one
+are three higher. At the prompt or over SSH:
+
+```
+RoamingHub> roamingNetworks QA add chargingStationManufacturer GraphDefined homepage https://stations.graphdefined.example GraphDefined Charging Stations
+The ChargingStationManufacturer 'GraphDefined' was added to the roaming network 'QA', at revision 1, commit a77d56ee…. Charging stations and energy meters may name it now.
+RoamingHub> roamingNetworks QA add energyMeterManufacturer SAALE homepage https://saale-metering.example Saale Metering
+RoamingHub> roamingNetworks QA add energyMeterManufacturer KERNBERG homepage https://kernberg-metering.example Kernberg DC Metering
+```
+
+In the web interface: **Points of interest**, the card **New manufacturer of a roaming network**, *Manufacturer of*
+`Charging station manufacturer` or `Energy meter manufacturer`, then **Add the manufacturer**. Over HTTP, `POST
+/api/v1/poi/RNs/QA/CSMs` and `…/EMMs` with the manufacturer as POI writes it, `201` with the commit; the same one again
+is `409`. The POI API lists them at `GET /poi/RNs/QA/CSMs` and `GET /poi/RNs/QA/EMMs`.
+
 ### What is refused
 
 Nothing is committed then, and the answer says why:
@@ -312,8 +372,8 @@ E-mobility providers, grid operators and parking operators are added the same wa
 
 ## Next
 
-- [Example A3](exampleA3.md): `DE*GEF` adds its templates, two charging pools of a DC and an AC station each, and their
-  groups, with change sets it signs with its `infrastructure` key.
+- [Example A3](exampleA3.md): `DE*GEF` adds its templates, two charging pools of a DC and an AC station each, every EVSE
+  with its energy meter, and their groups, with change sets it signs with its `infrastructure` key.
 - Its keys replaced: a change of `signingKeys` signed by one of its signing keys that may sign for the `party`, or by an
   identity key; a new identity key signs its change as well, see
   [ChargingStationOperator](../docs/ChargingStationOperator.md).

@@ -115,6 +115,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///     out, which ~/RNs/{RN_Id}/EMPs/{EMP_Id}/{EVSEGs|CSGs|CPGs|CTOs} list, each of them below it, e.g. …/CTOs/{CTO_Id}
     /// GET ~/RNs/{RN_Id}/CSMs                                                     its charging station manufacturers, in short
     /// GET ~/RNs/{RN_Id}/CSMs/{CSM_Id}                                            a charging station manufacturer
+    /// GET ~/RNs/{RN_Id}/EMMs                                                     its energy meter manufacturers, in short
+    /// GET ~/RNs/{RN_Id}/EMMs/{EMM_Id}                                            an energy meter manufacturer
     /// GET ~/RNs/{RN_Id}/POs                                                      its parking operators, in short
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}                                              a parking operator;
     ///     ?without=parkingGarages,parkingSpaces,parkingSpaceTemplates,parkingSpaceGroups,parkingSensors,parkingProducts,
@@ -189,7 +191,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// What a roaming network may leave out: what it holds, each of them with a list of its own.
         /// </summary>
-        private static readonly String[]     RoamingNetworkOmittables = [ "chargingStationManufacturers", "chargingStationOperators", "eMobilityProviders", "gridOperators", "parkingOperators" ];
+        private static readonly String[]     RoamingNetworkOmittables = [ "chargingStationManufacturers", "chargingStationOperators", "eMobilityProviders", "energyMeterManufacturers", "gridOperators", "parkingOperators" ];
 
         /// <summary>
         /// The view of a collection as a list of its children as their parent embeds them.
@@ -268,12 +270,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region ~/RNs/{RN_Id}/CSOs, GOs, EMPs, CSMs, POs
+            #region ~/RNs/{RN_Id}/CSOs, GOs, EMPs, CSMs, EMMs, POs
 
             AddListHandlers(roamingNetworkPath, "CSOs",  roamingNetwork => roamingNetwork.ChargingStationOperators,      EntitySummaries);
             AddListHandlers(roamingNetworkPath, "GOs",   roamingNetwork => roamingNetwork.GridOperators,                 EntitySummaries);
             AddListHandlers(roamingNetworkPath, "EMPs",  roamingNetwork => roamingNetwork.EMobilityProviders,            EntitySummaries);
             AddListHandlers(roamingNetworkPath, "CSMs",  roamingNetwork => roamingNetwork.ChargingStationManufacturers,  EntitySummaries);
+            AddListHandlers(roamingNetworkPath, "EMMs",  roamingNetwork => roamingNetwork.EnergyMeterManufacturers,      EntitySummaries);
             AddListHandlers(roamingNetworkPath, "POs",   roamingNetwork => roamingNetwork.ParkingOperators,              EntitySummaries);
 
             #endregion
@@ -1029,6 +1032,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   return roamingNetwork.TryGetChargingStationManufacturerById(chargingStationManufacturerId, out var chargingStationManufacturer)
                                              ? CachedEntityResponse(request, chargingStationManufacturer, () => chargingStationManufacturer.ToJSON(Embedded: true))
                                              : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The charging station manufacturer '{chargingStationManufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+
+                              });
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/EMMs/{EMM_Id}
+
+            AddEntityHandlers(roamingNetworkPath + "/EMMs/{energyMeterManufacturerId}",
+                              request => {
+
+                                  if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
+                                      return errorResponse;
+
+                                  if (!EnergyMeterManufacturer_Id.TryParse(request.ParsedURLParameters[1], out var energyMeterManufacturerId))
+                                      return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid energy meter manufacturer identification!");
+
+                                  return roamingNetwork.TryGetEnergyMeterManufacturerById(energyMeterManufacturerId, out var energyMeterManufacturer)
+                                             ? CachedEntityResponse(request, energyMeterManufacturer, () => energyMeterManufacturer.ToJSON(Embedded: true))
+                                             : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The energy meter manufacturer '{energyMeterManufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
 
                               });
 

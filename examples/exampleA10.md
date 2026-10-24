@@ -61,9 +61,9 @@ var statements = A1.History.PriceStatementsOf(EVSEId);
 
 The proof gives completely: the roaming network with `OCC`, its key statement and the certificates of its signing keys;
 the skeleton of `DE*GEF` with its keys; the pool, the station and its EVSEs as they are at runtime, the properties of
-their templates taken in; and the charging tariffs the EVSEs take. Every other child array is pruned to its Merkle root.
-`QA` has no energy meters yet; the proof would give theirs, with the public keys the signed meter values of a session are
-checked with.
+their templates taken in, each EVSE with its energy meter and the public key it signs its measurements with; the
+manufacturer of the station and of the meters of the station, `GraphDefined` and `KERNBERG`; and the charging tariffs the
+EVSEs take. Every other child array is pruned to its Merkle root, also `SAALE`, which no meter of the station names.
 
 b) The app checks them offline as charging begins, against the trust anchor it scanned: the proof attested by the
 signing keys of two holders of `OCC` at least, each certified by a trusted identity key of its holder; each statement
@@ -76,17 +76,21 @@ foreach (var given in statements)
         Helpers.Fail(error);
 ```
 
-It shows the names of the verified proof, not those of the trust anchor (section 8.6), and the price: the charging
-tariff the EVSE takes, from its EVSE template, and the price the statement sets for it.
+It shows the names of the verified proof, not those of the trust anchor (section 8.6), the station and the energy meter
+of the EVSE with their manufacturers, and the price: the charging tariff the EVSE takes, from its EVSE template, and the
+price the statement sets for it.
 
 ```
 The app, at DE*GEF*E1*1: Quality Assurance of Open Charging Cloud, revision 12
+DE*GEF*S1: GraphDefined Charging Stations GD-DC300
+DE*GEF*M1*1, the energy meter of DE*GEF*E1*1: Kernberg DC Metering KDM-500, serial DCM-2026-001-1, OCMF, secp256r1 key 0cc14973…
 DE*GEF*E1*1, 150 kW: DE*GEF*T_DC 0.69 €/kWh, by the price statement 0.65 €/kWh
-Kept: driver/evidence-DE_GEF_E1_1.json, 27 KiB
+Kept: driver/evidence-DE_GEF_E1_1.json, 31 KiB
 ```
 
 c) It keeps the trust anchor, the EVSE, when charging began, the proof and the statements. When the session ends, the
-energy is the one of the signed meter values, not part of this example.
+energy is the one of the meter values `DE*GEF*M1*1` signed, in OCMF: a transparency software checks them with the key
+the proof gives, not part of this example.
 
 
 ## 3. A week later: a commit, checkpoint 5, its witnesses
@@ -122,7 +126,7 @@ if (!A1.History.TryGetPriceStatementProof(checkpoint5.Id, statement.Digest, out 
 ```
 
 ```
-Completed: driver/evidence-DE_GEF_E1_1.json, 36 KiB: the proof of revision 12 in checkpoint 4, of the statement in checkpoint 5, and both checkpoints
+Completed: driver/evidence-DE_GEF_E1_1.json, 40 KiB: the proof of revision 12 in checkpoint 4, of the statement in checkpoint 5, and both checkpoints
 ```
 
 What the file holds, as JSON, in bytes:
@@ -131,7 +135,7 @@ What the file holds, as JSON, in bytes:
 |---|---|---|
 | `trustAnchor` | 0.5 K | the QR code of `QA` |
 | `EVSEId`, `chargingStarted` | | the session |
-| `chargingStationProof` | 19.7 K | with its 3 attestations, one of each holder of `OCC` |
+| `chargingStationProof` | 21.6 K | with the energy meters of the station and their manufacturer, and its 3 attestations, one of each holder of `OCC` |
 | `priceStatements` | 0.9 K | the statement of the EVSE |
 | `commitProof` | 0.6 K | revision 12 in checkpoint 4 |
 | `priceStatementProofs` | 1.0 K | the statement in checkpoint 5 |
@@ -164,17 +168,20 @@ d) The statement was made after checkpoint 4, which it names, and before checkpo
 checkpoint 4. The witnesses checked it with checkpoint 5: no other statement of its sequence was shown to them, and it
 was not made afterwards.
 
-e) What applied: the tariff of the EVSE as the proof gives it, and the price the statement set for it.
+e) What applied: the station and the energy meter of the EVSE, with the key the signed meter values of the session are
+checked with, the tariff of the EVSE as the proof gives it, and the price the statement set for it.
 
 ```
 Checkpoint 4: revision 12, signed by AlphaOrg, BetaOrg, GammaOrg, witnessed by calibration.example, association.example
 Checkpoint 5: revision 13, signed by AlphaOrg, BetaOrg, GammaOrg, witnessed by calibration.example, association.example
 
-At 2026-10-24T03:28:04.990Z, when charging began: the station proof attested, the price statement valid
-2027-01-22T03:28:04.990Z, by its attestations alone: Valid attestations of trusted keys of 0 holders attest the root effectiveTree:sha256:hex:1af918ed… of the proof, not of 2!
+At 2026-10-24T04:06:58.083Z, when charging began: the station proof attested, the price statement valid
+2027-01-22T04:06:58.083Z, by its attestations alone: Valid attestations of trusted keys of 0 holders attest the root effectiveTree:sha256:hex:f6ab8661… of the proof, not of 2!
 Revision 12, the version of the station proof: in checkpoint 4, witnessed
 The price statement, sequence 2: after checkpoint 4, before checkpoint 5, witnessed
 
+DE*GEF*S1: GraphDefined Charging Stations GD-DC300
+DE*GEF*M1*1, the energy meter of DE*GEF*E1*1: Kernberg DC Metering KDM-500, serial DCM-2026-001-1, OCMF, secp256r1 key 0cc14973…
 DE*GEF*E1*1, 150 kW: DE*GEF*T_DC 0.69 €/kWh, by the price statement 0.65 €/kWh
 ```
 
@@ -185,12 +192,14 @@ The DC tariff of `QA` is 0.72 €/kWh by now; the evidence shows the 0.65 €/kW
 
 a) A statement of another price: its signature is not the one of its content. b) A session claimed to have begun an hour
 earlier, before the statement was valid. c) A station proof of another power: it leads to another root than the commit
-of checkpoint 4. d) Checkpoint 5 as it was before its witnesses signed it.
+of checkpoint 4. d) A station proof naming the key of another energy meter, e.g. to pass off meter values signed
+elsewhere: another root as well. e) Checkpoint 5 as it was before its witnesses signed it.
 
 ```
 A statement of another price: The signature of the price statement is invalid: The signature is invalid!
-Charging begun an hour earlier: The price statement is not valid at 2026-10-24T02:28:04.990Z: it is valid from 2026-10-24T03:28:04.947Z until 2026-10-24T04:28:04.947Z!
-A station proof of 300 kW: The proof leads to effectiveTree:sha256:hex:5c67aff9…, not to effectiveTree:sha256:hex:1af918ed…!
+Charging begun an hour earlier: The price statement is not valid at 2026-10-24T03:06:58.083Z: it is valid from 2026-10-24T04:06:58.034Z until 2026-10-24T05:06:58.034Z!
+A station proof of 300 kW: The proof leads to effectiveTree:sha256:hex:3e4b7de5…, not to effectiveTree:sha256:hex:f6ab8661…!
+A station proof naming another meter key: The proof leads to effectiveTree:sha256:hex:8ecc6ce4…, not to effectiveTree:sha256:hex:f6ab8661…!
 Checkpoint 5 without its witnesses: witnessed by 0 of 2
 ```
 
@@ -202,5 +211,6 @@ Checkpoint 5 without its witnesses: witnessed by 0 of 2
   the version of checkpoint 5 as well, e.g. by a proof of `OCC` in that version.
 - The app trusts the witnesses by configuration, as the verifier of [example A6](exampleA6.md). A signed list of them
   is open, as the trust lists of operators and their identity keys section 8.8 leaves open.
-- The energy charged is the one of the signed meter values of the session, checked with the public keys of the energy
-  meter the station proof gives. `QA` has no energy meters yet.
+- The energy charged is the one of the signed meter values of the session, checked with the public key of the energy
+  meter the station proof gives; the meter values, and the transparency software checking them, are not part of this
+  example. `QA` names no transparency software for its meters yet (`transparencySoftwareStatus`).

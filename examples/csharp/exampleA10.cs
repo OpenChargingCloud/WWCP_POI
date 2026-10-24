@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Security.Cryptography;
 
 using Newtonsoft.Json.Linq;
 
@@ -88,9 +89,11 @@ public static class ExampleA10
                 Helpers.Fail(error);
 
         Console.WriteLine($"The app, at {EVSEId}: {proof.RoamingNetworkName.FirstText()} of {proof.RoamingNetworkOperatorName.FirstText()}, revision {proof.Revision}{(proof.TrustAnchorTextMismatch(anchor) is String mismatch ? $", {mismatch}" : "")}");
+        ShowStation(proof);
         ShowPrice(proof, statements);
 
-        // c) It keeps them, with when charging began; the energy is the one of the signed meter values, not of this example.
+        // c) It keeps them, with when charging began; the energy is the one of the meter values the energy meter signs, which
+        //    a transparency software checks with its public key, not of this example.
         File.WriteAllText(Evidence, new JObject(
                                         new JProperty("trustAnchor",           anchor.ToQRCode()),
                                         new JProperty("EVSEId",                EVSEId.ToString()),
@@ -261,7 +264,8 @@ public static class ExampleA10
         Console.WriteLine($"The price statement, sequence {statement.Sequence}: after checkpoint {afterCheckpoint.Sequence}, before checkpoint {statementCheckpoint.Sequence}, witnessed");
         Console.WriteLine();
 
-        // e) What applied.
+        // e) What applied: at this charging station, its energy meter signing with this key, this price.
+        ShowStation(proof);
         ShowPrice(proof, statements);
         Console.WriteLine();
 
@@ -285,7 +289,18 @@ public static class ExampleA10
 
         Console.WriteLine($"A station proof of 300 kW: {(RoamingNetworkProof.TryParse(other, out var otherProof, out error) && otherProof.Verify(commitProof.ETags.Single(eTag => eTag.Format == ETagFormat.EffectiveTree && eTag.HashAlgorithm == otherProof.HashAlgorithm), out error) ? "valid" : error)}");
 
-        // d) Checkpoint 5 as it was before its witnesses signed it.
+        // d) A station proof naming the key of another energy meter, e.g. of meter values signed elsewhere: another root.
+        using var otherMeter = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+
+        var otherKey    = otherMeter.ExportSubjectPublicKeyInfo();
+        var anotherKey  = (JObject) evidence["chargingStationProof"]!.DeepClone();
+        var key         = anotherKey.SelectTokens("$..EVSEs[?(@['@id'] == 'DE*GEF*E1*1')].energyMeter.publicKeys[0]").Cast<JObject>().Single();
+        key["@id"]      = Convert.ToHexStringLower(SHA256.HashData(otherKey));
+        key["key"]      = Convert.ToBase64String(otherKey);
+
+        Console.WriteLine($"A station proof naming another meter key: {(RoamingNetworkProof.TryParse(anotherKey, out otherProof, out error) && otherProof.Verify(commitProof.ETags.Single(eTag => eTag.Format == ETagFormat.EffectiveTree && eTag.HashAlgorithm == otherProof.HashAlgorithm), out error) ? "valid" : error)}");
+
+        // e) Checkpoint 5 as it was before its witnesses signed it.
         var unwitnessed = (JObject) evidence["checkpoints"]![1]!.DeepClone();
 
         foreach (var signature in ((JArray) unwitnessed["signatures"]!).Where(signature => signature["role"]?.Value<String>() == RoamingNetworkCommitSignatureRoles.Witness).ToArray())
@@ -299,6 +314,26 @@ public static class ExampleA10
 
 
     #region Helpers
+
+    // The charging station of the EVSE and the energy meter of the EVSE as the proof gives them, with their manufacturers:
+    // the station a driver sees, and the key the signed meter values of the session are checked with.
+    private static void ShowStation(RoamingNetworkProof Proof)
+    {
+
+        var gef      = Proof.Given(RoamingNetwork.PropertyKeys.ChargingStationOperators).Single(json => json["@id"]?.Value<String>() == ExampleA2.gefId.ToString());
+        var station  = Proof.GivenBelow(gef, ChargingStationOperator.PropertyKeys.ChargingPools, ChargingPool.PropertyKeys.ChargingStations).Single(json => json[ChargingStation.PropertyKeys.EVSEs]?.Any(evse => evse["@id"]?.Value<String>() == EVSEId.ToString()) == true);
+        var meter    = (JObject) station[ChargingStation.PropertyKeys.EVSEs]!.Single(evse => evse["@id"]?.Value<String>() == EVSEId.ToString())["energyMeter"]!;
+
+        String NameOf(String ChildArray, JToken? Id)
+            => Proof.Given(ChildArray).SingleOrDefault(json => json["@id"]?.Value<String>() == Id?.Value<String>())?["name"]?["en"]?.Value<String>() ?? "an unknown manufacturer";
+
+        if (!EnergyMeterPublicKey.TryParse((JObject) meter["publicKeys"]![0]!, out var publicKey, out var error))
+            Helpers.Fail(error);
+
+        Console.WriteLine($"{station["@id"]}: {NameOf(RoamingNetwork.PropertyKeys.ChargingStationManufacturers, station["manufacturerId"])} {station["modelId"]}");
+        Console.WriteLine($"{meter["@id"]}, the energy meter of {EVSEId}: {NameOf(RoamingNetwork.PropertyKeys.EnergyMeterManufacturers, meter["manufacturerId"])} {meter["modelId"]}, serial {meter["serialNumber"]}, {String.Join(", ", meter["signatureMethods"]!.Values<String>())}, {publicKey.Algorithm} key {publicKey.Id[..8]}…");
+
+    }
 
     // The charging tariffs the EVSE takes as the proof gives them, and the price the statements set for each.
     private static void ShowPrice(RoamingNetworkProof Proof, IEnumerable<RoamingNetworkPriceStatement> Statements)

@@ -45,8 +45,8 @@ public static class ExampleA4
 
         // As in A3: pool n has the DC station 2n-1 and the AC station 2n, two EVSEs each. Their AC stations take the AC
         // template, 44 kW, and their EVSEs 22 kW each, as in A3: wrong, they have two EVSEs of 11 kW, 22 kW together.
-        Commit(A1, A2, "Jena Lobeda, a DC and an AC station",   RoamingNetworkChange.Add(Pool(3, "Jena Lobeda",   50.8858, 11.6157, ACkW: 22)));
-        Commit(A1, A2, "Jena Winzerla, a DC and an AC station", RoamingNetworkChange.Add(Pool(4, "Jena Winzerla", 50.9105, 11.5555, ACkW: 22)));
+        Commit(A1, A2, "Jena Lobeda, a DC and an AC station",   RoamingNetworkChange.Add(ExampleA3.Pool(3, "Jena Lobeda",   50.8858, 11.6157, ACkW: 22)));
+        Commit(A1, A2, "Jena Winzerla, a DC and an AC station", RoamingNetworkChange.Add(ExampleA3.Pool(4, "Jena Winzerla", 50.9105, 11.5555, ACkW: 22)));
 
         // A commit after the latest checkpoint is part of none yet: there is no proof of it.
         if (A1.History.TryGetCommitProof(A1.History.Head.Commit.Id, out _, out var notYet))
@@ -206,30 +206,6 @@ public static class ExampleA4
             Helpers.Fail(result.ErrorResponse ?? result.Status.ToString());
 
         Console.WriteLine($"{result.Status}, revision {result.Commit?.Revision}: {Description}");
-
-    }
-
-    // Pool n of DE*GEF, as in A3: the DC station 2n-1, two EVSEs of 150 kW, and the AC station 2n, two EVSEs of the given
-    // power; the EVSEs of station s are DE*GEF*E{s}*1 and DE*GEF*E{s}*2.
-    internal static ChargingPool Pool(Int32 N, String Name, Double Latitude, Double Longitude, Int32 ACkW)
-    {
-
-        static ChargingStation Station(Int32 S, CurrentTypes CurrentTypes, Int32 kW, String Kind)
-
-            => new (ChargingStation_Id.Parse($"DE*GEF*S{S}"),
-                    TemplateIds:  [ ChargingStationTemplate_Id.Parse($"DE*GEF*ST_{Kind}") ],
-                    EVSEs: [
-                        new EVSE(EVSE_Id.Parse($"DE*GEF*E{S}*1"), CurrentTypes: CurrentTypes, MaxPower: Watt.FromKW(kW), TemplateIds: [ EVSETemplate_Id.Parse($"DE*GEF*ET_{Kind}") ]),
-                        new EVSE(EVSE_Id.Parse($"DE*GEF*E{S}*2"), CurrentTypes: CurrentTypes, MaxPower: Watt.FromKW(kW), TemplateIds: [ EVSETemplate_Id.Parse($"DE*GEF*ET_{Kind}") ])
-                    ]);
-
-        return new (ChargingPool_Id.Parse($"DE*GEF*P{N}"),
-                    Name:              I18NString.Create(Languages.en, Name),
-                    GeoLocation:       GeoCoordinate.Parse(Latitude, Longitude),
-                    ChargingStations:  [
-                        Station(2 * N - 1, CurrentTypes.DC,             150,  "DC"),
-                        Station(2 * N,     CurrentTypes.AC_ThreePhases, ACkW, "AC")
-                    ]);
 
     }
 

@@ -19,7 +19,7 @@ e.g. `ACME` or `METERS`. It is unique within the roaming network.
 | Status | `EnergyMeterManufacturerStatusType`, initially `available` |
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `energyMeterManufacturers` |
 | Owner | the RNO (signing keys of the roaming network) |
-| HTTP | none of its own: as part of its roaming network, `GET ~/RNs/{RN_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/EMMs/{EMM_Id}`, listed by `GET ~/RNs/{RN_Id}/EMMs` |
 
 
 ## Common properties

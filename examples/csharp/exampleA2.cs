@@ -1,4 +1,5 @@
 ﻿using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 using cloud.charging.open.protocols.WWCP.POI;
 
@@ -6,9 +7,13 @@ using cloud.charging.open.protocols.WWCP.POI;
 public static class ExampleA2
 {
 
-    // The roaming network "QA" of example A1 gets its first party: the charging station operator "DE*GEF".
+    // The roaming network "QA" of example A1 gets its first party: the charging station operator "DE*GEF", and with it the
+    // manufacturers of its charging stations and of their energy meters.
 
-    public static readonly ChargingStationOperator_Id gefId = ChargingStationOperator_Id.Parse("DE*GEF");
+    public static readonly ChargingStationOperator_Id      gefId           = ChargingStationOperator_Id.Parse("DE*GEF");
+    public static readonly ChargingStationManufacturer_Id  stationMakerId  = ChargingStationManufacturer_Id.Parse("GraphDefined");
+    public static readonly EnergyMeterManufacturer_Id      acMeterMakerId  = EnergyMeterManufacturer_Id.Parse("SAALE");
+    public static readonly EnergyMeterManufacturer_Id      dcMeterMakerId  = EnergyMeterManufacturer_Id.Parse("KERNBERG");
 
 
     /// <summary>
@@ -63,19 +68,42 @@ public static class ExampleA2
 
         File.WriteAllText("DE-GEF/operator.json", gef.ToJSON().ToString());
 
+        // The manufacturers of its charging stations and of the energy meters of its EVSEs, which QA does not know yet: its
+        // stations and meters will name them. They are a registry of the roaming network operator, which decides on them
+        // together with DE*GEF.
+        var manufacturers         = new[] {
+                                        RoamingNetworkChange.Add(new ChargingStationManufacturer(
+                                                                     stationMakerId,
+                                                                     Name:      I18NString.Create(Languages.en, "GraphDefined Charging Stations"),
+                                                                     Homepage:  URL.Parse("https://stations.graphdefined.example")
+                                                                 )),
+                                        RoamingNetworkChange.Add(new EnergyMeterManufacturer(
+                                                                     acMeterMakerId,
+                                                                     Name:         ImmutableI18NString.Create(Languages.en, "Saale Metering"),
+                                                                     Description:  ImmutableI18NString.Create(Languages.en, "Calibrated AC energy meters"),
+                                                                     Homepage:     URL.Parse("https://saale-metering.example")
+                                                                 )),
+                                        RoamingNetworkChange.Add(new EnergyMeterManufacturer(
+                                                                     dcMeterMakerId,
+                                                                     Name:         ImmutableI18NString.Create(Languages.en, "Kernberg DC Metering"),
+                                                                     Description:  ImmutableI18NString.Create(Languages.en, "Calibrated DC energy meters"),
+                                                                     Homepage:     URL.Parse("https://kernberg-metering.example")
+                                                                 ))
+                                    };
+
         #endregion
 
         #region 2. DE*GEF asks to be added to QA
 
-        // DE*GEF makes the change set adding it, for the version of QA it checked (ExampleA1.Validate), and signs it with
-        // each of its identity keys: the proof that it holds them, and that it asks for it. Without, OCC could add DE*GEF
-        // without it knowing, or anybody the keys of another one.
+        // DE*GEF makes the change set adding it and its manufacturers, for the version of QA it checked
+        // (ExampleA1.Validate), and signs it with each of its identity keys: the proof that it holds them, and that it asks
+        // for it. Without, OCC could add DE*GEF without it knowing, or anybody the keys of another one.
         if (!RoamingNetwork.TryParse(Helpers.ReadJSON("published/QA.json"), out var checkedQA, out var error))
             Helpers.Fail(error);
 
         var addGEF                = checkedQA.CreateChangeSet(
-                                        [ RoamingNetworkChange.Add(gef) ],
-                                        Description:  ImmutableI18NString.Create(Languages.en, "DE*GEF, GraphDefined Charging Solutions")
+                                        [ RoamingNetworkChange.Add(gef), .. manufacturers ],
+                                        Description:  ImmutableI18NString.Create(Languages.en, "DE*GEF, GraphDefined Charging Solutions, and the manufacturers of its charging stations and energy meters")
                                     );
 
         foreach (var identityKey in identityKeys)
@@ -93,7 +121,8 @@ public static class ExampleA2
         if (!RoamingNetworkChangeSet.TryParse(Helpers.ReadJSON("DE-GEF/addGEF.json"), out var addGEFSent, out error))
             Helpers.Fail(error);
 
-        // Who is a member is the roaming network operator's, decided by its quorum: two of its three holders.
+        // Who is a member is the roaming network operator's, decided by its quorum: two of its three holders; so are its
+        // registries of manufacturers.
         if (!A1.RoamingNetwork.TryCheckCoSigning(addGEFSent, out var missing, out _, out error))
             Helpers.Fail(error);
 
@@ -174,6 +203,15 @@ public static class ExampleA2
 
         foreach (var key in gef.IdentityKeys)
             Console.WriteLine($"  identity key {key.Id}");
+
+        // c) The manufacturers its stations and meters will name.
+        Console.WriteLine();
+
+        foreach (var manufacturer in qa.ChargingStationManufacturers)
+            Console.WriteLine($"Charging station manufacturer {manufacturer.Id}: {manufacturer.Name.FirstText()}");
+
+        foreach (var manufacturer in qa.EnergyMeterManufacturers)
+            Console.WriteLine($"Energy meter manufacturer     {manufacturer.Id}: {manufacturer.Name.FirstText()}");
 
         #endregion
 

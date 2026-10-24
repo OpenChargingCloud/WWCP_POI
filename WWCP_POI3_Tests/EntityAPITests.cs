@@ -64,6 +64,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
         private const String GC   = GO  + "/GCPs/connection-42";
         private const String EM   = RN  + "/EMPs/DE*EMP";
         private const String CM   = RN  + "/CSMs/ACME";
+        private const String MM   = RN  + "/EMMs/METERS";
         private const String PO   = RN  + "/POs/DE*PAR";
 
         private HTTPServer?             httpServer;
@@ -123,6 +124,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                     ChargingStationManufacturers:  [ new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("ACME"),
                                                                                      I18NString.Create(Languages.en, "ACME Chargers"),
                                                                                      Created: Created) ],
+                    EnergyMeterManufacturers:  [ new EnergyMeterManufacturer(EnergyMeterManufacturer_Id.Parse("METERS"),
+                                                                             ImmutableI18NString.Create(Languages.en, "Example Meters"),
+                                                                             Created: Created) ],
                     ParkingOperators:          [ new ParkingOperator(ParkingOperator_Id.Parse("DE*PAR"),
                                                                      Created:        Created,
                                                                      ParkingSpaces:  [ new ParkingSpace(ParkingSpace_Id.Parse("space-1"), Created: Created) ]) ],
@@ -241,6 +245,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                            (GC,  "connection-42"),
                                            (EM,  "DE*EMP"),
                                            (CM,  "ACME"),
+                                           (MM,  "METERS"),
                                            (PO,  "DE*PAR")
                                        })
             {
@@ -328,6 +333,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                             (RN + "/GOs",   new[] { "DE*NE2", "DE*NET" }),
                                             (RN + "/EMPs",  new[] { "DE*EMP" }),
                                             (RN + "/CSMs",  new[] { "ACME" }),
+                                            (RN + "/EMMs",  new[] { "METERS" }),
                                             (RN + "/POs",   new[] { "DE*PAR" })
                                         })
             {
@@ -834,6 +840,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                                      GO  + "/GCPs/connection-43",
                                      RN  + "/EMPs/DE*XYZ",
                                      RN  + "/CSMs/ZAP",
+                                     RN  + "/EMMs/ZAP",
                                      RN  + "/POs/DE*XYZ"
                                  })
             {
