@@ -207,7 +207,9 @@ Checkpoint 0 of epoch 2 holds runtime status: False
 ## Limits
 
 - The runtime status is as trustworthy as the server telling it and the operator setting it: it is neither signed nor
-  provable later. What has to be provable, the price that applied, is a price statement ([example A8](exampleA8.md)).
+  provable later. What has to be provable, the price that applied, is a price statement ([example A8](exampleA8.md));
+  signed statements of the status, e.g. of the availability of a station, are open
+  ([SPECIFICATION.md](../SPECIFICATION.md), section 8.8, point 4, and section 12.6, point 3).
 - The mirror takes no price statements: those of epoch 1 that `OCC` took along into epoch 2 (section 11.4) are signed
   with ES256, not with an algorithm of epoch 2, and a peer starting in epoch 2 refuses them. How a peer takes them is
   open.
