@@ -162,6 +162,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    EMobilityProvider        eMobilityProvider        => Of(eMobilityProvider,        Format),
                    GridOperator             gridOperator             => Of(gridOperator,             Format),
                    ParkingOperator          parkingOperator          => Of(parkingOperator,          Format),
+                   TransparencySoftwareManufacturer  transparencySoftwareManufacturer  => Of(transparencySoftwareManufacturer, Format),
                    ChargingPool             chargingPool             => Of(chargingPool,             Format),
                    ChargingStation          chargingStation          => Of(chargingStation,          Format),
                    _                                                 => null
@@ -198,7 +199,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                      Array(RoamingNetwork.PropertyKeys.GridOperators,                     RoamingNetwork.GridOperators,                    party => () => Of(party, Format)),
                      Array(RoamingNetwork.PropertyKeys.ParkingOperators,                  RoamingNetwork.ParkingOperators,                 party => () => Of(party, Format)),
                      Array(RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          RoamingNetwork.EnergyMeterManufacturers,         value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)),
-                     Array(RoamingNetwork.PropertyKeys.TransparencySoftware,              RoamingNetwork.TransparencySoftware,             value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)),
+                     Array(RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers, RoamingNetwork.TransparencySoftwareManufacturers, party => () => Of(party, Format)),
                      Array(RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates,  RoamingNetwork.TransparencySoftwareCertificates,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
 
                    Format));
@@ -271,6 +272,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    [ Array(GridOperator.PropertyKeys.GridConnectionPoints,  GridOperator.GridConnectionPoints,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)),
                      Array(GridOperator.PropertyKeys.EnergyMeterTemplates,  GridOperator.EnergyMeterTemplates,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)),
                      Array(GridOperator.PropertyKeys.EnergyMeterGroups,     GridOperator.EnergyMeterGroups,     value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
+
+                   Format));
+
+        #endregion
+
+        #region (private) Of(TransparencySoftwareManufacturer, Format)
+
+        private static Representation Of(TransparencySoftwareManufacturer  TransparencySoftwareManufacturer,
+                                         ETagFormat                        Format)
+
+            => Kept(TransparencySoftwareManufacturer, Format, () => Compose(
+
+                   TransparencySoftwareManufacturer.ToJSON(Embedded: true, IncludeChildArrays: false),
+
+                   [ Array(TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware,  TransparencySoftwareManufacturer.TransparencySoftware,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
 
                    Format));
 

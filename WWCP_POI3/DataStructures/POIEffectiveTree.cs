@@ -140,8 +140,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 RoamingNetwork.PropertyKeys.GridOperators,
                 RoamingNetwork.PropertyKeys.ParkingOperators,
                 RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,
-                RoamingNetwork.PropertyKeys.TransparencySoftware,
+                RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers,
                 RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates ] },
+
+            { RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers,
+              [ TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware ] },
 
             { RoamingNetwork.PropertyKeys.ChargingStationOperators,
               [ ChargingStationOperator.PropertyKeys.ChargingPools,

@@ -92,6 +92,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public static POIPartyId Party(ParkingOperator_Id OperatorId)
             => new (nameof(ParkingOperator), OperatorId.ToString());
 
+        /// <summary>
+        /// A transparency software manufacturer.
+        /// </summary>
+        public static POIPartyId Party(TransparencySoftwareManufacturer_Id ManufacturerId)
+            => new (nameof(TransparencySoftwareManufacturer), ManufacturerId.ToString());
+
         #endregion
 
         #region Key(Party, Kind)
@@ -184,7 +190,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             foreach (var (array, type) in new[] { ("chargingStationOperators", nameof(ChargingStationOperator)),
                                                   ("eMobilityProviders",       nameof(EMobilityProvider)),
                                                   ("gridOperators",            nameof(GridOperator)),
-                                                  ("parkingOperators",         nameof(ParkingOperator)) })
+                                                  ("parkingOperators",         nameof(ParkingOperator)),
+                                                  ("transparencySoftwareManufacturers", nameof(TransparencySoftwareManufacturer)) })
                 foreach (var party in (json[array] as JArray ?? []).OfType<JObject>())
                     WithKeys(party, new POIPartyId(type, party["@id"]!.Value<String>()!));
 
@@ -232,6 +239,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public static ParkingOperator WithKeys(this ParkingOperator Operator)
 
             => ParkingOperator.TryParse(WithKeys(Operator.ToJSON(), new POIPartyId(nameof(ParkingOperator), Operator.Id.ToString())), out var withKeys, out var error)
+                   ? withKeys
+                   : throw new ArgumentException(error);
+
+        /// <summary>
+        /// The given transparency software manufacturer with its test keys.
+        /// </summary>
+        public static TransparencySoftwareManufacturer WithKeys(this TransparencySoftwareManufacturer Manufacturer)
+
+            => TransparencySoftwareManufacturer.TryParse(WithKeys(Manufacturer.ToJSON(), Party(Manufacturer.Id)), out var withKeys, out var error)
                    ? withKeys
                    : throw new ArgumentException(error);
 

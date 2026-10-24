@@ -128,9 +128,10 @@ version the meter is in; an energy meter manufacturer still named by a meter can
 ## transparencySoftwareStatus
 
 `TransparencySoftwareAssignment` ([source](../WWCP_POI3/RoamingNetwork/TransparencySoftware/TransparencySoftwareAssignment.cs)):
-the legal status of one transparency software release for this meter, optionally proven by a certificate. Both
-the release and the certificate are embedded in the roaming network (`transparencySoftware`,
-`transparencySoftwareCertificates`, see [RoamingNetwork](RoamingNetwork.md#transparencysoftware)).
+the legal status of one transparency software release for this meter, optionally proven by a certificate. The
+release is embedded in its [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md#transparencysoftware),
+the certificate in the roaming network (`transparencySoftwareCertificates`, see
+[RoamingNetwork](RoamingNetwork.md#transparencysoftwarecertificates)).
 
 | JSON key | Type | Description |
 |---|---|---|

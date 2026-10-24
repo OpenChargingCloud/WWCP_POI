@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EMobilityProviders">The e-mobility providers linked to the roaming network.</param>
         /// <param name="GridOperators">The grid operators linked to the roaming network.</param>
         /// <param name="ParkingOperators">The parking operators linked to the roaming network.</param>
-        /// <param name="TransparencySoftware">The transparency software linked to the roaming network.</param>
+        /// <param name="TransparencySoftwareManufacturers">The transparency software manufacturers of the roaming network, with their releases.</param>
         /// <param name="TransparencySoftwareCertificates">The transparency software certificates linked to the roaming network.</param>
         /// <param name="EnergyMeterManufacturers">The energy meter manufacturers linked to the roaming network.</param>
         /// 
@@ -115,7 +115,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           IEnumerable<EMobilityProvider>?                EMobilityProviders                 = null,
                                                           IEnumerable<GridOperator>?                     GridOperators                      = null,
                                                           IEnumerable<ParkingOperator>?                  ParkingOperators                   = null,
-                                                          IEnumerable<TransparencySoftware>?             TransparencySoftware               = null,
+                                                          IEnumerable<TransparencySoftwareManufacturer>? TransparencySoftwareManufacturers  = null,
                                                           IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates   = null,
                                                           IEnumerable<EnergyMeterManufacturer>?          EnergyMeterManufacturers           = null,
 
@@ -143,7 +143,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     EMobilityProviders,
                     GridOperators,
                     ParkingOperators,
-                    TransparencySoftware,
+                    TransparencySoftwareManufacturers,
                     TransparencySoftwareCertificates,
                     EnergyMeterManufacturers,
                     RoamingNetworkOperator,

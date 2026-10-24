@@ -236,10 +236,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 RoamingNetwork.EnergyMeterManufacturers.Ids,
                                 energyMeters.Select(energyMeter => energyMeter.ManufacturerId).OfType<EnergyMeterManufacturer_Id>());
 
-            SetPartialOfNetwork(networkJSON,
-                                POI.RoamingNetwork.PropertyKeys.TransparencySoftware,
-                                RoamingNetwork.TransparencySoftware.Ids,
-                                energyMeters.SelectMany(energyMeter => energyMeter.TransparencySoftwareStatus).Select(assignment => assignment.TransparencySoftwareId));
+            #region The transparency software releases its energy meters name, in their manufacturers
+
+            var releaseIds     = energyMeters.SelectMany(energyMeter => energyMeter.TransparencySoftwareStatus).
+                                              Select  (assignment  => assignment.TransparencySoftwareId).
+                                              ToHashSet();
+
+            var manufacturers  = new List<(Int32, JObject)>();
+
+            for (var manufacturerIndex = 0; manufacturerIndex < RoamingNetwork.TransparencySoftwareManufacturers.Count; manufacturerIndex++)
+            {
+
+                var manufacturer      = RoamingNetwork.TransparencySoftwareManufacturers[manufacturerIndex];
+                var releaseIndices    = Enumerable.Range(0, manufacturer.TransparencySoftware.Length).
+                                                   Where (index => releaseIds.Contains(manufacturer.TransparencySoftware[index].Id)).
+                                                   ToArray();
+
+                if (releaseIndices.Length == 0)
+                    continue;
+
+                var manufacturerNode  = Root.Arrays[POI.RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers].Children![manufacturerIndex];
+                var manufacturerJSON  = (JObject) manufacturerNode.Skeleton.DeepClone();
+
+                SetPartial(manufacturerJSON,
+                           manufacturerNode,
+                           TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware,
+                           releaseIndices.Select(index => (index, manufacturer.TransparencySoftware[index].ToJSON(Embedded: true))));
+
+                manufacturers.Add((manufacturerIndex, manufacturerJSON));
+
+            }
+
+            if (manufacturers.Count > 0)
+                networkJSON[POI.RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers] = Partial(Root.Arrays[POI.RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers],
+                                                                                                         manufacturers);
+
+            #endregion
 
             SetPartialOfNetwork(networkJSON,
                                 POI.RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates,

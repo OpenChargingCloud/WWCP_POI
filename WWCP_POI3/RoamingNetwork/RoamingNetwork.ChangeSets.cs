@@ -86,7 +86,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      eMobilityProviders,
                                      gridOperators,
                                      parkingOperators,
-                                     transparencySoftware,
+                                     transparencySoftwareManufacturers,
                                      transparencySoftwareCertificates,
                                      energyMeterManufacturers,
                                      Operator,
@@ -568,7 +568,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var providers             = new Dictionary<EMobilityProvider_Id, EMobilityProvider>(eMobilityProviders.Index);
             var gridOps               = new Dictionary<GridOperator_Id, GridOperator>(gridOperators.Index);
             var parkingOps            = new Dictionary<ParkingOperator_Id, ParkingOperator>(parkingOperators.Index);
-            var softwares             = new Dictionary<TransparencySoftware_Id, TransparencySoftware>(transparencySoftware.Index);
+            var softwareManufacturers = new Dictionary<TransparencySoftwareManufacturer_Id, TransparencySoftwareManufacturer>(transparencySoftwareManufacturers.Index);
             var certificates          = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(transparencySoftwareCertificates.Index);
             var meterManufacturers    = new Dictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>(energyMeterManufacturers.Index);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
@@ -1035,11 +1035,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Transparency software releases and certificates
+                #region Transparency software manufacturers, their releases, and certificates
+
+                else if (change.EntityType == nameof(TransparencySoftwareManufacturer))
+                {
+                    if (!TryApplyRegistryChange(TransparencySoftwareManufacturerRegistry, change, index, ChangeSet.CreatedAt, softwareManufacturers, out currentValue, out ErrorResponse))
+                        return false;
+                }
 
                 else if (change.EntityType == nameof(TransparencySoftware))
                 {
-                    if (!TryApplyRegistryChange(TransparencySoftwareRegistry,            change, index, ChangeSet.CreatedAt, softwares,    out currentValue, out ErrorResponse))
+                    if (!TryApplyTransparencySoftwareChange(change, index, ChangeSet.CreatedAt, softwareManufacturers, out currentValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1107,6 +1113,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var allEnergyMeters         = AllEnergyMeters        (operators.Values, gridOps.Values).ToArray();
             var allEnergyMeterGroups    = AllEnergyMeterGroups   (operators.Values, gridOps.Values).ToArray();
             var allEnergyMeterTemplates = AllEnergyMeterTemplates(operators.Values, gridOps.Values).ToArray();
+            var softwares               = TransparencySoftwareOf (softwareManufacturers.Values);
 
             if ((networkOperators.Values.SingleOrDefault()?.KeyStatementError(Id) ??
                  UnknownManufacturer (operators.Values, manufacturers) ??
@@ -1117,6 +1124,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  DuplicateParking    (parkingOps.Values, operators.Values) ??
                  UnknownChargingStation(parkingOps.Values, operators)  ??
                  UnknownParkingSpace(operators.Values, parkingOps.Values) ??
+                 DuplicateTransparencySoftware(softwareManufacturers.Values) ??
                  UnknownTransparencyReference(allEnergyMeters, softwares, certificates, manufacturers) ??
                  UnknownEnergyMeterManufacturer(allEnergyMeters, meterManufacturers) ??
                  DuplicateEnergyMeterGroup(allEnergyMeterGroups)       ??
@@ -1149,7 +1157,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  providers.Values,
                                  gridOps.Values,
                                  parkingOps.Values,
-                                 softwares.Values,
+                                 softwareManufacturers.Values,
                                  certificates.Values,
                                  meterManufacturers.Values,
                                  networkOperators.Values.SingleOrDefault(),

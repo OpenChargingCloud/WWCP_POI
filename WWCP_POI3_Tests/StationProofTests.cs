@@ -102,7 +102,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                    ChargingStationManufacturers:      [ new ChargingStationManufacturer(ACME, Created: Created) ],
                    EnergyMeterManufacturers:          [ new EnergyMeterManufacturer(Meters, Created: Created),
                                                         new EnergyMeterManufacturer(Others, Created: Created) ],
-                   TransparencySoftware:              [ NewRelease(Chargy10, "1.0"), NewRelease(Chargy11, "1.1") ],
+                   TransparencySoftwareManufacturers: [ new TransparencySoftwareManufacturer(TransparencySoftwareManufacturer_Id.Parse("OpenChargingCloud"),
+                                                                                             TransparencySoftware:  [ NewRelease(Chargy10, "1.0"), NewRelease(Chargy11, "1.1") ],
+                                                                                             Created:               Created) ],
                    TransparencySoftwareCertificates:  [ new TransparencySoftwareCertificate(Cert1,
                                                                                             "PTB",
                                                                                             ChargingStationModel_Id.Parse("Wallbox-22"),
@@ -167,7 +169,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                     ImmutableI18NString.Create(Languages.en, "Chargy"),
                     TransparencySoftwareVersion.Parse(Version),
                     [ OpenSourceLicense.AGPL3 ],
-                    "GraphDefined GmbH",
                     SourceCodeRepository: URL.Parse("https://github.com/OpenChargingCloud/ChargyDesktopApp"));
 
         private static ChargingTariff NewTariff(ChargingTariff_Id Id, Decimal Price)
@@ -315,7 +316,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 // What the station and its energy meters name.
                 Assert.That(Ids(proof.Given("chargingStationManufacturers")),                         Is.EqualTo(new[] { "ACME" }));
                 Assert.That(Ids(proof.Given("energyMeterManufacturers")),                             Is.EqualTo(new[] { "METERS" }));
-                Assert.That(Ids(proof.Given("transparencySoftware")),                                 Is.EqualTo(new[] { "chargy-1.0" }));
+                Assert.That(Ids(proof.Given("transparencySoftwareManufacturers")),                    Is.EqualTo(new[] { "OpenChargingCloud" }));
+                Assert.That(Ids(proof.Given("transparencySoftwareManufacturers", "transparencySoftware")), Is.EqualTo(new[] { "chargy-1.0" }));
                 Assert.That(Ids(proof.Given("transparencySoftwareCertificates")),                     Is.EqualTo(new[] { "cert-1" }));
                 Assert.That(Ids(proof.Given("parkingOperators", "parkingSpaces")),                    Is.EqualTo(new[] { "space-1" }));
                 Assert.That(proof.Given("parkingOperators", "parkingSpaces").Single()["roofed"]?.Value<Boolean>(), Is.True, "the effective parking space");

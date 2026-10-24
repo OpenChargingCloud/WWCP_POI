@@ -43,12 +43,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
         private static TransparencySoftware Software(string version = "2.0") => new(TransparencySoftware_Id.Parse("verifier-" + version),
             I18NString.Parse(JObject.Parse("""{"en":"Verifier","de":"Prüfprogramm"}"""))!, TransparencySoftwareVersion.Parse(version),
             [new OpenSourceLicense(OpenSourceLicense_Id.Parse("MIT"), I18NString.Parse(JObject.Parse("""{"en":"MIT license","de":"MIT-Lizenz"}"""))!,
-                URL.Parse("https://example.org/license"))], "Vendor",
+                URL.Parse("https://example.org/license"))],
             URL.Parse("https://example.org/logo.svg"), URL.Parse("https://example.org/manual"),
-            URL.Parse("https://example.org/software"), URL.Parse("https://example.org/source"));
+            URL.Parse("https://example.org/software"), URL.Parse("https://example.org/source"),
+            DateTimeOffset.Parse("2031-12-31T23:59:59.9999Z", CultureInfo.InvariantCulture),
+            URL.Parse("https://example.org/declarationOfConformity.pdf"), URL.Parse("https://example.org/sbom.cdx.json"));
 
         private static TransparencySoftware Release(string version, params OpenSourceLicense[] licenses)
-            => new(TransparencySoftware_Id.Parse("verifier"), I18NString.Create("Verifier"), TransparencySoftwareVersion.Parse(version), licenses, "Vendor");
+            => new(TransparencySoftware_Id.Parse("verifier"), I18NString.Create("Verifier"), TransparencySoftwareVersion.Parse(version), licenses);
 
         private static TransparencySoftwareCertificate Certificate(string id = "certificate-1", DateTimeOffset? start = null)
             => new(TransparencySoftwareCertificate_Id.Parse(id), "issuer-a", ChargingStationModel_Id.Parse("station-model"), "1.0",
@@ -117,11 +119,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
         public void Minimal_software_omits_optional_links()
         {
 
-            var json = JObject.Parse("""{"@id":"verifier-1","name":{"en":"Verifier"},"version":"1","vendor":"Vendor","openSourceLicenses":[{"@id":"MIT"}]}""");
+            var json = JObject.Parse("""{"@id":"verifier-1","name":{"en":"Verifier"},"version":"1","openSourceLicenses":[{"@id":"MIT"}]}""");
             var parsed = TransparencySoftware.Parse(json);
 
             Assert.That(parsed.Logo, Is.Null);
             Assert.That(parsed.HowToUse, Is.Null);
+            Assert.That(parsed.SupportUntil, Is.Null);
+            Assert.That(parsed.DeclarationOfConformity, Is.Null);
+            Assert.That(parsed.SoftwareBillOfMaterials, Is.Null);
             Assert.That(parsed.OpenSourceLicenses.Single().URLs, Is.Empty);
             Assert.That(TransparencySoftware.Parse(parsed.ToJSON()), Is.EqualTo(parsed));
 
@@ -146,7 +151,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
 
         [TestCase("name")]
         [TestCase("version")]
-        [TestCase("vendor")]
         [TestCase("openSourceLicenses")]
         public void Missing_software_fields_are_rejected(string field)
         {
@@ -166,7 +170,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
         [TestCase("name", "{\"en\":\" \"}")]
         [TestCase("version", "true")]
         [TestCase("version", "\" \"")]
-        [TestCase("vendor", "{}")]
+        [TestCase("supportUntil", "\"tomorrow\"")]
+        [TestCase("supportUntil", "42")]
+        [TestCase("declarationOfConformity", "\"relative/path\"")]
+        [TestCase("softwareBillOfMaterials", "12")]
         [TestCase("logo", "12")]
         [TestCase("howToUse", "\"relative/path\"")]
         [TestCase("moreInformation", "[]")]
@@ -187,6 +194,32 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
             Assert.That(TransparencySoftware.TryParse(json, out var result, out var error), Is.False);
             Assert.That(result, Is.Null);
             Assert.That(error, Is.Not.Empty);
+
+        }
+
+        [Test]
+        public void A_vendor_is_no_property_of_a_release()
+        {
+
+            // Its manufacturer embeds it: a release names no vendor of its own.
+            var json = Software().ToJSON();
+
+            json["vendor"] = "Vendor";
+            Assert.That(TransparencySoftware.TryParse(json, out _, out var error), Is.False);
+            Assert.That(error, Does.Contain("vendor"));
+
+        }
+
+        [Test]
+        public void The_end_of_support_is_kept_to_the_millisecond()
+        {
+
+            var json = Software().ToJSON();
+
+            Assert.That(json["supportUntil"]!.ToString(), Is.EqualTo("2031-12-31T23:59:59.999Z"));
+            Assert.That(json["declarationOfConformity"]!.ToString(), Is.EqualTo("https://example.org/declarationOfConformity.pdf"));
+            Assert.That(json["softwareBillOfMaterials"]!.ToString(), Is.EqualTo("https://example.org/sbom.cdx.json"));
+            Assert.That(TransparencySoftware.Parse(json), Is.EqualTo(Software()));
 
         }
 
@@ -243,7 +276,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
             Assert.That(Release("2.0", OpenSourceLicense.MIT),     Is.Not.EqualTo(Release("2.1", OpenSourceLicense.MIT)));
 
             Assert.That(() => new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), I18NString.Empty, TransparencySoftwareVersion.Parse("1"),
-                                                       [OpenSourceLicense.MIT], "Vendor"),
+                                                       [OpenSourceLicense.MIT]),
                         Throws.ArgumentException);
 
         }
@@ -411,8 +444,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
 
             var plain = Release("2.0", OpenSourceLicense.MIT);
             var logo = new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), I18NString.Create("Verifier"), TransparencySoftwareVersion.Parse("2.0"),
-                                                [OpenSourceLicense.MIT], "Vendor", Logo: URL.Parse("https://example.org/logo"));
+                                                [OpenSourceLicense.MIT], Logo: URL.Parse("https://example.org/logo"));
+            var supported = new TransparencySoftware(TransparencySoftware_Id.Parse("verifier"), I18NString.Create("Verifier"), TransparencySoftwareVersion.Parse("2.0"),
+                                                     [OpenSourceLicense.MIT], SupportUntil: DateTimeOffset.Parse("2031-01-01T00:00:00Z", CultureInfo.InvariantCulture));
 
+            Assert.That(plain.CompareTo(supported), Is.Not.Zero);
+            Assert.That(plain, Is.Not.EqualTo(supported));
             Assert.That(plain.CompareTo(logo), Is.Not.Zero);
             Assert.That(logo.CompareTo(plain), Is.EqualTo(-plain.CompareTo(logo)));
             Assert.That(new SortedSet<TransparencySoftware> { plain, logo }.Count, Is.EqualTo(2));

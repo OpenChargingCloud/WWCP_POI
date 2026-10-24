@@ -32,8 +32,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// The charging transparency software.
-    /// This information will e.g. be used for the German calibration law.
+    /// A release of charging transparency software, e.g. for the German calibration law, embedded in its
+    /// manufacturer: one per version of a software. Besides what it is, it names what the EU Cyber Resilience Act
+    /// asks its manufacturer to tell its users about it (Regulation (EU) 2024/2847, Annex II): the end of its
+    /// support period, its EU declaration of conformity and its software bill of materials.
     /// </summary>
     public sealed partial class TransparencySoftware : IEquatable<TransparencySoftware>,
                                                        IComparable<TransparencySoftware>,
@@ -45,7 +47,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/transparencySoftware";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/transparencySoftware/v1";
 
         /// <summary>
         /// The licenses in their canonical order; licenses are mutable, so they are copied on access.
@@ -90,11 +92,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  OpenSourceLicenses     = "openSourceLicenses";
 
             /// <summary>
-            /// The property of its vendor.
-            /// </summary>
-            public const String  Vendor                 = "vendor";
-
-            /// <summary>
             /// The property of its logo URL.
             /// </summary>
             public const String  Logo                   = "logo";
@@ -113,6 +110,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of its source code repository URL.
             /// </summary>
             public const String  SourceCodeRepository   = "sourceCodeRepository";
+
+            /// <summary>
+            /// The property of the end of its support period (CRA, Article 13(8) and Annex II, point 7).
+            /// </summary>
+            public const String  SupportUntil              = "supportUntil";
+
+            /// <summary>
+            /// The property of the URL of its EU declaration of conformity (CRA, Article 28 and Annex II, point 6).
+            /// </summary>
+            public const String  DeclarationOfConformity   = "declarationOfConformity";
+
+            /// <summary>
+            /// The property of the URL of its software bill of materials, when its manufacturer makes it available
+            /// to its users (CRA, Annex I, Part II, point 1, and Annex II, point 9).
+            /// </summary>
+            public const String  SoftwareBillOfMaterials   = "softwareBillOfMaterials";
 
         }
 
@@ -144,12 +157,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => openSourceLicenses.Select(openSourceLicense => openSourceLicense.Clone());
 
         /// <summary>
-        /// The vendor of the transparency software.
-        /// </summary>
-        [Mandatory]
-        public String                          Vendor                  { get; }
-
-        /// <summary>
         /// The optional URL where to find a small logo of the transparency software.
         /// </summary>
         [Optional]
@@ -173,6 +180,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         [Optional]
         public URL?                            SourceCodeRepository    { get; }
 
+        /// <summary>
+        /// The optional end of the support period of this release, in UTC to the millisecond: until when its
+        /// manufacturer handles its vulnerabilities and provides security updates for it (CRA, Article 13(8)).
+        /// </summary>
+        [Optional]
+        public DateTimeOffset?                 SupportUntil            { get; }
+
+        /// <summary>
+        /// The optional URL of the EU declaration of conformity of this release (CRA, Article 28).
+        /// </summary>
+        [Optional]
+        public URL?                            DeclarationOfConformity { get; }
+
+        /// <summary>
+        /// The optional URL of the software bill of materials of this release.
+        /// </summary>
+        [Optional]
+        public URL?                            SoftwareBillOfMaterials { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -184,22 +210,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Name">The multi-language name of the transparency software.</param>
         /// <param name="Version">The version of the transparency software.</param>
         /// <param name="OpenSourceLicenses">The Open Source licenses of the transparency software, at least one.</param>
-        /// <param name="Vendor">The vendor of the transparency software.</param>
         ///
         /// <param name="Logo">An optional URL where to find a small logo of the transparency software.</param>
         /// <param name="HowToUse">An optional URL where to find a manual how to use the transparency software.</param>
         /// <param name="MoreInformation">An optional URL where to find more information about the transparency software.</param>
         /// <param name="SourceCodeRepository">An optional URL where to find the source code of the transparency software.</param>
+        /// <param name="SupportUntil">The optional end of the support period of this release.</param>
+        /// <param name="DeclarationOfConformity">The optional URL of the EU declaration of conformity of this release.</param>
+        /// <param name="SoftwareBillOfMaterials">The optional URL of the software bill of materials of this release.</param>
         public TransparencySoftware(TransparencySoftware_Id         Id,
                                     ImmutableI18NString             Name,
                                     TransparencySoftwareVersion     Version,
                                     IEnumerable<OpenSourceLicense>  OpenSourceLicenses,
-                                    String                          Vendor,
 
                                     URL?                            Logo                   = null,
                                     URL?                            HowToUse               = null,
                                     URL?                            MoreInformation        = null,
-                                    URL?                            SourceCodeRepository   = null)
+                                    URL?                            SourceCodeRepository      = null,
+                                    DateTimeOffset?                 SupportUntil              = null,
+                                    URL?                            DeclarationOfConformity   = null,
+                                    URL?                            SoftwareBillOfMaterials   = null)
         {
 
             if (Id.IsNullOrEmpty)
@@ -213,7 +243,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Version.IsNullOrEmpty)
                 throw new ArgumentException("A software version is required.", nameof(Version));
 
-            ArgumentException.ThrowIfNullOrWhiteSpace(Vendor);
             ArgumentNullException.ThrowIfNull(OpenSourceLicenses);
 
             var licenses = OpenSourceLicenses.ToArray();
@@ -227,7 +256,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (licenses.Select(license => license.Id.ToString()).Distinct(StringComparer.OrdinalIgnoreCase).Count() != licenses.Length)
                 throw new ArgumentException("A license must not be given twice.", nameof(OpenSourceLicenses));
 
-            foreach (var link in new[] { Logo, HowToUse, MoreInformation, SourceCodeRepository })
+            foreach (var link in new[] { Logo, HowToUse, MoreInformation, SourceCodeRepository, DeclarationOfConformity, SoftwareBillOfMaterials })
                 if (link is { } url && !Uri.TryCreate(url.ToString(), UriKind.Absolute, out _))
                     throw new ArgumentException("Software links must be absolute URLs.");
 
@@ -236,12 +265,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Version               = Version;
             this.openSourceLicenses    = [.. licenses.Select (license => license.Clone()).
                                                       OrderBy(TransparencyJSON.LicenseOrder, StringComparer.Ordinal)];
-            this.Vendor                = Vendor;
 
             this.Logo                  = Logo;
             this.HowToUse              = HowToUse;
             this.MoreInformation       = MoreInformation;
             this.SourceCodeRepository  = SourceCodeRepository;
+            this.SupportUntil          = SupportUntil.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(SupportUntil.Value.ToUnixTimeMilliseconds()) : null;
+            this.DeclarationOfConformity  = DeclarationOfConformity;
+            this.SoftwareBillOfMaterials  = SoftwareBillOfMaterials;
 
         }
 
@@ -331,7 +362,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  new JProperty(PropertyKeys.Name,                   Name.    ToJSON()),
                                  new JProperty(PropertyKeys.Version,                Version. ToString()),
                                  new JProperty(PropertyKeys.OpenSourceLicenses,     new JArray(openSourceLicenses.Select(license => license.ToJSON(Embedded: true)))),
-                                 new JProperty(PropertyKeys.Vendor,                 Vendor),
 
                            Logo.                HasValue
                                ? new JProperty(PropertyKeys.Logo,                   Logo.                ToString())
@@ -347,6 +377,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                            SourceCodeRepository.HasValue
                                ? new JProperty(PropertyKeys.SourceCodeRepository,   SourceCodeRepository.ToString())
+                               : null,
+
+                           SupportUntil.        HasValue
+                               ? new JProperty(PropertyKeys.SupportUntil,           SupportUntil.Value.ToISO8601())
+                               : null,
+
+                           DeclarationOfConformity.HasValue
+                               ? new JProperty(PropertyKeys.DeclarationOfConformity, DeclarationOfConformity.ToString())
+                               : null,
+
+                           SoftwareBillOfMaterials.HasValue
+                               ? new JProperty(PropertyKeys.SoftwareBillOfMaterials, SoftwareBillOfMaterials.ToString())
                                : null
 
                        );
@@ -371,11 +413,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    Name,
                    Version,
                    openSourceLicenses,
-                   Vendor.               CloneString(),
-                   Logo?.                Clone(),
-                   HowToUse?.            Clone(),
-                   MoreInformation?.     Clone(),
-                   SourceCodeRepository?.Clone()
+                   Logo?.                   Clone(),
+                   HowToUse?.               Clone(),
+                   MoreInformation?.        Clone(),
+                   SourceCodeRepository?.   Clone(),
+                   SupportUntil,
+                   DeclarationOfConformity?.Clone(),
+                   SoftwareBillOfMaterials?.Clone()
                );
 
         #endregion
@@ -532,9 +576,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    String.Join("|", TransparencySoftware.openSourceLicenses.Select(TransparencyJSON.LicenseOrder)));
 
             if (c == 0)
-                c = StringComparer.Ordinal.Compare(Vendor, TransparencySoftware.Vendor);
-
-            if (c == 0)
                 c = Nullable.Compare(Logo, TransparencySoftware.Logo);
 
             if (c == 0)
@@ -545,6 +586,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (c == 0)
                 c = Nullable.Compare(SourceCodeRepository, TransparencySoftware.SourceCodeRepository);
+
+            if (c == 0)
+                c = Nullable.Compare(SupportUntil, TransparencySoftware.SupportUntil);
+
+            if (c == 0)
+                c = Nullable.Compare(DeclarationOfConformity, TransparencySoftware.DeclarationOfConformity);
+
+            if (c == 0)
+                c = Nullable.Compare(SoftwareBillOfMaterials, TransparencySoftware.SoftwareBillOfMaterials);
 
             return c;
 
@@ -583,7 +633,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                Name.             Equals(TransparencySoftware.Name)               &&
                Version.          Equals(TransparencySoftware.Version)            &&
                LicensesEqual            (TransparencySoftware)                   &&
-               Vendor.           Equals(TransparencySoftware.Vendor)             &&
+               Nullable.Equals(SupportUntil,            TransparencySoftware.SupportUntil)            &&
+               Nullable.Equals(DeclarationOfConformity, TransparencySoftware.DeclarationOfConformity) &&
+               Nullable.Equals(SoftwareBillOfMaterials, TransparencySoftware.SoftwareBillOfMaterials) &&
 
             ((!Logo.                HasValue && !TransparencySoftware.Logo.                HasValue) ||
               (Logo.                HasValue &&  TransparencySoftware.Logo.                HasValue && Logo.                Value.Equals(TransparencySoftware.Logo.                Value))) &&
@@ -624,7 +676,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        Name.                 GetHashCode()       * 23 ^
                        Version.              GetHashCode()       * 19 ^
                        openSourceLicenses.Aggregate(0, (hash, license) => hash ^ TransparencyJSON.LicenseHash(license)) * 13 ^
-                       Vendor.               GetHashCode()       * 11 ^
+                      (SupportUntil?.        GetHashCode() ?? 0) * 11 ^
                       (Logo?.                GetHashCode() ?? 0) * 7 ^
                       (HowToUse?.            GetHashCode() ?? 0) * 5 ^
                       (MoreInformation?.     GetHashCode() ?? 0) * 3 ^
@@ -646,7 +698,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    Name.FirstText(), ", ",
                    Version,          ", ",
-                   Vendor,           ", ",
                    String.Join(" / ", openSourceLicenses.Select(license => license.Id))
 
                );

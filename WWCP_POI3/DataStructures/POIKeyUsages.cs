@@ -49,6 +49,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String PriceStatements  = "priceStatements";
 
         /// <summary>
+        /// The transparency software releases of a transparency software manufacturer.
+        /// </summary>
+        public const String Software         = "software";
+
+        /// <summary>
         /// The party itself: its own properties and, by a signing key, its signing keys; of the roaming network operator
         /// also the roaming network, its registries, who is a member, commits and attestations.
         /// </summary>
@@ -61,6 +66,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                        Infrastructure,
                                                                                        Tariffs,
                                                                                        PriceStatements,
+                                                                                       Software,
                                                                                        Party);
 
         #region (internal) Of(Change)
@@ -95,6 +101,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    nameof(ParkingProduct)          or
                    nameof(ParkingSpaceTemplate)    or
                    nameof(ParkingSpaceGroup)       => Infrastructure,
+
+                   nameof(TransparencySoftware)    => Software,
 
                    _                               => Party
 

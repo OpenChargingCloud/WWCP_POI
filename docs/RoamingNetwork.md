@@ -1,15 +1,16 @@
 # RoamingNetwork
 
 A roaming network is the root of all POI data: one shared data set of charging station operators,
-e-mobility providers, grid operators and parking operators (the *parties*), together with the registries
-they share, e.g. charging station and energy meter manufacturers and transparency software.
+e-mobility providers, grid operators, parking operators and transparency software manufacturers (the *parties*),
+together with the registries they share, e.g. charging station and energy meter manufacturers and transparency
+software certificates.
 A version of a roaming network with everything it embeds is one immutable data set, named by its
 [ETags](README.md#etags); a change set leads to the next version.
 
 The roaming network is owned by its **roaming network operator (RNO)**, the
 [RoamingNetworkOperator](RoamingNetworkOperator.md) it embeds as `operator`, with its keys: the
 network has none of its own. The RNO signs changes of the network's own properties, adds and removes parties, and
-owns the registries (manufacturers, energy meter manufacturers, transparency software releases and certificates).
+owns the registries (manufacturers, energy meter manufacturers, transparency software certificates).
 Each party owns its own properties and data. There is no registry of brands: every charging station operator, pool,
 station, EVSE and RFID authentication mode embeds its own, see [Brand](Brand.md).
 
@@ -60,12 +61,12 @@ See [README.md](README.md#common-properties).
 | `gridOperators` | `GridOperators` | [GridOperator](GridOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `parkingOperators` | `ParkingOperators` | [ParkingOperator](ParkingOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `energyMeterManufacturers` | `EnergyMeterManufacturers` | [EnergyMeterManufacturer](EnergyMeterManufacturer.md)[] | add/remove | Ordered by `@id` (ordinal). |
-| `transparencySoftware` | `TransparencySoftware` | [TransparencySoftware](#transparencysoftware)[] | add/remove | Releases, one per version of a software, ordered by `@id` (ordinal). |
+| `transparencySoftwareManufacturers` | `TransparencySoftwareManufacturers` | [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md)[] | add/remove | Parties, each with its releases, one per version of a software; ordered by `@id` (ordinal). `TransparencySoftware` gives the releases of all of them by their identifications, unique within the network. |
 | `transparencySoftwareCertificates` | `TransparencySoftwareCertificates` | [TransparencySoftwareCertificate](#transparencysoftwarecertificates)[] | add/remove | Ordered by `@id` (ordinal). |
 
 Every collection is omitted when empty. Children are never written or read by their identifications alone:
 `TryParse` refuses `chargingStationOperatorIds`, `chargingStationManufacturerIds`, `eMobilityProviderIds`,
-`gridOperatorIds`, `parkingOperatorIds`, `energyMeterManufacturerIds`, `transparencySoftwareIds`
+`gridOperatorIds`, `parkingOperatorIds`, `energyMeterManufacturerIds`, `transparencySoftwareManufacturerIds`
 and `transparencySoftwareCertificateIds`. The network has no `brands`: brands are embedded in what they are a brand
 of ([Brand](Brand.md)).
 
@@ -85,7 +86,8 @@ with the default view options ([SPECIFICATION.md](../SPECIFICATION.md#2-the-cont
 - `Revision` — a local counter, one more per applied change set; not content.
 - Lookups: `TryGetChargingStationOperatorById`, `TryGetEMobilityProviderById`, `TryGetGridOperatorById`,
   `TryGetParkingOperatorById`, `TryGetChargingStationManufacturerById`, `TryGetEnergyMeterManufacturerById`,
-  `TryGetTransparencySoftwareById`, `TryGetTransparencySoftwareCertificateById`, ….
+  `TryGetTransparencySoftwareManufacturerById`, `TryGetTransparencySoftwareById`, `TransparencySoftwareManufacturerOf`,
+  `TryGetTransparencySoftwareCertificateById`, ….
 
 
 ## @context
@@ -168,27 +170,14 @@ station manufacturers. Owned by the RNO: `RoamingNetworkChange.Add(energyMeterMa
 removed.
 
 
-## transparencySoftware
+## transparencySoftwareManufacturers
 
-Releases of transparency software, e.g. for the German calibration law, one per version of a software
-(`TransparencySoftware`, [source](../WWCP_POI2/RoamingNetwork/TransparencySoftware/TransparencySoftware.cs)).
-Without runtime status, timestamps and custom data. Named by certificates and by the `transparencySoftwareStatus`
-of [EnergyMeter](EnergyMeter.md)s. Read strictly: an unknown property is an error.
-
-| JSON key | Type | Change set | Description |
-|---|---|---|---|
-| `@id` | string | — | `TransparencySoftware_Id`: any text, compared case-insensitively, surrounding whitespace trimmed. |
-| `name` | I18N text | update | Mandatory; a nonempty text in each language. |
-| `version` | string | update | Mandatory `TransparencySoftwareVersion`, e.g. `1.4.0`. |
-| `openSourceLicenses` | object[] | update | Mandatory, at least one: `{@id, description?, URLs}` (Hermod `OpenSourceLicense`, embedded without `@context`); an `@id` only once (case-insensitive); in a canonical order (`@id` upper case, description, URLs). |
-| `vendor` | string | update | Mandatory, nonempty. |
-| `logo` | URL | update/remove | Absolute. |
-| `howToUse` | URL | update/remove | Absolute; a manual. |
-| `moreInformation` | URL | update/remove | Absolute. |
-| `sourceCodeRepository` | URL | update/remove | Absolute. |
-
-`RoamingNetworkChange.Add(transparencySoftware)`, `Remove(transparencySoftwareId)`, `UpdateProperty(…)`/`RemoveProperty(…)`,
-signed by the RNO. A release still named by a certificate or an energy meter can not be removed.
+The [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md)s, parties as the operators are: the RNO
+adds and removes them with their keys, each changes its own properties and its releases of transparency software,
+embedded in it as `transparencySoftware`, one per version of a software. Releases are named by certificates and by
+the `transparencySoftwareStatus` of [EnergyMeter](EnergyMeter.md)s, by their identifications alone: these are unique
+within the network, whichever manufacturer embeds them. A manufacturer whose release is still named can not be
+removed.
 
 
 ## transparencySoftwareCertificates
@@ -232,7 +221,8 @@ A change set must be signed by the owner of each of its changes ([../README.md](
 | `UpdateProperty` of the RNO's `identityKeys` | identity key |
 | `Add`/`Remove` of a charging station operator, e-mobility provider, grid operator or parking operator | signing key |
 | `UpdateProperty` of the `signingKeys`/`identityKeys` of such a party (recovery; the party's own keys also count, see its file) | identity key |
-| every change of charging station manufacturers, energy meter manufacturers, transparency software releases and certificates | signing key |
+| every change of charging station manufacturers, energy meter manufacturers and transparency software certificates | signing key |
+| `Add`/`Remove` of a transparency software manufacturer, its releases with it | signing key |
 
 - A party is added with at least one `signingKeys` and one `identityKeys` entry, and without embedded children
   (`chargingPools`, `chargingTariffs`, the four group arrays; `parkingGarages`, `parkingSpaces`, `parkingSensors`,

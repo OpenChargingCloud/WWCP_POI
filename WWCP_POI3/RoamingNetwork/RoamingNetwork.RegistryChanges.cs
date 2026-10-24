@@ -199,24 +199,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
             (changed, previous)     => changed.ShareRuntimeOf(previous)
         );
 
-        private static readonly Registry<TransparencySoftware_Id, TransparencySoftware> TransparencySoftwareRegistry = new (
-            "transparency software release",
+        /// <summary>
+        /// The properties of a transparency software manufacturer: those of a charging station manufacturer, and what the
+        /// Cyber Resilience Act asks of it. Its releases are changed on their own.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> ChangeableTransparencySoftwareManufacturerProperties = ChangeableManufacturerProperties.Union([
+            TransparencySoftwareManufacturer.PropertyKeys.CRARole,
+            TransparencySoftwareManufacturer.PropertyKeys.VulnerabilityContact,
+            TransparencySoftwareManufacturer.PropertyKeys.VulnerabilityReporting,
+            TransparencySoftwareManufacturer.PropertyKeys.VulnerabilityDisclosurePolicy,
+            TransparencySoftwareManufacturer.PropertyKeys.SecurityAdvisories
+        ]);
+
+        private static readonly Registry<TransparencySoftwareManufacturer_Id, TransparencySoftwareManufacturer> TransparencySoftwareManufacturerRegistry = new (
+            "transparency software manufacturer",
             "a",
-            [ POI.TransparencySoftware.PropertyKeys.Name,
-              POI.TransparencySoftware.PropertyKeys.Version,
-              POI.TransparencySoftware.PropertyKeys.OpenSourceLicenses,
-              POI.TransparencySoftware.PropertyKeys.Vendor,
-              POI.TransparencySoftware.PropertyKeys.Logo,
-              POI.TransparencySoftware.PropertyKeys.HowToUse,
-              POI.TransparencySoftware.PropertyKeys.MoreInformation,
-              POI.TransparencySoftware.PropertyKeys.SourceCodeRepository ],
-            TransparencySoftware_Id.TryParse,
-            POI.TransparencySoftware.TryParse,
-            transparencySoftware => transparencySoftware.Id,
-            transparencySoftware => transparencySoftware.ToJSON(Embedded: true),
-            // Releases have no runtime status and no timestamps.
-            (changed, previous) => { },
-            Timestamps: false
+            ChangeableTransparencySoftwareManufacturerProperties,
+            TransparencySoftwareManufacturer_Id.TryParse,
+            TransparencySoftwareManufacturer.TryParse,
+            manufacturer        => manufacturer.Id,
+            manufacturer        => manufacturer.ToJSON(Embedded: true),
+            // Its releases have no runtime status.
+            (changed, previous) => changed.ShareRuntimeOf(previous)
         );
 
         private static readonly Registry<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate> TransparencySoftwareCertificateRegistry = new (

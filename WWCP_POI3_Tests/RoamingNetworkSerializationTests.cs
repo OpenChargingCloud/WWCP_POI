@@ -68,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                EMobilityProviders:                basis.EMobilityProviders,
                                GridOperators:                     basis.GridOperators,
                                ParkingOperators:                  basis.ParkingOperators,
-                               TransparencySoftware:              basis.TransparencySoftware,
+                               TransparencySoftwareManufacturers: basis.TransparencySoftwareManufacturers,
                                TransparencySoftwareCertificates:  basis.TransparencySoftwareCertificates,
                                EnergyMeterManufacturers:          basis.EnergyMeterManufacturers,
                                Operator:                          RoamingNetworkOperatorSerializationTests.Full(),
@@ -128,7 +128,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                       RoamingNetwork.PropertyKeys.GridOperators,
                                       RoamingNetwork.PropertyKeys.ParkingOperators,
                                       RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,
-                                      RoamingNetwork.PropertyKeys.TransparencySoftware,
+                                      RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers,
                                       RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates,
                                       RoamingNetwork.PropertyKeys.TreeHashAlgorithms };
             var idsOnly     = network.ToJSON(ExpandDataLicenses:                InfoStatus.ShowIdOnly,

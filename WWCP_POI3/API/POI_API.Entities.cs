@@ -117,6 +117,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSMs/{CSM_Id}                                            a charging station manufacturer
     /// GET ~/RNs/{RN_Id}/EMMs                                                     its energy meter manufacturers, in short
     /// GET ~/RNs/{RN_Id}/EMMs/{EMM_Id}                                            an energy meter manufacturer
+    /// GET ~/RNs/{RN_Id}/TSMs                                                     its transparency software manufacturers, in short
+    /// GET ~/RNs/{RN_Id}/TSMs/{TSM_Id}                                            a transparency software manufacturer, with its releases
     /// GET ~/RNs/{RN_Id}/POs                                                      its parking operators, in short
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}                                              a parking operator;
     ///     ?without=parkingGarages,parkingSpaces,parkingSpaceTemplates,parkingSpaceGroups,parkingSensors,parkingProducts,
@@ -270,13 +272,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region ~/RNs/{RN_Id}/CSOs, GOs, EMPs, CSMs, EMMs, POs
+            #region ~/RNs/{RN_Id}/CSOs, GOs, EMPs, CSMs, EMMs, TSMs, POs
 
             AddListHandlers(roamingNetworkPath, "CSOs",  roamingNetwork => roamingNetwork.ChargingStationOperators,      EntitySummaries);
             AddListHandlers(roamingNetworkPath, "GOs",   roamingNetwork => roamingNetwork.GridOperators,                 EntitySummaries);
             AddListHandlers(roamingNetworkPath, "EMPs",  roamingNetwork => roamingNetwork.EMobilityProviders,            EntitySummaries);
             AddListHandlers(roamingNetworkPath, "CSMs",  roamingNetwork => roamingNetwork.ChargingStationManufacturers,  EntitySummaries);
             AddListHandlers(roamingNetworkPath, "EMMs",  roamingNetwork => roamingNetwork.EnergyMeterManufacturers,      EntitySummaries);
+            AddListHandlers(roamingNetworkPath, "TSMs",  roamingNetwork => roamingNetwork.TransparencySoftwareManufacturers, EntitySummaries);
             AddListHandlers(roamingNetworkPath, "POs",   roamingNetwork => roamingNetwork.ParkingOperators,              EntitySummaries);
 
             #endregion
@@ -1051,6 +1054,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   return roamingNetwork.TryGetEnergyMeterManufacturerById(energyMeterManufacturerId, out var energyMeterManufacturer)
                                              ? CachedEntityResponse(request, energyMeterManufacturer, () => energyMeterManufacturer.ToJSON(Embedded: true))
                                              : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The energy meter manufacturer '{energyMeterManufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+
+                              });
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/TSMs/{TSM_Id}
+
+            AddEntityHandlers(roamingNetworkPath + "/TSMs/{transparencySoftwareManufacturerId}",
+                              request => {
+
+                                  if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
+                                      return errorResponse;
+
+                                  if (!TransparencySoftwareManufacturer_Id.TryParse(request.ParsedURLParameters[1], out var transparencySoftwareManufacturerId))
+                                      return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid transparency software manufacturer identification!");
+
+                                  return roamingNetwork.TryGetTransparencySoftwareManufacturerById(transparencySoftwareManufacturerId, out var transparencySoftwareManufacturer)
+                                             ? CachedEntityResponse(request, transparencySoftwareManufacturer, () => transparencySoftwareManufacturer.ToJSON(Embedded: true))
+                                             : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The transparency software manufacturer '{transparencySoftwareManufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
 
                               });
 

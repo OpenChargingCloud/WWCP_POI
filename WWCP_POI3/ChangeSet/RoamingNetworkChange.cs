@@ -1168,17 +1168,65 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Add                   (TransparencySoftware)
+        #region Add                   (TransparencySoftwareManufacturer)
 
         /// <summary>
-        /// Add the given transparency software release to its roaming network.
+        /// Add the given transparency software manufacturer to its roaming network, with its keys and without its releases.
+        /// </summary>
+        /// <param name="TransparencySoftwareManufacturer">The new transparency software manufacturer.</param>
+        public static RoamingNetworkChange Add(TransparencySoftwareManufacturer TransparencySoftwareManufacturer)
+
+            => Add(nameof(POI.TransparencySoftwareManufacturer),
+                   TransparencySoftwareManufacturer.Id.ToString(),
+                   TransparencySoftwareManufacturer.ToJSON(Embedded: true));
+
+        /// <summary>
+        /// Remove the given transparency software manufacturer, with its releases, optionally checking its complete
+        /// previous JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(TransparencySoftwareManufacturer_Id  TransparencySoftwareManufacturerId,
+                                                  JToken?                              OldValue                             = null)
+
+            => Remove(nameof(POI.TransparencySoftwareManufacturer),
+                      TransparencySoftwareManufacturerId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given transparency software manufacturer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(TransparencySoftwareManufacturer  TransparencySoftwareManufacturer,
+                                                          String                            PropertyName,
+                                                          JToken?                           OldValue,
+                                                          JToken                            NewValue)
+
+            => UpdateProperty(nameof(POI.TransparencySoftwareManufacturer), TransparencySoftwareManufacturer.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given transparency software manufacturer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(TransparencySoftwareManufacturer  TransparencySoftwareManufacturer,
+                                                          String                            PropertyName,
+                                                          JToken?                           OldValue   = null)
+
+            => RemoveProperty(nameof(POI.TransparencySoftwareManufacturer), TransparencySoftwareManufacturer.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (TransparencySoftware, TransparencySoftwareManufacturerId)
+
+        /// <summary>
+        /// Add the given transparency software release to its manufacturer.
         /// </summary>
         /// <param name="TransparencySoftware">The new transparency software release.</param>
-        public static RoamingNetworkChange Add(TransparencySoftware TransparencySoftware)
+        /// <param name="TransparencySoftwareManufacturerId">The identification of its manufacturer.</param>
+        public static RoamingNetworkChange Add(TransparencySoftware                 TransparencySoftware,
+                                               TransparencySoftwareManufacturer_Id  TransparencySoftwareManufacturerId)
 
             => Add(nameof(POI.TransparencySoftware),
                    TransparencySoftware.Id.ToString(),
-                   TransparencySoftware.ToJSON(Embedded: true));
+                   TransparencySoftware.ToJSON(Embedded: true),
+                   nameof(POI.TransparencySoftwareManufacturer),
+                   TransparencySoftwareManufacturerId.ToString());
 
         /// <summary>
         /// Remove the given transparency software release, optionally checking its complete previous JSON representation.

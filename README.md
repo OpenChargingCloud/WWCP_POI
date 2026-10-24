@@ -34,7 +34,8 @@ flowchart TD
     RoamingNetwork --> EMobilityProvider
     RoamingNetwork --> GridOperator
     RoamingNetwork --> ParkingOperator
-    RoamingNetwork --> TransparencySoftware
+    RoamingNetwork --> TransparencySoftwareManufacturer
+    TransparencySoftwareManufacturer --> TransparencySoftware
     RoamingNetwork --> TransparencySoftwareCertificate
     RoamingNetwork --> EnergyMeterManufacturer
     ParkingOperator --> ParkingGarage
@@ -84,7 +85,7 @@ flowchart TD
 ```
 
 Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`,
-`gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
+`gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `transparencySoftwareManufacturers`, `transparencySoftware`, `transparencySoftwareCertificates`, `chargingTariffs`,
 `EVSETemplates`, `chargingStationTemplates`, `chargingPoolTemplates`, `chargingTariffTemplates`, `energyMeterTemplates`,
 `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `energyMeterGroups`, `chargingTariffOffers`,
 `chargingPools`, `chargingStations`, `EVSEs`, `chargingConnectors`, `energyMeters`, `gridConnectionPoints`, `parkingGarages`,
@@ -190,8 +191,12 @@ parking product ids compare case-sensitively.
   operator for its own EVSEs, or of an e-mobility provider for its customers at the EVSEs of any operator: a
   `chargingTariff` of its own or a `discount`, `notBefore`/`notAfter`, `openingTimes`, and for which sessions; two
   offers of one owner must not overlap. They change no member. See [docs/ChargingTariffOffer.md](docs/ChargingTariffOffer.md).
-- **Transparency software:** releases (`TransparencySoftware`, one per version) and their certificates
-  are embedded in the network, without status and timestamps. A certificate names the releases it
+- **Transparency software:** releases (`TransparencySoftware`, one per version) are embedded in their
+  manufacturer (`TransparencySoftwareManufacturer`, a party: it signs its releases itself, with a key that may sign
+  `software`, and names what the EU Cyber Resilience Act asks of it: its role, a contact for vulnerabilities, its
+  disclosure policy and its security advisories; a release names the end of its support period, its declaration of
+  conformity and its bill of materials), their identifications unique within the network; certificates are embedded in
+  the network. Releases and certificates have no status and timestamps. A certificate names the releases it
   verifies or finds compatible, and optionally a manufacturer. An energy meter's `transparencySoftwareStatus`
   assigns releases with their `legalStatus`, at most one entry per release; a given `certificateId` must cover it.
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
@@ -299,7 +304,7 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
 
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
   `Add`/`Remove` of operators, manufacturers, energy meter manufacturers, e-mobility providers, grid operators, parking operators,
-  transparency software releases and certificates, pools, tariffs, templates, groups, offers, stations
+  transparency software manufacturers, releases (`Add(release, manufacturerId)`) and certificates, pools, tariffs, templates, groups, offers, stations
   (`Add(station, poolId)`), EVSEs (`Add(evse, stationId)`), parking garages, spaces, sensors, space templates and space groups
   (`Add(space, parkingOperatorId)`) and grid connection points (`Add(point, gridOperatorId)`). Energy meters
   are properties of what embeds them (`energyMeters`, `energyMeter`).
@@ -334,7 +339,8 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
   in the version it is applied to, valid at its `createdAt` (`TryCheckOwnership`); every signature must be one of
   a key of a party. Nobody else's signature counts, there is no external trust configuration.
   - The **RNO** owns itself, the roaming network itself, manufacturers, energy meter manufacturers and
-    transparency software, and adds and removes parties: with their keys (a grid operator not taking part
+    transparency software certificates, and adds and removes parties, also transparency software manufacturers,
+    which own their releases: with their keys (a grid operator not taking part
     without, then the RNO signs in its place until it gives it keys), each of their identity keys signing the change
     set as well, as the proof that the party holds it and asks to be added, without their children:
     `RoamingNetworkChange.Add(party)` leaves them out, `AddChildren(party)` gives the changes the party then
@@ -507,7 +513,7 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   holders (`RoamingNetworkKeyStatement.Create(…)`, `WithSignature(…)`), and each holder certifies its own signing
   keys with one of its identity keys (`RoamingNetworkSigningKeyCertificate.Create(…)`, as `signingKeyCertificates`),
   so that it renews them alone; both are committed as properties of the operator, so that every proof gives them.
-  Signing keys may name `usages` (`infrastructure`, `tariffs`, `priceStatements`, `party`), e.g. one key of a charging
+  Signing keys may name `usages` (`infrastructure`, `tariffs`, `priceStatements`, `software`, `party`), e.g. one key of a charging
   station operator for its pools and one for its tariffs. An app scans the QR code of the trust anchor (`GET ~/RNs/{id}/trustAnchor`): `WWCP/TA-2:` and the
   Base45 of its CBOR, with the network, its name and description, the thumbprints of the identity
   keys and the `minConsensus` (`RoamingNetworkTrustAnchor.TryParse(text, …)`; the URI
@@ -860,7 +866,7 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
 | Directory | What it is |
 |---|---|
 | `WWCP_POI2` | Shared lower layer: identifications, status values, predefined strings, energy information, transparency software |
-| `WWCP_POI3` | Roaming networks with their operators, pools, stations, EVSEs, tariffs, templates, groups, offers, manufacturers, e-mobility providers, grid operators, energy meters, transparency software and parking; change sets, history, sync |
+| `WWCP_POI3` | Roaming networks with their operators, pools, stations, EVSEs, tariffs, templates, groups, offers, manufacturers, e-mobility providers, grid operators, energy meters, transparency software manufacturers and parking; change sets, history, sync |
 | `old` | The earlier implementation, for reference only; not developed further |
 
 

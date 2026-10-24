@@ -24,6 +24,7 @@ using NUnit.Framework;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
+using org.GraphDefined.Vanaheimr.Hermod.Mail;
 
 #endregion
 
@@ -31,8 +32,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// Transparency software releases and their certificates embedded in the roaming network,
-    /// assigned to energy meters with their legal status.
+    /// Transparency software releases, embedded in their manufacturers, and their certificates embedded in the roaming
+    /// network, assigned to energy meters with their legal status.
     /// </summary>
     [TestFixture]
     public class TransparencyTests
@@ -40,15 +41,17 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #region Data
 
-        private static readonly DateTimeOffset                      Created     = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
-        private static readonly DateTimeOffset                      T0          = DateTimeOffset.Parse("2026-10-11T12:00:00Z");
+        private static readonly DateTimeOffset                       Created     = DateTimeOffset.Parse("2026-01-01T00:00:00Z");
+        private static readonly DateTimeOffset                       T0          = DateTimeOffset.Parse("2026-10-11T12:00:00Z");
 
-        private static readonly ChargingStationOperator_Id          GEF         = ChargingStationOperator_Id.        Parse("DE*GEF");
-        private static readonly ChargingStationManufacturer_Id      ACME        = ChargingStationManufacturer_Id.    Parse("ACME");
-        private static readonly TransparencySoftware_Id             Chargy10    = TransparencySoftware_Id.           Parse("chargy-1.0");
-        private static readonly TransparencySoftware_Id             Chargy11    = TransparencySoftware_Id.           Parse("chargy-1.1");
-        private static readonly TransparencySoftwareCertificate_Id  Cert1       = TransparencySoftwareCertificate_Id.Parse("cert-1");
-        private static readonly EnergyMeter_Id                      Meter1      = EnergyMeter_Id.                    Parse("meter-1");
+        private static readonly ChargingStationOperator_Id           GEF         = ChargingStationOperator_Id.         Parse("DE*GEF");
+        private static readonly ChargingStationManufacturer_Id       ACME        = ChargingStationManufacturer_Id.     Parse("ACME");
+        private static readonly TransparencySoftwareManufacturer_Id  OCC         = TransparencySoftwareManufacturer_Id.Parse("OpenChargingCloud");
+        private static readonly TransparencySoftwareManufacturer_Id  Other       = TransparencySoftwareManufacturer_Id.Parse("Other");
+        private static readonly TransparencySoftware_Id              Chargy10    = TransparencySoftware_Id.            Parse("chargy-1.0");
+        private static readonly TransparencySoftware_Id              Chargy11    = TransparencySoftware_Id.            Parse("chargy-1.1");
+        private static readonly TransparencySoftwareCertificate_Id   Cert1       = TransparencySoftwareCertificate_Id. Parse("cert-1");
+        private static readonly EnergyMeter_Id                       Meter1      = EnergyMeter_Id.                     Parse("meter-1");
 
         #endregion
 
@@ -60,8 +63,28 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     ImmutableI18NString.Create(Languages.en, "Chargy"),
                     TransparencySoftwareVersion.Parse(Version),
                     [ OpenSourceLicense.AGPL3 ],
-                    "GraphDefined GmbH",
-                    SourceCodeRepository: URL.Parse("https://github.com/OpenChargingCloud/ChargyDesktopApp"));
+                    SourceCodeRepository:     URL.Parse("https://github.com/OpenChargingCloud/ChargyDesktopApp"),
+                    SupportUntil:             DateTimeOffset.Parse("2031-12-31T23:59:59.9999Z"),
+                    DeclarationOfConformity:  URL.Parse("https://open.charging.cloud/chargy/" + Version + "/declarationOfConformity.pdf"),
+                    SoftwareBillOfMaterials:  URL.Parse("https://open.charging.cloud/chargy/" + Version + "/sbom.cdx.json"));
+
+        #endregion
+
+        #region NewManufacturer(Id, Releases)
+
+        private static TransparencySoftwareManufacturer NewManufacturer(TransparencySoftwareManufacturer_Id  Id,
+                                                                        params TransparencySoftware[]        Releases)
+
+            => new (Id,
+                    I18NString.Create(Languages.en, "Open Charging Cloud"),
+                    Homepage:                       URL.Parse("https://open.charging.cloud"),
+                    CRARole:                        TransparencySoftwareManufacturer.CRARoles.OpenSourceSoftwareSteward,
+                    VulnerabilityContact:           EMailAddress.Parse("security@open.charging.cloud"),
+                    VulnerabilityReporting:         URL.Parse("https://open.charging.cloud/.well-known/security.txt"),
+                    VulnerabilityDisclosurePolicy:  URL.Parse("https://open.charging.cloud/security/policy"),
+                    SecurityAdvisories:             URL.Parse("https://github.com/OpenChargingCloud/ChargyDesktopApp/security/advisories"),
+                    TransparencySoftware:           Releases,
+                    Created:                        Created);
 
         #endregion
 
@@ -90,7 +113,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                           Created,
                     ChargingStationManufacturers:      [ new ChargingStationManufacturer(ACME, Created: Created) ],
-                    TransparencySoftware:              [ NewRelease(Chargy10, "1.0"), NewRelease(Chargy11, "1.1") ],
+                    TransparencySoftwareManufacturers: [ NewManufacturer(OCC, NewRelease(Chargy10, "1.0"), NewRelease(Chargy11, "1.1")) ],
                     TransparencySoftwareCertificates:  [ NewCertificate(Cert1, [ Chargy10 ], [ Chargy11 ]) ],
                     ChargingStationOperators:          [ new ChargingStationOperator(GEF,
                                                                                      Created:        Created,
@@ -118,6 +141,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region SignedBy(Network, Party, Changes)
+
+        private static RoamingNetworkChangeSet SignedBy(RoamingNetwork                  Network,
+                                                        POIPartyId                      Party,
+                                                        params RoamingNetworkChange[]   Changes)
+
+            => Network.CreateChangeSet(Changes, CreatedAt: T0).SignedBy(Party);
+
+        #endregion
+
 
         #region Transparency_software_survives_JSON_JSON_text_and_CBOR()
 
@@ -125,14 +158,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void Transparency_software_survives_JSON_JSON_text_and_CBOR()
         {
 
-            var rn1   = NewNetwork();
-            var json  = rn1.ToJSON();
+            var rn1           = NewNetwork();
+            var json          = rn1.ToJSON();
 
             Assert.That(RoamingNetwork.TryParse(json,                            out var fromJSON, out var errorJSON),  Is.True, errorJSON);
             Assert.That(RoamingNetwork.TryParse(JObject.Parse(json.ToString()),  out var fromText, out var errorText),  Is.True, errorText);
             Assert.That(RoamingNetwork.TryParse(rn1.ToCBOR(),                    out var fromCBOR, out var errorCBOR),  Is.True, errorCBOR);
 
-            var meter = json["chargingStationOperators"]![0]!["chargingPools"]![0]!["chargingStations"]![0]!["EVSEs"]![0]!["energyMeter"]!;
+            var meter         = json["chargingStationOperators"]![0]!["chargingPools"]![0]!["chargingStations"]![0]!["EVSEs"]![0]!["energyMeter"]!;
+            var manufacturer  = json["transparencySoftwareManufacturers"]![0]!;
 
             using (Assert.EnterMultipleScope())
             {
@@ -142,14 +176,25 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(fromCBOR!.ToJSON().ToString(),                                          Is.EqualTo(json.ToString()));
                 Assert.That(fromText.CalcETags(),                                                   Is.EqualTo(rn1.CalcETags()));
 
-                Assert.That(json["transparencySoftware"]!.Select(release => release["@id"]!.ToString()),  Is.EqualTo(new[] { "chargy-1.0", "chargy-1.1" }));
+                Assert.That(json["transparencySoftware"],                                           Is.Null);
+                Assert.That(manufacturer["@id"]!.ToString(),                                        Is.EqualTo("OpenChargingCloud"));
+                Assert.That(manufacturer["craRole"]!.ToString(),                                    Is.EqualTo("openSourceSoftwareSteward"));
+                Assert.That(manufacturer["vulnerabilityContact"]!.ToString(),                       Is.EqualTo("security@open.charging.cloud"));
+                Assert.That(manufacturer["vulnerabilityDisclosurePolicy"]!.ToString(),              Is.EqualTo("https://open.charging.cloud/security/policy"));
+                Assert.That(manufacturer["signingKeys"]!.Count(),                                   Is.EqualTo(1));
+                Assert.That(manufacturer["transparencySoftware"]!.Select(release => release["@id"]!.ToString()),  Is.EqualTo(new[] { "chargy-1.0", "chargy-1.1" }));
+                Assert.That(manufacturer["transparencySoftware"]![0]!["vendor"],                    Is.Null);
+                Assert.That(manufacturer["transparencySoftware"]![0]!["supportUntil"]!.ToString(),  Is.EqualTo("2031-12-31T23:59:59.999Z"));
+                Assert.That(manufacturer["transparencySoftware"]![0]!["softwareBillOfMaterials"]!.ToString(),  Is.EqualTo("https://open.charging.cloud/chargy/1.0/sbom.cdx.json"));
                 Assert.That(json["transparencySoftwareCertificates"]![0]!["@id"]!.ToString(),       Is.EqualTo("cert-1"));
                 Assert.That(json["transparencySoftwareCertificates"]![0]!["notBefore"]!.ToString(), Is.EqualTo("2026-01-01T00:00:00.000Z"));
                 Assert.That(meter["transparencySoftwareStatus"]![0]!["certificateId"]!.ToString(),  Is.EqualTo("cert-1"));
                 Assert.That(meter["transparencySoftwareStatus"]![0]!["legalStatus"]!.ToString(),    Is.EqualTo(LegalStatus.GermanCalibrationLaw.ToString()));
 
-                Assert.That(fromJSON.TryGetTransparencySoftwareById(Chargy11, out var chargy11),    Is.True);
+                Assert.That(fromCBOR.TryGetTransparencySoftwareById(Chargy11, out var chargy11),    Is.True);
                 Assert.That(chargy11!.Version.ToString(),                                           Is.EqualTo("1.1"));
+                Assert.That(chargy11.SupportUntil,                                                  Is.EqualTo(DateTimeOffset.Parse("2031-12-31T23:59:59.999Z")));
+                Assert.That(fromCBOR.TransparencySoftwareManufacturerOf(Chargy11)?.Id,             Is.EqualTo(OCC));
                 Assert.That(fromJSON.TryGetTransparencySoftwareCertificateById(Cert1, out var cert1),  Is.True);
                 Assert.That(cert1!.Covers(Chargy11),                                                Is.True);
                 Assert.That(fromJSON.TryGetEnergyMeterById(Meter1, out var meter1),                 Is.True);
@@ -212,11 +257,22 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             JObject Meter(JObject Network)
                 => (JObject) Network["chargingStationOperators"]![0]!["chargingPools"]![0]!["chargingStations"]![0]!["EVSEs"]![0]!["energyMeter"]!;
 
+            JArray Releases(JObject Network)
+                => (JArray) Network["transparencySoftwareManufacturers"]![0]!["transparencySoftware"]!;
+
             var unknownRelease      = Changed(network => network["transparencySoftwareCertificates"]![0]!["compatibleTransparencySoftwareIds"] = new JArray("chargy-9.9"));
             var unknownManufacturer = Changed(network => network["transparencySoftwareCertificates"]![0]!["chargingStationManufacturerId"] = "NOBODY");
-            var meterRelease        = Changed(network => ((JArray) network["transparencySoftware"]!).RemoveAt(1));
+            var meterRelease        = Changed(network => Releases(network).RemoveAt(1));
             var meterCertificate    = Changed(network => Meter(network)["transparencySoftwareStatus"]![0]!["certificateId"] = "cert-9");
             var twice               = Changed(network => Meter(network)["transparencySoftwareStatus"]![1]!["transparencySoftwareId"] = "chargy-1.0");
+            var vendor              = Changed(network => Releases(network)[0]!["vendor"] = "GraphDefined GmbH");
+            var role                = Changed(network => network["transparencySoftwareManufacturers"]![0]!["craRole"] = "importer");
+
+            // The same release at another manufacturer as well: releases are unique within the network.
+            var otherManufacturer   = Changed(network => ((JArray) network["transparencySoftwareManufacturers"]!).Add(new JObject(new JProperty("@id",                  "Other"),
+                                                                                                                                       new JProperty("transparencySoftware", new JArray(Releases(network)[0]!.DeepClone())),
+                                                                                                                                       new JProperty("created",              "2026-01-01T00:00:00.000Z"),
+                                                                                                                                       new JProperty("lastChange",           "2026-01-01T00:00:00.000Z"))));
 
             // Chargy 1.1 is only compatible with the certificate, but covered by it: fine.
             var covered             = Changed(network => Meter(network)["transparencySoftwareStatus"]![1]!["certificateId"] = "cert-1");
@@ -233,6 +289,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(error4,                                                                Does.Contain("certificate 'cert-9' of the energy meter 'meter-1'"));
                 Assert.That(RoamingNetwork.TryParse(twice,                out _, out var error6),  Is.False);
                 Assert.That(error6,                                                                Does.Contain("must not be given twice"));
+                Assert.That(RoamingNetwork.TryParse(vendor,               out _, out var error8),  Is.False);
+                Assert.That(error8,                                                                Does.Contain("vendor"));
+                Assert.That(RoamingNetwork.TryParse(role,                 out _, out var error9),  Is.False);
+                Assert.That(error9,                                                                Does.Contain("'importer'"));
+                Assert.That(RoamingNetwork.TryParse(otherManufacturer,    out _, out var error10), Is.False);
+                Assert.That(error10,                                                               Does.Contain("release 'chargy-1.0' of the manufacturer 'Other' is one of the manufacturer 'OpenChargingCloud' already"));
                 Assert.That(RoamingNetwork.TryParse(covered,              out _, out var error5),  Is.True, error5);
             }
 
@@ -260,21 +322,24 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             rn1.TryGetTransparencySoftwareById(Chargy11, out var chargy11);
 
             var rn2      = Apply(rn1,
-                                 RoamingNetworkChange.Add           (NewRelease(chargy20, "2.0")),
+                                 RoamingNetworkChange.Add           (NewRelease(chargy20, "2.0"), OCC),
                                  RoamingNetworkChange.UpdateProperty(cert1,     "compatibleTransparencySoftwareIds", null, new JArray("chargy-1.1", "chargy-2.0")),
-                                 RoamingNetworkChange.UpdateProperty(chargy11!, "vendor",                            null, "Open Charging Cloud"));
+                                 RoamingNetworkChange.UpdateProperty(chargy11!, "supportUntil",                      null, "2027-12-31T23:59:59.000Z"));
 
             rn2.TryGetTransparencySoftwareById(Chargy11, out var changedChargy11);
             rn2.TryGetTransparencySoftwareCertificateById(Cert1, out var changedCert1);
+            rn2.TryGetTransparencySoftwareManufacturerById(OCC, out var manufacturer);
 
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(rn2.TransparencySoftware.Select(release => release.Id.ToString()).Order(),  Is.EqualTo(new[] { "chargy-1.0", "chargy-1.1", "chargy-2.0" }));
-                Assert.That(changedChargy11!.Vendor,                                                    Is.EqualTo("Open Charging Cloud"));
+                Assert.That(rn2.TransparencySoftware.Keys.Select(releaseId => releaseId.ToString()).Order(),  Is.EqualTo(new[] { "chargy-1.0", "chargy-1.1", "chargy-2.0" }));
+                Assert.That(manufacturer!.TransparencySoftware.Select(release => release.Id.ToString()),      Is.EqualTo(new[] { "chargy-1.0", "chargy-1.1", "chargy-2.0" }));
+                Assert.That(changedChargy11!.SupportUntil,                                              Is.EqualTo(DateTimeOffset.Parse("2027-12-31T23:59:59Z")));
                 Assert.That(changedCert1!.Covers(chargy20),                                             Is.True);
-                // Releases and certificates have no timestamps.
-                Assert.That(rn2.ToJSON()["transparencySoftware"]![2]!["created"],                        Is.Null);
+                // Releases and certificates have no timestamps; the manufacturer embedding them changed with them.
+                Assert.That(rn2.ToJSON()["transparencySoftwareManufacturers"]![0]!["transparencySoftware"]![2]!["created"],  Is.Null);
+                Assert.That(manufacturer.LastChangeDate,                                                Is.EqualTo(T0));
 
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(Chargy10)),
                             Throws.ArgumentException.With.Message.Contains("release 'chargy-1.0' of the certificate 'cert-1'"));
@@ -285,6 +350,135 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(changedChargy11, "@id", null, "x")),
                             Throws.ArgumentException.With.Message.Contains("can not be changed"));
 
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(changedChargy11, "vendor", null, "GraphDefined GmbH")),
+                            Throws.ArgumentException.With.Message.Contains("can not be changed"));
+
+                // A release to add needs its manufacturer; its releases are no property of the manufacturer.
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.Add("TransparencySoftware", "chargy-3.0", NewRelease(TransparencySoftware_Id.Parse("chargy-3.0"), "3.0").ToJSON(Embedded: true))),
+                            Throws.ArgumentException.With.Message.Contains("needs its TransparencySoftwareManufacturer"));
+
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(manufacturer, "transparencySoftware", null, new JArray())),
+                            Throws.ArgumentException.With.Message.Contains("can not be changed"));
+
+                // A manufacturer whose release a certificate names can not be removed.
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(OCC)),
+                            Throws.ArgumentException.With.Message.Contains("release 'chargy-1.0' of the certificate 'cert-1'"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_manufacturer_signs_its_releases_itself()
+
+        /// <summary>
+        /// A transparency software manufacturer is a party: the roaming network operator adds and removes it, with its keys
+        /// and without its releases; it changes its own properties and its releases with its own keys, and only it.
+        /// </summary>
+        [Test]
+        public void A_manufacturer_signs_its_releases_itself()
+        {
+
+            var rn1           = NewNetwork();
+            var manufacturer  = TestParties.Party(OCC);
+            var other         = TestParties.Party(Other);
+            var rno           = TestParties.Party(rn1);
+            var chargy20      = TransparencySoftware_Id.Parse("chargy-2.0");
+            var addRelease    = RoamingNetworkChange.Add(NewRelease(chargy20, "2.0"), OCC);
+
+            rn1.TryGetTransparencySoftwareManufacturerById(OCC, out var occ);
+
+            var changeRole    = RoamingNetworkChange.UpdateProperty(occ!, "craRole", null, "manufacturer");
+
+            // Another manufacturer, added by the roaming network operator with its keys: not with releases.
+            var withRelease   = NewManufacturer(Other, NewRelease(TransparencySoftware_Id.Parse("other-1.0"), "1.0")).WithKeys();
+            var withoutKeys   = NewManufacturer(Other);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, manufacturer, addRelease),  out var withNew, out var error1),  Is.True,  error1);
+                Assert.That(withNew!.TryGetTransparencySoftwareById(chargy20, out _),                                         Is.True);
+
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, rno,          addRelease),  out _, out var error2),            Is.False, "a release signed by the roaming network operator");
+                Assert.That(error2,                                                                                            Does.Contain("needs a signature by a signing key of the TransparencySoftwareManufacturer 'OpenChargingCloud'"));
+
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, manufacturer, changeRole),  out _, out var error3),            Is.True,  error3);
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, rno,          changeRole),  out _, out var error4),            Is.False, "its properties signed by the roaming network operator");
+
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Add(withRelease)),
+                            Throws.ArgumentException.With.Message.Contains("must be added without its transparencySoftware"));
+
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Add(withoutKeys)),
+                            Throws.ArgumentException.With.Message.Contains("must be added with its signingKeys"));
+
+                var withOther = Apply(rn1, RoamingNetworkChange.Add(NewManufacturer(Other).WithKeys()));
+
+                // Removed by the roaming network operator, with its releases; by itself, not.
+                Assert.That(withOther.TryApplyChangeSet(SignedBy(withOther, other, RoamingNetworkChange.Remove(Other)),  out _, out var error5),  Is.False, "removed by itself");
+                Assert.That(error5,                                                                                            Does.Contain("roaming network operator"));
+                Assert.That(withOther.TryApplyChangeSet(SignedBy(withOther, rno,   RoamingNetworkChange.Remove(Other)),  out _, out var error8),  Is.True,  error8);
+
+                // A release of one manufacturer, signed by another one.
+                Assert.That(withOther.TryApplyChangeSet(SignedBy(withOther, other, addRelease),  out _, out var error6),     Is.False, "a release of another manufacturer");
+                Assert.That(withOther.TryApplyChangeSet(SignedBy(withOther, other, RoamingNetworkChange.UpdateProperty(NewRelease(Chargy11, "1.1"), "supportUntil", null, "2027-12-31T23:59:59.000Z")),
+                                                        out _, out var error7),                                               Is.False, "a release of another manufacturer");
+
+            }
+
+        }
+
+        #endregion
+
+        #region Releases_need_a_key_that_may_sign_software()
+
+        /// <summary>
+        /// A signing key naming usages signs only what they name: releases are "software".
+        /// </summary>
+        [Test]
+        public void Releases_need_a_key_that_may_sign_software()
+        {
+
+            var (partyKey,    partyPublic)     = TestParties.Key(new POIPartyId(nameof(TransparencySoftwareManufacturer), "OpenChargingCloud/party"));
+            var (softwareKey, softwarePublic)  = TestParties.Key(new POIPartyId(nameof(TransparencySoftwareManufacturer), "OpenChargingCloud/software"));
+
+            var json = NewNetwork().ToJSON();
+            json["transparencySoftwareManufacturers"]![0]!["signingKeys"] = new JArray(POIPublicKey.From(partyKey,    Usages: [ POIKeyUsages.Party    ]).ToJSON(Embedded: true),
+                                                                                         POIPublicKey.From(softwareKey, Usages: [ POIKeyUsages.Software ]).ToJSON(Embedded: true));
+
+            Assert.That(RoamingNetwork.TryParse(json, out var rn1, out var error),  Is.True, error);
+
+            var addRelease  = RoamingNetworkChange.Add(NewRelease(TransparencySoftware_Id.Parse("chargy-2.0"), "2.0"), OCC);
+            var byParty     = rn1!.CreateChangeSet([ addRelease ], CreatedAt: T0).Sign(partyKey,    POIPublicKey.From(partyKey).Id,    COSEAlgorithm.ES256);
+            var bySoftware  = rn1. CreateChangeSet([ addRelease ], CreatedAt: T0).Sign(softwareKey, POIPublicKey.From(softwareKey).Id, COSEAlgorithm.ES256);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(rn1.TryApplyChangeSet(byParty,    out _, out var error1),  Is.False, "a release by the key of the party");
+                Assert.That(error1,                                                     Does.Contain("that may sign 'software'"));
+                Assert.That(rn1.TryApplyChangeSet(bySoftware, out _, out var error2),  Is.True,  error2);
+            }
+
+        }
+
+        #endregion
+
+        #region Manufacturers_have_a_runtime_status()
+
+        [Test]
+        public void Manufacturers_have_a_runtime_status()
+        {
+
+            var history = RoamingNetworkHistory.Start(NewNetwork());
+
+            var result  = history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(TransparencySoftwareManufacturer), "OpenChargingCloud", "outOfService", T0, out _, out var error);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result,                                                                         Is.EqualTo(POIStatusUpdateResult.Updated), error);
+                Assert.That(history.RuntimeStatus.All.Single(status => status.EntityType == nameof(TransparencySoftwareManufacturer) &&
+                                                                       status.Kind       == POIRuntimeStatusKind.AdminStatus).Value,  Is.EqualTo("outOfService"));
             }
 
         }

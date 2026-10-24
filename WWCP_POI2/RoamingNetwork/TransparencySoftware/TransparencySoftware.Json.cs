@@ -51,8 +51,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (CustomTransparencySoftwareParser is null)
                     StrictJSON.OnlyProperties(JSON, PropertyKeys.Id, PropertyKeys.Context, PropertyKeys.Name, PropertyKeys.Version,
-                                                    PropertyKeys.OpenSourceLicenses, PropertyKeys.Vendor, PropertyKeys.Logo,
-                                                    PropertyKeys.HowToUse, PropertyKeys.MoreInformation, PropertyKeys.SourceCodeRepository);
+                                                    PropertyKeys.OpenSourceLicenses, PropertyKeys.Logo,
+                                                    PropertyKeys.HowToUse, PropertyKeys.MoreInformation, PropertyKeys.SourceCodeRepository,
+                                                    PropertyKeys.SupportUntil, PropertyKeys.DeclarationOfConformity, PropertyKeys.SoftwareBillOfMaterials);
 
                 if (JSON[PropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
@@ -65,11 +66,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                Name:                  StrictJSON.RequiredName(JSON, PropertyKeys.Name),
                                                Version:               TransparencySoftwareVersion.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.Version)),
                                                OpenSourceLicenses:    TransparencyJSON.Licenses(JSON, PropertyKeys.OpenSourceLicenses),
-                                               Vendor:                StrictJSON.RequiredText(JSON, PropertyKeys.Vendor),
                                                Logo:                  StrictJSON.Link(JSON, PropertyKeys.Logo),
                                                HowToUse:              StrictJSON.Link(JSON, PropertyKeys.HowToUse),
                                                MoreInformation:       StrictJSON.Link(JSON, PropertyKeys.MoreInformation),
-                                               SourceCodeRepository:  StrictJSON.Link(JSON, PropertyKeys.SourceCodeRepository)
+                                               SourceCodeRepository:     StrictJSON.Link(JSON, PropertyKeys.SourceCodeRepository),
+                                               SupportUntil:             StrictJSON.Date(JSON, PropertyKeys.SupportUntil),
+                                               DeclarationOfConformity:  StrictJSON.Link(JSON, PropertyKeys.DeclarationOfConformity),
+                                               SoftwareBillOfMaterials:  StrictJSON.Link(JSON, PropertyKeys.SoftwareBillOfMaterials)
                                            );
 
                 TransparencySoftware = CustomTransparencySoftwareParser is null

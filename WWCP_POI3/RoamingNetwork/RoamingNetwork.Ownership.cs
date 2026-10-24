@@ -187,10 +187,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// a signing key for data and for the signing keys of a party, an identity key for its identity keys.
     /// <list type="bullet">
     ///   <item>The roaming network operator (the RoamingNetworkOperator it embeds) owns itself, the roaming network itself,
-    ///         manufacturers, energy meter manufacturers and transparency software, and adds and removes parties:
+    ///         manufacturers, energy meter manufacturers and transparency software certificates, and adds and removes parties:
     ///         it decides who is a member, so removing a party removes all its data with it, without its signature.</item>
-    ///   <item>A charging station operator, e-mobility provider, grid operator or parking operator owns its own properties,
-    ///         a charging station operator its brands, pools, stations, EVSEs, tariffs and groups, a parking operator its parking data.
+    ///   <item>A charging station operator, e-mobility provider, grid operator, parking operator or transparency software
+    ///         manufacturer owns its own properties, a charging station operator its brands, pools, stations, EVSEs, tariffs
+    ///         and groups, a parking operator its parking data, a transparency software manufacturer its releases.
     ///         Brands are embedded in what they are a brand of, and so owned by its owner.</item>
     ///   <item>A grid connection point is owned by its maintainer: its grid operator, or the charging station operator or
     ///         parking operator its maintainedBy names. One of them adds it, with the maintainer it names, or its grid operator.
@@ -217,7 +218,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             nameof(ChargingStationOperator),
             nameof(EMobilityProvider),
             nameof(GridOperator),
-            nameof(ParkingOperator)
+            nameof(ParkingOperator),
+            nameof(TransparencySoftwareManufacturer)
         ];
 
         /// <summary>
@@ -250,7 +252,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  ParkingOperator.PropertyKeys.ParkingSensors,
                                                  ParkingOperator.PropertyKeys.ParkingSpaceTemplates,
                                                  ParkingOperator.PropertyKeys.ParkingSpaceGroups,
-                                                 ParkingOperator.PropertyKeys.ParkingProducts ] }
+                                                 ParkingOperator.PropertyKeys.ParkingProducts ] },
+            { nameof(TransparencySoftwareManufacturer),
+                                               [ TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware ] }
         };
 
         #endregion
@@ -287,6 +291,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 nameof(ParkingOperator)          => ParkingOperator_Id.TryParse(PartyId.EntityId, out var parkingOperatorId) &&
                                                     parkingOperators.TryGet(parkingOperatorId, out var parkingOperator)
                                                         ? parkingOperator : null,
+
+                nameof(TransparencySoftwareManufacturer)
+                                                 => TransparencySoftwareManufacturer_Id.TryParse(PartyId.EntityId, out var softwareManufacturerId) &&
+                                                    transparencySoftwareManufacturers.TryGet(softwareManufacturerId, out var softwareManufacturer)
+                                                        ? softwareManufacturer : null,
 
                 _                                => null
 
@@ -346,6 +355,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 foreach (var parkingOperator in parkingOperators)
                     yield return (new POIPartyId(nameof(ParkingOperator),         parkingOperator.        Id.ToString()), parkingOperator);
+
+                foreach (var softwareManufacturer in transparencySoftwareManufacturers)
+                    yield return (new POIPartyId(nameof(TransparencySoftwareManufacturer), softwareManufacturer.Id.ToString()), softwareManufacturer);
 
             }
         }
@@ -954,11 +966,52 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (Change.EntityType is nameof(ChargingStationManufacturer)
                                   or nameof(EnergyMeterManufacturer)
-                                  or nameof(TransparencySoftware)
                                   or nameof(TransparencySoftwareCertificate))
             {
                 Owners = [ (roamingNetworkOperator, POIKeyKind.Signing) ];
                 return true;
+            }
+
+            #endregion
+
+            #region The transparency software releases of a transparency software manufacturer: added to it, or found in it
+
+            if (Change.EntityType == nameof(TransparencySoftware))
+            {
+
+                if (!TransparencySoftware_Id.TryParse(Change.EntityId, out var releaseId))
+                {
+                    ErrorResponse = $"invalid {Change.EntityType} identification '{Change.EntityId}'!";
+                    return false;
+                }
+
+                POIPartyId? softwareManufacturer = null;
+
+                if (Change.Kind == RoamingNetworkChangeKind.Add)
+                {
+
+                    if (Change.ParentEntityType != nameof(TransparencySoftwareManufacturer) || Change.ParentEntityId is null)
+                    {
+                        ErrorResponse = $"adding the {Change.EntityType} '{Change.EntityId}' needs its TransparencySoftwareManufacturer as its parent!";
+                        return false;
+                    }
+
+                    softwareManufacturer = PartyIdOf(new POIPartyId(Change.ParentEntityType, Change.ParentEntityId));
+
+                }
+
+                else if (TransparencySoftwareManufacturerOf(releaseId) is TransparencySoftwareManufacturer owner)
+                    softwareManufacturer = PartyIdOf(new POIPartyId(nameof(TransparencySoftwareManufacturer), owner.Id.ToString()));
+
+                if (softwareManufacturer is null)
+                {
+                    ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' is unknown!";
+                    return false;
+                }
+
+                Owners = [ SignerOf(softwareManufacturer.Value) ];
+                return true;
+
             }
 
             #endregion

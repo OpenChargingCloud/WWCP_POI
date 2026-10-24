@@ -229,14 +229,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  EnergyMeterManufacturerIds          = "energyMeterManufacturerIds";
 
             /// <summary>
-            /// The property of its transparency software releases.
+            /// The property of its transparency software manufacturers, with their releases.
             /// </summary>
-            public const String  TransparencySoftware                = "transparencySoftware";
+            public const String  TransparencySoftwareManufacturers   = "transparencySoftwareManufacturers";
 
             /// <summary>
-            /// The property of the identifications of its transparency software releases.
+            /// The property of the identifications of its transparency software manufacturers.
             /// </summary>
-            public const String  TransparencySoftwareIds             = "transparencySoftwareIds";
+            public const String  TransparencySoftwareManufacturerIds = "transparencySoftwareManufacturerIds";
 
             /// <summary>
             /// The property of its transparency software certificates.
@@ -333,7 +333,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               IEnumerable<EMobilityProvider>?                EMobilityProviders                 = null,
                               IEnumerable<GridOperator>?                     GridOperators                      = null,
                               IEnumerable<ParkingOperator>?                  ParkingOperators                   = null,
-                              IEnumerable<TransparencySoftware>?             TransparencySoftware               = null,
+                              IEnumerable<TransparencySoftwareManufacturer>? TransparencySoftwareManufacturers  = null,
                               IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates   = null,
                               IEnumerable<EnergyMeterManufacturer>?          EnergyMeterManufacturers           = null,
                               RoamingNetworkOperator?                        Operator                           = null,
@@ -441,19 +441,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException(providerGroupError, nameof(EMobilityProviders));
             }
 
-            this.transparencySoftware = new (TransparencySoftware, entity => entity.Id, "transparency software release");
+            this.transparencySoftwareManufacturers = new (TransparencySoftwareManufacturers, entity => entity.Id, "transparency software manufacturer");
+
+            // Releases are embedded in their manufacturers, and unique within the network: energy meters and certificates
+            // name them by their identifications alone.
+            if (DuplicateTransparencySoftware(transparencySoftwareManufacturers) is String duplicateRelease)
+                throw new ArgumentException(duplicateRelease, nameof(TransparencySoftwareManufacturers));
+
+            this.transparencySoftware = TransparencySoftwareOf(transparencySoftwareManufacturers);
 
             this.transparencySoftwareCertificates = new (TransparencySoftwareCertificates, entity => entity.Id, "transparency software certificate");
 
             // Certificates name releases and manufacturers of this network; energy meters name releases and certificates.
-            if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators, gridOperators), transparencySoftware.Index, transparencySoftwareCertificates.Index, chargingStationManufacturers.Index) is String transparencyError)
-                throw new ArgumentException(transparencyError, nameof(TransparencySoftware));
+            if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators, gridOperators), transparencySoftware, transparencySoftwareCertificates.Index, chargingStationManufacturers.Index) is String transparencyError)
+                throw new ArgumentException(transparencyError, nameof(TransparencySoftwareManufacturers));
 
             // Energy meter templates and groups are unique within the network; templates name manufacturers, releases and
             // certificates of it.
             if ((DuplicateEnergyMeterGroup          (AllEnergyMeterGroups   (chargingStationOperators, gridOperators)) ??
                  DuplicateEnergyMeterTemplate       (AllEnergyMeterTemplates(chargingStationOperators, gridOperators)) ??
-                 UnknownEnergyMeterTemplateReference(AllEnergyMeterTemplates(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware.Index, transparencySoftwareCertificates.Index)) is String energyMeterGroupError)
+                 UnknownEnergyMeterTemplateReference(AllEnergyMeterTemplates(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware, transparencySoftwareCertificates.Index)) is String energyMeterGroupError)
             {
                 throw new ArgumentException(energyMeterGroupError, nameof(ChargingStationOperators));
             }
@@ -820,12 +827,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                  out var parkingOperators,
                                                                  out ErrorResponse) ||
 
-                    !POIJSON.TryParseChildren<TransparencySoftware>(JSON,
-                                                                 PropertyKeys.TransparencySoftware,
-                                                                 PropertyKeys.TransparencySoftwareIds,
-                                                                 "transparency software releases",
-                                                                 POI.TransparencySoftware.TryParse,
-                                                                 out var transparencySoftware,
+                    !POIJSON.TryParseChildren<TransparencySoftwareManufacturer>(JSON,
+                                                                 PropertyKeys.TransparencySoftwareManufacturers,
+                                                                 PropertyKeys.TransparencySoftwareManufacturerIds,
+                                                                 "transparency software manufacturers",
+                                                                 TransparencySoftwareManufacturer.TryParse,
+                                                                 out var transparencySoftwareManufacturers,
                                                                  out ErrorResponse) ||
 
                     !POIJSON.TryParseChildren<TransparencySoftwareCertificate>(JSON,
@@ -909,7 +916,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      EMobilityProviders:                 eMobilityProviders,
                                      GridOperators:                      gridOperators,
                                      ParkingOperators:                   parkingOperators,
-                                     TransparencySoftware:               transparencySoftware,
+                                     TransparencySoftwareManufacturers:  transparencySoftwareManufacturers,
                                      TransparencySoftwareCertificates:   transparencySoftwareCertificates,
                                      EnergyMeterManufacturers:           energyMeterManufacturers,
                                      Operator:                           roamingNetworkOperator,
@@ -1178,8 +1185,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (IncludeChildArrays && !energyMeterManufacturers.IsEmpty)
                 json.Add(PropertyKeys.EnergyMeterManufacturers,          new JArray(energyMeterManufacturers.Select(energyMeterManufacturer => energyMeterManufacturer.ToJSON(Embedded: true))));
 
-            if (IncludeChildArrays && !transparencySoftware.IsEmpty)
-                json.Add(PropertyKeys.TransparencySoftware,              new JArray(transparencySoftware.Select(release => release.ToJSON(Embedded: true))));
+            if (IncludeChildArrays && !transparencySoftwareManufacturers.IsEmpty)
+                json.Add(PropertyKeys.TransparencySoftwareManufacturers, new JArray(transparencySoftwareManufacturers.Select(manufacturer => manufacturer.ToJSON(Embedded: true))));
 
             if (IncludeChildArrays && !transparencySoftwareCertificates.IsEmpty)
                 json.Add(PropertyKeys.TransparencySoftwareCertificates,  new JArray(transparencySoftwareCertificates.Select(certificate => certificate.ToJSON(Embedded: true))));
@@ -1433,12 +1440,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                        out var parkingOperators,
                                                                        out ErrorResponse) ||
 
-                    !TryParseCBORChildren<TransparencySoftware>       (CBOR,
-                                                                       PropertyKeys.TransparencySoftware,
-                                                                       PropertyKeys.TransparencySoftwareIds,
-                                                                       "transparency software releases",
-                                                                       POI.TransparencySoftware.TryParse,
-                                                                       out var transparencySoftware,
+                    !TryParseCBORChildren<TransparencySoftwareManufacturer>(CBOR,
+                                                                       PropertyKeys.TransparencySoftwareManufacturers,
+                                                                       PropertyKeys.TransparencySoftwareManufacturerIds,
+                                                                       "transparency software manufacturers",
+                                                                       TransparencySoftwareManufacturer.TryParse,
+                                                                       out var transparencySoftwareManufacturers,
                                                                        out ErrorResponse) ||
 
                     !TryParseCBORChildren<TransparencySoftwareCertificate>(CBOR,
@@ -1515,7 +1522,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      EMobilityProviders:        eMobilityProviders,
                                      GridOperators:             gridOperators,
                                      ParkingOperators:          parkingOperators,
-                                     TransparencySoftware:      transparencySoftware,
+                                     TransparencySoftwareManufacturers:  transparencySoftwareManufacturers,
                                      TransparencySoftwareCertificates:  transparencySoftwareCertificates,
                                      EnergyMeterManufacturers:  energyMeterManufacturers,
                                      Operator:                  roamingNetworkOperator,
@@ -1620,12 +1627,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          CBORValue.FromArray(energyMeterManufacturers.
                                                  Select(energyMeterManufacturer => energyMeterManufacturer.ToCBOR(Embedded: true))));
 
-            // Transparency software releases and certificates have no CBOR representation of their own: theirs are the
-            // keys and values of their JSON representation.
-            if (!transparencySoftware.IsEmpty)
-                cbor.Add(CBORValue.FromText(PropertyKeys.TransparencySoftware),
-                         CBORValue.FromArray(transparencySoftware.
-                                                 Select(release => CBORJSON.ToCBOR(release.ToJSON(Embedded: true)))));
+            if (!transparencySoftwareManufacturers.IsEmpty)
+                cbor.Add(CBORValue.FromText(PropertyKeys.TransparencySoftwareManufacturers),
+                         CBORValue.FromArray(transparencySoftwareManufacturers.
+                                                 Select(manufacturer => manufacturer.ToCBOR(Embedded: true))));
+
+            // Transparency software certificates have no CBOR representation of their own: theirs are the keys and values
+            // of their JSON representation.
 
             if (!transparencySoftwareCertificates.IsEmpty)
                 cbor.Add(CBORValue.FromText(PropertyKeys.TransparencySoftwareCertificates),
@@ -2181,16 +2189,80 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region Transparency software releases and certificates
+        #region Transparency software manufacturers, their releases, and certificates
 
-        private readonly POICollection<TransparencySoftware_Id, TransparencySoftware>             transparencySoftware;
-        private readonly POICollection<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  transparencySoftwareCertificates;
+        private readonly POICollection<TransparencySoftwareManufacturer_Id, TransparencySoftwareManufacturer>  transparencySoftwareManufacturers;
+        private readonly IReadOnlyDictionary<TransparencySoftware_Id, TransparencySoftware>                    transparencySoftware;
+        private readonly POICollection<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>    transparencySoftwareCertificates;
 
         /// <summary>
-        /// The transparency software releases in this immutable network version: one per version of a software.
+        /// The transparency software manufacturers in this immutable network version, with their releases.
         /// </summary>
-        public POICollection<TransparencySoftware_Id, TransparencySoftware>             TransparencySoftware
+        public POICollection<TransparencySoftwareManufacturer_Id, TransparencySoftwareManufacturer>  TransparencySoftwareManufacturers
+            => transparencySoftwareManufacturers;
+
+        /// <summary>
+        /// The transparency software releases of all manufacturers in this immutable network version: one per version of a
+        /// software, unique within the network.
+        /// </summary>
+        public IReadOnlyDictionary<TransparencySoftware_Id, TransparencySoftware>                    TransparencySoftware
             => transparencySoftware;
+
+        /// <summary>
+        /// Try to get the transparency software manufacturer having the given identification.
+        /// </summary>
+        public Boolean TryGetTransparencySoftwareManufacturerById(TransparencySoftwareManufacturer_Id                        ManufacturerId,
+                                                                  [NotNullWhen(true)] out TransparencySoftwareManufacturer?  Manufacturer)
+
+            => transparencySoftwareManufacturers.TryGet(ManufacturerId, out Manufacturer);
+
+        /// <summary>
+        /// The manufacturer of the transparency software release having the given identification, if it is one of this network.
+        /// </summary>
+        public TransparencySoftwareManufacturer? TransparencySoftwareManufacturerOf(TransparencySoftware_Id TransparencySoftwareId)
+
+            => TransparencySoftwareManufacturerOf(transparencySoftwareManufacturers, TransparencySoftwareId);
+
+        /// <summary>
+        /// The manufacturer of the given release among the given manufacturers.
+        /// </summary>
+        internal static TransparencySoftwareManufacturer? TransparencySoftwareManufacturerOf(IEnumerable<TransparencySoftwareManufacturer>  Manufacturers,
+                                                                                            TransparencySoftware_Id                        TransparencySoftwareId)
+
+            => Manufacturers.FirstOrDefault(manufacturer => manufacturer.TryGetTransparencySoftware(TransparencySoftwareId, out _));
+
+        /// <summary>
+        /// The releases of the given manufacturers, by their identifications.
+        /// </summary>
+        internal static IReadOnlyDictionary<TransparencySoftware_Id, TransparencySoftware> TransparencySoftwareOf(IEnumerable<TransparencySoftwareManufacturer> Manufacturers)
+        {
+
+            var releases = new Dictionary<TransparencySoftware_Id, TransparencySoftware>();
+
+            foreach (var manufacturer in Manufacturers)
+                foreach (var release in manufacturer.TransparencySoftware)
+                    releases.TryAdd(release.Id, release);
+
+            return releases;
+
+        }
+
+        /// <summary>
+        /// The error, when two of the given manufacturers have a release of the same identification.
+        /// </summary>
+        internal static String? DuplicateTransparencySoftware(IEnumerable<TransparencySoftwareManufacturer> Manufacturers)
+        {
+
+            var seen = new Dictionary<TransparencySoftware_Id, TransparencySoftwareManufacturer_Id>();
+
+            foreach (var manufacturer in Manufacturers)
+                foreach (var release in manufacturer.TransparencySoftware)
+                    if (!seen.TryAdd(release.Id, manufacturer.Id))
+                        return $"The transparency software release '{release.Id}' of the manufacturer '{manufacturer.Id}' is one of the manufacturer '{seen[release.Id]}' already!";
+
+            return null;
+
+        }
 
         /// <summary>
         /// The certificates of transparency software releases in this immutable network version.
@@ -2204,7 +2276,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetTransparencySoftwareById(TransparencySoftware_Id                        TransparencySoftwareId,
                                                       [NotNullWhen(true)] out TransparencySoftware?  TransparencySoftware)
 
-            => transparencySoftware.TryGet(TransparencySoftwareId, out TransparencySoftware);
+            => transparencySoftware.TryGetValue(TransparencySoftwareId, out TransparencySoftware);
 
         /// <summary>
         /// Try to get the transparency software certificate having the given identification.
